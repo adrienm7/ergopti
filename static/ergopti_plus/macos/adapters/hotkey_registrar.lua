@@ -30,7 +30,7 @@ local M = {}
 
 local hs     = hs
 local Chord  = require("keyboard.engine.chord")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "adapters.hotkey_registrar"

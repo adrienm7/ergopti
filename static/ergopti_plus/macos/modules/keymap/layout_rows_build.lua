@@ -27,7 +27,7 @@
 ---    replays the whole sequence and the field run reuses it with its own record.
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Rows = require("layouts.engine.composer.keylayout_rows")
 
 local M = {}

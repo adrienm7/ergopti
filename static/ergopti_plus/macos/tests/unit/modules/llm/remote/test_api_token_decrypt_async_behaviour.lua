@@ -14,7 +14,7 @@ local function with_crypto_fixture(options, body)
 	options = options or {}
 	local names = {
 		"modules.llm.api_token_crypto", "adapters.shell_runner",
-		"core.events.timer_scheduler", "infra.timings", "infra.logger",
+		"core.events.timer_scheduler", "infra.timings", "core.logger.engine.logger",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -36,7 +36,7 @@ local function with_crypto_fixture(options, body)
 		args = nil,
 		errors = {},
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
@@ -680,7 +680,7 @@ end)
 helpers.describe("API menu metadata path", function()
 	helpers.it("builds before token resolution without starting any shell work", function()
 		local names = {
-			"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 			"menu.engine.renderer", "core.fs.adapters.json_codec",
 		}
@@ -713,7 +713,7 @@ helpers.describe("API menu metadata path", function()
 				},
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.logger"] = { error = function() end }
+			package.loaded["core.logger.engine.logger"] = { error = function() end }
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["infra.notifications"] = {}
 			package.loaded["infra.manifest_menu"] = {

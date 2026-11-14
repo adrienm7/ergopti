@@ -12,13 +12,13 @@ local function check(actual, expected)
 end
 local function scenario(options, run)
 	local saved_fs, saved_adapter, saved_logger, saved_hs = package.loaded["core.fs.adapters.file_system"],
-		package.loaded["adapters.managed_ollama_pull"], package.loaded["infra.logger"], _G.hs
+		package.loaded["adapters.managed_ollama_pull"], package.loaded["core.logger.engine.logger"], _G.hs
 	local present, inode, raw, removals, releases = true, 2, "", 0, 0
 	local physical = options.physical == true
 	local marker = physical
 	if options.receipt_flag == false then marker = false end
 	local receipt = { removed = marker }
-	package.loaded["infra.logger"] = { error = function() end }
+	package.loaded["core.logger.engine.logger"] = { error = function() end }
 	package.loaded["adapters.managed_ollama_pull"] = nil
 	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function() return true end,
@@ -74,7 +74,7 @@ local function scenario(options, run)
 	}
 	local ok, failure = xpcall(function() run(f) end, debug.traceback)
 	package.loaded["core.fs.adapters.file_system"], package.loaded["adapters.managed_ollama_pull"],
-		package.loaded["infra.logger"], _G.hs = saved_fs, saved_adapter, saved_logger, saved_hs
+		package.loaded["core.logger.engine.logger"], _G.hs = saved_fs, saved_adapter, saved_logger, saved_hs
 	if not ok then error(failure, 0) end
 	cases = cases + 1
 end

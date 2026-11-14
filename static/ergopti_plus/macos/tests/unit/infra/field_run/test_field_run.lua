@@ -28,7 +28,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
-local MODULES = { "infra.logger", "infra.field_run", "core.lifecycle.engine.shutdown.termination_coordinator", "core.lifecycle.engine.shutdown.emergency_exit" }
+local MODULES = { "core.logger.engine.logger", "infra.field_run", "core.lifecycle.engine.shutdown.termination_coordinator", "core.lifecycle.engine.shutdown.emergency_exit" }
 local FOLDER = "/repo/build/field-run"
 
 local function read(path)
@@ -42,7 +42,7 @@ local SPEC_TEXT = read(helpers.driver_root() .. "data/field_run.json")
 
 --- Loads a fresh engine with a silent logger and returns it.
 local function engine()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.field_run"] = nil
 	return require("infra.field_run")
 end
@@ -718,7 +718,7 @@ helpers.describe("field run: a run", function()
 			-- (field run 2026-10-27 16:53:45: the Ollama pull failed on a digest
 			-- mismatch a minute after the timeout). That answer is expected and is
 			-- the only record of what happened: INFO with its verdict, not a warning.
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local warnings, infos = {}, {}
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.info = function(_, fmt, ...) infos[#infos + 1] = string.format(fmt, ...) end
@@ -742,7 +742,7 @@ helpers.describe("field run: a run", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local warnings = {}
-			package.loaded["infra.logger"].warn = function(_, fmt, ...)
+			package.loaded["core.logger.engine.logger"].warn = function(_, fmt, ...)
 				warnings[#warnings + 1] = string.format(fmt, ...)
 			end
 			local state = world({ field_network = function(_, finish)
@@ -1097,10 +1097,10 @@ end)
 
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
 			local files = { ["/cfg/config.toml"] = "a = 1\n" }
 			local settings = { llm_backend = "ollama", keep = true }
@@ -1155,10 +1155,10 @@ end)
 
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
 			"infra.config_paths", "adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
@@ -1200,12 +1200,12 @@ helpers.describe("field run ports: the MLX model step", function()
 	--- @param write_ok boolean|nil False makes putting the file back fail.
 	--- @return table outcome { verdict, codes, files }
 	local function run_mlx_model(initial, write_ok)
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "infra.config_paths",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "infra.config_paths",
 			"adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run",
 			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
 		local outcome = {}
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local active = "/cfg/mlx_active_model.txt"
 			local files = { [active] = initial, ["/shared/models.json"] = "{}" }
 			package.loaded["infra.config_paths"] = { get = function(key)
@@ -1284,11 +1284,11 @@ end)
 
 helpers.describe("field run ports: Ollama model step", function()
 	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "adapters.shell_runner",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "adapters.shell_runner",
 			"core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run", "modules.llm.ollama_binary",
 			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
 			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
 			local timers = 0

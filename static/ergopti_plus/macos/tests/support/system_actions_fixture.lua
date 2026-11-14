@@ -30,14 +30,14 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-		"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
+		"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "infra.notifications",
 		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 		"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
 		"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
 		"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.gestures"] = {}
 		return callback()
 	end)
@@ -124,7 +124,7 @@ local function load_capslock_fixture(toggle_impl)
 	logger.error = function(_, format, ...)
 		logs.error[#logs.error + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local raw_key_attempts = 0
 	package.loaded["adapters.synthetic_input"] = {
@@ -331,7 +331,7 @@ local function load_h01_system(options)
 	refresh_native_consumers()
 	package.loaded["adapters.key_state"] = nil
 	package.loaded["infra.notifications"] = nil
-	local previous_logger = package.loaded["infra.logger"]
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
@@ -339,13 +339,13 @@ local function load_h01_system(options)
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
-	if options.logger then package.loaded["infra.logger"] = options.logger end
+	if options.logger then package.loaded["core.logger.engine.logger"] = options.logger end
 	if options.text_actions then
 		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
 	end
 	local system, synthetic = SyntheticInputStack.load(
 		"modules.shortcuts.actions.system", options.hs_overrides)
-	if options.logger then package.loaded["infra.logger"] = previous_logger end
+	if options.logger then package.loaded["core.logger.engine.logger"] = previous_logger end
 	return { system = system, synthetic = synthetic, hs = _G.hs }
 end
 

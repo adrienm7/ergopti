@@ -56,9 +56,9 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	end)
 
 	helpers.it("skips an unidentifiable foreign folder instead of rebuilding it forever", function()
-		helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 			local ledger_opens, sql_calls, rebuilds, device_rows = 0, 0, 0, 0
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 			local export = helpers.load_with_stubs("modules.keystats.export", {
 				fs = { attributes = function() return { size = 100 } end },
@@ -177,7 +177,7 @@ helpers.describe("keystats-device-log-privacy", function()
 	for _, phase in ipairs({ "clear", "replay" }) do
 		helpers.it("keystats-device-log-privacy: " .. phase .. " refusal keeps its error without logging the device prefix", function()
 			helpers.with_stub_scope({
-				"infra.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
+				"core.logger.engine.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
 				"metrics.engine.metrics", "core.fs.adapters.file_system", "core.events.timer_scheduler",
 			}, function()
@@ -185,7 +185,7 @@ helpers.describe("keystats-device-log-privacy", function()
 				local identity = "private-foreign-device"
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
-				package.loaded["infra.logger"] = logger
+				package.loaded["core.logger.engine.logger"] = logger
 				local db = {}
 				function db:exec(sql)
 					queries[#queries + 1] = sql

@@ -71,7 +71,7 @@ end
 --- @param body function Receives build() and the observation table.
 local function with_menu(body)
 	return helpers.with_stub_scope({ "ui.menu.menu_tap_holds", "infra.manifest_menu",
-		"core.i18n.engine.i18n", "infra.logger", "ui.menu.menu_utils" }, function()
+		"core.i18n.engine.i18n", "core.logger.engine.logger", "ui.menu.menu_utils" }, function()
 		local menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", {})
 		local i18n = require("core.i18n.engine.i18n")
 		local original_get = i18n.get

@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.file_system_transaction_fixture").with_fixture
-local OWNERS = { "hs", "core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger" }
+local OWNERS = { "hs", "core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger" }
 
 local function with_observer(callback)
 	helpers.with_stub_scope(OWNERS, function()

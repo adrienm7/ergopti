@@ -14,7 +14,7 @@ local function with_window(test)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local state = { callbacks = {}, views = {}, options = {}, writes = 0, errors = {} }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end,
 			error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)

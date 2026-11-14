@@ -52,7 +52,7 @@ hs.sqlite3.open=sqlite_open
 for _,name in ipairs({'fs','timer','json','sqlite3'}) do package.loaded['hs.'..name]=hs[name] end
 local errors,logger={},Helpers.make_logger_stub()
 logger.error=function(_,fmt,...) errors[#errors+1]=string.format(fmt,...) end
-package.loaded['infra.logger']=logger
+package.loaded['core.logger.engine.logger']=logger
 package.loaded['modules.keystats.export']={sync_foreign_data_sql=function()return{}end, get_native_app_category=function() return nil end}
 -- This proof isolates raw-row ingest. SQL outbox publication writes real Lua bytes
 -- and acknowledges its actual cache clear, but does not qualify LedgerAppend recovery.

@@ -184,8 +184,8 @@ helpers.describe("recurring native timer single owner", function()
 		helpers.assert_eq(#owners, 1,
 			"only the runtime callback wrapper may reference doEvery directly; got "
 				.. table.concat(owners, ", "))
-		helpers.assert_true(owners[1]:match("/infra/logger%.lua$") ~= nil,
-			"the sole direct doEvery owner must be infra.logger, got " .. tostring(owners[1]))
+		helpers.assert_true(owners[1]:match("/core/logger/engine/logger%.lua$") ~= nil,
+			"the sole direct doEvery owner must be core.logger.engine.logger, got " .. tostring(owners[1]))
 	end)
 
 	helpers.it("inventories every explicit repeating timer.new acquisition", function()

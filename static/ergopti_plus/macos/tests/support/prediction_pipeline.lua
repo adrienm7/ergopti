@@ -48,7 +48,7 @@ local function load_fixture(options)
 		path = function() return "/Applications/Fixture.app" end,
 		pid = function() return 42 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = {
 			frontmostApplication = function() return front_app end,
 		},
@@ -74,7 +74,7 @@ local function load_fixture(options)
 			if options.on_log then options.on_log(fixture, record) end
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local defaults = make_defaults()
 	-- The engine reads its enable switch from these defaults when it loads.

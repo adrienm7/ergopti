@@ -18,7 +18,7 @@ local function load_bridge(scheduler, pathwatcher)
 	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("modules.keystats.kc_bridge", {
 		pathwatcher = pathwatcher,
 		keycodes = { map = {} },
@@ -188,7 +188,7 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 		package.loaded["modules.keystats.kc_bridge"] = {
 			init = function() return false end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.timings"] = {
 			ms = function() return 1 end,
 			sec = function() return 1 end,

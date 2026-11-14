@@ -102,7 +102,7 @@ function M.start(record)
 		vpn = function()
 			return M.vpn_status("/sys/class/net", function(path) return NativeDirectory.entries(path) end, read)
 		end,
-		now_ms = function() return require("infra.monotonic").now_ms() end,
+		now_ms = function() return require("core.logger.engine.monotonic").now_ms() end,
 	})
 	Logger.info(LOG, "Connectivity transitions are recorded.")
 	return sampler

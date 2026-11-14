@@ -14,7 +14,7 @@ local function with_presentation(mode, is_new, scenario)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local state = { current = true, active = false, minimized = true, effects = {}, errors = {}, pending = {} }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end,
 			error = function(_, text) state.errors[#state.errors + 1] = text end,
 		}

@@ -22,9 +22,9 @@ local POSIX_CONFIG = "/\n;\n?\n!\n-\n"
 local function on_posix(existing, scenario)
 	local saved_config, saved_hs = package.config, rawget(_G, "hs")
 	local ok, failure = xpcall(function()
-		helpers.with_fresh_modules({ "core.fs.engine.paths", "infra.logger" }, function()
+		helpers.with_fresh_modules({ "core.fs.engine.paths", "core.logger.engine.logger" }, function()
 			package.config = POSIX_CONFIG
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local probed = {}
 			_G.hs = { fs = { attributes = function(path)
 				probed[#probed + 1] = path

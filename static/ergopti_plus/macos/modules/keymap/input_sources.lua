@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local hs      = hs
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")

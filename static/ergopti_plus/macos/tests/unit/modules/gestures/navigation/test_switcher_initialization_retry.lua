@@ -12,9 +12,9 @@ helpers.describe("native switcher initialization", function()
 	helpers.it("retries the facade after the input owner was initialized", function()
 		helpers.with_fresh_modules({ "modules.gestures.native_app_switcher_action",
 			"modules.gestures.native_app_switcher", "adapters.synthetic_input",
-			"adapters.system_switcher_runtime", "infra.timings", "infra.logger" }, function()
+			"adapters.system_switcher_runtime", "infra.timings", "core.logger.engine.logger" }, function()
 			local input_calls, facade_calls = 0, 0
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.timings"] = { sec = function() return 1 end }
 			package.loaded["adapters.system_switcher_runtime"] = { descriptor = function() return {} end }
 			package.loaded["adapters.synthetic_input"] = { init_system_switcher = function()

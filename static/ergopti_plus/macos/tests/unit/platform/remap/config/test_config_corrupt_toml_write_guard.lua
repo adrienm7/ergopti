@@ -26,7 +26,7 @@ local helpers = require("tests.helpers")
 
 local FileSystem = require("core.fs.adapters.file_system")
 local Config = helpers.load_with_stubs("platform.remap.config")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 helpers.admit_logger_privacy(Logger)
 -- Unclosed table header plus a bare unquoted value: the shared codec returns a

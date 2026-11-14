@@ -39,7 +39,7 @@ package.loaded["core.i18n.engine.locale"] = {
 }
 
 -- Stub lib.logger (silent no-op).
-package.loaded["infra.logger"] = helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 -- Save original hs.host.locale so we can override it per test.
 local _orig_host_locale = hs.host.locale
@@ -359,7 +359,7 @@ helpers.describe("i18n: init()", function()
 	helpers.it("warns about a saved locale without a catalogue (i18n-unknown-saved)", function()
 		hs.settings.set("ergopti.i18n_locale", "xx")
 		set_system_locale("de_DE")
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local warn, warnings = logger.warn, {}
 		logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 		local ok, detail = pcall(function()
@@ -415,7 +415,7 @@ helpers.describe("i18n: get()", function()
 
 	helpers.it("warns once per raw key shown, never for a probe (i18n-miss-warned)", function()
 		local stub_locale, stub_core = package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"]
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local warn, warnings = logger.warn, {}
 		logger.warn = function(_, message, key) warnings[#warnings + 1] = message:gsub("%%s", key or "") end
 		package.loaded["core.i18n.engine.locale"] = nil

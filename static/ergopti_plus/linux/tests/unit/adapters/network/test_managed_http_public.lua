@@ -169,13 +169,13 @@ end
 local function fresh_client(config)
  config = config or {}
  local fake, state = fake_luv(config)
- local names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" }
+ local names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline", "core.fs.engine.paths" }
  local saved = {}
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, client = pcall(function()
   for _, name in ipairs(names) do package.loaded[name] = nil end
  package.loaded.luv = fake
- package.loaded["infra.monotonic"] = { now_ms = function() return state.time end }
+ package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return state.time end }
  local policy_module = helpers.fresh_module("core.network.engine.proxy_policy_core")
  local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
  local data = Json.decode(file:read("*a")); file:close()

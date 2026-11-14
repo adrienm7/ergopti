@@ -13,8 +13,8 @@ local Json = require("core.text.engine.json")
 
 helpers.describe("trigger ROI SQLite events", function()
 	helpers.it("routes each ROI event with the exact Windows metadata fields", function()
-		helpers.with_stub_scope({ "modules.keystats.sqlite_writer", "infra.logger", "hs.json" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "modules.keystats.sqlite_writer", "core.logger.engine.logger", "hs.json" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 			local json = require("hs.json")
 			local original_encode = json.encode

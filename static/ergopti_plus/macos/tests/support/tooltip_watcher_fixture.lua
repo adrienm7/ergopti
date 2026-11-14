@@ -119,11 +119,11 @@ local function with_fixture(callback)
 		"core.events.timer_scheduler",
 		"core.fs.adapters.storage",
 		"infra.hotpath_profiler",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}, function()
 		local restore_context = function() end
 		local outcome = table.pack(xpcall(function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- Facade-only cases also need fresh native capabilities before importing Config.
 			helpers.load_with_stubs("hs")
 			--- Loads one real tooltip module with observable renderer and eventtap ports.

@@ -27,7 +27,7 @@ local function choose(parameter, clicked, refusal, picked)
 	local names = {
 		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
-		"infra.logger", "infra.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
+		"core.logger.engine.logger", "infra.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
@@ -100,7 +100,7 @@ local function choose(parameter, clicked, refusal, picked)
 		end,
 	}
 	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
 	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
 	package.loaded["adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
@@ -174,7 +174,7 @@ end)
 -- Exercise the real status provider and renderer; status probes and platform
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
-	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "infra.logger",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
 	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
 }
@@ -213,7 +213,7 @@ local function with_status_refresh(options, callback)
 		}
 		package.loaded["modules.gestures"] = fixture.gestures
 		package.loaded["core.i18n.engine.i18n"] = i18n
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.menu_utils"] = { section = function(title) return { title = title } end }
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["ui.action_picker"] = {}

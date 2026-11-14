@@ -66,7 +66,7 @@ local function load_keystats(options)
 		local ok, rendered = pcall(string.format, fmt, ...)
 		ctx.errors[#ctx.errors + 1] = ok and rendered or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
 	}

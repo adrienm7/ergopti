@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local function with_fixture(callback)
 	local names = { "adapters.tooltip_renderer", "ui.tooltip", "ui.tooltip.init",
 		"ui.tooltip.config", "ui.tooltip.renderer", "ui.tooltip.tooltip_llm",
-		"ui.tooltip.tooltip_hotstring", "infra.logger" }
+		"ui.tooltip.tooltip_hotstring", "core.logger.engine.logger" }
 	helpers.with_fresh_modules(names, function()
 		for _, name in ipairs(names) do package.loaded[name] = nil end
 		local state = { visible = false, paints = 0, on_paint = nil, errors = 0, on_error = nil }
@@ -33,7 +33,7 @@ local function with_fixture(callback)
 			state.errors = state.errors + 1
 			if state.on_error then state.on_error() end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["ui.tooltip.config"] = {}
 		package.loaded["ui.tooltip.renderer"] = {}
 		package.loaded["ui.tooltip.tooltip_llm"] = {

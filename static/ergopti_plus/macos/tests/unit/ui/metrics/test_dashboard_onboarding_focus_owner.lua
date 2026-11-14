@@ -236,7 +236,7 @@ end)
 -- A failed factory returns diagnostics, never a caller-owned native window.
 local function onboarding_factory_error_observer()
 	local errors = {}
-	package.loaded["infra.logger"].error = function(_, message, ...)
+	package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 		errors[#errors + 1] = string.format(message, ...)
 	end
 	return errors

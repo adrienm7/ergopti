@@ -22,7 +22,7 @@ local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 local Calendar = require("modules.keystats.calendar")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local native_capture = Calendar.capture
 local fixtures = {
 	{ name = "25-hour DST end late evening", year = 2026, month = 10, day = 25, hour = 23, min = 30, previous = "2026-10-24" },

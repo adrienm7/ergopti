@@ -251,7 +251,7 @@ helpers.describe("tone rewrite retains its original native destination", functio
 	helpers.it("refuses a throwing final selection guard before HTTP (tone-focus-guard-error)", function()
 		with_world(function(world)
 			local checked, errors = false, {}
-			require("infra.logger").error = function(_, template, ...)
+			require("core.logger.engine.logger").error = function(_, template, ...)
 				errors[#errors + 1] = string.format(template, ...)
 			end
 			helpers.assert_eq(world.engine.request_selection_rewrite("tone_formal", "Hello", function()

@@ -21,7 +21,7 @@ local function with_replacement(mode, scenario)
 		helpers.assert_true(state.b_accepted)
 		helpers.assert_not_nil(predecessor)
 		state.original_b = predecessor
-		require("infra.logger").set_sink(function(line)
+		require("core.logger.engine.logger").set_sink(function(line)
 			if state.replacement_observed or not line:find("MLX server identity changed", 1, true) then return end
 			state.replacement_observed = true
 			if mode == "healthy" then return end

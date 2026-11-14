@@ -21,7 +21,7 @@ local function copy_capture(mode)
 	local notices = {}
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.system_pixel", "adapters.task_lifecycle",
-		"core.fs.adapters.file_system", "infra.notifications", "core.i18n.engine.i18n", "infra.logger",
+		"core.fs.adapters.file_system", "infra.notifications", "core.i18n.engine.i18n", "core.logger.engine.logger",
 		"modules.shortcuts.actions.screen_capture_flow",
 	}, function()
 		local tasks = {}
@@ -46,7 +46,7 @@ local function copy_capture(mode)
 			notify = function(_, _, level) notices[#notices + 1] = level end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.shortcuts.actions.screen_capture_flow"] = {
 			ensure_permission = function() return true end,
 		}

@@ -27,8 +27,8 @@ local EXPANDER_LOG_TAG = "keymap.expander"
 
 -- Force a fresh Logger so the sink installed below does not inherit state from
 -- other suites that may have run before this file in the same process.
-package.loaded["infra.logger"] = nil
-local Logger = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 Logger.set_level(Logger.LEVELS.DEBUG)
 
 
@@ -88,7 +88,7 @@ local function fresh_expander()
 		"modules.keymap.terminator_replay",
 		"infra.text_utils",
 		"modules.keymap.utils",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"modules.keystats",
 		"ui.tooltip",
 	}
@@ -98,9 +98,9 @@ local function fresh_expander()
 
 	-- Reinstall Logger with the same fresh stub so the sink we install in the
 	-- test body reaches the Logger instance used by the expander.
-	local L = helpers.load_with_stubs("infra.logger")
+	local L = helpers.load_with_stubs("core.logger.engine.logger")
 	L.set_level(L.LEVELS.DEBUG)
-	package.loaded["infra.logger"] = L
+	package.loaded["core.logger.engine.logger"] = L
 
 	return require("modules.keymap.expander")
 end
@@ -158,7 +158,7 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 
 	helpers.it("a conflicting init() emits exactly one ERROR log line", function()
 		local expander = fresh_expander()
-		local L = require("infra.logger")
+		local L = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(L)
 		L.set_level(L.LEVELS.DEBUG)
 
@@ -206,7 +206,7 @@ helpers.describe("expander.M.init(): duplicate call is ignored", function()
 
 	helpers.it("first init() emits no WARN and leaves the module functional", function()
 		local expander = fresh_expander()
-		local L = require("infra.logger")
+		local L = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(L)
 		L.set_level(L.LEVELS.DEBUG)
 

@@ -119,7 +119,7 @@ local function with_delivery(callback, native_timers)
 					return true
 				end
 			end
-			package.loaded["infra.logger"].error = function(_, message, ...)
+			package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 				errors[#errors + 1] = string.format(message, ...)
 				if state.on_error then state.on_error() end
 			end

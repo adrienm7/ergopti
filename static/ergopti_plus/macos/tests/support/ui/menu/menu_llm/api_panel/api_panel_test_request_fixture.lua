@@ -65,7 +65,7 @@ local function install_doubles(args)
 		end
 		return key
 	end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

@@ -14,7 +14,7 @@ require("core.logger.engine")
 --- Composes pinned native child creation with the real factory lifecycle.
 --- @param scenario function Scenario over independent native observations.
 local function with_windows(scenario)
-	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.logger",
+	helpers.with_stub_scope({ "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.logger.engine.logger",
 		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.i18n.engine.locale", "core.text.engine.json", "core.i18n.engine.core",
 		"core.ui.engine.webview.i18n_seed", "core.ui.engine.webview.presentation", "core.ui.engine.window_titles", "tests.support.webview_recursive_close_fixture",
 	}, function()
@@ -55,7 +55,7 @@ local function with_windows(scenario)
 			return parent
 		end
 		h.native_new = constructor
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function(_, callback)
 			h.deferred[#h.deferred + 1] = callback
 			return true

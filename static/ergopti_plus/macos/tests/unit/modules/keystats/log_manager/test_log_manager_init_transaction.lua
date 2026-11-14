@@ -27,7 +27,7 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 helpers.describe("log_manager — initialization transaction", function()
 	helpers.it("rolls back a post-publication throw and retries the full init (keystats-log-init-transaction)", function()
 		local slots = {
-			"infra.logger",
+			"core.logger.engine.logger",
 			"core.fs.adapters.file_system",
 			"modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator",
@@ -59,7 +59,7 @@ helpers.describe("log_manager — initialization transaction", function()
 			logger.success = function(_, message, ...)
 				success_messages[#success_messages + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return [[{"device_id":"device-stable","name":"Test Mac","os":"darwin","host_signature":"fallback:unknown","created_at":"2026-08-13 00:00:00.000"}]], "ok"

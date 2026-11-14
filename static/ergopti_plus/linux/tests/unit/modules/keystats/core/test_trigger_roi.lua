@@ -32,7 +32,7 @@ end
 Home.it("Linux trigger ROI: native snapshots survive refusal and finish once with private gains", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		collector.record_hotstring("Editor", "SECRET", "x", now + 11, "static", 6, true)
 		collector.record_hotstring("Editor", "empty", "", now + 12, "static", 5, false)
@@ -180,7 +180,7 @@ Home.it("Linux trigger ROI: early cipher refusal still retires queued text and k
 			local configuration = assert(collector.configuration_snapshot())
 			configuration.enabled = true; helpers.assert_true(collector.apply_configuration(configuration))
 			for _ = 1, 5 do collector.record_roi_text("retiredcandidate ", context(), unknown) end
-			local now = require("infra.monotonic").now_ms()
+			local now = require("core.logger.engine.monotonic").now_ms()
 			for index = 1, 10 do collector.record_hotstring("Editor", "x", "xx", now + index, "static", 1, true) end
 			if probe[1] == "unknown" then
 				configuration.enabled = false; helpers.assert_true(collector.apply_configuration(configuration))
@@ -225,7 +225,7 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			TapHold = { observe_copy_activity = function() end },
 			wrap_on_type = { on_pointer_down = function() end }, Logger = { debug = function() end },
 			keyboard_hook = { held_modifiers = function() return {} end },
-			Monotonic = require("infra.monotonic"),
+			Monotonic = require("core.logger.engine.monotonic"),
 			WordReset = { observe_key = function() return false end, cascade_max_arrows = function() return 0 end,
 				click_resets_word = function() return false end },
 			terminators_mod = { is_terminator = function() return false end },
@@ -301,7 +301,7 @@ Home.it("Linux trigger ROI: requested encryption purges new text without deletin
 		for _ = 1, 5 do text("discarded ") end
 		for _ = 1, 4 do text("fresh ") end
 		text("fragment")
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "x", "xx", now + index, "static", 1, true) end
 		local configuration = assert(collector.configuration_snapshot())
 		configuration.encrypt = true
@@ -384,7 +384,7 @@ Home.it("Linux trigger ROI: the native writer admits only numerical new events u
 			local operation = assert(writer.start_flush("fixture", {
 				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, roi = events }, upserts = {},
 			}))
-			local uv, now = require("luv"), require("infra.monotonic").now_ms
+			local uv, now = require("luv"), require("core.logger.engine.monotonic").now_ms
 			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
 			while not operation:is_settled() and now() < until_ms do
 				operation:pump()
@@ -458,7 +458,7 @@ end)
 
 
 Home.it("Linux trigger ROI: encryption refusal clears last-use text before later native idle checks", function()
-	local clock, cipher = require("infra.monotonic"), require("modules.keystats.text_cipher")
+	local clock, cipher = require("core.logger.engine.monotonic"), require("modules.keystats.text_cipher")
 	local original_now, original_available = clock.now_ms, cipher.is_available
 	local offset = 0
 	clock.now_ms = function() return original_now() + offset end

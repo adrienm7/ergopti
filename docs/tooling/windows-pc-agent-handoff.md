@@ -272,7 +272,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   `ui/menu/timed_build.lua`, `fix/linux-todo-final`). The Windows rebuild
   (`ui/menu/menu_rebuild.ahk`) writes neither, so `field-log-analyse.py` judges
   no Windows menu rebuild: time it, write the same line and call
-  `infra/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
+  `core/logger/engine/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
   without the line.
 - Screen action vision backend on Windows: the native parameter prompt of
   `llm_vision` (`modules/gestures/config.ahk`, `param_llm_vision`) still
@@ -439,7 +439,7 @@ Branch `feat/field-report-analysis-3` (171d233f76, 33c3091d9b and the protocol
 fix after them). Nothing below ever ran under AutoHotkey or `pwsh`; the JS and
 meta tests pin names, not behaviour. Run, in order:
 
-1. Parse and the full AHK suite: `infra/perf_budget.ahk`,
+1. Parse and the full AHK suite: `core/logger/engine/perf_budget.ahk`,
    `modules/llm/llm_request_latency.ahk` (included by `prediction_exec.ahk`,
    which the LLM suites load), `infra/field_run.ahk`, and the edits in
    `ErgoptiPlus.ahk` (boot budget, field run start) and `core/lifecycle/engine/lifecycle.ahk`
@@ -663,14 +663,14 @@ The owned-runtimes commit of `b8894bb73c` overlapped a PC commit; the PC drops i
 macOS and Linux now mask the configuration folder at write time: the logger's
 redactor receives the folder the path owner resolves at boot and every folder
 the user moves to afterwards (`Logger.follow_config_dir` in
-`macos/infra/logger.lua`, called by `macos/infra/config_paths.lua`;
-`logger_sink.follow_config_dir` in `linux/infra/logger_sink.lua`, called by
+`macos/core/logger/engine/logger.lua`, called by `macos/infra/config_paths.lua`;
+`logger_sink.follow_config_dir` in `linux/core/logger/engine/sink.lua`, called by
 `linux/infra/config_paths.lua`). Every line then shows the folder as
 `config_placeholder` and each name below it as `config_name_placeholder` from
 `_shared/diagnostics/data/redaction.json`, except `config_known_names`.
 
 Windows still builds its redaction context without `config_dir`
-(`windows/infra/logger.ahk`, the `Context := Map("home", …, "user", …)` of the
+(`windows/core/logger/engine/logger.ahk`, the `Context := Map("home", …, "user", …)` of the
 privacy admission), so a log line keeps "C:\Users\…\Sync\Jean Dupont\famille.toml"
 past the home placeholder. To do: give that context the configuration folder,
 read live from the paths owner rather than frozen at admission (the folder can

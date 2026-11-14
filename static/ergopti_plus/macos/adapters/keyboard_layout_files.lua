@@ -16,7 +16,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local FileSystem = require("core.fs.adapters.file_system")
 
 local LOG = "adapters.keyboard_layout_files"

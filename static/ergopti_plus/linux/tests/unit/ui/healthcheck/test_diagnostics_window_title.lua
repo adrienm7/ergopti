@@ -13,7 +13,7 @@ local Json = require("core.text.engine.json")
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
 		local names = { "lgi", "ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
-			"infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.notifier",
+			"core.logger.engine.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.notifier",
 			"ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
 		local saved = {}
 		local close_fixture

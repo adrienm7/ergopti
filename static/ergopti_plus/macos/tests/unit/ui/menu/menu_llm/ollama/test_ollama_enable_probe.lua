@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "infra.logger", "adapters.http_client", "core.events.timer_scheduler",
+local OWNED = { "core.logger.engine.logger", "adapters.http_client", "core.events.timer_scheduler",
 	"ui.menu.menu_llm.ollama_enable_probe", "ai.engine.settings.enable_admission_core" }
 
 -- ===================================
@@ -21,7 +21,7 @@ local OWNED = { "infra.logger", "adapters.http_client", "core.events.timer_sched
 --- @param callback function Receives probe owner and observed ports.
 local function with_probe(options, callback)
 	helpers.with_stub_scope(OWNED, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local ports = { requests = {}, timers = {}, delivered = {} }
 		local scheduler = {}
 		function scheduler.after(_, action)

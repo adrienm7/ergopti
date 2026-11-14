@@ -33,7 +33,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			load_api_entries = noop,
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = noop, info = noop, warn = noop, error = noop,
 		}
 		package.loaded["infra.manifest_menu"] = {
@@ -142,7 +142,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 				-- The real Ollama retirement consumer can load manifest_reader, which
 				-- requires the complete production logger contract, including done().
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["infra.manifest_menu"] = {
 					render_rows = function(rows) return rows end,
 				}
@@ -273,7 +273,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				load_api_entries = noop,
 			}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
@@ -372,7 +372,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				load_api_entries = function() return true end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
@@ -468,7 +468,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				load_api_entries = function() return true end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(rows) return rows end,
 			}
@@ -541,7 +541,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 			load_api_entries = function() return true end,
 		}
 		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 		}
@@ -635,7 +635,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				load_api_entries = function() return true end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(items) return items end,
 			}
@@ -764,7 +764,7 @@ helpers.describe("backend panel: external effects wait for preference commit", f
 				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = {
 				render_rows = function(items) return items end,
 			}

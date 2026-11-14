@@ -28,7 +28,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local NativePath = require("core.fs.engine.native_path")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local DisplayServer = require("infra.display_server")
 local LOG = "ui.webview_manager"
 

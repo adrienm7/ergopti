@@ -57,7 +57,7 @@ end
 -- ====================================
 
 describe("Boot profiler: paired stages", function()
-	local BootProfiler = require("infra.boot_profiler")
+	local BootProfiler = require("core.logger.engine.boot_profiler")
 
 	it("pairs every stage with a timed SUCCESS and reports the total", function()
 		BootProfiler._reset_for_test()

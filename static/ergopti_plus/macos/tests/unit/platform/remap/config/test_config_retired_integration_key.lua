@@ -13,12 +13,12 @@ local helpers = require("tests.helpers")
 --- @param source string Independent TOML source.
 --- @param body function Assertions receiving the owner and native boundary controls.
 local function with_file(source, body)
-	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "infra.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
 		local path = require("tests.support.tap_hold_file_text").private_path()

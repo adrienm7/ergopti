@@ -38,7 +38,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 
 	helpers.it("withholds private callback failures while preserving rollback visibility", function()
 		local _, registry = fresh_registry()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		local previous_level = Logger.current_level
@@ -157,7 +157,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 			parse = function() error("injected editor reload failure", 0) end,
 		}
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		local previous_level = Logger.current_level

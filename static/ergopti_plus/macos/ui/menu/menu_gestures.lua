@@ -23,7 +23,7 @@ local LabelValue = require("core.i18n.engine.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local DeferredWork   = require("infra.deferred_work")
 local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 

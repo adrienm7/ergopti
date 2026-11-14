@@ -20,7 +20,7 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
 local TokenBudget = require("ai.engine.request_plan.token_budget")

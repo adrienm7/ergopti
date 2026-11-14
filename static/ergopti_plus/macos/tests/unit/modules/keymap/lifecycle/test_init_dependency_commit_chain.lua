@@ -176,7 +176,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			["infra.text_utils"] = {},
 			["infra.hotstring_engine"] = {},
 			["modules.keymap.utils"] = {},
-			["infra.logger"] = LOGGER_STUB,
+			["core.logger.engine.logger"] = LOGGER_STUB,
 			["modules.keymap.state"] = {},
 			["adapters.text_sender"] = {},
 			["adapters.synthetic_input"] = {},
@@ -209,7 +209,7 @@ helpers.describe("keymap child init: exact dependency commitments", function()
 			},
 			["infra.text_utils"] = {},
 			["modules.llm"] = { DEFAULT_STATE = {} },
-			["infra.logger"] = LOGGER_STUB,
+			["core.logger.engine.logger"] = LOGGER_STUB,
 			["infra.keycodes"] = { ESCAPE = 53, RETURN = 36, F16_LLM_CHAIN_SIGNAL = 106 },
 			["modules.keystats"] = {},
 			["ui.tooltip"] = {
@@ -243,7 +243,7 @@ end)
 helpers.describe("leaf init ownership: exact dependencies only", function()
 	helpers.it("TerminatorReplay refuses a different state", function()
 		with_stubbed_module("modules.keymap.terminator_replay", {
-			["infra.logger"] = LOGGER_STUB,
+			["core.logger.engine.logger"] = LOGGER_STUB,
 			["adapters.text_sender"] = {},
 			["core.events.timer_scheduler"] = {},
 			["adapters.synthetic_input"] = {},
@@ -258,7 +258,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 
 	helpers.it("WarmupController refuses a different dependency set", function()
 		with_stubbed_module("modules.llm.warmup_controller", {
-			["infra.logger"] = LOGGER_STUB,
+			["core.logger.engine.logger"] = LOGGER_STUB,
 			["infra.timings"] = { sec = function() return 0.1 end },
 			["core.events.timer_scheduler"] = {},
 		}, function(warmup)
@@ -283,7 +283,7 @@ helpers.describe("leaf init ownership: exact dependencies only", function()
 	helpers.it("StreamingHandler refuses a different dependency set", function()
 		with_stubbed_module("modules.llm.streaming_handler", {
 			["modules.llm.parser"] = {},
-			["infra.logger"] = LOGGER_STUB,
+			["core.logger.engine.logger"] = LOGGER_STUB,
 			["infra.timings"] = { sec = function() return 0.1 end },
 			["core.i18n.engine.i18n"] = {},
 		}, function(streaming)
@@ -343,7 +343,7 @@ local function with_prediction_results(warmup_result, streaming_result, callback
 		},
 		["modules.llm.app_filter"] = {},
 		["modules.llm.api_common"] = {},
-		["infra.logger"] = LOGGER_STUB,
+		["core.logger.engine.logger"] = LOGGER_STUB,
 		["infra.timings"] = { sec = function() return 0.1 end },
 		["core.events.timer_scheduler"] = PortFakes.timer_scheduler(),
 		["core.i18n.engine.i18n"] = {},

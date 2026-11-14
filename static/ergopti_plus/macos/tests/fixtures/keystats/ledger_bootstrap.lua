@@ -89,7 +89,7 @@ for _, name in ipairs({ "fs", "json", "sqlite3" }) do package.loaded["hs." .. na
 package.loaded["hs.timer"] = loop.api
 local errors, logger = {}, Helpers.make_logger_stub()
 logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-package.loaded["infra.logger"] = logger
+package.loaded["core.logger.engine.logger"] = logger
 local Export = require("modules.keystats.export")
 package.loaded["modules.keystats.export"] = {
 	init = function() return true end, cleanup = function() return true end,
@@ -105,7 +105,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 	end
 	package.loaded["core.fs.adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
 	package.loaded["core.fs.adapters.ledger_append"] = nil
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["hs.sqlite3"], package.loaded["hs.json"], package.loaded["hs.timer"] = sqlite_port, json_port, loop.api
 	local Writer = require("modules.keystats.sqlite_writer")
 	local Manager = require("modules.keystats.log_manager")

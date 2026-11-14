@@ -110,7 +110,7 @@ local function with_fixed_controls_locale(locale, scenario)
 		local driver = helpers.driver_root():gsub("/+$", "")
 		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname())
 		assert(os.remove(scratch))
 		assert(hs.fs.mkdir(scratch))

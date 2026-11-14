@@ -8,7 +8,7 @@ local Json = require("core.text.engine.json")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 local raw, removed, inode = "", false, 2
 local policy = "CURL_CONNECT_TIMEOUT_SEC=30\nCURL_STALL_SEC=60\nCURL_MAX_TIME_SEC=600\n"
-package.loaded["infra.logger"] = { error = function() end }
+package.loaded["core.logger.engine.logger"] = { error = function() end }
 package.loaded["core.fs.adapters.file_system"] = {
 	exists = function() return true end,
 	read_with_status = function(path)

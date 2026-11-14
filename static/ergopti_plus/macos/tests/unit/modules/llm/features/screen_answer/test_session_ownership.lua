@@ -183,7 +183,7 @@ helpers.describe("private screen data retains the exact answer session", functio
 		helpers.it("requires strict optional local continuation for " .. verdict, function()
 			with_world(function(world)
 				local failures, errors = {}, {}
-				require("infra.logger").error = function(_, format, ...)
+				require("core.logger.engine.logger").error = function(_, format, ...)
 					errors[#errors + 1] = string.format(format, ...)
 				end
 				local guard

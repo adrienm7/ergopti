@@ -13,14 +13,14 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 
 local function with_frame(body, paused)
 	local translator = require("core.i18n.engine.i18n")
-	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu",
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "infra.manifest_menu",
 		"modules.hotstrings.hotstrings_config", "ui.menu.menu_hotstrings_management" }, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["core.i18n.engine.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator,
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		return OutputFixture.with_output(function(path)

@@ -15,7 +15,7 @@ local DRIVER_ROOT = helpers.driver_root()
 local PRODUCTION_SOURCE_FLOOR = 200
 -- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_SETTINGS_OWNERS = {
-	["adapters.log_transport"] = true,
+	["core.logger.adapters.log_transport"] = true,
 	["core.fs.adapters.storage"] = true,
 }
 

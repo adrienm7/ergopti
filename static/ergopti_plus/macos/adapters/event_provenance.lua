@@ -25,7 +25,7 @@ M.STATUS_FOREIGN   = "foreign"
 M.STATUS_UNREADABLE = "unreadable"
 
 local hs             = hs
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local SyntheticInput = require("adapters.synthetic_input")
 local LOG             = "adapters.event_provenance"
 

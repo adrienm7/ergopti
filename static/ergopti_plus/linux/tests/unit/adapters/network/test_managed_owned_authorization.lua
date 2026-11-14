@@ -21,7 +21,7 @@ assert(file:close())
 local function with_client(config, exercise)
 	config = config or {}
 	local state = { time = 0, metadata = 0, curls = {}, proxies = {}, timers = {}, reports = {}, chunks = {}, results = {} }
-	local names = { "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline" }
+	local names = { "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "core.logger.engine.monotonic", "infra.managed_http_deadline" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local client
@@ -121,7 +121,7 @@ local function with_client(config, exercise)
 			return policy
 		end,
 			environment = function() if config.environment then config.environment(client, state) end; return {} end }
-		package.loaded["infra.monotonic"] = { now_ms = function()
+		package.loaded["core.logger.engine.monotonic"] = { now_ms = function()
 			if config.initial_clock_failure then
 				state.clock_calls = (state.clock_calls or 0) + 1
 				if config.initial_clock_failure == "throw" then error("private native clock refusal") end

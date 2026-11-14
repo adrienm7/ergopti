@@ -122,8 +122,8 @@ local function build_tray(observe_layout, catalogue)
 	end, { catalogue = catalogue, real_streaming_panel = true, real_trigger_panel = true })
 
 	local lines = {}
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	for _, level in ipairs({ "warn", "error" }) do
@@ -133,7 +133,7 @@ local function build_tray(observe_layout, catalogue)
 			return real_logger[level](module_name, fmt, ...)
 		end
 	end
-	package.loaded["infra.logger"] = spy
+	package.loaded["core.logger.engine.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
 	local i18n = require("core.i18n.engine.i18n")
@@ -192,7 +192,7 @@ local function build_tray(observe_layout, catalogue)
 	local cleanup = observe_layout and observe_layout(require("infra.manifest_menu"), mods, ctx)
 	local ok, menu = pcall(builder.generate, ctx, mods, actions)
 	if cleanup then cleanup() end
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	if not ok then return nil, lines, tostring(menu) end
 	return menu, lines, nil
 end

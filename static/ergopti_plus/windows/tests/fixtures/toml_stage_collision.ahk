@@ -5,7 +5,7 @@
 #Warn VarUnset, Off
 #Warn LocalSameAsGlobal, Off
 #Include ../test_framework.ahk
-#Include ../../infra/logger.ahk
+#Include ../../core/logger/engine/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../infra/toml/toml_helpers.ahk

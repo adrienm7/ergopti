@@ -37,7 +37,7 @@ local function with_changelog(callback)
 			"core.events.timer_scheduler",
 			"infra.deferred_work",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"core.fs.engine.paths",
 			"modules.shortcuts.script_control",
 			"hs",
@@ -129,7 +129,7 @@ local function with_changelog(callback)
 			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- The real adapter's symlink-safe inspection needs hs.fs; the fixture
 			-- only has to hand the controller the shared defaults bytes.
 			local function read_file(path)

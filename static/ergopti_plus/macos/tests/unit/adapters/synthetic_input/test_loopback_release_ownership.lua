@@ -15,7 +15,7 @@ require("core.logger.engine")
 
 local function with_loopback(callback, options, prepare)
 	helpers.with_stub_scope({ "adapters.synthetic_input", "adapters.event_provenance", "core.fs.adapters.storage",
-		"core.events.timer_scheduler", "core.fs.adapters.json_codec", "infra.logger", "core.fs.engine.paths", "infra.timings",
+		"core.events.timer_scheduler", "core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
 		"infra.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path",
 		"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner", "adapters.synthetic_input_loopback_owner" }, function()
 		local f = Fixture.make(options)
@@ -295,7 +295,7 @@ helpers.describe("loopback release survives uncertain native handoff", function(
 			local next_world = Fixture.make()
 			local next_input = next_world.load()
 			local next_scheduler, next_logger = package.loaded["core.events.timer_scheduler"],
-				package.loaded["infra.logger"]
+				package.loaded["core.logger.engine.logger"]
 			helpers.assert_true(next_input.emit_loopback_key_stroke({}, "f16", 0))
 			helpers.assert_true(package.loaded["adapters.synthetic_input_loopback_owner"] == factory)
 			f.drain()
@@ -309,7 +309,7 @@ helpers.describe("loopback release survives uncertain native handoff", function(
 			helpers.assert_eq(next_input.stats().active_transactions, 0)
 			helpers.assert_eq(f.completions, 1)
 			helpers.assert_true(package.loaded["core.events.timer_scheduler"] == next_scheduler)
-			helpers.assert_true(package.loaded["infra.logger"] == next_logger)
+			helpers.assert_true(package.loaded["core.logger.engine.logger"] == next_logger)
 		end)
 	end)
 

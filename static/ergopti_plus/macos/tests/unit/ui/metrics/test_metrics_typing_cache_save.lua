@@ -34,7 +34,7 @@ local function with_save(mode, callback)
 				return self
 			end
 			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
-			package.loaded["infra.logger"].warn = function(_, message, ...)
+			package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end
 			os.remove = function() state.unlinks = state.unlinks + 1; return true end

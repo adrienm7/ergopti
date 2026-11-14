@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- A prior test may have installed a stub modules.llm.profiles (with empty
 -- get_all_profiles) that would leak into this file's top-level require.

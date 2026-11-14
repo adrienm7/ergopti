@@ -17,14 +17,14 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 	helpers.it("relabels a cached app after a language change", function()
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
-			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths",
+			helpers.with_fresh_modules({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths",
 				"core.i18n.engine.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
 					en = { ["menu.apps.clone_desc"] = "Duplicate an app" },
 				}
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.fs.engine.paths"] = {}
 				package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, _, providers)
 					return providers.apps_installed()

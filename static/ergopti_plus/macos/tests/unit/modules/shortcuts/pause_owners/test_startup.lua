@@ -457,7 +457,7 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 		hs_stub.__reset()
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		hs_stub.timer.new = function(_, callback)

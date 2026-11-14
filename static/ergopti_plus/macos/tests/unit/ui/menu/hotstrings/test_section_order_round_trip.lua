@@ -128,9 +128,9 @@ end
 
 helpers.describe("hotstring-section-order: menu, config.toml and restart round trip", function()
 	helpers.it("persists a move, shows it after a restart, refuses a stale menu and resets", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 		local logger = helpers.make_logger_stub()
-		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		local file = assert(io.open(PATH, "wb"))
 		assert(file:write(SOURCE)); assert(file:close())
 		local ok, err = xpcall(function()

@@ -32,7 +32,7 @@ require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 
 helpers.describe("hot-path segment inventory: linux spans", function()
 	helpers.it("declares every inventory segment as a perf span", function()
-		local spans = helpers.load_module("infra.perf_counters").snapshot().spans
+		local spans = helpers.load_module("core.logger.engine.perf_counters").snapshot().spans
 		for name in pairs(require("metrics.engine.perf.hotpath_segments").for_driver("linux")) do
 			helpers.assert_true(spans[name] ~= nil, "'" .. name .. "' is in the inventory but is not a perf span")
 		end

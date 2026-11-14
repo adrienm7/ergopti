@@ -22,7 +22,7 @@ local function child()
 		assert(db:exec(schema) == sqlite.OK)
 	end
 	local helpers = require("tests.helpers")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats.sqlite_writer"] = {
 		get_db = function() return db end,
 		quarantine_db = function() return true end,

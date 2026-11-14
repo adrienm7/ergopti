@@ -15,10 +15,10 @@ local helpers = require("tests.helpers")
 --- @return table counters
 local function fresh(now)
 	package.loaded["infra.typed_input_withheld"] = nil
-	local saved = package.loaded["infra.monotonic"]
-	package.loaded["infra.monotonic"] = { now_ms = function() return now end }
+	local saved = package.loaded["core.logger.engine.monotonic"]
+	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return now end }
 	local counters = require("infra.typed_input_withheld")
-	return counters, function() package.loaded["infra.monotonic"] = saved end
+	return counters, function() package.loaded["core.logger.engine.monotonic"] = saved end
 end
 
 helpers.describe("typed input withheld counters", function()

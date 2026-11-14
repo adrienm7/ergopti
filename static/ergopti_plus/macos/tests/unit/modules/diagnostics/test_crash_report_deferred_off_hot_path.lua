@@ -63,8 +63,8 @@ helpers.describe("logger: a recoverable timer-callback error never reaches the c
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
 
-		package.loaded["infra.logger"] = nil
-		local Logger = require("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.install_runtime_error_capture()
 

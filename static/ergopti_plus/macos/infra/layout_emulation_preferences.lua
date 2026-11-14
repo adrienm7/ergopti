@@ -14,7 +14,7 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Settings = require("layouts.engine.emulation.settings")
 local LOG = "infra.layout_emulation_preferences"
 

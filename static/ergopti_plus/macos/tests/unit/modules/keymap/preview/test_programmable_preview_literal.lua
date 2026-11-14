@@ -72,7 +72,7 @@ end
 local function render_provider_row(provider_result)
 	local text
 	helpers.with_stub_scope({
-		"adapters.synthetic_input", "core.events.timer_scheduler", "infra.logger",
+		"adapters.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
 		"modules.llm.prediction_engine", "ui.tooltip", "modules.keymap.llm_bridge",
@@ -92,7 +92,7 @@ local function render_provider_row(provider_result)
 			every = function() return { kind = "diagnostic-pump" }, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_reader"] = { default_for = function() return MAGIC end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
 		package.loaded["modules.keymap.expander"] = {

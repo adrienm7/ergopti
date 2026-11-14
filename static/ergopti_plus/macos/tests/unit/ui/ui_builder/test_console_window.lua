@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs the console owner against a stateful native window and deferred queue.
 --- @param run function Receives the owner and observable native state.
 local function with_console(run)
-	helpers.with_fresh_modules({ "ui.console_window", "infra.deferred_work", "infra.logger", "core.fs.engine.paths" }, function()
+	helpers.with_fresh_modules({ "ui.console_window", "infra.deferred_work", "core.logger.engine.logger", "core.fs.engine.paths" }, function()
 		local state = {
 			frame = { x = 10, y = 20, w = 300, h = 200 },
 			screen = { x = 100, y = 50, w = 1000, h = 800 },
@@ -26,7 +26,7 @@ local function with_console(run)
 		end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() state.errors = state.errors + 1 end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local window = {
 			frame = function() return state.frame end,
 			setFrame = function(self, frame)

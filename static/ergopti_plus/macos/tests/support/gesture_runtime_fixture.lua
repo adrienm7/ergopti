@@ -27,7 +27,7 @@ local MODULE_NAMES = {
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
 	"infra.timings",
@@ -96,7 +96,7 @@ function M.with_fixture(options, scenario)
 			return pcall(fn, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,

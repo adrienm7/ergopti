@@ -31,9 +31,9 @@ local function run_window(module_name, scenario)
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
 		"ui.model_browser", "ui.changelog",
 		"ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
-		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
-		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "adapters.log_transport",
-		"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
+		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
+		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, controllers = {}, timers = {} }

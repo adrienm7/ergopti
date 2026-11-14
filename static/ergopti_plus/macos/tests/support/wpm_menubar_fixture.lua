@@ -18,7 +18,7 @@ return function(callback)
 	local original_hs = _G.hs
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({ "ui.wpm.wpm_menubar", "ui.wpm.shared", "ui.wpm.wpm_widget",
-			"ui.tooltip", "modules.keystats", "infra.logger", "core.events.timer_scheduler" }, function()
+			"ui.tooltip", "modules.keystats", "core.logger.engine.logger", "core.events.timer_scheduler" }, function()
 			local state = { items = {}, timers = {}, logs = {} }
 			local logger = helpers.make_logger_stub()
 			for _, level in ipairs({ "debug", "info", "error" }) do
@@ -27,7 +27,7 @@ return function(callback)
 					if state.on_log then state.on_log(level, message) end
 				end
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["modules.keystats"] = { get_live_stats = function() return { wpm = 10 } end }
 			package.loaded["ui.wpm.wpm_widget"] = { _load_shared_const = function() return { source_color_duration = 1 } end }
 			package.loaded["ui.wpm.shared"] = { get_active_source = function() return "none" end,

@@ -19,7 +19,7 @@
 local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
 
 local DB = "/Users/someone/" .. AppDirs.macos.cache_relative .. "/metrics/db.sqlite"
 local QUICK_CHECK = "/usr/bin/sqlite3 -readonly file:" .. DB .. "?immutable=1 PRAGMA quick_check;"
@@ -71,7 +71,7 @@ end
 local function run(ports)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["infra.field_check_probes"] = nil

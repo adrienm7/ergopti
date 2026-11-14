@@ -259,7 +259,7 @@ for _, in_callback in ipairs({ false, true }) do
 		local function arm()
 			uv.sleep(HTTP_STALE_WORK_MS); start = uv.hrtime()
 			pcall(function()
-				local clock = require("infra.monotonic").backend()
+				local clock = require("core.logger.engine.monotonic").backend()
 				active_http_trace = { start = start / 1000000, cached = uv.now(), events = {},
 					mode = in_callback and "inside-callback" or "after-blocking",
 					clock = clock == "luv.hrtime" and "luv.hrtime" or "Other" }

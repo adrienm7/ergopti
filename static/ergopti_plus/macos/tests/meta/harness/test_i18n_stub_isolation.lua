@@ -24,7 +24,7 @@ helpers.describe("load_with_stubs isolates menu modules from a leaked i18n stub"
 
 		-- Any load_with_stubs call must drop the cached menu modules and reinstall the
 		-- canonical i18n stub.
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 
 		helpers.assert_nil(package.loaded["ui.menu.menu_tap_holds"])
 		helpers.assert_nil(package.loaded["ui.menu.menu_utils"])

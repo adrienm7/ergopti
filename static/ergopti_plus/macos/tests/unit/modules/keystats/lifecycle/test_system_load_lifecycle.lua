@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Scenario receiving watcher, shared state and fixture.
 local function with_fixture(scenario)
 	local names = {
-		"infra.logger", "infra.timings", "adapters.task_lifecycle",
+		"core.logger.engine.logger", "infra.timings", "adapters.task_lifecycle",
 		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.watchers",
 	}
@@ -21,7 +21,7 @@ local function with_fixture(scenario)
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { tasks = {}, events = {}, paused = false, now = 1000000000 }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop, error = noop,
 		pcall = function(_, callback) return pcall(callback) end,
 	}

@@ -18,7 +18,7 @@ local SUBJECT_MODULES = {
 	"adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 }
@@ -68,7 +68,7 @@ local function with_subject(options, scenario)
 			return key
 		end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

@@ -62,7 +62,7 @@ local function load_active_remap(options)
 		if calls.phase_listener then calls.phase_listener(phase, TOKEN) end
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		error = function(_, message, ...)
 			calls.errors[#calls.errors + 1] = string.format(message, ...)

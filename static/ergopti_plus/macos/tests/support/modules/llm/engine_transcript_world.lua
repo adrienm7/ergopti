@@ -75,10 +75,10 @@ function M.with_world(config, body)
 		bundleID = function() return "test.e2e" end, path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	_G.hs.timer.secondsSinceEpoch = function() return world.clock end
 
 	for _, name in ipairs({

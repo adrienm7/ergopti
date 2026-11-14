@@ -128,7 +128,7 @@ def consent_boundary(**changes):
 
 
 def scripting_line(pid=42, getter="boolean", allowed="true", bridge="callable"):
-    """Return the boot-journal line adapters/boot_journal.lua writes at startup."""
+    """Return the boot-journal line core/logger/adapters/boot_journal.lua writes at startup."""
     return (
         "2026-10-18 00:00:00 [INFO] [init] Native scripting server: "
         f"pid={pid}; getter={getter}; allowed={allowed}; bridge={bridge}; "

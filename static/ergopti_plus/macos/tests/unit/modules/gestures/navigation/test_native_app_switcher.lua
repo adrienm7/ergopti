@@ -153,8 +153,8 @@ helpers.describe("macOS product native switcher facade", function()
 		end)
 	end)
 	local function with_real_scheduler(callback, options)
-		helpers.with_stub_scope({ "core.events.timer_scheduler", "infra.logger" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "core.events.timer_scheduler", "core.logger.engine.logger" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			with_facade(callback, function(f)
 				local native = { running_state = false, stop_calls = 0 }
 				function native:running() return self.running_state end

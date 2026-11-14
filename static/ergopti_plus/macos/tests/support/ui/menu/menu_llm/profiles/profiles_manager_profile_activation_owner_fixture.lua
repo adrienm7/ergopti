@@ -14,7 +14,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
 	"modules.llm",
@@ -57,7 +57,7 @@ local function with_profiles_fixture(options, body)
 		}
 		local logger = helpers.make_logger_stub()
 		logger.error = function() error_count = error_count + 1 end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback, timer = {} }
@@ -74,7 +74,7 @@ local function with_profiles_fixture(options, body)
 			end,
 			json_decode = require("core.text.engine.json").decode,
 			i18n = package.loaded["core.i18n.engine.i18n"],
-			logger = package.loaded["infra.logger"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,

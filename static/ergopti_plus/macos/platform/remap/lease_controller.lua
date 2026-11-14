@@ -25,7 +25,7 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local ShellRunner    = require("adapters.shell_runner")
 local Storage        = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
@@ -34,8 +34,8 @@ local LeaseContract  = require("platform.remap.lease_contract")
 local TokenReuse     = require("platform.remap.token_reuse")
 local LeaseHelper    = require("platform.remap.lease_helper")
 local TaskOutputTurn = require("adapters.task_output_turn")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
-local KeyEventHealth = require("infra.key_event_health")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 
 local LOG = "karabiner.lease"
@@ -827,7 +827,7 @@ local function fail_generation(generation, reason)
 	if generation.ready then
 		KeystrokeIntegrity.note_exposure("a Karabiner lease fence that switched Ergopti's rules off")
 	end
-	-- The session totals the next issue report carries (infra/key_event_health.lua).
+	-- The session totals the next issue report carries (core/logger/engine/key_event_health.lua).
 	pcall(KeyEventHealth.note_lease_failure, reason)
 	-- Starvation is the open explanation of silent PONG and READY timeouts: the
 	-- free memory at the failure confirms or rules it out (items 117/140).

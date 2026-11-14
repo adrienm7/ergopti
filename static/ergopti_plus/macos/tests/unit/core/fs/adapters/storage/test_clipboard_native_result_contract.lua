@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function load_clipboard(pasteboard)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("adapters.clipboard", { pasteboard = pasteboard })
 end
 

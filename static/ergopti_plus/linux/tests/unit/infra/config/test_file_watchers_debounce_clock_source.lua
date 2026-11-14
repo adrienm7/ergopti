@@ -42,8 +42,8 @@ helpers.describe("file_watchers debounce clock source", function()
 	end
 
 	helpers.it("computes the debounce deadline from the monotonic clock, not os.clock", function()
-		local restore = helpers.keep_loaded({ "infra.monotonic", "core.fs.engine.file_watchers" })
-		local Monotonic = require("infra.monotonic")
+		local restore = helpers.keep_loaded({ "core.logger.engine.monotonic", "core.fs.engine.file_watchers" })
+		local Monotonic = require("core.logger.engine.monotonic")
 		local wall, fired = 1000000, 0
 		local clock = setmetatable({ now_ms = function() return wall end }, { __index = Monotonic })
 		local original_clock = os.clock
@@ -55,7 +55,7 @@ helpers.describe("file_watchers debounce clock source", function()
 			assert(handle:write('[personal.clock]\ntrigger = "before"\n'))
 			assert(handle:close())
 			assert(native_luv.fs_utime(source, 1700000000, 1700000000))
-			package.loaded["infra.monotonic"] = clock
+			package.loaded["core.logger.engine.monotonic"] = clock
 			os.clock = function() return 0 end
 			watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			watcher.start({ personal_dir = root, on_reload = function() fired = fired + 1 end })

@@ -27,7 +27,7 @@ local function with_window(module_name, scenario)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local state = { views = {}, deferred = {}, focuses = 0 }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }

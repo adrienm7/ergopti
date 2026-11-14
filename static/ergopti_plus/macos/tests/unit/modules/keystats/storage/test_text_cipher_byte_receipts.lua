@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local Double = require("tests.support.keystats.cipher_shell_double")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
-local MODULES = { "core.crypto.crypto", "adapters.shell_runner", "modules.keystats.text_cipher", "infra.logger" }
+local MODULES = { "core.crypto.crypto", "adapters.shell_runner", "modules.keystats.text_cipher", "core.logger.engine.logger" }
 
 --- Runs a callback against a real cipher over the native shell double.
 --- @param faults table|nil Faults forwarded to the double.
@@ -35,7 +35,7 @@ local function with_cipher(faults, callback)
 		local logs = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.shell_runner"] = nil
 		package.loaded["core.crypto.crypto"] = nil
 		require("adapters.shell_runner")._set_private_stdin_native(native)

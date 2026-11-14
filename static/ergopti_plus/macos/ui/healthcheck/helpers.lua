@@ -25,7 +25,7 @@
 local H = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 
 local LOG = "healthcheck"
 
@@ -272,7 +272,7 @@ function H.collect_input()
 	-- The session's key-event counters: how the taps saw the keys pair up, how
 	-- late they came and how often the lease failed. Counts only, never a key.
 	local health = read("the key event counters", function()
-		return require("infra.key_event_health").counts()
+		return require("core.logger.engine.key_event_health").counts()
 	end)
 	if health then
 		local lease_failures = 0

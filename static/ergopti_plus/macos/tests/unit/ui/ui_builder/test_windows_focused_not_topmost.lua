@@ -223,7 +223,7 @@ end)
 local function load_healthcheck(view)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -250,7 +250,7 @@ local function load_healthcheck(view)
 		return self
 	end
 	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
@@ -309,7 +309,7 @@ end)
 --- @return table dialog, table timers
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
-		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "core.i18n.engine.i18n",
+		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.i18n.engine.locale", "ui.ui_builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -335,7 +335,7 @@ local function load_error_dialog(view, app)
 	end
 
 	local timers = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
 	package.loaded["core.i18n.engine.locale"] = { all = function() return {} end }
 	package.loaded["core.events.timer_scheduler"] = {

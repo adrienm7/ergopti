@@ -6,8 +6,8 @@ local H = require("tests.helpers")
 local function fixture(body)
 	local old_hs = _G.hs
 	local ok, failure = xpcall(function()
-		H.with_fresh_modules({ "adapters.shell_runner", "infra.logger", "adapters.task_environment" }, function()
-			package.loaded["infra.logger"] = H.make_logger_stub()
+		H.with_fresh_modules({ "adapters.shell_runner", "core.logger.engine.logger", "adapters.task_environment" }, function()
+			package.loaded["core.logger.engine.logger"] = H.make_logger_stub()
 			local f = { tasks = {}, wire = string.rep("A", 1024) }
 			_G.hs = { task = { new = function(_, terminal, chunks)
 				local task = { running = false, environment_values = {} }

@@ -20,7 +20,7 @@ assert(require("luv").os_uname().sysname == "Linux", "Actual Linux libuv require
 --- Actual unlinked retained-FD digest vectors. No pathname read by the worker.
 local uv = require("luv")
 local Digest = require("infra.fd_sha256")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 local factory = Digest.native()
 local vectors = {
 	{ "abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },

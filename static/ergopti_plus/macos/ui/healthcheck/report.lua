@@ -31,7 +31,7 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local IssueLink   = require("diagnostics.engine.reports.issue_link")
 local Redact      = require("diagnostics.engine.reports.redact")
 local Share       = require("diagnostics.engine.healthcheck.share")

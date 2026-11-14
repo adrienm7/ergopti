@@ -47,7 +47,7 @@ end
 --- @param callback function Observations asserted outside production catches.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
 		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",

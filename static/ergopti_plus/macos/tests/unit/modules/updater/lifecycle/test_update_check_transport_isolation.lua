@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "infra.logger", "infra.timings",
+	"modules.updater.auto_check", "modules.updater", "core.fs.engine.paths", "core.logger.engine.logger", "infra.timings",
 	"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec", "adapters.update_launcher", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.http_header_policy",
@@ -52,7 +52,7 @@ local function with_owner(run)
 				return nil
 			end },
 		})
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = {}
 		package.loaded["infra.timings"] = Timings
 		package.loaded["core.fs.adapters.file_system"] = {}

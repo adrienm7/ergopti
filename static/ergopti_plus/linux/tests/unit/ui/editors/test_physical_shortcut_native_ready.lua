@@ -11,7 +11,7 @@ helpers.describe("Physical editor native readiness", function()
 			local noop=function()end
 			local event=nil
 			package.loaded['core.logger.engine.shim']={debug=noop,success=noop,warn=noop,error=noop,info=function()if event then event()end end}
-			package.loaded['infra.monotonic']={now_ms=function()return 0 end}
+			package.loaded['core.logger.engine.monotonic']={now_ms=function()return 0 end}
 			package.loaded['core.ui.engine.window_titles']={compose=function(v)return v end}
 			package.loaded['ui.webkit_host']={}
 			local file=assert(package.searchpath('ui.webview_manager', package.path))

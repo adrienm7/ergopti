@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local notifications = helpers.load_with_stubs("infra.notifications")
 
@@ -61,7 +61,7 @@ helpers.describe("notifications.notify", function()
 
 	helpers.it("(nui-004-notice-privacy) logs a dispatched notice by shape, never its text", function()
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -107,7 +107,7 @@ helpers.describe("notifications.notify", function()
 
 	helpers.it("returns false and never claims dispatch if hs.notify.new throws", function()
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -124,7 +124,7 @@ helpers.describe("notifications.notify", function()
 
 	helpers.it("returns false and never claims dispatch if native send refuses", function()
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -175,7 +175,7 @@ helpers.describe("notifications.notify", function()
 			error("hs.application.get searches every window when nothing matches", 0)
 		end
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -281,7 +281,7 @@ helpers.describe("notifications.debugLog", function()
 		notifications.DEBUG = true
 		_G.hs.console.printStyledtext = function() error("nope") end
 		local lines = {}
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = line end)

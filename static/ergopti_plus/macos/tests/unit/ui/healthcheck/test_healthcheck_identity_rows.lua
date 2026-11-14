@@ -18,10 +18,10 @@ local BUNDLE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_
 --- @param body function Receives (H).
 local function with_collectors(body)
 	helpers.with_stub_scope({
-		"infra.logger", "ui.healthcheck.helpers", "modules.updater", "adapters.system_info",
+		"core.logger.engine.logger", "ui.healthcheck.helpers", "modules.updater", "adapters.system_info",
 	}, function()
-		helpers.load_with_stubs("infra.logger", { configdir = BUNDLE })
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.load_with_stubs("core.logger.engine.logger", { configdir = BUNDLE })
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.updater"] = {
 			current_version = function() return LAUNCHER_VERSION end,
 			installed_channel = function() return "main" end,

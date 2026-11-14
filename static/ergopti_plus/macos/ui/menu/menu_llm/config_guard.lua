@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local Shared = require("ai.engine.policy.config_guard")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "ui.menu.menu_llm.config_guard"
 

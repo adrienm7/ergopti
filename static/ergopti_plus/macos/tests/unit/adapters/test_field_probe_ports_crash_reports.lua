@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "core.fs.engine.dir", "adapters.field_probe_ports" }
+local MODULES = { "core.logger.engine.logger", "core.fs.engine.dir", "adapters.field_probe_ports" }
 
 --- Writes one file.
 local function write(path, text)
@@ -55,7 +55,7 @@ helpers.describe("field run crash report port", function()
 			errors = 0
 			logger.error = function() errors = errors + 1 end
 			logger.crash_reports_dir = function() return home .. "/missing/crash_reports/" end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.engine.dir"] = nil
 			package.loaded["adapters.field_probe_ports"] = nil
 			hs.fs.__set_entries(reports, entries)

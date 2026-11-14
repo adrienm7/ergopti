@@ -19,8 +19,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local Logger = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 package.loaded["core.events.timer_scheduler"] = nil
 local Engine = helpers.load_with_stubs("modules.gestures.engine")
@@ -99,7 +99,7 @@ end
 --- Engine.init() if the module was already initialized in a previous test.
 --- @return table Fresh engine module instance.
 local function fresh_engine(logger)
-	package.loaded["infra.logger"] = logger or Logger
+	package.loaded["core.logger.engine.logger"] = logger or Logger
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	local E = helpers.load_with_stubs("modules.gestures.engine")

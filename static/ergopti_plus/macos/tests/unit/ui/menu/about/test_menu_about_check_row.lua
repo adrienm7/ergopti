@@ -163,7 +163,7 @@ end)
 --- @param alternative boolean True to independently replace the declared label and reason.
 local function with_source_row(alternative, callback)
 	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
-		"infra.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
+		"core.logger.engine.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
 		"ui.changelog", "adapters.update_launcher", "ui.menu.start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
 		native.__reset()
@@ -176,7 +176,7 @@ local function with_source_row(alternative, callback)
 			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["modules.updater"] = {
 			is_local_source = function() return true end,

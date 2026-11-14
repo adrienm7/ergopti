@@ -20,9 +20,9 @@ local SILENT_LEVEL = 1000
 --- @param callback function Receives (Logger, Healthcheck).
 local function with_healthcheck(callback)
 	helpers.with_stub_scope({
-		"infra.logger", "core.logger.engine", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "core.logger.engine", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	}, function()
-		local Logger = helpers.load_with_stubs("infra.logger")
+		local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 		Logger.set_level("DEBUG")
 		Logger.reset_dedup()
 		Logger.ring_buffer_clear()

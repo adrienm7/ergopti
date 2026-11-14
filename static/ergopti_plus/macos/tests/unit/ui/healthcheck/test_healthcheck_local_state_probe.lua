@@ -28,10 +28,10 @@ local function with_core(body)
 	-- A case may script hs.usb; the shared hs stub outlives this module
 	local saved_usb = hs.usb
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"infra.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"core.logger.engine.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
 		"adapters.accessibility_permission", "adapters.screen_capture",
 	}, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { signal_reads = 0, tcc_reads = {} }
 		package.loaded["adapters.accessibility_permission"] = {
 			is_trusted = function()
@@ -69,9 +69,9 @@ local function run_local_state(step_costs, failing)
 	local saved_absolute = hs.timer.absoluteTime
 	local clock_ns = 0
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"infra.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "core.events.timer_scheduler",
+		"core.logger.engine.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "core.events.timer_scheduler",
 	}, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		hs.timer.absoluteTime = function() return clock_ns end
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)

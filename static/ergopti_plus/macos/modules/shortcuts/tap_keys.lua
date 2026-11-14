@@ -32,7 +32,7 @@
 local M = {}
 local BindingPublication = require("settings.engine.publication.binding_publication")
 
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local Manifest   = require("infra.manifest_reader")
 local ConfigOutdated = require("settings.engine.migration.outdated")

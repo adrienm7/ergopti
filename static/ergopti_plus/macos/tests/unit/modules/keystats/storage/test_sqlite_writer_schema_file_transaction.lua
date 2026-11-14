@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 --- @param schedule table Mutable native file failure schedule.
 --- @param check function Assertions against the writer and observed owners.
 local function observe(schedule, check)
-	helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 		local state = { opens = 0, reads = 0, closes = 0, db_opens = 0, db_closes = 0, errors = {} }
 		state.file_exists = schedule.existing_partial == true
 		state.meta_exists = schedule.existing_partial == true
 		state.schema_applied = false
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer", {
 			fs = { attributes = function() return state.file_exists and { mode = "file" } or nil end },
 			sqlite3 = { OK = 0, DONE = 101, ROW = 100,

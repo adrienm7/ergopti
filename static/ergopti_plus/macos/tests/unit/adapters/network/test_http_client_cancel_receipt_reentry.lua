@@ -8,7 +8,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.http_client", "core.events.timer_scheduler", "infra.logger",
+	"adapters.http_client", "core.events.timer_scheduler", "core.logger.engine.logger",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 --- The native port only captures callbacks; no network or native timer is started.
 local function isolated(scenario)
 	helpers.with_stub_scope(OWNED_MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local state = { requests = {}, timers = {}, cancellations = 0 }
 		local function dispatch(url, callback)
 			local request = { url = url, callback = callback }

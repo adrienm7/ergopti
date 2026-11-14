@@ -2,8 +2,8 @@
 local helpers = require("tests.helpers")
 
 -- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Load the module. This will trigger load_api_providers() internally
 -- which reads static/ergopti_plus/_shared/ai/data/api_providers.json

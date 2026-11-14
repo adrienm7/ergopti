@@ -16,7 +16,7 @@ local hs     = hs
 local ShellRunner = require("adapters.shell_runner")
 local FileSystem = require("core.fs.adapters.file_system")
 local DeferredWork = require("infra.deferred_work")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local i18n   = require("core.i18n.engine.i18n")
 local text_utils = require("infra.text_utils")
 

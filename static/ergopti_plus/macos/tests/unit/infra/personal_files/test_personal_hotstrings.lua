@@ -212,7 +212,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- Capture Logger.warn calls without silencing them (same pattern as
 		-- tests/meta/architecture/test_healthcheck_api_contract.lua).
 		package.loaded["infra.personal_hotstrings"] = nil
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local warnings = {}
 		local orig_warn = Logger.warn

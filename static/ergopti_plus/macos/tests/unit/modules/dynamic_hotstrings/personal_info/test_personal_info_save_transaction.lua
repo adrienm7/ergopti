@@ -64,17 +64,17 @@ end
 --- @return table personal_info Real module instance.
 --- @return table fence Mutable fence state.
 local function load_personal_info(config_path, logs)
-	local previous_logger = package.loaded["infra.logger"]
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	local Logger = helpers.make_logger_stub()
 	local function capture(_log, format_string, ...)
 		logs[#logs + 1] = string.format(format_string, ...)
 	end
 	Logger.warn = capture
 	Logger.error = capture
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 	local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-	package.loaded["infra.logger"] = previous_logger
+	package.loaded["core.logger.engine.logger"] = previous_logger
 	local fence = { allow = false, calls = 0, raises = false }
 	local keymap = {
 		get_trigger_char = function() return "★" end,
@@ -115,7 +115,7 @@ local function load_editor()
 	}
 	_G.hs = hs_stub
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		error = function(_, message)
@@ -142,7 +142,7 @@ local function load_editor()
 	end, state, function()
 		package.loaded["ui.personal_info_editor"] = nil
 		package.loaded["ui.ui_builder"] = nil
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 	end
 end
 
@@ -508,7 +508,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				logs[#logs + 1] = string.format(format_string, ...)
 			end
 			Logger.error = Logger.warn
-			package.loaded["infra.logger"] = Logger
+			package.loaded["core.logger.engine.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 			local file_system = require("core.fs.adapters.file_system")
@@ -562,7 +562,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 				logs[#logs + 1] = string.format(format_string, ...)
 			end
 			Logger.error = Logger.warn
-			package.loaded["infra.logger"] = Logger
+			package.loaded["core.logger.engine.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 			local file_system = require("core.fs.adapters.file_system")

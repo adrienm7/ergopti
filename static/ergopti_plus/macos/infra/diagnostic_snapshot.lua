@@ -18,7 +18,7 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local Snapshot    = require("diagnostics.engine.snapshot")
 

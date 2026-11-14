@@ -131,8 +131,8 @@ local function build_tray(on, extra)
 	end)
 
 	local errors = {}
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	spy.error = function(module_name, fmt, ...)
@@ -140,7 +140,7 @@ local function build_tray(on, extra)
 		errors[#errors + 1] = tostring(module_name) .. ": " .. (ok and text or tostring(fmt))
 		return real_logger.error(module_name, fmt, ...)
 	end
-	package.loaded["infra.logger"] = spy
+	package.loaded["core.logger.engine.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
 	CaptionFixture.install(require("core.i18n.engine.i18n"))
@@ -205,7 +205,7 @@ local function build_tray(on, extra)
 	local builder = require("ui.menu.builder")
 	local ok, tray = pcall(builder.generate, ctx, mods, actions)
 	ManifestMenu.render_rows = render_rows
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(tray))
 	helpers.assert_true(type(provided) == "table", "the tray root must reach the renderer")
 	observed.group_on = group_on

@@ -48,7 +48,7 @@ local EEXIST = 17 -- Linux exclusive-create collision receipt.
 -- them, and follow a LogsDirPath override: resolved per call.
 --- @return string Absolute folder, no trailing slash.
 local function crash_dir()
-	return require("infra.logger_sink").crash_reports_dir()
+	return require("core.logger.engine.sink").crash_reports_dir()
 end
 
 
@@ -235,14 +235,14 @@ end
 --- @return boolean True after write, close and the retained redacted path image acknowledge.
 function M.dump(module_name, error_msg, context)
 	if type(module_name) ~= "string" or type(error_msg) ~= "string" or error_msg == "" then return false end
-	local available, Sink = pcall(require, "infra.logger_sink")
+	local available, Sink = pcall(require, "core.logger.engine.sink")
 	if not available or type(Sink) ~= "table" or type(Sink.capture_redactor) ~= "function"
 		or type(Sink.crash_reports_dir) ~= "function" then return refused() end
 	local capture, resolve = Sink.capture_redactor, Sink.crash_reports_dir
 	local admitted, redact, current = pcall(capture)
 	if not admitted or type(redact) ~= "function" or type(current) ~= "function" then return refused() end
 	local function live()
-		if package.loaded["infra.logger_sink"] ~= Sink or Sink.capture_redactor ~= capture
+		if package.loaded["core.logger.engine.sink"] ~= Sink or Sink.capture_redactor ~= capture
 			or Sink.crash_reports_dir ~= resolve then return false end
 		local ok, value = pcall(current)
 		return ok and value == true

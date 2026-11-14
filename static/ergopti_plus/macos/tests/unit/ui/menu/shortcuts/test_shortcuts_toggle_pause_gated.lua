@@ -47,8 +47,8 @@ local function build_paused()
 		end,
 	}
 	local render_ctx, render_lists = nil, nil
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {

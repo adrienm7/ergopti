@@ -33,8 +33,8 @@ local function read_corpus()
 	return assert(json.decode(raw), "the user action corpus is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
@@ -62,7 +62,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
-	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "core.i18n.engine.i18n",
+	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
 	"infra.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
 	"adapters.synthetic_input", "adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
@@ -81,7 +81,7 @@ local function with_world(body)
 				world.logs[#world.logs + 1] = string.format(tostring(fmt), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, ...)

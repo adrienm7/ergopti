@@ -18,7 +18,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-		"core.events.timer_scheduler", "infra.logger",
+		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "hello world",
@@ -98,7 +98,7 @@ local function load_fixture(options)
 		return synthetic.emit_key_stroke(modifiers, key, 0, tx)
 	end
 	package.loaded["adapters.synthetic_input"] = synthetic
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local timer_calls = 0
 	local clock_ns = 0
 	local text = helpers.load_with_stubs("modules.shortcuts.actions.text", {

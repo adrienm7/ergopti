@@ -63,7 +63,7 @@ local function load_keymap_capturing_taps()
 	local to_wipe = {
 		"ui.tooltip",
 		"infra.text_utils",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"modules.keystats",
 		"modules.hotstrings.hotstrings_config",
 	}

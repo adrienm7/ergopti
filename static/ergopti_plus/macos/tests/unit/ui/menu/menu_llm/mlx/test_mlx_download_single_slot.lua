@@ -21,7 +21,7 @@ local helpers = require("tests.helpers")
 local MIXIN_MODULES = {
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"ui.download_window",
 	"ui.menu.menu_llm.models_manager_mlx_download",
 }
@@ -95,7 +95,7 @@ end
 --- @return table window_calls
 local function install_mixin()
 	return helpers.with_fresh_modules(MIXIN_MODULES, function()
-		helpers.load_with_stubs("infra.logger", {
+		helpers.load_with_stubs("core.logger.engine.logger", {
 			task = { new = function(_path, _done, _stream_or_args, _args)
 				local task = { running = false }
 				function task:start()

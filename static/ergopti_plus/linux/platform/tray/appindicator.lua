@@ -45,7 +45,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Perf = require("infra.perf_counters")
+local Perf = require("core.logger.engine.perf_counters")
 
 local LOG = "platform.tray.appindicator"
 

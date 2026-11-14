@@ -11,9 +11,9 @@
 
 local helpers = require("tests.helpers")
 
-helpers.admit_logger_privacy(require("infra.logger"))
-package.loaded["adapters.boot_journal"] = nil
-local BootJournal = require("adapters.boot_journal")
+helpers.admit_logger_privacy(require("core.logger.engine.logger"))
+package.loaded["core.logger.adapters.boot_journal"] = nil
+local BootJournal = require("core.logger.adapters.boot_journal")
 local LauncherEnvironment = require("core.lifecycle.engine.launcher_environment")
 
 local SCRATCH = helpers.temp_dir() .. "/ergopti_boot_journal_test"

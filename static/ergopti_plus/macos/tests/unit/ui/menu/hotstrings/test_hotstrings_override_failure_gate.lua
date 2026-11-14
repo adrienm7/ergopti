@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("hotstring category delay is fail-closed", function()
 	helpers.it("stops when the canonical override writer returns false", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function() return "OK", "250" end,
 		}

@@ -46,13 +46,13 @@
 
 local M = {}
 local hs         = hs
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local text_utils = require("infra.text_utils")
 local FileSystem = require("core.fs.adapters.file_system")
 local TomlCodec  = require("infra.toml.codec")
 local AppDirs    = require("core.fs.engine.app_dirs")
-local LogFolders = require("infra.log_folders")
+local LogFolders = require("core.logger.engine.log_folders")
 local LOG        = "config_paths"
 
 

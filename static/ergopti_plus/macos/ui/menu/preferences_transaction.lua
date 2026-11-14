@@ -10,7 +10,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu"
 local OperationReporter = require("diagnostics.engine.operation_reporter")
 local TableUtil = require("core.text.engine.table_util")

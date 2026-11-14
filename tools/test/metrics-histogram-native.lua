@@ -17,7 +17,7 @@ end
 logger.warn = function(_, message, ...) error(select('#', ...) > 0 and string.format(message, ...) or message) end
 logger.error = logger.warn
 package.loaded['core.logger.engine.shim'] = logger
-package.loaded['infra.logger'] = logger
+package.loaded['core.logger.engine.logger'] = logger
 package.loaded['hs.json'] = json
 local command = require('modules.keystats.sqlite_command')
 

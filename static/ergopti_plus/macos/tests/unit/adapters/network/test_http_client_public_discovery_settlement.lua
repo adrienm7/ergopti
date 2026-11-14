@@ -11,7 +11,7 @@ local SourceFile = require("tests.support.source_file")
 
 local OWNED_MODULES = {
 	"modules.llm.api_remote", "modules.llm.local_servers", "adapters.http_client",
-	"core.events.timer_scheduler", "infra.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.events.timer_scheduler", "core.logger.engine.logger", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	"core.fs.adapters.json_codec", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
 	"ai.engine.policy.provider_config_policy", "core.text.engine.json", "modules.llm.provider_uses",
 	"infra.timings", "infra.text_utils", "modules.llm.profiles", "modules.llm.parser",
@@ -33,7 +33,7 @@ end
 local function isolated(scenario)
 	helpers.with_stub_scope(OWNED_MODULES, function()
 		package.loaded["infra.http_header_policy"] = require("tests.support.network.header_policy_fixture").load()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local state = { requests = {}, timers = {}, clients = {} }
 		local function dispatch(url, callback)
 			state.requests[#state.requests + 1] = { url = url, callback = callback }

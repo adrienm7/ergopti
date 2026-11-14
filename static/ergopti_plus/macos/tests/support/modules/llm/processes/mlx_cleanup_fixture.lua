@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"infra.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
+	"core.logger.engine.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
 	"core.events.timer_scheduler", "adapters.task_lifecycle", "modules.llm.profiles",
@@ -43,7 +43,7 @@ function M.with_commands(callback)
 				if type(fn) ~= "function" then return false end
 				return pcall(fn, ...)
 			end
-			package.loaded["infra.logger"] = {
+			package.loaded["core.logger.engine.logger"] = {
 				debug = noop, info = noop, warn = noop, error = noop,
 				callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 				today_log_path = function() return "/fixture/log.txt" end,

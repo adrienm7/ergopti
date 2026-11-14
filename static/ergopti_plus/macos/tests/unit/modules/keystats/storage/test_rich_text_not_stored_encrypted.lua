@@ -34,9 +34,9 @@ local SECRET = "ZZRICHSECRETZZ"
 --- @param enabled boolean Whether at-rest encryption is on.
 --- @return string The single typing statement.
 local function typing_insert(enabled)
-	return helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer",
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer",
 		"modules.keystats.text_cipher" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.keystats.text_cipher"] = {
 			is_enabled = function() return enabled end,
 			encrypt = function(_, _, value)
@@ -77,8 +77,8 @@ helpers.describe("events_typing.rich_text under at-rest encryption", function()
 	end)
 
 	helpers.it("is cleared for the local device by the encrypt pass", function()
-		helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local executed = {}
 			local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 			for i = 1, math.huge do

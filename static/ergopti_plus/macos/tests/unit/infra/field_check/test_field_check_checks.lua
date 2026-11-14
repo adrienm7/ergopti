@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
 	"platform.remap.lease_memory_snapshot" }
 
 --- Builds scripted ports; `world` records every command.
@@ -57,7 +57,7 @@ end
 local function run_on(runtime, name, ports)
 	local steps, result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["platform.remap.ke_paths"] = nil
 		if runtime then require("platform.remap.ke_paths").select_runtime(runtime) end
 		package.loaded["infra.field_check"] = nil
@@ -366,7 +366,7 @@ helpers.describe("owned runtime check", function()
 
 	helpers.it("parses the driver listing", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.field_check_checks"] = nil
 			local Checks = require("infra.field_check_checks")
 			helpers.assert_eq(Checks.parse_version("karabiner_cli 16.0.0 (x)"), "16.0.0")

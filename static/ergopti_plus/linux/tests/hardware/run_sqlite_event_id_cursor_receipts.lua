@@ -20,7 +20,7 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local checks, failures = 0, 0
 local serial = 0
 local function check(name, test)

@@ -31,15 +31,15 @@ local function with_window(module_name, scenario)
 			"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.leaf_rows",
 			"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.writer",
 			"adapters.webview_result", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
-			"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
-			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "adapters.log_transport",
-			"core.fs.engine.app_dirs", "infra.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
+			"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
+			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
+			"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 			"tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, script_refs = {}, timers = {}, bridges = {}, errors = {} }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...) h.errors[#h.errors + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local construct = require("tests.support.native_webview_close_fixture")(h)
 			local function new_window()
 				local view = construct()

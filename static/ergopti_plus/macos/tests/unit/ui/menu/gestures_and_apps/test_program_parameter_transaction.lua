@@ -25,7 +25,7 @@ local function with_owner(body, options)
 				observations.logs[#observations.logs + 1] = string.format(template, ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local gestures = {
 			is_assignable = function() return true end,
 			get_action_parameter_spec = function(name)
@@ -479,8 +479,8 @@ helpers.describe("parameter transaction keeps physical assignments with their sc
 		for _, slot in ipairs({ "physical_none_KeyA", "physical_broken" }) do
 			for _, route in ipairs({ "binding", "mutation" }) do
 				helpers.it("(action-parameter-physical-scope) refuses " .. action .. " physical " .. route .. " " .. slot .. " before transaction ports", function()
-					helpers.with_stub_scope({ "infra.logger", "ui.menu.program_parameter_transaction" }, function()
-						package.loaded["infra.logger"] = helpers.make_logger_stub()
+					helpers.with_stub_scope({ "core.logger.engine.logger", "ui.menu.program_parameter_transaction" }, function()
+						package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 						package.loaded["ui.menu.program_parameter_transaction"] = nil
 						local calls = { admission = 0, parameter = 0, assignment = 0, save = 0, source = 0 }
 						local function port(name)

@@ -149,7 +149,7 @@ helpers.describe("hotstrings config window refresh channel is defensive", functi
 			calls = calls + 1
 			error("menu rebuild exploded")
 		end
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")

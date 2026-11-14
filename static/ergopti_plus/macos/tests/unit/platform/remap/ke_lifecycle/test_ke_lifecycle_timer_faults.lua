@@ -41,7 +41,7 @@ local function load_lifecycle()
 			ctx.logs[#ctx.logs + 1] = level .. ":" .. tostring(message)
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.notifications"] = {
 		notify = function()
 			if ctx.fail_notification_once then

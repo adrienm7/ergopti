@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.keymap.utils"] = nil
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 
 local function install_scoped_watcher_fixture()
@@ -107,7 +107,7 @@ helpers.describe("keymap.M.start prepares ownership before key capture", functio
 		local KU = helpers.load_with_stubs("modules.keymap.utils")
 		install_scoped_watcher_fixture()
 		hs.window.focusedWindow = function() return nil end
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		local original_warn, warnings = Logger.warn, {}
 		Logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 		KU.start_ignored_win_tracking({}, {})

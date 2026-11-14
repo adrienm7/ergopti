@@ -20,7 +20,7 @@
 --- ==============================================================================
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local i18n   = require("core.i18n.engine.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("core.events.timer_scheduler")

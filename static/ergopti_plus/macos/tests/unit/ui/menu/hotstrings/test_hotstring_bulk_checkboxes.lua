@@ -324,7 +324,7 @@ local function with_category_file(committed, body, change_label)
 				return document
 			end,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["ui.menu.menu_hotstrings"] = nil
 		hotstrings = require("ui.menu.menu_hotstrings")
@@ -382,12 +382,12 @@ end)
 
 --- The actual common-category owner consumes a fresh genuine manifest renderer.
 local function with_common_section_frame(body)
-	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
 		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
 		local translator = require("core.i18n.engine.i18n")
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local hotstrings = require("ui.menu.menu_hotstrings")

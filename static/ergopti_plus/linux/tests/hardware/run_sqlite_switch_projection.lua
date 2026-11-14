@@ -16,7 +16,7 @@ local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 local Json = require("core.text.engine.json")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local path, day = root .. "/metrics.sqlite", os.date("%Y-%m-%d")
 local checks, failures = 0, 0
 local function check(name, body)

@@ -63,7 +63,7 @@ local function auto_world(options)
 	local _, ready_index = World.get_upvalue(api.is_ready, "_is_ready")
 	debug.setupvalue(api.is_ready, ready_index, true)
 	world.logs = {}
-	local Logger = package.loaded["infra.logger"]
+	local Logger = package.loaded["core.logger.engine.logger"]
 	for _, level in ipairs({ "info", "warn" }) do
 		Logger[level] = function(_, fmt, ...)
 			world.logs[#world.logs + 1] = { level = level, text = string.format(fmt, ...) }

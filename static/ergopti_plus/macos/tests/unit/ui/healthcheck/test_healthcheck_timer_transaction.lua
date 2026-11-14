@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -75,7 +75,7 @@ local function load_healthcheck(scheduler, title_label)
 	logger.warn = function(_, message, ...)
 		context.warnings[#context.warnings + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	local compose_title = require("ui.ui_builder").window_title

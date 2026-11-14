@@ -7,27 +7,27 @@ local quote = require("core.text.engine.utils_core").shell_quote
 helpers.describe("instrumentation fixture logger ownership", function()
 	helpers.it("(logger-fixture-identity) restores aliases and instrumentation after an assertion fails", function()
 		local core, shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
-		local instrument = package.loaded["infra.perf_counters"]
-		local ok, failure = pcall(require("tests.support.logger_fixture").with, { "infra.perf_counters" }, function()
+		local instrument = package.loaded["core.logger.engine.perf_counters"]
+		local ok, failure = pcall(require("tests.support.logger_fixture").with, { "core.logger.engine.perf_counters" }, function()
 			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
 			require("core.logger.engine.shim")
-			helpers.load_module("infra.perf_counters")
+			helpers.load_module("core.logger.engine.perf_counters")
 			error("controlled logger fixture failure")
 		end)
 		helpers.assert_eq(ok, false)
 		helpers.assert_contains(failure, "controlled logger fixture failure")
 		helpers.assert_true(package.loaded["core.logger.engine"] == core)
 		helpers.assert_true(package.loaded["core.logger.engine.shim"] == shim)
-		helpers.assert_true(package.loaded["infra.perf_counters"] == instrument)
+		helpers.assert_true(package.loaded["core.logger.engine.perf_counters"] == instrument)
 	end)
 
 	for _, scenario in ipairs({
-		{ module = "tests.unit.infra.test_perf_counters", owned = { "infra.perf_counters", "core.fs.engine.paths", "core.text.engine.toml_codec.reader" } },
+		{ module = "tests.unit.core.logger.test_perf_counters", owned = { "core.logger.engine.perf_counters", "core.fs.engine.paths", "core.text.engine.toml_codec.reader" } },
 		{ module = "tests.unit.infra.test_phase_stats", owned = {
-			"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
-			"infra.perf_counters", "core.text.engine.toml_codec.reader",
+			"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "core.logger.engine.boot_profiler",
+			"core.logger.engine.perf_counters", "core.text.engine.toml_codec.reader",
 		} },
-		{ module = "tests.unit.core.lifecycle.test_boot_profiler_summary", owned = { "infra.boot_profiler", "infra.phase_stats" } },
+		{ module = "tests.unit.core.lifecycle.test_boot_profiler_summary", owned = { "core.logger.engine.boot_profiler", "infra.phase_stats" } },
 	}) do
 		local module_name = scenario.module
 		for _, mode in ipairs({ "cold", "warm" }) do

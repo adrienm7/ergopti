@@ -57,7 +57,7 @@ local function fresh_harness(overrides)
 		if not results[1] then logger.error(module, "Exception: %s", tostring(results[2])) end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)

@@ -29,7 +29,7 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
 local Paths       = require("core.fs.engine.paths")

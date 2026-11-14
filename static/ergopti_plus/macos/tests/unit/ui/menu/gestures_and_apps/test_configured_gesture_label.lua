@@ -15,7 +15,7 @@ helpers.describe("configured gesture menu label", function()
 		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
 			"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
 			"menu.engine.renderer",
-			"ui.menu.shortcut_utils", "infra.logger", "infra.deferred_work" }, function()
+			"ui.menu.shortcut_utils", "core.logger.engine.logger", "infra.deferred_work" }, function()
 			local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
@@ -48,7 +48,7 @@ helpers.describe("configured gesture menu label", function()
 			}
 			package.loaded["ui.action_picker"] = {}
 			package.loaded["ui.menu.shortcut_utils"] = {}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.deferred_work"] = {}
 			local menu = require("ui.menu.menu_gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })
 			local prefix = assert(strings["sg_actions.open_url"]:match("^(.-)%[[^%[%]]*%]$"))

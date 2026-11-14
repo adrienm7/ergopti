@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"infra.keycodes",
 	"modules.gestures.engine",
@@ -130,7 +130,7 @@ local function load_context(options)
 	logger.warn = function(_module, format_string, ...)
 		ctx.warnings[#ctx.warnings + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.notifications"] = {
 		notify = function(title, body, kind)
 			ctx.notifications[#ctx.notifications + 1] = {

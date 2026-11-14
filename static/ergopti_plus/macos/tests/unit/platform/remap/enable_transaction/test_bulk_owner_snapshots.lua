@@ -412,7 +412,7 @@ helpers.describe("configured navigation reservations share actual remap settings
 	helpers.it("nav-configured " .. phase .. " predecessor read failure cannot erase a real successor", function()
 		with_navigation_case(function(remap, calls)
 			local original_open = io.open
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local original_error, armed, entered = logger.error, false, 0
 			local successor_accepted, successor_completed, successor
 			logger.error = function(...)

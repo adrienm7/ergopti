@@ -29,8 +29,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 -- lib.logger must be resolved first so downstream requires can find it.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- export is required by aggregator.flush(); stub it so we never touch SQLite.
 package.loaded["modules.keystats.export"] = {

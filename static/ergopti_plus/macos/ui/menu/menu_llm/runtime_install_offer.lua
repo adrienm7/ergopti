@@ -30,7 +30,7 @@ local M = {}
 
 local hs = hs
 
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local i18n          = require("core.i18n.engine.i18n")
 local OllamaBinary  = require("modules.llm.ollama_binary")
 local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")

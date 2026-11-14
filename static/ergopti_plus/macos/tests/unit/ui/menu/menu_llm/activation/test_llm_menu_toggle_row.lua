@@ -249,9 +249,9 @@ helpers.describe("actual transient download producer reaches completed root comp
 					end
 					-- The activation fixture deliberately exposes a subset renderer and key-only i18n.
 					-- Root construction needs the genuine native binding and complete locale owners.
-					local activation_logger = package.loaded["infra.logger"]
+					local activation_logger = package.loaded["core.logger.engine.logger"]
 					local owned = { "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
-						"menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.logger" }
+						"menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.logger.engine.logger" }
 					local previous = {}
 					for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
 					helpers.with_fresh_modules(owned, function()
@@ -260,7 +260,7 @@ helpers.describe("actual transient download producer reaches completed root comp
 						for name, value in pairs(activation_logger) do closed_logger[name] = value end
 						closed_logger.LEVELS = require("core.logger.engine").LEVELS
 						closed_logger.current_level = closed_logger.LEVELS.WARNING
-						package.loaded["infra.logger"] = closed_logger
+						package.loaded["core.logger.engine.logger"] = closed_logger
 						helpers.assert_true(rawequal(closed_logger.LEVELS, require("core.logger.engine").LEVELS))
 						helpers.assert_eq(closed_logger.current_level, require("core.logger.engine").LEVELS.WARNING)
 						for name, value in pairs(activation_logger) do
@@ -320,8 +320,8 @@ local function with_genuine_outer_parent(calls, callback)
 	helpers.assert_eq(calls.root_deps.state.llm_backend, "api")
 	local port = package.loaded["infra.manifest_menu"]
 	local before_build, before_group = port.build, port.group_row
-	local activation_logger = package.loaded["infra.logger"]
-	local owned = { "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.logger" }
+	local activation_logger = package.loaded["core.logger.engine.logger"]
+	local owned = { "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.logger.engine.logger" }
 	local previous = {}
 	for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
 	local ok, detail = xpcall(function()
@@ -330,7 +330,7 @@ local function with_genuine_outer_parent(calls, callback)
 			for name, value in pairs(activation_logger) do closed_logger[name] = value end
 			closed_logger.LEVELS = require("core.logger.engine").LEVELS
 			closed_logger.current_level = closed_logger.LEVELS.WARNING
-			package.loaded["infra.logger"] = closed_logger
+			package.loaded["core.logger.engine.logger"] = closed_logger
 			local native_i18n, native_locale = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			native_i18n.set_locale_injector(native_locale.set_locale)
 			native_i18n.set_locale_no_reload("en")

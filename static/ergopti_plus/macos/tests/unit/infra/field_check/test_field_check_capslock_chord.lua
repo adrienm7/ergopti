@@ -15,12 +15,12 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "infra.field_check_probes" }
 
 local function run(facts)
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		package.loaded["infra.field_check_probes"] = nil
@@ -87,7 +87,7 @@ helpers.describe("Ctrl+Caps Lock evidence sources (capslock-chord-field)", funct
 			read = function() return '{"keys":[{"id":"capslock","label":"Caps Lock"},{"id":"a","label":"A"}]}' end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.gestures.actions"] = {
 			is_assignable = function(action_id) return type(action_id) == "string" end,
 			execute_single = function() executed = executed + 1; return true end,

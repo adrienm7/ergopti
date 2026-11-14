@@ -59,7 +59,7 @@ local function make_fixture(options)
 		return { stop = function() end }
 	end
 
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["adapters.synthetic_input"] = synthetic
 	package.loaded["adapters.event_provenance"] = nil
 	fixture.provenance = helpers.load_with_stubs("adapters.event_provenance", {

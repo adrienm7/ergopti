@@ -18,7 +18,7 @@ local CATEGORY_OWNERS = {
 	"hs.json",
 	"ui.metrics_apps",
 	"ui.ui_builder",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.dialog_util",
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
@@ -107,7 +107,7 @@ local function with_category_store_owned(spec, callback)
 	}
 
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop, trace = noop, done = noop, info = noop, start = noop, success = noop,
 		warn = function(_log, format_string, ...)
 			logs[#logs + 1] = string.format(format_string, ...)
@@ -178,7 +178,7 @@ local function with_category_store_owned(spec, callback)
 	package.loaded["ui.metrics_apps"] = nil
 	package.loaded["ui.ui_builder"] = nil
 	package.loaded["infra.dialog_util"] = nil
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	package.loaded["core.fs.adapters.file_system"] = nil
 	for name, prior in pairs(previous_modules) do package.loaded[name] = prior.value end
 	if not ok then error(result, 0) end

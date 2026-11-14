@@ -18,10 +18,10 @@ local OWNED_MODULES = {
 	"layouts.engine.layers.control_signals",
 	"adapters.event_provenance",
 	"adapters.synthetic_input",
-	"infra.key_event_health",
+	"core.logger.engine.key_event_health",
 	"core.events.clock",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
 	"platform.input.keycodes.core",
@@ -78,7 +78,7 @@ local function with_fixture(callback)
 				end,
 			},
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.synthetic_input"] = {
 			claim_tag = function() return nil end,
 			claim_physical_fence = function() return nil end,

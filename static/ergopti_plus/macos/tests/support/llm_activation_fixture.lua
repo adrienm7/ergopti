@@ -12,7 +12,7 @@ local OWNED_MODULES = {
 	"adapters.http_client",
 	"ui.menu.menu_llm.ollama_enable_probe",
 	"ai.engine.settings.enable_admission_core",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
@@ -153,7 +153,7 @@ local function build_fixture(backend, save_results, options)
 		return strict_result(mode, "backend setter")
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop, info = noop, warn = noop, error = noop, done = noop,
 		start = noop, success = noop,
 		callback = function(_, _, callback, ...)
@@ -435,7 +435,7 @@ local function build_fixture(backend, save_results, options)
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
-		logger = package.loaded["infra.logger"],
+		logger = package.loaded["core.logger.engine.logger"],
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		check_row = native_renderer.check_row,

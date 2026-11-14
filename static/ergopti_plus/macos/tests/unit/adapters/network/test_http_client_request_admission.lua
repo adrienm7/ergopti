@@ -74,12 +74,12 @@ local function load_client(redirects)
 	end
 	package.loaded["adapters.http_client"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	local HttpClient = helpers.load_with_stubs("adapters.http_client", { http = http, timer = timer })
 	local logs = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["adapters.http_client"] = nil
 	HttpClient = require("adapters.http_client")
 	return HttpClient.new(), state, logs

@@ -18,11 +18,11 @@ local function with_fixture(callback)
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "ui.menu.menu_paths", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"infra.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
+			"core.logger.engine.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "hs", "tests.stubs.hs",
 		}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			local state = { creates = 0, titles = {}, deletes = 0, acquired = false }

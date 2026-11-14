@@ -26,7 +26,7 @@ local function load_with_third_timer_failure()
 	end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = nil
 	return require("adapters.synthetic_input")
 end
@@ -53,7 +53,7 @@ local function load_with_first_dispatch_start_failure()
 	end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = nil
 	return require("adapters.synthetic_input")
 end
@@ -66,7 +66,7 @@ helpers.describe("synthetic action listener registration is transactional", func
 		hs_stub.__reset()
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.synthetic_input"] = nil
 		local synthetic = require("adapters.synthetic_input")
 		local attempts, observed = 0, {}

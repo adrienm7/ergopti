@@ -48,7 +48,7 @@ local function with_registry(data_by_path, callback)
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_eq(Registry.init(state), true)
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		local warnings, infos = {}, {}
 		local original_warn, original_info = Logger.warn, Logger.info
 		Logger.warn = function(_, fmt, ...) table.insert(warnings, string.format(fmt, ...)) end

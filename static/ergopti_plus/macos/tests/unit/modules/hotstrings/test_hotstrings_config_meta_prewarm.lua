@@ -21,10 +21,10 @@ local helpers = require("tests.helpers")
 --- @param body function body(cfg, world)
 local function with_config(body)
 	helpers.with_stub_scope({
-		"infra.logger", "infra.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
+		"core.logger.engine.logger", "infra.toml.reader", "infra.deferred_work", "core.fs.adapters.file_system",
 		"modules.hotstrings.hotstrings_config",
 	}, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { parses = {}, scheduled = {} }
 		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		-- The module reads its shared defaults through the real reader at load

@@ -36,7 +36,7 @@ local function with_remote(callback)
 		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
-		"infra.logger", "core.events.timer_scheduler", "core.fs.adapters.file_system",
+		"core.logger.engine.logger", "core.events.timer_scheduler", "core.fs.adapters.file_system",
 		"core.fs.adapters.json_codec", "core.fs.adapters.storage", "infra.manifest_reader",
 		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
 		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.policy.thinking_off", "ai.engine.local_servers.discovery",
@@ -47,7 +47,7 @@ local function with_remote(callback)
 		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local pending, posts, timers = {}, {}, {}
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 			trace = function() end, done = function() end,

@@ -20,7 +20,7 @@ longer makes a line for its parent, and repeats within ten seconds are counted
 in the next line's "similar" figure, not printed. Exclude the errors-only mirror when aggregating the main
 log, or warnings are counted twice.
 
-`static/ergopti_plus/windows/infra/boot_profiler.ahk` measures startup with
+`static/ergopti_plus/windows/core/logger/engine/boot_profiler.ahk` measures startup with
 `A_TickCount`, whose coarse resolution makes zero mean "below one tick", not
 zero work. For uncovered code, use a standalone harness around production code
 with `QueryPerformanceCounter`, warm-up, a real input, and enough repetitions to

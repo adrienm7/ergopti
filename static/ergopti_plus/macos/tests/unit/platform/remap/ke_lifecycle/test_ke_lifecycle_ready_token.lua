@@ -22,7 +22,7 @@ local function load_lifecycle()
 			return ctx.phase, { phase = ctx.phase, token = ctx.token }
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {
 		notify = function() ctx.notifications = ctx.notifications + 1 end,
 	}

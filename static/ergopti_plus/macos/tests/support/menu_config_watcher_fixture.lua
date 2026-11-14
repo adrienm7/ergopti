@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"ui.menu.menu_watchers", "infra.logger", "infra.git_status", "core.lifecycle.engine.reload.gate",
+	"ui.menu.menu_watchers", "core.logger.engine.logger", "infra.git_status", "core.lifecycle.engine.reload.gate",
 	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 }
 
@@ -24,7 +24,7 @@ function M.with_watcher(body, options)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_fresh_modules(OWNERS, function()
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
-			package.loaded["infra.logger"] = options.logger or helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = options.logger or helpers.make_logger_stub()
 			package.loaded["infra.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}

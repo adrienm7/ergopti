@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local function fresh_detector(options)
 	options = options or {}
 	package.loaded["modules.llm.backend_detector"] = nil
-	package.loaded["infra.logger"] = options.logger
+	package.loaded["core.logger.engine.logger"] = options.logger
 	package.loaded["core.fs.adapters.storage"] = options.storage
 	package.loaded["hs"] = nil
 	local hs_stub = require("tests.stubs.hs")

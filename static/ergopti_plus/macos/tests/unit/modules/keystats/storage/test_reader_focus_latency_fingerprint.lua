@@ -50,7 +50,7 @@ local function child()
 	local errors = {}
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
 	package.loaded["modules.keystats.sqlite_writer"] = { get_db = function() return db end }
 	package.loaded["modules.keystats.export"] = { get_native_app_category = function() return nil end }

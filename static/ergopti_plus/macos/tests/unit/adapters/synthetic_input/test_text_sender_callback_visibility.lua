@@ -13,7 +13,7 @@ helpers.describe("text_sender completion callback visibility", function()
 			"adapters.clipboard",
 			"adapters.synthetic_input",
 			"core.events.timer_scheduler",
-			"infra.logger",
+			"core.logger.engine.logger",
 		}, function()
 			local errors = {}
 			local logger = helpers.make_logger_stub()
@@ -28,7 +28,7 @@ helpers.describe("text_sender completion callback visibility", function()
 				end
 				return ok, callback_error
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["adapters.clipboard"] = {}
 			package.loaded["core.events.timer_scheduler"] = {}
 			package.loaded["adapters.synthetic_input"] = {

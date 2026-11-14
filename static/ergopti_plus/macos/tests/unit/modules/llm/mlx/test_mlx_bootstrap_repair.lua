@@ -33,7 +33,7 @@ local LAUNCHER_ENV = {
 }
 
 local OWNED = {
-	"infra.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
 	"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
@@ -190,7 +190,7 @@ local function load_world(world)
 		local ok, text = pcall(string.format, fmt, ...)
 		world.errors[#world.errors + 1] = ok and text or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	-- Only native boundaries are doubled: the policy bytes and parser remain real.
 	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function(path) return fake_fs(world).attributes(path, "mode") ~= nil end,
@@ -1325,7 +1325,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 
 	helpers.it("managed-network-modal: unavailable diagnostics never creates an actionable row", scoped(function()
 		local world, _, _, offer, first = failed_world(false)
-		package.loaded["infra.logger"].today_log_path = function() return nil end
+		package.loaded["core.logger.engine.logger"].today_log_path = function() return nil end
 		world.answers = { "later" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)

@@ -61,7 +61,7 @@ local function schema_read_admitted(check, content, status)
 	local called, accepted = pcall(check, content, status)
 	return called and accepted == true
 end
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")

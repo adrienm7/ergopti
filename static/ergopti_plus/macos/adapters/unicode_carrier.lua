@@ -23,7 +23,7 @@
 
 local M = {}
 
-local KeyEventHealth = require("infra.key_event_health")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 
 --- Plain character keys of the ANSI block, key code 0 (A) first as Quartz and
 --- hs.eventtap.keyStrokes use it. Return (36), Tab (48), Space (49), Delete

@@ -14,7 +14,7 @@ local M = {}
 local Config          = require("ui.tooltip.config")
 local TooltipLLM      = require("ui.tooltip.tooltip_llm")
 local TooltipHotstring = require("ui.tooltip.tooltip_hotstring")
-local Logger          = require("infra.logger")
+local Logger          = require("core.logger.engine.logger")
 
 local LOG = "tooltip"
 

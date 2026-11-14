@@ -185,7 +185,7 @@ function M.on_message(payload, state, context)
 				-- A folder the next start could not use is refused now rather than
 				-- stored: install() would fall back to stdout for it.
 				if normalized ~= nil and normalized ~= "" and normalized ~= config_paths.default_logs_dir() then
-					local sink = dependency(state, "logger_sink", "infra.logger_sink")
+					local sink = dependency(state, "logger_sink", "core.logger.engine.sink")
 					if not sink or type(sink.prepare_dir) ~= "function" then
 						normalized, refusal = nil, "the logs folder cannot be prepared"
 					else
@@ -210,7 +210,7 @@ function M.on_message(payload, state, context)
 			if logs_dir ~= nil then
 				-- The daemon outlives this editor's reload, so the running sink is
 				-- moved now; until it is, every opener names the folder it writes.
-				local sink = dependency(state, "logger_sink", "infra.logger_sink")
+				local sink = dependency(state, "logger_sink", "core.logger.engine.sink")
 				local moved, move_err = false, "the logger sink cannot be moved"
 				if sink and type(sink.repoint) == "function" then moved, move_err = sink.repoint() end
 				if moved ~= true then

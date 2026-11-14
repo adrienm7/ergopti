@@ -29,7 +29,7 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- Runs body against the real api_remote over a scripted HTTP client and clock.
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "core.logger.engine.shim",
+	local names = { "adapters.http_client", "modules.llm.api_remote", "core.logger.engine.monotonic", "core.logger.engine.shim",
 		"core.events.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -61,7 +61,7 @@ local function with_remote(body)
 		get = function() return false end,
 		cancel = function() return true end,
 	}
-	package.loaded["infra.monotonic"] = {
+	package.loaded["core.logger.engine.monotonic"] = {
 		now_ms = function() return clock.now * 1000 end,
 		now_sec = function() return clock.now end,
 	}

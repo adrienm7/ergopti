@@ -17,7 +17,7 @@ local INPUT = "private typed material"
 --- @param faults table Mutable native faults.
 --- @param body function Receives (runner, native, logs, logger).
 local function with_runner(faults, body)
-	helpers.with_fresh_modules({ "adapters.shell_runner", "infra.logger" }, function()
+	helpers.with_fresh_modules({ "adapters.shell_runner", "core.logger.engine.logger" }, function()
 		local execute, _, native = Double.new(faults)
 		helpers.load_with_stubs("adapters.shell_runner", { execute = execute })
 		local logger, logs = helpers.make_logger_stub(), {}
@@ -26,7 +26,7 @@ local function with_runner(faults, body)
 				logs[#logs + 1] = string.format(template, ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.shell_runner"] = nil
 		local runner = require("adapters.shell_runner")
 		runner._set_private_stdin_native(native)

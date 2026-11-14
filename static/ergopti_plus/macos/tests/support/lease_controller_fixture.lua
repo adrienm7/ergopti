@@ -32,7 +32,7 @@ local function load_controller(options)
 			log_events[level][#log_events[level] + 1] = { ... }
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local ctx = {
 		clock = 0,
@@ -348,7 +348,7 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "core.fs.adapters.storage",
 		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}, function()
 		return callback(load_controller)
 	end)

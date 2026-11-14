@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local MODULE = "ui.healthcheck.appleevents"
-local FIXTURE_MODULES = { MODULE, "adapters.shell_runner", "core.events.timer_scheduler", "infra.logger" }
+local FIXTURE_MODULES = { MODULE, "adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger" }
 local NONCE = "00000000000000000000000000000001"
 
 local function with_probe(options, body)
@@ -18,7 +18,7 @@ local function with_probe(options, body)
 	local saved_hs = hs
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
 		local world = { now = 0, tasks = {}, timers = {}, replies = {}, cancelled = 0, log = {} }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			trace = function() end, done = function() end,
 			error = function(_, text) world.log[#world.log + 1] = text end,
 		}

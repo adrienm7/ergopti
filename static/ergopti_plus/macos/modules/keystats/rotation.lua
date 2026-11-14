@@ -31,7 +31,7 @@ local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local TextCipher = require("modules.keystats.text_cipher")
 local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG    = "keystats.rotation"
 
 

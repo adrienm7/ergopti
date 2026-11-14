@@ -54,7 +54,7 @@ end
 local function install_common_stubs()
 	local logger = helpers.make_logger_stub()
 	logger.today_log_path = function() return "/tmp/ergopti-hs007.log" end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 	package.loaded["infra.notifications"] = {notify = function() end}
 	package.loaded["infra.config_paths"] = {
@@ -141,7 +141,7 @@ end
 helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-backend-stale) delivers one stale handoff from a real MLX check", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
 			"adapters.task_lifecycle", "infra.dialog_util",
@@ -209,7 +209,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-a-b-order) prevents late A from reaching the server after B commits", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
 			"adapters.task_lifecycle", "infra.dialog_util",
@@ -278,7 +278,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-dispatch-stale) deduplicates a stale handoff and false dispatch result", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.config_paths",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.config_paths",
 			"modules.llm", "infra.dialog_util", "ui.menu.menu_llm.profile_label",
 			"ui.menu.menu_llm.model_switcher",
 		}
@@ -332,7 +332,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-a-b-order) prevents late absent A from prompting or pulling after B commits", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.shell_runner", "adapters.task_lifecycle", "core.events.timer_scheduler",
 			"adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
@@ -507,7 +507,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-invalidation-stale) invokes one stale callback after a native check expires", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "adapters.task_lifecycle",
 			"ui.menu.menu_llm.models_manager_mlx_hf",
@@ -547,7 +547,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "adapters.shell_runner", "core.events.timer_scheduler", "infra.logger", "core.i18n.engine.i18n",
+			"hs", "adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger", "core.i18n.engine.i18n",
 			"infra.dialog_util", "core.fs.engine.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
@@ -644,7 +644,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-freshness-fail-closed) rejects nil and throwing generation predicates", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.config_paths",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.config_paths",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
@@ -710,7 +710,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-readiness-yield) prevents stale readiness from publishing server state", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
@@ -780,7 +780,7 @@ helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-mlx-download-publication-yield) drops stale detached-download continuations", function()
 		local modules = {
 			"core.fs.adapters.json_codec",
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications",
 			"adapters.task_lifecycle", "core.events.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
@@ -1020,7 +1020,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-pull-publication-yield) refuses a successor before UI and drops stale completion", function()
 		local modules = {
-			"hs", "infra.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.notifications", "infra.text_utils",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
 			"adapters.task_lifecycle", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",

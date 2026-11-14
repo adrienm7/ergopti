@@ -22,7 +22,7 @@ local function run_add_action(check_result, assertions)
 		helpers.with_fresh_modules({
 			"modules.llm",
 			"core.i18n.engine.i18n",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"infra.dialog_util",
 			"infra.notifications",
 			"infra.manifest_menu",
@@ -76,7 +76,7 @@ local function run_add_action(check_result, assertions)
 				end,
 			}
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.logger"] = {
+			package.loaded["core.logger.engine.logger"] = {
 				debug = function() end,
 				info = function() end,
 				warn = function() end,

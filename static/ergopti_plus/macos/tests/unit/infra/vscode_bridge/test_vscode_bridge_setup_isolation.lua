@@ -42,8 +42,8 @@ local helpers = require("tests.helpers")
 --- @return table bridge, function server_started, function notice_calls
 local function load_bridge_with_throwing_notice()
 	package.loaded["infra.vscode_bridge"] = nil
-	package.loaded["infra.logger"] = nil
-	_ = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	_ = helpers.load_with_stubs("core.logger.engine.logger")
 
 	-- Both plausible notification channels raise, so the test does not encode
 	-- WHICH one the fix chooses — only that neither can stop the server.

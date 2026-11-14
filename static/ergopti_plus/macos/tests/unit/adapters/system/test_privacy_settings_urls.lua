@@ -15,7 +15,7 @@ local LEGACY = "x-apple.systempreferences:com.apple.preference.security?"
 local EXTENSION = "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?"
 
 local function load()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.privacy_settings"] = nil
 	return require("adapters.privacy_settings")
 end

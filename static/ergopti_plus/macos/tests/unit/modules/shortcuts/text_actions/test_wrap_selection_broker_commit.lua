@@ -20,7 +20,7 @@ local function with_broker(callback)
 		"modules.keymap.utils",
 		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
-		"core.fs.adapters.json_codec", "infra.logger", "core.fs.engine.paths", "infra.timings",
+		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })
 		local initial = {

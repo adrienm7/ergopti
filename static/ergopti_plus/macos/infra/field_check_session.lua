@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local Report = require("diagnostics.engine.field_check.report")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 
 local M = {}

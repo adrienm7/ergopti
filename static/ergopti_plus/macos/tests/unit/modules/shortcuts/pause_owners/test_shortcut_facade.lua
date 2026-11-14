@@ -88,7 +88,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		package.loaded["core.lifecycle.engine.startup_transaction"] = {
 			run = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local shortcuts = helpers.load_with_stubs("modules.shortcuts")
 		local url_state = { chatgpt_url = live_url }
 		local url_owner = require("ui.menu.chatgpt_url_transaction").new({
@@ -339,7 +339,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local facade = {}
 		local switch_ctx = nil
 		local startup_ctx = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
@@ -431,7 +431,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.text.engine.json").decode,
 			i18n = {get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get},
-			logger = package.loaded["infra.logger"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			template_rows = profile_renderer.template_rows,

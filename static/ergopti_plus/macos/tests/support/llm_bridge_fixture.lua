@@ -158,11 +158,11 @@ local function with_bridge_fixture(callback, options)
 		fixture.engine = make_prediction_engine(fixture)
 		package.loaded["ui.tooltip"] = fixture.tooltip
 		package.loaded["modules.llm.prediction_engine"] = fixture.engine
-		package.loaded["infra.logger"] = nil
+		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["adapters.event_provenance"] = options.event_provenance
 		fixture.bridge = helpers.load_with_stubs("modules.keymap.llm_bridge")
 		fixture.hs = rawget(_G, "hs")
-		fixture.logger = package.loaded["infra.logger"]
+		fixture.logger = package.loaded["core.logger.engine.logger"]
 		return callback(fixture)
 	end, debug.traceback))
 

@@ -17,10 +17,10 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 --- @param source string|nil config.toml bytes, nil for an absent file.
 --- @param body function Receives (preferences, path).
 local function with_source(source, body)
-	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim",
+	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim",
 		"settings.engine.migration.outdated" }, function()
 		local logger = helpers.make_logger_stub()
-		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["core.fs.adapters.file_system"] = nil
 		local config_outdated = require("settings.engine.migration.outdated")
 		if type(config_outdated.reset_for_tests) == "function" then config_outdated.reset_for_tests() end

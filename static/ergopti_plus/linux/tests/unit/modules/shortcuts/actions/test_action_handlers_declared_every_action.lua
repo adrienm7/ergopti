@@ -135,7 +135,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	helpers.it("today's log path comes from the sink, not from a second copy of the name", function()
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("open_today_log", "test__slot")
-			local Sink = require("infra.logger_sink")
+			local Sink = require("core.logger.engine.sink")
 			local expected = Sink.main_log_path()
 			helpers.assert_true(joined(commands):find(expected, 1, true) ~= nil,
 				"the action must open exactly the file the sink is writing to. Rebuilding the name from a local copy of the 'ErgoptiPlus_' prefix opens the wrong file the day the constant changes — and xdg-open on a missing path fails silently")

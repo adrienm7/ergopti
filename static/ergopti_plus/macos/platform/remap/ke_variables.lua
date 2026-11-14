@@ -30,7 +30,7 @@
 
 local M = {}
 
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local JsonCodec     = require("core.fs.adapters.json_codec")
 local ShellRunner   = require("adapters.shell_runner")
 local TimerScheduler = require("core.events.timer_scheduler")

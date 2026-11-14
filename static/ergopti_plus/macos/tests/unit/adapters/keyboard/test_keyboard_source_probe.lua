@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
 	"adapters.keyboard_source_probe", "adapters.shell_runner", "core.events.timer_scheduler",
-	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "infra.logger",
+	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "core.logger.engine.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
 
@@ -72,7 +72,7 @@ local function fixture(options)
 			levels = { { code = 41, text = ";", dead = false, direct = true } },
 		}
 	end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = { sec = function() return 10 end }
 	package.loaded["platform.remap.lease_helper"] = {
 		resolve = function()
@@ -306,7 +306,7 @@ helpers.describe("native keyboard source proof ownership", function()
 		helpers.with_stub_scope(MODULES, function()
 			local context = fixture()
 			local logged = { error = {}, warn = {} }
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.error = function(_, fmt, ...) logged.error[#logged.error + 1] = string.format(fmt, ...) end
 			logger.warn = function(_, fmt, ...) logged.warn[#logged.warn + 1] = string.format(fmt, ...) end
 			local operation = context.request()

@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 -- =====================================
 -- =====================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 package.loaded["modules.keystats.export"] = {
 	get_native_app_category = function() return "Development" end,

@@ -289,12 +289,12 @@ function M.register_pure(helpers)
 end
 
 local function with_native(helpers, content, body)
-	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+	helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		package.loaded["core.fs.adapters.file_system"] = nil
 		require("settings.engine.migration.outdated").reset_for_tests()
 		local preferences = helpers.load_with_stubs("infra.preferences")

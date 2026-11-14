@@ -26,7 +26,7 @@ helpers.describe("load_with_stubs isolates modules.keystats from a leaked lib.ti
 		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
 
 		-- Any load_with_stubs call must drop the cached partial stub.
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		helpers.assert_nil(package.loaded["infra.timings"], "load_with_stubs must clear a cached lib.timings entry")
 
 		-- The next require must load the real module, whose M.ms is callable
@@ -41,7 +41,7 @@ helpers.describe("load_with_stubs isolates modules.keystats from a leaked lib.ti
 		package.loaded["infra.timings"]       = { sec = function() return 0.1 end }
 		package.loaded["modules.keystats"] = nil
 
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 
 		local ok, err = pcall(require, "modules.keystats")
 		helpers.assert_true(ok, "modules.keystats must load without error after a leaked partial lib.timings stub: " .. tostring(err))

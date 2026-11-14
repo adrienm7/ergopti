@@ -17,13 +17,13 @@ function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
 			"adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "infra.monotonic" }
+			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { allowed = true, guard = guard, field = field, wire = {}, held = {}, writes = {},
 			clipboard = "SAVED", starts = 0, emits = 0, resets = 0, stopped = 0, now = 0,
 			selection = { first = 0, last = 3, text = "btw" }, requests = {} }
-		package.loaded["infra.monotonic"] = { now_ms = function() return state.now end }
+		package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return state.now end }
 		package.loaded["modules.hotstrings.selected_output"] = nil
 		local function boundary(name)
 			if state.on_boundary then state.on_boundary(name) end

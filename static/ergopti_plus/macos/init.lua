@@ -95,11 +95,11 @@ do
 	end
 end
 
-local Logger             = require("infra.logger")
+local Logger             = require("core.logger.engine.logger")
 -- Admit canonical privacy before any dependency can publish an error or path.
 do
 	local admitted = pcall(function()
-		local raw = require("adapters.boot_journal").read_privacy_policy(logger_shared_root)
+		local raw = require("core.logger.adapters.boot_journal").read_privacy_policy(logger_shared_root)
 		Logger.initialize_privacy(raw)
 	end)
 	if not admitted then
@@ -148,7 +148,7 @@ do
 		if InstanceAdmission.may_exit_process(decision) then
 			Logger.warn("init", "Refusing a second Ergopti runtime started without the launcher (%s); "
 				.. "exiting before any module starts.", identity)
-			require("adapters.boot_journal").append("WARNING",
+			require("core.logger.adapters.boot_journal").append("WARNING",
 				"Stray Ergopti runtime refused before boot: " .. identity .. ".")
 			os.exit(0)
 			return
@@ -240,8 +240,8 @@ end
 -- Boot-phase profiler — ported from the AHK driver. Begin timing as early as the
 -- logger is ready so every subsequent Boot.mark() reports its delta + running
 -- total in the boot log, making a slow startup self-diagnosing (no profiler attach).
-local Boot               = require("infra.boot_profiler")
-local BootJournal        = require("adapters.boot_journal")
+local Boot               = require("core.logger.engine.boot_profiler")
+local BootJournal        = require("core.logger.adapters.boot_journal")
 local ReloadBreadcrumb   = require("adapters.reload_breadcrumb")
 -- A controlled reload's trail ends with this line when a boot followed it
 -- (field run 2026-10-30 21:06: the reload lost the app and no boot followed).

@@ -40,14 +40,14 @@ local function endpoint_with(stored)
 	}
 	local logger = helpers.make_logger_stub()
 	logger.info = function(_, fmt, ...) lines[#lines + 1] = string.format(fmt, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.llm.ollama_endpoint"] = nil
 	return require("modules.llm.ollama_endpoint"), stored, lines, defaults
 end
 
 local function scoped(fn)
 	return function()
-		helpers.with_stub_scope({ "modules.llm", "core.fs.adapters.storage", "infra.logger",
+		helpers.with_stub_scope({ "modules.llm", "core.fs.adapters.storage", "core.logger.engine.logger",
 			"modules.llm.ollama_endpoint", "modules.llm.ollama_binary", "adapters.managed_ollama_hint" }, fn)
 	end
 end

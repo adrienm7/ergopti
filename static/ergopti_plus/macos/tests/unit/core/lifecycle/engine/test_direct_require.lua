@@ -49,7 +49,7 @@ helpers.describe("direct require", function()
 		local source = assert(helpers.read_driver_unit('require("core.lifecycle.engine.direct_require").install(_G)'))
 		local install = source:find('require("core.lifecycle.engine.direct_require").install(_G)', 1, true)
 		helpers.assert_true(install ~= nil, "init.lua must install the direct require")
-		helpers.assert_true(install < source:find('require("infra.logger")', 1, true),
+		helpers.assert_true(install < source:find('require("core.logger.engine.logger")', 1, true),
 			"the logger's own load tree is the largest user of the wrapper")
 		helpers.assert_true(source:find("if not direct_require_installed then", 1, true) ~= nil,
 			"a refused install must reach the log")

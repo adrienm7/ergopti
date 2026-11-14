@@ -33,8 +33,8 @@ local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 -- =====================================
 
 -- Must be registered BEFORE load_with_stubs so downstream requires resolve them.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 package.loaded["core.i18n.engine.i18n"] = {
 	t = function(key) return key end,

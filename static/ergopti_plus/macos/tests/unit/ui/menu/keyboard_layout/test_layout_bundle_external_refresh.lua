@@ -31,7 +31,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"core.fs.engine.dir",
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
-				"infra.logger",
+				"core.logger.engine.logger",
 				"infra.text_utils",
 				"core.i18n.engine.i18n",
 				"infra.notifications",
@@ -48,7 +48,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				hs_stub.__reset()
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				package.loaded["infra.text_utils"] = {
 					shell_quote = function(value) return "'" .. tostring(value) .. "'" end,

@@ -170,7 +170,7 @@ end
 --- the names under it at write time. Required lazily: the sink reads this module
 --- when it installs, so neither may require the other at load.
 local function follow_config_dir_in_logs()
-	require("infra.logger_sink").follow_config_dir(M.get_config_dir())
+	require("core.logger.engine.sink").follow_config_dir(M.get_config_dir())
 end
 
 --- Persists a configuration-directory override.

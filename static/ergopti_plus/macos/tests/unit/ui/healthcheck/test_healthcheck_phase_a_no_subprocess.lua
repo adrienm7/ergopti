@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 
 -- Reloaded under the counted runtime and restored after the case
 local FIXTURE_MODULES = {
-	"tests.stubs.hs", "infra.logger", "ui.healthcheck.core", "ui.healthcheck.helpers",
+	"tests.stubs.hs", "core.logger.engine.logger", "ui.healthcheck.core", "ui.healthcheck.helpers",
 	"adapters.system_info", "adapters.key_state", "adapters.network_info",
 	"adapters.accessibility_permission", "adapters.screen_capture",
 }
@@ -40,7 +40,7 @@ local function run_phase_a()
 		end
 		hs_stub.host.vmStat = function() return { memSize = RAM_BYTES, pagesFree = 1000, pageSize = 16384 } end
 		hs_stub.usb = { attachedDevices = function() return { USB_KEYBOARD } end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		os.execute = function(command)
 			calls[#calls + 1] = "os.execute " .. tostring(command)
 			return nil

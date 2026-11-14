@@ -53,7 +53,7 @@ local function retire_daemon(daemon, status, before_completion)
 end
 
 local MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"infra.text_utils",
@@ -189,7 +189,7 @@ local function with_fixture(spec, body)
 		local native_task_results = spec.native_task_results or {}
 		local menu_updates = 0
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = {
 			notify = function(...)
 				notifications[#notifications + 1] = table.pack(...)

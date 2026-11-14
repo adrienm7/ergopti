@@ -20,7 +20,7 @@ assert(cfg:write("[metrics]\nenabled = true\n") and cfg:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
 local R = require("modules.keystats.sqlite_reader")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 assert(Clock.backend() == "luv.hrtime")
 local db = root .. "/metrics.sqlite"
 K.init({ sqlite_path = db, log_dir = root .. "/logs" })

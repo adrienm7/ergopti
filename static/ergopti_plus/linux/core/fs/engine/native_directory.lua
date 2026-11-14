@@ -6,7 +6,7 @@
 --- Lists directories and walks trees in this process through libuv, for the
 --- callers that used to fork `find` for it: the hotstring pack discovery
 --- (modules/hotstrings/loader.lua) and the log retention purge
---- (infra/logger_sink.lua).
+--- (core/logger/engine/sink.lua).
 ---
 --- FEATURES & RATIONALE:
 --- 1. GNU `find -P` semantics, kept exactly. walk() visits the root, then every

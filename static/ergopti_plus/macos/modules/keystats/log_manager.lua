@@ -44,7 +44,7 @@ local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Timings = require("infra.timings")
 local Literal = require("core.fs.engine.sqlite.literal")
 local Queries = require("metrics.engine.queries")

@@ -21,8 +21,8 @@ local helpers = require("tests.helpers")
 
 -- Reload the module fresh so watchers are not already running from a prior test.
 package.loaded["modules.keymap.utils"] = nil
-package.loaded["infra.logger"]           = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"]           = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 local KU = helpers.load_with_stubs("modules.keymap.utils")
 

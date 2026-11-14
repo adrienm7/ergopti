@@ -18,7 +18,7 @@ local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
 
@@ -63,7 +63,7 @@ local function with_gate(options, scenario)
 				f.logs[level][#f.logs[level] + 1] = string.format(tostring(message), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 
 		--- @param name string Event to look up.

@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local function with_fixture(callback)
 	helpers.with_fresh_modules({
-		"ui.ui_builder", "infra.logger", "core.fs.engine.paths", "infra.timings", "infra.deferred_work",
+		"ui.ui_builder", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings", "infra.deferred_work",
 		"hs", "tests.stubs.hs",
 	}, function()
 		local controls = {delete_throws = false}
@@ -33,7 +33,7 @@ local function with_fixture(callback)
 		end
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = {shared = function() return "shared" end}
 		helpers.provide_timings()
 		package.loaded["infra.deferred_work"] = {

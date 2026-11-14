@@ -76,7 +76,7 @@ end
 local function new_fixture()
 	package.loaded["modules.keymap.utils"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local scheduler = make_scheduler()
 	package.loaded["core.events.timer_scheduler"] = scheduler

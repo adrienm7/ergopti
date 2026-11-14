@@ -31,7 +31,7 @@ local kl_mod        = require("modules.keystats")
 local i18n          = require("core.i18n.engine.i18n")
 local ManifestMenu  = require("infra.manifest_menu")
 local Manifest      = require("infra.manifest_reader")
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local ParentSource = require("menu.engine.frames.parent_source")
 
 local LOG = "menu_metrics"

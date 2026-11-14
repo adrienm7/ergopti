@@ -11,8 +11,8 @@ local function write(path, bytes)
 end
 local function with_source(source, callback)
 	return helpers.with_stub_scope({ "infra.preferences", "ui.menu.unused_keys_cleanup", "menu.engine.wrap_preferences",
-		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger" }, function()
-		helpers.load_with_stubs("infra.logger")
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger" }, function()
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
 		local engine = require("settings.engine.migration.unused_keys")

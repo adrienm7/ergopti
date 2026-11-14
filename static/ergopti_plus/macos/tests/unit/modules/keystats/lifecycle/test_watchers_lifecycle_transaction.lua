@@ -32,7 +32,7 @@ local helpers = require("tests.helpers")
 local MODULE_NAMES = {
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"modules.keystats.context_tracker",
 	"modules.keystats.log_manager",
@@ -183,7 +183,7 @@ local function with_fixture(options, scenario)
 	_G.hs = hs_stub
 
 	local function noop() end
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function(_, format_string, ...)
 			fixture.error_lines[#fixture.error_lines + 1] = string.format(format_string, ...)
 		end,

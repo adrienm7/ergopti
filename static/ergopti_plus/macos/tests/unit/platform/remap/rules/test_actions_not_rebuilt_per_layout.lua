@@ -39,8 +39,8 @@ local ACTIONS_FILE = "/fake/actions.json"
 --- @return table Config, function read_count
 local function load_config()
 	package.loaded["platform.remap.config"] = nil
-	package.loaded["infra.logger"] = nil
-	_ = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	_ = helpers.load_with_stubs("core.logger.engine.logger")
 
 	local reads = { n = 0 }
 	local real_open = io.open

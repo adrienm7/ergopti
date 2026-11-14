@@ -18,7 +18,7 @@ local MODULES = {
 	"hs",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"infra.text_utils",
 	"modules.llm",
@@ -121,7 +121,7 @@ local function with_fixture(save_results, callback)
 			}
 			_G.hs = hs_fixture
 			package.loaded["hs"] = hs_fixture
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.notifications"] = {notify = function() return true end}
 			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}

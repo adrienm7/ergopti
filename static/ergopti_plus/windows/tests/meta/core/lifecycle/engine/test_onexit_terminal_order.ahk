@@ -97,7 +97,7 @@ Test("OnExit: refusal keeps gesture hooks live until terminal acceptance "
 
 _OTO_MainRunsBeforeFinalLoggerFlush() {
 	Main := _OTO_Read("ErgoptiPlus.ahk")
-	Logger := _OTO_Read("infra/logger.ahk")
+	Logger := _OTO_Read("core/logger/engine/logger.ahk")
 	Assert(InStr(Main, "OnExit(Ergopti_OnShutdown, -1)", true) > 0,
 		"the refusal-capable lifecycle callback must be prepended")
 	Assert(InStr(Logger, "OnExit(_LoggerOnExitFlush)", true) > 0,

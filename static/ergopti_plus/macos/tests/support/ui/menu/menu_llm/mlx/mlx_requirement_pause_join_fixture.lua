@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"core.fs.engine.dir",
@@ -144,7 +144,7 @@ end
 --- Installs strict shared dependencies for ScriptControl and the real manager.
 --- @param native table Native-state record receiving server starts.
 local function install_subject_stubs(native)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = function() return true end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }

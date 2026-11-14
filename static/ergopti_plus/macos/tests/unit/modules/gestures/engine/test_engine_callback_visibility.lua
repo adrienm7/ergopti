@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local Logger = helpers.load_with_stubs("infra.logger")
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 local current_time = 0
 
@@ -43,7 +43,7 @@ local function recording_actions()
 end
 
 local function fresh_engine()
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	local engine = helpers.load_with_stubs("modules.gestures.engine")

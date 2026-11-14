@@ -45,7 +45,7 @@ helpers.describe("onboarding configuration import transaction", function()
 	helpers.it("(onboarding-import-transaction) new configuration directory restarts the pages from neutral values", function()
 		fixture.with_delivery(function(_, state, pending, errors, evaluations)
 			local debug_messages = {}
-			package.loaded["infra.logger"].debug = function(_, template, ...)
+			package.loaded["core.logger.engine.logger"].debug = function(_, template, ...)
 				local message = string.format(template, ...)
 				if message:find("existing configuration", 1, true) then
 					debug_messages[#debug_messages + 1] = message

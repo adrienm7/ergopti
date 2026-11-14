@@ -77,7 +77,7 @@ local function with_delivery(cached, callback)
 					if state.submit then return state.submit(self, code, done) end
 					return self
 				end
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				logger.success = function(_, message, ...) successes[#successes + 1] = string.format(message, ...) end
 				pending[#pending]()

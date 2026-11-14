@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"core.fs.adapters.toml_cache", "infra.logger", "lfs", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.bom",
+	"core.fs.adapters.toml_cache", "core.logger.engine.logger", "lfs", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.bom",
 	"core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner", "core.lifecycle.engine.compat.utf8",
 }
 local OLD = '[[alpha]]\n"key" = { output = "OLD" }\n'
@@ -32,7 +32,7 @@ local function with_cache(run)
 			local directory, source = root .. "/cache", root .. "/source.toml"
 			assert(fs.mkdir(directory))
 			_G.hs = { fs = { attributes = fs.attributes, mkdir = fs.mkdir } }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local cache, reader = require("core.fs.adapters.toml_cache"), require("core.text.engine.toml_codec.reader")
 			cache.init(directory)
 			reader.set_cache_provider(cache)

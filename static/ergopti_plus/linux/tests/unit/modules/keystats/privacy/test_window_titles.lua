@@ -324,7 +324,7 @@ helpers.describe("window titles: privacy changes without a window change", funct
 	}
 	for _, policy in ipairs(policies) do
 		it("privacy-open-interval: " .. policy.name .. " cannot backfill a stationary window", function()
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous_now, now = clock.now_ms, 1000
 			clock.now_ms = function() return now end
 			local ok, err = pcall(function()

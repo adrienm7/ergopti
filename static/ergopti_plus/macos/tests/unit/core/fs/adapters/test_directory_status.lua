@@ -12,8 +12,8 @@ local function with_adapter(run)
 	local previous_hs = rawget(_G, "hs")
 	local state = { entry = { mode = "directory" }, followed = { mode = "directory" }, follows = 0 }
 	local ok, failure = xpcall(function()
-		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger", "core.fs.engine.dir", "infra.text_utils" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger", "core.fs.engine.dir", "infra.text_utils" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.text_utils"] = {}
 			package.loaded["core.fs.engine.dir"] = { try_entries = function()
 				if state.list_error then return nil, false, "cannot list parent" end

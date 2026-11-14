@@ -28,7 +28,7 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local Timings = require("infra.timings")
 local TimerScheduler = require("core.events.timer_scheduler")

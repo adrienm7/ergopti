@@ -19,7 +19,7 @@ local function with_fixture(callback)
 		"core.fs.adapters.file_system",
 		"infra.config_paths",
 		"core.i18n.engine.i18n",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}
 	helpers.with_fresh_modules(module_names, function()
 		local original_open = io.open
@@ -42,7 +42,7 @@ local function with_fixture(callback)
 		local logger_stub = helpers.make_logger_stub()
 		-- The logger is the one resolver of the crash-reports folder.
 		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 
 		-- The legacy implementation writes directly with mode "w". Model that
 		-- faithfully so the pre-fix code overwrites the same in-memory path and

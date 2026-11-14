@@ -19,7 +19,7 @@
 --- 3. Every collaborator is injectable (registry, build deps, active sources).
 --- ==============================================================================
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local M = {}
 

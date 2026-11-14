@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture Persisted events and contextual diagnostics.
 local function complete_sample(status, stdout)
 	local names = {
-		"infra.logger", "infra.timings", "adapters.task_lifecycle",
+		"core.logger.engine.logger", "infra.timings", "adapters.task_lifecycle",
 		"core.events.timer_scheduler", "modules.keystats.log_manager",
 		"modules.keystats.network_watcher", "modules.keystats.watchers",
 	}
@@ -23,7 +23,7 @@ local function complete_sample(status, stdout)
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { events = {}, errors = {} }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop,
 		error = function(_, message, ...)
 			fixture.errors[#fixture.errors + 1] = string.format(message, ...)

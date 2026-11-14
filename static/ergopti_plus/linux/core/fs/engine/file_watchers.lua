@@ -33,7 +33,7 @@ local TableUtil = require("core.text.engine.table_util")
 local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local reload_gate = require("core.lifecycle.engine.reload.gate")
 local FileSystem = require("core.fs.adapters.file_system")
 local RuntimeLog = require("diagnostics.engine.runtime_log")

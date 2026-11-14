@@ -129,7 +129,7 @@ local function load_inventory_context(options)
 		for _, owner in ipairs(OWNER_IDS) do late(owner) end
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.keycodes"] = {

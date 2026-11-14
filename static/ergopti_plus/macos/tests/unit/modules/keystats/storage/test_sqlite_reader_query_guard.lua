@@ -61,7 +61,7 @@ end
 --- @return table module, table error_calls
 local function load_reader_with(sqlite_stub)
 	local error_calls = {}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info  = function() end, start = function() end, success = function() end,
 		warn  = function() end,

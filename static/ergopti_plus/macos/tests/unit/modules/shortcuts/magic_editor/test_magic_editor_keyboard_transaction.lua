@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
 local MODULES = {
-	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "core.fs.engine.paths", "infra.logger",
+	"core.fs.adapters.file_system", "adapters.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
 	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -30,7 +30,7 @@ local function with_subject(assignments, scenario)
 			read = function() return Json.encode(catalogue) end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "modifier-chords.json" end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_reader"] = nil
 		package.loaded["modules.gestures.actions"] = {
 			is_assignable = function(action) return type(action) == "string" end,
@@ -153,7 +153,7 @@ end)
 helpers.describe("contextual keyboard slot: logger-bound source rejoin", function()
 	helpers.it("refuses a source revoked inside the actual parent logger callback", function()
 		with_subject({}, function(_, observed)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local original_callback, source_current, logger_entries, rechecks = logger.callback, true, 0, 0
 			logger.callback = function(log, name, callback, ...)
 				logger_entries = logger_entries + 1

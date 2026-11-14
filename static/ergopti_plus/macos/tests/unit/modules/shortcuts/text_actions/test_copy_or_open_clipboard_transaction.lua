@@ -15,7 +15,7 @@ local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "infra.logger",
+		"adapters.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
@@ -28,7 +28,7 @@ local function load_fixture(options)
 	local restore_calls = 0
 	local copies = 0
 	local snapshots = 0
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.window_info"] = {
 		getFocused = function() return { appId = "TextEdit" } end,
 	}

@@ -8,7 +8,7 @@
 
 local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local text_utils = require("infra.text_utils")
 local Notifications = require("infra.notifications")
 local i18n    = require("core.i18n.engine.i18n")

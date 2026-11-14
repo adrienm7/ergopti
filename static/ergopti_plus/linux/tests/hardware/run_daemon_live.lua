@@ -58,7 +58,7 @@ local LLM_REWRITE_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REWRITE_REPLY")
 local KEY_LEFTMETA, KEY_SPACE = 125, 57
 local LLM_KEY = "live-test-key"
 
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 -- Once the daemon's output is open, every wait of this harness also reads it:
 -- the kernel keeps about 32 keystrokes for a reader, and an expansion typed

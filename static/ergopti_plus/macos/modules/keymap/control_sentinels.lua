@@ -26,7 +26,7 @@
 local M = {}
 
 local Keycodes       = require("platform.input.keycodes.core")
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local SyntheticInput = require("adapters.synthetic_input")
 local ControlSignals = require("layouts.engine.layers.control_signals")
 

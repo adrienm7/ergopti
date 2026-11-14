@@ -17,7 +17,7 @@ local prime_counts = {apps = 0, keyboard_layout = 0, karabiner = 0}
 local pause_listener
 local paused = false
 
-local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 hs_stub.timer = {
 	new = function(delay, callback)
 		local timer = {
@@ -79,7 +79,7 @@ local state = {
 	update_check_interval_seconds = 3600,
 }
 
-package.loaded["infra.logger"] = helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 package.loaded["infra.notifications"] = { notify = function() end }
 package.loaded["ui.hotstring_editor"] = { set_update_menu = function() end }
 package.loaded["infra.text_utils"] = {

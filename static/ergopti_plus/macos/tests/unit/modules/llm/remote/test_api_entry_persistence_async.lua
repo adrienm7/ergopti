@@ -31,7 +31,7 @@ local function with_persistence_fixture(options, body)
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote",
 		"modules.llm.api_token_crypto", "modules.llm.api_common",
-		"infra.logger", "core.fs.engine.paths", "core.events.timer_scheduler", "core.fs.adapters.storage",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.events.timer_scheduler", "core.fs.adapters.storage",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -104,7 +104,7 @@ local function with_persistence_fixture(options, body)
 			return { cancel = function() return true end }
 		end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, info = function() end, warn = function() end,
 		start = function() end, success = function() end, done = function() end,
 		error = function(_, fmt, ...)

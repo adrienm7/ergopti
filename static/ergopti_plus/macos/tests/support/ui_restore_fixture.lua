@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local MODULE_NAMES = {
-	"core.fs.adapters.storage", "core.events.timer_scheduler", "infra.logger", "infra.timings",
+	"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger", "infra.timings",
 	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
@@ -35,7 +35,7 @@ function M.with_fixture(options, scenario)
 				},
 			}
 			local function noop() end
-			package.loaded["infra.logger"] = setmetatable({}, {
+			package.loaded["core.logger.engine.logger"] = setmetatable({}, {
 				__index = function(_, method)
 					if method == "error" then
 						return function(_log, format, ...)

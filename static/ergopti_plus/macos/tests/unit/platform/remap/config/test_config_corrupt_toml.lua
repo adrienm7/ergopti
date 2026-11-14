@@ -21,7 +21,7 @@ package.loaded["core.text.engine.toml_codec"]     = _toml_stub
 package.loaded["infra.toml.codec"] = _toml_stub
 
 -- Capture Logger calls via the runtime capture helper.
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
 local captured = {}
 local original_fn = {}

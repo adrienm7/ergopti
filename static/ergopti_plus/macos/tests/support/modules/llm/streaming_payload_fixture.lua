@@ -13,7 +13,7 @@ local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "core.fs.adapters.file_system",
-	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
+	"core.logger.engine.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
@@ -49,7 +49,7 @@ local function with_stream(backend, callback)
 		end }
 		package.loaded["adapters.shell_runner"] = {}
 		package.loaded["core.events.timer_scheduler"] = { now = function() return 0 end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end, done = function() end,
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}

@@ -30,7 +30,7 @@ local function with_gesture(mode, conflict, scenario)
 				local controls = { mode = mode, assigned = "none", disk = "none", saves = 0,
 					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {}, name_reads = 0 }
 				local state = { gestures = true, action = "none" }
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				package.loaded["core.logger.engine.shim"] = logger
 				package.loaded["infra.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}

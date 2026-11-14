@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture Observable fixture fields and the loaded bridge.
 local function load_fixture(render_result, previews_enabled, options)
 	options = options or {}
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local fixture = {
 		scheduled = {},
 		live_stops = {},

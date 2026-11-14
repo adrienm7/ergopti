@@ -28,7 +28,7 @@ local Terminators = require("layouts.engine.layers.terminators")
 local SyntheticInput = require("adapters.synthetic_input")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local text_utils = require("infra.text_utils")
 local LOG    = "dynamic_hotstrings.rules"
 

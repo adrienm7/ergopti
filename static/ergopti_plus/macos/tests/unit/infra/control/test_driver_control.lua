@@ -104,14 +104,14 @@ end
 --- @param options table Native fault controls.
 --- @param callback function Receives the module and independently observable native state.
 local function with_native_world(options, callback)
-	helpers.with_stub_scope({ "core.lifecycle.engine.driver_control", "infra.logger", "core.fs.adapters.file_system", "adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
+	helpers.with_stub_scope({ "core.lifecycle.engine.driver_control", "core.logger.engine.logger", "core.fs.adapters.file_system", "adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
 		local state = { files = {}, stops = 0, starts = 0, created = 0, running = false, options = options }
 		state.errors = {}
 		local module
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) state.errors[#state.errors + 1] = string.format(message, ...) end
 		logger.start = function() if options.on_log_start then options.on_log_start(module, state) end end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		module = helpers.load_with_stubs("core.lifecycle.engine.driver_control", {
 			fs = { attributes = function() return { mode = "directory", permissions = "rwx------" } end },
 			pathwatcher = { new = function(folder, delivery)

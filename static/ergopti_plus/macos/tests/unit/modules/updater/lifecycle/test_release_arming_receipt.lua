@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 
 local function with_installer(options, check)
 	options = options or {}
-	helpers.with_stub_scope({ "modules.updater.release_installer", "infra.logger", "core.fs.engine.paths",
+	helpers.with_stub_scope({ "modules.updater.release_installer", "core.logger.engine.logger", "core.fs.engine.paths",
 		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "adapters.shell_runner" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.fs.engine.paths"] = { shared = function(path)
 			helpers.assert_eq(path, "../macos/adapters/release_stage.sh")
 			return helpers.driver_root() .. "adapters/release_stage.sh"

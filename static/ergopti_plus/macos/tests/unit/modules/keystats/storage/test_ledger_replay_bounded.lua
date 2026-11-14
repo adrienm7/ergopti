@@ -13,8 +13,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local Export = helpers.load_with_stubs("modules.keystats.export")
 package.loaded["modules.keystats.ledger_replay"] = nil
 local LedgerReplay = require("modules.keystats.ledger_replay")

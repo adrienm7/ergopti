@@ -29,7 +29,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
 				"ui.menu.menu_shortcuts",
-				"infra.logger",
+				"core.logger.engine.logger",
 				"infra.deferred_work",
 				"core.fs.engine.dir",
 				"infra.dialog_util",
@@ -59,7 +59,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 				end
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["infra.deferred_work"] = {
 					after = function() return true end,
 				}
@@ -86,7 +86,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.fs.adapters.json_codec").decode,
 					i18n = package.loaded["core.i18n.engine.i18n"],
-					logger = package.loaded["infra.logger"],
+					logger = package.loaded["core.logger.engine.logger"],
 				}))
 				package.loaded["infra.manifest_menu"] = {
 					group_receiver = extension_renderer.group_receiver,
@@ -180,7 +180,7 @@ end)
 --- @param callback function Native provider and initialized owner assertions.
 local function with_extension_boundary(callback)
 	local names = {
-		"ui.menu.menu_shortcuts", "infra.logger", "infra.deferred_work", "core.fs.engine.dir",
+		"ui.menu.menu_shortcuts", "core.logger.engine.logger", "infra.deferred_work", "core.fs.engine.dir",
 		"infra.dialog_util", "modules.shortcuts", "modules.shortcuts.actions.text",
 		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.engine.paths", "core.fs.adapters.json_codec",
 		"core.fs.adapters.storage", "core.events.timer_scheduler", "menu.engine.renderer", "ui.menu.menu_utils",
@@ -216,7 +216,7 @@ local function with_extension_boundary(callback)
 				packs[#packs + 1] = { id = id, name = id, dir = dir }
 			end
 			native_hs.extension_boundary = { loads = 0, actions = {}, accept = false }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 			package.loaded["infra.dialog_util"] = {}
@@ -351,7 +351,7 @@ helpers.describe("Shortcut extension presentation boundary", function()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local projected = assert(Renderer.new({ platform = platform,
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-					json_decode = Json.decode, i18n = native_i18n, logger = require("infra.logger") }))
+					json_decode = Json.decode, i18n = native_i18n, logger = require("core.logger.engine.logger") }))
 				helpers.assert_eq(projected.template_rows(expected.section, {}, {}, {}), expected.projections[platform])
 			end
 		end)

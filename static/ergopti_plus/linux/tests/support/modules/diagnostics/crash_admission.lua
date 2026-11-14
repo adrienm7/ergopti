@@ -6,7 +6,7 @@
 local M = {}
 
 function M.with_admission(body, identity)
-	local Sink = require("infra.logger_sink")
+	local Sink = require("core.logger.engine.sink")
 	local previous = Sink.capture_redactor
 	local root = require("core.fs.engine.paths").shared_root()
 	local file = assert(io.open(root .. "/diagnostics/data/redaction.json", "rb"))

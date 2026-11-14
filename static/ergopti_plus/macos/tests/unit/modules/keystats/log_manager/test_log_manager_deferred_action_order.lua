@@ -17,7 +17,7 @@ local function plaintext_cipher()
 	package.loaded["infra.preferences"] = nil
 	local path = os.tmpname()
 	assert(os.remove(path))
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	local previous, errors = logger.error, {}
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 	local _, status = helpers.load_with_stubs("infra.preferences").load(path)
@@ -34,7 +34,7 @@ local function load_fixture(options)
 	package.loaded["modules.keystats.aggregator"] = nil
 	package.loaded["modules.keystats.export"] = nil
 	package.loaded["metrics.engine.metrics"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.events.timer_scheduler"] = nil
 
 	local appended = {}
@@ -398,7 +398,7 @@ end)
 for _, name in ipairs({
 	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
-	"modules.keystats.export", "metrics.engine.metrics", "infra.logger",
+	"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
 	"core.events.timer_scheduler",
 }) do
 	package.loaded[name] = nil

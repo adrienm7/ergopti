@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 
 -- manifest_reader logs through infra.logger; load the stub first.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 require("tests.lua.features_manifest_contract").run(helpers, "hs", require("infra.manifest_reader"))

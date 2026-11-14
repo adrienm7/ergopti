@@ -59,7 +59,7 @@ local function with_picker(options, callback)
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() fixture.errors = fixture.errors + 1 end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, _, confirm, cancel)
 				if options.cancel then return cancel end

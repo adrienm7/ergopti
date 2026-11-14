@@ -19,7 +19,7 @@ local PrintfModel = require("tests.support.posix_printf_model")
 --- @return table ShellRunner, table executed, table logs
 local function load_runner(answer)
 	local executed, logs = {}, {}
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	local ShellRunner = helpers.load_with_stubs("adapters.shell_runner", {
 		execute = function(command)
 			executed[#executed + 1] = command:match("^[^%z]*")
@@ -29,7 +29,7 @@ local function load_runner(answer)
 	})
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["adapters.shell_runner"] = nil
 	ShellRunner = require("adapters.shell_runner")
 	return ShellRunner, executed, logs

@@ -2,8 +2,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 -- Exercise the shared fallback transaction directly. The macOS wrapper now
 -- injects adapters.file_system; adapter-specific source revalidation is covered
 -- below with an explicit behavioral double.

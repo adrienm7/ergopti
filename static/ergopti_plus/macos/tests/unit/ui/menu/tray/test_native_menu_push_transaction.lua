@@ -25,7 +25,7 @@ local function load_fixture(opts)
 	local destroyed = 0
 	local logs = { info = {}, error = {} }
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 	hs_stub.timer = {
 		new = function(delay, callback)
@@ -67,7 +67,7 @@ local function load_fixture(opts)
 	Logger.error = function(_, message, ...)
 		logs.error[#logs.error + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["infra.text_utils"] = {

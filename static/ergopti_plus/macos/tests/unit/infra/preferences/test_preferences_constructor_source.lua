@@ -20,7 +20,7 @@ local shared = assert(driver:match("^(.*)/macos$")) .. "/_shared"
 local absolute = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;"
 package.path = absolute .. inherited
 _G.hs = require("tests.stubs.hs")
-require("tests.helpers").load_with_stubs("infra.logger")
+require("tests.helpers").load_with_stubs("core.logger.engine.logger")
 local expected = mode == "absolute" or mode == "relative" or mode == "mixed"
 local called = 0
 if mode ~= "absolute" and mode ~= "relative" then

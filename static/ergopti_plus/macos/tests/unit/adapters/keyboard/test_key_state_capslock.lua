@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table adapter
 local function load_adapter(toggle_impl, get_impl)
 	package.loaded["adapters.key_state"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("adapters.key_state", {
 		hid = {
 			capslock = { toggle = toggle_impl, get = get_impl },

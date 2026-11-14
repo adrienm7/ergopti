@@ -61,7 +61,7 @@ local function production()
 		settle_ms = Timings.ms("ui", "x11_layout_reapply_settle_ms"),
 		window_ms = Timings.ms("ui", "x11_layout_reapply_window_ms"),
 		read_timeout_ms = Timings.ms("ui", "x11_layout_reapply_read_timeout_ms"),
-		now_ms = require("infra.monotonic").now_ms,
+		now_ms = require("core.logger.engine.monotonic").now_ms,
 		start_process = OwnedProcess.start,
 		command = function()
 			local uv = require("luv")

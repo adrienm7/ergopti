@@ -237,7 +237,7 @@ function M.native()
 	}))
 	local null_pointer = ffi.cast("void *", 0)
 	local crypto = ffi.load(soname)
-	local Clock, Deadline = require("infra.monotonic"), require("infra.managed_http_deadline")
+	local Clock, Deadline = require("core.logger.engine.monotonic"), require("infra.managed_http_deadline")
 	return M.new({
 		now_ms = Clock.now_ms, deadline = Deadline.start,
 		read = function(fd, capacity, offset, callback)

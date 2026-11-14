@@ -27,8 +27,8 @@ local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 -- =====================================
 -- =====================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local ROT = helpers.load_with_stubs("modules.keystats.rotation")
 
@@ -276,7 +276,7 @@ end)
 --- @param callback function Receives the fresh Rotation module and exact fixture controls.
 local function with_rollover_owner(callback)
 	return helpers.with_stub_scope({
-		"modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger",
+		"modules.keystats.rotation", "core.fs.adapters.ledger_append", "core.logger.engine.logger",
 		"modules.keystats.timestamp", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}, function()
 		local real_open, real_date = io.open, os.date
@@ -326,7 +326,7 @@ local function with_rollover_owner(callback)
 					return checked_reset("2024-07-01", completion) == true
 				end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- Rebind Timestamp's scheduler and its native hs capture before native IO ports.
 			local r = helpers.load_with_stubs("modules.keystats.rotation")
 			io.open = function(path, mode)

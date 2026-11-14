@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
 
 local PAC_URL = "http://pac.intranet.example/proxy.pac"
 local SCUTIL_PAC = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : " .. PAC_URL .. "\n}\n"
@@ -52,7 +52,7 @@ local function run(world)
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		local Engine = require("infra.field_check")

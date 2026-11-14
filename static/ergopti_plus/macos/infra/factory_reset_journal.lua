@@ -22,7 +22,7 @@ local M = {}
 
 local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec = require("core.fs.adapters.json_codec")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "factory_reset_journal"
 local VERSION = 1

@@ -22,7 +22,7 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local Ports          = require("ai.engine.request_plan.ports")
 local text_utils = require("infra.text_utils")
 local Parser         = require("modules.llm.parser")

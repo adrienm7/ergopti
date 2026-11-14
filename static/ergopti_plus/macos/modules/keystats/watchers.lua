@@ -25,7 +25,7 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Timings = require("infra.timings")
 local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("core.events.timer_scheduler")

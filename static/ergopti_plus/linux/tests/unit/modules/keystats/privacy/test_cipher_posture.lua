@@ -1,7 +1,7 @@
 --- tests/unit/modules/keystats/privacy/test_cipher_posture.lua
 --- Saved encryption consent must never become a plaintext persistence fallback.
 local helpers = require("tests.helpers")
-require("infra.monotonic") -- Capture the genuine clock before temporary ports.
+require("core.logger.engine.monotonic") -- Capture the genuine clock before temporary ports.
 
 local function with_unavailable_cipher(saved, body)
 	local names = { "infra.metrics_preferences", "modules.keystats.sqlite_writer",

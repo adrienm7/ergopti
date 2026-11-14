@@ -17,7 +17,7 @@ local function with_tree(scenario)
 	local previous_hs = rawget(_G, "hs")
 	rawset(_G, "lfs", nil)
 	local okay, failure = xpcall(function()
-		helpers.with_fresh_modules({ "core.fs.engine.paths", "infra.logger", "lfs" }, function()
+		helpers.with_fresh_modules({ "core.fs.engine.paths", "core.logger.engine.logger", "lfs" }, function()
 			local fs = require("lfs")
 			local script_shared = helpers.driver_root():gsub("[/\\]$", ""):gsub("/macos$", "/_shared")
 			local base = os.tmpname():gsub("\\", "/")
@@ -45,7 +45,7 @@ local function with_tree(scenario)
 				state.mkdir(base .. "/checkout/macos")
 				state.parent = base .. "/checkout/_shared"
 				state.nearest = base .. "/checkout/macos/_shared"
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				_G.hs = {
 					configdir = base .. "/checkout/macos",
 					fs = { attributes = function(path)

@@ -15,7 +15,7 @@ local M = {}
 
 local hs         = hs
 local Identifiers = require("core.text.engine.identifiers")
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec  = require("core.fs.adapters.json_codec")

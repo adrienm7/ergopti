@@ -31,7 +31,7 @@
 local M = {}
 
 local Identifiers = require("core.text.engine.identifiers")
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Paths       = require("core.fs.engine.paths")
 local NativePath  = require("core.fs.engine.native_path")
 local FileSystem  = require("core.fs.adapters.file_system")

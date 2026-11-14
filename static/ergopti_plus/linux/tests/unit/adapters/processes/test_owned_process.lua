@@ -64,7 +64,7 @@ end
 local function load(native)
 	-- ShellRunner captures both luv and its monotonic clock at module load.
 	-- Restore exact prior owners, including absent/false caches, on every path.
-	local scoped = { "adapters.owned_process", "adapters.shell_runner", "infra.monotonic" }
+	local scoped = { "adapters.owned_process", "adapters.shell_runner", "core.logger.engine.monotonic" }
 	local previous = {}
 	for _, name in ipairs(scoped) do
 		previous[name] = package.loaded[name]

@@ -30,7 +30,7 @@ local _counts, _last_reason, _last_ms, _last_error_type = {}, nil, nil, nil
 --- The monotonic stamp of a record, from the daemon's clock owner.
 --- @return number|nil
 local function now_ms()
-	local ok, Monotonic = pcall(require, "infra.monotonic")
+	local ok, Monotonic = pcall(require, "core.logger.engine.monotonic")
 	if not ok or type(Monotonic) ~= "table" or type(Monotonic.now_ms) ~= "function" then return nil end
 	local read, value = pcall(Monotonic.now_ms)
 	return read and type(value) == "number" and math.floor(value) or nil

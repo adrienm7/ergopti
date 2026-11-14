@@ -11,7 +11,7 @@
 local M = {}
 local Atspi = require("adapters.atspi_focus")
 local Timings = require("infra.timings")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 local Logger = require("core.logger.engine.shim")
 local Utf8 = require("core.lifecycle.engine.compat.utf8")
 

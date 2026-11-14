@@ -99,7 +99,7 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = { shell_quote = function(value)
@@ -143,7 +143,7 @@ local function find(fn, key)
 	for i=1,100 do local n,v=debug.getupvalue(fn,i); if n==key then return v end; if n==nil then break end end
 	error("Missing actual writer upvalue: "..key)
 end
-package.loaded["infra.logger"]=helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
 helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
@@ -162,7 +162,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["hs.fs"],package.loaded["hs.sqlite3"]=fs,sqlite
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
-	package.loaded["infra.logger"]=log
+	package.loaded["core.logger.engine.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
@@ -446,7 +446,7 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
 	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.text_utils"] = { shell_quote = function(value)
@@ -490,7 +490,7 @@ local function find(fn, key)
 	for i=1,100 do local n,v=debug.getupvalue(fn,i); if n==key then return v end; if n==nil then break end end
 	error("Missing actual writer upvalue: "..key)
 end
-package.loaded["infra.logger"]=helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
 helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
@@ -509,7 +509,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["hs.fs"],package.loaded["hs.sqlite3"]=fs,sqlite
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
-	package.loaded["infra.logger"]=log
+	package.loaded["core.logger.engine.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
 	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}

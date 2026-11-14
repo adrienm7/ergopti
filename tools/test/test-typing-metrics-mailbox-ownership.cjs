@@ -90,7 +90,7 @@ package.loaded['hs.json'].encode=json.encode
 package.loaded['modules.keystats.sqlite_reader']={}
 local reads,errors,removes=0,0,0
 package.loaded['modules.keystats.log_manager'].get_sqlite_path=function() reads=reads+1;return nil end
-package.loaded['infra.logger'].error=function() errors=errors+1 end
+package.loaded['core.logger.engine.logger'].error=function() errors=errors+1 end
 os.remove=function() removes=removes+1;return true end
 -- A completed projection saves its snapshot; keep that write off the real disk
 local real_open=io.open

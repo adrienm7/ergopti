@@ -31,7 +31,7 @@ local FIXTURE_MODULES = {
 	"infra.config_paths",
 	"infra.diagnostic_snapshot",
 	"modules.diagnostics.crash_reporter",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.updater",
 }
 
@@ -76,7 +76,7 @@ end
 --- Loads the healthcheck helpers as the packaged app runs them.
 --- @return table H
 local function packaged_helpers()
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		configdir = APP_SCRIPTS,
 		execute = function() return "" end,
 	})
@@ -139,8 +139,8 @@ helpers.describe("build-commit: the macOS resolver", function()
 			logger.warn = function(tag, fmt, ...)
 				warnings[#warnings + 1] = tostring(tag) .. ": " .. string.format(fmt, ...)
 			end
-			helpers.load_with_stubs("infra.logger")
-			package.loaded["infra.logger"] = logger
+			helpers.load_with_stubs("core.logger.engine.logger")
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["infra.diagnostic_snapshot"] = nil
 			local Collector = require("infra.diagnostic_snapshot")
 			local commit, source = Collector.resolve_commit({
@@ -211,7 +211,7 @@ end)
 helpers.describe("build-commit: the crash report of a packaged app", function()
 	helpers.it("build-commit: carries the commit and both directories without system probes", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
-			helpers.load_with_stubs("infra.logger", { configdir = APP_SCRIPTS })
+			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
 			package.loaded["infra.config_paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
 			package.loaded["modules.diagnostics.crash_reporter"] = nil
@@ -225,7 +225,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 
 	helpers.it("build-commit: the version is the launcher's, not Hammerspoon's", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
-			helpers.load_with_stubs("infra.logger", { configdir = APP_SCRIPTS })
+			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
 			package.loaded["infra.config_paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = stamped_snapshot()
 			package.loaded["modules.updater"] = { current_version = function() return "2.4.0" end }
@@ -243,7 +243,7 @@ helpers.describe("build-commit: the crash report of a packaged app", function()
 
 	helpers.it("build-commit: a resolver failure is reported as unknown, not raised", function()
 		helpers.with_stub_scope(FIXTURE_MODULES, function()
-			helpers.load_with_stubs("infra.logger", { configdir = APP_SCRIPTS })
+			helpers.load_with_stubs("core.logger.engine.logger", { configdir = APP_SCRIPTS })
 			package.loaded["infra.config_paths"] = chosen_config_paths()
 			package.loaded["infra.diagnostic_snapshot"] = {
 				resolve_commit = function() error("stamp read exploded") end,

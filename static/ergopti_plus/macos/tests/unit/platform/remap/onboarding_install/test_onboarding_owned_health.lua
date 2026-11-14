@@ -20,7 +20,7 @@ local LISTING = "*\t*\tG43BCU2T37\torg.pqrs.Karabiner-DriverKit-VirtualHIDDevice
 --- @param world table { files = set of paths, jobs = boolean, listing = string }.
 --- @return table Onboarding module.
 local function load_onboarding(world)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 	package.loaded["infra.notifications"] = { notify = function() end }
 	package.loaded["infra.dialog_util"] = { block_alert = function() return "later" end }

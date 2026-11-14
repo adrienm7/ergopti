@@ -23,7 +23,7 @@ local SUBJECT_MODULES = {
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"infra.notifications",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.shortcuts.actions.system_pixel",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -104,7 +104,7 @@ local function with_pixel(options, scenario)
 				f.logs[level][#f.logs[level] + 1] = string.format(tostring(message), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 
 		local subject = helpers.load_with_stubs("modules.shortcuts.actions.system_pixel", {
 			screenRecordingState = function(prompt)

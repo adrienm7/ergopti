@@ -452,7 +452,7 @@ end)
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
 		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
-			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.logger" }
+			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.fs.engine.paths", "core.logger.engine.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 		local provider = native_language_provider()

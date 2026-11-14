@@ -47,7 +47,7 @@ helpers.describe("n-gram history merge yields to the run loop (ngram-merge-paced
 	end)
 
 	helpers.it("passes the job's pacer to both merges of a history extension", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local Real = helpers.load_with_stubs("modules.keystats.sqlite_reader")
 		local projection = helpers.load_with_stubs("ui.metrics_typing.projection")
 		projection.reset()

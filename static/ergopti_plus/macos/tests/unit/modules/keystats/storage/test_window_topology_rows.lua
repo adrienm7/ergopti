@@ -89,11 +89,11 @@ helpers.describe("macOS window topology: the watcher", function()
 	-- real watchers.lua starts the real watchers here, over scripted adapters
 	-- and a PrivacyContext that refuses on demand.
 	helpers.it("macos-topology-private: the watchers ask the whole privacy context", function()
-		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "infra.logger",
+		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "core.logger.engine.logger",
 			"modules.keystats.privacy_context", "modules.keystats.topology_watcher", "modules.keystats.network_watcher",
 			"adapters.window_info", "adapters.network_info", "core.events.timer_scheduler",
 			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
 			package.loaded["modules.keystats.log_manager"] = { append_log = function(entry) rows[#rows + 1] = entry end }
 			package.loaded["modules.keystats.privacy_context"] = { allows_logging = function() return not refused end }

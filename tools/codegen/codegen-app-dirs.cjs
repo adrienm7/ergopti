@@ -429,7 +429,7 @@ function emitAhk() {
 		'; MODULE: Application Folders and Log File Names (Windows)\n' +
 		'; DESCRIPTION:\n' +
 		'; The application folder name, the default logs folder and the log file-name\n' +
-		'; prefixes. infra/logger.ahk owns the one logs-folder resolver built on them;\n' +
+		'; prefixes. core/logger/engine/logger.ahk owns the one logs-folder resolver built on them;\n' +
 		'; nothing else spells a prefix or a folder formula.\n' +
 		';\n' +
 		'; Functions rather than global initialisers so include ORDER cannot matter:\n' +

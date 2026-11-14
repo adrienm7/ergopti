@@ -26,7 +26,7 @@ function M.request(action, changed, deps)
 	deps = deps or {}
 	local resolver = deps.resolver or require("platform.remap.lease_helper")
 	local shell = deps.shell or require("adapters.shell_runner")
-	local logger = deps.logger or require("infra.logger")
+	local logger = deps.logger or require("core.logger.engine.logger")
 	local function alert(text_key, style)
 		local i18n = deps.i18n or require("core.i18n.engine.i18n")
 		local dialog = deps.dialog or require("infra.dialog_util")

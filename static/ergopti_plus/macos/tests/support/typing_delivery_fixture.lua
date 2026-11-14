@@ -45,7 +45,7 @@ return function(callback)
 		package.loaded["modules.keystats.sqlite_reader"] = {}
 		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		logger.error = function(_, template, ...) errors[#errors + 1] = string.format(template, ...) end
 		logger.success = function(tag, template, ...)
 			if tag == "metrics_typing" then successes[#successes + 1] = string.format(template, ...) end

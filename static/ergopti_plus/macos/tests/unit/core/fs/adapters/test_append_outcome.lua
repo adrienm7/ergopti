@@ -14,13 +14,13 @@ helpers.describe("FileSystem append outcomes", function()
 		helpers.it("(append-native-outcome) handles " .. mode, function()
 			local previous_hs, previous_open = _G.hs, io.open
 			local ok, err = xpcall(function()
-				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
+				helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
 					local errors, writes, closes, opened, content = {}, 0, 0, nil, nil
 					local logger = helpers.make_logger_stub()
 					logger.error = function(_, message, ...)
 						errors[#errors + 1] = string.format(message, ...)
 					end
-					package.loaded["infra.logger"] = logger
+					package.loaded["core.logger.engine.logger"] = logger
 					local adapter = helpers.load_with_stubs("core.fs.adapters.file_system")
 					-- Destination admission is covered by test_file_system_append_admission;
 					-- here the destination is a proven-absent path, so open is reached.
