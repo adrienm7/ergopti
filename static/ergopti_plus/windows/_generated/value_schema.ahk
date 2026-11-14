@@ -28,9 +28,7 @@ ValueSchemaData() {
 			"file", "config.toml",
 			"type", "integer",
 			"min", 1,
-			"max", 10,
-			"default_from", Map(
-				"manifest", "hotstrings.cascade_max_arrows")),
+			"max", 10),
 		"hotstrings.dynamic.user_code.time_activation_seconds", Map(
 			"file", "config.toml",
 			"type", "decimal",
@@ -51,9 +49,7 @@ ValueSchemaData() {
 			"entry_unit", "ms",
 			"special", [Map(
 				"value", 0,
-				"label_key", "value_check.special.no_time_limit")],
-			"default_from", Map(
-				"manifest", "hotstrings.expansion_delay")),
+				"label_key", "value_check.special.no_time_limit")]),
 		"hotstrings.idle_reset_seconds", Map(
 			"file", "config.toml",
 			"type", "decimal",
@@ -62,9 +58,7 @@ ValueSchemaData() {
 			"max", 3600,
 			"special", [Map(
 				"value", 0,
-				"label_key", "value_check.special.never")],
-			"default_from", Map(
-				"manifest", "hotstrings.idle_reset_seconds")),
+				"label_key", "value_check.special.never")]),
 		"hotstrings_config.*.*.delay", Map(
 			"file", "hotstrings_config.toml",
 			"type", "decimal",
@@ -97,10 +91,7 @@ ValueSchemaData() {
 			"file", "layers.toml",
 			"type", "integer",
 			"min", 1,
-			"max", 99,
-			"max_from", Map(
-				"file", "layouts/data/layer_actions.toml",
-				"pattern", "\[parameters\.repeat_count\]\n(?:[^\n]*\n)*?max = (\d+)")),
+			"max", 99),
 		"layout_source.keys.virtual_key", Map(
 			"file", "layout_source.toml",
 			"type", "integer",
@@ -111,21 +102,13 @@ ValueSchemaData() {
 			"type", "integer",
 			"unit", "ms",
 			"min", 1,
-			"max", 10000,
-			"max_from", Map(
-				"timing", "tap_hold.max_activation_ms",
-				"scale", 1)),
+			"max", 10000),
 		"llm.generation.context_length", Map(
 			"file", "config.toml",
 			"type", "integer",
 			"unit", "characters",
 			"min", 80,
-			"max", 4000,
-			"default_from", Map(
-				"manifest", "llm.generation.context_length"),
-			"max_from", Map(
-				"file", "ai/engine/policy/context_buffer.lua",
-				"pattern", "M\.MAX_CONTEXT_LENGTH = ([0-9]+)")),
+			"max", 4000),
 		"llm.generation.max_words", Map(
 			"file", "config.toml",
 			"type", "integer",
@@ -134,34 +117,23 @@ ValueSchemaData() {
 			"max", 10000,
 			"special", [Map(
 				"value", 0,
-				"label_key", "value_check.special.unlimited")],
-			"default_from", Map(
-				"manifest", "llm.generation.max_words")),
+				"label_key", "value_check.special.unlimited")]),
 		"llm.generation.min_words", Map(
 			"file", "config.toml",
 			"type", "integer",
 			"unit", "words",
 			"min", 1,
-			"max", 20,
-			"default_from", Map(
-				"manifest", "llm.generation.min_words")),
+			"max", 20),
 		"llm.generation.temperature", Map(
 			"file", "config.toml",
 			"type", "decimal",
 			"min", 0,
-			"max", 1.3,
-			"default_from", Map(
-				"manifest", "llm.generation.temperature"),
-			"max_from", Map(
-				"file", "ai/data/inference.json",
-				"pattern", "`"max_temperature`": ([0-9.]+)")),
+			"max", 1.3),
 		"llm.profiles.num_predictions", Map(
 			"file", "config.toml",
 			"type", "integer",
 			"min", 1,
-			"max", 10,
-			"default_from", Map(
-				"manifest", "llm.profiles.num_predictions")),
+			"max", 10),
 		"llm.trigger.debounce_ms", Map(
 			"file", "config.toml",
 			"type", "integer",
@@ -170,17 +142,13 @@ ValueSchemaData() {
 			"max", 10000,
 			"special", [Map(
 				"value", -1,
-				"label_key", "value_check.special.never")],
-			"default_from", Map(
-				"manifest", "llm.trigger.debounce_ms")),
+				"label_key", "value_check.special.never")]),
 		"llm.trigger.min_request_interval_ms", Map(
 			"file", "config.toml",
 			"type", "integer",
 			"unit", "ms",
 			"min", 0,
-			"max", 10000,
-			"default_from", Map(
-				"manifest", "llm.trigger.min_request_interval_ms")),
+			"max", 10000),
 		"metrics_apps.*.score", Map(
 			"file", "app_categories.json",
 			"type", "decimal",
@@ -191,9 +159,7 @@ ValueSchemaData() {
 			"type", "integer",
 			"unit", "ms",
 			"min", 1,
-			"max", 1000,
-			"default_from", Map(
-				"manifest", "mod_combos.simultaneous_threshold_ms")),
+			"max", 1000),
 		"personal_info.info.*", Map(
 			"file", "personal_info.toml",
 			"type", "string",
@@ -209,27 +175,19 @@ ValueSchemaData() {
 			"max", 3600,
 			"special", [Map(
 				"value", 0,
-				"label_key", "value_check.special.never")],
-			"default_from", Map(
-				"manifest", "shortcuts.caps_word.idle_timeout_seconds")),
+				"label_key", "value_check.special.never")]),
 		"shortcuts.chatgpt_url", Map(
 			"file", "config.toml",
 			"type", "url",
-			"max_length", 2048,
-			"default_from", Map(
-				"manifest", "shortcuts.chatgpt_url")),
+			"max_length", 2048),
 		"shortcuts.search.search_engine", Map(
 			"file", "config.toml",
 			"type", "url",
-			"max_length", 2048,
-			"default_from", Map(
-				"manifest", "shortcuts.search.search_engine")),
+			"max_length", 2048),
 		"shortcuts.search.search_engine_url_query", Map(
 			"file", "config.toml",
 			"type", "url",
-			"max_length", 2048,
-			"default_from", Map(
-				"manifest", "shortcuts.search.search_engine_url_query")),
+			"max_length", 2048),
 		"tap_hold.keys.*.time_activation_seconds", Map(
 			"file", "tap_hold.toml",
 			"type", "decimal",
@@ -238,10 +196,7 @@ ValueSchemaData() {
 			"max", 10,
 			"entry_scale", 1000,
 			"entry_type", "integer",
-			"entry_unit", "ms",
-			"max_from", Map(
-				"timing", "tap_hold.max_activation_ms",
-				"scale", 0.001)),
+			"entry_unit", "ms"),
 		"tap_hold.time_activation_seconds", Map(
 			"file", "tap_hold.toml",
 			"type", "decimal",
@@ -250,13 +205,7 @@ ValueSchemaData() {
 			"max", 10,
 			"entry_scale", 1000,
 			"entry_type", "integer",
-			"entry_unit", "ms",
-			"default_from", Map(
-				"timing", "tap_hold.default_activation_ms",
-				"scale", 0.001),
-			"max_from", Map(
-				"timing", "tap_hold.max_activation_ms",
-				"scale", 0.001)),
+			"entry_unit", "ms"),
 		"tap_holds.lone_modifier_tap_max_ms", Map(
 			"file", "config.toml",
 			"type", "integer",
@@ -265,9 +214,7 @@ ValueSchemaData() {
 			"max", 10000,
 			"special", [Map(
 				"value", 0,
-				"label_key", "value_check.special.off")],
-			"default_from", Map(
-				"manifest", "tap_holds.lone_modifier_tap_max_ms")),
+				"label_key", "value_check.special.off")]),
 		"updater.check_interval_seconds", Map(
 			"file", "config.toml",
 			"type", "integer",
