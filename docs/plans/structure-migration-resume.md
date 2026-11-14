@@ -4,7 +4,7 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 03:50)
+## Where things stand (2026-11-14, 07:05)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night`, fast-forward only,
   rebased on dev `42f8c1327`. Never merge dev into a branch: rebase it, so
@@ -85,9 +85,23 @@ same commit as each step or checkpoint. Times are Paris time.
 - Later steps need listed edits once their input text exists: S14 (the two
   AT-SPI workers in `literal_appdir_contract.py`), S30 (`wpm_surface` in
   the focus audit's overlay detector).
-- **Next: proof 23 = S03–S12 rebuilt from the night tip**, dispatched once
-  run 43538289052 has finished (one run at a time); land if only baseline
-  reds, as for every block.
+- Proof 22 also failed Linux E2E network-ai (the runtime probe staged in
+  platform/network; listed edit `8b08555c`). Since then: published records
+  are never rewritten (`1e0244e6`, worker I's v1.0.9 class), unbraced shell
+  paths follow (`4312b039`), the updater cohort pin of test_framework.ahk is
+  requalified (`a52d1ecc`).
+- **Proof 23 (current): S03–S12, `…-proof-23` at `4bd75248` (night
+  `a52d1ecc` plus ten steps on dev `95764817`), run 43564272171, dispatched
+  07:01.** Locally on the same steps: JS 26 baseline reds with unchanged
+  error tails (managed Ollama now stops on root permissions; the encryptor
+  check flakes under parallel load only, 0/6 alone), Lua macOS 18 and Linux
+  35 = baseline by name.
+- Proof rule: for every red job, compare its failing names with the same job
+  of baseline run 43309556011 (scratchpad `basefail/`, `fail-names.py`), not
+  only the conclusion.
+- Next: if only baseline names, land S03–S12 (rebase on origin/dev, 0
+  merges and trailers, gates, `git push origin HEAD:refs/heads/dev`); then
+  S13 onwards the same way.
 - **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
