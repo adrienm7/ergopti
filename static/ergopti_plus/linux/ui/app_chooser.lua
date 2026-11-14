@@ -110,7 +110,7 @@ function M.pick(shell, title, opts)
 	if type(resolve) == "function" then called, resolved, status = pcall(resolve, id) end
 	if not called or status ~= "found" or absolute_path(resolved) ~= absolute_path(chosen) then
 		local notify = type(opts) == "table" and opts.notify or function()
-			local message = require("infra.i18n").get("dialog.app_picker.selection_unverified")
+			local message = require("core.i18n.engine.i18n").get("dialog.app_picker.selection_unverified")
 			local command = require("ui.native_dialog").command() .. " --error --no-markup --title="
 				.. shell.quote(title) .. " --text=" .. shell.quote(message) .. " 2>/dev/null"
 			return require("ui.modal").run(function() return shell.exec_checked(command) end) == true

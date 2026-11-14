@@ -400,7 +400,7 @@ end
 local function approved_text(long)
 	local config = documents()
 	return Share.document(host_snapshot(long), config.schema,
-		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key)).text
 end
 
 --- Performs one action as the bridge does.
@@ -497,7 +497,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 			hs.fs.attributes = function() return "directory" end
 			overrides.save = nil
 			local config, snapshot = documents(), host_snapshot(false)
-			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			local action = { action = "save", text = document.text, name = document.name }
 			local context = Report.redaction_context(overrides)
 			local one = completed_action(Report, action, paths(), config, context, overrides, snapshot)
@@ -534,7 +534,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 			end }
 			local ok, result = pcall(function()
 				local config, snapshot = documents(), host_snapshot(false)
-				local doc = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+				local doc = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 				return completed_action(Report, { action = "save", text = doc.text, name = doc.name }, paths(),
 					config, Report.redaction_context(overrides), overrides, snapshot)
 			end)
@@ -696,7 +696,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 		local config = documents()
 		for _, vector in ipairs(corpus.vectors) do
 			local document = Share.document(vector.snapshot, config.schema,
-				require("infra.i18n").get(config.schema.share_policy.notice_key))
+				require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			for _, canary in ipairs(vector.canaries) do
 				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
 			end
@@ -877,7 +877,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 			return completed_action_for(Report, action, config, context, overrides, snapshot)
 		end
 		local function text(with_log)
-			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+			return Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key),
 				with_log).text
 		end
 		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
@@ -916,7 +916,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local text = f.text(true)
 		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
 		local document = Share.document(f.snapshot, f.config.schema,
-			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+			require("core.i18n.engine.i18n").get(f.config.schema.share_policy.notice_key), true)
 		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#f.calls.save, 2)

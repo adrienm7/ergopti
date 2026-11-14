@@ -27,8 +27,8 @@ local MODULE_NAMES = {
 	"platform.remap.lease_controller",
 	"infra.boot_profiler",
 	"adapters.boot_journal",
-	"infra.i18n",
-	"infra.locale",
+	"core.i18n.engine.i18n",
+	"core.i18n.engine.locale",
 	"modules.diagnostics.crash_reporter",
 	"infra.reload_guard",
 	"infra.emergency_exit",
@@ -284,13 +284,13 @@ local function run_isolated(options, assertions)
 				set_user_log_ready = function() end,
 				describe_path = function() return "folder" end,
 			},
-			["infra.i18n"] = {
+			["core.i18n.engine.i18n"] = {
 				set_locale_injector = function() end,
 				init = function() return true end,
 				adopt_saved_locale = function() return false end,
 				get = function(key) return tostring(key) end,
 			},
-			["infra.locale"] = {
+			["core.i18n.engine.locale"] = {
 				set_locale = function() end,
 				set_trigger_provider = function() end,
 			},

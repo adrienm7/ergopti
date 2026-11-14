@@ -122,7 +122,7 @@ local function load_editor()
 			state.errors[#state.errors + 1] = tostring(message)
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared/personal_info_editor" end }
 	package.loaded["ui.ui_builder"] = {
 		get_app_geometry = function() return { width = 800, height = 700 } end,

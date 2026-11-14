@@ -18,7 +18,7 @@ if mode == "layout" then
 	display._set_for_test(display.UNKNOWN, "")
 	assert(require("adapters.keyboard_layout").refresh(root .. "/source") == false)
 elseif mode == "locale" then
-	assert(#require("infra.i18n").list_locales() > 0)
+	assert(#require("core.i18n.engine.i18n").list_locales() > 0)
 elseif mode == "network" then
 	local delivered = false
 	require("adapters.network_check_ports").new().chain(function(status)

@@ -30,10 +30,10 @@ end
 
 helpers.describe("keystats export — foreign directory enumeration", function()
 	helpers.it("distinguishes a missing directory from an uninspectable directory", function()
-		helpers.with_fresh_modules({"infra.logger", "infra.i18n", "core.fs.engine.dir", "core.fs.adapters.file_system",
+		helpers.with_fresh_modules({"infra.logger", "core.i18n.engine.i18n", "core.fs.engine.dir", "core.fs.adapters.file_system",
 			"modules.keystats.export"}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			local status, failing_path = "error", "/metrics/"
 			package.loaded["core.fs.adapters.file_system"] = {classify_no_follow = function(path)
 				helpers.assert_eq(path, failing_path)
@@ -60,7 +60,7 @@ helpers.describe("keystats export — foreign directory enumeration", function()
 	helpers.it("returns the canonical directory refusal without throwing", function()
 		helpers.with_fresh_modules({
 			"core.fs.engine.dir",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 			"infra.logger",
 			"modules.keystats.export",
 		}, function()
@@ -73,7 +73,7 @@ helpers.describe("keystats export — foreign directory enumeration", function()
 					return {}, false, "HS023_DIRECTORY_REFUSAL"
 				end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()

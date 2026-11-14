@@ -207,14 +207,14 @@ end)
 helpers.describe("physical magic notice fixture lifecycle", function()
 	helpers.it("(native-magic-caption-lifecycle) setup import failure restores every owned cache entry", function()
 		local saved, primary, secondary = magic_notice_cache_snapshot(), {}, {}
-		local preload, original = package.preload, package.preload["infra.locale"]
+		local preload, original = package.preload, package.preload["core.i18n.engine.locale"]
 		local ok, failure = pcall(function()
-			rawset(preload, "infra.locale", function() error(primary, 0) end)
+			rawset(preload, "core.i18n.engine.locale", function() error(primary, 0) end)
 			with_magic_notice(function() error("setup failure must prevent scenario entry", 0) end, secondary)
 		end)
-		local restored, restore_failure = pcall(function() rawset(preload, "infra.locale", original) end)
+		local restored, restore_failure = pcall(function() rawset(preload, "core.i18n.engine.locale", original) end)
 		helpers.assert_true(restored, restore_failure)
-		helpers.assert_true(rawequal(rawget(preload, "infra.locale"), original))
+		helpers.assert_true(rawequal(rawget(preload, "core.i18n.engine.locale"), original))
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(rawequal(failure, primary), "setup primary object must survive independent cleanup")
 		helpers.assert_eq(secondary, {})

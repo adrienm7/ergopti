@@ -12,7 +12,7 @@ local Json = require("core.text.engine.json")
 
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
-		local names = { "lgi", "ui.webview_manager", "infra.i18n", "core.events.loop",
+		local names = { "lgi", "ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
 			"infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.notifier",
 			"ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
 		local saved = {}
@@ -78,7 +78,7 @@ helpers.describe("shared application native window titles", function()
 				},
 			}
 			package.loaded["core.events.loop"] = { add_idle_handler = function() end }
-			package.loaded["infra.i18n"] = { get = function(key)
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 				assert(key == label_key)
 				return label
 			end }

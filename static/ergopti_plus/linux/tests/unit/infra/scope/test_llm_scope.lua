@@ -276,7 +276,7 @@ helpers.describe("Linux terminal LLM scope", function()
 				os.execute = function(command)
 					if command:find("dialog_host.lua' --question", 1, true) then
 						questions = questions + 1
-						helpers.assert_contains(command, require("infra.i18n").get("menu.llm.title"))
+						helpers.assert_contains(command, require("core.i18n.engine.i18n").get("menu.llm.title"))
 						return 0
 					end
 					if command:find("command -v zenity", 1, true) then return 0 end
@@ -289,11 +289,11 @@ helpers.describe("Linux terminal LLM scope", function()
 				local action
 				local function find(items)
 					for _, row in ipairs(items) do
-						if row.title == require("infra.i18n").get(key) then action = row.fn end
+						if row.title == require("core.i18n.engine.i18n").get(key) then action = row.fn end
 						if row.menu then find(row.menu) end
 					end
 				end
-				local llm_label = require("infra.i18n").get("menu.llm.title")
+				local llm_label = require("core.i18n.engine.i18n").get("menu.llm.title")
 				for _, row in ipairs(rows) do
 					if row.menu and row.title:find(llm_label, 1, true) then find(row.menu) end
 				end

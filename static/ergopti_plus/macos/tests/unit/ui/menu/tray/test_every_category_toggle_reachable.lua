@@ -143,7 +143,7 @@ local function build_tray(on, extra)
 	package.loaded["infra.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
-	CaptionFixture.install(require("infra.i18n"))
+	CaptionFixture.install(require("core.i18n.engine.i18n"))
 	-- The provider rows the builders hand the renderer, before it drops what no
 	-- tray can use: an action on a row that opens a submenu is lost there.
 	local ManifestMenu = require("infra.manifest_menu")
@@ -153,7 +153,7 @@ local function build_tray(on, extra)
 		if list_id == "top_level" then provided = rows end
 		return render_rows(rows, list_id)
 	end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.build_language_menu_items = function()
 		return { { label = "Français", checked = true, action = function() end } }
 	end
@@ -218,7 +218,7 @@ end
 --- @param key string
 --- @return table|nil
 local function provider_row(rows, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(rows or {}) do
 		if type(row.label) == "string" and row.label:sub(1, #text) == text then return row end
 	end
@@ -230,7 +230,7 @@ end
 --- @param key string
 --- @return table|nil
 local function top_row(tray, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(tray or {}) do
 		if type(row.title) == "string" and row.title:sub(1, #text) == text then return row end
 	end
@@ -243,7 +243,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens each feature submenu with its switch, ticked " .. tostring(posture), function()
 			local tray, _, observed, errors = build_tray(posture)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local checked = 0
 			for _, category in ipairs(CATEGORIES) do
 				local parent = top_row(tray, category.title)
@@ -280,12 +280,12 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 	}
 	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
 		require("tests.lua.category_off_contract").assert_every_gated_menu(helpers,
-			require("infra.manifest_menu"), require("infra.i18n"), "hs")
+			require("infra.manifest_menu"), require("core.i18n.engine.i18n"), "hs")
 	end)
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("applies the category-off rule to the built tray, on " .. tostring(posture), function()
 			local tray = build_tray(posture)
-			local i18n, Contract = require("infra.i18n"), require("tests.lua.category_off_contract")
+			local i18n, Contract = require("core.i18n.engine.i18n"), require("tests.lua.category_off_contract")
 			local ManifestMenu = require("infra.manifest_menu")
 			for _, category in ipairs(CATEGORIES) do
 				Contract.assert_category(helpers, i18n, ManifestMenu.get_array(MENU_KEYS[category.title]),
@@ -300,7 +300,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens « Combinaisons de touches » with its own switch, ticked " .. tostring(posture), function()
 			local tray = build_tray(posture)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local group = nil
 			local label = i18n.get("menu.shortcuts.key_combinations")
 			for _, row in ipairs(top_row(tray, "menu.shortcuts.title").menu or {}) do
@@ -400,7 +400,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 					requests[#requests + 1] = scope .. ":" .. mode
 					return true
 				end })
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = top_row(tray, "menu.hotstrings.title").menu
 			helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"))
 			helpers.assert_eq(rows[3].title, i18n.get("common.clear_to_system"))

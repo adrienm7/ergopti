@@ -188,7 +188,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			return id
 		end
 		local locale = "en"
-		local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+		local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 		if ok_i18n and type(i18n_mod.get_locale) == "function" then
 			local current = i18n_mod.get_locale()
 			if type(current) == "string" and current ~= "" then locale = current end
@@ -1428,7 +1428,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
 					local description = bound.description
 					if type(description) == "table" then
-						local locale = require("infra.i18n").get_locale()
+						local locale = require("core.i18n.engine.i18n").get_locale()
 						description = description[locale] or description.en
 					end
 					if type(description) ~= "string" or description == "" then description = bound.section end

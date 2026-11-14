@@ -38,7 +38,7 @@ const FAIL_SYMBOL = '✗';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MACOS_ROOT = path.join(REPO_ROOT, 'static/ergopti_plus/macos');
-const I18N_KERNEL = path.join(MACOS_ROOT, 'infra/i18n.lua');
+const I18N_KERNEL = path.join(MACOS_ROOT, 'core/i18n/engine/i18n.lua');
 const SHARED_LABELS = path.join(REPO_ROOT, 'static/ergopti_plus/_shared/menu/engine/labels.lua');
 
 let total_pass = 0;
@@ -122,12 +122,12 @@ check(
 );
 check(
 	'macOS: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
-	'static/ergopti_plus/macos/infra/i18n.lua',
+	'static/ergopti_plus/macos/core/i18n/engine/i18n.lua',
 	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
 );
 check(
 	'Linux: infra/i18n.lua M.decorate_section delegates to shared Labels.decorate_section',
-	'static/ergopti_plus/linux/infra/i18n.lua',
+	'static/ergopti_plus/linux/core/i18n/engine/i18n.lua',
 	/function M\.decorate_section\(text\)[\s\S]*return Labels\.decorate_section\(text\)/
 );
 

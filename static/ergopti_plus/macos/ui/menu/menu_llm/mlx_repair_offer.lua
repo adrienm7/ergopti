@@ -46,7 +46,7 @@ local _network_contract = nil
 
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
 local function checker() return require("modules.llm.mlx_deps_checker") end
-local function i18n() return require("infra.i18n") end
+local function i18n() return require("core.i18n.engine.i18n") end
 local function router() return require("ui.menu.menu_llm.runtime_install_offer") end
 local function menu_llm() return require("ui.menu.menu_llm") end
 local function dialogs() return require("infra.dialog_util") end

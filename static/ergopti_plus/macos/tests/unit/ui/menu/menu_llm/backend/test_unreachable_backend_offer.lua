@@ -146,7 +146,7 @@ local function with_offer(scenario)
 		"modules.llm.local_servers", "modules.llm.api_remote", "modules.llm",
 		"modules.llm.ollama_endpoint", "infra.dialog_util", "infra.notifications",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.unreachable_backend_offer",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 	}, function()
 		local api = helpers.load_with_stubs("modules.llm.api_remote")
 		-- The four servers these cases drive run; every other catalogue server is
@@ -217,7 +217,7 @@ local function with_offer(scenario)
 		}
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		-- format keeps its arguments visible: "key|arg1|arg2"
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, ...)
 				local parts = { key }

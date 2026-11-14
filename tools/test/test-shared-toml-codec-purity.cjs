@@ -8,7 +8,7 @@
  * (_shared/core/text/engine/toml_codec/*) is the single implementation meant to load on EVERY
  * Lua runtime — the macOS Hammerspoon driver, the Linux daemon, LuaJIT test
  * runners, and the Node/Lua build scripts. A hard `require("infra.logger")` /
- * `require("infra.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
+ * `require("core.i18n.engine.i18n")` (macOS-driver-only packages) in reader.lua / writer.lua
  * silently broke that promise: those modules could not load off macOS, which is
  * why the Linux driver forked its own zero-dependency TOML parser
  * (linux/modules/hotstrings/loader.lua).

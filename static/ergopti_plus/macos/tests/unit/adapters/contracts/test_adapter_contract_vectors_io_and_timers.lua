@@ -84,8 +84,8 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 
 	adapter = helpers.load_with_stubs("adapters.notifier", hs_overrides)
 
-	helpers.it("localizes warning and error subtitles through infra.i18n", function()
-		local I18n = require("infra.i18n")
+	helpers.it("localizes warning and error subtitles through core.i18n.engine.i18n", function()
+		local I18n = require("core.i18n.engine.i18n")
 		local original_get = I18n.get
 		local requested_keys = {}
 		I18n.get = function(key)

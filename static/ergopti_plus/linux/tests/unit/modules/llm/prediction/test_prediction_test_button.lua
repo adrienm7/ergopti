@@ -62,7 +62,7 @@ local function latest(seen) return seen.notices[#seen.notices] end
 helpers.describe("Linux test prediction engine", function()
 	helpers.it("sends the sample to the active backend and only shows the answer", function()
 		local engine, seen = fixture({ model = "local-a" })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local ok, err = pcall(function()
 			helpers.assert_eq(engine.test_prediction(), true, "an empty typing buffer refuses nothing")
 			helpers.assert_eq(#seen.chats, 1, "one request")
@@ -121,7 +121,7 @@ helpers.describe("Linux test prediction engine", function()
 	end)
 
 	helpers.it("refuses a pause, the AI off and no model with their notices, and withdraws on a pause", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, case in ipairs({
 			{ state = { model = "m", paused = true }, key = "llm.manual_prediction.paused" },
 			{ state = { model = "m", enabled = false }, key = "llm.manual_prediction.disabled" },

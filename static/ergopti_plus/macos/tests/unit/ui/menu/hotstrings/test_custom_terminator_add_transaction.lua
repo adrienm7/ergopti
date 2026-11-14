@@ -53,7 +53,7 @@ end
 local function with_fixture(outcome, callback, locale)
 	return helpers.with_stub_scope({
 		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 		"ui.hotstrings_config_window",
@@ -78,7 +78,7 @@ local function with_fixture(outcome, callback, locale)
 			translations = assert(require("core.fs.adapters.json_codec").decode(raw))
 		end
 		local translate = function(key) return translations[key] or key end
-		package.loaded["infra.i18n"] = { get = translate }
+		package.loaded["core.i18n.engine.i18n"] = { get = translate }
 		local active_context, current_outcome = nil, outcome
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, _, affirmative, cancel)

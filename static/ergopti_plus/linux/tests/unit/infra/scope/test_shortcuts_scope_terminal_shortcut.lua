@@ -313,7 +313,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 				local root = renderer.get_root()
 				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					root.top_level = declared_parent(top, "shortcuts")
@@ -372,7 +372,7 @@ helpers.describe("Linux Shortcuts restore row", function()
 				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end,
 					on_menu_changed = function() changed = changed + 1 end })
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local action
 				for _, item in ipairs(menu) do
 					if item.title == i18n.get("menu.shortcuts.title") then
@@ -411,7 +411,7 @@ helpers.describe("Linux Shortcuts wrap group", function()
 				root.top_level = declared_parent(top, "shortcuts")
 				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end })
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local submenu
 				for _, item in ipairs(menu) do
 					if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
@@ -528,7 +528,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local function group()
 					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,

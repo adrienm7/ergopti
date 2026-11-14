@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.manifest_menu",
 	"infra.notifications",
@@ -141,7 +141,7 @@ local function with_fixture(options, body)
 				return options.delete_choice or "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
@@ -163,7 +163,7 @@ local function with_fixture(options, body)
 				end
 				return manifest
 			end,
-			i18n = package.loaded["infra.i18n"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
 			logger = package.loaded["infra.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {

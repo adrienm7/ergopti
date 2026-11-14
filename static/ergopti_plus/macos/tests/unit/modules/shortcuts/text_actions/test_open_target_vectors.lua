@@ -34,7 +34,7 @@ end
 --- @param target string
 --- @return string
 local function notice(key, target)
-	return (tostring(require("infra.i18n").get(key)):gsub("%%s", function() return target end))
+	return (tostring(require("core.i18n.engine.i18n").get(key)):gsub("%%s", function() return target end))
 end
 
 --- The modules a fixture replaces; with_fresh_modules restores each one, so a

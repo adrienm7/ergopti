@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local M = {}
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 local RowDialect = require("menu.engine.row_dialect")
 
 --- Builds a disabled section header formatted as "— Label —".

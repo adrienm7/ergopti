@@ -130,7 +130,7 @@ end)
 helpers.describe("llm_vision parameter: what the binding editors show", function()
 	local providers = read_json("ai/data/api_providers.json")
 	local config = read_json("ai/data/vision.json")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	-- The providers a screen action may name, in catalogue order
 	local vision_ids, excluded = {}, {}
 	for _, id in ipairs(providers.provider_order) do

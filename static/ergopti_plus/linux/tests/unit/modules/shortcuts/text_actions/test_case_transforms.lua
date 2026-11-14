@@ -127,7 +127,7 @@ local function with_caps_word_menu(body, shortcuts_enabled)
 						on_quit = function() end,
 						on_menu_changed = function() changed.count = changed.count + 1 end,
 					})
-					local label = require("infra.i18n").get("sg_actions.caps_word")
+					local label = require("core.i18n.engine.i18n").get("sg_actions.caps_word")
 					local function find(items)
 						for _, item in ipairs(items or {}) do
 							if item.title == label then return item end
@@ -159,7 +159,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 				if vector.reserved then helpers.assert_eq(manager.acquire_configuration(owner), true) end
 				local item = row()
 				helpers.assert_type(item, "table", "the declared CapsWord checkbox must remain present")
-				helpers.assert_eq(item.title, require("infra.i18n").get(corpus.label_key))
+				helpers.assert_eq(item.title, require("core.i18n.engine.i18n").get(corpus.label_key))
 				helpers.assert_eq(item.checked, vector.checked)
 				helpers.assert_eq(item.disabled == true, vector.disabled)
 				if vector.reserved then helpers.assert_eq(manager.release_configuration(owner), true) end
@@ -254,7 +254,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 				helpers.assert_eq(row().fn(), true)
 				helpers.assert_eq(row().fn(), true)
 				helpers.assert_eq(#notices, 2)
-				helpers.assert_eq(notices[1][1], require("infra.i18n").get("sg_actions.caps_word"))
+				helpers.assert_eq(notices[1][1], require("core.i18n.engine.i18n").get("sg_actions.caps_word"))
 				helpers.assert_eq(notices[1][2], true)
 				helpers.assert_eq(notices[2][2], false)
 				local owner = {}
@@ -325,7 +325,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 		helpers.it("keeps the existing " .. vector.platform .. " platform boundary (selection-caps-word)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
 				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"),
+				json_decode = require("core.text.engine.json").decode, i18n = require("core.i18n.engine.i18n"),
 				logger = require("core.logger.engine.shim"),
 			}))
 			local rows = renderer.build(corpus.section, "CapsWord", nil, nil, {
@@ -335,7 +335,7 @@ helpers.describe("CapsWord selection checkbox ownership", function()
 			})
 			helpers.assert_eq(#rows, vector.rows)
 			if vector.rows > 0 then
-				helpers.assert_eq(rows[1].title, require("infra.i18n").get(corpus.label_key))
+				helpers.assert_eq(rows[1].title, require("core.i18n.engine.i18n").get(corpus.label_key))
 				helpers.assert_eq(rows[1].checked, false)
 				helpers.assert_type(rows[1].fn, "function")
 			end
@@ -361,7 +361,7 @@ local function with_case_menu(body)
 			})
 		end
 		local function item(label_key)
-			local label = require("infra.i18n").get(label_key)
+			local label = require("core.i18n.engine.i18n").get(label_key)
 			local function find(items)
 				for _, row in ipairs(items or {}) do
 					if row.title == label then return row end
@@ -463,7 +463,7 @@ helpers.describe("shared selection case command ownership", function()
 		helpers.it("keeps " .. vector.platform .. " selection command placement (selection-case-command)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
 				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+				json_decode = require("core.text.engine.json").decode, i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters = {}, {}
 			for _, command in ipairs(corpus.commands) do
@@ -474,7 +474,7 @@ helpers.describe("shared selection case command ownership", function()
 				{ commands = commands, state_getters = getters })
 			helpers.assert_eq(#rows, vector.rows)
 			for index, row in ipairs(rows) do
-				helpers.assert_eq(row.title, require("infra.i18n").get(corpus.commands[index].label_key))
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.commands[index].label_key))
 				helpers.assert_eq(row.fn(), true)
 			end
 		end)
@@ -632,7 +632,7 @@ helpers.describe("shared selection helper command ownership", function()
 		helpers.it("preserves " .. vector.platform .. " placement (selection-helper-command)", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = vector.platform,
 				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+				json_decode = require("core.text.engine.json").decode, i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			local commands, getters, calls = {}, {}, 0
 			for _, command in ipairs(corpus.commands) do
@@ -644,7 +644,7 @@ helpers.describe("shared selection helper command ownership", function()
 			helpers.assert_eq(#rows, vector.rows)
 			helpers.assert_eq(calls, 0)
 			for index, row in ipairs(rows) do
-				helpers.assert_eq(row.title, require("infra.i18n").get(corpus.commands[index].label_key))
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.commands[index].label_key))
 				helpers.assert_eq(row.fn(), true)
 			end
 			helpers.assert_eq(calls, vector.rows)
@@ -665,7 +665,7 @@ helpers.describe("shared selection helper command ownership", function()
 
 	helpers.it("preserves the composed helper order and separator (selection-helper-command)", function()
 		with_helper_menu(function(_, _, _, rows)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local entries, index = containing(rows(), i18n.get(corpus.commands[1].label_key))
 			helpers.assert_type(entries, "table")
 			helpers.assert_true(index > 2)
@@ -693,7 +693,7 @@ helpers.describe("shared selection helper command ownership", function()
 			replacement.i18n = "common.error_title"
 			root[corpus.section] = { replacement, original[2], original[1] }
 			local ok, err = pcall(function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local entries, index = containing(rows(), i18n.get("common.error_title"))
 				helpers.assert_type(entries, "table")
 				helpers.assert_eq(entries[index - 1].title, "-")
@@ -708,7 +708,7 @@ helpers.describe("shared selection helper command ownership", function()
 	helpers.it("uses actual helper captions in all 21 locales (selection-helper-command)", function()
 		-- Each binding captures its locale owner at load time. The full suite may
 		-- have replaced that owner; reload the whole chain and restore it together.
-		local names = { "core.i18n.engine.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+		local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }
 		local previous_modules = {}
 		for _, name in ipairs(names) do
 			previous_modules[name] = package.loaded[name]
@@ -721,7 +721,7 @@ helpers.describe("shared selection helper command ownership", function()
 				local order = json.decode(order_file:read("*a")).order
 				order_file:close()
 				helpers.assert_eq(#order, 21)
-				local i18n, locale = require("infra.i18n"), require("infra.locale")
+				local i18n, locale = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 				i18n.init()
 				local previous = i18n.get_locale()
 				local ok, err = pcall(function()
@@ -773,7 +773,7 @@ helpers.describe("shared selection presentation boundaries", function()
 
 	helpers.it("keeps the complete physical order under an actual configured native owner", function()
 		with_helper_menu(function(_, _, effects, rows)
-			local native = require("infra.i18n")
+			local native = require("core.i18n.engine.i18n")
 			local entries, first = selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
 			helpers.assert_type(entries, "table")
 			helpers.assert_eq(#corpus.selection_child_order, 9)
@@ -794,7 +794,7 @@ helpers.describe("shared selection presentation boundaries", function()
 			local held = item("menu.shortcuts.select_word").fn
 			local owner = {}
 			helpers.assert_eq(manager.acquire_configuration(owner), true)
-			local native = require("infra.i18n")
+			local native = require("core.i18n.engine.i18n")
 			local entries, first = selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
 			helpers.assert_type(entries, "table")
 			for offset, expected in ipairs(corpus.selection_child_order) do
@@ -820,7 +820,7 @@ helpers.describe("shared selection presentation boundaries", function()
 				local root = manifest.get_root()
 				local original = root[section]
 				helpers.assert_type(original, "table")
-				local native = require("infra.i18n")
+				local native = require("core.i18n.engine.i18n")
 				local offset = section == fragments[1] and 2 or 6
 				local function block()
 					return selection_boundary_block(rows(), native.get(corpus.selection_child_order[1].key))
@@ -854,7 +854,7 @@ helpers.describe("shared selection presentation boundaries", function()
 		helpers.it("keeps the truthful " .. native_platform .. " boundary projection without an action", function()
 			local renderer = assert(require("menu.engine.renderer").new({ platform = native_platform,
 				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-				json_decode = require("core.text.engine.json").decode, i18n = require("infra.i18n"), logger = require("core.logger.engine.shim"),
+				json_decode = require("core.text.engine.json").decode, i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 			}))
 			for _, section in ipairs(fragments) do
 				local rows = assert(renderer.template_rows(section, {}, {}, {}))

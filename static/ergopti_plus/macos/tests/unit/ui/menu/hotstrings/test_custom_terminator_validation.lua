@@ -32,7 +32,7 @@ end
 local function run_action(mode, outcome, language)
 	local module_names = {
 		"infra.dialog_util",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
 		"infra.manifest_reader",
 		"infra.notifications",
@@ -74,7 +74,7 @@ local function run_action(mode, outcome, language)
 	Locale.set_locale(language or "en")
 	local magic_prefix = Locale.get("menu.hotstrings.magic_key_prefix")
 
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "editor.hotstrings.err_id_exists" then return "DUPLICATE:%s" end
 			if key == "menu.hotstrings.magic_key_prefix" or key == "menu.hotstrings.magic_key" then return Locale.get(key) end

@@ -37,7 +37,7 @@ local TimerScheduler = require("core.events.timer_scheduler")
 local Timings       = require("infra.timings")
 local Logger        = require("infra.logger")
 local Keycodes      = require("infra.keycodes")
-local i18n          = require("infra.i18n")
+local i18n          = require("core.i18n.engine.i18n")
 
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")

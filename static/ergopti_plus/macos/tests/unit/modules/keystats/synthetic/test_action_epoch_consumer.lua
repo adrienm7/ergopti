@@ -23,7 +23,7 @@ local RESET_MODULES = {
 	"adapters.keyboard_hook", "adapters.event_provenance",
 	"adapters.synthetic_input", "adapters.input_source_broker",
 	"infra.logger", "infra.timings",
-	"infra.manifest_reader", "infra.i18n", "infra.dialog_util",
+	"infra.manifest_reader", "core.i18n.engine.i18n", "infra.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
 }
 
@@ -274,7 +274,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		metrics_cache_dir = function() return "/tmp/ergopti_timer_failure/cache" end,
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = noop }
 
 	local keystats = require("modules.keystats.init")
@@ -442,7 +442,7 @@ local function load_fixture()
 		sec = function() return 1 end,
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.dialog_util"] = { alert = noop }
 	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,

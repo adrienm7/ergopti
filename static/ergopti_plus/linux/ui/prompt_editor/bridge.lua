@@ -28,7 +28,7 @@ local function dependency(state, field, module_name)
 end
 
 local function translated(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 

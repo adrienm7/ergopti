@@ -33,7 +33,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				"ui.menu.menu_keyboard_layout",
 				"infra.logger",
 				"infra.text_utils",
-				"infra.i18n",
+				"core.i18n.engine.i18n",
 				"infra.notifications",
 				"core.fs.adapters.storage",
 				"infra.deferred_work",
@@ -61,7 +61,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					["menu.layout.scope_system"] = "system",
 					["menu.layout.scope_user"] = "user",
 				}
-				package.loaded["infra.i18n"] = {
+				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key) return labels[key] or key end,
 					section = function(key) return key end,
 				}
@@ -169,7 +169,7 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				package.loaded["infra.deferred_work"] = { after = function() return true end }
 				package.loaded["infra.timings"] = { sec = function() return 0.1 end }
 				package.loaded["ui.menu.keymap_lifecycle"] = { ensure_started = function() return true end }
-				local actual_manifest = LayoutFixture.install(package.loaded["infra.i18n"])
+				local actual_manifest = LayoutFixture.install(package.loaded["core.i18n.engine.i18n"])
 				package.loaded["infra.manifest_menu"] = {
 					template_rows = actual_manifest.template_rows,
 					group_row = actual_manifest.group_row,

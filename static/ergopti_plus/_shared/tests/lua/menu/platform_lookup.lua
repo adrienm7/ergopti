@@ -31,7 +31,7 @@ function M.register(helpers, platform)
 			handle = assert(io.open(path, "wb"))
 			assert(handle:write(document))
 			assert(handle:close()); handle = nil
-			local translator = require("infra.i18n")
+			local translator = require("core.i18n.engine.i18n")
 			local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
 				manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 				i18n = translator, logger = helpers.make_logger_stub(),

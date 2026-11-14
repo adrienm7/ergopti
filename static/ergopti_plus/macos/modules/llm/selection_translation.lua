@@ -33,7 +33,7 @@ local M = {}
 
 local Translate  = require("ai.engine.prediction.translate")
 local Logger     = require("infra.logger")
-local i18n       = require("infra.i18n")
+local i18n       = require("core.i18n.engine.i18n")
 local Paths      = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec  = require("core.fs.adapters.json_codec")

@@ -157,7 +157,7 @@ package.loaded["ui.llm_enable_refusal"] = { show = function(origin, rows)
 	for _, row in ipairs(rows) do print("EXPLICIT_ROW " .. tostring(row.label)) end
 	local selected
 	for _, row in ipairs(rows) do
-		if row.label == require("infra.i18n").get(action == "download" and "ollama.offer_download" or "ollama.runtime_start") then selected = row.value end
+		if row.label == require("core.i18n.engine.i18n").get(action == "download" and "ollama.offer_download" or "ollama.runtime_start") then selected = row.value end
 	end
 	return true, false, selected
 end }

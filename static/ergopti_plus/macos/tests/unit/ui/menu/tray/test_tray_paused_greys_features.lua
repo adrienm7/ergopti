@@ -85,7 +85,7 @@ local function build_tray(paused)
 		llm_item = llm_menu.build_item()
 	end)
 	helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	CaptionFixture.install(i18n)
 	LayoutFixture.install(i18n)
 	package.loaded["ui.menu.builder"] = nil
@@ -138,7 +138,7 @@ end
 --- @param keys string[] i18n keys to find.
 --- @return table rows Key → row.
 local function index_rows(menu, keys)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local rows = {}
 	for _, key in ipairs(keys) do
 		local text = i18n.get(key):gsub("^%S+ ", "")

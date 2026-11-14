@@ -23,7 +23,7 @@ local function with_window(test)
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
 		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["modules.keymap"] = {}
 		package.loaded["infra.personal_hotstrings"] = { adoptions = function() return {} end }

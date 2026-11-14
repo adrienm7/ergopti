@@ -102,7 +102,7 @@ helpers.describe("the shared key names", function()
 		helpers.assert_eq(KeyNames.fill("absent.key", "Ctrl", fr), "absent.key", "a miss reads as its dotted key")
 		helpers.assert_eq((pcall(KeyNames.fill, "key_name.ctrl", "Ctrl", fr)), false, "a template without {1}")
 		local Keyboard = require("modules.shortcuts.keyboard_shortcuts")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved = i18n.get
 		i18n.get = fr
 		local ok, err = pcall(function()

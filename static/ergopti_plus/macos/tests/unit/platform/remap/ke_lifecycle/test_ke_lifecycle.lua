@@ -27,7 +27,7 @@ local function fresh_lifecycle(phase, hs_overrides)
 		status = function() return phase, { phase = phase, token = "a" } end,
 	}
 	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 
 	local facade = helpers.load_with_stubs("platform.remap.ke_lifecycle", hs_overrides)
 	local hs_stub = _G.hs

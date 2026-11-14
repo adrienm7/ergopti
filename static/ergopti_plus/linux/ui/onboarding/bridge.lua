@@ -218,7 +218,7 @@ local function number_row_capability(state)
 end
 
 local function build_init_data(state)
-	local i18n = dependency(state, "i18n", "infra.i18n")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	if not i18n or not config_paths then return nil end
 	local ok_catalogue, catalogue_error = pcall(catalogue)
@@ -263,7 +263,7 @@ local normalize_config_dir = ConfigDirPicker.normalize
 --- @param state table Daemon state.
 --- @return table translator { get(key) }.
 local function wizard_translator(state)
-	local i18n = dependency(state, "i18n", "infra.i18n")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	local strings = _chosen_strings
 	return { get = function(key)
 		if strings and type(strings[key]) == "string" then return strings[key] end
@@ -429,7 +429,7 @@ local function finish_owned(state, answers)
 		return { done = false }
 	end
 	local authorities = {
-		i18n = dependency(state, "i18n", "infra.i18n"),
+		i18n = dependency(state, "i18n", "core.i18n.engine.i18n"),
 		config_paths = dependency(state, "config_paths", "infra.config_paths"),
 		manifest = dependency(state, "manifest", "infra.manifest_reader"),
 		writer = dependency(state, "writer", "core.text.engine.toml_codec.writer"),
@@ -482,7 +482,7 @@ local function finish_owned(state, answers)
 			return dependency(state, "writer", "core.text.engine.toml_codec.writer") == authorities.writer
 				and dependency(state, "file_system", "core.fs.adapters.file_system") == files
 				and dependency(state, "config_paths", "infra.config_paths") == authorities.config_paths
-				and dependency(state, "i18n", "infra.i18n") == authorities.i18n
+				and dependency(state, "i18n", "core.i18n.engine.i18n") == authorities.i18n
 				and authorities.config_paths.set_config_dir == path_set and authorities.config_paths.get_config_dir == path_get
 				and authorities.i18n.set_locale == locale_set and authorities.i18n.get_locale == locale_get
 				and authorities.i18n.persist_locale == locale_persist
@@ -628,7 +628,7 @@ function M.on_message(payload, state, context)
 		return { pushed = push(state, "initData", data, page_current), data = data,
 			titled = retitle(state, data.strings, page_current) }
 	elseif action == "previewLocale" then
-		local i18n = dependency(state, "i18n", "infra.i18n")
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if not locale_available(i18n, payload.locale) then return { pushed = false } end
 		local strings = locale_strings(payload.locale)
 		if not strings then return { pushed = false } end
@@ -636,7 +636,7 @@ function M.on_message(payload, state, context)
 			locale = payload.locale, strings = strings,
 		}, page_current), titled = retitle(state, strings, page_current) }
 	elseif action == "localeSelected" then
-		local i18n = dependency(state, "i18n", "infra.i18n")
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if not locale_available(i18n, payload.locale) then return { accepted = false } end
 		local strings = locale_strings(payload.locale)
 		if not strings then return { accepted = false } end

@@ -16,7 +16,7 @@ local function fixture(picked, typed, body)
 	local asked = { typed_prompts = 0 }
 	local ok, failure = xpcall(function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.dialog_util"] = {
 			choose = function(title, message, labels)
 				asked.choose = { title = title, message = message, labels = labels }

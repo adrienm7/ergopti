@@ -677,7 +677,7 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 				helpers.assert_true(Settings.persist())
 				local controls, _, observed = menu_controls(Settings, false, false)
 				for index, row in ipairs(expected.rows) do
-					helpers.assert_eq(controls[index].title, require("infra.i18n").get(row.i18n))
+					helpers.assert_eq(controls[index].title, require("core.i18n.engine.i18n").get(row.i18n))
 					helpers.assert_type(controls[index].fn, "function")
 				end
 				helpers.assert_eq(controls[4].title, "-")
@@ -709,7 +709,7 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 			local labels = {}
 			for _, row in ipairs(expected.rows) do labels[row.id] = row.i18n end
 			for position, id in ipairs(expected.reordered_ids) do
-				helpers.assert_eq(controls[position].title, require("infra.i18n").get(labels[id]))
+				helpers.assert_eq(controls[position].title, require("core.i18n.engine.i18n").get(labels[id]))
 			end
 			local owner = {}
 			local preferences = require("infra.hotstring_preferences")

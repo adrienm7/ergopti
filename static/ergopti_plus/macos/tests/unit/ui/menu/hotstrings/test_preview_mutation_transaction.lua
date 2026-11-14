@@ -41,7 +41,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
 		"infra.preferences", "core.fs.adapters.file_system", "infra.logger", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
 	}, function()
@@ -51,7 +51,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		local Global = require("ui.menu.global_actions_transaction")
 		local Preview = require("ui.menu.preview_transaction")
 		translate = translate or function(key) return key end
-		package.loaded["infra.i18n"] = { get = translate }
+		package.loaded["core.i18n.engine.i18n"] = { get = translate }
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)

@@ -16,7 +16,7 @@ local MODULES = {
 	"adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"infra.notifications",
 	"modules.llm",
@@ -478,7 +478,7 @@ local function with_fixture(plan, callback)
 				records.errors[#records.errors + 1] = ok and rendered or tostring(message)
 			end
 			package.loaded["infra.logger"] = logger_stub
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}

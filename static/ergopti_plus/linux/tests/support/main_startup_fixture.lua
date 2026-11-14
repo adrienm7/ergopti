@@ -240,7 +240,7 @@ function M.run(options)
 			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
-		elseif name == "infra.i18n" then
+		elseif name == "core.i18n.engine.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
 		elseif name == "infra.perf_counters" then
 			-- The real counters: the exit path flushes their last interval.

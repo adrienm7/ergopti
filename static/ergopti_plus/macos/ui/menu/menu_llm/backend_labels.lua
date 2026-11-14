@@ -120,7 +120,7 @@ end
 function M.option(backend)
 	local option = OPTIONS[backend]
 	if not option then error("backend_labels.option: unknown backend " .. tostring(backend)) end
-	return option.brand .. " " .. EM_DASH .. " " .. require("infra.i18n").get(option.description_key)
+	return option.brand .. " " .. EM_DASH .. " " .. require("core.i18n.engine.i18n").get(option.description_key)
 end
 
 --- What an option names: its label before the first em dash, trimmed, or the

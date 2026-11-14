@@ -113,7 +113,7 @@ function M.backend_choices(default_models, use)
 	end
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
-		label = require("infra.i18n").get("llm.vision.local_backend"),
+		label = require("core.i18n.engine.i18n").get("llm.vision.local_backend"),
 		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
 	} }
 	for _, provider in ipairs(require("modules.llm.api_remote").providers_for(use or "vision")) do

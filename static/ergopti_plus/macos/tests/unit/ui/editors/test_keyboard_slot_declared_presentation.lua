@@ -17,7 +17,7 @@ local function fixture(callback, cleanup_failures)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "ui.action_picker", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.logger", "core.fs.engine.paths", "infra.config_paths", "infra.deferred_work",
 			"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed",
 			"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "apps.engine.program_provider_picker",
@@ -96,9 +96,9 @@ local function fixture(callback, cleanup_failures)
 					end
 				end
 				-- Restore the actual locale facade before the contextual factory captures it.
-				package.loaded["infra.i18n"] = nil
-				local i18n = require("infra.i18n")
-				local locale = require("infra.locale")
+				package.loaded["core.i18n.engine.i18n"] = nil
+				local i18n = require("core.i18n.engine.i18n")
+				local locale = require("core.i18n.engine.locale")
 				local core = require("core.i18n.engine.core")
 				local original_core_get = core.get
 				core.get = function(key)
@@ -359,7 +359,7 @@ helpers.describe("keyboard slot presentation saved-locale initialization", funct
 			helpers.assert_eq(i18n.get_locale(), "de")
 			helpers.assert_eq(locale.current_locale(), "de")
 			helpers.assert_eq(core.current_locale(), "de")
-			for name, owner in pairs({ ["infra.i18n"] = i18n, ["infra.locale"] = locale, ["core.i18n.engine.core"] = core }) do
+			for name, owner in pairs({ ["core.i18n.engine.i18n"] = i18n, ["core.i18n.engine.locale"] = locale, ["core.i18n.engine.core"] = core }) do
 				helpers.assert_true(rawequal(package.loaded[name], owner), "initialization must retain " .. name)
 			end
 			helpers.assert_eq(i18n.get, translate_owner)

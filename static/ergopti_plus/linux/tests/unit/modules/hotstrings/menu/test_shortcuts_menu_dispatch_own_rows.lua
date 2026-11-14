@@ -92,7 +92,7 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 			return { { i18n = "menu.shortcuts.wrap_symbols_title", pairs = { standard, lower } } }
 		end
 		local rows = shortcuts_menu({ shortcuts = shortcuts })
-		local wrap = assert(find_row(rows, require("infra.i18n").get("menu.shortcuts.wrap_symbols")))
+		local wrap = assert(find_row(rows, require("core.i18n.engine.i18n").get("menu.shortcuts.wrap_symbols")))
 		local titles = {}
 		for _, row in ipairs(wrap_pair_rows(wrap.menu)) do titles[#titles + 1] = row.title end
 		helpers.assert_eq(titles, { standard.left .. " \226\128\166 " .. standard.right,
@@ -101,7 +101,7 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 
 	helpers.it("orders the wrapping pairs, so a rebuild does not shuffle them", function()
 		local function titles()
-			local wrap = assert(find_row(shortcuts_menu(), require("infra.i18n").get("menu.shortcuts.wrap_symbols")))
+			local wrap = assert(find_row(shortcuts_menu(), require("core.i18n.engine.i18n").get("menu.shortcuts.wrap_symbols")))
 			local out = {}
 			for _, row in ipairs(wrap_pair_rows(wrap.menu)) do out[#out + 1] = row.title end
 			return out
@@ -118,14 +118,14 @@ helpers.describe("shortcuts menu: this driver's own rows", function()
 		local redraws = 0
 		local function wrap()
 			return assert(find_row(shortcuts_menu({ shortcuts = shortcuts, on_menu_changed = function() redraws = redraws + 1 end }),
-				require("infra.i18n").get("menu.shortcuts.wrap_symbols"))).menu
+				require("core.i18n.engine.i18n").get("menu.shortcuts.wrap_symbols"))).menu
 		end
 		local pair = wrap_pair_rows(wrap())[1]
 		helpers.assert_eq(pair.checked, true)
 		pair.fn()
 		helpers.assert_eq(log.wrap_states["("], false)
 		helpers.assert_eq(wrap_pair_rows(wrap())[1].checked, false, "the redrawn row shows the choice")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		assert(find_row(wrap(), i18n.get("menu.shortcuts.wrap_symbols_check_all"))).fn()
 		helpers.assert_eq(log.wrap_states["("], true)
 		local answers = { "§", "" }
@@ -212,7 +212,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 
 	helpers.it("renders the Linux ChatGPT URL editor declared by the manifest", function()
 		local rows = shortcuts_menu()
-		local wanted = require("infra.i18n").get("menu.shortcuts.chatgpt_url_item")
+		local wanted = require("core.i18n.engine.i18n").get("menu.shortcuts.chatgpt_url_item")
 		local editor = nil
 		for _, row in ipairs(rows or {}) do
 			if row.title == wanted then editor = row end
@@ -252,7 +252,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		-- Compared against the resolved key, not against a substring of the French
 		-- label: the label became a catalogue entry on 2026-08-05 and a test that
 		-- pinned its spelling would have reported that improvement as a defect.
-		local unavailable = require("infra.i18n").get("menu.shortcuts.unavailable")
+		local unavailable = require("core.i18n.engine.i18n").get("menu.shortcuts.unavailable")
 		local top_level, placeholder = 0, false
 		for _, item in ipairs(tree) do
 			if type(item.menu) == "table" then
@@ -349,7 +349,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 			if declaration.id == "shortcuts_toggle" then key = declaration.i18n; declarations = declarations + 1 end
 		end
 		helpers.assert_eq(declarations, 1)
-		local row = find_row(shortcuts_menu({ shortcuts = sc, on_menu_changed = changed }), require("infra.i18n").get(key))
+		local row = find_row(shortcuts_menu({ shortcuts = sc, on_menu_changed = changed }), require("core.i18n.engine.i18n").get(key))
 		helpers.assert_not_nil(row)
 		helpers.assert_eq(type(row.fn), "function")
 		return row
@@ -382,7 +382,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
 					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)
 		end
@@ -460,7 +460,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 		local prior = package.loaded["modules.shortcuts.script_chords"]
 		package.loaded["modules.shortcuts.script_chords"] = chords
 		local called, row = pcall(function()
-			return find_row(shortcuts_menu({ on_menu_changed = changed }), require("infra.i18n").get(key))
+			return find_row(shortcuts_menu({ on_menu_changed = changed }), require("core.i18n.engine.i18n").get(key))
 		end)
 		package.loaded["modules.shortcuts.script_chords"] = prior
 		helpers.assert_true(called, tostring(row))
@@ -496,7 +496,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
 					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)
 		end
@@ -668,7 +668,7 @@ helpers.describe("declared Shortcut wrap presentation source", function()
 		local renderer = require("infra.manifest_menu")
 		local root = renderer.get_root()
 		local original = root.shortcut_wrap_frame
-		local label = require("infra.i18n").get("menu.shortcuts.wrap_symbols")
+		local label = require("core.i18n.engine.i18n").get("menu.shortcuts.wrap_symbols")
 		local log = {}
 		local ok, detail = xpcall(function()
 			local current = assert(find_row(shortcuts_menu({ shortcuts = fake_shortcuts(log) }), label))
@@ -689,7 +689,7 @@ helpers.describe("declared Shortcut wrap presentation source", function()
 		local renderer = require("infra.manifest_menu")
 		local root = renderer.get_root()
 		local original = root.shortcut_wrap_live_control
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local state, admitted, writes, redraws = false, true, 0, 0
 		local shortcuts = fake_shortcuts()
 		shortcuts.configuration_admitted = function() return admitted end
