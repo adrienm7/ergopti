@@ -89,14 +89,14 @@ end)
 -- =========================================================================
 -- =========================================================================
 
-helpers.describe("adapters.network_info — sha256_hex nil-safety", function()
+helpers.describe("core.network.adapters.info — sha256_hex nil-safety", function()
 local NI
 	local function load_network_info(overrides)
 		-- network_info captures Crypto at require time. Clear that dependency so
 		-- every scenario uses its own hs.hash override instead of a prior test's.
 		package.loaded["core.crypto.crypto"] = nil
 		package.loaded["adapters.shell_runner"] = nil
-		return helpers.load_with_stubs("adapters.network_info", overrides)
+		return helpers.load_with_stubs("core.network.adapters.info", overrides)
 	end
 
 	--- Returns an hs.hash double whose SHA-256 context reports `value`.

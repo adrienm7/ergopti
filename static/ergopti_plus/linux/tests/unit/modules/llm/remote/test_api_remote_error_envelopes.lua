@@ -13,10 +13,10 @@ local Json = require("core.text.engine.json")
 require("modules.llm.api_remote")
 
 local function isolated(body, logger)
-	local names = { "modules.llm.api_remote", "adapters.http_client", "core.logger.engine.shim" }
+	local names = { "modules.llm.api_remote", "core.network.adapters.http_client", "core.logger.engine.shim" }
 	local saved, calls = {}, {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, _, payload, callback)
 			calls[#calls + 1] = { url = url, payload = payload, callback = callback }
 			return true

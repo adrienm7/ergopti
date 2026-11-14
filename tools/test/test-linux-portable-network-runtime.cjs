@@ -500,7 +500,7 @@ for (const [name, snippets] of [
 		[
 			'generator.flatpakModules(data)',
 			'source "$DRIVER_ROOT/network-runtime-env.sh" /app "$DRIVER_ROOT"',
-			'/app/lib/ergopti/platform/network/runtime_probe.lua /app/lib/ergopti/_shared'
+			'/app/lib/ergopti/core/network/adapters/runtime_probe.lua /app/lib/ergopti/_shared'
 		]
 	]
 ]) {
@@ -774,7 +774,7 @@ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
  m.shutil.which=lambda name:str(sources/name)
  try:
   for index,value in enumerate([str(schema),'','relative/untrusted-schemas']):
-   appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True);(driver/'platform/network/runtime_probe.lua').write_bytes(b'no execution in query witness')
+   appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'core/network/adapters').mkdir(parents=True);(driver/'core/network/adapters/runtime_probe.lua').write_bytes(b'no execution in query witness')
    queries=[];copies=[];closure=[];crypto_queries=[]
    def controlled_run(arguments,**options):
     if arguments[0]==str(sources/'luajit'):

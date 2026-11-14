@@ -138,11 +138,11 @@ helpers.describe("ShellRunner: argv typing", function()
 	-- here" ships. Ordering matters too -- a check after luv.spawn proves nothing.
 	helpers.it("every luv.spawn site validates its argv before spawning", function()
 		local sites = {
-			{ file = "adapters.curl_http_client", binary = "curl" },
+			{ file = "core.network.adapters.curl_http_client", binary = "curl" },
 			{ file = "core.fs.adapters.file_digest", binary = "sha256sum" },
 			{ file = "adapters.process_runner", binary = "any program (python3 for layouts)", boundary = "pcall(OwnedProcess.start," },
 			{ file = "adapters.owned_process", binary = "the retained native process", boundary = "pcall(native.spawn," },
-			{ file = "adapters.system_proxy", binary = "the native proxy lookup helper" },
+			{ file = "core.network.adapters.system_proxy", binary = "the native proxy lookup helper" },
 		}
 		local checked = 0
 		for _, site in ipairs(sites) do

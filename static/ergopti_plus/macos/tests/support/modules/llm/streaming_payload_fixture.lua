@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
-	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "core.fs.adapters.file_system",
+	"adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
 	"core.logger.engine.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",

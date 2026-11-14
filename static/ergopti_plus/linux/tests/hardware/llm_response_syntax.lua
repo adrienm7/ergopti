@@ -10,7 +10,7 @@
 
 local uv = require("luv")
 local Remote = require("modules.llm.api_remote")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local origin = assert(os.getenv("LLM_RESPONSE_ORIGIN"))
 local root = assert(os.getenv("LLM_RESPONSE_ROOT"))
 local corpus = require("tests.fixtures.llm_response_syntax_contract")

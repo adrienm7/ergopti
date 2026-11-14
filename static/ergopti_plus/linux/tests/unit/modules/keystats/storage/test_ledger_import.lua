@@ -21,7 +21,7 @@ end)()
 
 local Import = require("modules.keystats.ledger_import")
 local Rebuild = require("modules.keystats.ledger_rebuild")
-local Digest = require("infra.openssl_digest")
+local Digest = require("core.network.engine.openssl_digest")
 local quote = require("core.text.engine.utils_core").shell_quote
 
 local FOREIGN = "0b6f4c1e-3a2d-4f5b-9c8e-1d2e3f4a5b6c"

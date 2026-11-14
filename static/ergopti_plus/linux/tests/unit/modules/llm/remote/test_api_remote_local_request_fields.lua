@@ -16,7 +16,7 @@ local Json = require("core.text.engine.json")
 --- Loads the module over an inert HTTP client.
 --- @return table remote
 local function load_remote()
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function() return true end,
 		post = function() return true end,
 		cancel = function() return true end,
@@ -27,7 +27,7 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 end
 

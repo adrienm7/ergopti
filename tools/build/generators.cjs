@@ -63,7 +63,7 @@ const GENERATORS = [
 		script: 'codegen/codegen-native-http-failure-stages.cjs',
 		outputs: [
 			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift',
-			'static/ergopti_plus/macos/platform/network/native_http.py',
+			'static/ergopti_plus/macos/core/network/adapters/native_http.py',
 			'static/ergopti_plus/_shared/core/network/native/go/native_http/transport.go'
 		]
 	},

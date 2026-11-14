@@ -33,7 +33,7 @@ local RELOADED = {
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama", "adapters.shell_runner",
 }
 
@@ -75,7 +75,7 @@ function M.run(opts, body)
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, headers, options, callback)
 				world.probes[#world.probes + 1] = { url = url, options = options, callback = callback }
 				return true

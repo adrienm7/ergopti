@@ -19,7 +19,7 @@ if not ok_luv then
 end
 require("core.lifecycle.engine.compat.utf8").install()
 
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local Ollama = require("modules.llm.api_ollama")
 local Policy = require("ai.engine.ollama.local_model_policy")
 local Offer = require("modules.llm.local_model_offer")

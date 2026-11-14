@@ -139,7 +139,7 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	-- every wrap-key press re-paid both synchronous cross-process AX calls inline on
 	-- the CGEventTap thread. nil is the COMMON result — nothing selected, or an app
 	-- that hides AXSelectedText — so the cache was effectively inert exactly when it
-	-- mattered. Same defect and same fix as infra/vscode_bridge.lua (3e403b254), whose
+	-- mattered. Same defect and same fix as core/network/engine/vscode_bridge.lua (3e403b254), whose
 	-- sibling site this is. The spy above could not express it: it hardcoded a
 	-- positive selection.
 	helpers.it("N rapid presses with NO selection also trigger at most 1 real AX call", function()

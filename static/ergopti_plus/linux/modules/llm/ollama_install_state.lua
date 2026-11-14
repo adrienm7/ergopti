@@ -72,7 +72,7 @@ end
 function M.pull_refusal_key(origin)
 	local reason = M.relay_refusal(origin)
 	if reason == nil then return nil end
-	local relay = require("infra.proxy_auth_relay").load()
+	local relay = require("core.network.engine.proxy_auth_relay").load()
 	return relay and relay.message_key(reason) or "network.relay.failed"
 end
 

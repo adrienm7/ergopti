@@ -148,7 +148,7 @@ def capture(root, out, expected_head):
             ]
         },
     )
-    native = dependency / "static/ergopti_plus/linux/adapters/curl_http_client.lua"
+    native = dependency / "static/ergopti_plus/linux/core/network/adapters/curl_http_client.lua"
     admission = {
         "expected_manifest": digest(manifest.read_bytes()),
         "expected_inventory_sha256": digest(inventory_path.read_bytes()),

@@ -744,8 +744,8 @@ class Receiver:
             "_shared/ai/data/managed_ollama_bootstrap.json",
             "_shared/ai/adapters/python/managed_ollama_pull.py",
             "_shared/ai/data/managed_python_release.json",
-            "macos/platform/network/native_http.py",
-            "macos/platform/network/native_ollama_api.py",
+            "macos/core/network/adapters/native_http.py",
+            "macos/core/network/adapters/native_ollama_api.py",
             "macos/modules/llm/managed_bootstrap_http.py",
             "macos/modules/llm/managed_ollama_runtime.py",
             "macos/modules/llm/managed-python-release.sh",
@@ -1000,7 +1000,7 @@ class Receiver:
         self.prepare_phase = "api_load"
         self.api = load(
             "ollama_fixture_bound_api",
-            self.api_payload / "macos/platform/network/native_ollama_api.py",
+            self.api_payload / "macos/core/network/adapters/native_ollama_api.py",
         )
         self.pull = load(
             "ollama_fixture_pull_owner",

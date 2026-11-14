@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Debug menu's one-click « Test network (PAC, proxy, download) »: a click
 --- runs the shared steps (_shared/core/network/engine/field_check_network.lua) over this
---- driver's ports (adapters/network_check_ports.lua), writes the one evidence
+--- driver's ports (core/network/adapters/check_ports.lua), writes the one evidence
 --- record to the log and shows the result, one line per step, with a « Copy
 --- report » button. macOS runs the same steps; Windows runs them in AutoHotkey.
 ---
@@ -27,6 +27,6 @@ return Window.new({
 	steps = function(ports, report, finish)
 		require("core.network.engine.field_check_network").run(ports, report, finish)
 	end,
-	env = function() return require("adapters.network_check_ports").new() end,
+	env = function() return require("core.network.adapters.check_ports").new() end,
 	unusable_step = "proxy_settings",
 })

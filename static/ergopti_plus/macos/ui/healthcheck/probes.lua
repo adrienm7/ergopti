@@ -193,7 +193,7 @@ end
 --- @return function Probe body.
 local function github_api(config)
 	return function(done, on_cancel)
-		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		local client = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_ms })
 		on_cancel(function() client.cancel() end)
 		client.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
 			function(result)
@@ -231,7 +231,7 @@ local function ai_health(config)
 		end
 		local base = backend == "mlx" and require("modules.llm.api_mlx").get_base_url()
 			or require("modules.llm.api_ollama").get_base_url()
-		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		local client = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_ms })
 		on_cancel(function() client.cancel() end)
 		client.get(base .. path, {}, function(result)
 			local status = tonumber(result.status) or 0
@@ -273,7 +273,7 @@ local function proxy_pac()
 				done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } })
 				return
 			end
-			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+			local client = require("core.network.adapters.http_client").new({ timeout_ms = 6000 })
 			on_cancel(function() client.cancel() end)
 			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
 				local state, text = PacCheck.judge(result.status, result.body, result.error)
