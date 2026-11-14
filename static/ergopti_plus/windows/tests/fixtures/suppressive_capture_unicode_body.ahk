@@ -42,6 +42,8 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 ; registry whose exclusive one-shot/dead-key admission is under test.
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", Chr(0x2605))
+; The one-shot capture reads its timeout from the remap owner; no fallback exists.
+global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 global OneShotShiftEnabled := false, InDeadKeySequence := false
 global _TH_SyntheticEpoch := 0
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""

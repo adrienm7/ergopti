@@ -1730,46 +1730,46 @@ reason_linux = "platform_reason.action_same_action_under_another_name"
 equivalent_linux = ["one_shot_shift"]
 
 [sg_actions.sticky_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_option]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_shift]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_option]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_option_shift]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_option_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_ctrl_shift]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_option_shift]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_option_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_cmd_shift_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_option_shift_ctrl]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_hyper]
-platform = "ahk,hs,linux"
+platform = "all"
 
 # The layout's AltGr level held for one key (maintainer decision of
 # 2026-11-13): Right Alt on Linux, Option on macOS (Ergopti's AltGr level),
@@ -1778,10 +1778,10 @@ platform = "ahk,hs,linux"
 # its Kana layers to that level (decided by the agent on 2026-11-13, to review
 # by the maintainer).
 [sg_actions.sticky_altgr]
-platform = "ahk,hs,linux"
+platform = "all"
 
 [sg_actions.sticky_altgr_shift]
-platform = "ahk,hs,linux"
+platform = "all"
 
 # --- Debug ---
 

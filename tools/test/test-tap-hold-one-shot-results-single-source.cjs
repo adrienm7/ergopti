@@ -71,7 +71,7 @@ if (
 	);
 }
 const preload = body.indexOf('_TapHoldOneShotTable()');
-const capture = body.indexOf('InputHook("L2 T" . TimeoutSec . " E C", _SIHO_ScalarEndKeys())');
+const capture = body.indexOf('InputHook("L2" . TimeoutOption . " E C", _SIHO_ScalarEndKeys())');
 const startOwned = body.indexOf('SIHO_StartOwned(');
 const decode = body.indexOf('Capture := _SIHO_ReadScalar(ihvText, NamedKeys)');
 const scalar = body.indexOf('Scalar := Capture.Text');
