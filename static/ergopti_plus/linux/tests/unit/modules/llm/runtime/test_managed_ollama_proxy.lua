@@ -583,13 +583,28 @@ it("an automatic override keeps the PAC lookup, and an invalid one refuses the s
 	restore()
 	assert(ok, failure)
 	active, restore = bound_policy("proxy.corp.example:3128")
+	-- The refused stored value is reported once, by its key only (value-validation).
+	local saved_logger = package.loaded["core.logger.engine.shim"]
+	local errors = {}
 	ok, failure = pcall(function()
+		local logger = setmetatable({ error = function(_, message, ...)
+			local line = string.format(message, ...)
+			if line:find("is refused", 1, true) then errors[#errors + 1] = line end
+		end }, { __index = saved_logger })
+		package.loaded["core.logger.engine.shim"] = logger
+		package.loaded["infra.proxy_policy"] = nil
+		active = assert(require("infra.proxy_policy").load())
 		local w = world({ policy = active })
 		local result = w:run()
 		eq(result.ok, false)
 		eq(result.error, "proxy_route_invalid")
 		eq(w.lookups, 0)
+		w:run()
+		eq(#errors, 1, "the refused override is reported once")
+		eq(errors[1]:find("network.proxy_override", 1, true) ~= nil, true, "the report names the key")
+		eq(errors[1]:find("corp.example", 1, true), nil, "the report never names the relay")
 	end)
+	package.loaded["core.logger.engine.shim"] = saved_logger
 	restore()
 	assert(ok, failure)
 end)
