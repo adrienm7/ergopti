@@ -111,6 +111,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The feature requirements name the WebView2 host helpers by their file
+		// name prefix; S12 moves the three of them into core/ui/engine/webview.
+		file: 'static/ergopti_plus/_shared/settings/data/features/requirements.toml',
+		moves: 'windows/infra/webview_utils.ahk',
+		from: '"infra/webview_" = "the WebView2 host helpers the windows share"',
+		to: '"core/ui/engine/webview/" = "the WebView2 host helpers the windows share"'
+	},
+	{
 		// The bash resolution check runs one macOS test module by its --only
 		// name, which no load site carries; S10 moves the module under core/text.
 		file: 'tools/test/test-bash-resolution.cjs',
