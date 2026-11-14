@@ -4,9 +4,10 @@
 ==============================================================================
 MODULE: Ergopti Studio Section Layout
 DESCRIPTION:
-Wraps the Ergopti Studio pages with their tab bar: « Éditer » (the layout
-editor) and « Comparer » (layout comparison). The tabs come from
-siteNavigation.js.
+Ergopti Studio is an app-like workspace: under the site header, a slim tab
+bar (« Éditer », « Comparer », from siteNavigation.js) and the framed tool,
+which takes the full width and the rest of the viewport height and scrolls
+inside itself. The site page around it does not scroll.
 ==============================================================================
 -->
 
@@ -27,5 +28,51 @@ siteNavigation.js.
 	);
 </script>
 
-<SubNav label="Onglets d’Ergopti Studio" {items} />
-{@render children()}
+<div class="studio-shell">
+	<SubNav label="Onglets d’Ergopti Studio" {items} compact />
+	<main class="studio-workspace">
+		{@render children()}
+	</main>
+</div>
+
+<style>
+	/* Below the fixed header (and the dev banner), the shell fills the screen. */
+	.studio-shell {
+		display: flex;
+		flex-direction: column;
+		height: calc(100dvh - var(--header-height) - var(--banner-height));
+		min-height: 480px;
+	}
+
+	/* The site's main rule sizes text pages; the workspace is full bleed. */
+	.studio-workspace {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		margin: 0;
+		min-height: 0;
+		overflow: hidden;
+		padding: 0;
+		width: 100%;
+	}
+
+	.studio-workspace :global(.studio-frame) {
+		background: #101018;
+		border: 0;
+		display: block;
+		flex: 1;
+		min-height: 0;
+		width: 100%;
+	}
+
+	.studio-workspace :global(.studio-title) {
+		clip: rect(0 0 0 0);
+		clip-path: inset(50%);
+		height: 1px;
+		margin: -1px;
+		overflow: hidden;
+		position: absolute;
+		white-space: nowrap;
+		width: 1px;
+	}
+</style>

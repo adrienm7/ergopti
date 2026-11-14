@@ -2,23 +2,20 @@
 
 <!--
 ==============================================================================
-MODULE: Ergopti Studio Page
+MODULE: Ergopti Studio — Éditer
 DESCRIPTION:
-Ergopti Studio, the website tab of the unified layout editor. It frames the shared editor
-page served as-is from static/ergopti_plus/_shared/ui/layout_editor/, the
-same code ErgoptiPlus mounts in its layout manager window, so the site and
-the app can never diverge. Files open with the browser's file picker and
-save as downloads; nothing leaves the visitor's computer.
+The editor tab of Ergopti Studio, an app-like workspace: it frames the shared
+editor page served as-is from static/ergopti_plus/_shared/ui/layout_editor/,
+the same code Ergopti+ mounts in its layout editor window, so the site and
+the app can never diverge. The shell (tab bar, full-bleed frame) is
++layout.svelte. Files open with the browser's file picker and save as
+downloads; nothing leaves the visitor's computer.
 ==============================================================================
 -->
 
 <script>
-	import { asset, resolve } from '$app/paths';
-	import PageWrapper from '#lib/components/PageWrapper.svelte';
+	import { asset } from '$app/paths';
 	import SiteFrame from '#lib/components/SiteFrame.svelte';
-
-	/** Height of the framed editor; it scrolls inside the frame beyond that. */
-	const EDITOR_HEIGHT_PX = 1400;
 
 	const editorSrc = asset('ergopti_plus/_shared/ui/layout_editor/index.html') + '?lang=fr';
 </script>
@@ -31,57 +28,5 @@ save as downloads; nothing leaves the visitor's computer.
 	/>
 </svelte:head>
 
-<PageWrapper>
-	<svelte:fragment slot="introduction">
-		<bloc-introduction>
-			<h1>Ergopti Studio</h1>
-			<p>
-				<strong>Ergopti Studio</strong> est l’éditeur de disposition du projet Ergopti. Configurez
-				votre propre disposition : couches, touches mortes, modificateurs, raccourcis et couche de
-				navigation. Ouvrez ou enregistrez le fichier source Ergopti (TOML), importez un
-				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. Ergopti Studio
-				fonctionne entièrement dans votre navigateur : aucun fichier n’est envoyé.
-			</p>
-			<ol class="layout-editor-steps">
-				<li>
-					<strong>Partir de</strong> : « Nouvelle » propose une disposition vierge, QWERTY, AZERTY, Bépo,
-					Ergo-L ou Ergopti, à modifier.
-				</li>
-				<li>
-					<strong>Exporter pour chaque système</strong> : le paquet macOS (<code>.bundle</code>),
-					les fichiers XKB de Linux et le <code>.klc</code> de Windows se téléchargent ici. Le
-					pilote
-					<code>.dll</code> de Windows et son installateur <code>.exe</code> ne se construisent pas
-					dans un navigateur : ils sortent de l’outil du dépôt (<code
-						>node tools/kbd-dll.cjs build</code
-					>).
-				</li>
-				<li>
-					<strong>Installer ou émuler</strong> : dans
-					<a href={resolve('/ergopti-plus')}>Ergopti+</a>, le menu « Disposition clavier » ouvre le
-					même éditeur, qui sait installer la disposition sur le système ou l’émuler sans rien
-					installer (sans droit administrateur).
-					<a href={resolve('/ergopti-plus/installation') + '#ep-telecharger'}
-						>Télécharger Ergopti+</a
-					>.
-				</li>
-			</ol>
-		</bloc-introduction>
-	</svelte:fragment>
-
-	<SiteFrame
-		class="layout-editor-frame"
-		title="Ergopti Studio"
-		src={editorSrc}
-		height={EDITOR_HEIGHT_PX}
-	/>
-</PageWrapper>
-
-<style>
-	:global(.layout-editor-frame) {
-		border: 0;
-		border-radius: 8px;
-		display: block;
-		width: 100%;
-	}
-</style>
+<h1 class="studio-title">Ergopti Studio</h1>
+<SiteFrame class="studio-frame" title="Ergopti Studio — Éditer" src={editorSrc} />

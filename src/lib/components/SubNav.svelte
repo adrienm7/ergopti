@@ -11,8 +11,14 @@ where the current tab is brought into view.
 -->
 
 <script>
-	/** @type {{ label: string, items: Array<{href: string, label: string, current: boolean}> }} */
-	let { label, items } = $props();
+	/**
+	 * @type {{
+	 *   label: string,
+	 *   items: Array<{href: string, label: string, current: boolean}>,
+	 *   compact?: boolean
+	 * }}
+	 */
+	let { label, items, compact = false } = $props();
 
 	let list = $state();
 
@@ -25,7 +31,7 @@ where the current tab is brought into view.
 	});
 </script>
 
-<nav class="subnav" aria-label={label}>
+<nav class="subnav" class:compact aria-label={label}>
 	<ul bind:this={list}>
 		{#each items as item (item.href)}
 			<li>
@@ -63,6 +69,16 @@ where the current tab is brought into view.
 		padding: 0.35rem 0.9rem;
 		text-decoration: none;
 		white-space: nowrap;
+	}
+
+	/* Slim bar above an app-like workspace (Ergopti Studio). */
+	.subnav.compact {
+		padding: 0.35rem 16px;
+	}
+
+	.subnav.compact a {
+		font-size: 0.9rem;
+		padding: 0.2rem 0.8rem;
 	}
 
 	.subnav a:hover,

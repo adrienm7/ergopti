@@ -234,14 +234,29 @@ async function exerciseSections(page, origin, basePath) {
 	}
 	for (const route of ['/studio', '/studio/comparer'])
 		await expectSingleFrameLoads(page, origin, basePath, route, 'main iframe');
-	// The comparison page reports its height; the frame follows it.
-	const frame = page.locator('iframe.layout-analysis-frame');
-	await page.waitForFunction(() => {
-		const element = document.querySelector('iframe.layout-analysis-frame');
-		const inner = element?.contentDocument?.documentElement;
-		return inner && Math.abs(element.clientHeight - inner.scrollHeight) <= 2;
-	});
-	assert.equal(await frame.count(), 1);
+	for (const [route] of STUDIO_TABS) await expectStudioWorkspace(page, origin, basePath, route);
+}
+
+/**
+ * Ergopti Studio is an app-like workspace (maintainer, 2026-11-14): no title
+ * block, introduction or table of contents around the tool, whose frame
+ * spans the full width and reaches the bottom of the screen.
+ */
+async function expectStudioWorkspace(page, origin, basePath, route) {
+	await visit(page, origin, basePath, route);
+	assert.equal(await page.locator('#sidebar, bloc-introduction').count(), 0, 'Bare workspace');
+	const frame = page.locator('main iframe.studio-frame');
+	await frame.waitFor({ state: 'visible' });
+	const box = await frame.boundingBox();
+	const viewport = page.viewportSize();
+	assert.ok(
+		box.x <= 1 && Math.abs(box.x + box.width - viewport.width) <= 1,
+		'Studio frame spans the full width on ' + route
+	);
+	assert.ok(
+		Math.abs(box.y + box.height - viewport.height) <= 2,
+		'Studio frame reaches the bottom of the screen on ' + route
+	);
 }
 
 /** Every former address lands on its new page, anchors included. */
@@ -288,6 +303,7 @@ async function exercisePhone(page, origin, basePath) {
 		await studio.waitFor({ state: 'visible' });
 		await Promise.all([page.waitForURL(origin + basePath + '/studio'), studio.click()]);
 
+		for (const [route] of STUDIO_TABS) await expectStudioWorkspace(page, origin, basePath, route);
 		for (const route of ['/ergopti/informations', '/ergopti-plus/faq']) {
 			await visit(page, origin, basePath, route);
 			const tab = page.locator('nav.subnav a[aria-current="page"]');

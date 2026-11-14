@@ -20,7 +20,7 @@ loaded twice, its first load cut off. The address is set on the client only.
 	 *   src: string,
 	 *   title: string,
 	 *   class?: string,
-	 *   height: number,
+	 *   height?: number,
 	 *   frame?: HTMLIFrameElement
 	 * }}
 	 */
@@ -31,4 +31,9 @@ loaded twice, its first load cut off. The address is set on the client only.
 	});
 </script>
 
-<iframe bind:this={frame} class={className} {title} style="height:{height}px"></iframe>
+<iframe
+	bind:this={frame}
+	class={className}
+	{title}
+	style={height === undefined ? undefined : 'height:' + height + 'px'}
+></iframe>
