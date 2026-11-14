@@ -77,6 +77,12 @@ for (const file of locales) {
 		check(typeof strings[key] === 'string' && strings[key] !== '', `${file}: ${key}`);
 }
 
+// The site sizes its frame from this message (contract with src/routes/studio).
+check(
+	page.includes("'ergopti-layout-analysis:height'") && page.includes('postMessage'),
+	'the page no longer posts its height to the framing site'
+);
+
 // 3/ Corpora
 check(DATA.corpora.length > 0, 'no built-in corpus');
 for (const corpus of DATA.corpora)

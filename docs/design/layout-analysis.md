@@ -247,6 +247,12 @@ window.LAYOUT_ANALYSIS_HOST = {
 };
 ```
 
+Framed by the site (`/studio/comparer`, owned by the site routes), the page
+needs no bridge: it uses relative URLs only, honours `?lang=<code>` (French by
+default), makes no request outside the site and posts
+`{type: 'ergopti-layout-analysis:height', height}` to its parent on load and on
+every resize so the frame fits its content.
+
 Weights, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.
 

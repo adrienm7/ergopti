@@ -24,6 +24,8 @@
  *    localStorage when it is available; the page works the same without it.
  * 5. A layout file of any common format (layout_formats.js) joins the
  *    comparison; what it could not read is listed.
+ * 6. Framed by the site, it posts its height to the parent
+ *    ({type: 'ergopti-layout-analysis:height', height}) on load and resize.
  * ==============================================================================
  */
 
@@ -57,6 +59,8 @@
 	// Size of one key unit of the heatmap, in pixels.
 	const HEAT_UNIT_PX = 44;
 	const TEXT_DEBOUNCE_MS = 400;
+	// The message the framing page listens for to size its frame.
+	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
 	const lang = new URLSearchParams(location.search).get('lang');
@@ -692,12 +696,29 @@
 		});
 	}
 
+	/**
+	 * Tells the framing page (the site's /studio/comparer) how tall the page
+	 * is, so the frame fits without an inner scroll bar; a page opened on its
+	 * own has no parent to tell.
+	 */
+	function reportHeight() {
+		if (window.parent === window) return;
+		const post = () =>
+			window.parent.postMessage(
+				{ type: HEIGHT_MESSAGE, height: document.documentElement.scrollHeight },
+				'*'
+			);
+		post();
+		if (typeof ResizeObserver === 'function') new ResizeObserver(post).observe(document.body);
+	}
+
 	function start() {
 		fillCorpora();
 		fillLayouts();
 		fillWeights();
 		bind();
 		analyse();
+		reportHeight();
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
