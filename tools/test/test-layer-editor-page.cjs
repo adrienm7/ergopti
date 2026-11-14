@@ -213,6 +213,7 @@ function loadPage() {
 		path.join(UI, 'host_bridge.js'),
 		path.join(APP, '_generated', 'layer_data.js'),
 		path.join(APP, 'layer_model.js'),
+		path.join(UI, 'value_check.js'),
 		path.join(APP, 'script.js')
 	]) {
 		vm.runInContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
@@ -443,6 +444,29 @@ for (const os of ['windows', 'macos', 'linux']) {
 	page.el('keystroke-apply').click();
 
 	page.key('Digit5').click();
+	// The shared value check refuses a count outside the declaration, which
+	// equals the layer vocabulary's (value-validation): nothing is bound and the
+	// status line names the range.
+	const V = page.context.ErgoptiValueCheck;
+	const declared = V.entryFor(V.SCHEMA, V.KEY.LAYERS_REPEAT_COUNT);
+	const vocabulary = page.context.DATA.repeat_count;
+	check(
+		declared.min === vocabulary.min && declared.max === vocabulary.max,
+		'the declared repeat count bounds equal the layer vocabulary'
+	);
+	const rangeText = EN['dialog.value_check.range_integer']
+		.replace('{1}', String(declared.min))
+		.replace('{2}', String(declared.max));
+	for (const typed of ['0', '100', '2.5', 'abc', '', '0x7']) {
+		const before = page.binding('Digit5');
+		page.el('repeat-count').value = typed;
+		page.el('repeat-apply').click();
+		check(page.binding('Digit5') === before, `a refused repeat count "${typed}" must bind nothing`);
+		check(
+			page.el('status').textContent.includes(rangeText),
+			`a refused repeat count "${typed}" must name the range, not "${page.el('status').textContent}"`
+		);
+	}
 	page.el('repeat-count').value = '7';
 	page.el('repeat-apply').click();
 

@@ -308,6 +308,16 @@
 			"type": "decimal",
 			"min": -2,
 			"max": 2
+		},
+		"layers.repeat_count": {
+			"file": "layers.toml",
+			"type": "integer",
+			"min": 1,
+			"max": 99,
+			"max_from": {
+				"file": "layouts/data/layer_actions.toml",
+				"pattern": "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)"
+			}
 		}
 	}
 }

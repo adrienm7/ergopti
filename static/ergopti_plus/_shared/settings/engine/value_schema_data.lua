@@ -17,6 +17,7 @@ return {
 		["HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS"] = "hotstrings.dynamic.user_code.time_activation_seconds",
 		["HOTSTRINGS_EXPANSION_DELAY"] = "hotstrings.expansion_delay",
 		["HOTSTRINGS_IDLE_RESET_SECONDS"] = "hotstrings.idle_reset_seconds",
+		["LAYERS_REPEAT_COUNT"] = "layers.repeat_count",
 		["LLM_GENERATION_CONTEXT_LENGTH"] = "llm.generation.context_length",
 		["LLM_GENERATION_MAX_WORDS"] = "llm.generation.max_words",
 		["LLM_GENERATION_MIN_WORDS"] = "llm.generation.min_words",
@@ -125,6 +126,16 @@ return {
 			["file"] = "hotstrings_config.toml",
 			["max"] = 100,
 			["min"] = 0,
+			["type"] = "integer",
+		},
+		["layers.repeat_count"] = {
+			["file"] = "layers.toml",
+			["max"] = 99,
+			["max_from"] = {
+				["file"] = "layouts/data/layer_actions.toml",
+				["pattern"] = "\\[parameters\\.repeat_count\\]\\n(?:[^\\n]*\\n)*?max = (\\d+)",
+			},
+			["min"] = 1,
 			["type"] = "integer",
 		},
 		["llm.generation.context_length"] = {

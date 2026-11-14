@@ -642,9 +642,18 @@ function renderRepeat(panel, info) {
 		box.classList.add('disabled');
 	}
 	apply.addEventListener('click', function () {
-		var n = Number(input.value);
-		if (!(n >= DATA.repeat_count.min && n <= DATA.repeat_count.max && Math.floor(n) === n)) return;
-		pick('repeat_count:' + n);
+		// The shared value check (_shared/ui/value_check.js) reads the typed count;
+		// a refusal is shown in the status line with the localized text naming
+		// the accepted range, and nothing is bound.
+		var V = window.ErgoptiValueCheck;
+		var entry = V.entryFor(V.SCHEMA, V.KEY.LAYERS_REPEAT_COUNT);
+		var typed = V.parseEntry(entry, input.value);
+		if (!typed.ok) {
+			state.status = V.renderMessage(V.messageParts(entry, typed), _t);
+			el('status').textContent = state.status;
+			return;
+		}
+		pick('repeat_count:' + typed.value);
 	});
 	box.appendChild(input);
 	box.appendChild(apply);
