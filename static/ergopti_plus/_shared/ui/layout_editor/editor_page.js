@@ -2512,7 +2512,39 @@ var LayoutEditorPage = (function () {
 		// ======= 14/ Render =========
 		// ============================
 
+		// A render inside a render (see below) only asks for one more pass.
+		let rendering = false;
+		let renderAgain = false;
+
 		function render() {
+			if (rendering) {
+				renderAgain = true;
+				return;
+			}
+			rendering = true;
+			try {
+				// A field edited but not yet committed commits on blur. Blur it before its node
+				// leaves the page, so its change renders (as the pass below) before the tree is
+				// replaced, instead of being lost or firing inside replaceChildren, where a
+				// nested render once made the outer replacement throw.
+				const focused = document.activeElement;
+				if (
+					focused &&
+					focused !== root &&
+					root.contains(focused) &&
+					typeof focused.blur === 'function'
+				)
+					focused.blur();
+				do {
+					renderAgain = false;
+					renderTree();
+				} while (renderAgain);
+			} finally {
+				rendering = false;
+			}
+		}
+
+		function renderTree() {
 			keyView = makeKeyView(doc(), state.platform || host.platform || null);
 			root.replaceChildren(
 				el('header', { class: 'le-header' }, [

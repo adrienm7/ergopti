@@ -532,6 +532,23 @@ async function exerciseManager(browser, origin) {
 			fs.rmSync(reopened);
 		}
 
+		// A render that does not move the focus (the locale arriving, a host answer) while a
+		// field holds an uncommitted edit: removing the field fires its blur, whose change
+		// renders again inside the first render, and the outer replaceChildren once threw
+		// « The node to be removed is no longer a child … blur event handler » (CI 43611195865).
+		await page.fill('#le-description', 'typed, not yet committed');
+		assert.equal(
+			await page.evaluate(() => document.activeElement && document.activeElement.id),
+			'le-description',
+			'the edited field keeps the focus'
+		);
+		await page.evaluate(() => window.layoutEditor.render());
+		assert.deepEqual(errors, [], 'a render while a field is being edited throws nothing');
+		assert.equal(
+			await page.inputValue('#le-description'),
+			'typed, not yet committed',
+			'the edit is committed, not lost, by that render'
+		);
 		// The preview types through the web emulation: a tap-hold's tap and a shortcut.
 		await page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
 		await page.waitForFunction(() => document.querySelector('#le-name').value === 'Source Fixture');
