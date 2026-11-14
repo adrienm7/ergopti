@@ -101,7 +101,11 @@ jobs:
 
   python-floor:
     name: 'Installer tests on Python 3.8 (oldest supported)'
-    runs-on: ubuntu-latest
+    # Pinned: actions/setup-python's last 3.8 build (3.8.18) exists for Ubuntu
+    # 20.04, 22.04 and 24.04 only, and ubuntu-latest moved to 26.04 (2026-11),
+    # where the job stopped before any test. Move the floor and this runner
+    # together when 3.8 stops being the oldest supported interpreter.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
