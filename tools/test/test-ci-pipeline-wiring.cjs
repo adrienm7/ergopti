@@ -1501,6 +1501,15 @@ function commonPlanProblems(files) {
 						run: 'python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"\nnode tools/lint/format.cjs --check\n'
 					},
 					{
+						name: 'Refuse AI assistant commit identities and attribution trailers',
+						env: {
+							EVENT_NAME: '${{ github.event_name }}',
+							PUSH_BEFORE: '${{ github.event.before }}',
+							PR_BASE: '${{ github.event.pull_request.base.sha }}'
+						},
+						run: 'set -euo pipefail\n# The checkout is shallow; a blobless fetch gives the commit graph cheaply.\ngit fetch --no-tags --filter=blob:none --unshallow origin\nif [ "$EVENT_NAME" = pull_request ]; then\n  base="$PR_BASE"\nelif [ "$EVENT_NAME" = push ] && [ -n "$PUSH_BEFORE" ] && ! printf \'%s\' "$PUSH_BEFORE" | grep -qE \'^0+$\'; then\n  base="$PUSH_BEFORE"\nelse\n  base="$(git merge-base origin/dev HEAD)"\nfi\n# A worker branch may still await the coordinator\'s author rewrite, so\n# only a push to dev or main fails here; other runs keep their proof.\nif [ "$EVENT_NAME" = push ] && { [ "$GITHUB_REF" = refs/heads/dev ] || [ "$GITHUB_REF" = refs/heads/main ]; }; then\n  node tools/lint/check-commit-identity.cjs --range "$base..HEAD"\nelif ! node tools/lint/check-commit-identity.cjs --range "$base..HEAD"; then\n  echo "::warning::Commits authored as an AI assistant must be rewritten before they reach dev."\nfi\n'
+					},
+					{
 						name: 'Plan every canonical feature and additional suite',
 						id: 'plan',
 						run: 'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan\n'
