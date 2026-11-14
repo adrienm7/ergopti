@@ -456,7 +456,12 @@ function resolvePathToken(
 		const lead = (token.match(/^(%A_LineFile%\/\.\.\/|%A_ScriptDir%\/)/) || [''])[0];
 		const rest = token.slice(lead.length);
 		const dir = path.posix.dirname(file);
-		if (lead !== '%A_ScriptDir%/')
+		// #Include %A_ScriptDir%\..\x.ahk is written only by entry scripts (the
+		// driver, the bundled app entry, the UIA worker, the layout registrar):
+		// launched on their own, their script folder is their own folder. In a
+		// test it is windows/tests, which the A_ScriptDir climb rule reads.
+		const ownScriptDir = file.endsWith('.ahk') && !file.includes('/tests/');
+		if (lead !== '%A_ScriptDir%/' || ownScriptDir)
 			candidates.push({ form: 'file', lead, abs: path.posix.normalize(`${dir}/${rest}`) });
 		// "./lua" and "../x" are relative to the file and nothing else.
 		const fileRelative = /^\.\.?\//.test(rest);
