@@ -136,6 +136,10 @@ Account and tester actions (maintainer, from the PC):
       the editor in its own window; a second request brings it to the front with its unsaved work; « Close » closes
       it; an install from it refreshes an open layout manager.
 
+- [ ] Layout editor downloads (2026-11-14, `layout_editor_downloads`): the editor window's XKB, KLC, DLL and macOS
+      bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext »,
+      and the `.klc` opens in MSKLC.
+
 - [ ] Restored API entry under another account (2026-11-13): restore a configuration backup holding a DPAPI API key
       under a second Windows account; the entry is greyed with « Edit » only, and a new key makes it work.
 
