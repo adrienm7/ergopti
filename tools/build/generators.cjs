@@ -272,7 +272,9 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_nemolivier.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_autonomy.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_hello_world.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_punctuation.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_punctuation.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_leipzig_news.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_leipzig_wikipedia.js'
 		]
 	},
 	{

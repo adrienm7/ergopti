@@ -382,6 +382,8 @@ function buildCorpora(engine) {
 			);
 		let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/\uFEFF/g, '');
 		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
+		// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
+		if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
 		const counts = engine.ngramsFromText(text);
 		const sorted = (table) =>
 			Object.fromEntries(

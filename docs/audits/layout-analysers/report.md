@@ -417,8 +417,9 @@ of every layout is recomputed without re-analysing (`LAYOUT_ANALYSIS.rescore`).
 
 Measured with the engine on an ISO board, the whole library (115 layouts) in
 about 0.3 s per corpus. French: `static/corpus/original/fr/corpus_nemolivier.txt`
-(2.5 MB); English: `static/corpus/original/en/Chained English Bigrams 9.txt`
-(2.9 MB). A layout of the imported library has only its alphabetic block (no
+(2.5 MB); English: `static/corpus/original/en/don_quixote_ormsby.txt`
+(2.2 MB; it replaced a synthetic text deleted with the corpora of unknown
+licence). A layout of the imported library has only its alphabetic block (no
 accents): its `unsupported` share shows what it cannot type.
 
 French corpus (best eight and the reference layouts), with the model of
@@ -438,13 +439,12 @@ French corpus (best eight and the reference layouts), with the model of
 |  108 | AZERTY (FR)   | −90.5 | 7.60 | 7.97 | 4.40 |     1.47 |          1.03 |        18.07 |       28.00 |    23.77 |    15.3 |        0.04 |
 |  110 | QWERTY (US)   | −94.4 | 7.40 | 8.70 | 5.33 |     0.54 |          1.06 |        17.14 |       29.18 |    29.80 |    13.6 |        2.21 |
 
-English corpus: Graphite (7.2), Gallium (7.1), Gallium Colstag (6.9), Nerbs,
-Maya, AdNW, Hands Down Neu and S-Roll lead; Ergopti+ −7.6, Colemak-DH −11.2,
-Dvorak −13.7, Ergo-L −14.4, Bépo −29.4, QWERTY −92.1, AZERTY −105.4. The SFB
-of QWERTY (7.0 %), Colemak-DH (1.9 %) and Dvorak (3.2 %) on this synthetic
-corpus are of the order the Keyboard Layouts Doc gives (QWERTY ~6 %, Dvorak
-2.5 %, Colemak 1.5 %), the difference coming from its chained bigrams (« e, »
-alone is 0.2 % of Colemak-DH's bigrams).
+English corpus (_Don Quixote_, Ormsby, 2.2 MB): APT (24.5), Graphite (24.2),
+APTv3, Gallium, Gallium Colstag, Maya, Noctum and Nerbs lead; Ergopti+ 11.3
+(51st), Ergo-L −1.3, Dvorak −4.4, Colemak-DH −6.2, Bépo −24.5, QWERTY −86.5,
+AZERTY −91.2. The SFB of QWERTY (5.8 %), Colemak-DH (1.6 %) and Dvorak (2.7 %)
+are of the order the Keyboard Layouts Doc gives (QWERTY ~6 %, Dvorak 2.5 %,
+Colemak 1.5 %).
 
 ## 13. Layout library
 
@@ -588,30 +588,28 @@ contributions, and 5.1 % on English. Both are inside the maintainer's 5–10 %.
 ## 18. Corpus licences
 
 On 2026-11-14 the maintainer asked for every corpus in `static/corpus` to be
-usable in the analyser, with its attribution shown. Each text was audited.
-The register `static/corpus/register.json` keeps the source, licence,
-attribution, status and evidence of each one, and the codegen refuses to ship
-a text it does not clear.
+usable in the analyser, with its attribution shown, and then set the rule:
+keep only the texts whose licence is clearly compatible and recorded, and
+delete the others. The register `static/corpus/register.json` keeps the
+source, licence, attribution, status and evidence of each text, and the
+codegen refuses to ship a text it does not clear.
 
-| Status  | Texts                                                                                                                                                                                                                                                                                     |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT, Hello World Collection)                                                                                   |
-| hold    | The two Leipzig samples (their licence is cited both as CC BY 4.0 and as CC BY-NC 4.0); the GLM project (co-author's consent); the eight KLAnext-style texts and Auxlang X (origin unconfirmed)                                                                                           |
-| refused | The 2003 e-mails (personal data, no licence); `romans.txt` as it stands (one contemporary author, an « all rights reserved » note, five unnamed translators, five Leblanc books still protected in the US); _Python for Everybody_ (CC BY-NC-SA 3.0, not compatible with the MIT project) |
+| Status  | Texts                                                                                                                                                                                                                                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT); the two Leipzig samples (CC BY 4.0, the maintainer's choice) |
+| refused | Marked for deletion by the maintainer: the 2003 e-mails, `romans.txt`, _Python for Everybody_, the GLM project, the eight KLAnext-style texts and Auxlang X                                                                                   |
 
 Notes:
 
 - _Autonomie_: the copy in the repository had lost every accent (9,945
   U+FFFD characters). It was re-imported from the ISO-8859-1 original in the
   bépo corpus archive. Its n-gram tables are shipped in their own file,
-  marked CC BY-SA 1.0 with the required credit. Jean-Michel Smith's name must
-  not be used to promote Ergopti.
-- The Hello World files are a 2004 snapshot. The collection's repository was
-  placed under MIT in 2017. Rebuilding the files from that repository would
-  remove the doubt.
-- The raw texts are already public in the GitHub repository. The maintainer
-  should decide whether to remove the e-mails (personal data) and the parts of
-  `romans.txt` that cannot be redistributed.
-
-Decided by the agent, to review by the maintainer: these statuses, and
-shipping the CC BY-SA and MIT tables with their notices.
+  marked CC BY-SA 1.0 with the required credit.
+- The Hello World files are a 2004 snapshot of a collection placed under MIT
+  in 2017.
+- Leipzig: the maintainer chose CC BY 4.0. The licence page could not be read
+  from the build container, and third parties cite recent releases as CC BY
+  4.0 and older ones as CC BY-NC 4.0. The Wikipédia sample also credits
+  Wikipédia's contributors.
+- The e-mails come from the bépo corpus archive (source confirmed), but no
+  licence is granted and they hold personal data.

@@ -222,9 +222,11 @@ Shipped as of 2026-11-14:
   and the Nemolivier anthology: public domain.
 - _Autonomie_: CC BY-SA 1.0, re-imported from its ISO-8859-1 original.
 - The Hello World programs, with and without letters: MIT.
+- The Leipzig French news and Wikipédia samples: CC BY 4.0, by the
+  maintainer's choice. `strip_sentence_numbers` removes their line numbers.
 
 The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
-is held or refused, and why.
+is refused, and why.
 
 ## Layout file formats
 
