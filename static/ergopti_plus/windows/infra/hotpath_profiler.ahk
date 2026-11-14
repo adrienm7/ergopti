@@ -96,7 +96,7 @@ global _HOTPATH_BREAKDOWN_CAP := 24
 ; ==================================================
 
 ; Assign the slow-segment threshold from the shared registry. AHK v2 runs global
-; initializers before the auto-execute body, so infra/boot.ahk calls this right
+; initializers before the auto-execute body, so core/lifecycle/engine/boot.ahk calls this right
 ; after TimingsLoadShared(). Fail-fast: TimingsGet throws on a missing key, and a
 ; threshold of zero would report every keystroke as slow.
 HotPath_LoadTimings() {

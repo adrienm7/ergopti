@@ -107,7 +107,7 @@ same commit as each step or checkpoint. Times are Paris time.
 - Proof 24 (S03–S12 on dev `37de779c`, run 43581641357, cancelled at its
   last job): Windows core, hotstrings and Driver startup green. New names:
   the Windows OS-purity ratchet (modules+lib 247 to 249: S06's singleton
-  pass folds windows/adapters/driver_control.ahk into core/lifecycle, fixed
+  pass folds windows/core/lifecycle/driver_control.ahk into core/lifecycle, fixed
   by naming it in the listed exemption, `6b2836cc`); the live updater
   `installed` check, which fails the same way on dev (worker G owns it; the
   coordinator counts it as baseline). Also fixed while rebasing: a file dev

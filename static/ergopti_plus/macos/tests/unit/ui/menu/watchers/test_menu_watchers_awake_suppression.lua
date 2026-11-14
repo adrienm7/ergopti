@@ -51,7 +51,7 @@ local OWNED_MODULES = {
 	"core.fs.engine.dir",
 	"infra.git_status",
 	"core.i18n.engine.i18n",
-	"infra.launcher_environment",
+	"core.lifecycle.engine.launcher_environment",
 	"infra.log_folders",
 	"infra.logger",
 	"infra.manifest_reader",
@@ -59,9 +59,9 @@ local OWNED_MODULES = {
 	"core.fs.engine.paths",
 	"infra.personal_shortcuts",
 	"infra.preferences",
-	"infra.reload_guard",
+	"core.lifecycle.engine.reload.guard",
 	"infra.script_chord_catalogue",
-	"infra.termination_coordinator",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"infra.text_utils",
 	"infra.toml.codec",
 	"infra.toml.reader",
@@ -210,7 +210,7 @@ local function with_menu(body)
 						world.deferred_reload = callback
 						return true
 					end
-					package.loaded["infra.termination_coordinator"].request_reload = function(source)
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"].request_reload = function(source)
 						helpers.assert_eq(source, "watcher", "the real menu must identify its source request")
 						world.reloads = world.reloads + 1
 						return world.reload_accepts

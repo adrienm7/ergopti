@@ -4,7 +4,7 @@
 
 Status: proposed on 2026-11-11 by the Linux performance pass, approved by the
 maintainer the same day for the installed tree only, and implemented
-(`infra/bytecode_package.lua`, `install/compile_bytecode.lua`; decision in
+(`core/lifecycle/engine/bytecode_package.lua`, `install/compile_bytecode.lua`; decision in
 `docs/memory/maintainer-decisions.md`). The receipt question was settled by
 excluding `.bytecode/` and admitting it by name. Measured after
 implementation, in an installed tree under the container session (three runs of

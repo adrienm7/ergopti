@@ -10,7 +10,7 @@
 
 local M = {}
 
-local LauncherEnvironment = require("infra.launcher_environment")
+local LauncherEnvironment = require("core.lifecycle.engine.launcher_environment")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 

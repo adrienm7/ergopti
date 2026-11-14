@@ -22,7 +22,7 @@
 --- Exit 0 = survived and delivered; 1 = a failure; 2 = no environment.
 --- ==============================================================================
 
-local SignalHandlers = require("infra.signal_handlers")
+local SignalHandlers = require("core.lifecycle.engine.shutdown.signal_handlers")
 local unreserved = arg[1] == "--unreserved"
 if not unreserved then
 	local reserved, why = SignalHandlers.reserve_webkit_gc_signal()

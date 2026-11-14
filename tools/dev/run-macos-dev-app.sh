@@ -7,7 +7,7 @@
 # Builds ErgoptiPlus.app in developer source mode and opens it: its launcher
 # runs the Lua of this clone (static/ergopti_plus/macos), so a saved .lua edit
 # reloads the driver and the menu's Reload picks it up. A stock Hammerspoon can
-# no longer run the driver (infra/instance_admission.lua), so this replaces
+# no longer run the driver (core/lifecycle/engine/reload/instance_admission.lua), so this replaces
 # the former ~/.hammerspoon bootstrap installer.
 #
 # USAGE:

@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 #Include ../../../_shared/hotstrings/data/catalogue/user_code.ahk
 #Include ../../adapters/user_hotstrings_native.ahk
 

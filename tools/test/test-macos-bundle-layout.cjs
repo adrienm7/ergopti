@@ -116,7 +116,9 @@ for (const tool of new Set(launcherTools)) {
 		);
 	}
 }
-const environmentLua = read('static/ergopti_plus/macos/infra/launcher_environment.lua');
+const environmentLua = read(
+	'static/ergopti_plus/macos/core/lifecycle/engine/launcher_environment.lua'
+);
 const reportedKeys = [...environmentLua.matchAll(/^\t"(ERGOPTI_[A-Z_]+)",$/gm)].map(
 	(match) => match[1]
 );

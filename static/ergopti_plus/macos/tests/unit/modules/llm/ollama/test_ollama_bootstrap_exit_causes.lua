@@ -58,8 +58,8 @@ end)
 --- @return string refused_words The refused pinned runtime words.
 local function missing_catalogue_failure(developer)
 	local message, developer_words, refused_words
-	helpers.with_stub_scope({ "infra.dev_source" }, function()
-		package.loaded["infra.dev_source"] = { is_active = function() return developer end }
+	helpers.with_stub_scope({ "core.lifecycle.engine.dev_source" }, function()
+		package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() return developer end }
 		Fixture.scoped(function()
 			local state = Fixture.new_state()
 			local checker = Fixture.load_ollama_checker(state)

@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 --- @return table world { storage, written, done, logs }
 local function migrate(lists, opts)
 	opts = opts or {}
-	local Migration = helpers.load_module("infra.app_identity_migration")
+	local Migration = helpers.load_module("core.lifecycle.engine.app_identity_migration")
 	local world = { written = {}, store = opts.store or {} }
 	world.storage = {
 		get = function(key, default) local value = world.store[key]; if value == nil then return default end return value end,
@@ -53,7 +53,7 @@ end
 
 helpers.describe("ADD-3: saved application lists move to the WM class (add3-app-identity)", function()
 	helpers.it("converts known comm names, keeps unknown entries, removes duplicates (add3-app-identity)", function()
-		local Migration = helpers.load_module("infra.app_identity_migration")
+		local Migration = helpers.load_module("core.lifecycle.engine.app_identity_migration")
 		local aliases, same = Migration.load_table()
 		local converted, changed, unknown = Migration.convert(
 			{ "chrome", "gnome-terminal-", "firefox", "My-Tool", "google-chrome" }, aliases, same)

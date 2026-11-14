@@ -57,7 +57,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const WINDOWS_WORKFLOW_REL = '.github/workflows/ci-windows.yml';
 const WRITER_REL = 'tools/build/write_build_stamp.sh';
 const READER_REL = 'static/ergopti_plus/_shared/diagnostics/engine/snapshot.lua';
-const WINDOWS_BUNDLE_REL = 'static/ergopti_plus/windows/infra/bundle.ahk';
+const WINDOWS_BUNDLE_REL = 'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk';
 
 // The scripts that assemble a shipped tree and therefore write the stamp.
 const STAMPING_BUILDS = {

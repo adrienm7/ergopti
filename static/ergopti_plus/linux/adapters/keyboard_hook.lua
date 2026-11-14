@@ -47,7 +47,7 @@ local M = {}
 local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
-local RuntimeGuard = require("infra.runtime_guard")
+local RuntimeGuard = require("core.lifecycle.engine.runtime_guard")
 -- The new logical lease trusts the normal package loader's cold construction,
 -- before any backend/setup callback. A preloaded facade keeps ordinary input
 -- compatibility but supplies no evidence that these authority exports are original.

@@ -678,7 +678,7 @@ _check_or_install() {
 # Inline LuaJIT probes are app-owned entry points as well: initialise the
 # literal owner without changing LUA_INIT or host processes.
 _lua_app_probe() {
-	local bootstrap="local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX')) end; "
+	local bootstrap="local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); if d and d~='' then assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX')) end; "
 	luajit -e "$bootstrap$1"
 }
 
@@ -1353,7 +1353,7 @@ prune_retired_payload() {
 }
 prune_retired_payload "${LIB_DIR}/.ergopti-owned-files" || exit 1
 
-# The bytecode package (infra/bytecode_package.lua), compiled after the receipt
+# The bytecode package (core/lifecycle/engine/bytecode_package.lua), compiled after the receipt
 # by the luajit the daemon runs; without it the daemon starts from source.
 if ! luajit "${LIB_DIR}/linux/install/compile_bytecode.lua" "${LIB_DIR}" >/dev/null; then
 	ergopti_msg_with "  ⚠  " install.bytecode_skipped

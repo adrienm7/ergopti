@@ -33,7 +33,7 @@
 
 local Identifiers = require("core.text.engine.identifiers")
 local Logger = require("infra.logger")
-local MainThreadHold = require("infra.main_thread_hold")
+local MainThreadHold = require("core.lifecycle.engine.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")

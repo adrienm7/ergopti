@@ -26,7 +26,7 @@ function M.run(deps)
 		logger.info("ui.menu.uninstall", "Uninstall ignored: this is a local version run from source, with nothing to remove.")
 		return false
 	end
-	local lifecycle = deps.lifecycle or require("infra.termination_coordinator")
+	local lifecycle = deps.lifecycle or require("core.lifecycle.engine.shutdown.termination_coordinator")
 	if lifecycle.is_pending() then return false end
 	local i18n = deps.i18n or require("core.i18n.engine.i18n")
 	local dialog = deps.dialog or require("infra.dialog_util")

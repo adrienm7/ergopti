@@ -85,7 +85,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 				return true
 			end,
 		}
-		package.loaded["infra.startup_transaction"] = {
+		package.loaded["core.lifecycle.engine.startup_transaction"] = {
 			run = function() return true end,
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -226,7 +226,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			setEnabled = function() return true end,
 			unbind = function() return true end,
 		}
-		package.loaded["infra.termination_coordinator"] = {
+		package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 			request_exit = function() return true end,
 			request_reload = function() return true end,
 		}

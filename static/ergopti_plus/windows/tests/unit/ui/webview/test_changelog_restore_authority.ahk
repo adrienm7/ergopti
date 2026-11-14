@@ -156,7 +156,7 @@ _CRAW_LifecycleSource(Root) {
 		Source .= "#Include " . Owner . "`n"
 	}
 	Source .= "#Include " . _DriverDir . "\tests\test_framework.ahk`n"
-		. "#Include " . _DriverDir . "\tests\unit\infra\lifecycle\test_reload_terminal_pending.ahk`n"
+		. "#Include " . _DriverDir . "\tests\unit\core\lifecycle\engine\reload\test_terminal_pending.ahk`n"
 		. "global _CRAWC_SchemaVersion := " . ConfigMigrateCurrentVersion() . "`n"
 	return Source . "#Include " . _DriverDir . "\tests\fixtures\changelog_restore_lifecycle_body.ahk`n"
 }

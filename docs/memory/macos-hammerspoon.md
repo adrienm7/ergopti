@@ -938,7 +938,7 @@ first physical input.
 ### project-hs-fork-admission-in-both-launch-modes
 
 A Git checkout runs through the developer app (`tools/dev/run-macos-dev-app.sh`),
-never through ordinary Hammerspoon: `infra/instance_admission.lua` admits only
+never through ordinary Hammerspoon: `core/lifecycle/engine/reload/instance_admission.lua` admits only
 a runtime the launcher started with its logger authority, and tells a stock
 Hammerspoon pointed at the checkout why the driver did not start. Users of a
 checkout must still not need a published ErgoptiPlus.app to obtain the native
@@ -1472,7 +1472,7 @@ Hammerspoon 1.1.1 replaces the global `require` (`_coresetup.lua`): every call,
 for a loaded module too, lists, sorts and joins `package.loaded` for its crash
 reporter, about 300 us and 4 KB on the main thread. The unit runner's plain
 `require` cannot show it: one lazy `require` per script-chord row cost 47 ms ->
-1 s in the field only. `infra/direct_require.lua` restores the original
+1 s in the field only. `core/lifecycle/engine/direct_require.lua` restores the original
 (`rawrequire`) first thing in init.lua. Action: compare a field number before
 blaming row counts, and keep that install ahead of every module load.
 
@@ -1981,7 +1981,7 @@ millisecond, one with no `ERGOPTI_*` key and a config dir from the default
 configuration folder. No Ergopti code launches that bundle without the
 environment, so treat session restore (loginwindow reopening every running
 app, the nested one included) as the trigger until a launcher.log proves
-otherwise. `infra/instance_admission.lua` therefore runs before any settings
+otherwise. `core/lifecycle/engine/reload/instance_admission.lua` therefore runs before any settings
 write, timer or path resolution and quits such a stray runtime silently; a
 stock Hammerspoon pointed at Ergopti is refused without `os.exit`, which would
 quit the user's application. The launcher holds a per-user flock
@@ -1997,7 +1997,7 @@ fatal dialog.
 run every Debug field check, the diagnostics snapshot and the Ollama and MLX
 flows through `infra/field_run.lua`: a request file in the clone folder that
 `static/ergopti_plus/macos/data/field_run.json` names, one JSON result per
-step, then a done marker. It starts only behind `infra/dev_source.lua`; a
+step, then a done marker. It starts only behind `core/lifecycle/engine/dev_source.lua`; a
 packaged runtime never loads it. Runtime installs go through
 `runtime_install_offer` (the only grantor), never the checkers' install
 entries directly, or `ai-runtime-triggers` fails. Add a new Debug field check to the

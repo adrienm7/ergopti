@@ -114,7 +114,7 @@ local _debounce_sec = 0.5
 -- a git operation is currently rewriting it.
 local _base_dir = nil
 
--- Developer run only (infra/dev_source.lua): the source trees whose saved .lua
+-- Developer run only (core/lifecycle/engine/dev_source.lua): the source trees whose saved .lua
 -- edits call _on_source_change, a daemon restart, instead of _on_reload, which
 -- re-reads the hotstrings and cannot load new code.
 local _source_dirs = {}

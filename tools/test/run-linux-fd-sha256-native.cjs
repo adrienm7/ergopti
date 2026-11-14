@@ -216,6 +216,7 @@ function qualifyStandalonePaths() {
 			fs.mkdirSync(root, { mode: PRIVATE_DIRECTORY_MODE });
 			for (const relative of [
 				'static/ergopti_plus/linux/infra',
+				'static/ergopti_plus/linux/core/lifecycle/engine',
 				'static/ergopti_plus/linux/core/i18n/engine',
 				'static/ergopti_plus/linux/core/fs/engine',
 				'static/ergopti_plus/linux/_generated',

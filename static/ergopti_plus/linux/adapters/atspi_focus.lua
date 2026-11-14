@@ -508,7 +508,7 @@ local function read_snapshot(include_context)
 	local timeout_seconds = math.max(1, math.ceil(timeout_ms / 1000))
 	local query = include_context and "_get_native_context_snapshot" or "_get_native_snapshot"
 	local child_code = "local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); "
-		.. "if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX'),os.getenv('ERGOPTI_LITERAL_DIRECT')=='1' and 'child-direct' or (os.getenv('ERGOPTI_LITERAL_DAEMON')=='1' and 'daemon' or nil)) end; "
+		.. "if d and d~='' then assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX'),os.getenv('ERGOPTI_LITERAL_DIRECT')=='1' and 'child-direct' or (os.getenv('ERGOPTI_LITERAL_DAEMON')=='1' and 'daemon' or nil)) end; "
 		.. "local m=require('adapters.atspi_focus'); local j=require('core.text.engine.json'); "
 		.. "local s,ok=m." .. query .. "(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
 	local command = string.format("env LUA_PATH=%s timeout -s KILL %ds %s -e %s 2>/dev/null",

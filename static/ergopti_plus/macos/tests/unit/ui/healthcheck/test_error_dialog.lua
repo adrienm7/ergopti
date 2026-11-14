@@ -39,7 +39,7 @@ local function load_dialog(controls)
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "core.i18n.engine.i18n",
 		"core.i18n.engine.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
-		"infra.termination_coordinator",
+		"core.lifecycle.engine.shutdown.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -56,7 +56,7 @@ local function load_dialog(controls)
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	package.loaded["infra.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		terminal_in_progress = function() return context.terminal == true end,
 	}
 	local function catalogue() return { ["common.error_title"] = "Error" } end

@@ -83,9 +83,9 @@ end
 
 local _STORE_PATH = _config_dir() .. "storage.json"
 -- Named after this process (pid and kernel start tick): a stage a killed
--- daemon left never blocks this one, and infra/stage_owner.lua reaps it at
+-- daemon left never blocks this one, and core/lifecycle/engine/stage_owner.lua reaps it at
 -- start (CFD-1); a foreign file under this name still refuses the write.
-local _TMP_PATH   = require("infra.stage_owner").stage_path(_STORE_PATH)
+local _TMP_PATH   = require("core.lifecycle.engine.stage_owner").stage_path(_STORE_PATH)
 local _CORRUPT_PATH = _STORE_PATH .. ".corrupt"
 
 

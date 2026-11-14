@@ -45,7 +45,7 @@ const LUA_HELPER_RE = /read_driver_source|source_concat|list_lua_files\(/;
 
 // macOS shape: driver_root() .. "modules|lib|ui/….lua".
 const MACOS_PIN_RE =
-	/driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui)[\\/][^"'\n]*\.lua)["']/g;
+	/driver_root\(\)\s*\.\.\s*["']([^"'\n]*(?:modules|lib|ui|core)[\\/][^"'\n]*\.lua)["']/g;
 
 // Linux shape: helpers.driver_root() .. "/…" — any depth, files and directories,
 // including the "/../_shared/…" escapes into the shared tree.

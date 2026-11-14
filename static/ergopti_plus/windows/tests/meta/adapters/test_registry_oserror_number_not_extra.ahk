@@ -36,7 +36,7 @@
 ; =====================================================
 
 _RONE_NoRemainingExtraChecks() {
-	Src := _DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(Src != "", "lib must be readable")
 
 	for _, FuncName in ["Reg_DeleteValue", "Reg_DeleteKey", "Reg_KeyExists"] {

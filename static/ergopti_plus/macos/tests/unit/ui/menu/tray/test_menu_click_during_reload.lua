@@ -42,7 +42,7 @@ helpers.describe("menubar click during a reload (menu-click-reload-handoff)", fu
 		fixture.terminal_pending = true
 		items[1].menu[1].fn({}, {})
 		helpers.assert_eq(switch.runs, 0, "a click during a reload must not run against a dying generation")
-		require("infra.reload_guard").mark_reload()
+		require("core.lifecycle.engine.reload.guard").mark_reload()
 		helpers.assert_true(fixture.menu ~= nil)
 		helpers.assert_true(require("ui.menu.init").stop_watchers())
 		local stored = require("core.fs.adapters.storage").get(REPLAY_KEY, nil)

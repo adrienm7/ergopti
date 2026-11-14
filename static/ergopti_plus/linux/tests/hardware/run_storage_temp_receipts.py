@@ -28,7 +28,7 @@ WORKER = r"""
 local prepared = os.getenv("ERGOPTI_PREPARED_STAGE")
 if prepared then
 	local store = require("infra.config_paths").default_config_dir() .. "/storage.json"
-	local stage = require("infra.stage_owner").stage_path(store)
+	local stage = require("core.lifecycle.engine.stage_owner").stage_path(store)
 	assert(os.rename(prepared, stage), "the prepared stage could not take the worker's name")
 	io.write("STAGE=", stage, "\n")
 end

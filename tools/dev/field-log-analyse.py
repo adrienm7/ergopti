@@ -365,7 +365,7 @@ BUDGETS = (
     ),
     (
         "main_thread.hold",
-        "static/ergopti_plus/macos/infra/main_thread_hold.lua",
+        "static/ergopti_plus/macos/core/lifecycle/engine/main_thread_hold.lua",
         r"(?m)^\s*COUNT_MS = (\d+)",
         True,
     ),

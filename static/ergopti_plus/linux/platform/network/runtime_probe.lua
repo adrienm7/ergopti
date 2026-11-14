@@ -3,7 +3,7 @@
 local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
 if literal_driver and literal_driver ~= "" then
 	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
-	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+	assert(loadfile(literal_driver .. "/core/lifecycle/engine/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
 end
 
 
@@ -24,7 +24,7 @@ if not root or type(shared) ~= "string" or shared:sub(1, 1) ~= "/" or arg[2] ~= 
 	os.exit(1)
 end
 if literal_driver then
-	local resolver = assert(package.loaded["infra.literal_module_loader"])
+	local resolver = assert(package.loaded["core.lifecycle.engine.literal_module_loader"])
 	resolver.prepend({ { root, ".lua" }, { shared .. "", ".lua" } })
 else
 	package.path = root .. "/?.lua;" .. shared .. "/?.lua;" .. package.path

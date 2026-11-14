@@ -1,5 +1,5 @@
 {
-	"_comment": "Replayed by value_check.js (tools/test/test-value-schema.cjs), the Lua port (_shared/tests/lua/value_check_contract.lua, run by the macOS and Linux suites) and the AHK port (windows/tests/unit/infra/test_value_check_vectors.ahk). Values JSON cannot spell are strings: \"nan\", \"inf\", \"-inf\". A stored vector checks a loaded value, an entry vector checks typed text. ahk_skip marks a vector the AHK port cannot express.",
+	"_comment": "Replayed by value_check.js (tools/test/test-value-schema.cjs), the Lua port (_shared/tests/lua/value_check_contract.lua, run by the macOS and Linux suites) and the AHK port (windows/tests/unit/core/lifecycle/engine/test_value_check_vectors.ahk). Values JSON cannot spell are strings: \"nan\", \"inf\", \"-inf\". A stored vector checks a loaded value, an entry vector checks typed text. ahk_skip marks a vector the AHK port cannot express.",
 	"declarations": {
 		"timeout_ms": {
 			"type": "integer",

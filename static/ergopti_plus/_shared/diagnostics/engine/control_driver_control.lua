@@ -4,7 +4,7 @@
 --- MODULE: Local Driver Control Policy (shared Lua)
 --- DESCRIPTION:
 --- The pure half of the local reload command shared by the macOS and Linux
---- drivers; windows/infra/driver_control.ahk is its AutoHotkey port and the
+--- drivers; windows/core/lifecycle/engine/driver_control.ahk is its AutoHotkey port and the
 --- corpus under _shared/tests/corpus/control pins both. The declaration is
 --- _shared/diagnostics/data/control/driver_control.json.
 ---

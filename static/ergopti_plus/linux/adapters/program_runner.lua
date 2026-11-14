@@ -1,8 +1,8 @@
 --- adapters/program_runner.lua
 
 --- Owns one private detached group until leader exit and native group absence.
-local ProcessGroup = require("infra.libuv_process_group")
-local Exit = require("infra.libuv_exit")
+local ProcessGroup = require("core.lifecycle.engine.libuv_process_group")
+local Exit = require("core.lifecycle.engine.shutdown.libuv_exit")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end
 local M = {}

@@ -25,7 +25,7 @@ local LOG         = "menu_watchers"
 --- request expected rather than a fault.
 --- @return boolean terminating
 local function reload_already_terminating()
-	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	local loaded, coordinator = pcall(require, "core.lifecycle.engine.shutdown.termination_coordinator")
 	if not loaded or type(coordinator) ~= "table" then return false end
 	local checked, in_progress = pcall(coordinator.terminal_in_progress)
 	return checked and in_progress == true

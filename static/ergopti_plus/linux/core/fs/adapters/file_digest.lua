@@ -13,10 +13,10 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
-local LibuvExit = require("infra.libuv_exit")
+local LibuvExit = require("core.lifecycle.engine.shutdown.libuv_exit")
 local NativeTimer = require("infra.native_timer")
 local NumberPolicy = require("core.text.engine.number_policy")
-local ProcessGroup = require("infra.libuv_process_group")
+local ProcessGroup = require("core.lifecycle.engine.libuv_process_group")
 local LOG = "core.fs.adapters.file_digest"
 
 local ok_luv, luv = pcall(require, "luv")

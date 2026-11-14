@@ -27,7 +27,7 @@ helpers.describe("instrumentation fixture logger ownership", function()
 			"infra.phase_stats", "adapters.shell_runner", "ui.menu.timed_build", "infra.toml.reader", "infra.boot_profiler",
 			"infra.perf_counters", "core.text.engine.toml_codec.reader",
 		} },
-		{ module = "tests.unit.infra.lifecycle.test_boot_profiler_summary", owned = { "infra.boot_profiler", "infra.phase_stats" } },
+		{ module = "tests.unit.core.lifecycle.test_boot_profiler_summary", owned = { "infra.boot_profiler", "infra.phase_stats" } },
 	}) do
 		local module_name = scenario.module
 		for _, mode in ipairs({ "cold", "warm" }) do

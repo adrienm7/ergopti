@@ -21,7 +21,7 @@ for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOM
 end
 local Shell = require("adapters.shell_runner")
 local Connectors = require("modules.llm.agent_connectors")
-local Loop, Coordinator = require("core.events.loop"), require("infra.shutdown_coordinator")
+local Loop, Coordinator = require("core.events.loop"), require("core.lifecycle.engine.shutdown.coordinator")
 local function read(path)
 	local file = io.open(path, "rb"); if not file then return nil end
 	local data = file:read("*a"); assert(file:close()); return data

@@ -71,7 +71,7 @@ const PROPER_NOUNS = /Ergopti(?:Plus|\+)?|\b(?:Ollama|MLX|HuggingFace|GitHub)\b/
 // matches anything fails, so an exemption cannot outlive its reason.
 const ALLOWED = [
 	{
-		file: 'windows/infra/bundle.ahk',
+		file: 'windows/core/lifecycle/engine/bundle.ahk',
 		sink: 'Ui_MsgBox',
 		reason: 'bundle extraction runs before the locale catalogue is on disk (audit I10)'
 	},

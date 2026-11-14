@@ -15,7 +15,7 @@ local WindowTitles = require("core.ui.engine.window_titles")
 
 local ShellRunner = require("adapters.shell_runner")
 local Paths = require("core.fs.engine.paths")
-local Installation = require("infra.installation")
+local Installation = require("core.lifecycle.engine.installation")
 local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.menu.uninstall"

@@ -14,7 +14,7 @@
 ; The generated key vocabulary the word-reset and cascade settings are named by
 ; (a dedupe-safe include: menu_init.ahk and menu_manifest.ahk name it too).
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\core\lifecycle\engine\value_check.ahk
 
 global _MagicKeyEditorInputHook := ""
 global _MagicKeyEditorStopDebt := false

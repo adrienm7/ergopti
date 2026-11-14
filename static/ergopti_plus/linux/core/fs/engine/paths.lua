@@ -4,7 +4,7 @@
 --- MODULE: Linux Path Resolver
 --- DESCRIPTION:
 --- Single source of truth for where the shared tree lives, mirroring the macOS
---- core/fs/engine/paths.lua and windows/infra/boot.ahk.
+--- core/fs/engine/paths.lua and windows/core/lifecycle/engine/boot.ahk.
 ---
 --- WHY THIS EXISTS — TWO SHIPPED BUGS, SAME CAUSE:
 --- Every Linux module used to derive `_shared` itself, from its own file's

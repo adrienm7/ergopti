@@ -3,7 +3,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 ; Generous but finite admission budgets. These protect boot/config inputs from
 ; turning canonical signature construction into an unbounded per-request walk.

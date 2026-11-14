@@ -89,7 +89,7 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 | Uninstall                                                              | differs (by design): nothing is installed; the row is greyed with its reason                                                                                                                       |
 | Layout catalogue                                                       | works like the release: the published registry, unless the clone's registry folder differs from HEAD, then the clone's (see [Layout catalogue in a source run](#layout-catalogue-in-a-source-run)) |
 | Accessibility and Input Monitoring                                     | differs: each ad hoc rebuild is a new code identity and asks again, unless signed with the stable certificate                                                                                      |
-| A stock Hammerspoon running the clone                                  | refused (by design, `infra/instance_admission.lua`)                                                                                                                                                |
+| A stock Hammerspoon running the clone                                  | refused (by design, `core/lifecycle/engine/reload/instance_admission.lua`)                                                                                                                         |
 | Native helpers, Swift launcher, LuaSocket edits                        | differs: need a rebuild (`run-macos-dev-app.sh` without `--open-only`); no Lua reload can load them                                                                                                |
 
 ### Linux
@@ -104,7 +104,7 @@ every native helper path, read in `origin/dev` at `bde408f3a6`.
 | Config (`~/.config/ergopti`, `paths.toml`)                   | works: the same `infra/config_paths.lua`                                                                                                               |
 | Tray Reload                                                  | fixed by 57a5518ece: a checkout had no relaunchable wrapper, so `daemon_restart` refused and Reload failed; it now relays the developer runner         |
 | Saved-source auto-reload                                     | fixed by 57a5518ece: the watcher watched only top-level `.lua` and re-read the hotstrings; it now restarts on any driver or `_shared` `.lua`           |
-| Updater, Versions window installs, uninstall                 | differs (by design): a checkout is a source run (`infra/installation.lua`)                                                                             |
+| Updater, Versions window installs, uninstall                 | differs (by design): a checkout is a source run (`core/lifecycle/engine/installation.lua`)                                                             |
 | Layout catalogue                                             | works like the release, with the same exception as on macOS                                                                                            |
 | Start at login                                               | differs: requires an installed application (the row says so)                                                                                           |
 | `bin/ergopti-hotstrings` from a clone                        | works: runs the tree it lives in, even when a package is installed; the developer runner does not use it                                               |

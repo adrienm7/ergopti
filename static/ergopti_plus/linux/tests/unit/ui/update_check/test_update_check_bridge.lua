@@ -40,7 +40,7 @@ local function load_bridge(answer)
 	}
 	for _, name in ipairs(STUBBED) do context.saved[name] = package.loaded[name] end
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	context.real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
@@ -119,7 +119,7 @@ end
 
 local function restore(context)
 	for _, name in ipairs(STUBBED) do package.loaded[name] = context.saved[name] end
-	require("infra.installation").is_source_run = context.real_is_source_run
+	require("core.lifecycle.engine.installation").is_source_run = context.real_is_source_run
 	package.loaded["ui.update_check.bridge"] = nil
 end
 
@@ -241,7 +241,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 			end
 			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
 				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
-				.. "package.loaded['infra.installation']={is_source_run=function()return false end};"
+				.. "package.loaded['core.lifecycle.engine.installation']={is_source_run=function()return false end};"
 				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
 				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
 				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"

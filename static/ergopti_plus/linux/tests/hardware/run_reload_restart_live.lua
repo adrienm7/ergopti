@@ -6,8 +6,8 @@
 --- Proves the pending-record protocol of docs/design/driver-control-pending-record.md
 --- between real processes: the published POSIX tool (tools/control/
 --- request_driver_reload.sh) writes a request and rings SIGUSR1; the running
---- process, through the production infra/driver_control.lua and
---- infra/daemon_restart.lua, writes the pending record (successor null, deadline)
+--- process, through the production core/lifecycle/engine/driver_control.lua and
+--- core/lifecycle/engine/reload/daemon_restart.lua, writes the pending record (successor null, deadline)
 --- and arms the real detached relay of modules/updater/restarter.lua, then exits;
 --- the relay starts the launcher once that process has gone, and the successor,
 --- a new pid, claims the record and completes it, refuses it with the reason of
@@ -70,10 +70,10 @@ local function run_daemon(scratch)
 		uv.sleep((SHORT_TTL_SECONDS + 2) * 1000)
 	end
 	local declaration = exists(scratch .. "/short_ttl.json") and (scratch .. "/short_ttl.json") or nil
-	local DaemonRestart = require("infra.daemon_restart")
+	local DaemonRestart = require("core.lifecycle.engine.reload.daemon_restart")
 	local session
 	local exiting = false
-	session = assert(require("infra.driver_control").start({
+	session = assert(require("core.lifecycle.engine.driver_control").start({
 		pid = pid,
 		declaration = declaration,
 		reload = function(reason)

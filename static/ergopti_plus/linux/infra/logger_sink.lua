@@ -158,7 +158,7 @@ local _config_dir = nil
 --- @param supplied table|nil Explicit identity dependency for portable fixtures.
 --- @return function Captured immutable-context redactor.
 local function admit_redaction(supplied)
-	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("infra.account_name").resolve() }
+	local context = supplied or { home = require("infra.config_paths").account_home(), user = require("core.lifecycle.engine.account_name").resolve() }
 	assert(type(context) == "table", "logger_sink: privacy identity unavailable")
 	assert(type(context.home) == "string" and context.home ~= "", "logger_sink: privacy identity unavailable: HOME is not an absolute directory")
 	assert(type(context.user) == "string" and context.user ~= "", "logger_sink: privacy identity unavailable: no account name from USER, LOGNAME or the passwd entry")

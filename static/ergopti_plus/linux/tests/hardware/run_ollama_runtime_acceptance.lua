@@ -335,7 +335,7 @@ EventLoop.stop = function()
 end
 local shutdown_ok, shutdown_error = xpcall(function()
 	assert(type(Engine.shutdown_runtime) == "function", "actual adopted terminal runtime shutdown owner")
-	local coordinator = require("infra.shutdown_coordinator").new({
+	local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({
 		pre_wait = { { name = "engine-runtime-acceptance", wait_for_ack = true, stop = Engine.shutdown_runtime } },
 		keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 		event_loop = EventLoop,

@@ -6,7 +6,7 @@
 --- Drives the real field run engine over in-memory files, a fake folder watcher
 --- and a fake clock, against the shipped data/field_run.json:
 --- 1. developer source mode only: without the clone root nothing starts, and
----    init.lua starts it only behind infra/dev_source.lua;
+---    init.lua starts it only behind core/lifecycle/engine/dev_source.lua;
 --- 2. request parsing: every step, a subset in declaration order, and the
 ---    refusals (unknown step, unknown key, bad deadline, oversized);
 --- 3. a run writes one result per step with the declared shape, runs every
@@ -28,7 +28,7 @@
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 
-local MODULES = { "infra.logger", "infra.field_run", "infra.termination_coordinator", "infra.emergency_exit" }
+local MODULES = { "infra.logger", "infra.field_run", "core.lifecycle.engine.shutdown.termination_coordinator", "core.lifecycle.engine.shutdown.emergency_exit" }
 local FOLDER = "/repo/build/field-run"
 
 local function read(path)
@@ -159,7 +159,7 @@ end
 --- @return table coordinator
 --- @return function refuse_fence Settles that exact native boundary as refused.
 local function pending_coordinator(kind)
-	local coordinator = require("infra.termination_coordinator")
+	local coordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 	local fence
 	local function forbidden() error("no post-fence capability may run before the held fence") end
 	-- A reload must arm its deadline at acceptance; the held handle never fires
@@ -281,8 +281,8 @@ helpers.describe("field run: developer source mode only", function()
 	helpers.it("is started by init.lua only for a developer clone or the collector's admitted clone", function()
 		local source = assert(helpers.read_driver_unit('require("infra.field_run").start('))
 		-- The installed signed app takes the clone only from ERGOPTI_FIELD_RUN_ROOT, which its launcher admits.
-		local root = source:find('local field_run_root = require("infra.dev_source").is_active() and '
-			.. 'require("infra.dev_source").root()\n\tor os.getenv(require("core.text.engine.identifiers").field_report.environment)', 1, true)
+		local root = source:find('local field_run_root = require("core.lifecycle.engine.dev_source").is_active() and '
+			.. 'require("core.lifecycle.engine.dev_source").root()\n\tor os.getenv(require("core.text.engine.identifiers").field_report.environment)', 1, true)
 		helpers.assert_not_nil(root, "the root must come from developer source mode or the collector's variable only")
 		local gate = source:find('if type(field_run_root) == "string" and field_run_root ~= "" then', 1, true)
 		local start = source:find('require("infra.field_run").start(', 1, true)

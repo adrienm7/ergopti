@@ -55,7 +55,7 @@ _PWRM_Tree(Dir) {
 	return Files
 }
 
-; The boot chain of infra/boot.ahk for an installed driver, in its order.
+; The boot chain of core/lifecycle/engine/boot.ahk for an installed driver, in its order.
 ; @returns {String} The configuration folder boot selects.
 _PWRM_Boot() {
 	Paths := AppFoldersPathsFile()

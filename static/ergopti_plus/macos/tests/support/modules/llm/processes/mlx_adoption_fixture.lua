@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local OWNED = {
 	"infra.logger", "core.logger.engine", "diagnostics.engine.reports.redact", "core.text.engine.json", "core.fs.engine.app_dirs",
 	"infra.log_folders", "_generated.logger_sub_files", "adapters.log_transport",
-	"infra.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
+	"core.lifecycle.engine.launcher_environment", "infra.notifications", "core.i18n.engine.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
 	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
 	"core.fs.adapters.json_codec", "modules.llm.api_mlx",

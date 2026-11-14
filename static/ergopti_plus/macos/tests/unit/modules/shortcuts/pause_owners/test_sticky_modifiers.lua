@@ -94,7 +94,7 @@ local function load_real_sticky_pause_owner()
 		describe_held_modifiers = function() return "(none)" end,
 	})
 	package.loaded["adapters.shell_runner"] = permissive()
-	package.loaded["infra.termination_coordinator"] = permissive()
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = permissive()
 	local function scoped_child(pause_name, resume_name, query_name, pending_name)
 		local paused = {}
 		return {

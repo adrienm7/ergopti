@@ -45,7 +45,7 @@ const WIN = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
 const INHERITING_LAUNCHES = {
 	'modules/updater/self_update.ahk':
 		'the swap PowerShell inherits the driver process handle it waits on, at exit',
-	'infra/uninstall.ahk':
+	'core/lifecycle/engine/shutdown/uninstall.ahk':
 		'the uninstaller PowerShell inherits the driver process handle it waits on, at exit'
 };
 

@@ -202,12 +202,12 @@ _StartupOtherSourceIdentity(Script, ReadFn := FSReadBounded) {
 	; A fixed upper bound is a parser input limit, never an execution capability.
 	Limit := 1048576
 	Entry := ReadFn.Call(Script, Limit)
-	Bundle := ReadFn.Call(Directory . "\infra\bundle.ahk", Limit)
+	Bundle := ReadFn.Call(Directory . "\core\lifecycle\engine\bundle.ahk", Limit)
 	Defaults := ReadFn.Call(Directory . "\..\_shared\updater\data\defaults.json", Limit)
 	if !(Entry is String) || !(Bundle is String) || !(Defaults is String)
 		return false
 	if !RegExMatch(Entry, "im)^#Requires\s+Autohotkey\s+v2\.0\+")
-		|| !RegExMatch(Entry, "im)^#Include\s+infra/bundle\.ahk\s*$")
+		|| !RegExMatch(Entry, "im)^#Include\s+core/lifecycle/engine/bundle\.ahk\s*$")
 		|| !RegExMatch(Entry, "im)^#Include\s+modules/updater\.ahk\s*$")
 		|| !RegExMatch(Bundle, 'm)^global BUNDLE_VERSION\s*:=\s*"__BUNDLE_VERSION__"\s*$')
 		return false
@@ -256,7 +256,7 @@ StartupOtherSourceConfigured(Folder, Command, ApprovalFn := _StartupReadApproval
 ; The folder that stands for the user's Startup folder in an isolated profile,
 ; or "" for a real one. ERGOPTI_STARTUP_SMOKE_DIR already moves the paths, logs
 ; and configuration of a startup smoke or a live check into its scratch folder
-; (infra/boot.ahk); the login shortcut follows, so the harness can read it there.
+; (core/lifecycle/engine/boot.ahk); the login shortcut follows, so the harness can read it there.
 ; @returns {String} Absolute path, or "" when the driver owns the real profile.
 StartAtLoginPrivateFolder() {
 	global _DriverStartupSmokeDir

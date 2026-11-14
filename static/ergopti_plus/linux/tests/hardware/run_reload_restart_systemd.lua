@@ -60,9 +60,9 @@ end
 local function run_daemon(scratch)
 	local pid = uv.os_getpid()
 	append(scratch .. "/pids", tostring(pid))
-	local DaemonRestart = require("infra.daemon_restart")
+	local DaemonRestart = require("core.lifecycle.engine.reload.daemon_restart")
 	local session
-	session = assert(require("infra.driver_control").start({
+	session = assert(require("core.lifecycle.engine.driver_control").start({
 		pid = pid,
 		reload = function(reason)
 			local how, detail = DaemonRestart.restart({ reason = reason, args = {} })

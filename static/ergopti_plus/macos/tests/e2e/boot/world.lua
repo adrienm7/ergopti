@@ -832,7 +832,7 @@ end
 
 --- Runs the folder commands of the modelled Mac for real inside its HOME.
 --- The shared hs.execute stub answers any command it does not know with a
---- synthetic success that does nothing. infra/driver_control.lua makes its
+--- synthetic success that does nothing. core/lifecycle/engine/driver_control.lua makes its
 --- folder with `/bin/mkdir -p P && /bin/chmod 700 P` and then checks the result
 --- with hs.fs.attributes, so the stub's success left no folder and every boot
 --- logged that the control could not start. Only that exact shape, on paths

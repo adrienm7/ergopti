@@ -331,9 +331,9 @@ Test("runner receipt sharing: incomplete reset is refused and closed (receipt-sh
 ; The native desktop cohort is a third real entry, not an assertion-library owner.
 _TRFE_ReceiptBootstrapPatterns() {
 	return Map(
-		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)",
+		"shared", "(?im)^#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./core/lifecycle/engine/app_state\.ahk(?=[ \t]*\r?$)",
 		"e2e", "(?im)^#Include[ \t]+\.\./test_framework\.ahk\s*\r?\n\s*global[ \t]+TEST_RESULTS_FILE[ \t]*:=[ \t]*_TestResultsPath\([ \t]*A_ScriptDir[^\r\n]*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./\.\./modules/keystats/keystats_hook\.ahk(?=[ \t]*\r?$)",
-		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./infra/app_state\.ahk(?=[ \t]*\r?$)")
+		"native", "(?im)^OnError\(_NativeDesktopStartupError\)\s*\r?\n\s*#Include[ \t]+test_framework\.ahk\s*\r?\n\s*_TestResultsBeginRun\(\)\s*\r?\n\s*#Include[ \t]+\.\./core/lifecycle/engine/app_state\.ahk(?=[ \t]*\r?$)")
 }
 
 _TRFE_ReceiptBootstrapOwned(ReceiptBootstrapCode) {

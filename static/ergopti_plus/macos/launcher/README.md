@@ -65,13 +65,13 @@ exports its exact process identity to its Hammerspoon child as
 `ERGOPTI_LAUNCHER_PID` and, when available,
 `ERGOPTI_LAUNCHER_BUNDLE_ID`.
 
-`infra/launcher_guard.lua` starts a strongly retained native application watcher
+`core/lifecycle/engine/launcher_guard.lua` starts a strongly retained native application watcher
 before immediately resolving that PID. A matching termination event invokes an
 injected emergency-quit callback once. A native `applicationForPID` lookup every
 two seconds is only a backstop for a missed event; it does not shell out or run
 from an eventtap. When the launcher environment is absent the guard stays
 inactive, but the driver no longer starts there: instance admission
-(`infra/instance_admission.lua`) runs it only in the launcher's embedded runtime
+(`core/lifecycle/engine/reload/instance_admission.lua`) runs it only in the launcher's embedded runtime
 with the managed log environment. Developers use the developer source mode
 below instead of a stock Hammerspoon.
 

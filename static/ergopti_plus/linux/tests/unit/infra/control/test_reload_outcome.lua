@@ -14,8 +14,8 @@ local helpers = require("tests.helpers")
 local APP_FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local Json = require("core.text.engine.json")
 local Policy = require("diagnostics.engine.control_driver_control")
-local DriverControl = require("infra.driver_control")
-local Outcome = require("infra.reload_outcome")
+local DriverControl = require("core.lifecycle.engine.driver_control")
+local Outcome = require("core.lifecycle.engine.reload.outcome")
 
 local shared = helpers.driver_root() .. "/../_shared"
 

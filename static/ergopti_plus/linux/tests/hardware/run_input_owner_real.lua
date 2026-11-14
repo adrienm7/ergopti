@@ -333,7 +333,7 @@ end
 local function signal_shutdown(first_signal)
 	local uv = require("luv")
 	local NativeTimer = require("infra.native_timer")
-	local signals = require("infra.signal_handlers")
+	local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 	assert(signals.is_settled(), "no preceding signal installation may remain owned")
 	local file = assert(io.open("ergopti_hotstrings.lua", "r"))
 	local text = file:read("*a"); assert(file:close())
@@ -351,7 +351,7 @@ local function signal_shutdown(first_signal)
 	local owners = {}
 	local final_registry = compile_signal_code("return " .. final,
 		setmetatable({ privacy_owners = owners }, { __index = _G }))()
-	local coordinator = require("infra.shutdown_coordinator").new({
+	local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({
 		pre_wait = { { name = "external native cleanup", wait_for_ack = true, stop = function() return state.ready end } },
 		final_wait = final_registry,
 		keyboard_hook = Hook,
@@ -750,7 +750,7 @@ local function cleanup(callback, label)
 end
 cleanup(function() if Hook then Hook.stop(); return not Hook.isRunning() end; return true end, "final actual Hook stop")
 cleanup(function()
-	local signals = package.loaded["infra.signal_handlers"]
+	local signals = package.loaded["core.lifecycle.engine.shutdown.signal_handlers"]
 	if not signals and not signal_timer and not signal_deadline then return true end
 	local uv = require("luv")
 	if signal_timer then uv.timer_stop(signal_timer); uv.close(signal_timer); signal_timer = nil end

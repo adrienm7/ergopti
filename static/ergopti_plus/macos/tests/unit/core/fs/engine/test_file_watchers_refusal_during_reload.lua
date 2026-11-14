@@ -26,8 +26,8 @@ local Fixture = require("tests.support.file_watcher_self_write_fixture")
 --- @return table lines Captured `{ level, template }` pairs from file_watchers.
 --- @return boolean rearmed True when the burst kept a poll owner.
 local function refused_reload(terminating)
-	local previous = package.loaded["infra.termination_coordinator"]
-	package.loaded["infra.termination_coordinator"] = {
+	local previous = package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"]
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		terminal_in_progress = function() return terminating end,
 	}
 	local lines = {}
@@ -49,7 +49,7 @@ local function refused_reload(terminating)
 		helpers.assert_eq(w.reloads(), 1, "fixture: the settled burst must reach the reload request")
 		rearmed = type(w.scheduled()) == "function"
 	end, { logger = logger, reload = function() return false end })
-	package.loaded["infra.termination_coordinator"] = previous
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = previous
 	if not ok then error(err, 0) end
 	return lines, rearmed
 end

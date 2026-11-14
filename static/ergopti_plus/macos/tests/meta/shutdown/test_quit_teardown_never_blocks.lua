@@ -33,13 +33,13 @@ local FORBIDDEN = {
 -- Root-level receivers used by teardown steps, mapped to their module names.
 -- Files are resolved through package.path, so a module move cannot break this.
 local RECEIVER_MODULES = {
-	LauncherGuard = "infra.launcher_guard",
+	LauncherGuard = "core.lifecycle.engine.launcher_guard",
 	karabiner = "platform.remap",
 	keymap = "modules.keymap",
 	gestures = "modules.gestures",
 	shortcuts = "modules.shortcuts",
 	Storage = "core.fs.adapters.storage",
-	TerminationCoordinator = "infra.termination_coordinator",
+	TerminationCoordinator = "core.lifecycle.engine.shutdown.termination_coordinator",
 }
 
 -- Receivers that are not module facades (local objects or the step's own guard)

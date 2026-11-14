@@ -9,7 +9,7 @@
 
 #Requires AutoHotkey v2.0
 
-; The unit runner deliberately excludes infra/lifecycle.ahk: its suspension
+; The unit runner deliberately excludes core/lifecycle/engine/lifecycle.ahk: its suspension
 ; globals and timers belong to the real boot. The builders still require both
 ; native callback identities. Record and refuse their fallback effects so even
 ; a caught dispatch cannot conceal an accidental runner reload or termination.

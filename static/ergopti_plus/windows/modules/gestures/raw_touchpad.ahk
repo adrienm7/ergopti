@@ -33,7 +33,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include %A_LineFile%\..\..\..\infra\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 ; The running owner, "" until RawTouchpadStart.
 global _RawTouchpadOwner := ""

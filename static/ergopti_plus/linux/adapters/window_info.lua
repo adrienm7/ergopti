@@ -217,7 +217,7 @@ local function focused_x11()
 	-- window without WM_CLASS (or without the native transport): the kernel
 	-- cuts it to 15 bytes (TASK_COMM_LEN 16 with its NUL), so
 	-- gnome-terminal-server reads « gnome-terminal- ». Saved lists were
-	-- converted once by infra/app_identity_migration.lua.
+	-- converted once by core/lifecycle/engine/app_identity_migration.lua.
 	local pid = native_pid
 	local class = native_reason == nil and X11Focus.has_transport() and X11Focus.window_class(win_id) or nil
 	info.appId = (type(class) == "string" and class ~= "") and class or comm_of(pid)

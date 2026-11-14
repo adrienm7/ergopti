@@ -166,7 +166,7 @@ helpers.describe("menu: the check row opens the update-check window (Linux)", fu
 			on_update_checked = function(result) recorded.notified = result end,
 		}
 		-- An installed build's rows: the checkout the suite runs from greys them.
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local built, rows = pcall(mb._about_update_rows, {

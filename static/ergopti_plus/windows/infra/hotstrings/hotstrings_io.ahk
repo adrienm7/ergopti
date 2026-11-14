@@ -24,7 +24,7 @@
 
 
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
-#Include %A_LineFile%\..\..\value_check.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 #Include common_autocorrection_migration.ahk
 
 ; ============================================================

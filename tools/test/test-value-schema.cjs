@@ -100,11 +100,11 @@ const PORTS = [
 		}
 	},
 	{
-		port: 'windows/infra/value_check.ahk',
-		test: 'windows/tests/unit/infra/test_value_check_vectors.ahk',
+		port: 'windows/core/lifecycle/engine/value_check.ahk',
+		test: 'windows/tests/unit/core/lifecycle/engine/test_value_check_vectors.ahk',
 		wiring: {
 			file: 'windows/tests/run_all.ahk',
-			needle: '#Include unit/infra/test_value_check_vectors.ahk'
+			needle: '#Include unit/core/lifecycle/engine/test_value_check_vectors.ahk'
 		}
 	}
 ];

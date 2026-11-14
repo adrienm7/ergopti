@@ -472,11 +472,11 @@ end
 -- ==========================
 
 --- Builds the ports of a developer runtime.
---- @param root string Clone root (infra/dev_source.lua).
+--- @param root string Clone root (core/lifecycle/engine/dev_source.lua).
 --- @return table ports
 function M.new(root)
 	assert(type(root) == "string" and root:sub(1, 1) == "/", "field run ports need the clone root")
-	local declaration = root .. require("infra.dev_source").DRIVER_SUBPATH .. "/data/field_run.json"
+	local declaration = root .. require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH .. "/data/field_run.json"
 	return {
 		read_declaration = function() return FileSystem.read(declaration) end,
 		read = function(path) return FileSystem.read_with_status(path) end,
@@ -494,7 +494,7 @@ function M.new(root)
 		log_ring = Logger.ring_buffer_snapshot,
 		config_snapshot = config_snapshot,
 		config_restore = config_restore,
-		reload_driver = function(reason) return require("infra.termination_coordinator").request_reload(reason) end,
+		reload_driver = function(reason) return require("core.lifecycle.engine.shutdown.termination_coordinator").request_reload(reason) end,
 		run_step = run_step,
 	}
 end

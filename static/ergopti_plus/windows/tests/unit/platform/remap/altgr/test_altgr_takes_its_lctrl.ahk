@@ -109,7 +109,7 @@ _ATIL_TheWiringIsInPlace() {
 	Owner := _DriverFuncBody("_AltGrHandleHold")
 	AssertTrue(InStr(Owner, "TapHoldAltGrTakesItsLCtrl(Passthrough)") > 0,
 		"the AltGr owner must take its fake LCtrl back from a left_ctrl hold")
-	Dispatcher := _StripFullLineComments(_DriverDirsConcat("infra", "core/i18n/engine", "core/fs/engine"))
+	Dispatcher := _StripFullLineComments(_DriverDirsConcat("infra", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine"))
 	KeyDown := InStr(Dispatcher, "static _OnKeyDown(ih, vk, sc) {")
 	AssertTrue(KeyDown > 0, "HookDispatcher._OnKeyDown must exist")
 	Body := SubStr(Dispatcher, KeyDown, InStr(Dispatcher, "static _OnKeyUp(", , KeyDown) - KeyDown)

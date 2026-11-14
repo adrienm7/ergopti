@@ -67,7 +67,7 @@ class SessionLockTests(unittest.TestCase):
             code = (
                 "package.path = "
                 + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
-                + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
+                + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); local ok, reason = lock.acquire(); "
                 + "if ok then lock.release() else io.stderr:write(reason .. '\\n') end; os.exit(ok and 0 or 78)"
             )
             for entry, command in (
@@ -116,7 +116,7 @@ class SessionLockTests(unittest.TestCase):
             code = (
                 "package.path = "
                 + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
-                + "; local lock = require('infra.session_lock'); "
+                + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); "
                 + "local protected = lock.protect(); local acquired = protected and lock.acquire(); "
                 + "os.exit(acquired and 0 or 78)"
             )
@@ -179,7 +179,7 @@ class SessionLockTests(unittest.TestCase):
                     code = (
                         "package.path = "
                         + repr(str(driver / "?.lua") + ";" + str(driver.parent / "_shared/?.lua"))
-                        + "; local lock = require('infra.session_lock'); local ok, reason = lock.acquire(); "
+                        + "; local lock = require('core.lifecycle.engine.shutdown.session_lock'); local ok, reason = lock.acquire(); "
                         + "if ok then lock.release() else io.stderr:write('[session_lock] ' .. reason .. '\\n') end; os.exit(ok and 0 or 78)"
                     )
                     command = (

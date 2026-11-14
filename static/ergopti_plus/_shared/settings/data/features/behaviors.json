@@ -15,7 +15,7 @@
 			"platform": "windows",
 			"file": "static/ergopti_plus/windows/infra/hotstrings/hotstring_inputhook.ahk",
 			"symbol": "_OnPrefixKeyDown",
-			"sha256": "46a5709625ca658a2987dcbca5af6378eabbee309dd8cacd9fed97228e5fb00f"
+			"sha256": "3e1855685b06c365eac370db154f3f08857c4061cfc73233b0c03b7532802011"
 		},
 		{
 			"id": "windows-undo",
@@ -57,7 +57,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/ergopti_hotstrings.lua",
 			"symbol": "local undo = _undoable",
-			"sha256": "45b153394697cd839f6301d621a3b9ec13c5bb17e57ed28a5799c4b121484143"
+			"sha256": "6c5337b33727ad0835da997a5ddbe46e2b71f34abb7ec03e317156093de771fd"
 		},
 		{
 			"id": "windows-dead-legacy",
@@ -92,7 +92,7 @@
 			"platform": "linux",
 			"file": "static/ergopti_plus/linux/adapters/keyboard_hook.lua",
 			"symbol": "local function _dispatch_post_remap(ev, source)",
-			"sha256": "37270b983ae1a2eb66a604cdd58569ea900e61117bac453ba8056b008319f7e6"
+			"sha256": "0ecf08a63151ca8057033a6ce412bbeb6cb001b1be6da15b9ff691c175e842f6"
 		},
 		{
 			"id": "windows-layout-emulation",

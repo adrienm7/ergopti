@@ -8,7 +8,7 @@
 # (ergopti_nav_owner.dll, ergopti_network_pac.exe, sqlite3.dll, WebView2Loader,
 # the PowerShell workers), the same config folder and the same AI runtimes. The
 # clone root is handed to the driver in the shared developer variable
-# (dev_source.environment), so a saved .ahk reloads it (infra/dev_source.ahk);
+# (dev_source.environment), so a saved .ahk reloads it (core/lifecycle/engine/dev_source.ahk);
 # the tray's Reload does it on demand. The updater is off: a source run has no
 # release to update from (Updater_IsLocalSource).
 #

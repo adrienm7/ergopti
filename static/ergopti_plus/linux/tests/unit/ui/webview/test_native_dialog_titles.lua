@@ -175,7 +175,7 @@ h.describe("native menu dialog captions", function()
 
 	h.it("(linux-native-titles) real Uninstall callbacks brand confirmation and failure without changing body or refusal", function()
 		-- The prompt captures its Shell owner; load it under this scenario's authority.
-		local names = { "ui.menu.builder", "ui.menu.uninstall", "infra.installation", "ui.modal", "ui.menu.llm_backend_rows",
+		local names = { "ui.menu.builder", "ui.menu.uninstall", "core.lifecycle.engine.installation", "ui.modal", "ui.menu.llm_backend_rows",
 			"ui.text_prompt" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -187,7 +187,7 @@ h.describe("native menu dialog captions", function()
 			bind_page = function(_, options) dialogs = options.dialogs end,
 			caption = function() return "model button" end,
 		}
-		package.loaded["infra.installation"] = { is_source_run = function() return false end }
+		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return false end }
 		package.loaded["ui.modal"] = { run = function(fn) modals = modals + 1; return fn() end }
 		package.loaded["ui.menu.uninstall"] = { run = function(opts)
 			accepted = opts.confirm(opts.title, "Preserved <confirmation>")

@@ -776,7 +776,7 @@ end
 --- Karabiner lease was taken this session, and the reload wrapper reloads
 --- natively, as it does for every caller.
 local function reload_applying_answers()
-	local TerminationCoordinator = require("infra.termination_coordinator")
+	local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 	if TerminationCoordinator.is_initialized() ~= true then
 		hs.reload()
 		return

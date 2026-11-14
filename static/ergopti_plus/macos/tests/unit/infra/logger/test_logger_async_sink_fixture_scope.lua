@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.logger_async_sink_fixture")
 local OWNERS = {
 	"infra.logger", "adapters.log_transport", "tests.stubs.hs", "hs", "core.logger.engine",
-	"infra.launcher_environment", "_generated.logger_sub_files", "socket",
+	"core.lifecycle.engine.launcher_environment", "_generated.logger_sub_files", "socket",
 }
 
 helpers.describe("Logger asynchronous fixture scope", function()

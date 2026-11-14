@@ -4,7 +4,7 @@ local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
 	"platform.remap.watchers", "adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.input_source_broker", "adapters.task_environment", "infra.launcher_environment",
+	"adapters.input_source_broker", "adapters.task_environment", "core.lifecycle.engine.launcher_environment",
 	"infra.deferred_work", "diagnostics.engine.runtime_log", "infra.logger", "infra.timings", "infra.keycodes",
 	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
 	"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",

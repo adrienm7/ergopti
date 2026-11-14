@@ -39,7 +39,10 @@ const SCHEMA = path.join(SP, '_shared', 'settings', 'data', 'features', 'manifes
 const LOCALES = path.join(SP, '_shared', 'core', 'i18n', 'data', 'locales');
 const GENERATED_AHK = path.join(SP, 'windows', '_generated', 'features_manifest.ahk');
 const CONSUMERS = [
-	{ file: path.join(SP, 'windows', 'infra', 'master_gates.ahk'), token: 'superseded_reason_key' },
+	{
+		file: path.join(SP, 'windows', 'core', 'lifecycle', 'engine', 'master_gates.ahk'),
+		token: 'superseded_reason_key'
+	},
 	{
 		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_engine.ahk'),
 		token: 'LayoutSupersededReason('

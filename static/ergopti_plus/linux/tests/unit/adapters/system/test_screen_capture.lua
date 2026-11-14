@@ -190,7 +190,7 @@ helpers.it("retires both staged images only after a real cancelled child settles
 		end
 		helpers.assert_true(ScreenCapture.cleanup_pending(), "active captures retain cleanup ownership")
 		local loop_stopped = false
-		local shutdown = require("infra.shutdown_coordinator").new({
+		local shutdown = require("core.lifecycle.engine.shutdown.coordinator").new({
 			pre_wait = { { name = "screen capture cleanup", wait_for_ack = true,
 				stop = function() return ScreenCapture.shutdown() end } },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end,

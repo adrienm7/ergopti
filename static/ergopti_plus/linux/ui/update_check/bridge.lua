@@ -35,7 +35,7 @@ M.bridge_name = "update_check_bridge"
 local Json         = require("core.text.engine.json")
 local Logger       = require("core.logger.engine.shim")
 local CheckSession = require("updater.engine.check_session")
-local Installation = require("infra.installation")
+local Installation = require("core.lifecycle.engine.installation")
 
 local LOG = "bridge.update_check"
 

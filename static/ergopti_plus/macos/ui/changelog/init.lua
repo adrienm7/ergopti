@@ -201,7 +201,7 @@ local function deps()
 		updater = require("modules.updater"),
 		backup = require("modules.updater.config_backup"),
 		installer = require("modules.updater.release_installer"),
-		coordinator = require("infra.termination_coordinator"),
+		coordinator = require("core.lifecycle.engine.shutdown.termination_coordinator"),
 		handoff = require("modules.updater.feed_handoff"),
 		timer = require("core.events.timer_scheduler"),
 	}

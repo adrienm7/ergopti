@@ -7,7 +7,7 @@
 ; MODULE: User Value Schema Data (Windows)
 ; DESCRIPTION:
 ; The declaration of every user-entered setting value, as the data
-; infra/value_check.ahk checks against. A compiled build has no JSON reader
+; core/lifecycle/engine/value_check.ahk checks against. A compiled build has no JSON reader
 ; at include time, and a hand-maintained copy would drift.
 ; ==============================================================================
 

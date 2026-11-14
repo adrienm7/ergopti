@@ -142,7 +142,7 @@ package.loaded["adapters.tray_menu"] = {
 	adopt = function() end,
 	setMenu = function() return true end,
 }
-package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
+package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 for _, module_name in ipairs({
 	"ui.menu.menu_gestures",

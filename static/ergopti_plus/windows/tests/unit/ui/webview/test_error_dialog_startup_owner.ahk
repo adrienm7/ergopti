@@ -76,7 +76,7 @@ _EDOT_Source(Root, LogOpeners := false) {
 			Source .= "_EDOS_Phase(" . _EDOT_Quote("included owner " . Symbol) . ")`n"
 		}
 	}
-	Source .= "#Include " . _DriverDir . "\infra\bundle.ahk`n"
+	Source .= "#Include " . _DriverDir . "\core\lifecycle\engine\bundle.ahk`n"
 	Source .= '_EDOS_Phase("included bundle; before fixture body")' . "`n"
 	if LogOpeners {
 		Owner := _DriverProductionFileForSymbol("LogOpeners_OpenTodayErrors", _DriverDir)

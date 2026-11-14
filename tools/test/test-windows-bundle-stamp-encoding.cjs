@@ -38,7 +38,7 @@ if (process.platform !== 'win32') {
 } else {
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-bundle-stamp-'));
 	try {
-		const file = path.join(root, 'static/ergopti_plus/windows/infra/bundle.ahk');
+		const file = path.join(root, 'static/ergopti_plus/windows/core/lifecycle/engine/bundle.ahk');
 		fs.mkdirSync(path.dirname(file), { recursive: true });
 		const source =
 			'\uFEFF; Unicode: café / 𐐀 / 中文\n' +

@@ -195,7 +195,7 @@ helpers.describe("gesture pump: a dead touchpad descriptor", function()
 		helpers.assert_true(M.enable())
 
 		local ok, failure = xpcall(function()
-			local RuntimeGuard = require("infra.runtime_guard")
+			local RuntimeGuard = require("core.lifecycle.engine.runtime_guard")
 			helpers.assert_true(not RuntimeGuard.call("gesture pump", M.pump, M.stop_reading),
 				"the fixture must make the pump throw")
 			helpers.assert_true(not M.is_reading(), "the failed reader is stopped")
