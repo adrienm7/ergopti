@@ -396,7 +396,7 @@ helpers.describe("Ollama pending retry core composition", function()
 			package.loaded["modules.llm.warmup_controller"] = nil
 			local core = require("modules.llm")
 			local controller = require("modules.llm.warmup_controller")
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local state = warmup_upvalue(core.configuration_idle, "CoreState")
 			fixture.finalize = function()
 				helpers.assert_true(controller.stop(), "the exact controller timer must retire")

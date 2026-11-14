@@ -1,4 +1,4 @@
---- adapters/event_clock.lua
+--- core/events/clock.lua
 
 --- ==============================================================================
 --- MODULE: Quartz Event Clock Adapter (Hammerspoon)

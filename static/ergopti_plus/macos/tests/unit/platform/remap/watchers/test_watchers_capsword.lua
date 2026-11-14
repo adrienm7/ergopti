@@ -94,7 +94,7 @@ helpers.describe("karabiner.watchers: eventtap callback survives a throwing deac
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local captured = { cb = nil }
 		local state = {
 			wall_now = 1000,

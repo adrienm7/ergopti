@@ -66,7 +66,7 @@ local function load_fixture(streaming)
 		get = function(key) return key end,
 	}
 	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 
 	local core = {
 		DEFAULT_STATE = DEFAULTS,

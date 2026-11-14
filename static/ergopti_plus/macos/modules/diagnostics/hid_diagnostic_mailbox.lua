@@ -18,7 +18,7 @@
 
 local M = {}
 
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Logger = require("infra.logger")
 
 local LOG = "diagnostics.hid_mailbox"

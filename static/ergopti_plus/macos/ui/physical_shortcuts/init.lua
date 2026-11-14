@@ -13,7 +13,7 @@ local Files = require("adapters.file_system")
 local I18n = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigKeys = require("settings.engine.keys")
 local active = nil
 

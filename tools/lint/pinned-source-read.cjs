@@ -42,7 +42,7 @@ const path = require('path');
 // A quoted path naming a file inside one of a driver's source trees, or the
 // driver-root init.lua. Deliberately unanchored to any concatenation syntax.
 const SOURCE_PATH_LITERAL =
-	'["\'](?:[.\\\\/]*(?:modules|infra|lib|ui|adapters)[\\\\/][^"\'\\n]*|[.\\\\/]*init)\\.lua["\']';
+	'["\'](?:[.\\\\/]*(?:modules|infra|lib|ui|adapters|core)[\\\\/][^"\'\\n]*|[.\\\\/]*init)\\.lua["\']';
 
 /** Fresh global matcher — callers must not share lastIndex. */
 function literalMatcher() {

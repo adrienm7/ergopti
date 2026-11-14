@@ -72,7 +72,7 @@ end
 local function render_provider_row(provider_result)
 	local text
 	helpers.with_stub_scope({
-		"adapters.synthetic_input", "adapters.timer_scheduler", "infra.logger",
+		"adapters.synthetic_input", "core.events.timer_scheduler", "infra.logger",
 		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
 		"modules.llm.prediction_engine", "ui.tooltip", "modules.keymap.llm_bridge",
@@ -82,7 +82,7 @@ local function render_provider_row(provider_result)
 		package.loaded["adapters.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }

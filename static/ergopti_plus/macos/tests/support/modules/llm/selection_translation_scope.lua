@@ -114,7 +114,7 @@ local OWNED = {
 	"adapters.storage",
 	"adapters.synthetic_input",
 	"adapters.task_environment",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.window_info",
 	"infra.config_paths",
 	"infra.deferred_work",
@@ -198,7 +198,7 @@ local OWNED = {
 	-- key-event health, per-application profile and storage-ownership work.
 	"shortcuts.engine.actions.catalogue",
 	"shortcuts.engine.actions.catalogue_data",
-	"adapters.event_clock",
+	"core.events.clock",
 	"core.lifecycle.engine.compat.base64",
 	"gestures.engine.direction",
 	"infra.key_event_health",

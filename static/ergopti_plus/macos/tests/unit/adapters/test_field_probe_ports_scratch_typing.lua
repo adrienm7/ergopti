@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.field_probe_ports", "adapters.timer_scheduler", "adapters.own_window",
+	"infra.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "adapters.own_window",
 	"adapters.synthetic_input", "ui.ui_builder", "modules.keymap", "infra.field_run_selftest",
 	"modules.keymap.utils",
 }
@@ -35,7 +35,7 @@ local function run(world, keys, options)
 		-- A virtual clock: the earliest pending timer fires next.
 		local queue = {}
 		now = 0
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				local entry = { at = now + seconds, fn = fn }
 				queue[#queue + 1] = entry

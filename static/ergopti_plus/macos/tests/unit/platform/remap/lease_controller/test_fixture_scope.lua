@@ -11,7 +11,7 @@ local with_fixture = require("tests.support.lease_controller_fixture").with_fixt
 local OWNERS = {
 	"hs", "tests.stubs.hs", "infra.i18n", "infra.paths",
 	"platform.remap.lease_controller", "adapters.shell_runner", "adapters.storage",
-	"adapters.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
+	"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
 	"infra.logger",
 }
 

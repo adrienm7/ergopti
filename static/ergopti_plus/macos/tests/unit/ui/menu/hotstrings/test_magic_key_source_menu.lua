@@ -19,7 +19,7 @@ local KEYCODE_SPACE = 49
 local KEYCODE_ESCAPE = 53
 
 local MODULES = {
-	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
+	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "infra.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
 	"adapters.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
 }
@@ -40,7 +40,7 @@ local function with_menu(body, faults)
 			get_pause_epoch = function() return world.pause.epoch end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = world.pause_owner
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
 				local mode = delay == 0 and world.faults.answer or world.faults.deadline

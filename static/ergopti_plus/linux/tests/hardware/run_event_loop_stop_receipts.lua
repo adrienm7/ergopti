@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Loop = require("adapters.event_loop")
+local Loop = require("core.events.loop")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-event-stop-XXXXXX"))
 local checks, failures = 0, 0
 local owned = {}

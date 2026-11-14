@@ -41,7 +41,7 @@ local function with_action(session, action, change, body)
 	local names = {
 		"adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
 		"adapters.keyboard_hook", "adapters.modifier_broker", "adapters.uinput_writer",
-		"adapters.event_loop", "modules.hotstrings.injector", "adapters.clipboard",
+		"core.events.loop", "modules.hotstrings.injector", "adapters.clipboard",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"adapters.window_info", "core.logger.engine.shim",
 	}
@@ -109,7 +109,7 @@ local function with_action(session, action, change, body)
 					return true
 				end,
 			}
-			package.loaded["adapters.event_loop"] = { sleep_ms = function(ms)
+			package.loaded["core.events.loop"] = { sleep_ms = function(ms)
 				if ms == 80 then retire("copy-wait") end
 				if ms == 30 then retire("paste-wait"); retire("privacy") end
 				return true
@@ -243,7 +243,7 @@ end)
 --- @return table world Independently recorded output and handler result.
 local function observe_compound_action(action, change)
 	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
+		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter",
 		"adapters.window_info" }
@@ -270,7 +270,7 @@ local function observe_compound_action(action, change)
 			}
 			package.loaded["adapters.keyboard_hook"] = {}
 			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
+			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
 			package.loaded["adapters.window_info"] = { focused_app_id = function()
 				retire("metrics"); return "owned-editor"
 			end }
@@ -375,7 +375,7 @@ end)
 --- @return table observations Independent output, clipboard and owner receipts.
 local function observe_configured_insertion(session, action, route, change)
 	local names = { "adapters.shell_runner", "infra.display_server", "adapters.keyboard_hook",
-		"adapters.modifier_broker", "adapters.uinput_writer", "adapters.event_loop",
+		"adapters.modifier_broker", "adapters.uinput_writer", "core.events.loop",
 		"modules.hotstrings.injector", "adapters.clipboard", "adapters.keyboard_layout",
 		"modules.shortcuts.manager", "modules.gestures.manager", "modules.gestures.combo_emitter" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -421,7 +421,7 @@ local function observe_configured_insertion(session, action, route, change)
 			}
 			package.loaded["adapters.keyboard_hook"] = {}
 			package.loaded["adapters.modifier_broker"] = { for_channel = function() return nil end }
-			package.loaded["adapters.event_loop"] = { sleep_ms = function() return true end }
+			package.loaded["core.events.loop"] = { sleep_ms = function() return true end }
 			local writer = {
 				is_open = function() return true end,
 				emit = function(code, value)

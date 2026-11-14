@@ -40,7 +40,7 @@ function M.new(root, production, options)
 		return { cancel = function() return true end, isActive = function() return false end,
 			isSettled = function() return true end, onSettled = function(callback) callback(); return true end }
 	end }
-	modules["adapters.timer_scheduler"] = { after = function() error("No restart delay or detached timer is admitted") end }
+	modules["core.events.timer_scheduler"] = { after = function() error("No restart delay or detached timer is admitted") end }
 	modules["modules.llm.ollama_endpoint"] = {
 		read_port_override = function() return PORT end, get_default_port = function() return PORT end,
 	}

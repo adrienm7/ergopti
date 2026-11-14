@@ -161,7 +161,7 @@ end
 --- Retains a timer when its cancellation has not been acknowledged.
 local function cancel_save_timer()
 	if not _save_timer then return true end
-	local scheduler = _scheduler or require("adapters.timer_scheduler")
+	local scheduler = _scheduler or require("core.events.timer_scheduler")
 	local called, cancelled = pcall(scheduler.cancel, _save_timer)
 	if not called or cancelled ~= true then return false end
 	_save_timer = nil
@@ -220,7 +220,7 @@ end
 
 --- Schedules a save.
 local function schedule_save()
-	local scheduler = _scheduler or require("adapters.timer_scheduler")
+	local scheduler = _scheduler or require("core.events.timer_scheduler")
 	if not cancel_save_timer() then return end
 	local timer
 	timer = scheduler.after(SAVE_DEBOUNCE_SEC, function()

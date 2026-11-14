@@ -15,7 +15,7 @@ local OWNERS = {
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "infra.logger",
-	"adapters.timer_scheduler", "modules.keystats.timestamp",
+	"core.events.timer_scheduler", "modules.keystats.timestamp",
 }
 
 helpers.describe("Data SQL outbox fixture isolation", function()

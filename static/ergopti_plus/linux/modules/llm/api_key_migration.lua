@@ -212,7 +212,7 @@ function M.init(ports)
 	_ports = {
 		entries = ports.entries or require("modules.llm.api_entries"),
 		store = ports.store or require("modules.llm.api_token_store"),
-		scheduler = ports.scheduler or require("adapters.timer_scheduler"),
+		scheduler = ports.scheduler or require("core.events.timer_scheduler"),
 		probe_timeout_ms = timings.probe_ms or Timings.ms("llm", "api_key_migration_probe_timeout_ms"),
 		store_timeout_ms = timings.store_ms or Timings.ms("llm", "api_key_migration_store_timeout_ms"),
 		retry_ms = timings.retry_ms or Timings.ms("llm", "api_key_migration_retry_ms"),

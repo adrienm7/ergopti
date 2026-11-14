@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 local native_ok, native_luv = pcall(require, "luv")
 local function load_pump_loop()
-  return helpers.load_module_with_dependency("adapters.event_loop", "luv", false)
+  return helpers.load_module_with_dependency("core.events.loop", "luv", false)
 end
 local el = load_pump_loop()
 
@@ -47,10 +47,10 @@ local function stop_fixture(source)
 		-- Stopping the adapter's own idle/timer cannot retire a foreign owner.
 		state.waited = state.stops == stops_before
 	end
-	local previous_backend, previous_loop = package.loaded.luv, package.loaded["adapters.event_loop"]
-	package.loaded.luv, package.loaded["adapters.event_loop"] = backend, nil
-	local ok, loop = pcall(require, "adapters.event_loop")
-	package.loaded.luv, package.loaded["adapters.event_loop"] = previous_backend, previous_loop
+	local previous_backend, previous_loop = package.loaded.luv, package.loaded["core.events.loop"]
+	package.loaded.luv, package.loaded["core.events.loop"] = backend, nil
+	local ok, loop = pcall(require, "core.events.loop")
+	package.loaded.luv, package.loaded["core.events.loop"] = previous_backend, previous_loop
 	if not ok then error(loop, 0) end
 	return loop, state, backend
 end
@@ -455,7 +455,7 @@ helpers.describe("linux-sleep-completion-receipts", function()
 				if branch == "explicit cdef refusal" then
 					dependency = { cdef = function() error("controlled cdef refusal") end }
 				end
-				local loop = helpers.load_module_with_dependency("adapters.event_loop", "ffi", dependency)
+				local loop = helpers.load_module_with_dependency("core.events.loop", "ffi", dependency)
 				local execute = os.execute
 				local commands = {}
 				os.execute = function(command)
@@ -493,7 +493,7 @@ end
 helpers.describe("event loop backend isolation", function()
   helpers.it("dependency fixtures restore cached and preload values after success", function()
     local loaded, preload = package.loaded.luv, package.preload.luv
-    local native = helpers.load_module_with_dependency("adapters.event_loop", "luv", {})
+    local native = helpers.load_module_with_dependency("core.events.loop", "luv", {})
     helpers.assert_true(native.HAS_LUV, "present dependency selects the native backend")
     helpers.assert_true(package.loaded.luv == loaded, "restore the exact original cache")
     helpers.assert_true(package.preload.luv == preload, "restore the exact original loader")

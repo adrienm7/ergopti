@@ -21,7 +21,7 @@ helpers.describe("LogTransport authenticated ACK handling", function()
 			context.hs.timer.absoluteTime = nil
 			context.hs.timer.secondsSinceEpoch = function() return wall_clock end
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			local timer_scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+			local timer_scheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 				timer = context.hs.timer,
 			})
 			context.scheduler.now_ns = timer_scheduler.now_ns

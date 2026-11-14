@@ -443,7 +443,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 
 	helpers.it("the real URI adapter guards the actual Ctrl+C emitter", function()
 		local Subject = require("modules.shortcuts.open_selection")
-		local names = { "adapters.clipboard", "modules.gestures.combo_emitter", "adapters.event_loop" }
+		local names = { "adapters.clipboard", "modules.gestures.combo_emitter", "core.events.loop" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local app, emitted = "nautilus", 0

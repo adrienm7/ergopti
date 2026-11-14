@@ -3,7 +3,7 @@
 --- Owns explicit Command/Tab edges, native observations and release compensation.
 --- A queued edge is admission only; the broker advances after tagged tap receipt.
 local M = {}
-local Scheduler = require("adapters.timer_scheduler")
+local Scheduler = require("core.events.timer_scheduler")
 local Sampler = require("adapters.system_switcher_sampler")
 
 --- Binds one admitted native helper and the central synthetic provenance owner.

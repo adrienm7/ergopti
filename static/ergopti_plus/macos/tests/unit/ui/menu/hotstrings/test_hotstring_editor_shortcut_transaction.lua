@@ -297,10 +297,10 @@ end)
 --- @param timer_result boolean|nil Actual scheduler receipt.
 --- @return table observation Recorded native admissions.
 local function editor_observation(vector, deferred_pause, timer_result, label_key)
-	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "adapters.timer_scheduler", "infra.manifest_menu", "infra.paths", "infra.i18n" }, function()
+	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "infra.paths", "infra.i18n" }, function()
 		local calls, scheduled, callback = 0, 0, nil
 		local current = vector.initial_paused
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_delay, work)
 				scheduled = scheduled + 1
 				if timer_result == false then return nil, false end

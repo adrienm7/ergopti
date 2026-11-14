@@ -34,7 +34,7 @@ local function with_changelog(callback)
 			"adapters.file_system",
 			"adapters.json_codec",
 			"adapters.http_client",
-			"adapters.timer_scheduler",
+			"core.events.timer_scheduler",
 			"infra.deferred_work",
 			"infra.i18n",
 			"infra.logger",

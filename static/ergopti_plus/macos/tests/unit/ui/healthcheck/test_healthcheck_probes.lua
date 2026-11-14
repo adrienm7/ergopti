@@ -18,7 +18,7 @@ local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
-	"infra.logger", "ui.healthcheck.probes", "adapters.timer_scheduler", "adapters.http_client",
+	"infra.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "adapters.http_client",
 	"adapters.shell_runner", "adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
@@ -62,7 +62,7 @@ local function with_probes(body)
 			world.samplers[#world.samplers + 1] = sampler
 			return sampler
 		end
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback }
 				world.timers[#world.timers + 1] = handle
@@ -208,7 +208,7 @@ local function with_retained_actor(body)
 		}
 		local run, answers = start(Probes)
 		controls.watchdog = assert(run.watchdogs.appleevent_transport)
-		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local original_cancel = scheduler.cancel
 		scheduler.cancel = function(handle)
 			if handle == controls.watchdog then
@@ -375,7 +375,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 	helpers.it("passes the original start clock to the separately controlled AppleEvent collaborator", function()
 		with_probes(function(Probes, world)
 			local timer = hs.timer
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local saved_clock, saved_after = timer.absoluteTime, scheduler.after
 			local now_ns, watchdog_starts = 12345 * 1e6, {}
 			timer.absoluteTime = function() return now_ns end

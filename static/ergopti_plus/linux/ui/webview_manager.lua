@@ -1303,7 +1303,7 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 		-- of dispatches and document polls on each keyboard tick.
 		if not _gtk_pump_registered then
 			local ok_pump = pcall(function()
-				local event_loop = require("adapters.event_loop")
+				local event_loop = require("core.events.loop")
 				assert(type(event_loop.add_idle_handler) == "function", "GTK event pump unavailable")
 				local accepted = event_loop.add_idle_handler(function()
 					poll_documents()

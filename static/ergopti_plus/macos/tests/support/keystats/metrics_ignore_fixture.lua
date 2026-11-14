@@ -8,7 +8,7 @@ local Quote = require("core.text.engine.utils_core").shell_quote
 local M = {}
 local OWNERS = {
 	"tests.stubs.hs", "infra.logger", "infra.fs_dir", "adapters.file_system", "adapters.ledger_append",
-	"adapters.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.events.timer_scheduler", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator", "modules.keystats.export",
 	"hs.fs", "hs.timer", "hs.json", "hs.sqlite3",
 }

@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local function run_scenario()
 	local dependency_names = {
 		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"infra.logger",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
@@ -53,7 +53,7 @@ local function run_scenario()
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }

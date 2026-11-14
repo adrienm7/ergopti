@@ -37,7 +37,7 @@
 --- ==============================================================================
 
 local Logger       = require("infra.logger")
-local Scheduler    = require("adapters.timer_scheduler")
+local Scheduler    = require("core.events.timer_scheduler")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
 local Driver       = require("metrics.engine.privacy.text_migration_driver")

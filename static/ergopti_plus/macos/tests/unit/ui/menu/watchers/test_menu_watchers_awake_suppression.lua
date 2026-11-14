@@ -24,7 +24,7 @@ local OWNED_MODULES = {
 	"adapters.shell_runner",
 	"adapters.storage",
 	"adapters.task_environment",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.tray_menu",
 	"adapters.update_launcher",
 	"core.fs.engine.app_dirs",
@@ -223,7 +223,7 @@ local function with_menu(body)
 				end,
 			})
 			Menu = require("ui.menu.init")
-			Scheduler = require("adapters.timer_scheduler")
+			Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_not_nil(fixture.menu, "the actual menu must boot")
 			helpers.assert_eq(#world.watchers, 1, "the real config watcher must own one native stream")
 			helpers.assert_eq(world.watchers[1].path, "/virtual/")
@@ -234,7 +234,7 @@ local function with_menu(body)
 			body(world)
 		end, debug.traceback)
 		Menu = Menu or package.loaded["ui.menu.init"]
-		Scheduler = Scheduler or package.loaded["adapters.timer_scheduler"]
+		Scheduler = Scheduler or package.loaded["core.events.timer_scheduler"]
 		if Menu then helpers.assert_eq(Menu.stop_watchers(), true, "the exact menu watcher owner must retire") end
 		if Scheduler then helpers.assert_eq(Scheduler.cancelAll(), true, "the menu's native timer owners must retire") end
 		for _, watcher in ipairs(world.watchers) do

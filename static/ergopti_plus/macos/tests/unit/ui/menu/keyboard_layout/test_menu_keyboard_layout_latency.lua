@@ -113,7 +113,7 @@ end)
 helpers.describe("menu_keyboard_layout async refresh", function()
 	helpers.it("updates the cache from the probe stdout via hs.task", function()
 		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
 			task = task_stub_firing('({ "KeyboardLayout Name" = French; }, { "KeyboardLayout Name" = Ergopti_v2_2_2_plus; })'),
 		})

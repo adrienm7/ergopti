@@ -1878,7 +1878,7 @@ function M.run_modal(fn, ...)
 end
 
 --- Names the source line of the function a timer callback runs.
---- adapters/timer_scheduler.lua wraps every owner's callback in a closure of
+--- core/events/timer_scheduler.lua wraps every owner's callback in a closure of
 --- its own, so its site names nothing: the first function upvalue defined in
 --- another file is the owner's callback.
 --- @param fn function Callback handed to the hs.timer constructor.

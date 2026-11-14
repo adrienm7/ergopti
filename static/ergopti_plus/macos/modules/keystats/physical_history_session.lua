@@ -295,7 +295,7 @@ end
 local function new_manager(capacity, on_refused, native_ports)
 	local Policy = require("metrics.engine.capture.physical_lease_policy")
 	local policy_new = port(Policy, "new")
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local managed_bind = rawget(Capture, "bind_managed_source")
 	if type(managed_bind) ~= "function" then return nil, "physical_history_managed_unavailable" end
 	local owner, manager = {}, {}
@@ -648,7 +648,7 @@ local function legacy_forwarder(session, handlers, native_ports, on_refused)
 		requested = true
 		if observer and not observing then
 			observing = true
-			events = event_owner(require("adapters.timer_scheduler"), continuation, signal, refuse)
+			events = event_owner(require("core.events.timer_scheduler"), continuation, signal, refuse)
 			frames = frames + 1
 			local ok, accepted = pcall(handlers.retirement_hint, signal)
 			frames = frames - 1

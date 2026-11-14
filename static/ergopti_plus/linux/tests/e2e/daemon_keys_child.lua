@@ -462,10 +462,10 @@ local CONTROL_MODS = { CBS = { ctrl = true } }
 
 local final_screen = nil
 
-package.preload["adapters.event_loop"] = function()
+package.preload["core.events.loop"] = function()
 	-- Keep the real deferred queue: boot schedules crash reporting before the
 	-- loop begins, and dropping that boundary would conceal startup failures.
-	local adapter = dofile("adapters/event_loop.lua")
+	local adapter = dofile("core/events/loop.lua")
 	local native_run = adapter.run
 	local function play(loop)
 		-- A settled async observation is published by the next actual daemon tick.

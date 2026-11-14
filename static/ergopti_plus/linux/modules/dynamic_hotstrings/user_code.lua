@@ -16,7 +16,7 @@
 --- ==============================================================================
 local Driver = require("hotstrings.engine.dynamic.user_code_driver")
 local FileSystem = require("adapters.file_system")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("core.logger.engine.shim")
 local Notifier = require("adapters.application_notifier")

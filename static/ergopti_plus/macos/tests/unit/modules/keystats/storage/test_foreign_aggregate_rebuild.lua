@@ -179,7 +179,7 @@ helpers.describe("keystats-device-log-privacy", function()
 			helpers.with_stub_scope({
 				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"metrics.engine.metrics", "adapters.file_system", "adapters.timer_scheduler",
+				"metrics.engine.metrics", "adapters.file_system", "core.events.timer_scheduler",
 			}, function()
 				local messages, queries = {}, {}
 				local identity = "private-foreign-device"

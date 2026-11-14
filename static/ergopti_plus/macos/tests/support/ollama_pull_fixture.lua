@@ -22,7 +22,7 @@ local MODULES = {
 	"modules.llm.opaque_network_admission",
 	"adapters.shell_runner",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"adapters.http_client",
 	"ui.download_window",
 	"ui.ui_builder",
@@ -87,7 +87,7 @@ local function with_fixture(options, callback)
 		opaque_prelude = function() return "", nil end,
 	}
 	package.loaded["adapters.shell_runner"] = { spawn = function() return nil end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, fn)
 			local handle = { callback = fn, timer = {}, observers = {} }

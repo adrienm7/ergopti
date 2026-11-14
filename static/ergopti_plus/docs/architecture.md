@@ -52,7 +52,6 @@ graph TD
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
-        LINUX_event_loop["EventLoop.lua"]
         LINUX_file_digest["FileDigest.lua"]
         LINUX_file_manager_folder["FileManagerFolder.lua"]
         LINUX_file_system["FileSystem.lua"]
@@ -80,7 +79,6 @@ graph TD
         LINUX_system_proxy["SystemProxy.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tcp_probe["TcpProbe.lua"]
-        LINUX_timer_scheduler["TimerScheduler.lua"]
         LINUX_tray_menu["TrayMenu.lua"]
         LINUX_uinput_writer["UinputWriter.lua"]
         LINUX_user_hotstring_destination["UserHotstringDestination.lua"]
@@ -106,7 +104,6 @@ graph TD
         MACOS_boot_fatal["BootFatal.lua"]
         MACOS_boot_journal["BootJournal.lua"]
         MACOS_clipboard["Clipboard.lua"]
-        MACOS_event_clock["EventClock.lua"]
         MACOS_event_provenance["EventProvenance.lua"]
         MACOS_field_check_ports["FieldCheckPorts.lua"]
         MACOS_field_probe_ports["FieldProbePorts.lua"]
@@ -174,13 +171,11 @@ graph TD
         MACOS_task_output_turn["TaskOutputTurn.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
-        MACOS_timer_scheduler["TimerScheduler.lua"]
         MACOS_toml_cache["TomlCache.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
         MACOS_update_launcher["UpdateLauncher.lua"]
-        MACOS_wake_watcher["WakeWatcher.lua"]
         MACOS_webview_result["WebviewResult.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
@@ -189,7 +184,6 @@ graph TD
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
         WINDOWS_app_launcher["AppLauncher.ahk"]
-        WINDOWS_boot_clock["BootClock.ahk"]
         WINDOWS_bundled_apps_native["BundledAppsNative.ahk"]
         WINDOWS_clipboard["Clipboard.ahk"]
         WINDOWS_console_window["ConsoleWindow.ahk"]
@@ -237,7 +231,6 @@ graph TD
         WINDOWS_terminal_output_preview["TerminalOutputPreview.ahk"]
         WINDOWS_terminal_output_sendinput["TerminalOutputSendinput.ahk"]
         WINDOWS_text_sender["TextSender.ahk"]
-        WINDOWS_timer_scheduler["TimerScheduler.ahk"]
         WINDOWS_tooltip_renderer["TooltipRenderer.ahk"]
         WINDOWS_tray_menu["TrayMenu.ahk"]
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
@@ -268,7 +261,6 @@ graph TD
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
     P_Storage -->|implements| LINUX_storage
-    P_TimerScheduler -->|implements| LINUX_timer_scheduler
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info
 
@@ -288,7 +280,6 @@ graph TD
     P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
     P_Storage -->|implements| MACOS_storage
     P_TextSender -->|implements| MACOS_text_sender
-    P_TimerScheduler -->|implements| MACOS_timer_scheduler
     P_TooltipRenderer -->|implements| MACOS_tooltip_renderer
     P_TrayMenu -->|implements| MACOS_tray_menu
     P_WindowInfo -->|implements| MACOS_window_info
@@ -310,7 +301,6 @@ graph TD
     P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
     P_Storage -->|implements| WINDOWS_storage
     P_TextSender -->|implements| WINDOWS_text_sender
-    P_TimerScheduler -->|implements| WINDOWS_timer_scheduler
     P_TooltipRenderer -->|implements| WINDOWS_tooltip_renderer
     P_TrayMenu -->|implements| WINDOWS_tray_menu
     P_WindowInfo -->|implements| WINDOWS_window_info

@@ -362,7 +362,7 @@ InstallHotstringHooks()
 ; ── Adapter contract: include all port adapters so contract vector tests can call them ──
 #Include ../adapters/notifier.ahk
 #Include ../infra/quit_admission.ahk
-#Include ../adapters/timer_scheduler.ahk
+#Include ../core/events/timer_scheduler.ahk
 #Include ../adapters/file_system.ahk
 #Include ../adapters/window_info.ahk
 #Include ../adapters/uia_worker.ahk

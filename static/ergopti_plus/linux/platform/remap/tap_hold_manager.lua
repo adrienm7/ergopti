@@ -255,10 +255,10 @@ local function build_tap_copy(execute, capture_destination)
 			return called and result ~= false
 		end,
 		after = function(delay_ms, callback)
-			local handle = require("adapters.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
+			local handle = require("core.events.timer_scheduler").after(delay_ms / MS_PER_SECOND, callback)
 			return handle.armed == true and handle or nil
 		end,
-		cancel = function(handle) require("adapters.timer_scheduler").cancel(handle) end,
+		cancel = function(handle) require("core.events.timer_scheduler").cancel(handle) end,
 		log = function(level, fmt, ...) Logger[level](LOG, fmt, ...) end,
 		warn_user = function()
 			local sent_ok, sent = pcall(require("adapters.notifier").send,

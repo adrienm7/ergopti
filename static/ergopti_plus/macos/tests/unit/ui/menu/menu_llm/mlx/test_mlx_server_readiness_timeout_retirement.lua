@@ -19,7 +19,7 @@ local MODULE_NAMES = {
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -80,7 +80,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				mark_load_failed = noop,
 			}
 
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(delay, callback)
 					local handle = {
 						delay = delay,

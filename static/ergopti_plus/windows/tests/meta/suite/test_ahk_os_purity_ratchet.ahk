@@ -99,7 +99,9 @@ _AOPR_WholeIdentifiers() {
 Test("OS purity counter: whole native identifiers and captured built-ins (os-purity-token-boundaries)", _AOPR_WholeIdentifiers)
 
 ; Every .ahk file under the given driver subdirectories, recursively, with
-; adapters/ excluded — OS calls there are the legitimate isolation layer.
+; adapters/ excluded — OS calls there are the legitimate isolation layer. The
+; crypto adapter (S02) and the boot clock and timer scheduler (S03) live in
+; core/ outside any adapters/ folder: they stay the same isolation layer.
 _AOPR_FilesIn(SubDirs) {
 	Files := []
 	Root := _AOPR_DriverRoot()
@@ -109,6 +111,7 @@ _AOPR_FilesIn(SubDirs) {
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
 			if InStr(A_LoopFilePath, "\adapters\")
+				|| RegExMatch(A_LoopFilePath, "\\core\\(?:crypto\\crypto|events\\(?:boot_clock|timer_scheduler))\.ahk$")
 				continue
 			Files.Push(A_LoopFilePath)
 		}

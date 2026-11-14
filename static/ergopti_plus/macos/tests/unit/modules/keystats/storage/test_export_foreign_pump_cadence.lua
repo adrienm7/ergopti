@@ -15,7 +15,7 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- @param check function Receives the exporter, scheduler and native observations.
 local function observe(check)
 	helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export",
-		"adapters.foreign_ledger_snapshot", "adapters.timer_scheduler", "infra.paced_job" }, function()
+		"adapters.foreign_ledger_snapshot", "core.events.timer_scheduler", "infra.paced_job" }, function()
 		local source = BATCH:rep(8000)
 		local h = { now = 0, timers = {}, read_bytes = 0, foreground = 0, watermark = 0, applied = {}, closes = 0 }
 		local timer = { absoluteTime = function() return h.now * 1e9 end }
@@ -65,7 +65,7 @@ local function observe(check)
 		local export = helpers.load_with_stubs("modules.keystats.export", {
 			fs = { attributes = function() return { size = #source } end }, hash = oracle, timer = timer,
 		})
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		export.init({ paths = { metrics_dir = "/foreign-pump/metrics/" }, device_id = "local", get_db = function() return db end })
 		local original_open = io.open
 		io.open = function(path, ...)

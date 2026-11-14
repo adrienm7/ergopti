@@ -30,7 +30,7 @@ local PRODUCTION_SOURCE_FLOOR = 200
 -- poller fails instead of hiding behind one already-approved file.
 -- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_TIMER_NEW_OWNERS = {
-	["adapters.timer_scheduler"] = "canonical native timer owner",
+	["core.events.timer_scheduler"] = "canonical native timer owner",
 	["infra.launcher_guard"] = "runs before TimerScheduler and publishes before start",
 	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
 	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
