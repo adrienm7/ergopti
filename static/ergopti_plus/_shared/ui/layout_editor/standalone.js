@@ -11,6 +11,9 @@
  * ErgoptiPlus mounts the same editor in its layout editor window with a host
  * that saves through the driver and ships the same export assets
  * (layout_editor_window/script.js, _generated/export_assets.js).
+ * Framed by the site (/studio, « Éditer »), it posts its height to the parent
+ * ({type: 'ergopti-layout-editor:height', height}) on load and on every
+ * resize (the analysis panel opening, a panel unfolding), so the frame fits.
  * ==============================================================================
  */
 
@@ -117,4 +120,16 @@
 		loadSources: registrySources,
 		exportAssets: loadExportAssets
 	});
+
+	// The message the framing page (the site's /studio) listens for to size its frame.
+	const HEIGHT_MESSAGE = 'ergopti-layout-editor:height';
+	if (window.parent !== window) {
+		const post = () =>
+			window.parent.postMessage(
+				{ type: HEIGHT_MESSAGE, height: document.documentElement.scrollHeight },
+				'*'
+			);
+		post();
+		if (typeof ResizeObserver === 'function') new ResizeObserver(post).observe(document.body);
+	}
 })();

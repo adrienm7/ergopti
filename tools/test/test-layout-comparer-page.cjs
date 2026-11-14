@@ -239,6 +239,13 @@ check(
 	'layout_editor_window/index.html: no Comparer stylesheet'
 );
 
+// The site frames the editor in /studio and sizes the frame from this message.
+const standalone = fs.readFileSync(shared('ui', 'layout_editor', 'standalone.js'), 'utf8');
+check(
+	standalone.includes("'ergopti-layout-editor:height'") && standalone.includes('postMessage'),
+	'the editor page no longer posts its height to the framing site'
+);
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-comparer-page: ${errors.length} problem(s)`);
