@@ -264,18 +264,19 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 	},
 	{
 		// The OS-purity ratchets exempt adapters/ by folder; S02 and S03 put three
-		// adapters in core/ without one, and S03 adds core/ to the scan (to review).
+		// adapters in core/ without one, S06 folds the driver control adapter into
+		// core/lifecycle (the singleton pass), and S03 adds core/ to the scan.
 		file: 'static/ergopti_plus/windows/tests/meta/suite/test_ahk_os_purity_ratchet.ahk',
 		moves: 'windows/adapters/boot_clock.ahk',
 		from: '; Every .ahk file under the given driver subdirectories, recursively, with\n; adapters/ excluded \u2014 OS calls there are the legitimate isolation layer.',
-		to: '; Every .ahk file under the given driver subdirectories, recursively, with\n; adapters/ excluded \u2014 OS calls there are the legitimate isolation layer. The\n; crypto adapter (S02) and the boot clock and timer scheduler (S03) live in\n; core/ outside any adapters/ folder: they stay the same isolation layer.'
+		to: '; Every .ahk file under the given driver subdirectories, recursively, with\n; adapters/ excluded \u2014 OS calls there are the legitimate isolation layer. The\n; crypto adapter (S02), the boot clock and timer scheduler (S03) and the\n; driver control adapter (S06), the one adapter of core/lifecycle, live in\n; core/ outside any adapters/ folder: they stay the same isolation layer.'
 	},
 	{
 		// The same exemption, in the ratchets' file walk.
 		file: 'static/ergopti_plus/windows/tests/meta/suite/test_ahk_os_purity_ratchet.ahk',
 		moves: 'windows/adapters/boot_clock.ahk',
 		from: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\") || _AOPR_IsUiSource(A_LoopFilePath)\n\t\t\t\tcontinue',
-		to: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\") || _AOPR_IsUiSource(A_LoopFilePath)\n\t\t\t\t|| RegExMatch(A_LoopFilePath, "\\\\core\\\\(?:crypto\\\\crypto|events\\\\(?:boot_clock|timer_scheduler))\\.ahk$")\n\t\t\t\tcontinue'
+		to: '\t\t\tif InStr(A_LoopFilePath, "\\adapters\\") || _AOPR_IsUiSource(A_LoopFilePath)\n\t\t\t\t|| RegExMatch(A_LoopFilePath, "\\\\core\\\\(?:crypto\\\\crypto|events\\\\(?:boot_clock|timer_scheduler)|lifecycle\\\\driver_control)\\.ahk$")\n\t\t\t\tcontinue'
 	},
 	{
 		// The input probe's child drops the probe's relative includes, which named
