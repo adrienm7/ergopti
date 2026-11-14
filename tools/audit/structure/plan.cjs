@@ -1658,8 +1658,25 @@ function scanFile(file, text, ctx) {
 		text.includes('/windows') ||
 		/["'`]windows\//.test(text) ||
 		/\bpath\.(?:join|resolve)\([^)]*(["'])windows\1/.test(text);
-	const toolDriverOf = (token) => {
+	// FRAMELESS = { linux: { 'adapters/x.lua': … } }: a block keyed by a
+	// driver holds that driver's paths, whatever else the tool names.
+	const keyedBlocks = [];
+	if (!inTree && /\.(c?js|mjs)$/.test(file))
+		for (const m of text.matchAll(/\b(macos|linux|windows)\s*:\s*([{[])/g)) {
+			const close = m[2] === '{' ? '}' : ']';
+			let depth = 0;
+			for (let i = m.index + m[0].length - 1; i < text.length; i++) {
+				if (text[i] === m[2]) depth++;
+				else if (text[i] === close && --depth === 0) {
+					keyedBlocks.push({ driver: m[1], from: m.index, to: i });
+					break;
+				}
+			}
+		}
+	const toolDriverOf = (token, index = -1) => {
 		if (inTree) return null;
+		const keyed = keyedBlocks.filter((b) => index > b.from && index < b.to);
+		if (keyed.length > 0) return keyed[keyed.length - 1].driver;
 		if (namesWindows && /\.(?:ahk|ps1)$/.test(token)) return 'windows';
 		if (namedDrivers.length === 1) return namedDrivers[0];
 		// A tool naming both Lua drivers: a bare path only one of them holds.
@@ -1782,7 +1799,7 @@ function scanFile(file, text, ctx) {
 				byRepoPath,
 				isSharedArgument(text, m.index),
 				byRepoDir,
-				toolDriverOf(m[0])
+				toolDriverOf(m[0], m.index)
 			)
 		);
 		if (hit) add('path', m[0], hit.newRepo === PREFIX ? '(retired)' : hit.newRepo, hit);
