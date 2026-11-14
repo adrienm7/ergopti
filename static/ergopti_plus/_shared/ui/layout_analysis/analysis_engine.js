@@ -58,6 +58,9 @@ var LAYOUT_ANALYSIS = (function () {
 	// A dead-key rule typed by another dead key: « dead:<state> » names the dead
 	// key that enters <state> (Ergo-L's 1dk pressed twice gives the diaeresis).
 	const DEAD_TYPED = 'dead:';
+	// A key is lateral from this far (in key units, on the column grid) beyond
+	// its finger's home column: the index's inner column, the pinky's outer keys.
+	const LATERAL_MIN_STEP = 0.75;
 	// Dead-key chains deeper than this are not followed.
 	const MAX_DEAD_DEPTH = 4;
 
@@ -137,32 +140,84 @@ var LAYOUT_ANALYSIS = (function () {
 	const keyboardCache = new Map();
 
 	/**
+	 * Checks a fingering profile: the user's own model of which finger presses
+	 * each key and where each finger rests.
+	 * @param {object} profile - {id?, name?, base?: 'standard'|'angle',
+	 *   fingers?: {code: finger}, home?: {finger: code}}.
+	 * @returns {object} The profile, with empty maps filled in.
+	 * @throws {Error} On an unknown base, finger or key.
+	 */
+	function fingeringProfile(profile) {
+		const { model, geometry } = data();
+		if (!profile || typeof profile !== 'object')
+			throw new Error('layout_analysis: a fingering profile is an object');
+		if (profile.base !== undefined && !model.fingerings[profile.base])
+			throw new Error(`layout_analysis: unknown fingering ${profile.base}`);
+		const fingers = profile.fingers || {};
+		const home = profile.home || {};
+		for (const [code, finger] of Object.entries(fingers)) {
+			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
+			if (!model.fingers.includes(finger))
+				throw new Error(`layout_analysis: unknown finger ${finger}`);
+		}
+		for (const [finger, code] of Object.entries(home)) {
+			if (!model.fingers.includes(finger))
+				throw new Error(`layout_analysis: unknown finger ${finger}`);
+			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
+		}
+		return {
+			id: profile.id || 'custom',
+			name: profile.name || '',
+			base: profile.base,
+			fingers,
+			home
+		};
+	}
+
+	/**
 	 * The keys of one keyboard with their finger, hand, row and position.
 	 * @param {string} keyboardId - A key of model.keyboards.
+	 * @param {object} [profile] - A fingering profile (fingeringProfile): its
+	 *   base fingering, finger of each key and home key of each finger replace
+	 *   the keyboard's own; absent, the model's defaults.
 	 * @returns {object} {id, codes, index: Map code → i, finger, order, hand,
-	 *   row, x, y, home, lateral, outer, homeOf: finger → key index}.
-	 * @throws {Error} On an unknown keyboard.
+	 *   row, relRow (row relative to the finger's home key), x, y, home,
+	 *   lateral, outer, homeOf: finger → key index}.
+	 * @throws {Error} On an unknown keyboard, an invalid profile, or a home key
+	 *   that is not on the board or not pressed by its own finger (a shared
+	 *   home key, the space bar, rests both thumbs).
 	 */
-	function keyboard(keyboardId) {
-		if (keyboardCache.has(keyboardId)) return keyboardCache.get(keyboardId);
+	function keyboard(keyboardId, profile) {
+		const checked = profile === undefined ? null : fingeringProfile(profile);
+		const cacheKey = checked ? `${keyboardId}|${JSON.stringify(checked)}` : keyboardId;
+		if (keyboardCache.has(cacheKey)) return keyboardCache.get(cacheKey);
 		const { model, geometry } = data();
 		const spec = model.keyboards[keyboardId];
 		if (!spec) throw new Error(`layout_analysis: unknown keyboard ${keyboardId}`);
-		const fingering = model.fingerings[spec.fingering];
+		const fingering = Object.assign(
+			{},
+			model.fingerings[checked && checked.base ? checked.base : spec.fingering],
+			checked ? checked.fingers : {}
+		);
+		const homeKeys = Object.assign({}, model.home_keys, checked ? checked.home : {});
 		const form = spec.geometry === 'ortho' ? 'iso' : spec.geometry;
-		const lateral = new Set(model.lateral_keys);
 		const outer = new Set(model.outer_keys);
-		const homeCodes = new Set(Object.values(model.home_keys));
+		const modifierCodes = new Set(Object.values(model.modifier_keys));
+		const homeCodes = new Set(Object.values(homeKeys));
 		const board = {
 			id: keyboardId,
+			profile: checked,
 			codes: [],
 			index: new Map(),
 			finger: [],
 			order: [],
 			hand: [],
 			row: [],
+			relRow: [],
 			x: [],
 			y: [],
+			// The column grid: x without the row stagger, for lateral keys.
+			grid: [],
 			home: [],
 			lateral: [],
 			outer: []
@@ -172,8 +227,9 @@ var LAYOUT_ANALYSIS = (function () {
 			if (!g) continue;
 			const finger = model.fingers.indexOf(fingerId);
 			if (finger < 0) throw new Error(`layout_analysis: unknown finger ${fingerId}`);
+			const grid = g.col + g.width / 2 + model.ortho_row_offsets[String(g.row)];
 			let x = g.col + g.width / 2;
-			if (spec.geometry === 'ortho') x += model.ortho_row_offsets[String(g.row)];
+			if (spec.geometry === 'ortho') x = grid;
 			board.index.set(code, board.codes.length);
 			board.codes.push(code);
 			board.finger.push(finger);
@@ -182,16 +238,44 @@ var LAYOUT_ANALYSIS = (function () {
 			board.row.push(g.row);
 			board.x.push(x);
 			board.y.push(g.row);
+			board.grid.push(grid);
 			board.home.push(homeCodes.has(code));
-			board.lateral.push(lateral.has(code));
 			board.outer.push(outer.has(code));
 			// A wide modifier is pressed at its end nearest the home row.
-			if (Object.values(model.modifier_keys).includes(code)) {
+			if (modifierCodes.has(code)) {
 				board.x[board.x.length - 1] =
 					code === model.modifier_keys.shift_for_right_hand ? g.col + g.width - 0.5 : g.col + 0.5;
 			}
 		}
-		board.homeOf = model.fingers.map((fingerId) => board.index.get(model.home_keys[fingerId]));
+		board.homeOf = model.fingers.map((fingerId) => {
+			const k = board.index.get(homeKeys[fingerId]);
+			if (k === undefined)
+				throw new Error(
+					`layout_analysis: home key ${homeKeys[fingerId]} of ${fingerId} is not on ${keyboardId}`
+				);
+			// The space bar is wide: both thumbs rest on it, whichever presses it.
+			if (
+				model.fingers[board.finger[k]] !== fingerId &&
+				!model.shared_home_keys.includes(homeKeys[fingerId])
+			)
+				throw new Error(
+					`layout_analysis: home key ${homeKeys[fingerId]} is not pressed by ${fingerId}`
+				);
+			return k;
+		});
+		board.codes.forEach((code, k) => {
+			const home = board.homeOf[board.finger[k]];
+			board.relRow.push(board.row[k] - board.row[home]);
+			// Lateral: an index key toward the centre of its home column, a pinky key
+			// outward of it, on the column grid (stagger aside), modifiers excepted.
+			const inward = (board.grid[k] - board.grid[home]) * (board.hand[k] === 0 ? 1 : -1);
+			const order = board.order[k];
+			board.lateral.push(
+				!modifierCodes.has(code) &&
+					((order === INDEX_ORDER && inward >= LATERAL_MIN_STEP) ||
+						(order === 0 && inward <= -LATERAL_MIN_STEP))
+			);
+		});
 		// Distance in millimetres from each finger's home key to each key.
 		board.reach = board.codes.map((_, k) => {
 			const home = board.homeOf[board.finger[k]];
@@ -204,7 +288,7 @@ var LAYOUT_ANALYSIS = (function () {
 			shiftForRight: board.index.get(model.modifier_keys.shift_for_right_hand),
 			altgr: board.index.get(model.modifier_keys.altgr)
 		};
-		keyboardCache.set(keyboardId, board);
+		keyboardCache.set(cacheKey, board);
 		return board;
 	}
 
@@ -493,9 +577,12 @@ var LAYOUT_ANALYSIS = (function () {
 	 * The keyboard a layout is measured on: an angle-mod layout uses the angle
 	 * fingering of an ISO board.
 	 */
-	function boardFor(layout, keyboardId) {
-		if (keyboardId === 'iso' && layout.fingering === 'angle') return keyboard('iso_angle');
-		return keyboard(keyboardId);
+	function boardFor(layout, keyboardId, profile) {
+		// A profile with its own base fingering decides; otherwise an angle-mod
+		// layout on an ISO board takes the angle fingering.
+		if (keyboardId === 'iso' && layout.fingering === 'angle' && !(profile && profile.base))
+			return keyboard('iso_angle', profile);
+		return keyboard(keyboardId, profile);
 	}
 
 	/**
@@ -511,7 +598,7 @@ var LAYOUT_ANALYSIS = (function () {
 	function analyse(layoutInput, ngrams, options) {
 		const opts = options || {};
 		const layout = layoutFromRows(layoutInput);
-		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
 		const table = prepareNgrams(ngrams);
 		const best = compileLayout(layout, board, null);
 		const thumb = board.finger.map((f) => f === LEFT_THUMB || f === RIGHT_THUMB);
@@ -662,7 +749,8 @@ var LAYOUT_ANALYSIS = (function () {
 		for (let k = 0; k < keyCount.length; k++) {
 			if (thumb[k] || modifierKeys.has(k)) continue;
 			typing += keyCount[k];
-			rowLoad[board.row[k]] = (rowLoad[board.row[k]] || 0) + keyCount[k];
+			// Rows relative to each finger's home key: a staggered home counts as home.
+			rowLoad[board.relRow[k]] = (rowLoad[board.relRow[k]] || 0) + keyCount[k];
 		}
 		const allPresses = fingerLoad.reduce((sum, v) => sum + v, 0);
 		const fingers = {};
@@ -691,10 +779,10 @@ var LAYOUT_ANALYSIS = (function () {
 			alternation: pct(c.alternation, c.trigrams),
 			redirect: pct(c.redirect, c.trigrams),
 			redirect_bad: pct(c.redirect_bad, c.trigrams),
-			home_row: pct(rowLoad[3] || 0, typing),
-			top_row: pct(rowLoad[2] || 0, typing),
-			bottom_row: pct(rowLoad[4] || 0, typing),
-			number_row: pct(rowLoad[1] || 0, typing),
+			home_row: pct(rowLoad[0] || 0, typing),
+			top_row: pct(rowLoad[-1] || 0, typing),
+			bottom_row: pct(rowLoad[1] || 0, typing),
+			number_row: pct(rowLoad[-2] || 0, typing),
 			distance: c.chars > 0 ? c.distance / c.chars : 0,
 			finger_imbalance: imbalance / 2,
 			hand_imbalance: pct(Math.abs(left - right), left + right),
@@ -1080,6 +1168,7 @@ var LAYOUT_ANALYSIS = (function () {
 		LAYER_IDS,
 		hashText,
 		keyboard,
+		fingeringProfile,
 		layoutFromRows,
 		layoutFromComposerSource,
 		typingCodes,

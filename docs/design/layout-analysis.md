@@ -136,6 +136,25 @@ pressed by the left thumb and Digit6 by the right index (maintainer,
 left-hand key), AltGr by the right thumb. The **order** of a finger runs from the pinky (0) to the index (3);
 moving to a higher order is **inward**.
 
+**Fingering profiles.** `keyboard(id, profile)` and `analyse(…, {profile})`
+take a user model of the hand: `{id, name, base: 'standard'|'angle',
+fingers: {code: finger}, home: {finger: code}}`. The base fingering and the
+model's home keys are the defaults, so an empty profile gives the default
+numbers.
+
+- Every metric follows the profile: the finger and hand of each key, the
+  distance from each finger's own home key, the rows relative to each
+  finger's home row (a staggered index still counts as home), and the
+  lateral keys.
+- A lateral key is an index key at least 0.75 key toward the centre of the
+  index's home column, or a pinky key that far outward of the pinky's, on
+  the column grid with the stagger removed. On the default boards this rule
+  reproduces exactly the list it replaced.
+- A home key must be pressed by its own finger, except the space bar, on
+  which both thumbs rest (`shared_home_keys`).
+- `fingeringProfile(profile)` checks a profile and throws on an unknown base,
+  finger or key.
+
 **Shares.** A bigram or trigram metric is a share of the key bigrams or
 trigrams **without a thumb key**; a row metric a share of the non-thumb,
 non-modifier presses; finger load a share of every press; a « per character »

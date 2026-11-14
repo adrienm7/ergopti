@@ -1,5 +1,5 @@
 {
-	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home, lateral (index inner column, pinky outer columns) or outer (7th right-hand column), the keyboards it measures on, the reference character set, the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
+	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
 	"schema_version": 1,
 	"key_unit_mm": 19.05,
 	"fingers": ["lp", "lr", "lm", "li", "lt", "rt", "ri", "rm", "rr", "rp"],
@@ -125,24 +125,6 @@
 		"rr": "KeyL",
 		"rp": "Semicolon"
 	},
-	"lateral_keys": [
-		"Digit5",
-		"KeyT",
-		"KeyG",
-		"KeyB",
-		"Digit6",
-		"KeyY",
-		"KeyH",
-		"KeyN",
-		"Backquote",
-		"IntlBackslash",
-		"Minus",
-		"Equal",
-		"BracketLeft",
-		"BracketRight",
-		"Quote",
-		"Backslash"
-	],
 	"outer_keys": ["Equal", "BracketRight", "Backslash"],
 	"modifier_keys": {
 		"shift_for_left_hand": "ShiftRight",
@@ -174,6 +156,7 @@
 		"4": -0.75,
 		"5": 0
 	},
+	"shared_home_keys": ["Space"],
 	"ideal_finger_load": {
 		"lp": 6.5,
 		"lr": 11.5,

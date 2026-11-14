@@ -278,6 +278,94 @@ for (const bad of [
 	check(threw, `ideal load: ${JSON.stringify(bad)} must throw`);
 }
 
+// Fingering profiles. The default board derives the lateral keys this list
+// once named by hand (index inner column, pinky outer keys).
+const LATERAL_KEYS = [
+	'Digit5',
+	'KeyT',
+	'KeyG',
+	'KeyB',
+	'Digit6',
+	'KeyY',
+	'KeyH',
+	'KeyN',
+	'Backquote',
+	'IntlBackslash',
+	'Minus',
+	'Equal',
+	'BracketLeft',
+	'BracketRight',
+	'Quote',
+	'Backslash'
+];
+for (const id of ['iso', 'ansi', 'ortho', 'iso_angle']) {
+	const board = E.keyboard(id);
+	const lateral = board.codes.filter((_, k) => board.lateral[k]).sort();
+	const expected = LATERAL_KEYS.filter((code) => board.index.has(code)).sort();
+	check(
+		JSON.stringify(lateral) === JSON.stringify(expected),
+		`profile: ${id} lateral keys ${lateral.join(' ')}`
+	);
+}
+// An index resting one column in: its home key costs nothing, F costs a reach,
+// G stops being lateral, and the home row still counts both.
+const shifted = { home: { li: 'KeyG' }, fingers: { KeyG: 'li' } };
+const onGShifted = E.analyse(byId.get('qwerty'), E.ngramsFromText('g'), { profile: shifted });
+const onFShifted = E.analyse(byId.get('qwerty'), E.ngramsFromText('f'), { profile: shifted });
+check(
+	onGShifted.metrics.distance === 0 && onFShifted.metrics.distance > 0,
+	'profile: the index home key moved to G'
+);
+check(
+	!E.keyboard('iso', shifted).lateral[E.keyboard('iso', shifted).index.get('KeyG')],
+	'profile: G is the home column'
+);
+check(onFShifted.metrics.home_row === 100, 'profile: F stays on the index home row');
+// A key given to another finger moves its load; a home row one row up counts
+// the top row as home.
+const ringOnV = E.analyse(byId.get('qwerty'), E.ngramsFromText('v'), {
+	profile: { fingers: { KeyV: 'lr' } }
+});
+check(ringOnV.fingers.lr === 100, 'profile: V pressed by the left ring finger');
+const topHome = {
+	home: {
+		lp: 'KeyQ',
+		lr: 'KeyW',
+		lm: 'KeyE',
+		li: 'KeyR',
+		ri: 'KeyU',
+		rm: 'KeyI',
+		rr: 'KeyO',
+		rp: 'KeyP'
+	}
+};
+const onR = E.analyse(byId.get('qwerty'), E.ngramsFromText('r'), { profile: topHome });
+check(onR.metrics.home_row === 100 && onR.metrics.distance === 0, 'profile: a home row one row up');
+const onV = E.analyse(byId.get('qwerty'), E.ngramsFromText('v'), { profile: topHome });
+check(
+	onV.metrics.bottom_row === 0 && onV.metrics.distance > 0,
+	'profile: V is two rows below that home row'
+);
+check(
+	E.analyse(byId.get('qwerty'), ngrams, { profile: {} }).score.total ===
+		E.analyse(byId.get('qwerty'), ngrams, {}).score.total,
+	'profile: an empty profile is the default'
+);
+for (const bad of [
+	{ fingers: { KeyQ: 'nose' } },
+	{ fingers: { NoKey: 'lp' } },
+	{ home: { li: 'KeyJ' } },
+	{ base: 'diagonal' }
+]) {
+	let threw = false;
+	try {
+		E.keyboard('iso', bad);
+	} catch {
+		threw = true;
+	}
+	check(threw, `profile: ${JSON.stringify(bad)} must throw`);
+}
+
 const ranked = E.compare([byId.get('qwerty'), byId.get('ergopti')], ngrams, {});
 check(ranked[0].layout.id === 'ergopti' && ranked[0].rank === 1, 'compare: Ergopti beats QWERTY');
 const flipped = E.rescore(ranked, Object.fromEntries(Object.keys(defaults).map((m) => [m, 0])));
