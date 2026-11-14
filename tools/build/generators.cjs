@@ -268,7 +268,11 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/analysis_data.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_don_quichotte.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_swann.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_don_quixote.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_don_quixote.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_nemolivier.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_autonomy.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_hello_world.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_punctuation.js'
 		]
 	},
 	{

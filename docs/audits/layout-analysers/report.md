@@ -584,3 +584,34 @@ With this table, Ergopti scores 53.8 %. It already has B, I and U on the left,
 but S (save) and F (find) are on the right. The weight stays at 0.15: on the
 French reference corpora `shortcut_left` is 5.6–5.7 % of Ergopti's absolute
 contributions, and 5.1 % on English. Both are inside the maintainer's 5–10 %.
+
+## 18. Corpus licences
+
+On 2026-11-14 the maintainer asked for every corpus in `static/corpus` to be
+usable in the analyser, with its attribution shown. Each text was audited.
+The register `static/corpus/register.json` keeps the source, licence,
+attribution, status and evidence of each one, and the codegen refuses to ship
+a text it does not clear.
+
+| Status  | Texts                                                                                                                                                                                                                                                                                     |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT, Hello World Collection)                                                                                   |
+| hold    | The two Leipzig samples (their licence is cited both as CC BY 4.0 and as CC BY-NC 4.0); the GLM project (co-author's consent); the eight KLAnext-style texts and Auxlang X (origin unconfirmed)                                                                                           |
+| refused | The 2003 e-mails (personal data, no licence); `romans.txt` as it stands (one contemporary author, an « all rights reserved » note, five unnamed translators, five Leblanc books still protected in the US); _Python for Everybody_ (CC BY-NC-SA 3.0, not compatible with the MIT project) |
+
+Notes:
+
+- _Autonomie_: the copy in the repository had lost every accent (9,945
+  U+FFFD characters). It was re-imported from the ISO-8859-1 original in the
+  bépo corpus archive. Its n-gram tables are shipped in their own file,
+  marked CC BY-SA 1.0 with the required credit. Jean-Michel Smith's name must
+  not be used to promote Ergopti.
+- The Hello World files are a 2004 snapshot. The collection's repository was
+  placed under MIT in 2017. Rebuilding the files from that repository would
+  remove the doubt.
+- The raw texts are already public in the GitHub repository. The maintainer
+  should decide whether to remove the e-mails (personal data) and the parts of
+  `romans.txt` that cannot be redistributed.
+
+Decided by the agent, to review by the maintainer: these statuses, and
+shipping the CC BY-SA and MIT tables with their notices.

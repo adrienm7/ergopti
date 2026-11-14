@@ -543,7 +543,8 @@
 			? t('layout_analysis.corpus.info', {
 					chars: format(corpus.builtin.characters, 0),
 					licence: corpus.builtin.licence,
-					source: corpus.builtin.source
+					// The attribution the licence requires, then where the text comes from.
+					source: `${corpus.builtin.attribution} — ${corpus.builtin.source}`
 				})
 			: corpus.host
 				? t('layout_analysis.corpus.private')

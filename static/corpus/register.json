@@ -1,0 +1,202 @@
+{
+	"_description": "Licence register of every text under static/corpus/original: what it is, where it comes from, its licence, the attribution it requires, and whether Ergopti ships its n-gram tables (status ship), waits for the maintainer (hold) or must not ship them (refused), with the evidence. The layout analysis codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) reads the licence and attribution of a built-in corpus from here, refuses to build one whose status is not ship, and refuses a text with no entry here. Audit of 2026-11-14, decided by the agent, to review by the maintainer.",
+	"schema_version": 1,
+	"audited": "2026-11-14",
+	"files": {
+		"original/autre/Auxlang_X.txt": {
+			"title": "Auxlang X",
+			"source": "Unknown",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Generated pseudo-words with no author or licence line; nothing found online. Held until the maintainer says where it came from."
+		},
+		"original/code/Chained Code Bigrams 7.txt": {
+			"title": "Chained Code Bigrams 7 (1 MB)",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/code/Programming Punctuation.txt": {
+			"title": "Programming Punctuation",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/code/Projet GLM sur R.txt": {
+			"title": "Projet – Modélisation GLM avec R (2022)",
+			"source": "Coursework by Adrien Moyaux and Jonathan Munier",
+			"licence": "None granted (co-authored)",
+			"attribution": "Adrien Moyaux and Jonathan Munier",
+			"status": "hold",
+			"note": "Co-owned with Jonathan Munier: ship once he agrees in writing."
+		},
+		"original/code/Python for Everybody.txt": {
+			"title": "Python for Everybody (Charles R. Severance)",
+			"source": "The book, py4e.com",
+			"url": "https://www.py4e.com",
+			"licence": "CC BY-NC-SA 3.0",
+			"attribution": "Charles R. Severance",
+			"status": "refused",
+			"note": "Lines 10–16: CC BY-NC-SA 3.0, which cannot go into the MIT project. The author invites permission requests (lines 8286–8320): ship only with his permission."
+		},
+		"original/code/corpus_johnix_prog.txt": {
+			"title": "Hello World programs in many languages",
+			"source": "« prog » of the bépo corpus by Johnix (a 2004 snapshot of the Hello World Collection)",
+			"url": "https://gitlab.com/wolframroesler/helloworld",
+			"licence": "MIT",
+			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
+			"status": "ship",
+			"note": "The collection's repository (gitlab.com/wolframroesler/helloworld) is MIT, « Copyright (c) 2017 Wolfram Rösler ». This 2004 snapshot predates that grant; rebuilding it from the MIT repository would remove the doubt (to review by the maintainer)."
+		},
+		"original/code/corpus_johnix_prog_epure.txt": {
+			"title": "Hello World programs, punctuation only",
+			"source": "« prog_epure » of the bépo corpus by Johnix (the « prog » file with its letters removed)",
+			"url": "https://gitlab.com/wolframroesler/helloworld",
+			"licence": "MIT",
+			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
+			"status": "ship",
+			"note": "Derived from corpus_johnix_prog.txt; same terms."
+		},
+		"original/en/500 Common Words in Prose.txt": {
+			"title": "500 Common Words in Prose",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/Chained English Bigrams 7.txt": {
+			"title": "Chained English Bigrams 7 (1 MB)",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/Chained English Bigrams 9.txt": {
+			"title": "Chained English Bigrams 9 (3 MB)",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/Chained Proglish Bigrams 7.txt": {
+			"title": "Chained Proglish Bigrams 7 (1 MB)",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/Common English Words.txt": {
+			"title": "Common English Words",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/Common SAT Words.txt": {
+			"title": "Common SAT Words",
+			"source": "Unconfirmed (likely KLAnext)",
+			"url": "https://klanext.keyboard-design.com",
+			"licence": "Unknown",
+			"attribution": "",
+			"status": "hold",
+			"note": "Synthetic text or word list with no author or licence line. Most likely one of KLAnext's built-in texts (the site's benchmarks page lists these exact names under « Analyse KLAnext »); klanext.keyboard-design.com could not be read to confirm. Held until the maintainer confirms the origin and its terms."
+		},
+		"original/en/don_quixote_ormsby.txt": {
+			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
+			"source": "Project Gutenberg ebook 996, as kept by Ergo-L",
+			"url": "https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en.txt",
+			"licence": "Public domain",
+			"attribution": "Miguel de Cervantes, translated by John Ormsby",
+			"status": "ship",
+			"note": "Translation published in 1885, translator died in 1895; no Project Gutenberg boilerplate left."
+		},
+		"original/fr/corpus_johnix_autonomy.txt": {
+			"title": "Autonomie, la liberté de pensée (J.-M. Smith, French translation)",
+			"source": "« autonomy » of the bépo corpus by Johnix (corpus-johnix.zip), re-imported from its ISO-8859-1 original",
+			"url": "https://cdn.bepo.fr/donnees/corpus/corpus-johnix.zip",
+			"licence": "CC BY-SA 1.0",
+			"attribution": "Jean-Michel Smith; French translation by Thomas Tempé, Frédéric Henry, Thibaud Choné, Germain Chazot and Cédric Corazza",
+			"status": "ship",
+			"note": "Lines 9 and 1485–1500 grant CC BY-SA 1.0, on condition that Jean-Michel Smith's name is not used to promote a derived work. The n-gram tables are shipped in their own file under CC BY-SA 1.0. The earlier copy had lost every accent (9,945 U+FFFD)."
+		},
+		"original/fr/corpus_johnix_mail.txt": {
+			"title": "French e-mails, 2003",
+			"source": "« mail » of the bépo corpus by Johnix",
+			"licence": "None granted",
+			"attribution": "",
+			"status": "refused",
+			"note": "Real e-mails with 34 addresses, named senders and phone numbers, and no licence: each sender owns their message and the file holds personal data. Not shipped; the maintainer should also decide whether the raw file stays in the public repository."
+		},
+		"original/fr/corpus_johnix_swann10.txt": {
+			"title": "Du côté de chez Swann (Marcel Proust, 1913)",
+			"source": "« swann10 » of the bépo corpus by Johnix (corpus-johnix.zip)",
+			"url": "https://cdn.bepo.fr/donnees/corpus/corpus-johnix.zip",
+			"licence": "Public domain",
+			"attribution": "Marcel Proust",
+			"status": "ship",
+			"note": "Proust died in 1922: public domain in France since about 1987 (50 years plus war extensions) and in the whole EU since 1 January 1993 at the latest."
+		},
+		"original/fr/corpus_nemolivier.txt": {
+			"title": "Balzac, Baudelaire, Lautréamont, Maupassant, Nerval, Roussel (anthology)",
+			"source": "Corpus compiled by Nemolivier, of the bépo community",
+			"url": "https://bepo.fr/wiki/Statistiques",
+			"licence": "Public domain",
+			"attribution": "Honoré de Balzac, Charles Baudelaire, Lautréamont, Guy de Maupassant, Gérard de Nerval (digitised by publie.net), Raymond Roussel",
+			"status": "ship",
+			"note": "Every author died by 1933 (Roussel: public domain in the EU since 1 January 2004; Locus Solus was published in 1914). Who compiled the file was not found online."
+		},
+		"original/fr/don_quichotte.txt": {
+			"title": "L'ingénieux chevalier Don Quichotte de la Manche (Cervantes, trad. Charles Furne)",
+			"source": "Project Gutenberg, as kept by Ergo-L",
+			"url": "https://github.com/Nuclear-Squid/ergol/tree/main/corpus",
+			"licence": "Public domain",
+			"attribution": "Miguel de Cervantes, translated by Charles Furne",
+			"status": "ship",
+			"note": "19th-century translation (the preface is signed « CH. FURNE. », line 243); no Project Gutenberg boilerplate left."
+		},
+		"original/fr/leipzig_fra_news_2023_10K-sentences.txt": {
+			"title": "10,000 sentences of French news, 2023",
+			"source": "Leipzig Corpora Collection (fra_news_2023_10K)",
+			"url": "https://wortschatz.uni-leipzig.de/en/download",
+			"licence": "Unconfirmed: CC BY 4.0 or CC BY-NC 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "hold",
+			"note": "Third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0; the terms page (wortschatz.uni-leipzig.de/en/usage) could not be read. Ship if the terms are CC BY 4.0."
+		},
+		"original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt": {
+			"title": "10,000 sentences of French Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (fra_wikipedia_2021_10K)",
+			"url": "https://wortschatz.uni-leipzig.de/en/download",
+			"licence": "Unconfirmed: CC BY 4.0 or CC BY-NC 4.0; the text is also Wikipedia's CC BY-SA",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
+			"status": "hold",
+			"note": "As the news sample; Wikipédia must be credited as well."
+		},
+		"original/fr/romans.txt": {
+			"title": "Novels from Ebooks libres et gratuits (24 MB)",
+			"source": "« romans.txt » of the bépo wiki corpus table, from www.ebooksgratuits.com",
+			"url": "https://bepo.fr/wiki/Corpus",
+			"licence": "Mixed",
+			"attribution": "",
+			"status": "refused",
+			"note": "Mostly public domain, but it contains Pierre Duc's contemporary « Autour de Bray » (« toute utilisation commerciale ou professionnelle est soumise à une demande d'autorisation », line 9604), a « Tous droits réservés © 2007 » note (line 2844), five Leblanc books of 1931–1935 still protected in the US, and five translations whose translator is not named. Shippable only as a cleaned subset."
+		}
+	}
+}

@@ -196,14 +196,35 @@ shows the credit and the link in each layout's details.
 
 ## Built-in corpora
 
-`_shared/layouts/data/analysis/corpora.json` lists the corpora free to
-redistribute (public domain): the French _Don Quichotte_ (Furne), Proust's _Du
-côté de chez Swann_ and the English _Don Quixote_ (Ormsby). The codegen counts
-their n-grams with the engine's own `ngramsFromText` and writes only the tables,
-one file per corpus (`_generated/corpus_<id>.js`, loaded when the corpus is
-chosen); `LAYOUT_ANALYSIS_DATA.corpora` lists them with their source, licence
-and size. The other texts of `static/corpus` are not offered until their
-licence is known.
+`static/corpus/register.json` is the licence register of every text under
+`static/corpus/original`. For each text it records what it is, its source, its
+licence, the attribution it requires, a status and the evidence. The status is
+`ship`, `hold` (waits for the maintainer) or `refused`.
+
+`_shared/layouts/data/analysis/corpora.json` lists the built-in corpora by
+file. Their licence, attribution and source are read from the register, so the
+register is the one source for them. The codegen enforces three rules:
+
+- it refuses a text with no register entry;
+- it refuses an entry with no text;
+- it refuses a built-in corpus whose status is not `ship`.
+
+The codegen counts the n-grams of each built-in corpus with the engine's own
+`ngramsFromText` and writes only the tables. Each corpus gets its own file,
+`_generated/corpus_<id>.js`, loaded when the corpus is chosen, with the
+licence and attribution in its header. `LAYOUT_ANALYSIS_DATA.corpora` lists
+the corpora with their licence, attribution, source and size, and the page
+shows them under the corpus picker.
+
+Shipped as of 2026-11-14:
+
+- _Don Quichotte_ (Furne), _Du côté de chez Swann_, _Don Quixote_ (Ormsby)
+  and the Nemolivier anthology: public domain.
+- _Autonomie_: CC BY-SA 1.0, re-imported from its ISO-8859-1 original.
+- The Hello World programs, with and without letters: MIT.
+
+The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
+is held or refused, and why.
 
 ## Layout file formats
 

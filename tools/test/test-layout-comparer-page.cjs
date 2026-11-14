@@ -132,6 +132,16 @@ for (const file of locales) {
 
 // 4/ Corpora
 check(DATA.corpora.length > 0, 'no built-in corpus');
+// Each shipped corpus shows the licence and attribution static/corpus/register.json records.
+for (const corpus of DATA.corpora)
+	check(
+		corpus.licence && corpus.attribution && corpus.source,
+		`corpus ${corpus.id}: no licence, attribution or source to show`
+	);
+check(
+	/attribution/.test(page.match(/function showCorpusInfo[\s\S]*?\n\t}/)[0]),
+	'the corpus line no longer shows the attribution'
+);
 for (const corpus of DATA.corpora)
 	check(
 		fs.existsSync(path.join(PAGE_DIR, corpus.script)),

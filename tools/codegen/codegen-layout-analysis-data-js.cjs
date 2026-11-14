@@ -10,6 +10,8 @@
  *   - _shared/layouts/data/analysis/score_weights.json (default weights);
  *   - _shared/layouts/data/analysis/layout_library.json (alphabetic blocks);
  *   - _shared/layouts/data/analysis/sources.json (the « i » references);
+ *   - _shared/layouts/data/analysis/corpora.json and static/corpus/register.json
+ *     (the built-in corpora and the licence of every corpus text);
  *   - _shared/layouts/data/keycodes/physical_keys.json (key geometry);
  *   - the registry layouts and the reference QWERTY and AZERTY, read through
  *     the layout composer model (tools/lib/layout-composer.cjs).
@@ -38,6 +40,11 @@ const MODEL_PATH = shared('layouts', 'data', 'analysis', 'analysis_model.json');
 const WEIGHTS_PATH = shared('layouts', 'data', 'analysis', 'score_weights.json');
 const LIBRARY_PATH = shared('layouts', 'data', 'analysis', 'layout_library.json');
 const CORPORA_PATH = shared('layouts', 'data', 'analysis', 'corpora.json');
+// The licence register of every text under static/corpus/original.
+const CORPUS_DIR = path.join(REPO_ROOT, 'static', 'corpus');
+const CORPUS_REGISTER_PATH = path.join(CORPUS_DIR, 'register.json');
+const SHIP_STATUS = 'ship';
+const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The values the « i » popovers explain besides the metrics.
@@ -76,6 +83,7 @@ const SOURCES = [
 	'layouts/data/analysis/corpora.json',
 	'layouts/data/analysis/layout_credits.json',
 	'layouts/data/analysis/sources.json',
+	'static/corpus/register.json',
 	'layouts/data/keycodes/physical_keys.json',
 	'../../layouts/registry (through layout_composer)'
 ];
@@ -321,6 +329,41 @@ function restoreDeadKeyPairs(text) {
 }
 
 /**
+ * The licence register, checked against the texts on disk.
+ * @returns {object} relative path → entry.
+ * @throws {Error} On a text with no entry, an entry with no text, an unknown
+ *   status, or a shippable entry without licence or attribution.
+ */
+function corpusRegister() {
+	const register = JSON.parse(fs.readFileSync(CORPUS_REGISTER_PATH, 'utf8')).files;
+	const onDisk = [];
+	const walk = (dir) => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else onDisk.push(path.relative(CORPUS_DIR, full).split(path.sep).join('/'));
+		}
+	};
+	walk(path.join(CORPUS_DIR, 'original'));
+	for (const file of onDisk)
+		if (!register[file])
+			throw new Error(
+				`static/corpus/register.json: no entry for ${file} (record its source and licence)`
+			);
+	for (const [file, entry] of Object.entries(register)) {
+		if (!onDisk.includes(file))
+			throw new Error(`static/corpus/register.json: ${file} does not exist`);
+		if (!REGISTER_STATUSES.includes(entry.status))
+			throw new Error(`static/corpus/register.json: ${file} has status ${entry.status}`);
+		if (entry.status === SHIP_STATUS && (!entry.licence || !entry.attribution || !entry.source))
+			throw new Error(
+				`static/corpus/register.json: ${file} ships without licence, attribution or source`
+			);
+	}
+	return register;
+}
+
+/**
  * The n-gram tables of every built-in corpus, counted by the engine itself.
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @returns {{catalogue: object[], tables: object}} The list the page shows and
@@ -328,9 +371,15 @@ function restoreDeadKeyPairs(text) {
  */
 function buildCorpora(engine) {
 	const manifest = JSON.parse(fs.readFileSync(CORPORA_PATH, 'utf8'));
+	const register = corpusRegister();
 	const catalogue = [];
 	const tables = {};
 	for (const corpus of manifest.corpora) {
+		const entry = register[path.posix.relative('static/corpus', corpus.file)];
+		if (!entry || entry.status !== SHIP_STATUS)
+			throw new Error(
+				`corpora.json: ${corpus.id} is not cleared to ship in static/corpus/register.json`
+			);
 		let text = fs.readFileSync(path.join(REPO_ROOT, corpus.file), 'utf8').replace(/\uFEFF/g, '');
 		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
 		const counts = engine.ngramsFromText(text);
@@ -348,8 +397,10 @@ function buildCorpora(engine) {
 			id: corpus.id,
 			title: corpus.title,
 			language: corpus.language,
-			licence: corpus.licence,
-			source: corpus.source,
+			licence: entry.licence,
+			attribution: entry.attribution,
+			source: entry.source,
+			url: entry.url || '',
 			characters,
 			script: `_generated/corpus_${corpus.id}.js`
 		});
@@ -407,7 +458,7 @@ function tableText(table, patterns) {
  * @param {object} table - Its tables.
  * @returns {string} JS source.
  */
-function corpusSource(id, table) {
+function corpusSource(id, table, licence) {
 	const patterns = scannerPatterns();
 	return [
 		`// _shared/ui/layout_analysis/_generated/corpus_${id}.js`,
@@ -420,6 +471,7 @@ function corpusSource(id, table) {
 		'',
 		'// The n-gram tables of one built-in corpus; the page loads this file when',
 		'// the corpus is chosen.',
+		`// Licence of these tables: ${licence.licence}. Attribution: ${licence.attribution}.`,
 		'// eslint-disable-next-line no-var',
 		'var LAYOUT_ANALYSIS_CORPORA = typeof LAYOUT_ANALYSIS_CORPORA === "object" ? LAYOUT_ANALYSIS_CORPORA : {};',
 		`LAYOUT_ANALYSIS_CORPORA[${JSON.stringify(id)}] = {"chars":${tableText(table.chars, patterns)},` +
@@ -553,7 +605,9 @@ function buildSource(data) {
 		'',
 		'// ==========================================',
 		'// AUTO-GENERATED — do not edit manually',
-		...SOURCES.map((s) => `// Source: ${s.startsWith('..') ? s : sharedRel(s)}`),
+		...SOURCES.map(
+			(s) => `// Source: ${s.startsWith('..') || s.startsWith('static/') ? s : sharedRel(s)}`
+		),
 		'// Run: npm run codegen:layout-analysis-data:js',
 		'// ==========================================',
 		'',
@@ -587,7 +641,14 @@ function main() {
 	const data = buildData();
 	fs.writeFileSync(OUT_PATH, buildSource(data));
 	for (const [id, table] of Object.entries(data.corpusTables))
-		fs.writeFileSync(path.join(CORPUS_OUT_DIR, `corpus_${id}.js`), corpusSource(id, table));
+		fs.writeFileSync(
+			path.join(CORPUS_OUT_DIR, `corpus_${id}.js`),
+			corpusSource(
+				id,
+				table,
+				data.corpora.find((corpus) => corpus.id === id)
+			)
+		);
 	console.log(`codegen:layout-analysis-data:js — wrote ${OUT_PATH}`);
 }
 
