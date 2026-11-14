@@ -148,9 +148,7 @@ helpers.describe("tap-hold storage: the one-shot timeout in config.toml (one-sho
 	end)
 
 	helpers.it("hands the engine the loaded timeout, not the registry constant (one-shot-timeout-setting)", function()
-		local source = assert(io.open(require("core.fs.engine.paths").driver_root() .. "/platform/remap/tap_hold_manager.lua", "r"))
-		local text = source:read("*a")
-		source:close()
+		local text = assert(helpers.read_module_source("platform.remap.tap_hold_manager"))
 		helpers.assert_true(text:find("one_shot_timeout_ms = loaded.one_shot_timeout_ms,", 1, true) ~= nil,
 			"the manager builds the engine from the loaded configuration")
 		helpers.assert_nil(text:find('one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms")', 1, true),

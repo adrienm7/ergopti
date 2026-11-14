@@ -116,7 +116,7 @@ helpers.describe("meta: every Lua source compiles", function()
 	-- The remap facade is the driver's largest chunk and sits at the 200-local
 	-- limit, so it is named on its own as well.
 	helpers.it("platform/remap/init.lua compiles within Lua's local-variable limit", function()
-		local chunk, err = loadfile(DRIVER_ROOT .. "platform/remap/init.lua")
+		local chunk, err = loadfile(assert(package.searchpath("platform.remap", package.path)))
 		helpers.assert_true(chunk ~= nil,
 			string.format("platform/remap/init.lua must compile (loadfile failed): %s", tostring(err)))
 	end)

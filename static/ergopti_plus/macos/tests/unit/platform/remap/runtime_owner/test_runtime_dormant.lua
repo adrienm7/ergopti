@@ -15,7 +15,6 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SourceFile = require("tests.support.source_file")
 
 local SHARED_CLI = "/Library/Application Support/org.pqrs/Karabiner-Elements/bin/karabiner_cli"
 
@@ -95,7 +94,7 @@ end)
 --- Reads the remap bridge source.
 --- @return string source
 local function init_source()
-	return assert(SourceFile.read(helpers.driver_root() .. "platform/remap/init.lua"))
+	return assert(helpers.read_module_source("platform.remap"))
 end
 
 helpers.describe("the remap bridge reaches the owned runtime only after an opt-in", function()

@@ -53,7 +53,7 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 		local orig_decode = _toml_stub.decode
 		_toml_stub.decode = function(_raw) return nil end
 
-		local data, err = Config._load_toml_file(helpers.driver_root() .. "platform/remap/config.lua")
+		local data, err = Config._load_toml_file(assert(package.searchpath("platform.remap.config", package.path)))
 		_toml_stub.decode = orig_decode
 
 		helpers.assert_nil(data, "corrupt TOML must return nil data")
@@ -113,7 +113,7 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 		_toml_stub.decode = function(_raw) return nil end
 
 		local state, status = Config.load_user_config(
-			{}, {}, helpers.driver_root() .. "platform/remap/config.lua")
+			{}, {}, assert(package.searchpath("platform.remap.config", package.path)))
 		_toml_stub.decode = orig_decode
 
 		-- A caller must receive no publishable state: otherwise init can deploy
