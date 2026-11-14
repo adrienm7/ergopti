@@ -114,13 +114,13 @@
 			<a
 				href="./"
 				onclick={closeMenu}
-				aria-label="Accéder à la page Ergopti"
+				aria-label="Accéder à la page d’accueil"
 				aria-current={isCurrent('/') ? 'page' : undefined}
 			>
 				<i class="icon-keyboard-duotone" style="margin-right:7px;">
 					<span class="path1"></span><span class="path2"></span>
 				</i>
-				<span class="title">Ergopti</span>
+				<span class="title">Accueil</span>
 			</a>
 			<a
 				href="ergopti-plus"
@@ -136,6 +136,17 @@
 				</span>
 			</a>
 			<a
+				href="studio"
+				onclick={closeMenu}
+				aria-label="Accéder à Ergopti Studio, l’éditeur de disposition"
+				aria-current={isCurrent('/studio') ? 'page' : undefined}
+			>
+				<i class="icon-keyboard-duotone" style="margin-right:7px;">
+					<span class="path1"></span><span class="path2"></span>
+				</i>
+				<span class="title">Studio</span>
+			</a>
+			<a
 				href="benchmarks"
 				onclick={closeMenu}
 				aria-label="Accéder à la page Benchmarks"
@@ -145,17 +156,6 @@
 					<span class="path1"></span><span class="path2"></span>
 				</i>
 				<span class="title" style="margin-top:3px;">Benchmarks</span>
-			</a>
-			<a
-				href="editeur"
-				onclick={closeMenu}
-				aria-label="Accéder à l’éditeur de disposition"
-				aria-current={isCurrent('/editeur') ? 'page' : undefined}
-			>
-				<i class="icon-keyboard-duotone" style="margin-right:7px;">
-					<span class="path1"></span><span class="path2"></span>
-				</i>
-				<span class="title">Éditeur</span>
 			</a>
 			<a
 				href="utilisation"

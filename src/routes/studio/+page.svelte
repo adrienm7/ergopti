@@ -1,10 +1,10 @@
-<!-- src/routes/editeur/+page.svelte -->
+<!-- src/routes/studio/+page.svelte -->
 
 <!--
 ==============================================================================
-MODULE: Layout Editor Page
+MODULE: Ergopti Studio Page
 DESCRIPTION:
-The website tab of the unified layout editor. It frames the shared editor
+Ergopti Studio, the website tab of the unified layout editor. It frames the shared editor
 page served as-is from static/ergopti_plus/_shared/ui/layout_editor/, the
 same code ErgoptiPlus mounts in its layout manager window, so the site and
 the app can never diverge. Files open with the browser's file picker and
@@ -23,22 +23,23 @@ save as downloads; nothing leaves the visitor's computer.
 </script>
 
 <svelte:head>
-	<title>Éditeur de disposition</title>
+	<title>Ergopti Studio</title>
 	<meta
 		name="description"
-		content="Créer ou modifier sa disposition de clavier, l’enregistrer en TOML Ergopti et l’exporter"
+		content="Ergopti Studio : créer ou modifier sa disposition de clavier, l’enregistrer en TOML Ergopti et l’exporter"
 	/>
 </svelte:head>
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
 		<bloc-introduction>
-			<h1>Éditeur de disposition</h1>
+			<h1>Ergopti Studio</h1>
 			<p>
-				Configurez votre propre disposition : couches, touches mortes, modificateurs, raccourcis et
-				couche de navigation. Ouvrez ou enregistrez le fichier source Ergopti (TOML), importez un
-				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. L’éditeur fonctionne
-				entièrement dans votre navigateur : aucun fichier n’est envoyé.
+				<strong>Ergopti Studio</strong> est l’éditeur de disposition du projet Ergopti. Configurez
+				votre propre disposition : couches, touches mortes, modificateurs, raccourcis et couche de
+				navigation. Ouvrez ou enregistrez le fichier source Ergopti (TOML), importez un
+				<code>.keylayout</code> et téléchargez ce que le générateur sait déjà produire. Ergopti Studio
+				fonctionne entièrement dans votre navigateur : aucun fichier n’est envoyé.
 			</p>
 			<ol class="layout-editor-steps">
 				<li>
@@ -67,7 +68,7 @@ save as downloads; nothing leaves the visitor's computer.
 
 	<iframe
 		class="layout-editor-frame"
-		title="Éditeur de disposition Ergopti"
+		title="Ergopti Studio"
 		src={editorSrc}
 		style="height:{EDITOR_HEIGHT_PX}px"
 	></iframe>

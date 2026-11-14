@@ -33,7 +33,7 @@ const SITE_ROUTES = Object.freeze([
 	'/utilisation',
 	'/informations',
 	'/benchmarks',
-	'/editeur',
+	'/studio',
 	'/ergopti-plus',
 	'/ergopti-plus-old'
 ]);

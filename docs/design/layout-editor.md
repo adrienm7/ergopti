@@ -35,7 +35,7 @@ layout as a file (Apple's built-in layouts have no `.keylayout`, an XKB keymap h
 is read only by `tools/lib/kbd-dll/reader.cjs`), so the panel says to open its `.keylayout` or `.toml` instead.
 Decided by the coordinator on 2026-11-11, to review by the maintainer.
 
-- **Website.** `src/routes/editeur/+page.svelte` frames `layout_editor/index.html` served from `static/`.
+- **Website.** `src/routes/studio/+page.svelte` (Ergopti Studio; `/editeur` redirects there) frames `layout_editor/index.html` served from `static/`.
 - **ErgoptiPlus, its own window on the three OS.** The editor has a window of its own,
   `layout_editor_window/index.html` (manifest id `layout_editor_window`, bridge `layout_editor_window_bridge`), which
   loads the same scripts and mounts the editor on the host's first `sourceData`. The menu's « Create or edit a

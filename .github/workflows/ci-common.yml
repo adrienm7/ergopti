@@ -453,6 +453,7 @@ jobs:
         run: |
           set -euo pipefail
           node tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"
+          node tools/test/browser/site-structure.playwright.cjs "$RUNNER_TEMP/received-site/site" "$BASE_PATH"
           mkdir "$RUNNER_TEMP/site-proof"
           cp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"
           cp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"

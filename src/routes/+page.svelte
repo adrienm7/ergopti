@@ -17,20 +17,22 @@
 	import IntroductionDisposition from './accueil/introduction_ergopti.svelte';
 	import EspaceInsecableAutomatique from './accueil/espace_insecable_automatique.svelte';
 	import DispositionPlus from './accueil/ergopti_plus.svelte';
+	import ProjetErgopti from './accueil/projet_ergopti.svelte';
 	import PageWrapper from './PageWrapper.svelte';
 </script>
 
 <svelte:head>
-	<title>Disposition Ergopti</title>
+	<title>Ergopti : Disposition Ergopti, Ergopti+ et Ergopti Studio</title>
 	<meta
 		name="description"
-		content="Ergopti, une disposition clavier ergonomique optimisée pour le français, l'anglais et le code"
+		content="Ergopti, le projet pour optimiser la frappe au clavier : la Disposition Ergopti, ergonomique et optimisée pour le français, l’anglais et le code, le logiciel Ergopti+ et l’éditeur Ergopti Studio"
 	/>
 </svelte:head>
 
 <PageWrapper>
 	<svelte:fragment slot="introduction">
 		<bloc-introduction>
+			<ProjetErgopti />
 			<IntroductionDisposition />
 		</bloc-introduction>
 	</svelte:fragment>
