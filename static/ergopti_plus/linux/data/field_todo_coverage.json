@@ -127,6 +127,12 @@
 				}
 			],
 			"condition": "The Bépo registry layout installed."
+		},
+		{
+			"id": "layout_editor_window",
+			"title": "Layout editor in its own window",
+			"checks": [],
+			"not_testable": "Opening, refocusing and closing a WebKitGTK window needs a person at the desktop: open « Create or edit a layout… » and the manager's « Layout editor », check one window comes back to the front with its unsaved work, then « Close »."
 		}
 	]
 }
