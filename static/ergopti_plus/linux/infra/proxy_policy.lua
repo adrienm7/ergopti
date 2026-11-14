@@ -16,8 +16,12 @@ local Reader = require("infra.regular_file_reader")
 local Json = require("core.text.engine.json")
 local SharedPolicy = require("core.network.engine.proxy_policy_core")
 local Override = require("core.network.engine.proxy_override")
+local Logger = require("core.logger.engine.shim")
+local LOG = "infra.proxy_policy"
 local initialized, policy, refusal = false, nil, nil
 local override_initialized, override, override_refusal = false, nil, nil
+-- Whether a refused stored override was already reported this session.
+local override_reported = false
 
 --- Reads one small shared JSON declaration through the native file owner.
 --- @param relative string Path under the shared tree.
@@ -54,7 +58,15 @@ end
 function M.override_choice()
 	local setting, reason = M.override_setting()
 	if not setting then return nil, reason end
-	return setting.parse(require("adapters.storage").get(setting.storage_key, nil))
+	local choice, parse_reason = setting.parse(require("adapters.storage").get(setting.storage_key, nil))
+	-- A refused stored value refuses every download, as on Windows and macOS;
+	-- it is reported once, by its key only (a relay may carry credentials).
+	if not choice and not override_reported then
+		override_reported = true
+		Logger.error(LOG, "The stored %s is refused (%s): downloads are refused until it is corrected.",
+			setting.storage_key, tostring(parse_reason))
+	end
+	return choice, parse_reason
 end
 
 --- Loads the shared canonical routing inventory exactly once.
