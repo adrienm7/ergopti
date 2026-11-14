@@ -53,6 +53,8 @@ const LINUX_PIN_RE = /driver_root\(\)\s*\.\.\s*["']([^"'\n]+)["']/g;
 
 // Windows directory pins — the argument is the one thing the helper hardcodes.
 const AHK_DIR_PIN_RE = /_DriverDirConcat\(\s*["']([^"'\n]+)["']/g;
+// _DriverDirsConcat("a", "b"): every argument is a directory pin.
+const AHK_DIRS_CALL_RE = /_DriverDirsConcat\(([^)\n]*)\)/g;
 
 // Windows file pins — a driver-relative .ahk path written as a string literal.
 const AHK_FILE_PIN_RE =
@@ -166,6 +168,9 @@ const TARGETS = [
 		skipRe: null,
 		pins: (src) => [
 			...extract(src, AHK_DIR_PIN_RE).map((p) => ({ pin: p, kind: 'ahk-dir' })),
+			...extract(src, AHK_DIRS_CALL_RE)
+				.flatMap((args) => [...args.matchAll(/["']([^"'\n]+)["']/g)].map((a) => a[1]))
+				.map((p) => ({ pin: p, kind: 'ahk-dir' })),
 			...extract(src, AHK_FILE_PIN_RE).map((p) => ({ pin: p, kind: 'file' }))
 		]
 	}

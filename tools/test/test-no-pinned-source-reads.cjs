@@ -98,7 +98,7 @@ const BASELINE = 22;
 //              behaviour tests; the count had drifted one above the baseline.)
 const READ_BASELINE = 171;
 
-const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirConcat/;
+const HELPER_RE = /_DriverSourceConcat|_DriverFuncBody|_DriverDirs?Concat/;
 // A quoted relative path into a driver SOURCE tree ending in .ahk, e.g.
 // "modules/keystats/x.ahk" or "..\\lib\\layout\\layout_altgr.ahk", plus the
 // driver entry point, which belongs to no sub-tree. `lib` is dead since the
