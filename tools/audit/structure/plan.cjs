@@ -326,9 +326,12 @@ function steps(map, done = committedSteps()) {
 		// the numbers the committed plan gave them, not their rank among the rest.
 		let id = `S${String(i + 1).padStart(2, '0')}`;
 		if (done.stepped) {
+			// A file dev added after the map was committed (S06 met
+			// windows/infra/value_check.ahk) joins the step its folder already
+			// has; a group no committed move numbers stays refused.
 			const ids = new Set(moves.map(([old]) => done.byOld.get(PREFIX + old)));
-			if (ids.size !== 1 || ids.has(undefined))
-				throw new Error(`step ${key}: the committed move map does not number it`);
+			ids.delete(undefined);
+			if (ids.size !== 1) throw new Error(`step ${key}: the committed move map does not number it`);
 			[id] = ids;
 		}
 		return { id, key, moves };

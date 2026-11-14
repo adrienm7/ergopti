@@ -164,6 +164,18 @@ function run() {
 		() => Plan.steps(new Map([['core/other.lua', 'core/z/other.lua']]), done),
 		/does not number it/
 	);
+	// A file added after the map was committed joins its folder's step.
+	const joined = Plan.steps(
+		new Map([
+			['core/crypto/y.lua', 'core/crypto/z/y.lua'],
+			['core/crypto/new.lua', 'core/crypto/z/new.lua']
+		]),
+		done
+	);
+	assert.deepEqual(
+		joined.map((s) => [s.id, s.moves.length]),
+		[['S02', 2]]
+	);
 	console.log(
 		'[OK] the phase 2 runner refuses without its go and owns the follow-ups of each step.'
 	);
