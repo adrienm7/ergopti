@@ -236,7 +236,7 @@ _CLW_BuildWindow(Channel, Request) {
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 	try {
-		; Reuse the shared session environment (infra/webview_utils.ahk) so no
+		; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {

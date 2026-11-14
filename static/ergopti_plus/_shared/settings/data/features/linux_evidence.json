@@ -624,7 +624,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/ui/error_dialog/bridge.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/webview/test_error_dialog_bridge.lua"
+				"static/ergopti_plus/linux/tests/unit/core/ui/webview/test_error_dialog_bridge.lua"
 			]
 		},
 		"shortcuts.chatgpt_url": {
@@ -785,7 +785,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/ui/tooltip/preview.lua",
+				"static/ergopti_plus/linux/core/ui/ui/tooltip/preview.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_triggers.lua"
 			]
 		},
@@ -815,10 +815,10 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
-				"static/ergopti_plus/linux/ui/tooltip/preview.lua",
+				"static/ergopti_plus/linux/core/ui/ui/tooltip/llm.lua",
+				"static/ergopti_plus/linux/core/ui/ui/tooltip/preview.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_triggers.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/tooltip/test_llm_overlay_shared_stack.lua"
+				"static/ergopti_plus/linux/tests/unit/core/ui/tooltip/test_llm_overlay_shared_stack.lua"
 			]
 		},
 		"llm.trigger.secure_filter_enabled": {
@@ -876,7 +876,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
-				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
+				"static/ergopti_plus/linux/core/ui/ui/tooltip/llm.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
@@ -890,7 +890,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
-				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
+				"static/ergopti_plus/linux/core/ui/ui/tooltip/llm.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
@@ -978,7 +978,7 @@
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
 				"static/ergopti_plus/linux/ui/prompt_editor/bridge.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_webview_manager.lua"
+				"static/ergopti_plus/linux/tests/unit/core/ui/editors/test_bridge_handlers_webview_manager.lua"
 			]
 		},
 		"llm.profiles.active": {

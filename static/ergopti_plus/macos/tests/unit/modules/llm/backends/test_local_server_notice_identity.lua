@@ -45,14 +45,14 @@ local OWNED_MODULES = {
 	"hotstrings.engine.catalogue.personal_files",
 	"infra.config_paths",
 	"core.timing.engine.deferred_work",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.fs.engine.dir",
 	"core.lifecycle.engine.launcher_environment",
 	"core.logger.engine.log_folders",
 	"core.logger.engine.logger",
 	"infra.manifest_menu",
 	"infra.manifest_reader",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"core.text.engine.utils",
 	"core.timing.engine.timings",
@@ -253,7 +253,7 @@ helpers.describe("local server notifications retain their originating view (loca
 	helpers.it("a model prompt cannot publish after its native entry is replaced", function()
 		with_notice(function(fixture, _, api, servers, world)
 			servers.report_failure("omlx", 404, "owned fixture missing model", "missing")
-			local port = package.loaded["infra.dialog_util"]
+			local port = package.loaded["core.ui.engine.dialog_util"]
 			port.text_prompt = function(_, _, _, ok_label)
 				api.set_entries({ { id = "successor", provider = "omlx", base_url = "",
 					token = "", model = "missing" } })
@@ -301,7 +301,7 @@ helpers.describe("local server notifications retain their originating view (loca
 					})
 				end
 				if stage == "prompt" then
-					package.loaded["infra.dialog_util"].text_prompt = function(_, _, _, ok_label)
+					package.loaded["core.ui.engine.dialog_util"].text_prompt = function(_, _, _, ok_label)
 						replace_agent()
 						return ok_label, "replacement"
 					end
@@ -330,7 +330,7 @@ helpers.describe("local server notifications retain their originating view (loca
 	for _, transition in ipairs({ "entries", "context" }) do
 		helpers.it("the invalid-address retry refuses " .. transition .. " replacement", function()
 			with_notice(function(_, panel, api, _, world, ctx)
-				local port = package.loaded["infra.dialog_util"]
+				local port = package.loaded["core.ui.engine.dialog_util"]
 				local original, prompts = port.text_prompt, 0
 				port.text_prompt = function(...)
 					prompts = prompts + 1

@@ -8,7 +8,7 @@
 --- ROOT CAUSE ENCODED:
 --- A native Cancel must remain nil rather than an accepted empty string. Real
 --- LuaJIT pipe close acknowledgements can be true despite a non-zero child exit;
---- ui/text_prompt.lua delegates that distinction to the checked shell owner.
+--- core/ui/ui/text_prompt.lua delegates that distinction to the checked shell owner.
 --- This integration test retains the real rendered tap-hold delay callback:
 --- cancellation never writes, while a confirmed 300 ms answer writes 0.3 s.
 --- ==============================================================================
@@ -155,7 +155,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local ok, err = pcall(function()
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
-			helpers.load_module("ui.text_prompt")
+			helpers.load_module("core.ui.ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil,
@@ -179,7 +179,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local ok, err = pcall(function()
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
-			helpers.load_module("ui.text_prompt")
+			helpers.load_module("core.ui.ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil, "a delay row must exist")

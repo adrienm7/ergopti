@@ -103,7 +103,7 @@ local function scenario(options, body)
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
 		})
-		package.loaded["infra.display_server"] = { is_x11 = function() return true end,
+		package.loaded["core.ui.engine.display_server"] = { is_x11 = function() return true end,
 			is_wayland = function() return false end, kind = function() return "x11" end }
 		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
@@ -708,7 +708,7 @@ do
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
-			put("infra.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
+			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
 			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("modules.hotstrings.injector", {
@@ -779,7 +779,7 @@ do
 			local hook = require("adapters.keyboard_hook")
 			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
 			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
-			local optional = { ["modules.llm.prediction_engine"] = prediction, ["ui.tooltip.llm"] = overlay,
+			local optional = { ["modules.llm.prediction_engine"] = prediction, ["core.ui.ui.tooltip.llm"] = overlay,
 			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
 			put("core.lifecycle.engine.runtime_guard", { optional_require = function(name) return optional[name] end,
 			  call = function(_, callback) return true, callback() end })

@@ -76,7 +76,7 @@ local function report(offer, ok, reason, detail, reload)
 	local message = ok and i18n.get(offer.texts.done)
 		or i18n.format(offer.texts.failed, tostring(detail or reason))
 	local committed = require("core.timing.engine.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get(offer.texts.title), message,
+		require("core.ui.engine.dialog_util").block_alert(i18n.get(offer.texts.title), message,
 			i18n.get("common.ok"))
 		if ok then reload() end
 	end, "owned_runtime_install.report")
@@ -96,7 +96,7 @@ local function open_offer(offer, remap, reload)
 	validate(remap, offer)
 	reload = reload or function() hs.reload() end
 	local confirm = i18n.get(offer.texts.confirm)
-	local clicked = require("infra.dialog_util").block_alert(i18n.get(offer.texts.title),
+	local clicked = require("core.ui.engine.dialog_util").block_alert(i18n.get(offer.texts.title),
 		i18n.get(offer.texts.body), confirm, i18n.get("common.later"), "informational")
 	if clicked ~= confirm then
 		Logger.info(LOG, "Owned runtime %s postponed.", offer.name)

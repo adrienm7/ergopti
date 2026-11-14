@@ -39,7 +39,7 @@ local KbShortcuts  = require("modules.shortcuts")
 local InputSourceConflict = require("modules.shortcuts.input_source_conflict")
 local ManifestMenu = require("infra.manifest_menu")
 local ShellRunner  = require("core.process.adapters.shell_runner")
-local dialog       = require("infra.dialog_util")
+local dialog       = require("core.ui.engine.dialog_util")
 
 local LOG = "menu.keyboard_slots"
 

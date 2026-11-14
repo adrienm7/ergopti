@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real window and observable fixture.
 local function with_window(scenario)
 	local names = {
-		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
+		"ui.download_window", "ui.download_window.javascript", "core.ui.ui.builder",
 		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.timing.engine.timings", "core.i18n.engine.i18n",
 		"core.text.engine.utils",
 		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
@@ -46,7 +46,7 @@ local function with_window(scenario)
 		end,
 		delete = noop,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 460, height = 380 } end,
 		show_webview = function(opts)
 			fixture.navigation = opts.on_navigation

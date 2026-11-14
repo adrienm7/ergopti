@@ -107,7 +107,7 @@ helpers.describe("category submenu: its rows", function()
 					if outcome == "nil" then return nil end
 					return outcome == "true"
 				end
-				local execute, modal = os.execute, require("ui.modal")
+				local execute, modal = os.execute, require("core.ui.ui.modal")
 				local run, asked, modals = modal.run, {}, 0
 				modal.run = function(callback) modals = modals + 1; return callback() end
 				local called, result = pcall(function()
@@ -365,7 +365,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		error("the native hc section row was not rendered")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -540,7 +540,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		error("the extension provider did not draw the direct bound hc section")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)

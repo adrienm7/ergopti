@@ -133,7 +133,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			update_channel = "dev",
 			update_check_interval_seconds = 3600,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 		package.loaded["core.text.engine.utils"] = {
 			escape_gsub_replacement = function(value) return value end,
@@ -302,8 +302,8 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		})
 
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -340,7 +340,7 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local switch_ctx = nil
 		local startup_ctx = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
 		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())

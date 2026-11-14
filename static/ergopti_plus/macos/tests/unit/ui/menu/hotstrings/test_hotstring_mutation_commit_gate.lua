@@ -34,8 +34,8 @@ end
 --- @return table hotstrings
 --- @return any previous_notifications
 local function load_provider(calls)
-	local previous_notifications = package.loaded["infra.notifications"]
-	package.loaded["infra.notifications"] = {
+	local previous_notifications = package.loaded["core.ui.engine.notifications"]
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_title, _body, kind)
 			helpers.assert_eq(kind, "error")
 			calls.error_notices = calls.error_notices + 1
@@ -108,7 +108,7 @@ local function click_category_scope(outcome)
 	helpers.assert_eq(type(command and command.fn), "function",
 		"the explicit command below the submenu parent must be user-reachable")
 	local ok, err = pcall(command.fn)
-	package.loaded["infra.notifications"] = previous_notifications
+	package.loaded["core.ui.engine.notifications"] = previous_notifications
 	package.loaded["ui.menu.keymap_lifecycle"] = nil
 	helpers.assert_true(ok, "a reachable menu callback must contain mutation throws: " .. tostring(err))
 	helpers.assert_eq(calls.targets, { "alpha" })
@@ -140,8 +140,8 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 				error_notices = 0,
 				updates = 0,
 			}
-			local previous_notifications = package.loaded["infra.notifications"]
-			package.loaded["infra.notifications"] = {
+			local previous_notifications = package.loaded["core.ui.engine.notifications"]
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(_title, _body, kind)
 					helpers.assert_eq(kind, "error")
 					calls.error_notices = calls.error_notices + 1
@@ -184,7 +184,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			helpers.assert_eq(type(action), "function",
 				"the custom section row must be reachable below the submenu parent")
 			local ok, err = pcall(action)
-			package.loaded["infra.notifications"] = previous_notifications
+			package.loaded["core.ui.engine.notifications"] = previous_notifications
 			package.loaded["ui.menu.keymap_lifecycle"] = nil
 			helpers.assert_true(ok, "custom section callback must contain mutation throws: " .. tostring(err))
 			helpers.assert_eq(calls.mutations, 1)
@@ -239,7 +239,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 
 		local action = hotstrings.build_language_bulk_actions(ctx, { "alpha", "beta" })[1].action
 		local ok, err = pcall(action)
-		package.loaded["infra.notifications"] = previous_notifications
+		package.loaded["core.ui.engine.notifications"] = previous_notifications
 		package.loaded["ui.menu.keymap_lifecycle"] = nil
 		helpers.assert_true(ok, "language callback must contain a failed batch: " .. tostring(err))
 		helpers.assert_eq(calls.mutations, 1,

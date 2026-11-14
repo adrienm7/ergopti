@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 
 --- Installs the non-native dependencies used by script control.
 local function install_dependency_stubs()
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["infra.keycodes"] = {
 		F13_KARABINER_RETURN = 0x6A,
 		F14_KARABINER_BACKSPACE = 0x6B,

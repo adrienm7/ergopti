@@ -57,7 +57,7 @@ local function report(ok, reason, reload)
 		or i18n.format("karabiner.vhid_update.failed", tostring(reason))
 	local committed = require("core.timing.engine.deferred_work").after(0, function()
 		local shown, err = pcall(function()
-			require("infra.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"), message,
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"), message,
 				i18n.get("common.ok"))
 		end)
 		if not shown then Logger.error(LOG, "The driver update result could not be shown: %s.", tostring(err)) end
@@ -90,7 +90,7 @@ function M.open(remap, reload)
 		return false
 	end
 	local confirm = i18n.get("karabiner.vhid_update.confirm")
-	local clicked = require("infra.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"),
+	local clicked = require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.vhid_update.title"),
 		i18n.format("karabiner.vhid_update.body", version), confirm, i18n.get("common.later"), "warning")
 	if clicked ~= confirm then
 		Logger.info(LOG, "VirtualHIDDevice driver update to %s postponed.", version)

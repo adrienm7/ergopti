@@ -18,8 +18,8 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel runtime identity transaction", function()
 	helpers.it("(api-panel-runtime-identity) (no-model-runtime) (remote-identity-generation) resets visible predictions before changing entry identity", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
 		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
@@ -61,8 +61,8 @@ helpers.describe("API panel runtime identity transaction", function()
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.notifications"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = {}
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
@@ -146,8 +146,8 @@ helpers.describe("API panel runtime identity transaction", function()
 	-- label an earlier build stored is not read.
 	helpers.it("lists entries by their automatic name only", function()
 		local module_names = {
-			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
 		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
@@ -169,8 +169,8 @@ helpers.describe("API panel runtime identity transaction", function()
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.notifications"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = {}
 		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,

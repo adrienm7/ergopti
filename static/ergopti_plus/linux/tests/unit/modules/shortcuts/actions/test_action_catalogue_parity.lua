@@ -85,11 +85,11 @@ local function with_recorded_shell(body, native_webview)
 	local real_execute, real_popen = os.execute, io.popen
 	os.execute = function() return true end
 	io.popen = function() return nil end
-	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
+	local saved_webview = package.loaded["core.ui.ui.webview_manager"]
+	package.loaded["core.ui.ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
-	package.loaded["ui.webview_manager"] = saved_webview
+	package.loaded["core.ui.ui.webview_manager"] = saved_webview
 	if not ok then error(err, 0) end
 end
 
@@ -255,7 +255,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("greys an action whose requirement is proven absent, with the reason", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local M = recording_manager()
 		Display._set_for_test(Display.WAYLAND, "gnome")
 		local ok, items
@@ -283,7 +283,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("greys the folder actions with the reason when no file manager publishes its folder", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local Shell = require("core.process.adapters.shell_runner")
 		local M = recording_manager()
 		local function rows(nautilus)
@@ -339,7 +339,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("names the missing tool when a desktop could wrap without it", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local M = recording_manager()
 		Display._set_for_test(Display.X11, "xfce")
 		local ok, items
@@ -356,7 +356,7 @@ helpers.describe("action picker items (Linux)", function()
 	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
 		local name = "modules.gestures.workspace_switcher"
 		local saved = package.loaded[name]
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		Display._set_for_test(Display.X11, "xfce")
 		local ok, err = pcall(function()
 			local stale = helpers.load_module_with_dependency(name, "core.process.adapters.shell_runner", {
@@ -485,7 +485,7 @@ end)
 helpers.describe("Cursor-window native picker admission", function()
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("uses actual GNU timeout admission in the picker: " .. receipt, function()
-			local Display = require("infra.display_server")
+			local Display = require("core.ui.engine.display_server")
 			local Runner = require("core.process.adapters.program_runner")
 			local Shell = require("core.process.adapters.shell_runner")
 			local previous = Display.kind()

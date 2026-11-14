@@ -253,19 +253,19 @@ helpers.describe("LLM API persistence transaction", function()
 					end
 				end
 				remote.check_availability = function(_, callback) callback(); return true end
-				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "infra.dialog_util",
-					"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications" }, function()
+				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "core.ui.engine.dialog_util",
+					"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications" }, function()
 					local prompts, updates, warmups = 0, 0, 0
 					local notices = {}
 					package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-					package.loaded["infra.dialog_util"] = {
+					package.loaded["core.ui.engine.dialog_util"] = {
 						text_prompt = function()
 							prompts = prompts + 1
 							return "button.ok", ({ "http://127.0.0.1:8000/v1", "inert-form-secret", "selected-model" })[prompts]
 						end,
 						block_alert = function() return "button.cancel" end,
 					}
-					package.loaded["infra.notifications"] = { notify = function(_, _, kind)
+					package.loaded["core.ui.engine.notifications"] = { notify = function(_, _, kind)
 						notices[#notices + 1] = kind
 						return true
 					end }

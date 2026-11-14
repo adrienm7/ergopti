@@ -216,9 +216,9 @@ end)
 
 --- Loads window_info under a Wayland desktop with a shell that records commands.
 local function wayland_window_info(desktop)
-	local display = helpers.load_module("infra.display_server")
+	local display = helpers.load_module("core.ui.engine.display_server")
 	display._set_for_test(display.WAYLAND, desktop)
-	package.loaded["infra.display_server"] = display
+	package.loaded["core.ui.engine.display_server"] = display
 	local shell = helpers.load_module("core.process.adapters.shell_runner")
 	local commands = {}
 	shell._set_runner(function(command)
@@ -304,9 +304,9 @@ helpers.describe("compositor_focus: window_info join", function()
 
 	for _, case in ipairs({ { "x11", "GNOME" }, { "x11", "COSMIC" }, { "wayland", "sway" } }) do
 		helpers.it("(wayland-desktop-focus) starts nothing on " .. case[1] .. " " .. case[2], function()
-			local display = helpers.load_module("infra.display_server")
+			local display = helpers.load_module("core.ui.engine.display_server")
 			display._set_for_test(case[1], case[2])
-			package.loaded["infra.display_server"] = display
+			package.loaded["core.ui.engine.display_server"] = display
 			local window_info = helpers.load_module("adapters.window_info")
 			window_info._reset_state()
 			local started = false

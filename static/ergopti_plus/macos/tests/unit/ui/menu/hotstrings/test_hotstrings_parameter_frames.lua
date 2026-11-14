@@ -418,7 +418,7 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 			set[#set + 1] = { "tap_hold", value }; tap_hold = value; return true
 		end
 		f.context.do_reload = function() return true end
-		local dialog = require("infra.dialog_util")
+		local dialog = require("core.ui.engine.dialog_util")
 		local prompt, alert = dialog.text_prompt, dialog.block_alert
 		local alerts = 0
 		dialog.text_prompt = function() return f.captions("button.ok"), prompt_answer end

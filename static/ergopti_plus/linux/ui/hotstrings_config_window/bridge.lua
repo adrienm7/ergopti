@@ -319,7 +319,7 @@ local function push_state(state, context)
 		return false
 	end
 
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push setData(): webview_manager.eval_js is unavailable.")
 		return false
@@ -350,7 +350,7 @@ local function set_override(state, category, section, field, value, context)
 	local rendered, manager
 	if PersonalFiles.components(category) then
 		rendered = _rendered_personal
-		manager = require("ui.webview_manager")
+		manager = require("core.ui.ui.webview_manager")
 		if not rendered or rendered.state ~= state or rendered.config ~= state.config
 			or not window_current(context, manager) or rendered.epoch ~= context.epoch then return false end
 		local binding = rendered.bindings[category]
@@ -514,7 +514,7 @@ function M.on_message(payload, state, context)
 			-- No `or "#……"` here. The colour comes from the shared defaults, which
 			-- the config module loads fail-fast; substituting a literal would repaint
 			-- the user's categories a shade nothing else in the product uses.
-			local manager = require("ui.webview_manager")
+			local manager = require("core.ui.ui.webview_manager")
 			local setter = config.set_override
 			local function owned()
 				return state.config == config and config.set_override == setter
@@ -568,7 +568,7 @@ function M.on_message(payload, state, context)
 			for id in pairs(categories) do
 				if PersonalFiles.components(id) then
 					Logger.error(LOG, "Reset all refused: personal-file metadata cannot be reset atomically.")
-					local manager = require("ui.webview_manager")
+					local manager = require("core.ui.ui.webview_manager")
 					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
 						pcall(state.notify_error, "hs_config.reset_all_personal_unavailable")
 					end
@@ -576,7 +576,7 @@ function M.on_message(payload, state, context)
 				end
 			end
 			local config, clear = state.config, state.config.clear_override
-			local manager = require("ui.webview_manager")
+			local manager = require("core.ui.ui.webview_manager")
 			local function reset_one(id, section)
 				if state.config ~= config or config.clear_override ~= clear
 					or context ~= nil and not window_current(context, manager) then return false end

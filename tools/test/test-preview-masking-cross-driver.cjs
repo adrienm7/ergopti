@@ -141,7 +141,7 @@ for (const driver of DRIVERS) {
 const SEPARATOR = ' ' + String.fromCodePoint(0x21e5) + ' ';
 const SEPARATOR_PRODUCERS = [
 	{ label: 'linux', rel: 'static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua' },
-	{ label: 'linux-bubble', rel: 'static/ergopti_plus/linux/ui/tooltip/preview.lua' },
+	{ label: 'linux-bubble', rel: 'static/ergopti_plus/linux/core/ui/ui/tooltip/preview.lua' },
 	{ label: 'macos', rel: 'static/ergopti_plus/macos/modules/dynamic_hotstrings/personal_info.lua' },
 	{ label: 'windows', rel: 'static/ergopti_plus/windows/infra/personal_info_preview.ahk' }
 ];

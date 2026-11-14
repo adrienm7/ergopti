@@ -26,8 +26,8 @@ local MODULES = {
 	"modules.llm",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.dialog_util",
-	"infra.notifications",
+	"core.ui.engine.dialog_util",
+	"core.ui.engine.notifications",
 	"infra.manifest_menu",
 	"ui.menu.menu_llm.api_panel",
 }
@@ -86,7 +86,7 @@ local function run_add_fixture(provider, prompt_result)
 			warn = function() end,
 			error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(title, hint, default_val)
 				prompt_calls = prompt_calls + 1
 				prompt_texts[prompt_calls] = { title = title, hint = hint, default = default_val }
@@ -96,7 +96,7 @@ local function run_add_fixture(provider, prompt_result)
 				return "button.cancel"
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, text) notified[#notified + 1] = text; return true end,
 		}
 		local command_renderer = assert(require("menu.engine.renderer").new({

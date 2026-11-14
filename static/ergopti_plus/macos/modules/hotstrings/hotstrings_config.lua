@@ -1639,7 +1639,7 @@ end
 --- three hard-fallback constants from the single cross-driver source. A missing
 --- file, section, or key raises an error (fail fast — no driver-side literal).
 --- The path is resolved relative to THIS file (cwd-independent), mirroring
---- ui/tooltip/config.lua, so it behaves identically in production and in the
+--- core/ui/ui/tooltip/config.lua, so it behaves identically in production and in the
 --- headless unit harness (where the module is re-required per test).
 local function load_shared_defaults()
 	-- Resolved through the single shared-tree resolver (Paths.shared) so the

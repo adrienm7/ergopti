@@ -50,9 +50,9 @@ local function with_window(module_name, scenario)
 				return { setCallback = function(self) return self end }
 			end } },
 		}
-		package.loaded["ui.ui_builder"] = nil
-		local real_builder = require("ui.ui_builder")
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = nil
+		local real_builder = require("core.ui.ui.builder")
+		package.loaded["core.ui.ui.builder"] = {
 			force_focus = real_builder.force_focus,
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end,

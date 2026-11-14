@@ -153,9 +153,9 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			local _, state = install_hs_stubs()
 			package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 			package.loaded["ui.model_browser"] = nil
-			package.loaded["ui.ui_builder"] = nil
+			package.loaded["core.ui.ui.builder"] = nil
 			local browser = require("ui.model_browser")
-			local builder = require("ui.ui_builder")
+			local builder = require("core.ui.ui.builder")
 			local show_webview = builder.show_webview
 			builder.show_webview = function(options)
 				state.factory_options = options
@@ -176,7 +176,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local bridge, state = install_hs_stubs()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local browser = require("ui.model_browser")
 		local received, answers = {}, { false, true }
 		helpers.assert_true(browser.open({
@@ -202,7 +202,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local bridge, state = install_hs_stubs()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local browser = require("ui.model_browser")
 		local calls = {}
 		local function context(name)
@@ -231,7 +231,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local bridge, state = install_hs_stubs()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local browser = require("ui.model_browser")
 		local selected, urls, payloads = {}, {}, {}
 		local debug_messages = {}
@@ -284,7 +284,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local bridge, state = install_hs_stubs()
 		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local browser = require("ui.model_browser")
 		local context = { presets = {}, active_backend = "mlx" }
 		helpers.assert_true(browser.open(context))
@@ -311,7 +311,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 				errors[#errors + 1] = string.format(fmt, ...)
 			end
 			package.loaded["ui.model_browser"] = nil
-			package.loaded["ui.ui_builder"] = nil
+			package.loaded["core.ui.ui.builder"] = nil
 			local browser = require("ui.model_browser")
 			helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
 			state.webviews[1].evaluateJavaScript = function(self, _, callback)
@@ -341,7 +341,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			end,
 		}
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local browser = require("ui.model_browser")
 		helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
 		helpers.assert_type(fallback, "function")
@@ -360,7 +360,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
 
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"]    = nil
+		package.loaded["core.ui.ui.builder"]    = nil
 		local ModelBrowser = require("ui.model_browser")
 
 		local selected_name = nil
@@ -390,7 +390,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
 
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"]    = nil
+		package.loaded["core.ui.ui.builder"]    = nil
 		local ModelBrowser = require("ui.model_browser")
 
 		local selected_name = nil
@@ -435,7 +435,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local get_bridge_callback, state = install_hs_stubs()
 
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"]    = nil
+		package.loaded["core.ui.ui.builder"]    = nil
 		local ModelBrowser = require("ui.model_browser")
 
 		local attempts = 0
@@ -469,7 +469,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	helpers.it("blocks browser reuse until an ambiguous native delete settles", function()
 		local get_bridge_callback, state = install_hs_stubs()
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local ModelBrowser = require("ui.model_browser")
 		local selections = 0
 		local context = {
@@ -505,7 +505,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 	helpers.it("does not publish a browser closed synchronously during construction", function()
 		local _, state = install_hs_stubs()
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local ModelBrowser = require("ui.model_browser")
 		local context = {
 			presets = {},
@@ -533,7 +533,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			end,
 		}
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local ModelBrowser = require("ui.model_browser")
 		local function context(model)
 			return { presets = {}, active_backend = "mlx", active_model = model }
@@ -562,7 +562,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			after = function() return true end,
 		}
 		package.loaded["ui.model_browser"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		local ModelBrowser = require("ui.model_browser")
 		local function context(model)
 			return { presets = {}, active_backend = "mlx", active_model = model }

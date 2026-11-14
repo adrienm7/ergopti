@@ -8,7 +8,7 @@ local DF_OUTPUT = "Filesystem 512-blocks Used Available Capacity Mounted\n/dev/d
 local MODULES = {
 	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.fs.engine.paths", "core.timing.engine.timings",
@@ -113,7 +113,7 @@ local function with_fixture(callback)
 				return true, run.handle
 			end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				fixture.dialogs = fixture.dialogs + 1
 				fixture.child_present_during_dialog =

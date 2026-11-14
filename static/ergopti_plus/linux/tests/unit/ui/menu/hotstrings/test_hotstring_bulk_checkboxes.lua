@@ -154,7 +154,7 @@ helpers.describe("word delimiter admission", function()
 		end
 		local add = find(menu)
 		helpers.assert_true(add ~= nil)
-		local modal = require("ui.modal")
+		local modal = require("core.ui.ui.modal")
 		local previous, execute, calls, command = modal.run, os.execute, 0, nil
 		os.execute = function(text) command = text; return true end
 		modal.run = function(fn)
@@ -268,7 +268,7 @@ end)
 
 --- Records the existing keyboard-released dialog owner and restores all wrappers.
 local function with_bulk_error_receipts(body)
-	local Modal = require("ui.modal")
+	local Modal = require("core.ui.ui.modal")
 	local modal_run, execute = Modal.run, os.execute
 	local inside, notices, releases = false, {}, 0
 	Modal.run = function(callback)

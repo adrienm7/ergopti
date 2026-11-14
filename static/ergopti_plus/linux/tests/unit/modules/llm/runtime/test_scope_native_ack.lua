@@ -40,9 +40,9 @@ helpers.describe("LLM scope native acknowledgements", function()
 	end
 
 	helpers.it("retains an offer when its actual renderer refuses to hide", function()
-		isolated({ "ui.tooltip.llm", "modules.llm.display_settings" }, function()
+		isolated({ "core.ui.ui.tooltip.llm", "modules.llm.display_settings" }, function()
 			package.loaded["modules.llm.display_settings"] = { get = function() return false end }
-			local overlay = require("ui.tooltip.llm")
+			local overlay = require("core.ui.ui.tooltip.llm")
 			local refused = true
 			overlay.init({ style = {}, renderer = {
 				show = function() return true end,
@@ -58,7 +58,7 @@ helpers.describe("LLM scope native acknowledgements", function()
 	end)
 
 	helpers.it("requires native GTK hide readback and retains a failed window for retry", function()
-		isolated({ "adapters.graphics_renderer", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.tint" }, function()
+		isolated({ "core.ui.adapters.graphics_renderer", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.tint" }, function()
 			package.loaded["core.ui.engine.tooltip.layout"] = { compute_position = function() return { x = 0, y = 0 } end }
 			package.loaded["core.ui.engine.tooltip.tint"] = { mix = function() return {} end }
 			local visible, refuse, raises, on_hide, on_show, refuse_show = true, true, false, nil, nil, false
@@ -72,7 +72,7 @@ helpers.describe("LLM scope native acknowledgements", function()
 					if not refuse then if on_hide then on_hide() end; visible = false end
 				end,
 			}, { __index = function() return noop end })
-			local renderer = require("adapters.graphics_renderer")
+			local renderer = require("core.ui.adapters.graphics_renderer")
 			renderer._set_binding_for_test({ Gtk = { Window = function() return window end },
 				Pango = { FontDescription = { from_string = function() return { set_size = noop } end } },
 				PangoCairo = { create_layout = function() return { set_font_description = noop,
@@ -81,7 +81,7 @@ helpers.describe("LLM scope native acknowledgements", function()
 			})
 			local options = { style = {
 				fonts = { main = "sans" }, sizes = { main = 12 },
-				-- Every key the shipped config requires (ui/tooltip/config.lua), the
+				-- Every key the shipped config requires (core/ui/ui/tooltip/config.lua), the
 				-- shortcut column's two included.
 				layout = { pad_x = 1, pad_y = 1, line_spacing = 1, label_gap = 1, llm_max_content_width = 100 },
 				positioning = {}, tint = {}, colors = { bg = {} },

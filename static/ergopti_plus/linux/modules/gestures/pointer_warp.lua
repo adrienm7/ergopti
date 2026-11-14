@@ -140,7 +140,7 @@ end
 --- @return number|nil x
 --- @return number|nil y
 function M.read_state(action)
-	if require("infra.display_server").is_wayland() then
+	if require("core.ui.engine.display_server").is_wayland() then
 		Logger.error(LOG, "%s: a Wayland session lets no program move the pointer.", action)
 		return nil
 	end

@@ -180,7 +180,7 @@ package.loaded["infra.keycodes"] = {
 
 -- Stub ui.tooltip — set_navigate_callback and set_enter_validates are called
 -- at module load time (lines 879-881 of prediction_engine.lua).
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,
@@ -225,7 +225,7 @@ local function load_real_setting_bridge()
 			to_name = function() return "f16" end,
 		},
 		["modules.keystats"] = {},
-		["ui.tooltip"] = {},
+		["core.ui.ui.tooltip"] = {},
 		["modules.keymap.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
 		["modules.keymap.expander"] = {},
@@ -287,11 +287,11 @@ helpers.describe("prediction_engine — module surface", function()
 
 	helpers.it("calls tooltip.hide_forced immediately on reset (e.g. after prediction apply)", function()
 		local tt_hidden_forced = false
-		local old_hide_forced = package.loaded["ui.tooltip"].hide_forced
-		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
+		local old_hide_forced = package.loaded["core.ui.ui.tooltip"].hide_forced
+		package.loaded["core.ui.ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
 		PE.reset()
 		helpers.assert_true(tt_hidden_forced, "tooltip.hide_forced must be called on reset")
-		package.loaded["ui.tooltip"].hide_forced = old_hide_forced
+		package.loaded["core.ui.ui.tooltip"].hide_forced = old_hide_forced
 	end)
 end)
 
@@ -956,7 +956,7 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 
 	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
 		local core = package.loaded["modules.llm"]
-		local tooltip = package.loaded["ui.tooltip"]
+		local tooltip = package.loaded["core.ui.ui.tooltip"]
 		local warmup = package.loaded["modules.llm.warmup_controller"]
 		local previous_model = core.get_current_model
 		local previous_backend = core.get_backend
@@ -1122,7 +1122,7 @@ helpers.describe("prediction_engine: turning the AI preview off tears the state 
 
 	helpers.it("hides forcibly rather than with the soft hide the dismiss contract forbids", function()
 		local calls = {}
-		local tt = package.loaded["ui.tooltip"]
+		local tt = package.loaded["core.ui.ui.tooltip"]
 		local old_hide, old_forced = tt.hide, tt.hide_forced
 		tt.hide        = function() calls[#calls + 1] = "hide"; return true end
 		tt.hide_forced = function() calls[#calls + 1] = "hide_forced"; return true end
@@ -1174,7 +1174,7 @@ local function with_backend_label_composition(target, refuse_menu, body)
 		"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
-		"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
+		"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 		"core.timing.engine.deferred_work", "modules.llm.backend_detector",
 	}
 	helpers.with_fresh_modules(names, function()

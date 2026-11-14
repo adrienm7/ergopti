@@ -680,7 +680,7 @@ _DriverExtractDefinedBody(&Src, Definition) {
 
 ; Reads every .ahk under a windows/-relative directory (recursive), concatenated
 ; into one string. Use for source-introspection tests that scan a specific
-; module's files (e.g. "ui/tooltip") regardless of how that module is internally
+; module's files (e.g. "core/ui/ui/tooltip") regardless of how that module is internally
 ; split into sub-files. RelDir uses forward slashes.
 ;
 ; THROWS when any selected file is unreadable or the directory holds no .ahk

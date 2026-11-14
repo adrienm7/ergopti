@@ -20,7 +20,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local epoch,serial,callback,backend,picker,lastjs=0,0,nil,nil,nil,nil
 		package.loaded['modules.gestures.manager']=catalogue
 		package.loaded['ui.action_picker.bridge']={open=function(_,confirm)picker=confirm;return true end}
-		package.loaded['ui.webview_manager']={native_available=function()return true end,current_epoch=function()return epoch>0 and epoch or nil end,page_current=function(_,exact)return epoch>0 and epoch==exact end,show=function()serial=serial+1;epoch=serial;return backend.on_window_acquiring(epoch) end,hide=function(_,exact)if exact~=epoch then return false end;local old=epoch;epoch=0;backend.on_window_closed(old);return true end,eval_js=function(_,js)lastjs=js;return true end}
+		package.loaded['core.ui.ui.webview_manager']={native_available=function()return true end,current_epoch=function()return epoch>0 and epoch or nil end,page_current=function(_,exact)return epoch>0 and epoch==exact end,show=function()serial=serial+1;epoch=serial;return backend.on_window_acquiring(epoch) end,hide=function(_,exact)if exact~=epoch then return false end;local old=epoch;epoch=0;backend.on_window_closed(old);return true end,eval_js=function(_,js)lastjs=js;return true end}
 		backend=load_host()
 		local s=scope()
 		eq(backend.open({scope=s,is_paused=function()return false end}),true,'Linux actual host opens')
@@ -43,7 +43,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		package.loaded['ui.menu.menu_keyboard_slots']={build_action_items=function()return{}end}
 		package.loaded['ui.menu.shortcut_utils']={picker_parameter_fields=function()return{}end}
 		package.loaded['ui.action_picker']={open=function(_,confirm)picker=confirm;return true end}
-		package.loaded['ui.ui_builder']={get_app_geometry=function()return{width=720,height=580}end,get_centered_frame=function()return{}end,show_webview=function(options)
+		package.loaded['core.ui.ui.builder']={get_app_geometry=function()return{width=720,height=580}end,get_centered_frame=function()return{}end,show_webview=function(options)
 		 local v=setmetatable({},{__native_owned=true})
 		 function v:evaluateJavaScript(js)lastjs=js end
 		 function v:delete()if delete_refuse then error('private path should stay out of diagnostic')end;if delete_false then return false end;options.on_close();setmetatable(self,nil);return nil end

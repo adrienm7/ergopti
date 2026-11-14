@@ -13,7 +13,7 @@ import time
 import uuid
 
 
-CANDIDATE_SHA = "a91b4687aabe5a2252afc50d6264614f539c669f73477e272a683bdcd59629ca"
+CANDIDATE_SHA = "37526d23d2add70b2b4ae6aee2c750e571679f97150b251372e4ee373e3c6531"
 FAMILY_SHA = "7545c2d6aa8d48e5d48557b2b218e6d8a864eeb42ae761e055d4f917cdf06334"
 HERE = Path(__file__).resolve().parent
 
@@ -201,7 +201,7 @@ def execute(directory, root, candidate):
         root / "static/ergopti_plus/_shared/core/logger/engine/shim.lua",
         root / "static/ergopti_plus/linux/_generated/native_runtime.lua",
         original.FAMILY,
-        root / "static/ergopti_plus/linux/infra/display_server.lua",
+        root / "static/ergopti_plus/linux/core/ui/engine/display_server.lua",
         root / "static/ergopti_plus/_shared/core/logger/engine/init.lua",
     ]
     for path in inputs:

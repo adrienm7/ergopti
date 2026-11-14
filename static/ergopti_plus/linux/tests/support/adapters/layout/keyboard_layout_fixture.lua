@@ -135,7 +135,7 @@ end
 --- @param state table
 --- @param body function
 local function desktop_cohort(layout, backend, state, body)
-	local display = require("infra.display_server")
+	local display = require("core.ui.engine.display_server")
 	local shell = require("core.process.adapters.shell_runner")
 	local old_exec = shell.exec_checked
 	display._set_for_test("x11")

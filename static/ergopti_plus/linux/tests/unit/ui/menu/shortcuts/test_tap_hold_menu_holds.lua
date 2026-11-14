@@ -721,7 +721,7 @@ helpers.describe("declared complete per-key delay tail", function()
 		local Writer = require(WRITER)
 		local path = Manager.user_path()
 		local reloads, refreshes, notices = 0, 0, 0
-		local TextPrompt = require("ui.text_prompt")
+		local TextPrompt = require("core.ui.ui.text_prompt")
 		local previous_ask, previous_execute = TextPrompt.ask, os.execute
 		local answer, prompts, during_prompt = "375.4", {}, nil
 		local function write(text) local file = assert(io.open(path, "w")); file:write(text); file:close() end

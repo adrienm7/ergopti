@@ -22,7 +22,7 @@ local M = {}
 
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local dialog = require("infra.dialog_util")
+local dialog = require("core.ui.engine.dialog_util")
 local i18n   = require("core.i18n.engine.i18n")
 local Notifier = require("adapters.application_notifier")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")

@@ -86,8 +86,8 @@ local function load_real_wpm_surface(module_name)
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,
 	}
-	package.loaded["adapters.graphics_renderer"] = {}
-	package.loaded["ui.tooltip"] = { is_visible = function() return false end }
+	package.loaded["core.ui.adapters.graphics_renderer"] = {}
+	package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
 	reset_module(module_name)
 	local surface = require(module_name)
 	return surface, {
@@ -185,7 +185,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		})
 		package.loaded["modules.gestures.engine"] = gesture_engine
 		package.loaded["modules.gestures.conflicts"] = permissive()
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,

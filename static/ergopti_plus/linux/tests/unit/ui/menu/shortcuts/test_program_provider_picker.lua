@@ -153,7 +153,7 @@ local function bridge_fixture(body)
 		package.loaded["core.process.adapters.program_providers"] = { create = function()
 			local state = owner(); f.owners[#f.owners + 1] = state; return state
 		end }
-		package.loaded["ui.webview_manager"] = {
+		package.loaded["core.ui.ui.webview_manager"] = {
 			show = function() f.visible = true; return true end,
 			hide = function() if f.hide_refused then return false end; f.visible = false; return true end,
 			is_visible = function() return f.visible end,
@@ -252,7 +252,7 @@ end)
 -- They prove Source receiving behavior in unit execution, not live desktop GTK.
 local function contextual_native_fixture(body)
 	isolated(function()
-		for _, name in ipairs({ "ui.webview_manager", "ui.action_picker.bridge", "ui.webkit_host",
+		for _, name in ipairs({ "core.ui.ui.webview_manager", "ui.action_picker.bridge", "core.ui.ui.webkit_host",
 			"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.window_titles", "core.ui.engine.webview.presentation",
 			"apps.engine.program_provider_picker" }) do package.loaded[name] = nil end
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
@@ -309,7 +309,7 @@ local function contextual_native_fixture(body)
 			if state.translate_hook then state.translate_hook(key) end
 			return original_get(key)
 		end
-		local manager = require("ui.webview_manager")
+		local manager = require("core.ui.ui.webview_manager")
 		manager.build_page_html = function()
 			if state.html_hook then state.html_hook() end
 			return "<html>inert boundary fixture</html>"

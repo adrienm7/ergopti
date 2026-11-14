@@ -12,7 +12,7 @@
 _EPPP_EditorWritesBeforePublishingLiveState() {
 	for _, Name in ["ModifyMagicKey", "ToggleRepeatKeyEnabled", "ModifyLink"] {
 		Body := _DriverFuncBody(Name)
-		Assert(Body != "", Name . " must remain present in ui/editors.ahk")
+		Assert(Body != "", Name . " must remain present in core/ui/ui/editors.ahk")
 		Assert(InStr(Body, "_EditorWriteToml(") > 0,
 			Name . " must enter through the shared editor transaction gateway")
 	}

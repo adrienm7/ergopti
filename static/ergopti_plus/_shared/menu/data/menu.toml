@@ -2595,7 +2595,7 @@ id = "magic_key_config"
 # the submenu by hand and Linux built nothing, while
 # `features.hotstrings.preview_*` had declared all four for BOTH drivers since
 # they were written. So the manifest promised the features and described no way
-# to reach them, and on Linux there was none — ui/tooltip/preview.lua honoured
+# to reach them, and on Linux there was none — core/ui/ui/tooltip/preview.lua honoured
 # its four switches and nothing ever called set_enabled, leaving them stuck at
 # their load-time value for the life of the process.
 #

@@ -13,7 +13,7 @@
 --- hiding it deletes the answer.
 ---
 --- THE BUG THIS CLOSES:
---- `ui/tooltip/preview.lua` was complete — toggles, accent resolution, row
+--- `core/ui/ui/tooltip/preview.lua` was complete — toggles, accent resolution, row
 --- building, renderer call — and `M.show` had no caller anywhere in the driver.
 --- The whole preview surface was inert on every desktop and in every
 --- configuration, which also made the four preview toggles govern nothing. There

@@ -32,7 +32,7 @@ local SWITCHER = "modules.gestures.workspace_switcher"
 ---   refuse_switch = boolean }
 --- @param body function Receives (switcher, commands, pressed).
 local function in_session(session, body)
-	local Display = require("infra.display_server")
+	local Display = require("core.ui.engine.display_server")
 	local Shell = require("core.process.adapters.shell_runner")
 	local commands, pressed = {}, {}
 	local real_getenv = os.getenv

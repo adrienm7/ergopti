@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
-	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
+	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
@@ -114,13 +114,13 @@ local function with_rows(opts, scenario)
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body)
 				record.notices[#record.notices + 1] = { title = title, body = body }
 				return true
 			end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				record.dialogs = record.dialogs + 1
 				return opts.dialog_choice or "ollama.native_offer_install"
@@ -300,7 +300,7 @@ helpers.describe("The MLX row explains an unsupported Mac and offers Ollama (mlx
 			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(_, callback) callback(); return true end,
 			}
-			package.loaded["infra.dialog_util"].block_alert = function(_, _, primary)
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, _, primary)
 				record.dialogs = record.dialogs + 1
 				return primary
 			end
@@ -390,8 +390,8 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 			local observed = { backend = source, menus = {}, model_setters = 0 }
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
-			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = { llm_num_predictions = 1, llm_model_mlx = "candidate", llm_model_ollama = "candidate" },

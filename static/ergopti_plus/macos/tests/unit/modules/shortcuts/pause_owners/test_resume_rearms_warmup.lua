@@ -30,7 +30,7 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 			"ui.wpm.wpm_menubar",
 			"ui.wpm.wpm_widget",
 			"platform.remap.onboarding",
-			"ui.tooltip",
+			"core.ui.ui.tooltip",
 		}
 		local saved = {}
 		for _, name in ipairs(owner_names) do saved[name] = package.loaded[name] end
@@ -74,7 +74,7 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 			is_running = function() return false end,
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 
 		local SC = helpers.load_with_stubs("modules.shortcuts.script_control")
 

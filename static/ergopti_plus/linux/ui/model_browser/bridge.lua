@@ -195,7 +195,7 @@ end
 
 local function retained(frame)
 	if not frame or _projection ~= frame or _page_epoch ~= frame.epoch
-		or package.loaded["ui.webview_manager"] ~= frame.manager or frame.state.llm ~= frame.llm then return false end
+		or package.loaded["core.ui.ui.webview_manager"] ~= frame.manager or frame.state.llm ~= frame.llm then return false end
 	for name, port in pairs(frame.manager_ports) do if frame.manager[name] ~= port then return false end end
 	for name, port in pairs(frame.llm_ports) do if frame.llm[name] ~= port then return false end end
 	return true
@@ -301,7 +301,7 @@ end
 local function capture_projection(state, context)
 	if type(state) ~= "table" or type(state.llm) ~= "table" or type(context) ~= "table"
 		or context.app_name ~= APP_NAME or context.epoch ~= _page_epoch or context.document_owner == nil then return nil end
-	local manager = package.loaded["ui.webview_manager"]
+	local manager = package.loaded["core.ui.ui.webview_manager"]
 	if type(manager) ~= "table" then return nil end
 	local frame = { state = state, llm = state.llm, manager = manager, document = context.document_owner,
 		epoch = context.epoch, manager_ports = {}, llm_ports = {}, rows = {}, urls = {}, runs = {},

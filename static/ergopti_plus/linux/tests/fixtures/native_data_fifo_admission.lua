@@ -14,7 +14,7 @@ Paths.shared = function(path)
 	return original(path)
 end
 if mode == "layout" then
-	local display = require("infra.display_server")
+	local display = require("core.ui.engine.display_server")
 	display._set_for_test(display.UNKNOWN, "")
 	assert(require("adapters.keyboard_layout").refresh(root .. "/source") == false)
 elseif mode == "locale" then

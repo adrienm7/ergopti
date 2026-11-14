@@ -15,7 +15,7 @@ local function fixture(body)
 	local ok, failure = xpcall(function()
 		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker"] = nil
-		package.loaded["ui.webview_controller_pool"] = nil
+		package.loaded["core.ui.ui.webview_controller_pool"] = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
@@ -38,7 +38,7 @@ local function fixture(body)
 			f.content = content
 			return content
 		end } }, json = { encode = function(payload) f.payload = payload; return "{}" end } }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 600, height = 500 } end,
 			get_centered_frame = function() return {} end,
 			show_webview = function(options)
@@ -58,7 +58,7 @@ local function fixture(body)
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["core.process.adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, save) return save, f.typed end,
 			block_alert = function(_, reason) f.warning = reason end,
 		}

@@ -17,7 +17,7 @@
 --- 3. The mode goes through the prediction engine, which refuses the automatic
 ---    mode without System 1 and System 2 and tells the user why.
 --- 4. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- ==============================================================================
 
 local M = {}

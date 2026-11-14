@@ -15,7 +15,7 @@ local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 local RowDialect = require("menu.engine.row_dialect")
 local Logger = require("core.logger.engine.shim")
 local Extensions = require("hotstrings.engine.extensions")
-local TextPrompt = require("ui.text_prompt")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 

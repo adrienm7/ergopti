@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local scoped_helpers = helpers
 local OWNED = {
 	"adapters.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "core.events.timer_scheduler", "adapters.tooltip_renderer",
+	"adapters.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",
 	"infra.hotstring_engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
@@ -187,7 +187,7 @@ local function load_fixture(options)
 			return options.terminal_target
 		end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() end,
 	}
 

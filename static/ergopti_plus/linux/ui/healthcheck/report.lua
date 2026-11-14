@@ -177,7 +177,7 @@ local menu_request = Runner.menu_request
 --- @return table snapshot, table documents
 local function menu_snapshot(complete_local)
 	local bridge = require("ui.healthcheck.bridge")
-	return bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false, false, complete_local == true),
+	return bridge.build_snapshot(require("core.ui.ui.webview_manager").get_daemon_state(), false, false, complete_local == true),
 		bridge.config()
 end
 

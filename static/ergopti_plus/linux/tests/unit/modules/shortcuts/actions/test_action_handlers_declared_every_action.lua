@@ -181,25 +181,25 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	end)
 
 	helpers.it("restores exact native owners after the controlled window fixture raises", function()
-		local previous_webview = package.loaded["ui.webview_manager"]
+		local previous_webview = package.loaded["core.ui.ui.webview_manager"]
 		local previous_lgi = package.loaded["lgi"]
 		local previous_preload = package.preload["lgi"]
 		local ok, err = pcall(with_unavailable_webview, function(Webview)
-			helpers.assert_eq(package.loaded["ui.webview_manager"], Webview,
+			helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], Webview,
 				"the callback must receive the exact acquired page owner")
 			error("Controlled window fixture callback refusal", 0)
 		end)
 		helpers.assert_eq(ok, false, "the callback refusal must reach its caller")
 		helpers.assert_eq(err, "Controlled window fixture callback refusal", "preserve the callback failure")
-		helpers.assert_eq(package.loaded["ui.webview_manager"], previous_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], previous_webview, "restore the exact page owner")
 		helpers.assert_eq(package.loaded["lgi"], previous_lgi, "restore the exact native SDK cache")
 		helpers.assert_eq(package.preload["lgi"], previous_preload, "restore the exact native SDK loader")
 	end)
 
 	helpers.it("the paths action opens the dedicated paths editor", function()
-		local previous_webview = package.loaded["ui.webview_manager"]
+		local previous_webview = package.loaded["core.ui.ui.webview_manager"]
 		local opened = nil
-		package.loaded["ui.webview_manager"] = {
+		package.loaded["core.ui.ui.webview_manager"] = {
 			toggle = function(app_name)
 				opened = app_name
 				return true
@@ -207,7 +207,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 		}
 
 		local ok, err = pcall(Gestures.execute_action, "open_paths_editor", "test__slot")
-		package.loaded["ui.webview_manager"] = previous_webview
+		package.loaded["core.ui.ui.webview_manager"] = previous_webview
 
 		helpers.assert_true(ok, "opening the paths editor must not throw: " .. tostring(err))
 		helpers.assert_eq(opened, "paths_editor",
@@ -516,7 +516,7 @@ helpers.describe("linux actions: workspace switch", function()
 	--- @return table pressed The combos pressed on the virtual keyboard.
 	--- @return table commands Every other command run (xdotool fallbacks).
 	local function switch(action, listing, uinput_ok)
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local Shell = require("core.process.adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
 		local saved_writer = package.loaded["adapters.uinput_writer"]
