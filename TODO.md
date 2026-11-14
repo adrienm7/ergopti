@@ -80,19 +80,19 @@ rerun); a macOS cold-bootstrap job whose runner is lost (no log).
       NaN, out of range) fails fast with a log line instead of crashing. Start with an inventory of every prompt and
       key per OS, then regression tests per OS that feed a wrong type, a boundary and an out-of-range value at each
       of the three places.
-      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43532578410: the inventory
-      ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md), its « Migration
-      status » table is the state per family), the shared schema `_shared/settings/data/value_schema/value_schema.json`
-      and its check in JS, Lua (macOS, Linux) and AHK, pinned by shared vectors, with the localized refusals in 21
-      locales; then the families wired at entry, load and boundary: tap-hold timings, hotstring delays and
-      priorities, LLM settings, the CapsWord idle timeout, gesture steps and web addresses (a new `url` type).
+      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43539039731: the inventory
+      ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md), its « Migration status
+      » table is the state per family), the shared schema `_shared/settings/data/value_schema/value_schema.json` and
+      its check in JS, Lua (macOS, Linux) and AHK, pinned by shared vectors, with the localized refusals in 21
+      locales; then the families wired at entry, load and boundary: tap-hold timings, hotstring delays and priorities,
+      LLM settings, the CapsWord idle timeout, gesture steps, web addresses (a new `url` type), personal info (Linux
+      reports a field that is not text) and the user-code delay (prompt on macOS and Linux, engine check on Windows).
       Confirmed by the maintainer on 2026-11-13: `lone_modifier_tap_max_ms` gets a 10000 ms maximum and
       `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Decided by the
       agent, to review by the maintainer: LLM temperature 0 to 1.3 and context length 80 to 4000 (their engines'
       limits), CapsWord idle timeout at most 3600 s, URLs at most 2048 characters, the updater interval kept on its
-      snap-to-preset rule. On the branch for the next landing: personal info (Linux reports a field that is not text)
-      and the user-code delay prompt (macOS, Linux). Left: the one-shot timeout, once worker A lands « 0 = no time
-      limit ».
+      snap-to-preset rule, a typed user-code delay the one menu refusal told in words. Left: the one-shot timeout,
+      once worker A lands « 0 = no time limit ».
 - [ ] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
       Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
       (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
