@@ -421,14 +421,48 @@ Discord user ids were not imported). The codegen adds the six registry layouts
 and the reference QWERTY and AZERTY with all their layers and dead keys: 115
 layouts. Each entry names its `source` and `source_path`.
 
-**Decided by the agent, to review by the maintainer:** whether keeping the 35
-cmini blocks is acceptable (a layout's key arrangement is a short factual list
-published by its author, but the collection's licence does not say so); if
-not, deleting them from the JSON and regenerating leaves 80 layouts. A further
-step can complete the French library layouts (Optimot, Béopy, Ergo-L variants…)
-with their real layers and dead keys by adding them to the registry.
+**Basis for re-encoding** (maintainer, 2026-11-14, TODO « Read every common
+layout format »): a key arrangement itself is not protected by copyright, only
+its implementation; the Court of Justice of the European Union held in _SAS
+Institute v World Programming_ (C-406/10, 2 May 2012) that the functionality
+of a program, its programming language and its data file formats are not
+protected, only the expression of the code. This study found no analyser or
+collection that claims rights in an arrangement as such. Limits (not legal
+advice): the judgment concerns software, not keyboard layouts; a collection
+can carry database rights in the European Union when its making was a
+substantial investment; a layout's name may be a trademark. Hence the library:
 
-## 14. Decided by the agent, to review by the maintainer
+- re-encodes each arrangement in Ergopti's own format (what each key types, by
+  KeyboardEvent.code), never copies a file of another tool;
+- takes only the arrangement (no comment, no metadata, and no Discord user id
+  from cmini);
+- names the source file of every layout (`source`, `source_path`) and the
+  layout's name; the authors are not yet recorded, because neither collection
+  gives them in a structured field (a next step for the Studio's layout cards).
+
+A further step can complete the French library layouts (Optimot, Béopy, the
+Ergo-L variants…) with their real layers and dead keys by adding them to the
+registry.
+
+## 14. Layout file formats in use
+
+The Studio's importers (TODO « Read every common layout format ») meet these
+formats; each maps to the engine's rows (base, Shift, AltGr, Shift+AltGr and
+dead keys per physical key).
+
+| Format                  | Used by                                 | Content                                                                                      | Maps to the Ergopti source                          |
+| ----------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| KLA JSON                | KLA, SteveP's KLA, KLAtest, KLAnext     | `label`, `author`, `fingerStart`, `keyboardType`, `keys[]` with four char codes and a finger | four layers by key index of the board; no dead keys |
+| Kalamine TOML / YAML    | Kalamine, Ergo-L and its family         | ASCII-art `base` / `altgr` / `full` blocks, 1dk, 20 named dead keys                          | layers by XKB key name; dead-key tables             |
+| Kalamine JSON           | x-keyboard, ergol.org                   | `keymap` (code → 2–4 strings), `deadkeys`                                                    | direct (KeyboardEvent.code)                         |
+| DOF JSON                | Oxeylyzer                               | `layers.main` rows of characters, `board`, `fingering`, optional geometry                    | base layer only                                     |
+| cmini JSON              | cmini, Keysolve                         | `keys: {char: {row, col, finger}}`, `board`                                                  | base layer only                                     |
+| genkey / trialyzer text | genkey, trialyzer                       | three rows of characters (and a finger map)                                                  | base layer only                                     |
+| macOS `.keylayout`      | Ergopti registry, Ukelele, Kalamine     | XML key maps per modifier set, actions and states                                            | already read (`layout_composer`)                    |
+| XKB symbols             | Linux, Kalamine, Ergopti's XKB export   | `key <AC01> { [ a, A, ae, AE ] }`, `dead_*` keysyms                                          | four levels; dead keys through Compose              |
+| KLC                     | MSKLC, KbdEdit, Kalamine, Ergopti's KLC | per scan code columns, `DEADKEY` tables                                                      | four columns; dead-key tables                       |
+
+## 15. Decided by the agent, to review by the maintainer
 
 - The default fingering: Digit6 is typed by the right index; the ISO key left of
   Z and Z by the left pinky; the space bar by the right thumb (thumbs are left

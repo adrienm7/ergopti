@@ -1,16 +1,16 @@
 {
-	"_description": "Layout library of the layout analysis: the alphabetic block (3 rows, base characters only) of each layout, by KeyboardEvent.code, imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository, user-submitted; licence of the data to review by the maintainer, see docs/audits/layout-analysers/report.md). « source » and « source_path » name the file each block comes from. The codegen completes each block with the US number row and the US Shift pairs (letters: upper case). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
+	"_description": "Layout library of the layout analysis: the alphabetic block (3 rows, base characters only) of each layout, by KeyboardEvent.code, imported on 2026-11-14 from the Oxeylyzer layout set (Apache-2.0 repository) and, for the classics it lacks, from the cmini collection (GPL-3.0 repository). Only the arrangements are re-encoded, never a file, on the basis given in docs/audits/layout-analysers/report.md, section « Layout library ». « source » and « source_path » name the file each block comes from. The codegen completes each block with the US number row and the US Shift pairs (letters: upper case). The registry layouts (static/layouts/registry) and the reference QWERTY and AZERTY (layout_composer/reference_layouts.js) join the library at codegen with all their layers and dead keys, so they are not repeated here.",
 	"schema_version": 1,
 	"sources": {
 		"oxeylyzer": {
 			"url": "https://github.com/O-X-E-Y/oxeylyzer/tree/data-files",
 			"commit": "9cd336c",
-			"licence": "Apache-2.0 (repository)"
+			"licence": "Apache-2.0 (repository); arrangements re-encoded"
 		},
 		"cmini": {
 			"url": "https://github.com/Apsu/cmini",
 			"commit": "0db088e",
-			"licence": "GPL-3.0 (repository); user-submitted data, to review"
+			"licence": "GPL-3.0 (repository); user-submitted arrangements, re-encoded"
 		}
 	},
 	"layouts": [
