@@ -169,6 +169,43 @@ for (const id of ['azerty', 'bepo', 'ergol', 'ergopti_plus', 'qwerty']) {
 		`${id}: alternation differs from the stream`
 	);
 }
+// keyNgrams, the input of the analyser scorers, holds the same stream.
+{
+	const tables = E.prepareNgrams(E.ngramsFromText(STREAM_TEXT));
+	for (const id of ['bepo', 'ergol', 'qwerty']) {
+		const layout = byId.get(id);
+		const expected = streamCounts(layout, STREAM_TEXT, 'iso');
+		const k = E.keyNgrams(layout, tables, { keyboard: 'iso' });
+		const thumb = (i) => k.board.finger[i] === 4 || k.board.finger[i] === 5;
+		let bigrams = 0;
+		let sfb = 0;
+		for (const [code, n] of k.bigrams) {
+			const [a, b] = [Math.floor(code / k.KEY_BASE), code % k.KEY_BASE];
+			if (thumb(a) || thumb(b)) continue;
+			bigrams += n;
+			if (a !== b && k.board.finger[a] === k.board.finger[b]) sfb += n;
+		}
+		let trigrams = 0;
+		for (const [code, n] of k.trigrams) {
+			const keys = [
+				Math.floor(code / k.KEY_BASE ** 2),
+				Math.floor(code / k.KEY_BASE) % k.KEY_BASE,
+				code % k.KEY_BASE
+			];
+			if (!keys.some(thumb)) trigrams += n;
+		}
+		check(
+			bigrams === expected.bigrams,
+			`${id}: keyNgrams has ${bigrams} key bigrams, ${expected.bigrams} on the stream`
+		);
+		check(sfb === expected.sfb, `${id}: keyNgrams has ${sfb} SFBs, ${expected.sfb} on the stream`);
+		check(
+			trigrams === expected.trigrams,
+			`${id}: keyNgrams has ${trigrams} key trigrams, ${expected.trigrams} on the stream`
+		);
+		check(E.keyNgrams(layout, tables, { keyboard: 'iso' }) === k, `${id}: keyNgrams is not cached`);
+	}
+}
 check(
 	E.analyse(byId.get('ergol'), E.ngramsFromText('été'), {}).metrics.dead_key_usage > 0,
 	'Ergo-L types é with its dead key: the stream test needs a dead key'

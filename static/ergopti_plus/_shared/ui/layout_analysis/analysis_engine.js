@@ -599,60 +599,23 @@ var LAYOUT_ANALYSIS = (function () {
 			else c.roll_mixed += n;
 		};
 
-		const strokesOf = (char) => best.get(char);
-		const modifierKey = (k) =>
-			board.hand[k] === 0 && !thumb[k]
-				? board.modifiers.shiftForLeft
-				: board.modifiers.shiftForRight;
-
-		for (const [char, n] of table.uni) {
-			const seq = strokesOf(char);
-			if (!seq) {
+		walkKeyStream(board, best, table, {
+			char(char, seq, n) {
+				c.chars += n;
+				if (seq.dead) c.dead += n;
+				if (seq.shift + seq.altgr > 0) c.modifiers += n;
+			},
+			unsupported(char, n) {
 				c.unsupported += n;
 				unsupportedChars[char] = (unsupportedChars[char] || 0) + n;
-				continue;
-			}
-			c.chars += n;
-			if (seq.dead) c.dead += n;
-			if (seq.shift + seq.altgr > 0) c.modifiers += n;
-			for (const k of seq.keys) {
+			},
+			press(k, n) {
 				keyCount[k] += n;
 				c.distance += board.reach[k] * n;
-			}
-			// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
-			if (seq.shift > 0) {
-				const m = modifierKey(seq.keys[seq.keys.length - 1]);
-				keyCount[m] += n * seq.shift;
-				c.distance += board.reach[m] * n * seq.shift;
-			}
-			if (seq.altgr > 0) {
-				keyCount[board.modifiers.altgr] += n * seq.altgr;
-				c.distance += board.reach[board.modifiers.altgr] * n * seq.altgr;
-			}
-			const keys = seq.keys;
-			for (let i = 0; i + 1 < keys.length; i++) bigram(keys[i], keys[i + 1], n);
-			for (let i = 0; i + 2 < keys.length; i++) trigram(keys[i], keys[i + 1], keys[i + 2], n);
-		}
-		for (const [a, b, n] of table.bi) {
-			const sa = strokesOf(a);
-			const sb = strokesOf(b);
-			if (!sa || !sb) continue;
-			const ka = sa.keys;
-			const kb = sb.keys;
-			bigram(ka[ka.length - 1], kb[0], n);
-			// Key trigrams that start in a and end in b.
-			const s = ka.concat(kb);
-			for (let i = Math.max(0, ka.length - 2); i < ka.length; i++)
-				if (i + 2 >= ka.length && i + 2 < s.length) trigram(s[i], s[i + 1], s[i + 2], n);
-		}
-		for (const [a, b, d, n] of table.tri) {
-			const sb = strokesOf(b);
-			if (!sb || sb.keys.length !== 1) continue;
-			const sa = strokesOf(a);
-			const sd = strokesOf(d);
-			if (!sa || !sd) continue;
-			trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
-		}
+			},
+			bigram,
+			trigram
+		});
 
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
 		const allChars = c.chars + c.unsupported;
@@ -758,6 +721,137 @@ var LAYOUT_ANALYSIS = (function () {
 		};
 		result.score = score(result, opts.weights);
 		return result;
+	}
+
+	/**
+	 * The key held for Shift when a key is typed: the pinky's Shift of the other
+	 * hand (ShiftRight for a left-hand key).
+	 */
+	function shiftKeyFor(board, k) {
+		const f = board.finger[k];
+		return board.hand[k] === 0 && f !== LEFT_THUMB && f !== RIGHT_THUMB
+			? board.modifiers.shiftForLeft
+			: board.modifiers.shiftForRight;
+	}
+
+	/**
+	 * Walks the expanded key stream of a corpus from its character tables: the
+	 * pairs and triples inside a character's sequence come from its unigram
+	 * count, the pair across two characters from their bigram, and the triples
+	 * across three characters from their trigram. Held modifiers are pressed
+	 * (press) but are not in the stream (bigram, trigram).
+	 * @param {object} board - From keyboard().
+	 * @param {Map} best - From compileLayout().
+	 * @param {object} table - From prepareNgrams().
+	 * @param {{char, unsupported, press, bigram, trigram}} visit - Callbacks:
+	 *   char(char, seq, n), unsupported(char, n), press(k, n) for every press
+	 *   (modifiers included), bigram(k1, k2, n), trigram(k1, k2, k3, n).
+	 */
+	function walkKeyStream(board, best, table, visit) {
+		for (const [char, n] of table.uni) {
+			const seq = best.get(char);
+			if (!seq) {
+				visit.unsupported(char, n);
+				continue;
+			}
+			visit.char(char, seq, n);
+			for (const k of seq.keys) visit.press(k, n);
+			// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
+			if (seq.shift > 0)
+				visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
+			if (seq.altgr > 0) visit.press(board.modifiers.altgr, n * seq.altgr);
+			const keys = seq.keys;
+			for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
+			for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
+		}
+		for (const [a, b, n] of table.bi) {
+			const sa = best.get(a);
+			const sb = best.get(b);
+			if (!sa || !sb) continue;
+			const ka = sa.keys;
+			const kb = sb.keys;
+			visit.bigram(ka[ka.length - 1], kb[0], n);
+			// Key trigrams that start in a and end in b.
+			const s = ka.concat(kb);
+			for (let i = Math.max(0, ka.length - 2); i < ka.length; i++)
+				if (i + 2 >= ka.length && i + 2 < s.length) visit.trigram(s[i], s[i + 1], s[i + 2], n);
+		}
+		for (const [a, b, d, n] of table.tri) {
+			const sb = best.get(b);
+			if (!sb || sb.keys.length !== 1) continue;
+			const sa = best.get(a);
+			const sd = best.get(d);
+			if (!sa || !sd) continue;
+			visit.trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
+		}
+	}
+
+	// Key n-gram codes: k1 * KEY_BASE + k2, and (k1 * KEY_BASE + k2) * KEY_BASE + k3.
+	const KEY_BASE = 1024;
+	const keyNgramCache = new WeakMap();
+
+	/**
+	 * The key n-grams of a layout on a corpus, for the scorers that model
+	 * another analyser (analyser_scores.js): the same expanded key stream the
+	 * metrics are computed on, as sparse counts. Cached per prepared table,
+	 * layout object and keyboard.
+	 * @param {object} layoutInput - Library shape (see layoutFromRows).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {{keyboard?: string}} [options] - Board.
+	 * @returns {object} {board, layout, best, presses: Float64Array per key
+	 *   (held modifiers included), stream: Float64Array per key (the stream
+	 *   only), bigrams: Map code → n, trigrams: Map code → n, chars (typed
+	 *   characters), unsupported, modifiers (characters typed with a held
+	 *   modifier), dead (characters typed through a dead key), KEY_BASE}.
+	 */
+	function keyNgrams(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const table = prepareNgrams(ngrams);
+		const layout = layoutFromRows(layoutInput);
+		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD);
+		if (!keyNgramCache.has(table)) keyNgramCache.set(table, new WeakMap());
+		const perLayout = keyNgramCache.get(table);
+		if (!perLayout.has(layoutInput)) perLayout.set(layoutInput, new Map());
+		const perBoard = perLayout.get(layoutInput);
+		if (perBoard.has(board.id)) return perBoard.get(board.id);
+		const best = compileLayout(layout, board, null);
+		const out = {
+			board,
+			layout,
+			best,
+			presses: new Float64Array(board.codes.length),
+			stream: new Float64Array(board.codes.length),
+			bigrams: new Map(),
+			trigrams: new Map(),
+			chars: 0,
+			unsupported: 0,
+			modifiers: 0,
+			dead: 0,
+			KEY_BASE
+		};
+		const add = (map, code, n) => map.set(code, (map.get(code) || 0) + n);
+		walkKeyStream(board, best, table, {
+			char(char, seq, n) {
+				out.chars += n;
+				if (seq.dead) out.dead += n;
+				if (seq.shift + seq.altgr > 0) out.modifiers += n;
+				for (const k of seq.keys) out.stream[k] += n;
+			},
+			unsupported(char, n) {
+				out.unsupported += n;
+			},
+			press(k, n) {
+				out.presses[k] += n;
+			},
+			bigram(k1, k2, n) {
+				add(out.bigrams, k1 * KEY_BASE + k2, n);
+			},
+			trigram(k1, k2, k3, n) {
+				add(out.trigrams, (k1 * KEY_BASE + k2) * KEY_BASE + k3, n);
+			}
+		});
+		perBoard.set(board.id, out);
+		return out;
 	}
 
 	/**
@@ -965,6 +1059,7 @@ var LAYOUT_ANALYSIS = (function () {
 		typingCodes,
 		libraryLayouts,
 		compileLayout,
+		keyNgrams,
 		ngramsFromText,
 		prepareNgrams,
 		analyse,
