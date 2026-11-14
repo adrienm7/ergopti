@@ -174,8 +174,9 @@ function run() {
 
 /**
  * Once no tracked file is left under _shared/lua, no source spells that root.
- * Records (docs, data tables) and the structure tooling with its tests, which
- * name the old root on purpose, are not sources.
+ * Records (docs, data tables, a published release's layout), comments and the
+ * structure tooling with its tests, which name the old root on purpose, are
+ * not sources.
  */
 function leftoverRootSpellings() {
 	const repo = path.resolve(__dirname, '../..');
@@ -188,9 +189,11 @@ function leftoverRootSpellings() {
 	for (const file of tracked) {
 		if (/^(docs|tools\/audit\/structure)\//.test(file)) continue;
 		if (/\/test-structure-[\w-]+\.cjs$/.test(file) || /\.(md|json|tsv)$/.test(file)) continue;
+		if (Plan.neverRewritten(file)) continue;
 		const text = fs.readFileSync(path.join(repo, file), 'utf8');
 		if (text.includes('\0')) continue;
 		text.split('\n').forEach((line, i) => {
+			if (/^\s*(?:\/\/|\/?\*|#|--|;)/.test(line)) return;
 			if (Plan.sharedRootRewrite(line) !== line) leftovers.push(`${file}:${i + 1}`);
 		});
 	}
