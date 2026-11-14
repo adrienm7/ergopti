@@ -431,8 +431,8 @@ class PhysicalShortcutDelivery {
 		Ports := (IsSet(Ports) && Ports is Map) ? Ports : Map()
 		Suspended := Ports.Has("suspended") ? Ports["suspended"] : A_IsSuspended
 		RegExMatch(Spec, "i)(SC[0-9A-F]{3})$", &Scan)
-		Physical := Ports.Has("physical") ? Ports["physical"] : GetKeyState(Scan[1], "P")
-		AltGr := Ports.Has("altgr") ? Ports["altgr"] : GetKeyState("RAlt", "P")
+		Physical := Ports.Has("physical") ? Ports["physical"] : KS_IsDown(Scan[1])
+		AltGr := Ports.Has("altgr") ? Ports["altgr"] : KS_IsDown("RAlt")
 		if Suspended || !Physical || AltGr {
 			LoggerDebug("PhysicalShortcuts", "Slot '{1}' press refused (suspended={2}, physical={3}, altgr={4}).",
 				Slot, Suspended ? 1 : 0, Physical ? 1 : 0, AltGr ? 1 : 0)
