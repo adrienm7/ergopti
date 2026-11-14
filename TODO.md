@@ -410,6 +410,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       FrequencyWords, Tatoeba), imported as count tables through a generator with source, version, licence and
       attribution; word-level lists miss cross-word bigrams, said in their popover.
 
+- [ ] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
+      and app) the user sets, per physical key, the finger and hand that press it; the home row (row 1, 2, 3 or 4);
+      and a per-finger home key (e.g. the index or ring home key one column off the others). Defaults stay the
+      current model (Digit6 right index, space bar left thumb). Every metric and every other analyser's scorer follows
+      the user's mapping; the profile is saved with the user's layouts, exportable, importable and resettable.
+- [ ] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
+      /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
+
 ## Windows CI reliability (2026-11-07)
 
 - [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
