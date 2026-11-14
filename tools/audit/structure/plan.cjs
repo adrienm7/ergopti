@@ -1944,9 +1944,53 @@ function scanFile(file, text, ctx) {
 		for (const c of ownClimbs(text, selfOld, selfTarget))
 			add('lua-climb', c.old, c.new, { oldRepo: file });
 	}
+	// _DriverDirConcat("infra") in a Windows test scans a folder of the driver.
+	// When the step takes files out of it, the scan reads the folder (while it
+	// keeps files) and the new homes of the files that left: a kept name alone
+	// stops reading them, and a widened one reads their siblings. Nested homes
+	// are read once, through the outer folder.
+	const dirScans = [];
+	if (file.endsWith('.ahk') && inTree === 'windows')
+		for (const m of text.matchAll(/\b_DriverDirs?Concat\(((?:\s*"[\w./-]+"\s*,?)+)\)/g)) {
+			dirScans.push([m.index, m.index + m[0].length]);
+			const folders = [...m[1].matchAll(/"([\w./-]+)"/g)].map((a) => a[1].replace(/\/+$/, ''));
+			const reads = [];
+			let changed = false;
+			for (const folder of folders) {
+				const under = [...map.keys()].filter(
+					(o) => o.startsWith(`windows/${folder}/`) && o.endsWith('.ahk')
+				);
+				const leaving = under.filter((o) => {
+					const t = map.get(o);
+					return t !== o && !(t && t.startsWith(`windows/${folder}/`));
+				});
+				if (leaving.length === 0) {
+					reads.push(folder);
+					continue;
+				}
+				changed = true;
+				if (leaving.length < under.length) reads.push(folder);
+				for (const o of leaving) {
+					const t = map.get(o);
+					if (t && t.startsWith('windows/'))
+						reads.push(path.posix.dirname(t).slice('windows/'.length));
+				}
+			}
+			if (!changed) continue;
+			const unique = [...new Set(reads)];
+			const kept = unique.filter((d) => !unique.some((o) => o !== d && d.startsWith(`${o}/`)));
+			const call =
+				kept.length === 1
+					? `_DriverDirConcat("${kept[0]}")`
+					: `_DriverDirsConcat(${kept.map((d) => `"${d}"`).join(', ')})`;
+			if (call !== m[0])
+				add('lua-module-quoted', m[0], call, { oldRepo: `${PREFIX}windows/${folders[0]}` });
+		}
 	for (const m of text.matchAll(dirToken)) {
 		const raw = m[0].replace(/[\\/]$/, '');
 		if (/\.[A-Za-z0-9]+$/.test(raw) || !/[A-Za-z]/.test(raw)) continue;
+		// A folder scan's arguments are the rule above's.
+		if (dirScans.some(([a, b]) => m.index >= a && m.index < b)) continue;
 		// ${DRIVER_REL}/modules/llm: a base named for a driver keeps the folder
 		// the driver's own, whatever the file reads from _shared elsewhere.
 		const foreign = foreignBaseBefore(text, m.index);
