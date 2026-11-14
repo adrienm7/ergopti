@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function fixture_context()
-	return {
+	local ctx = {
 		state = { llm_backend = "api", llm_model = "probe-model" },
 		paused = false,
 		is_paused = function() return false end,
@@ -20,6 +20,10 @@ local function fixture_context()
 		update_menu = function() end,
 		WarmupCtrl = { warmup = function() end },
 	}
+	-- The page hands the real pause to the key test; here it follows the
+	-- fixture's own reader, so a test that swaps is_paused swaps both.
+	ctx.runtime_is_paused = function() return ctx.is_paused() end
+	return ctx
 end
 
 local function install_doubles(args)

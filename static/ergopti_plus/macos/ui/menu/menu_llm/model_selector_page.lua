@@ -185,9 +185,18 @@ local function collect(ctx)
 	local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
 	local backend_collect, api_collect = {}, {}
 	local paused = ctx.is_paused() ~= false
+	-- A pause stops typing, not configuration (EDD-1): the backend and API
+	-- panels only collect choices, so they read a pause that admits them.
+	-- An unreadable pause still refuses, and the local server rows, which
+	-- start servers, keep the real pause.
+	local function configuration_blocked()
+		local ok, current = pcall(ctx.is_paused)
+		return not ok or type(current) ~= "boolean"
+	end
 	local function panel_ctx(extra)
 		local out = {
-			state = ctx.state, keymap = ctx.keymap, paused = paused, is_paused = ctx.is_paused,
+			state = ctx.state, keymap = ctx.keymap, paused = configuration_blocked(), is_paused = configuration_blocked,
+			runtime_is_paused = ctx.is_paused,
 			models_mgr = ctx.models_mgr, get_display_model_name = ctx.get_display_model_name,
 			switch_model = ctx.switch_model, disable_model = ctx.disable_model, save_prefs = ctx.save_prefs,
 			update_menu = ctx.update_menu, WarmupCtrl = ctx.WarmupCtrl,
@@ -655,8 +664,18 @@ end
 --- @return boolean accepted True when the action was dispatched.
 function M.handle_action(ctx, body, probes, collected)
 	local action = body.action
-	if ctx.is_paused() ~= false then
-		Logger.warn(LOG, "Model selector action '%s' refused while paused.", tostring(action))
+	-- A pause stops typing, not configuration (EDD-1): choices, downloads and
+	-- installs run while paused. What starts or contacts a runtime (a key
+	-- test, a server rescan, an MLX port change that restarts MLX) waits.
+	local paused = ctx.is_paused()
+	if type(paused) ~= "boolean" then
+		Logger.warn(LOG, "Model selector action '%s' refused: the pause state is unreadable.", tostring(action))
+		return false
+	end
+	local runtime_action = (action == "row_action" and body.id == "test")
+		or (action == "group_action" and (body.id == "rescan" or body.id == "mlx_port" or body.id == "mlx_port_reset"))
+	if paused and runtime_action then
+		Logger.warn(LOG, "Model selector action '%s' waits for resume.", tostring(action))
 		return false
 	end
 	local blocked = ctx.config_reason()
@@ -836,7 +855,10 @@ end
 --- @param id string Tool id.
 --- @return boolean accepted
 function M.group_action(backend, id)
-	if not _ctx or _ctx.is_paused() ~= false or _ctx.config_reason() ~= nil then return false end
+	if not _ctx or _ctx.config_reason() ~= nil then return false end
+	local paused = _ctx.is_paused()
+	if type(paused) ~= "boolean" then return false end
+	if paused and (id == "rescan" or id == "mlx_port" or id == "mlx_port_reset") then return false end
 	return group_action(_ctx, collect(_ctx), backend, id, DEFAULT_PROBES)
 end
 
@@ -869,7 +891,7 @@ function M.open()
 	-- A window shown from inside the still-open menu callback can silently fail
 	-- to appear, so the page opens on the next tick.
 	local scheduled = DeferredWork.after(0, function()
-		if _ctx ~= ctx or ctx.is_paused() ~= false then return false end
+		if _ctx ~= ctx then return false end
 		local ModelBrowser = require("ui.model_browser")
 		local opened = ModelBrowser.open({
 			build_payload = function() return M.build_payload(ctx) end,

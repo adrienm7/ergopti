@@ -225,7 +225,7 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 		end)
 	end)
 
-	helpers.it("linux-model-delete: a declined question or a paused script removes nothing", function()
+	helpers.it("linux-model-delete: a declined question removes nothing; a paused script still asks (edd1-paused-writes)", function()
 		with_browser(function(f)
 			local deletes = installed(f)
 			local commands, restore_question = scripted_question(false)
@@ -234,11 +234,12 @@ helpers.describe("the page removes an installed model as on Windows and macOS", 
 				local delete_model = f.controls.bound.delete_model
 				helpers.assert_eq(delete_model("qwen:2b"), false)
 				helpers.assert_eq(#deletes, 0)
-				-- A page still open when the script is paused asks nothing.
+				-- A pause stops typing, not configuration (EDD-1): a page still open
+				-- when the script is paused asks again; the declined answer still wins.
 				local asked = #commands
 				f.ctx.paused = true
 				helpers.assert_eq(delete_model("qwen:2b"), false)
-				helpers.assert_eq(#commands, asked)
+				helpers.assert_eq(#commands, asked + 1)
 				helpers.assert_eq(#deletes, 0)
 			end)
 			restore_question()

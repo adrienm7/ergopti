@@ -144,7 +144,7 @@ end)
 
 
 h.describe("native menu dialog captions", function()
-	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation", function()
+	h.it("(linux-model-delete-owner) refuses deletion if the page closes during confirmation, keeps it across a pause", function()
 		local names = { "ui.menu.builder", "ui.menu.menu_llm", "ui.menu.llm_backend_rows", "core.ui.ui.modal" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -163,10 +163,12 @@ h.describe("native menu dialog captions", function()
 			h.assert_type(options, "table")
 			h.assert_eq(options.delete_model("model:1", function() return live end), false)
 			h.assert_eq(deletions, 0)
+			-- A pause stops typing, not configuration (EDD-1): a pause during the
+			-- confirmation keeps the removal.
 			live = true
 			os.execute = function() paused = true; return 0 end
-			h.assert_eq(options.delete_model("model:1", function() return live end), false)
-			h.assert_eq(deletions, 0)
+			h.assert_eq(options.delete_model("model:1", function() return live end), true)
+			h.assert_eq(deletions, 1)
 		end, debug.traceback)
 		os.execute = previous_execute
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end

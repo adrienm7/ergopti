@@ -431,6 +431,13 @@ function M.build(ctx)
 		local ok, current_paused = pcall(ctx.is_paused)
 		return ok and type(current_paused) == "boolean" and current_paused == false
 	end
+	-- A key test contacts the provider: it waits for resume, through the real
+	-- pause the page hands over (EDD-1 keeps only configuration live).
+	local function runtime_unpaused()
+		if type(ctx.runtime_is_paused) ~= "function" then return false end
+		local ok, current_paused = pcall(ctx.runtime_is_paused)
+		return ok and current_paused == false
+	end
 	local function add_commands_ready()
 		return native_unpaused() and state.llm_backend == "api" and _mutation_owner == nil
 	end
@@ -789,6 +796,7 @@ function M.build(ctx)
 	end
 	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("settings.engine.keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function()
+			if not runtime_unpaused() then return false end
 			local probed_id = active_entry.id
 			local probed_label = active_label
 			local probed_entry = {

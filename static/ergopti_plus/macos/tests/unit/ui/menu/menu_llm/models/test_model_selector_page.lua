@@ -342,8 +342,12 @@ helpers.describe("model selector page owner", function()
 			helpers.assert_eq(Page.handle_action(ctx, { action = "select_model", backend = "mlx", name = "Qwen-A" }, p, collected), false)
 			helpers.assert_eq(#calls.select + #calls.switch, 0)
 		end)
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): a choice runs while paused.
+	helpers.it("selects an installed model while paused (edd1-paused-writes)", function()
 		with_page({ paused = true }, function(Page, ctx, calls, collected, p)
-			helpers.assert_eq(Page.handle_action(ctx, { action = "select_model", backend = "ollama", name = "Qwen-A" }, p, collected), false)
+			helpers.assert_true(Page.handle_action(ctx, { action = "select_model", backend = "ollama", name = "Qwen-A" }, p, collected))
 		end)
 	end)
 

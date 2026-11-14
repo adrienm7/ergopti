@@ -896,11 +896,12 @@ local function _build_llm(ctx)
 	--- @param page_current function|nil Exact page projection owner.
 	--- @return boolean dispatched
 	local function delete_model(model, page_current)
+		-- A pause stops typing, not configuration (EDD-1): removing an
+		-- installed model runs while paused. An unreadable pause refuses.
 		local function admitted()
-			if ctx.paused == true then return false end
 			if type(ctx.is_paused) == "function" then
 				local ok, paused = pcall(ctx.is_paused)
-				if not ok or paused ~= false then return false end
+				if not ok or type(paused) ~= "boolean" then return false end
 			end
 			if page_current == nil then return true end
 			local ok, current = pcall(page_current)
