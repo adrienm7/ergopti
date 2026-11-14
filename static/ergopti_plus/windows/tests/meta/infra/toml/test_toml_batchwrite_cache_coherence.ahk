@@ -10,8 +10,10 @@
 
 #Requires AutoHotkey v2.0
 
-_TBCC_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol: a structure move may
+; rename the file to a base name another file shares, its symbol stays.
+_TBCC_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 
@@ -25,7 +27,7 @@ _TBCC_ReadSource(FileName) {
 ; =============================================
 
 _TBCC_DeepCopyPresent() {
-	Src := _TBCC_ReadSource("toml_helpers.ahk")
+	Src := _TBCC_ReadSource("_TOML_ParseCacheOwners")
 	Wrapper := _DriverFuncBody("TOML_BatchWrite")
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
 	Assert(Wrapper != "" && Seg != "",
@@ -46,7 +48,7 @@ Test("toml_helpers: TOML_BatchWrite deep-copies parsed Map before mutation", _TB
 
 
 _TBCC_FailurePathsInvalidateCache() {
-	Src := _TBCC_ReadSource("toml_helpers.ahk")
+	Src := _TBCC_ReadSource("_TOML_ParseCacheOwners")
 	Wrapper := _DriverFuncBody("TOML_BatchWrite")
 	Seg := _DriverFuncBody("_TOML_BatchWriteImpl")
 	Assert(Wrapper != "" && Seg != "",
