@@ -155,6 +155,62 @@ local function compose_string(text)
 	return '"' .. text:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
 end
 
+--- The keysyms a written Compose line types, or nil for a blank line.
+--- @param line string
+--- @return table|nil
+local function compose_keys(line)
+	local keys, position = {}, 1
+	while true do
+		local _, last, name = line:find("^<([^>]+)>%s*", position)
+		if not last then break end
+		keys[#keys + 1] = name
+		position = last + 1
+	end
+	if #keys == 0 or line:sub(position, position) ~= ":" then return nil end
+	return keys
+end
+
+--- Moves each written sequence before every written sequence it starts.
+--- A dead state's own line (`<dead_abovedot> : "˙"`) can be written after a
+--- chained state whose sequences it starts. libxkbcommon 1.6 (Ubuntu 24.04)
+--- keeps the longer sequences whatever the order; 1.13 (Ubuntu 26.04) lets a
+--- shorter line written later replace them, so that one line cut every
+--- sequence the dead key starts. Written first, the shorter line is extended by
+--- the longer ones on both. Lines already in that order keep their place; the
+--- Python converter (keylayout_to_xkb.prefixes_before_extensions) orders the
+--- same way.
+--- @param lines table
+--- @return table
+local function prefixes_before_extensions(lines)
+	local keys_of, first_extension = {}, {}
+	for index, line in ipairs(lines) do
+		local keys = compose_keys(line)
+		keys_of[index] = keys or false
+		for size = 1, (keys and #keys or 1) - 1 do
+			local prefix = table.concat(keys, " ", 1, size)
+			if first_extension[prefix] == nil then first_extension[prefix] = index end
+		end
+	end
+	local order = {}
+	for index in ipairs(lines) do
+		local keys = keys_of[index]
+		local target = index
+		if keys then target = math.min(index, first_extension[table.concat(keys, " ")] or index) end
+		-- A moved line goes just before the first line it starts, a shorter
+		-- prefix before a longer one.
+		order[index] = { target, target < index and 0 or 1, keys and #keys or 0, index }
+	end
+	table.sort(order, function(a, b)
+		for field = 1, 4 do
+			if a[field] ~= b[field] then return a[field] < b[field] end
+		end
+		return false
+	end)
+	local ordered_lines = {}
+	for position, entry in ipairs(order) do ordered_lines[position] = lines[entry[4]] end
+	return ordered_lines
+end
+
 --- An insertion-ordered string-keyed map.
 local function ordered()
 	local keys, values = {}, {}
@@ -647,7 +703,7 @@ function Converter:compose()
 	end
 	self.conflicts = conflicts
 	self.emitted = emitted
-	return 'include "%L"\n\n' .. table.concat(lines, "\n") .. "\n"
+	return 'include "%L"\n\n' .. table.concat(prefixes_before_extensions(lines), "\n") .. "\n"
 end
 
 --- Dead states starting a written sequence the locale Compose table extends.
