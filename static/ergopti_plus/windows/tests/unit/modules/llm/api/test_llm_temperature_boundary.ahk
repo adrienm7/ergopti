@@ -84,7 +84,8 @@ _LTB_PersistenceAndPayloadUseValidatedValue() {
 		CandidateFeatures["llm"]["generation"]["temperature"],
 		"(ahk2-11-temperature-boundary) refused persistence must leave the detached Features graph unchanged")
 
-	for Boundary in ["0", "2"] {
+	; The declared range's ends (the inference canon's maximum, 1.3).
+	for Boundary in ["0", "1.3"] {
 		AssertTrue(LLM_Option_TryNormalize("temperature", Boundary, &Normalized))
 		Ollama := JsonParse(LLM_BuildOllamaPayload(
 			"model", "system", "user", Normalized))

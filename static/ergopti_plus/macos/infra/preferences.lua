@@ -677,11 +677,19 @@ SCALAR_VALUE_RULES.caps_word_idle_timeout_seconds = function(value)
 	if CapsWordPolicy.validate_idle_timeout(value) then return true end
 	return false, "the CapsWord delay is not a number of seconds in the declared range (0 = never)"
 end
+-- The ChatGPT link: a web address its shared declaration admits, or "" (unset,
+-- the bindings then open the manifest default).
+SCALAR_VALUE_RULES.chatgpt_url = function(value)
+	if value == "" then return true end
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL), value)
+	if checked.ok then return true end
+	return false, string.format("the value is refused by its shared declaration (%s)", checked.reason)
+end
 -- The pause and resume layouts are layout ids or "" (no change), by the
 -- shared policy; a legacy `false` from the boolean declaration is outdated.
--- The LLM values and the ChatGPT link a hand edit or another driver can
--- store: their shared value schema declarations, the rule the three drivers
--- apply at load. The context
+-- The LLM values a hand edit or another driver can store: their shared value
+-- schema declarations, the rule the three drivers apply at load. The context
 -- length keeps its own owner, which demotes a stored value past the buffer's
 -- limit with an explicit confirmation (ui/menu/menu_state.lua).
 for state_key, schema_key in pairs({
@@ -689,16 +697,12 @@ for state_key, schema_key in pairs({
 	llm_min_words = ConfigKeys.KEY.LLM_GENERATION_MIN_WORDS,
 	llm_max_words = ConfigKeys.KEY.LLM_GENERATION_MAX_WORDS,
 	llm_num_predictions = ConfigKeys.KEY.LLM_PROFILES_NUM_PREDICTIONS,
-	chatgpt_url = ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL,
 }) do
-	assert(SCALAR_VALUE_RULES[state_key] == nil, "a declared value has one load rule")
+	assert(SCALAR_VALUE_RULES[state_key] == nil, "a declared LLM value has one load rule")
 	SCALAR_VALUE_RULES[state_key] = function(value)
 		local ValueCheck = require("settings.engine.value_check")
 		local checked = ValueCheck.check_value(ValueCheck.declaration(schema_key), value)
 		if checked.ok then return true end
-		if checked.min == nil then
-			return false, string.format("the value is refused by its shared declaration (%s)", checked.reason)
-		end
 		return false, string.format("the value is refused by its shared declaration (%s, %s..%s)",
 			checked.reason, tostring(checked.min), tostring(checked.max))
 	end

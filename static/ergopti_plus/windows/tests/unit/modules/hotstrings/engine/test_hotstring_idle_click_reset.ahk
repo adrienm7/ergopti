@@ -300,7 +300,7 @@ _HICR_ChoiceRowFreeEntry() {
 _HICR_LoaderRejectsNegative() {
 	Body := _DriverFuncBody("_FeatureStateIdleResetSeconds")
 	Assert(Body != "", "_FeatureStateIdleResetSeconds must exist")
-	AssertTrue(InStr(Body, "ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Raw)") > 0,
+	AssertTrue(InStr(Body, 'ValueCheckValue(ValueCheckEntryFor("hotstrings.idle_reset_seconds"), Raw)') > 0,
 		"the loader admits only delays its shared value schema declaration admits")
 	AssertTrue(InStr(Body, "LoggerWarn(") > 0, "an outdated delay is reported")
 	AssertTrue(InStr(Body, 'ManifestDefaultFor("hotstrings.idle_reset_seconds")') > 0)
