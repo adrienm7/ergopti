@@ -190,7 +190,9 @@ const LUA_FORMATTERS = new Set(['string.format', 'tostring']);
 const JS_DIALOGS = new Set(['alert', 'confirm', 'prompt']);
 const JS_TEXT_PROPERTIES = new Set(['textContent', 'innerText', 'placeholder', 'title']);
 const JS_TEXT_ATTRIBUTES = new Set(['title', 'placeholder', 'aria-label', 'alt']);
-const HTML_TEXT_ATTRIBUTE = /\b(title|placeholder|aria-label|alt)\s*=\s*"([^"]*)"/g;
+// The attribute itself, not the tail of a longer one: data-i18n-title="key"
+// names a locale key, it shows no text.
+const HTML_TEXT_ATTRIBUTE = /(?<![\w-])(title|placeholder|aria-label|alt)\s*=\s*"([^"]*)"/g;
 
 const SHELL_SCRIPTS = ['linux/install.sh', 'linux/uninstall.sh', 'linux/bin/ergopti-hotstrings'];
 const SHELL_SCRIPT_DIRECTORIES = ['linux/install'];
@@ -787,7 +789,8 @@ function selfTest() {
 			"el.title = _t('x');",
 			"html += '<span title=\"Clic ici\">' + v + '</span>';",
 			'html += `<td title="${_t(\'k\')}">x</td>`;',
-			"button.setAttribute('aria-label', 'Fermer');"
+			"button.setAttribute('aria-label', 'Fermer');",
+			'html += \'<input data-i18n-placeholder="a.b" data-i18n-title="c.d">\';'
 		].join('\n')
 	);
 	assert.deepEqual(
