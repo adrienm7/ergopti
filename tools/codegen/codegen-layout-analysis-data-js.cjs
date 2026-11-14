@@ -12,6 +12,8 @@
  *   - _shared/layouts/data/analysis/sources.json (the « i » references);
  *   - _shared/layouts/data/analysis/corpora.json and static/corpus/register.json
  *     (the built-in corpora and the licence of every corpus text);
+ *   - _shared/layouts/data/analysis/analyser_models.json (the constants of the
+ *     scorers that reproduce other analysers, analyser_scores.js);
  *   - _shared/layouts/data/keycodes/physical_keys.json (key geometry);
  *   - the registry layouts and the reference QWERTY and AZERTY, read through
  *     the layout composer model (tools/lib/layout-composer.cjs).
@@ -59,6 +61,7 @@ const HAND_FINGERS = [
 ];
 const HAND_SHARE = 50;
 const MAX_PINKY_SHARE = 8;
+const ANALYSERS_PATH = shared('layouts', 'data', 'analysis', 'analyser_models.json');
 // The text patterns the Windows antivirus-surface gate refuses in the shipped
 // bundle (tools/ci/windows-exe-av-surface.cjs reads the same file).
 const AV_POLICY_PATH = path.join(REPO_ROOT, 'tools', 'ci', 'windows-exe-av-surface.json');
@@ -87,6 +90,7 @@ const SOURCES = [
 	'layouts/data/analysis/layout_credits.json',
 	'layouts/data/analysis/sources.json',
 	'static/corpus/register.json',
+	'layouts/data/analysis/analyser_models.json',
 	'layouts/data/keycodes/physical_keys.json',
 	'../../layouts/registry (through layout_composer)'
 ];
@@ -575,8 +579,45 @@ function checkIdealLoad(load) {
 	}
 }
 
+// ============================
+// ======= 4/ Analysers =======
+// ============================
+
+// The fields every analyser entry of analyser_models.json carries.
+const ANALYSER_FIELDS = [
+	'name',
+	'url',
+	'revision',
+	'licence',
+	'fidelity',
+	'better',
+	'unit',
+	'model'
+];
+const FIDELITIES = new Set(['exact', 'close', 'approximate']);
+const DIRECTIONS = new Set(['higher', 'lower', 'none']);
+
+/**
+ * The constants of the analyser scorers, checked.
+ * @returns {object} analyser id → entry.
+ * @throws {Error} On a missing field, an unknown fidelity or direction.
+ */
+function buildAnalysers() {
+	const analysers = JSON.parse(fs.readFileSync(ANALYSERS_PATH, 'utf8')).analysers;
+	for (const [id, entry] of Object.entries(analysers)) {
+		for (const field of ANALYSER_FIELDS)
+			if (entry[field] === undefined)
+				throw new Error(`analyser_models.json: ${id} has no ${field}`);
+		if (!FIDELITIES.has(entry.fidelity))
+			throw new Error(`analyser_models.json: ${id} fidelity ${entry.fidelity}`);
+		if (!DIRECTIONS.has(entry.better))
+			throw new Error(`analyser_models.json: ${id} better ${entry.better}`);
+	}
+	return analysers;
+}
+
 // ==========================
-// ======= 4/ JS source =====
+// ======= 5/ JS source =====
 // ==========================
 
 /**
@@ -601,7 +642,8 @@ function buildData() {
 		layouts: buildLibrary(model),
 		corpora: corpora.catalogue,
 		sources: buildInfoSources(engine),
-		corpusTables: corpora.tables
+		corpusTables: corpora.tables,
+		analysers: buildAnalysers()
 	};
 }
 
@@ -635,6 +677,7 @@ function buildSource(data) {
 		`\t"library_sources": ${JSON.stringify(data.library_sources)},`,
 		`\t"corpora": ${JSON.stringify(data.corpora)},`,
 		`\t"sources": ${JSON.stringify(data.sources)},`,
+		`\t"analysers": ${JSON.stringify(data.analysers)},`,
 		'\t"layouts": [',
 		layoutLines,
 		'\t]',

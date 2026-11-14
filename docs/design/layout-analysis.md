@@ -194,6 +194,18 @@ the layout's own file or site states the credit (`source`) or it is the
 generally known author still to be checked (`knowledge`). The « Comparer »
 shows the credit and the link in each layout's details.
 
+## Other analysers' scores
+
+`_shared/ui/layout_analysis/analyser_scores.js` (global `LAYOUT_ANALYSER_SCORES`,
+loaded after the engine) gives each layout's score as KLA, its SteveP fork,
+KLAnext, a200, carpalx, keygen, genkey, Oxeylyzer, Keyboard Layout Optimizer,
+cmini and the Ergo-L analyser compute it, on the same cached tables; its
+formulas, sources, licences and fidelity are in
+[analyser-scores.md](analyser-scores.md). The engine's `keyNgrams(layout,
+ngrams, {keyboard})` exposes the expanded key stream `analyse` measures
+(presses, key bigrams and trigrams as sparse counts), cached per prepared
+table, layout object and keyboard.
+
 ## Built-in corpora
 
 `static/corpus/register.json` is the licence register of every text under

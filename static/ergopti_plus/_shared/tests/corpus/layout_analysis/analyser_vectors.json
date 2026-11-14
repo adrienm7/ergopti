@@ -1,0 +1,274 @@
+{
+	"_description": "Reference vectors of the analyser scorers (_shared/ui/layout_analysis/analyser_scores.js, gate tools/test/test-analyser-scores.cjs): a layout, a text or corpus, a keyboard and the value the analyser gives. « basis » says where the value comes from: « tool » = printed by the analyser's own code, run on the same input; « published » = a table the analyser's author published; « hand » = computed by hand from the formula of docs/design/analyser-scores.md. A text with « keep_line_breaks » is counted with its line breaks, as KLA reads them (KLA types each as Enter). Fixtures: analysers/kla_alice_ch1.txt is KLA's preset (Lewis Carroll, public domain; KLA is MIT), analysers/ergol_*.json are the Ergo-L repository's corpus tables (Project Gutenberg texts) and Kalamine keymaps (WTFPL v2).",
+	"schema_version": 1,
+	"vectors": [
+		{
+			"analyser": "kla",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 54.30769230769231,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "kla",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"file": "analysers/kla_alice_ch1.txt",
+			"keep_line_breaks": true,
+			"value": 53.0568,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla",
+			"basis": "tool",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"file": "analysers/kla_alice_ch1.txt",
+			"keep_line_breaks": true,
+			"value": 49.5354,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla_stevep",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 41.333333333333336,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "kla_stevep",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"file": "analysers/kla_alice_ch1.txt",
+			"keep_line_breaks": true,
+			"value": 46.5481,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "kla_stevep",
+			"basis": "tool",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"file": "analysers/kla_alice_ch1.txt",
+			"keep_line_breaks": true,
+			"value": 38.9089,
+			"tolerance": 0.0001
+		},
+		{
+			"analyser": "klanext",
+			"basis": "published",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"file": "../../../../../corpus/original/en/Chained English Bigrams 7.txt",
+			"keep_line_breaks": true,
+			"value": 207.32,
+			"tolerance": 0.2,
+			"parts": { "distance": 100.53, "same_finger": 92.21, "same_hand": 14.58 },
+			"parts_tolerance": 0.4
+		},
+		{
+			"analyser": "a200",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "thea",
+			"parts": {
+				"alternate": 50,
+				"roll_out": 50,
+				"roll_in": 0,
+				"redirect": 0,
+				"sfb": 0,
+				"unknown": 0,
+				"finger_li": 25,
+				"finger_ri": 25,
+				"finger_lm": 25,
+				"finger_lp": 25,
+				"row_top": 50,
+				"row_home": 50
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 3.463054595,
+			"tolerance": 1e-6,
+			"parts": { "base": 1.847693475, "penalty": 0.42032112, "path": 1.19504 },
+			"parts_tolerance": 1e-6
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "and",
+			"value": 3.534177,
+			"tolerance": 1e-6
+		},
+		{
+			"analyser": "carpalx",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "tbt",
+			"value": 5.744381,
+			"tolerance": 1e-6
+		},
+		{
+			"analyser": "keygen",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 1.8333333333333333,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "genkey",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "ge",
+			"value": 65,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "genkey",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "ded",
+			"value": 342.581,
+			"tolerance": 1e-6
+		},
+		{
+			"analyser": "oxeylyzer",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "the",
+			"value": 0.13333333333333333,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "oxeylyzer",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"text": "decided",
+			"value": -6.331428571428571,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "oxeylyzer",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ortho",
+			"text": "decided",
+			"value": -6.021428571428571,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "the",
+			"value": 270.79707531241087,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "The",
+			"value": 576.9584792289442,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "dariogoetz",
+			"basis": "tool",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "Hello, World.",
+			"value": 2656.976701538677,
+			"tolerance": 1e-9
+		},
+		{
+			"analyser": "cmini",
+			"basis": "hand",
+			"layout": "qwerty",
+			"keyboard": "ansi",
+			"tables": {
+				"chars": { "d": 1 },
+				"bigrams": { "de": 1, "th": 1, "aa": 1 },
+				"trigrams": { "the": 2, "ded": 1, "abc": 1, "zq€": 1 }
+			},
+			"parts": {
+				"sfb": 33.333333333333336,
+				"alternate": 40,
+				"redirect": 20,
+				"sfr": 20,
+				"unknown": 20,
+				"roll": 0
+			},
+			"parts_tolerance": 1e-9
+		},
+		{
+			"analyser": "ergol",
+			"basis": "tool",
+			"kalamine": "analysers/ergol_keymap_ergol.json",
+			"keyboard": "iso",
+			"ergol_corpus": "analysers/ergol_corpus_en_fr.json",
+			"parts": {
+				"sfb": 1.144883,
+				"skb": 2.605739,
+				"lsb": 5.726244,
+				"scissor": 1.191414,
+				"scissor_extended": 0.414516,
+				"roll_in": 18.256864,
+				"roll_out": 13.866865,
+				"sfs": 6.994369,
+				"sks": 2.531248,
+				"redirect": 5.653617,
+				"redirect_bad": 0.421049,
+				"unsupported": 0
+			},
+			"parts_tolerance": 1e-6
+		},
+		{
+			"analyser": "ergol",
+			"basis": "tool",
+			"kalamine": "analysers/ergol_keymap_qwerty.json",
+			"keyboard": "iso",
+			"ergol_corpus": "analysers/ergol_corpus_en_fr.json",
+			"parts": {
+				"sfb": 6.1664,
+				"skb": 2.5538,
+				"lsb": 8.639,
+				"scissor": 3.4177,
+				"scissor_extended": 4.5287,
+				"roll_in": 9.1095,
+				"roll_out": 9.2588,
+				"sfs": 10.1648,
+				"sks": 2.5862,
+				"redirect": 4.6007,
+				"redirect_bad": 0.4082,
+				"left_hand": 55.8187,
+				"right_hand": 43.1197,
+				"unsupported": 0.012
+			},
+			"parts_tolerance": 0.001
+		}
+	]
+}
