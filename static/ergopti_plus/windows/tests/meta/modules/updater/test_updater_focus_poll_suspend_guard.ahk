@@ -37,8 +37,10 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_UFPS_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol: a structure move may
+; rename the file to a base name another file shares, its symbol stays.
+_UFPS_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 
@@ -51,7 +53,7 @@ _UFPS_ReadSource(FileName) {
 ; ==================================================
 
 _UFPS_FocusPollHasSuspendGuard() {
-	Src := _UFPS_ReadSource("process_lifecycle.ahk")
+	Src := _UFPS_ReadSource("PLC_OnFocusChange")
 	Seg := _DriverFuncBody("PLC_Poll")
 	Assert(Seg != "", "PLC_Poll() declaration must exist in process_lifecycle.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
