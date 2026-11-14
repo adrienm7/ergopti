@@ -22,6 +22,10 @@
 ;    are bytes, sent as base64: SourceStore_Export writes them to the user's
 ;    Downloads folder under the name the page chose, or « name (2).ext » and so
 ;    on when it is taken, so nothing there is ever replaced.
+; 6. Ergopti Studio's personal layouts (StudioStore_*): the Windows twin of
+;    _shared/layouts/engine/composer/studio_store.lua, one JSON file of the same
+;    folder mapping each id to the page's JSON text, stored as given; an
+;    unreadable store refuses every operation and is never replaced.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -415,4 +419,248 @@ SourceStore_Export(Settings, Payload, Ports := 0) {
 	}
 	LoggerInfo("LayoutSource", "Layout editor download written: {1}.", Path)
 	return Map("ok", true, "code", "", "detail", "", "path", Path)
+}
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 5/ Ergopti Studio layouts ========
+; ==========================================
+; ==========================================
+
+/**
+ * Validates the studio table of the shared layout defaults.
+ * @param {Map} LayoutDefaults - Decoded _shared/layouts/data/defaults.json.
+ * @returns {Map} folder, file, id_pattern, id_max_length, max_layouts,
+ *   max_layout_bytes, corpus_folder, corpus_prefix, corpus_id_pattern,
+ *   max_corpus_bytes and failures (invalid, write, unreadable, corpus).
+ * @throws {Error} When the table is missing or one of its fields is not valid.
+ */
+StudioStore_Settings(LayoutDefaults) {
+	Source := (LayoutDefaults is Map) ? LayoutDefaults.Get("source", 0) : 0
+	Studio := (LayoutDefaults is Map) ? LayoutDefaults.Get("studio", 0) : 0
+	if !(Source is Map) || !(Studio is Map)
+		throw Error("The layout defaults have no source or studio table.")
+	for Value in [Source.Get("folder", 0), Studio.Get("file", 0)]
+		if !(Value is String) || !RegExMatch(Value, "^[A-Za-z0-9._-]+$")
+			throw Error("The studio folder or file is not a plain name.")
+	for Field in ["id_pattern", "corpus_id_pattern"] {
+		Pattern := Studio.Get(Field, 0)
+		if !(Pattern is String) || SubStr(Pattern, 1, 1) != "^" || SubStr(Pattern, -1) != "$"
+			throw Error("The studio " . Field . " is not an anchored pattern.")
+	}
+	Folder := Studio.Get("corpus_folder", 0)
+	if !(Folder is String) || !RegExMatch(Folder, "^[a-z0-9_]+[a-z0-9_/]*[a-z0-9_]$") || InStr(Folder, "//")
+		throw Error("The studio corpus_folder is not a plain relative folder.")
+	if !(Studio.Get("corpus_prefix", 0) is String) || !RegExMatch(Studio["corpus_prefix"], "^[a-z0-9_]+$")
+		throw Error("The studio corpus_prefix is not a plain name.")
+	for Field in ["id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes"]
+		if !(Studio.Get(Field, 0) is Integer) || Studio[Field] <= 0
+			throw Error("The studio " . Field . " is not a positive integer.")
+	Failures := Studio.Get("failures", 0)
+	for Code in ["invalid", "write", "unreadable", "corpus"]
+		if !(Failures is Map) || !(Failures.Get(Code, 0) is String) || !RegExMatch(Failures[Code], "^[a-z_]+$")
+			throw Error("The studio failures name no " . Code . " code.")
+	return Map("folder", Source["folder"], "file", Studio["file"], "id_pattern", Studio["id_pattern"],
+		"id_max_length", Studio["id_max_length"], "max_layouts", Studio["max_layouts"],
+		"max_layout_bytes", Studio["max_layout_bytes"], "corpus_folder", Folder,
+		"corpus_prefix", Studio["corpus_prefix"], "corpus_id_pattern", Studio["corpus_id_pattern"],
+		"max_corpus_bytes", Studio["max_corpus_bytes"],
+		"failures", Map("invalid", Failures["invalid"], "write", Failures["write"], "unreadable", Failures["unreadable"],
+			"corpus", Failures["corpus"]))
+}
+
+/**
+ * The studio settings from the shipped layout defaults, read once.
+ * @returns {Map}
+ */
+StudioStore_SharedSettings() {
+	static Settings := 0
+	if !(Settings is Map)
+		Settings := StudioStore_Settings(_LayoutRegistryReadJson("layouts\data\defaults.json"))
+	return Settings
+}
+
+/** Whether an id is one the store keeps. */
+StudioStore_ValidId(Settings, Id) {
+	return (Id is String) && StrLen(Id) <= Settings["id_max_length"] && RegExMatch(Id, Settings["id_pattern"]) > 0
+}
+
+/**
+ * Checks one layout the page saves: its JSON text names the id it is saved under.
+ * @returns {String} "" when it is accepted, else why it is refused.
+ */
+StudioStore_Check(Settings, Payload) {
+	if !(Payload is Map)
+		return "the save request is not a table"
+	if !StudioStore_ValidId(Settings, Payload.Get("id", 0))
+		return "the layout id is not a personal layout id"
+	Text := Payload.Get("text", 0)
+	if !(Text is String) || Text == ""
+		return "the layout is empty"
+	if StrPut(Text, "UTF-8") - 1 > Settings["max_layout_bytes"]
+		return "the layout is larger than its bound"
+	try Layout := JsonParse(Text)
+	catch
+		return "the layout is not a JSON object"
+	if !(Layout is Map)
+		return "the layout is not a JSON object"
+	if !(Layout.Get("id", 0) is String) || Layout["id"] != Payload["id"]
+		return "the layout names another id"
+	return ""
+}
+
+StudioStore_Path(Settings, ConfigDir) => ConfigDir . Settings["folder"] . "\" . Settings["file"]
+
+; The stored layouts (id -> JSON text), or the failure of an unreadable store.
+; An absent store is an empty one.
+_StudioStore_Load(Settings, ConfigDir, Ports, &Failure) {
+	Failure := ""
+	Path := StudioStore_Path(Settings, ConfigDir)
+	if !Ports["exists"].Call(Path)
+		return Map()
+	Bound := Settings["max_layouts"] * (Settings["max_layout_bytes"] * 2 + Settings["id_max_length"] + 8) + 64
+	Text := Ports["read"].Call(Path, Bound)
+	if !(Text is String) {
+		Failure := Path . " could not be read"
+		return 0
+	}
+	try Data := JsonParse(Text)
+	catch {
+		Failure := Path . " is not a layout store"
+		return 0
+	}
+	if !(Data is Map) || Data.Get("schema", 0) != 1 || !(Data.Get("layouts", 0) is Map) {
+		Failure := Path . " is not a schema 1 layout store"
+		return 0
+	}
+	Layouts := Map()
+	for Id, LayoutText in Data["layouts"] {
+		if !StudioStore_ValidId(Settings, Id) || !(LayoutText is String) {
+			Failure := Path . " holds an entry that is not a personal layout"
+			return 0
+		}
+		Layouts[Id] := LayoutText
+	}
+	if Layouts.Count > Settings["max_layouts"] {
+		Failure := Path . " holds more layouts than its bound"
+		return 0
+	}
+	return Layouts
+}
+
+; Writes the store file; "" or the write failure.
+_StudioStore_Write(Settings, ConfigDir, Ports, Layouts) {
+	try Ports["write"].Call(StudioStore_Path(Settings, ConfigDir),
+		_LayMgrWeb_Json(Map("layouts", Layouts, "schema", 1)) . "`n")
+	catch as Err
+		return Err.Message
+	return ""
+}
+
+/**
+ * Every stored layout, sorted by id, for the page's studioLayouts.
+ * @param {Map} Settings - From StudioStore_Settings.
+ * @param {String} ConfigDir - Configuration folder, with its trailing backslash.
+ * @param {Map} Ports - As SourceStore_Open.
+ * @returns {Map} ok and layouts (JSON texts), or ok false, code and detail.
+ */
+StudioStore_List(Settings, ConfigDir, Ports := 0) {
+	Ports := _SourceStore_Ports(Ports)
+	Layouts := _StudioStore_Load(Settings, ConfigDir, Ports, &Failure)
+	if !(Layouts is Map) {
+		LoggerError("LayoutSource", "The Ergopti Studio layouts are unreadable: {1}.", Failure)
+		return Map("ok", false, "code", Settings["failures"]["unreadable"], "detail", Failure)
+	}
+	Texts := []
+	for Id, Text in Layouts
+		Texts.Push(Text)
+	return Map("ok", true, "layouts", Texts)
+}
+
+/**
+ * Stores one layout, replacing the one with the same id.
+ * @returns {Map} ok, code and detail, the page's studioLayoutResult.
+ */
+StudioStore_Save(Settings, ConfigDir, Payload, Ports := 0) {
+	Ports := _SourceStore_Ports(Ports)
+	Refusal := StudioStore_Check(Settings, Payload)
+	if Refusal != "" {
+		LoggerWarn("LayoutSource", "Refused an Ergopti Studio layout: {1}.", Refusal)
+		return Map("ok", false, "code", Settings["failures"]["invalid"], "detail", Refusal)
+	}
+	Layouts := _StudioStore_Load(Settings, ConfigDir, Ports, &Failure)
+	if !(Layouts is Map) {
+		LoggerError("LayoutSource", "An Ergopti Studio layout was not saved over an unreadable store: {1}.", Failure)
+		return Map("ok", false, "code", Settings["failures"]["unreadable"], "detail", Failure)
+	}
+	Others := Layouts.Count - (Layouts.Has(Payload["id"]) ? 1 : 0)
+	if Others >= Settings["max_layouts"]
+		return Map("ok", false, "code", Settings["failures"]["invalid"],
+			"detail", "the store already holds its maximum number of layouts")
+	Layouts[Payload["id"]] := Payload["text"]
+	WriteFailure := _StudioStore_Write(Settings, ConfigDir, Ports, Layouts)
+	if WriteFailure != "" {
+		LoggerError("LayoutSource", "The Ergopti Studio layouts could not be written: {1}.", WriteFailure)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", WriteFailure)
+	}
+	LoggerInfo("LayoutSource", "Ergopti Studio layout saved: {1}.", Payload["id"])
+	return Map("ok", true, "detail", Payload["id"])
+}
+
+/**
+ * Removes one layout; an id the store does not hold is already removed.
+ * @returns {Map} ok, code and detail, the page's studioLayoutResult.
+ */
+StudioStore_Remove(Settings, ConfigDir, Payload, Ports := 0) {
+	Ports := _SourceStore_Ports(Ports)
+	if !(Payload is Map) || !StudioStore_ValidId(Settings, Payload.Get("id", 0))
+		return Map("ok", false, "code", Settings["failures"]["invalid"], "detail", "the layout id is not a personal layout id")
+	Layouts := _StudioStore_Load(Settings, ConfigDir, Ports, &Failure)
+	if !(Layouts is Map) {
+		LoggerError("LayoutSource", "An Ergopti Studio layout was not removed from an unreadable store: {1}.", Failure)
+		return Map("ok", false, "code", Settings["failures"]["unreadable"], "detail", Failure)
+	}
+	if !Layouts.Has(Payload["id"])
+		return Map("ok", true, "detail", Payload["id"])
+	Layouts.Delete(Payload["id"])
+	WriteFailure := _StudioStore_Write(Settings, ConfigDir, Ports, Layouts)
+	if WriteFailure != "" {
+		LoggerError("LayoutSource", "The Ergopti Studio layouts could not be written: {1}.", WriteFailure)
+		return Map("ok", false, "code", Settings["failures"]["write"], "detail", WriteFailure)
+	}
+	LoggerInfo("LayoutSource", "Ergopti Studio layout removed: {1}.", Payload["id"])
+	return Map("ok", true, "detail", Payload["id"])
+}
+
+/**
+ * The generated tables of one built-in corpus, as the JavaScript the Studio
+ * page runs (the page's relative corpus URLs name the comparer's folder).
+ * @param {Map} Settings - From StudioStore_Settings.
+ * @param {String} SharedDir - The _shared folder, without a trailing backslash.
+ * @param {Map} Payload - { id }.
+ * @param {Map} Ports - As SourceStore_Open.
+ * @returns {Map} ok and text, or ok false, code and detail.
+ */
+StudioStore_Corpus(Settings, SharedDir, Payload, Ports := 0) {
+	Ports := _SourceStore_Ports(Ports)
+	Id := (Payload is Map) ? Payload.Get("id", 0) : 0
+	if !(Id is String) || StrLen(Id) > Settings["id_max_length"] || !RegExMatch(Id, Settings["corpus_id_pattern"]) {
+		LoggerWarn("LayoutSource", "Refused an Ergopti Studio corpus request without a corpus id.")
+		return Map("ok", false, "code", Settings["failures"]["corpus"], "detail", "the corpus id is not a built-in corpus id")
+	}
+	Path := SharedDir . "\" . StrReplace(Settings["corpus_folder"], "/", "\") . "\" . Settings["corpus_prefix"] . Id . ".js"
+	if !Ports["exists"].Call(Path) {
+		LoggerWarn("LayoutSource", "Ergopti Studio has no built-in corpus {1}.", Id)
+		return Map("ok", false, "code", Settings["failures"]["corpus"], "detail", Path . " does not exist")
+	}
+	Text := Ports["read"].Call(Path, Settings["max_corpus_bytes"])
+	if !(Text is String) {
+		LoggerError("LayoutSource", "An Ergopti Studio corpus is unreadable: {1}.", Path)
+		return Map("ok", false, "code", Settings["failures"]["corpus"], "detail", Path . " could not be read")
+	}
+	return Map("ok", true, "text", Text)
 }

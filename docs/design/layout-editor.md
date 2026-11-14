@@ -236,6 +236,30 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
 - The analysis panels open their « i » links through `window.LAYOUT_ANALYSIS_HOST.openLink(url)`: the page posts
   `open_link`, and the host opens an https URL (and nothing else) in the system browser.
 
+## Ergopti Studio: « Éditer » and « Comparer »
+
+The window has two tabs: « Éditer » (the layout editor) and « Comparer » (the layout comparer of
+`_shared/ui/layout_analysis`, the page the site shows at `/studio/comparer`). The tab placement and the way the
+comparer is embedded were decided by the agent, to be reviewed by the maintainer.
+
+- Mounted, not framed: the app's pages forbid frames (`frame-src 'none'`) and macOS and Linux inline every
+  script, so the window loads the comparer's scripts and `script.js` calls
+  `LAYOUT_ANALYSIS_COMPARER.mount(#studio-comparer, {host: window.LAYOUT_ANALYSIS_HOST})` the first time the tab
+  opens: opening the window runs no analysis.
+- Personal layouts in the data folder: the host's `store` (`studio_layouts`, `studio_layout_save`,
+  `studio_layout_remove`, each with the page's request number) keeps the layouts imported in « Comparer » in
+  `layout_sources/studio_layouts.json`. Each layout is stored as the JSON text the page sent and returned
+  unchanged (`_shared/layouts/engine/composer/studio_store.lua`, Windows `StudioStore_*`). An unreadable store
+  refuses every operation and is never overwritten. The store waits for initData (`studio_store`), and a host
+  without one refuses its calls.
+- Built-in corpora on request: `LAYOUT_ANALYSIS_HOST.loadCorpus(id)` posts `studio_corpus`; the host reads
+  `_shared/ui/layout_analysis/_generated/corpus_<id>.js` (an id of `[a-z0-9_]`, so it names no other file; bounded by
+  `studio.max_corpus_bytes`), runs it in the page as a classic script and answers `studioCorpus`, or refuses with
+  `studio_corpus_unavailable`. The comparer uses it in place of a corpus script tag once worker R's corpus loader
+  asks the host (docs/design/layout-analysis.md).
+- « My typing »: the keystats counts loaded with « Analyse my typing » become the comparer's default corpus
+  (`studio-ngrams` event).
+
 ## Limits stated to the user
 
 - An imported `.keylayout` stays verbatim (exportable unchanged) until « Convert to an editable source »: the

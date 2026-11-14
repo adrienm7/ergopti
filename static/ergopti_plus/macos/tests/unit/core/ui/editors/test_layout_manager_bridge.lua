@@ -378,6 +378,10 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 			end,
 		}
 		local saved_sqlite, saved_reader = package.loaded["hs.sqlite3"], package.loaded["modules.keystats.sqlite_reader"]
+		-- The reader requires hs.json too; a run of this file alone has no other module that loaded it.
+		local saved_json = package.loaded["hs.json"]
+		local SharedJson = require("core.text.engine.json")
+		package.loaded["hs.json"] = saved_json or { encode = SharedJson.encode, decode = SharedJson.decode }
 		package.loaded["hs.sqlite3"] = fake
 		package.loaded["modules.keystats.sqlite_reader"] = nil
 		local ok, err = pcall(function()
@@ -395,6 +399,7 @@ helpers.describe("Ergopti Studio keystats bridge (macOS)", function()
 		end)
 		package.loaded["hs.sqlite3"] = saved_sqlite
 		package.loaded["modules.keystats.sqlite_reader"] = saved_reader
+		package.loaded["hs.json"] = saved_json
 		helpers.assert_true(ok, tostring(err))
 	end)
 
@@ -419,5 +424,176 @@ helpers.describe("Ergopti Studio links (macOS)", function()
 		local manager = editor_controller({ open_url = function(url) opened[#opened + 1] = url end })
 		helpers.assert_true(manager.on_message({ action = "open_link", url = "https://ergopti.fr" }) == false)
 		helpers.assert_eq(opened, { "https://ergopti.fr/studio" })
+	end)
+end)
+
+helpers.describe("Ergopti Studio personal layouts (studio-layout-store)", function()
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local defaults = Json.decode(assert(io.open(Paths.shared("layouts/data/defaults.json"), "rb")):read("*a"))
+	local settings = assert(StudioStore.settings(defaults))
+
+	--- A store over an in-memory disk.
+	local function store(files)
+		files = files or {}
+		local logs = {}
+		local operations = StudioStore.new({
+			settings = settings,
+			config_dir = "/cfg/", shared_dir = "/shared/",
+			exists = function(path) return files[path] ~= nil end,
+			read_bounded = function(path) return files[path], files[path] and "ok" or "absent" end,
+			write = function(path, text) files[path] = text; return true end,
+			log = function(level, message) logs[#logs + 1] = level .. ": " .. message end,
+		})
+		return operations, files, logs
+	end
+	local function call(operation, ...)
+		local result
+		local args = { ... }
+		args[#args + 1] = function(...) result = { ... } end
+		operation((table.unpack or unpack)(args))
+		return result
+	end
+
+	helpers.it("stores each layout's JSON text exactly as given and lists it back by id", function()
+		local operations, files = store()
+		helpers.assert_eq(call(operations.list), { true, {} }, "an absent store is empty")
+		local b = '{"id":"user_b","rows":{"KeyQ":["q",null,null,"Q"]},"name":"B"}'
+		local a = '{"id":"user_a","name":"A","dead":{}}'
+		helpers.assert_eq(call(operations.save, { id = "user_b", text = b }), { true, nil, "user_b" })
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = a }), { true, nil, "user_a" })
+		helpers.assert_eq(call(operations.list), { true, { a, b } }, "null cells survive: the text is never re-encoded")
+		local replaced = '{"id":"user_a","name":"A2"}'
+		call(operations.save, { id = "user_a", text = replaced })
+		helpers.assert_eq(call(operations.list), { true, { replaced, b } }, "saving an existing id replaces it")
+		helpers.assert_eq(call(operations.remove, { id = "user_a" }), { true, nil, "user_a" })
+		helpers.assert_eq(call(operations.remove, { id = "user_a" }), { true, nil, "user_a" }, "an absent id is already removed")
+		helpers.assert_eq(call(operations.list), { true, { b } })
+		helpers.assert_true(files["/cfg/" .. settings.folder .. "/" .. settings.file] ~= nil)
+	end)
+
+	helpers.it("refuses a foreign id, a layout naming another id and a non-JSON layout", function()
+		local operations, files = store()
+		local invalid = settings.failures.invalid
+		helpers.assert_eq(call(operations.save, { id = "../x", text = '{"id":"../x"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "bepo", text = '{"id":"bepo"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_b"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = "not json" })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = string.rep("x", settings.max_layout_bytes + 1) })[2], invalid)
+		helpers.assert_eq(call(operations.remove, { id = "/etc" })[2], invalid)
+		helpers.assert_eq(next(files), nil, "nothing reached the disk")
+	end)
+
+	helpers.it("never replaces an unreadable store and reports it on every operation", function()
+		local path = "/cfg/" .. settings.folder .. "/" .. settings.file
+		local operations, files = store({ [path] = "{broken" })
+		local unreadable = settings.failures.unreadable
+		helpers.assert_eq(call(operations.list)[2], unreadable)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_a"}' })[2], unreadable)
+		helpers.assert_eq(call(operations.remove, { id = "user_a" })[2], unreadable)
+		helpers.assert_eq(files[path], "{broken", "the damaged file is kept for the user")
+		files[path] = '{"schema":1,"layouts":{"bepo":"{}"}}'
+		helpers.assert_eq(call(operations.list)[2], unreadable, "a foreign entry makes the store unreadable")
+	end)
+
+	helpers.it("bounds the number of layouts", function()
+		local small = {}
+		for key, value in pairs(settings) do small[key] = value end
+		small.max_layouts = 2
+		local files = {}
+		local operations = StudioStore.new({ settings = small, config_dir = "/cfg/", shared_dir = "/shared/",
+			exists = function(path) return files[path] ~= nil end,
+			read_bounded = function(path) return files[path], "ok" end,
+			write = function(path, text) files[path] = text; return true end,
+			log = function() end })
+		call(operations.save, { id = "user_a", text = '{"id":"user_a"}' })
+		call(operations.save, { id = "user_b", text = '{"id":"user_b"}' })
+		helpers.assert_eq(call(operations.save, { id = "user_c", text = '{"id":"user_c"}' })[2], small.failures.invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_a","n":2}' })[1], true,
+			"replacing a stored layout is not one more")
+	end)
+end)
+
+helpers.describe("Ergopti Studio personal layouts through the controller (studio-layout-store)", function()
+	helpers.it("answers the page's requests with their number, from the Studio window only", function()
+		local saved = {}
+		local registry = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			source_open = function(on_done) on_done({}) end,
+			source_save = function(_, on_done) on_done(true) end,
+			studio_list = function(on_done) on_done(true, { '{"id":"user_a"}' }) end,
+			studio_save = function(payload, on_done)
+				saved[#saved + 1] = payload
+				on_done(false, "studio_write_failed", "disk full")
+			end,
+			studio_remove = function(payload, on_done) on_done(true, nil, payload.id) end,
+		}
+		local function controller(editor_window)
+			local pushes = {}
+			local instance = ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+				strings = function() return {} end, open_url = function() end, close = function() end,
+				log = function() end })
+			return instance, pushes
+		end
+		local instance, pushes = controller(true)
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(pushes[1].payload.studio_store == true)
+		helpers.assert_true(instance.on_message({ action = "studio_layouts", request = 4 }) == true)
+		helpers.assert_eq(pushes[#pushes], { name = "studioLayouts",
+			payload = { request = 4, ok = true, layouts = { '{"id":"user_a"}' } } })
+		helpers.assert_true(instance.on_message({ action = "studio_layout_save", request = 5, id = "user_a",
+			text = '{"id":"user_a"}' }) == true)
+		helpers.assert_eq(saved, { { id = "user_a", text = '{"id":"user_a"}' } })
+		helpers.assert_eq(pushes[#pushes], { name = "studioLayoutResult",
+			payload = { request = 5, ok = false, code = "studio_write_failed", detail = "disk full" } })
+		helpers.assert_true(instance.on_message({ action = "studio_layout_remove", request = 6, id = "user_a" }) == true)
+		helpers.assert_eq(pushes[#pushes].payload, { request = 6, ok = true, detail = "user_a" })
+		helpers.assert_true(instance.on_message({ action = "studio_layouts" }) == false, "a request number is required")
+		local manager, manager_pushes = controller(false)
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_pushes[1].payload.studio_store == false)
+		helpers.assert_true(manager.on_message({ action = "studio_layouts", request = 1 }) == false)
+	end)
+
+	helpers.it("runs a built-in corpus's tables in the Studio page before answering (studio-corpus-tables)", function()
+		local events, run_result = {}, true
+		local registry = {
+			snapshot = function() return { platform = "test", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			studio_corpus = function(payload, on_done)
+				if payload.id == "fr_swann" then on_done(true, "var T = 1;", "studio_corpus_unavailable")
+				else on_done(false, "studio_corpus_unavailable", "no such corpus") end
+			end,
+		}
+		local function controller(editor_window, run_script)
+			return ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) events[#events + 1] = { push = name, payload = payload }; return true end,
+				run_script = run_script, strings = function() return {} end, open_url = function() end,
+				close = function() end, log = function() end })
+		end
+		local instance = controller(true, function(text)
+			events[#events + 1] = { run = text }
+			return run_result
+		end)
+		helpers.assert_true(instance.on_message({ action = "studio_corpus", request = 2, id = "fr_swann" }) == true)
+		helpers.assert_eq(events, { { run = "var T = 1;" },
+			{ push = "studioCorpus", payload = { request = 2, ok = true } } })
+		events = {}
+		helpers.assert_true(instance.on_message({ action = "studio_corpus", request = 3, id = "absent" }) == true)
+		helpers.assert_eq(events, { { push = "studioCorpus",
+			payload = { request = 3, ok = false, code = "studio_corpus_unavailable", detail = "no such corpus" } } })
+		events, run_result = {}, false
+		helpers.assert_true(instance.on_message({ action = "studio_corpus", request = 4, id = "fr_swann" }) == true)
+		helpers.assert_eq(events[2], { push = "studioCorpus", payload = { request = 4, ok = false,
+			code = "studio_corpus_unavailable", detail = "the page refused the corpus script" } })
+		helpers.assert_true(instance.on_message({ action = "studio_corpus", id = "fr_swann" }) == false,
+			"a request number is required")
+		helpers.assert_true(controller(false, function() return true end).on_message({ action = "studio_corpus",
+			request = 1, id = "fr_swann" }) == false, "only the Studio window runs corpus tables")
+		helpers.assert_true(controller(true, nil).on_message({ action = "studio_corpus",
+			request = 1, id = "fr_swann" }) == false, "a host that cannot run a script refuses it")
 	end)
 end)

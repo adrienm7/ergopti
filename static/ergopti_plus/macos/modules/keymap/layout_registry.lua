@@ -1253,6 +1253,85 @@ function M.source_export(payload, on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
 end
 
+--- Ergopti Studio's personal layouts over this module (see layouts/engine/composer/studio_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function studio_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local settings, settings_err = StudioStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return StudioStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
+		-- The root of _shared, where the built-in corpus tables are generated.
+		shared_dir = deps.shared_dir or (Paths.shared_root() and Paths.shared_root() .. "/"),
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs an Ergopti Studio layout operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_studio(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = studio_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The Ergopti Studio layout store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Lists Ergopti Studio's personal layouts, as the JSON texts the page saved.
+--- @param on_done function on_done(ok, texts_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_list(on_done, deps)
+	return with_studio(deps, function(operations) operations.list(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores one Ergopti Studio personal layout.
+--- @param payload table { id, text }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Removes one Ergopti Studio personal layout.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_remove(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.remove(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads one built-in corpus's generated tables for the Ergopti Studio page.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_corpus(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.corpus(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
 --- The text and index entry of a layout the app ships (the field run's source of
 --- the number-row build), read from the shipped registry the offline install uses.
 --- @param id string Registry id.

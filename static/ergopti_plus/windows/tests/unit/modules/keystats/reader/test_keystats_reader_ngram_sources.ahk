@@ -430,3 +430,51 @@ _KLRSource_StudioSendsAnalysisStrings() {
 }
 Test("Layout editor window: the Studio page receives the analysis panels' strings (studio-analysis-strings)",
 	_KLRSource_StudioSendsAnalysisStrings)
+
+; The Studio window answers the Comparer's store with the page's request numbers.
+_KLRSource_StudioLayoutMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_layout_save", "request", 3,
+		"id", "user_a", "text", '{"id":"user_a"}'), Deps))
+	AssertContains(Pushed[1], 'studioLayoutResult {')
+	AssertContains(Pushed[1], '"request":3')
+	AssertContains(Pushed[1], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_layouts", "request", 4), Deps))
+	AssertContains(Pushed[2], 'studioLayouts {')
+	AssertContains(Pushed[2], '"layouts":["{\"id\":\"user_a\"}"]')
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_layouts"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the Comparer's personal layouts (studio-layout-store)",
+	_KLRSource_StudioLayoutMessages)
+
+; The Studio window runs the chosen corpus's generated tables, then answers.
+_KLRSource_StudioCorpusMessages() {
+	Script := 'var LAYOUT_ANALYSIS_CORPORA = {};'
+	Files := Map("C:\shared\ui\layout_analysis\_generated\corpus_fr_swann.js", Script)
+	Events := []
+	Deps := Map("shared_dir", "C:\shared",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false),
+		"run_script", (Text) => (Events.Push("run " . Text), true),
+		"push", (Name, Payload) => (Events.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "request", 5, "id", "fr_swann"), Deps))
+	AssertEqual(2, Events.Length)
+	AssertEqual("run " . Script, Events[1], "the tables run as shipped, before the answer")
+	AssertContains(Events[2], 'studioCorpus {')
+	AssertContains(Events[2], '"request":5')
+	AssertContains(Events[2], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "request", 6, "id", "../x"), Deps))
+	AssertEqual(3, Events.Length, "a refused id runs nothing")
+	AssertContains(Events[3], '"ok":false')
+	AssertContains(Events[3], '"code":"studio_corpus_unavailable"')
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "id", "fr_swann"), Deps),
+		"a request number is required")
+}
+Test("Layout editor window: Ergopti Studio runs a built-in corpus's tables on request (studio-corpus-tables)",
+	_KLRSource_StudioCorpusMessages)

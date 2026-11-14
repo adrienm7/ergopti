@@ -256,6 +256,56 @@ helpers.describe("Ergopti Studio links (Linux)", function()
 	end)
 end)
 
+helpers.describe("Ergopti Studio personal layouts (Linux bridge)", function()
+	helpers.it("forwards the Studio's layout store to the registry with the page's requests with their number", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		local saved = {}
+		daemon_state.layout_registry.studio_list = function(on_done) on_done(true, { '{"id":"user_a"}' }) end
+		daemon_state.layout_registry.studio_save = function(payload, on_done) saved[#saved + 1] = payload; on_done(true, nil, payload.id) end
+		daemon_state.layout_registry.studio_remove = function(payload, on_done) on_done(true, nil, payload.id) end
+		local Editor = Bridge.editor
+		Editor._reset()
+		local ok, err = pcall(function()
+			helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[1].js, '"studio_store":true')
+			helpers.assert_true(Editor.on_message({ action = "studio_layouts", request = 2 }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioLayouts(")
+			helpers.assert_contains(state.pushes[#state.pushes].js, '"request":2')
+			helpers.assert_true(Editor.on_message({ action = "studio_layout_save", request = 3, id = "user_a",
+				text = '{"id":"user_a"}' }, daemon_state).handled)
+			helpers.assert_eq(saved, { { id = "user_a", text = '{"id":"user_a"}' } })
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioLayoutResult(")
+		end)
+		Editor._reset()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("runs the chosen corpus's generated tables in the Studio page, then answers (studio-corpus-tables)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		daemon_state.layout_registry.studio_corpus = function(payload, on_done)
+			on_done(true, "var LAYOUT_ANALYSIS_CORPORA = {}; // " .. payload.id, "studio_corpus_unavailable")
+		end
+		local Editor = Bridge.editor
+		Editor._reset()
+		local ok, err = pcall(function()
+			helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+			local before = #state.pushes
+			helpers.assert_true(Editor.on_message({ action = "studio_corpus", request = 7, id = "fr_swann" }, daemon_state).handled)
+			helpers.assert_eq(#state.pushes, before + 2)
+			helpers.assert_eq(state.pushes[before + 1].js, "var LAYOUT_ANALYSIS_CORPORA = {}; // fr_swann",
+				"the tables run as shipped, before the answer")
+			helpers.assert_contains(state.pushes[before + 2].js, "window.studioCorpus(")
+			helpers.assert_contains(state.pushes[before + 2].js, '"request":7')
+		end)
+		Editor._reset()
+		helpers.assert_true(ok, tostring(err))
+	end)
+end)
+
 helpers.describe("Ergopti Studio keystats bridge (Linux)", function()
 	helpers.it("the Studio window title is exactly « Ergopti Studio » in every locale (window-title-product-name)", function()
 		package.loaded["core.ui.engine.window_titles"] = nil
@@ -754,5 +804,93 @@ helpers.describe("layout manager observes global operation settlement", function
 		helpers.assert_nil(update.result, "The old page's failure is not the replacement's operation result")
 		observed.installs[1](true, {})
 		helpers.assert_eq(#observed.pushes, before + 1, "A duplicate native terminal cannot republish into the observer")
+	end)
+end)
+
+helpers.describe("Ergopti Studio personal layouts (studio-layout-store)", function()
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local defaults = Json.decode(assert(io.open(Paths.shared("layouts/data/defaults.json"), "rb")):read("*a"))
+	local settings = assert(StudioStore.settings(defaults))
+
+	--- A store over an in-memory disk.
+	local function store(files)
+		files = files or {}
+		local logs = {}
+		local operations = StudioStore.new({
+			settings = settings,
+			config_dir = "/cfg/", shared_dir = "/shared/",
+			exists = function(path) return files[path] ~= nil end,
+			read_bounded = function(path) return files[path], files[path] and "ok" or "absent" end,
+			write = function(path, text) files[path] = text; return true end,
+			log = function(level, message) logs[#logs + 1] = level .. ": " .. message end,
+		})
+		return operations, files, logs
+	end
+	local function call(operation, ...)
+		local result
+		local args = { ... }
+		args[#args + 1] = function(...) result = { ... } end
+		operation((table.unpack or unpack)(args))
+		return result
+	end
+
+	helpers.it("stores each layout's JSON text exactly as given and lists it back by id", function()
+		local operations, files = store()
+		helpers.assert_eq(call(operations.list), { true, {} }, "an absent store is empty")
+		local b = '{"id":"user_b","rows":{"KeyQ":["q",null,null,"Q"]},"name":"B"}'
+		local a = '{"id":"user_a","name":"A","dead":{}}'
+		helpers.assert_eq(call(operations.save, { id = "user_b", text = b }), { true, nil, "user_b" })
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = a }), { true, nil, "user_a" })
+		helpers.assert_eq(call(operations.list), { true, { a, b } }, "null cells survive: the text is never re-encoded")
+		local replaced = '{"id":"user_a","name":"A2"}'
+		call(operations.save, { id = "user_a", text = replaced })
+		helpers.assert_eq(call(operations.list), { true, { replaced, b } }, "saving an existing id replaces it")
+		helpers.assert_eq(call(operations.remove, { id = "user_a" }), { true, nil, "user_a" })
+		helpers.assert_eq(call(operations.remove, { id = "user_a" }), { true, nil, "user_a" }, "an absent id is already removed")
+		helpers.assert_eq(call(operations.list), { true, { b } })
+		helpers.assert_true(files["/cfg/" .. settings.folder .. "/" .. settings.file] ~= nil)
+	end)
+
+	helpers.it("refuses a foreign id, a layout naming another id and a non-JSON layout", function()
+		local operations, files = store()
+		local invalid = settings.failures.invalid
+		helpers.assert_eq(call(operations.save, { id = "../x", text = '{"id":"../x"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "bepo", text = '{"id":"bepo"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_b"}' })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = "not json" })[2], invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = string.rep("x", settings.max_layout_bytes + 1) })[2], invalid)
+		helpers.assert_eq(call(operations.remove, { id = "/etc" })[2], invalid)
+		helpers.assert_eq(next(files), nil, "nothing reached the disk")
+	end)
+
+	helpers.it("never replaces an unreadable store and reports it on every operation", function()
+		local path = "/cfg/" .. settings.folder .. "/" .. settings.file
+		local operations, files = store({ [path] = "{broken" })
+		local unreadable = settings.failures.unreadable
+		helpers.assert_eq(call(operations.list)[2], unreadable)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_a"}' })[2], unreadable)
+		helpers.assert_eq(call(operations.remove, { id = "user_a" })[2], unreadable)
+		helpers.assert_eq(files[path], "{broken", "the damaged file is kept for the user")
+		files[path] = '{"schema":1,"layouts":{"bepo":"{}"}}'
+		helpers.assert_eq(call(operations.list)[2], unreadable, "a foreign entry makes the store unreadable")
+	end)
+
+	helpers.it("bounds the number of layouts", function()
+		local small = {}
+		for key, value in pairs(settings) do small[key] = value end
+		small.max_layouts = 2
+		local files = {}
+		local operations = StudioStore.new({ settings = small, config_dir = "/cfg/", shared_dir = "/shared/",
+			exists = function(path) return files[path] ~= nil end,
+			read_bounded = function(path) return files[path], "ok" end,
+			write = function(path, text) files[path] = text; return true end,
+			log = function() end })
+		call(operations.save, { id = "user_a", text = '{"id":"user_a"}' })
+		call(operations.save, { id = "user_b", text = '{"id":"user_b"}' })
+		helpers.assert_eq(call(operations.save, { id = "user_c", text = '{"id":"user_c"}' })[2], small.failures.invalid)
+		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_a","n":2}' })[1], true,
+			"replacing a stored layout is not one more")
 	end)
 end)

@@ -59,7 +59,26 @@
 			<span id="studio-keystats-status" class="studio-keystats-status" role="status"></span>
 			<p class="studio-keystats-privacy" data-i18n="layout_editor.studio.keystats.privacy"></p>
 		</section>
+		<!-- Ergopti Studio's two tabs: the editor, and the comparison of layouts. -->
+		<nav class="studio-tabs" role="tablist">
+			<button
+				type="button"
+				id="studio-tab-edit"
+				role="tab"
+				aria-selected="true"
+				data-i18n="layout_editor.studio.tab.edit"
+			></button>
+			<button
+				type="button"
+				id="studio-tab-compare"
+				role="tab"
+				aria-selected="false"
+				data-i18n="layout_editor.studio.tab.compare"
+			></button>
+		</nav>
 		<main id="layout-editor" class="layout-editor"></main>
+		<!-- The Comparer (_shared/ui/layout_analysis) mounts here when its tab first opens. -->
+		<section id="studio-comparer" class="studio-comparer" hidden></section>
 
 		<script src="script.js"></script>
 	</body>

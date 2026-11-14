@@ -574,6 +574,8 @@
 	"layout_editor.target.web": "Emulering på webstedet",
 	"layout_editor.target.windows": "KLC til Windows",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.studio.tab.edit": "Rediger",
+	"layout_editor.studio.tab.compare": "Sammenlign",
 	"layout_editor.studio.keystats.load": "Analysér min tastning",
 	"layout_editor.studio.keystats.privacy": "Dine tastestatistikker læses kun på denne computer fra Ergopti+'s lokale målinger og sendes aldrig nogen steder hen.",
 	"layout_editor.studio.keystats.loading": "Læser dine tastestatistikker…",

@@ -124,6 +124,9 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 				return child;
 			},
 			getAttribute: (name) => el.attributes[name],
+			setAttribute: (name, value) => {
+				el.attributes[name] = String(value);
+			},
 			addEventListener(type, fn) {
 				(listeners[type] = listeners[type] || []).push(fn);
 			},
@@ -151,12 +154,23 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		dispatchEvent: (event) => events.push(event),
 		getElementById: (id) => byId.get(id) || null,
 		createElement: makeElement,
+		// The Comparer's markup adds placeholders and option prefixes; this
+		// fake markup carries none of them.
 		querySelectorAll: (selector) => {
+			if (selector === '[data-i18n-placeholder]' || selector === 'select[data-i18n-option-prefix]')
+				return [];
 			assert.equal(selector, '[data-i18n]');
 			return i18nElements;
-		}
+		},
+		// Scripts run while the page is still loading, as in a WebView.
+		readyState: 'loading',
+		listeners: [],
+		addEventListener: (type, listener) => events.listeners.push({ type, listener })
 	};
+	events.listeners = [];
 	const window = {
+		events: [],
+		dispatchEvent: (event) => window.events.push(event),
 		webkit: {
 			messageHandlers: {
 				[page.bridge]: { postMessage: (payload) => messages.push(payload) }
@@ -169,6 +183,11 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		console,
 		setTimeout: (fn) => fn(),
 		TextDecoder,
+		Event: class Event {
+			constructor(type) {
+				this.type = type;
+			}
+		},
 		CustomEvent: class CustomEvent {
 			constructor(type, init) {
 				this.type = type;
@@ -179,6 +198,8 @@ function loadPage(page = { html, source, bridge: 'layout_manager_bridge' }) {
 		btoa: (text) => Buffer.from(text, 'binary').toString('base64')
 	});
 	vm.runInContext(hostBridge, context, { filename: 'host_bridge.js' });
+	for (const prelude of page.preludes || [])
+		vm.runInContext(prelude.source, context, { filename: prelude.filename });
 	vm.runInContext(page.source, context, { filename: 'script.js' });
 	return { context, byId, messages, window, document };
 }
@@ -844,7 +865,8 @@ check('Ergopti Studio reads « My typing » only on a click, from a host that of
 	const status = byId.get('studio-keystats-status');
 	assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.keystats_absent/);
 	assert.ok(status.classList.contains('error'));
-	assert.equal(document.events.length, 0, 'a refusal publishes no data');
+	const published = () => document.events.filter((event) => event.type === 'studio-ngrams');
+	assert.equal(published().length, 0, 'a refusal publishes no data');
 	window.keystatsNgrams({ ok: false, code: 'something_else' });
 	assert.match(status.textContent, /keystats_unreadable/, 'an unknown code reads as unreadable');
 	const ngrams = {
@@ -859,9 +881,8 @@ check('Ergopti Studio reads « My typing » only on a click, from a host that of
 	assert.match(status.textContent, /^T:layout_editor\.studio\.keystats\.loaded 7/);
 	assert.ok(!status.classList.contains('error'));
 	assert.equal(byId.get('studio-keystats-load').disabled, false);
-	assert.equal(document.events.length, 1);
-	assert.equal(document.events[0].type, 'studio-ngrams');
-	assert.deepEqual(plain(document.events[0].detail), ngrams);
+	assert.equal(published().length, 1);
+	assert.deepEqual(plain(published()[0].detail), ngrams);
 	// The analysis panels open their « i » links through the host.
 	window.LAYOUT_ANALYSIS_HOST.openLink('https://ergopti.fr/studio');
 	assert.deepEqual(plain(messages[messages.length - 1]), {
@@ -869,6 +890,111 @@ check('Ergopti Studio reads « My typing » only on a click, from a host that of
 		url: 'https://ergopti.fr/studio'
 	});
 });
+
+check(
+	'Ergopti Studio keeps the Comparer layouts in the host and runs corpus tables on request',
+	async () => {
+		const { window, byId, messages } = loadEditorPage();
+		const store = window.LAYOUT_ANALYSIS_HOST.store;
+		assert.ok(store, 'the Comparer finds the store at its mount, before initData');
+		// The Comparer lists the stored layouts when it starts, before initData.
+		const early = store.list();
+		assert.equal(
+			messages.filter((m) => m.action === 'studio_layouts').length,
+			0,
+			'nothing is asked before the host offers its store'
+		);
+		window.initData({ strings: {}, state: { platform: 'linux' }, studio_store: true });
+		await new Promise((resolve) => setImmediate(resolve));
+		const first = messages[messages.length - 1];
+		assert.equal(first.action, 'studio_layouts');
+		window.studioLayouts({ request: first.request, ok: true, layouts: [] });
+		assert.deepEqual(plain(await early), []);
+		const layout = { id: 'user_mine', rows: { KeyQ: ['q', null, null, 'Q'] } };
+		const saving = store.save(layout);
+		await new Promise((resolve) => setImmediate(resolve));
+		const save = messages[messages.length - 1];
+		assert.equal(save.action, 'studio_layout_save');
+		assert.equal(save.id, 'user_mine');
+		assert.equal(save.text, JSON.stringify(layout), 'the layout travels as its JSON text');
+		window.studioLayoutResult({ request: save.request, ok: true, detail: 'user_mine' });
+		await saving;
+		const listing = store.list();
+		await new Promise((resolve) => setImmediate(resolve));
+		const list = messages[messages.length - 1];
+		assert.equal(list.action, 'studio_layouts');
+		window.studioLayouts({ request: list.request, ok: true, layouts: [save.text] });
+		assert.deepEqual(plain(await listing), [layout]);
+		const failing = store.list();
+		await new Promise((resolve) => setImmediate(resolve));
+		window.studioLayouts({
+			request: messages[messages.length - 1].request,
+			ok: false,
+			code: 'studio_unreadable'
+		});
+		await assert.rejects(failing, (error) => error.code === 'studio_unreadable');
+		const removing = store.remove('user_mine');
+		await new Promise((resolve) => setImmediate(resolve));
+		const remove = messages[messages.length - 1];
+		assert.deepEqual(plain(remove), {
+			action: 'studio_layout_remove',
+			request: remove.request,
+			id: 'user_mine'
+		});
+		window.studioLayoutResult({ request: remove.request, ok: true });
+		await removing;
+
+		// A host without a store refuses every call instead of waiting forever.
+		const quiet = loadEditorPage();
+		const refused = quiet.window.LAYOUT_ANALYSIS_HOST.store.list();
+		quiet.window.initData({ strings: {}, state: { platform: 'linux' } });
+		await assert.rejects(refused, (error) => error.code === 'studio_store_unavailable');
+
+		// A built-in corpus's tables run in the page through the host.
+		const loading = window.LAYOUT_ANALYSIS_HOST.loadCorpus('fr_swann');
+		const corpus = messages[messages.length - 1];
+		assert.deepEqual(plain(corpus), {
+			action: 'studio_corpus',
+			request: corpus.request,
+			id: 'fr_swann'
+		});
+		window.LAYOUT_ANALYSIS_CORPORA = { fr_swann: { chars: {} } };
+		window.studioCorpus({ request: corpus.request, ok: true });
+		await loading;
+		const missing = window.LAYOUT_ANALYSIS_HOST.loadCorpus('en_other');
+		window.studioCorpus({ request: messages[messages.length - 1].request, ok: true });
+		await assert.rejects(missing, /no tables for the corpus en_other/);
+		const unavailable = window.LAYOUT_ANALYSIS_HOST.loadCorpus('en_other');
+		window.studioCorpus({
+			request: messages[messages.length - 1].request,
+			ok: false,
+			code: 'studio_corpus_unavailable'
+		});
+		await assert.rejects(unavailable, (error) => error.code === 'studio_corpus_unavailable');
+
+		// The tabs show one panel at a time; the Comparer mounts the first time.
+		const mounts = [];
+		window.LAYOUT_ANALYSIS_COMPARER = {
+			mount: (root, options) => mounts.push({ root, options })
+		};
+		byId.get('studio-tab-compare').click();
+		assert.equal(byId.get('layout-editor').hidden, true);
+		assert.equal(byId.get('studio-comparer').hidden, false);
+		assert.equal(mounts.length, 1);
+		assert.ok(mounts[0].root === byId.get('studio-comparer'));
+		assert.ok(mounts[0].options.host === window.LAYOUT_ANALYSIS_HOST, 'the Comparer gets the host');
+		byId.get('studio-tab-edit').click();
+		assert.equal(byId.get('layout-editor').hidden, false);
+		assert.equal(byId.get('studio-comparer').hidden, true);
+		byId.get('studio-tab-compare').click();
+		assert.equal(mounts.length, 1, 'the Comparer mounts once');
+		assert.equal(
+			window.events[window.events.length - 1].type,
+			'resize',
+			'the Comparer lays out again'
+		);
+	}
+);
 
 check(
 	'the editor window mounts the editor on sourceData and closes its window on « Close »',

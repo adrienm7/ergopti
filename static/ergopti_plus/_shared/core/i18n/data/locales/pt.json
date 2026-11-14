@@ -574,6 +574,8 @@
 	"layout_editor.target.web": "Emulação no site",
 	"layout_editor.target.windows": "KLC para Windows",
 	"layout_editor.title": "Ergopti Studio",
+	"layout_editor.studio.tab.edit": "Editar",
+	"layout_editor.studio.tab.compare": "Comparar",
 	"layout_editor.studio.keystats.load": "Analisar a minha digitação",
 	"layout_editor.studio.keystats.privacy": "As suas estatísticas de digitação são lidas apenas neste computador, a partir das métricas locais do Ergopti+, e nunca são enviadas para lado nenhum.",
 	"layout_editor.studio.keystats.loading": "A ler as suas estatísticas de digitação…",

@@ -285,6 +285,11 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
       read by the site's benchmarks and by the Studio.
+      In the app 2026-11-14 (`claude/ergopti-todo-studio-app`): Ergopti Studio's « Éditer » and « Comparer » tabs on
+      the three OS. « Comparer » is worker R's comparer, embedded without a frame. The imported layouts are kept in
+      the user's data folder, the built-in corpus tables are served by the host on request, and « My typing » is
+      the default corpus once loaded (docs/design/layout-editor.md). Tabs and embedding decided by the agent, to
+      review by the maintainer.
 
 - [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
       comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine

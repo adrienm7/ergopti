@@ -241,3 +241,69 @@ _LSS_DiskCase() {
 			DirDelete(Dir, true)
 	}
 }
+
+; Ergopti Studio's personal layouts (StudioStore_*), over an in-memory disk:
+; the twin of the Lua cases of studio_store.lua.
+_LSS_StudioDisk(Files) {
+	return Map(
+		"exists", (Path) => Files.Has(Path),
+		"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+		"write", (Path, Text) => (Files[Path] := Text, true))
+}
+
+_LSS_StudioRoundTrip() {
+	Settings := StudioStore_SharedSettings()
+	Files := Map()
+	Ports := _LSS_StudioDisk(Files)
+	Listed := StudioStore_List(Settings, "C:\cfg\", Ports)
+	AssertTrue(Listed["ok"])
+	AssertEqual(0, Listed["layouts"].Length, "an absent store is empty")
+	B := '{"id":"user_b","rows":{"KeyQ":["q",null,null,"Q"]}}'
+	A := '{"id":"user_a","name":"A"}'
+	AssertTrue(StudioStore_Save(Settings, "C:\cfg\", Map("id", "user_b", "text", B), Ports)["ok"])
+	AssertTrue(StudioStore_Save(Settings, "C:\cfg\", Map("id", "user_a", "text", A), Ports)["ok"])
+	Listed := StudioStore_List(Settings, "C:\cfg\", Ports)["layouts"]
+	AssertEqual(2, Listed.Length)
+	AssertEqual(A, Listed[1], "sorted by id, the text exactly as given")
+	AssertEqual(B, Listed[2], "null cells survive: the text is never re-encoded")
+	AssertTrue(StudioStore_Remove(Settings, "C:\cfg\", Map("id", "user_a"), Ports)["ok"])
+	AssertTrue(StudioStore_Remove(Settings, "C:\cfg\", Map("id", "user_a"), Ports)["ok"], "an absent id is already removed")
+	AssertEqual(1, StudioStore_List(Settings, "C:\cfg\", Ports)["layouts"].Length)
+	AssertTrue(Files.Has(StudioStore_Path(Settings, "C:\cfg\")))
+}
+Test("Studio layout store: stores each layout's JSON text as given (studio-layout-store)", _LSS_StudioRoundTrip)
+
+_LSS_StudioRefusals() {
+	Settings := StudioStore_SharedSettings()
+	Files := Map()
+	Ports := _LSS_StudioDisk(Files)
+	Invalid := Settings["failures"]["invalid"]
+	for Case in [Map("id", "..\x", "text", '{"id":"..\\x"}'), Map("id", "bepo", "text", '{"id":"bepo"}'),
+			Map("id", "user_a", "text", '{"id":"user_b"}'), Map("id", "user_a", "text", "not json")]
+		AssertEqual(Invalid, StudioStore_Save(Settings, "C:\cfg\", Case, Ports)["code"])
+	AssertEqual(0, Files.Count, "nothing reached the disk")
+	Path := StudioStore_Path(Settings, "C:\cfg\")
+	Files[Path] := "{broken"
+	Unreadable := Settings["failures"]["unreadable"]
+	AssertEqual(Unreadable, StudioStore_List(Settings, "C:\cfg\", Ports)["code"])
+	AssertEqual(Unreadable, StudioStore_Save(Settings, "C:\cfg\", Map("id", "user_a", "text", '{"id":"user_a"}'), Ports)["code"])
+	AssertEqual("{broken", Files[Path], "a damaged store is never replaced")
+}
+Test("Studio layout store: refuses foreign ids and never replaces an unreadable store (studio-layout-store)", _LSS_StudioRefusals)
+
+_LSS_StudioCorpus() {
+	Settings := StudioStore_SharedSettings()
+	Script := 'var LAYOUT_ANALYSIS_CORPORA = {}; LAYOUT_ANALYSIS_CORPORA["fr_swann"] = {};'
+	Files := Map("C:\shared\ui\layout_analysis\_generated\corpus_fr_swann.js", Script)
+	Ports := _LSS_StudioDisk(Files)
+	Read := StudioStore_Corpus(Settings, "C:\shared", Map("id", "fr_swann"), Ports)
+	AssertTrue(Read["ok"])
+	AssertEqual(Script, Read["text"])
+	; An id can name no other file, and a corpus that is not shipped is refused.
+	for Id in ["..\..\layouts\data\defaults", "../x", "fr/swann", "FR", "", "absent_corpus"] {
+		Refused := StudioStore_Corpus(Settings, "C:\shared", Map("id", Id), Ports)
+		AssertFalse(Refused["ok"], Id)
+		AssertEqual(Settings["failures"]["corpus"], Refused["code"], Id)
+	}
+}
+Test("Studio layout store: reads only a generated corpus file for the Studio page (studio-corpus-tables)", _LSS_StudioCorpus)

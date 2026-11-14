@@ -140,6 +140,36 @@ async function downloaded(page, click) {
 	};
 }
 
+/**
+ * (studio-comparer-tab) Ergopti Studio's « Comparer » tab in the app window:
+ * the comparer mounts into the tab the first time it opens, lists the host's
+ * stored layouts and ranks the layouts on a built-in corpus.
+ * @param {import('playwright').Page} page The editor window, after initData.
+ */
+async function exerciseStudioComparer(page) {
+	assert.equal(
+		await page.locator('#studio-comparer #la-table').count(),
+		0,
+		'nothing runs before the tab opens'
+	);
+	await page.click('#studio-tab-compare');
+	assert.equal(await page.isVisible('#layout-editor'), false);
+	assert.equal(await page.locator('#studio-comparer #la-table').count(), 1);
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_layouts'));
+	await page.evaluate(() => {
+		const list = window.__posted.find((p) => p.action === 'studio_layouts');
+		window.studioLayouts({ request: list.request, ok: true, layouts: [] });
+	});
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+	// English strings: the comparer reports its analysis, not a failure.
+	assert.match(
+		await page.evaluate(() => document.getElementById('la-status').textContent),
+		/^\d+ layouts compared on [\d,]+ characters/
+	);
+	await page.click('#studio-tab-edit');
+	assert.equal(await page.isVisible('#studio-comparer'), false);
+}
+
 /** The layout editor's own window with a recording Linux-style bridge, as ErgoptiPlus hosts it. */
 async function exerciseManager(browser, origin) {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -174,11 +204,13 @@ async function exerciseManager(browser, origin) {
 				source_editor: true,
 				source_pick: true,
 				nav_apply: true,
-				emulate: true
+				emulate: true,
+				studio_store: true
 			}),
 		state
 	);
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'ready'));
+	await exerciseStudioComparer(page);
 	// The host answers the window's ready with the last saved source.
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');

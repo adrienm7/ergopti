@@ -47,7 +47,16 @@
 ---    user asks: the page posts it from its « Analyse my typing » button.
 --- 9. The Studio's analysis panels open their « i » links in the system browser
 ---    (open_link {url}): only an https URL, and only from the editor window.
---- 10. PURE Lua: the driver injects the layout registry client, the push to the
+--- 10. Ergopti Studio keeps the user's personal layouts for its comparison
+---    (studio_layouts, studio_layout_save, studio_layout_remove, each with the
+---    page's request number): the registry's studio_* operations
+---    (composer/studio_store.lua) store each layout's JSON text as given, and
+---    the page receives studioLayouts and studioLayoutResult. Editor window only.
+---    studio_corpus {request, id} runs one built-in corpus's generated tables
+---    (registry.studio_corpus) in the page through deps.run_script, then
+---    answers studioCorpus: the macOS and Linux hosts inline the page's
+---    scripts, so the page cannot load them from a relative URL.
+--- 11. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -74,6 +83,10 @@ M.ACTIONS = {
 	open_editor = true,
 	keystats_ngrams = true,
 	open_link = true,
+	studio_layouts = true,
+	studio_layout_save = true,
+	studio_layout_remove = true,
+	studio_corpus = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -331,6 +344,65 @@ function M.handle_source(deps, action, payload)
 	return true
 end
 
+--- Whether the registry keeps Ergopti Studio's personal layouts.
+--- @param registry table
+--- @return boolean
+local function offers_studio(registry)
+	return type(registry.studio_list) == "function" and type(registry.studio_save) == "function"
+		and type(registry.studio_remove) == "function"
+end
+
+--- Answers one of the Studio's personal-layout messages.
+--- @param deps table The controller's deps.
+--- @param action string studio_layouts, studio_layout_save, studio_layout_remove or studio_corpus.
+--- @param payload table The message; request is the page's request number.
+--- @return boolean handled
+function M.handle_studio(deps, action, payload)
+	local request = payload.request
+	if type(request) ~= "number" or request < 1 or request % 1 ~= 0 then
+		deps.log("warn", "Refused an Ergopti Studio layout message without its request number.")
+		return false
+	end
+	if action == "studio_corpus" then
+		deps.registry.studio_corpus({ id = payload.id }, function(ok, text_or_code, detail)
+			if not ok then
+				deps.push("studioCorpus", { request = request, ok = false, code = tostring(text_or_code),
+					detail = detail ~= nil and tostring(detail) or nil })
+			elseif deps.run_script(text_or_code) == false then
+				-- On success, detail is the store's code for a corpus the page did not get.
+				deps.log("error", "The Ergopti Studio page refused the tables of the corpus %s.", tostring(payload.id))
+				deps.push("studioCorpus", { request = request, ok = false, code = tostring(detail),
+					detail = "the page refused the corpus script" })
+			else
+				deps.push("studioCorpus", { request = request, ok = true })
+			end
+		end)
+		return true
+	end
+	if action == "studio_layouts" then
+		deps.registry.studio_list(function(ok, texts_or_code, detail)
+			if ok then
+				deps.push("studioLayouts", { request = request, ok = true, layouts = texts_or_code })
+			else
+				deps.push("studioLayouts", { request = request, ok = false, code = tostring(texts_or_code),
+					detail = detail ~= nil and tostring(detail) or nil })
+			end
+		end)
+		return true
+	end
+	local function answer(ok, code, detail)
+		deps.push("studioLayoutResult", { request = request, ok = ok == true,
+			code = (not ok and code ~= nil) and tostring(code) or nil,
+			detail = detail ~= nil and tostring(detail) or nil })
+	end
+	if action == "studio_layout_save" then
+		deps.registry.studio_save({ id = payload.id, text = payload.text }, answer)
+	else
+		deps.registry.studio_remove({ id = payload.id }, answer)
+	end
+	return true
+end
+
 --- Creates the controller of one page.
 --- deps.registry: { refresh(on_done), snapshot(), install(id, on_done),
 ---   uninstall(id, on_done), select(id, on_done) }; on_done(ok, detail_or_code, detail).
@@ -369,6 +441,8 @@ end
 ---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
 ---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
 --- deps.push(function_name, payload) evaluates window.<function_name>(payload).
+--- deps.run_script(text) optionally runs a built-in corpus's generated tables in
+---   the editor window's page (studio_corpus); false when the page refused it.
 --- deps.strings() returns the translated strings the page shows.
 --- deps.open_url(url) opens an https URL; deps.close() closes the window.
 --- deps.log(level, message, ...) logs through the driver's logger.
@@ -428,7 +502,8 @@ function M.new(deps)
 				source_export = offers_export(deps.registry),
 				nav_apply = type(deps.apply_nav) == "function",
 				emulate = offers_emulate(deps),
-				keystats = editor_window and type(deps.read_keystats) == "function" })
+				keystats = editor_window and type(deps.read_keystats) == "function",
+				studio_store = editor_window and offers_studio(deps.registry) })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
 			if editor_wanted then
@@ -460,6 +535,20 @@ function M.new(deps)
 		end
 		if action == "source_export" then
 			return M.handle_export(deps, payload)
+		end
+		if action == "studio_corpus" then
+			if not editor_window or type(deps.registry.studio_corpus) ~= "function" or type(deps.run_script) ~= "function" then
+				deps.log("warn", "Refused an Ergopti Studio corpus request: only the Studio window of a host that runs corpus tables offers it.")
+				return false
+			end
+			return M.handle_studio(deps, action, payload)
+		end
+		if action == "studio_layouts" or action == "studio_layout_save" or action == "studio_layout_remove" then
+			if not editor_window or not offers_studio(deps.registry) then
+				deps.log("warn", "Refused an Ergopti Studio layout message: only the Studio window of a host that keeps them offers it.")
+				return false
+			end
+			return M.handle_studio(deps, action, payload)
 		end
 		if action == "open_link" then
 			if not editor_window or type(payload.url) ~= "string" or not payload.url:match("^https://[^%s]+$") then

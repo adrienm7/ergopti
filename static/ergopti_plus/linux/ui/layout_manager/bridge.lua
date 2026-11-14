@@ -128,7 +128,7 @@ local function new_handler(spec)
 		end
 		-- The composer's and the layout editor's operations take their callback last.
 		for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "composer_emulate", "source_open",
-			"source_save", "source_export" }) do
+			"source_save", "source_export", "studio_list", "studio_save", "studio_remove", "studio_corpus" }) do
 			local operation = registry[method]
 			if type(operation) == "function" then
 				owned_registry[method] = function(...)
@@ -172,6 +172,13 @@ local function new_handler(spec)
 		_controller = ManagerBridge.new({
 			registry = owned_registry,
 			push = push,
+			-- Ergopti Studio runs a built-in corpus's generated tables in this
+			-- page; WebKitGTK runs them before the push that follows.
+			run_script = spec.editor_window and function(text)
+				if not current() or not manager then return false end
+				local ran, accepted = pcall(manager.eval_js, spec.app_name, text)
+				return ran and accepted == true
+			end or nil,
 			strings = function() return page_strings(i18n, spec.strings_file) end,
 			editor_window = spec.editor_window,
 			-- The manager page's « Layout editor » shows the editor's own window.

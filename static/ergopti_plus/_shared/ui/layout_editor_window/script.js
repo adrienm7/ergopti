@@ -41,23 +41,51 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'source_export',
 	'nav_save',
 	'keystats_ngrams',
-	'open_link'
+	'open_link',
+	'studio_layouts',
+	'studio_layout_save',
+	'studio_layout_remove',
+	'studio_corpus'
 ]);
 
-// Locale strings, pushed by the host with initData.
+// Locale strings: the catalogue macOS and Linux seed as window._i18n_strings,
+// overlaid by the strings the host pushes with initData.
 let _strings = {};
 // Last state pushed by the host (the editor reads its platform).
 let _state = null;
 
 const _post = makeHostBridge('layout_editor_window_bridge');
 
-/** Applies translations to every element carrying data-i18n. */
+/**
+ * Whether a locale key has a translation.
+ * @param {string} key
+ * @returns {boolean}
+ */
+function hasString(key) {
+	return Object.prototype.hasOwnProperty.call(_strings, key);
+}
+
+/**
+ * Applies translations to every element carrying data-i18n, and to the
+ * placeholders and options the Comparer's markup names (as i18n.js does).
+ */
 function applyDomStrings() {
 	document.querySelectorAll('[data-i18n]').forEach(function (el) {
 		const key = el.getAttribute('data-i18n');
-		if (!Object.prototype.hasOwnProperty.call(_strings, key)) return;
+		if (!hasString(key)) return;
 		if (el.tagName === 'TITLE') document.title = _strings[key];
 		else el.textContent = _strings[key];
+	});
+	document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+		const key = el.getAttribute('data-i18n-placeholder');
+		if (hasString(key)) el.placeholder = _strings[key];
+	});
+	document.querySelectorAll('select[data-i18n-option-prefix]').forEach(function (select) {
+		const prefix = select.getAttribute('data-i18n-option-prefix');
+		select.querySelectorAll('option').forEach(function (option) {
+			const key = prefix + '.' + option.value;
+			if (hasString(key)) option.textContent = _strings[key];
+		});
 	});
 }
 
@@ -99,14 +127,18 @@ let _hostExports = false;
 window.initData = function (data) {
 	if (!data || typeof data !== 'object') return;
 	if (data.strings && typeof data.strings === 'object') {
-		_strings = data.strings;
+		_strings = Object.assign({}, window._i18n_strings || {}, data.strings);
+		window._i18n_strings = _strings;
 		applyDomStrings();
+		// The Comparer redraws the text it builds from data on this event.
+		document.dispatchEvent(new CustomEvent('i18n:applied'));
 	}
 	_hostPicks = data.source_pick === true;
 	_hostAppliesNav = data.nav_apply === true;
 	_hostEmulates = data.emulate === true;
 	_hostExports = data.source_export === true;
 	showKeystatsSource(data.keystats === true);
+	settleStudioStore(data.studio_store === true);
 	window.updateState(data.state);
 };
 
@@ -472,7 +504,8 @@ window.keystatsNgrams = function (result) {
 document.getElementById('studio-keystats-load').addEventListener('click', loadKeystats);
 
 // The analysis panels (_shared/ui/layout_analysis) open their « i » links
-// through the host, in the system browser, instead of a WebView tab.
+// through the host, in the system browser, instead of a WebView tab. The
+// panels and the Comparer read this same object (LAYOUT_ANALYSIS_HOST).
 window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 	openLink: function (url) {
 		send('open_link', { url: String(url) });
@@ -481,7 +514,152 @@ window.LAYOUT_ANALYSIS_HOST = Object.assign(window.LAYOUT_ANALYSIS_HOST || {}, {
 
 // ========================================
 // ========================================
-// ======= 5/ Ready =======================
+// ======= 5/ Personal layouts ============
+// ========================================
+// ========================================
+
+// The Comparer's personal layouts live in the host (the user's data folder),
+// so they survive the window, a reload and a crash. Each one travels as its
+// JSON text, which the host stores and returns exactly as given.
+let _studioRequest = 0;
+const _studioPending = new Map();
+
+/**
+ * Sends one personal-layout message and settles on the host's answer.
+ * @param {string} action
+ * @param {Object} [extra]
+ * @returns {Promise<Object>} The host's answer.
+ */
+function studioRequest(action, extra) {
+	return new Promise(function (resolve, reject) {
+		const request = ++_studioRequest;
+		_studioPending.set(request, { resolve: resolve, reject: reject });
+		send(action, Object.assign({ request: request }, extra || {}));
+	});
+}
+
+/**
+ * Settles the request a host answer names.
+ * @param {Object} result - { request, ok, code, detail, ... }.
+ */
+function settleStudio(result) {
+	const pending = result && _studioPending.get(result.request);
+	if (!pending) return;
+	_studioPending.delete(result.request);
+	if (result.ok === true) pending.resolve(result);
+	else pending.reject({ code: result.code || 'host_save_failed', path: result.detail || '' });
+}
+
+/** Called by the host with the stored layouts: { request, ok, layouts: [json text] }. */
+window.studioLayouts = settleStudio;
+/** Called by the host once a layout is saved or removed: { request, ok, code, detail }. */
+window.studioLayoutResult = settleStudio;
+/** Called by the host once a built-in corpus's tables ran in the page: { request, ok, code, detail }. */
+window.studioCorpus = settleStudio;
+
+// The Comparer lists the stored layouts as soon as it mounts, which can come
+// before the host's initData says whether it keeps them: every call waits
+// for that answer.
+let _settleStore = null;
+const _storeOffered = new Promise(function (resolve, reject) {
+	_settleStore = { resolve: resolve, reject: reject };
+});
+// A refusal nobody awaits yet is not an unhandled rejection.
+_storeOffered.catch(function () {});
+
+/**
+ * Settles whether the host keeps the Comparer's layouts (initData studio_store).
+ * @param {boolean} offered
+ */
+function settleStudioStore(offered) {
+	if (offered) _settleStore.resolve();
+	else _settleStore.reject({ code: 'studio_store_unavailable', path: '' });
+}
+
+/**
+ * Runs one store request once the host has offered its store.
+ * @param {string} action
+ * @param {Object} [extra]
+ * @returns {Promise<Object>}
+ */
+function storeRequest(action, extra) {
+	return _storeOffered.then(function () {
+		return studioRequest(action, extra);
+	});
+}
+
+Object.assign(window.LAYOUT_ANALYSIS_HOST, {
+	store: {
+		list: function () {
+			return storeRequest('studio_layouts').then(function (result) {
+				return (Array.isArray(result.layouts) ? result.layouts : []).map(function (text) {
+					return JSON.parse(text);
+				});
+			});
+		},
+		save: function (layout) {
+			return storeRequest('studio_layout_save', {
+				id: layout.id,
+				text: JSON.stringify(layout)
+			}).then(function () {});
+		},
+		remove: function (id) {
+			return storeRequest('studio_layout_remove', { id: id }).then(function () {});
+		}
+	},
+	// The macOS and Linux hosts inline the page's scripts, so a built-in
+	// corpus's tables cannot load from a relative <script src>: the host runs
+	// the generated file in the page on request, only for the chosen corpus.
+	loadCorpus: function (id) {
+		return studioRequest('studio_corpus', { id: String(id) }).then(function () {
+			const corpora = window.LAYOUT_ANALYSIS_CORPORA;
+			if (!corpora || !corpora[id]) throw new Error('the host ran no tables for the corpus ' + id);
+		});
+	}
+});
+
+// ========================================
+// ========================================
+// ======= 6/ Tabs ========================
+// ========================================
+// ========================================
+
+// The Comparer mounts the first time its tab opens, so opening the window
+// costs no analysis; « My typing » loaded before then waits for the mount
+// (comparer_page.js).
+let _comparerMounted = false;
+
+/**
+ * Shows one of the two tabs.
+ * @param {'edit'|'compare'} tab
+ */
+function showTab(tab) {
+	const compare = tab === 'compare';
+	const comparer = document.getElementById('studio-comparer');
+	document.getElementById('studio-tab-edit').setAttribute('aria-selected', String(!compare));
+	document.getElementById('studio-tab-compare').setAttribute('aria-selected', String(compare));
+	document.getElementById('layout-editor').hidden = compare;
+	comparer.hidden = !compare;
+	if (!compare) return;
+	if (!_comparerMounted) {
+		_comparerMounted = true;
+		window.LAYOUT_ANALYSIS_COMPARER.mount(comparer, { host: window.LAYOUT_ANALYSIS_HOST });
+	} else {
+		// Its charts lay out again once visible.
+		window.dispatchEvent(new Event('resize'));
+	}
+}
+
+document.getElementById('studio-tab-edit').addEventListener('click', function () {
+	showTab('edit');
+});
+document.getElementById('studio-tab-compare').addEventListener('click', function () {
+	showTab('compare');
+});
+
+// ========================================
+// ========================================
+// ======= 7/ Ready =======================
 // ========================================
 // ========================================
 

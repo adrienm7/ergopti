@@ -224,6 +224,14 @@ local function new_window(spec)
 		local controller = ManagerBridge.new({
 			registry = require("modules.keymap.layout_registry"),
 			push = function(function_name, payload) return push_to(view, function_name, payload) end,
+			-- Ergopti Studio runs a built-in corpus's generated tables in this
+			-- page; WKWebView runs them before the push that follows.
+			run_script = spec.editor_window and function(text)
+				if view == nil or view ~= _webview then return false end
+				local submitted = pcall(function() view:evaluateJavaScript(text) end)
+				if not submitted then Logger.error(LOG, "The %s corpus script was refused.", spec.label) end
+				return submitted
+			end or nil,
 			strings = function() return page_strings(spec.strings_file) end,
 			editor_window = spec.editor_window,
 			open_editor_window = not spec.editor_window and function() return M.open_editor() end or nil,

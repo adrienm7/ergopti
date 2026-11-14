@@ -63,3 +63,36 @@ body {
 	flex-basis: 100%;
 	margin: 0;
 }
+
+/* =================================== */
+/* =================================== */
+/* ======= 3/ Ergopti Studio tabs ==== */
+/* =================================== */
+/* =================================== */
+
+.studio-tabs {
+	border-bottom: 1px solid var(--theme-grey-ccc);
+	display: flex;
+	gap: 4px;
+	margin-bottom: 12px;
+}
+
+.studio-tabs button {
+	background: none;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 6px 12px;
+}
+
+.studio-tabs button[aria-selected='true'] {
+	border-bottom-color: var(--theme-accent);
+	font-weight: 600;
+}
+
+.layout-editor[hidden],
+.studio-comparer[hidden] {
+	display: none;
+}

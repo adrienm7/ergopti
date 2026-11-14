@@ -50,7 +50,8 @@ global _LayEdWin_StudioCache := 0
 global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
-	"nav_save", true, "keystats_ngrams", true, "open_link", true)
+	"nav_save", true, "keystats_ngrams", true, "open_link", true,
+	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true)
 
 
 
@@ -98,7 +99,8 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 			"state", LayoutManager_PageState(Deps["local_dir"]),
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
 			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
-			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true)))
+			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true),
+			"studio_store", LayMgrJsonBool_Of(true)))
 		return LayoutManager_HandleEditorAction("source_open", Map("action", "source_open"), Deps)
 	}
 	if (Action == "close") {
@@ -107,6 +109,10 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 	}
 	if (Action == "keystats_ngrams")
 		return LayoutEditorWindow_ReadKeystats(Deps)
+	if (Action == "studio_layouts" || Action == "studio_layout_save" || Action == "studio_layout_remove")
+		return LayoutEditorWindow_StudioLayouts(Action, Payload, Deps)
+	if (Action == "studio_corpus")
+		return LayoutEditorWindow_StudioCorpus(Payload, Deps)
 	; The Studio's analysis panels open their « i » links in the system browser:
 	; an https URL only.
 	if (Action == "open_link") {
@@ -164,6 +170,64 @@ _LayEdWin_OnStudioTerminal(Deps, Codes, Stamp, Status, Stage) {
 	Deps["push_raw"].Call("keystatsNgrams", '{"ok":true,"ngrams":' . Json . "}")
 }
 
+/**
+ * Answers one of the Studio's personal-layout messages (the Comparer's
+ * LAYOUT_ANALYSIS_HOST.store), through StudioStore_* (source_store.ahk).
+ * @param {String} Action - studio_layouts, studio_layout_save or studio_layout_remove.
+ * @param {Map} Payload - The message; request is the page's request number.
+ * @param {Map} Deps - "push" (FunctionName, Payload),
+ *   "config_dir" and optionally "studio_ports" (the store's file ports).
+ * @returns {Boolean} Whether the message was accepted.
+ */
+LayoutEditorWindow_StudioLayouts(Action, Payload, Deps) {
+	Request := Payload.Get("request", 0)
+	if !(Request is Integer) || Request < 1 {
+		LoggerWarn("LayoutEditorWindow", "Refused an Ergopti Studio layout message without its request number.")
+		return false
+	}
+	Settings := StudioStore_SharedSettings()
+	Ports := Deps.Get("studio_ports", 0)
+	if (Action == "studio_layouts") {
+		Result := StudioStore_List(Settings, Deps["config_dir"], Ports)
+		Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]))
+		if Result["ok"]
+			Answer["layouts"] := Result["layouts"]
+		else
+			Answer["code"] := Result["code"], Answer["detail"] := Result["detail"]
+		return Deps["push"].Call("studioLayouts", Answer)
+	}
+	Result := (Action == "studio_layout_save")
+		? StudioStore_Save(Settings, Deps["config_dir"], Payload, Ports)
+		: StudioStore_Remove(Settings, Deps["config_dir"], Payload, Ports)
+	Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]), "detail", Result.Get("detail", ""))
+	if !Result["ok"]
+		Answer["code"] := Result["code"]
+	return Deps["push"].Call("studioLayoutResult", Answer)
+}
+
+/**
+ * Runs one built-in corpus's generated tables in the Studio page, then
+ * answers studioCorpus (the Comparer's LAYOUT_ANALYSIS_HOST.loadCorpus).
+ * @param {Map} Payload - { request, id }.
+ * @param {Map} Deps - "push", "run_script" (Text), "shared_dir" and optionally "studio_ports".
+ * @returns {Boolean} Whether the message was accepted.
+ */
+LayoutEditorWindow_StudioCorpus(Payload, Deps) {
+	Request := Payload.Get("request", 0)
+	if !(Request is Integer) || Request < 1 {
+		LoggerWarn("LayoutEditorWindow", "Refused an Ergopti Studio corpus request without its request number.")
+		return false
+	}
+	Settings := StudioStore_SharedSettings()
+	Result := StudioStore_Corpus(Settings, Deps["shared_dir"], Payload, Deps.Get("studio_ports", 0))
+	if !Result["ok"]
+		return Deps["push"].Call("studioCorpus", Map("request", Request, "ok", LayMgrJsonBool_Of(false),
+			"code", Result["code"], "detail", Result["detail"]))
+	; WebView2 runs the tables before the push that follows.
+	Deps["run_script"].Call(Result["text"])
+	return Deps["push"].Call("studioCorpus", Map("request", Request, "ok", LayMgrJsonBool_Of(true)))
+}
+
 _LayEdWin_PushRefusal(Deps, Code) {
 	Deps["push_raw"].Call("keystatsNgrams", '{"ok":false,"code":' . JsonStringLiteral(Code) . "}")
 }
@@ -196,7 +260,7 @@ LayoutEditorWindow_Open(*) {
 
 ; The ports of one window: pushes go to that exact host only.
 _LayEdWin_Deps(Host) {
-	global _ConfigDir
+	global _ConfigDir, _SharedDir
 	return Map(
 		"push", _LayEdWin_Push.Bind(Host),
 		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
@@ -206,7 +270,10 @@ _LayEdWin_Deps(Host) {
 		"request_studio", KLPF_RequestStudio,
 		"push_raw", _LayEdWin_PushRaw.Bind(Host),
 		"read_stage", FSRead,
-		"open_url", (Url) => ExternalUrl_OpenHttp(Url)
+		"open_url", (Url) => ExternalUrl_OpenHttp(Url),
+		"config_dir", _ConfigDir,
+		"shared_dir", _SharedDir,
+		"run_script", (Text) => Host.Eval(Text)
 	)
 }
 

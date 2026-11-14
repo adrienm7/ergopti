@@ -1260,4 +1260,39 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(state.files["/Users/u/Downloads/mine (2).klc"], "\255\254k")
 		helpers.assert_eq(state.files["/Users/u/Downloads/mine.klc"], "kept")
 	end)
+
+	helpers.it("keeps Ergopti Studio's personal layouts in the editor folder (studio-layout-store)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local text = '{"id":"user_mine","rows":{"KeyQ":["q",null,null,null]}}'
+		local saved
+		helpers.assert_true(LayoutRegistry.studio_save({ id = "user_mine", text = text },
+			function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[2]) .. " " .. tostring(saved[3]))
+		helpers.assert_true(state.files["/cfg/layout_sources/studio_layouts.json"] ~= nil)
+		local listed
+		helpers.assert_true(LayoutRegistry.studio_list(function(...) listed = { ... } end, deps))
+		helpers.assert_eq(listed, { true, { text } })
+		local removed
+		helpers.assert_true(LayoutRegistry.studio_remove({ id = "user_mine" }, function(...) removed = { ... } end, deps))
+		helpers.assert_true(removed[1])
+		LayoutRegistry.studio_list(function(...) listed = { ... } end, deps)
+		helpers.assert_eq(listed, { true, {} })
+	end)
+
+	helpers.it("reads only a generated corpus file for the Studio page (studio-corpus-tables)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir, deps.shared_dir = "/cfg/", "/shared/"
+		local script = 'var LAYOUT_ANALYSIS_CORPORA = {}; LAYOUT_ANALYSIS_CORPORA["fr_swann"] = {};\n'
+		state.files["/shared/ui/layout_analysis/_generated/corpus_fr_swann.js"] = script
+		local read
+		helpers.assert_true(LayoutRegistry.studio_corpus({ id = "fr_swann" }, function(...) read = { ... } end, deps))
+		helpers.assert_eq(read, { true, script, "studio_corpus_unavailable" })
+		-- An id can name no other file, and a corpus that is not shipped is refused.
+		for _, id in ipairs({ "../../layouts/data/defaults", "fr/swann", "FR", "", "absent_corpus" }) do
+			helpers.assert_true(LayoutRegistry.studio_corpus({ id = id }, function(...) read = { ... } end, deps))
+			helpers.assert_eq(read[1], false, id)
+			helpers.assert_eq(read[2], "studio_corpus_unavailable", id)
+		end
+	end)
 end)
