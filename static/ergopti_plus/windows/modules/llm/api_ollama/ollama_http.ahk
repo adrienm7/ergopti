@@ -684,10 +684,12 @@ LLM_OllamaIsRunning_Async(on_result, Owner := 0, Structured := false) {
 		if (Structured || Owner.Has("origin_custody")) && (!(Origin is String) || Origin == "" || !LLM_OllamaProbeOriginCurrent(Owner, Origin))
 			throw Error("Selected-origin version ownership is no longer current.")
 		curl_exe := A_WinDir . "\System32\curl.exe"
-		; -m 2: hard 2 s ceiling. A local daemon answers GET /api/version in < 50 ms;
-		; one that needs longer is "not ready yet" for our purposes — the deps poll
-		; retries, and the health tick re-probes, so a slow first answer self-heals.
-		curlCmd := '"' . curl_exe . '" --disable -s -m 2 '
+		; A hard ceiling from the timing registry. A local daemon answers GET
+		; /api/version in < 50 ms; one that needs longer is "not ready yet" for our
+		; purposes — the deps poll retries, and the health tick re-probes, so a slow
+		; first answer self-heals.
+		ProbeSeconds := Format("{:.3f}", TimingsGet("llm", "local_server_probe_timeout_ms") / 1000)
+		curlCmd := '"' . curl_exe . '" --disable -s -m ' . ProbeSeconds . ' '
 			. _LLM_CurlMaxFileSizeArg() . '-o ' . _Q(tmp_out) . ' '
 			. _Q(Origin . (Structured ? LLM_EnableVersionPath() : "/api/version"))
 		cmd := _LLM_CurlOwnedCommand(curlCmd, terminal["status"], terminal["exit"])
@@ -840,8 +842,8 @@ _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 			return
 		}
 	}
-	; Curl owns a 2 s max-time; this 4 s backstop retires a missing receipt.
-	if _LLM_DeadlineExpired(start_tick, 4000) {
+	; Curl owns the registry's max-time; twice it retires a missing receipt.
+	if _LLM_DeadlineExpired(start_tick, 2 * TimingsGet("llm", "local_server_probe_timeout_ms")) {
 		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
 		_LLM_OllamaPingDeliver(Owner, on_result,
 			Structured ? Map("ok", false, "status", 0, "body", "") : false, Structured)

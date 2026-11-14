@@ -70,7 +70,11 @@ ai_health_watch_ms = 1000
 # (_shared/ai/data/local_servers.json). A running server on loopback
 # answers in milliseconds; an absent one refuses the connection at once, so
 # the deadline only bounds a server that accepted and hangs.
-# HS: api_remote.lua detect_local_servers (each probe client).
+# The same deadline bounds the Ollama GET /api/version probe (the enable
+# admission and, on Windows, the health ping: curl's --max-time, whose poll
+# retires a probe that left no receipt after twice the deadline).
+# HS: api_remote.lua detect_local_servers (each probe client). Linux:
+# enable_admission.lua. AHK: ollama_http.ahk LLM_OllamaIsRunning_Async.
 local_server_probe_timeout_ms = 1500
 
 # Deadline of each listening-socket or per-pid command of a local server sweep
