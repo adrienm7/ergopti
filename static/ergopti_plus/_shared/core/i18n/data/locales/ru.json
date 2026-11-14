@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "Оценка {score} · место {rank} из {count}",
 	"layout_analysis.panel.ranking": "Сравнение с библиотекой…",
 	"layout_analysis.panel.unavailable": "Эту раскладку нельзя проанализировать здесь ({reason}).",
-	"layout_analysis.panel.weights_note": "Оценка по весам и идеальной нагрузке на пальцы из « Сравнить »."
+	"layout_analysis.panel.weights_note": "Оценка по весам и идеальной нагрузке на пальцы из « Сравнить ».",
+	"layout_analysis.corpus.word_list": "Построено по списку частот слов: только n-граммы внутри слов и на их границах, без заглавных букв, пунктуации и пар между словами."
 }

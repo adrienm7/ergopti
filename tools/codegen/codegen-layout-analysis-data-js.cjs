@@ -47,6 +47,9 @@ const CORPUS_DIR = path.join(REPO_ROOT, 'static', 'corpus');
 const CORPUS_REGISTER_PATH = path.join(CORPUS_DIR, 'register.json');
 const SHIP_STATUS = 'ship';
 const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
+// The folders of static/corpus the register covers: texts, and word frequency lists.
+const CORPUS_FOLDERS = ['original', 'frequency'];
+const CORPUS_FORMATS = ['text', 'word_frequencies'];
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The repository and the host a repository document is linked on (one source each).
@@ -351,7 +354,7 @@ function corpusRegister() {
 			else onDisk.push(path.relative(CORPUS_DIR, full).split(path.sep).join('/'));
 		}
 	};
-	walk(path.join(CORPUS_DIR, 'original'));
+	for (const folder of CORPUS_FOLDERS) walk(path.join(CORPUS_DIR, folder));
 	for (const file of onDisk)
 		if (!register[file])
 			throw new Error(
@@ -368,6 +371,37 @@ function corpusRegister() {
 			);
 	}
 	return register;
+}
+
+/**
+ * The n-gram counts of a word frequency list (« word count » per line): each
+ * word counts its letters and one space, and its bigrams and trigrams with a
+ * space on either side, as often as the list says.
+ * @param {string} text - The list.
+ * @param {string} id - The corpus id, for errors.
+ * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+ * @throws {Error} On a line that is not a word and a positive count.
+ */
+function wordListCounts(text, id) {
+	const chars = {};
+	const bigrams = {};
+	const trigrams = {};
+	const add = (table, key, n) => {
+		table[key] = (table[key] || 0) + n;
+	};
+	text.split('\n').forEach((line, index) => {
+		if (line.trim() === '') return;
+		const match = /^(\S+) ([1-9][0-9]*)$/.exec(line);
+		if (!match) throw new Error(`corpora.json: ${id} line ${index + 1} is not « word count »`);
+		const n = Number(match[2]);
+		const cells = Array.from(` ${match[1]} `);
+		// The leading space stands for the one the previous word ended with.
+		for (let i = 1; i < cells.length; i++) add(chars, cells[i], n);
+		for (let i = 0; i + 1 < cells.length; i++) add(bigrams, cells[i] + cells[i + 1], n);
+		for (let i = 0; i + 2 < cells.length; i++)
+			add(trigrams, cells[i] + cells[i + 1] + cells[i + 2], n);
+	});
+	return { chars, bigrams, trigrams };
 }
 
 /**
@@ -391,7 +425,11 @@ function buildCorpora(engine) {
 		if (corpus.restore_dead_key_pairs) text = restoreDeadKeyPairs(text);
 		// A Leipzig sentence file numbers its lines: « 12<TAB>sentence ».
 		if (corpus.strip_sentence_numbers) text = text.replace(/^\d+\t/gm, '');
-		const counts = engine.ngramsFromText(text);
+		const format = corpus.format || 'text';
+		if (!CORPUS_FORMATS.includes(format))
+			throw new Error(`corpora.json: ${corpus.id} has format ${format}`);
+		const counts =
+			format === 'text' ? engine.ngramsFromText(text) : wordListCounts(text, corpus.id);
 		const sorted = (table) =>
 			Object.fromEntries(
 				Object.entries(table).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
@@ -406,6 +444,7 @@ function buildCorpora(engine) {
 			id: corpus.id,
 			title: corpus.title,
 			language: corpus.language,
+			format,
 			licence: entry.licence,
 			attribution: entry.attribution,
 			source: entry.source,
@@ -709,4 +748,11 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { buildData, buildSource, corpusSource, restoreDeadKeyPairs, OUT_PATH };
+module.exports = {
+	buildData,
+	buildSource,
+	corpusSource,
+	restoreDeadKeyPairs,
+	wordListCounts,
+	OUT_PATH
+};

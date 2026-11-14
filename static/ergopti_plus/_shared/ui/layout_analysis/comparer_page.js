@@ -729,6 +729,9 @@
 				: corpus.host
 					? t('layout_analysis.corpus.private')
 					: t('layout_analysis.corpus.local');
+			// A word frequency list says what its n-grams leave out.
+			if (corpus.builtin && corpus.builtin.format === 'word_frequencies')
+				$('la-corpus-info').textContent += ` ${t('layout_analysis.corpus.word_list')}`;
 		}
 
 		function fillLayouts() {

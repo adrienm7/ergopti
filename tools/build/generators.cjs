@@ -274,7 +274,15 @@ const GENERATORS = [
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_hello_world.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_punctuation.js',
 			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_leipzig_news.js',
-			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_leipzig_wikipedia.js'
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_leipzig_wikipedia.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_fr_subtitles_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_en_subtitles_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_de_subtitles_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_es_subtitles_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_it_subtitles_words.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_javascript.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_python.js',
+			'static/ergopti_plus/_shared/ui/layout_analysis/_generated/corpus_code_rust.js'
 		]
 	},
 	{

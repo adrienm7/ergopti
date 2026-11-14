@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "Pontuação {score} · posição {rank} de {count}",
 	"layout_analysis.panel.ranking": "A classificar face à biblioteca…",
 	"layout_analysis.panel.unavailable": "Esta disposição não pode ser analisada aqui ({reason}).",
-	"layout_analysis.panel.weights_note": "Pontuada com os pesos e a carga ideal dos dedos definidos em « Comparar »."
+	"layout_analysis.panel.weights_note": "Pontuada com os pesos e a carga ideal dos dedos definidos em « Comparar ».",
+	"layout_analysis.corpus.word_list": "Construído a partir de uma lista de frequências de palavras: só n-gramas dentro das palavras e nos seus limites, sem maiúsculas, pontuação nem pares entre palavras."
 }

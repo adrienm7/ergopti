@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "स्कोर {score} · {count} में से {rank}वाँ स्थान",
 	"layout_analysis.panel.ranking": "लाइब्रेरी के साथ क्रम तय हो रहा है…",
 	"layout_analysis.panel.unavailable": "इस लेआउट का यहाँ विश्लेषण नहीं हो सकता ({reason})।",
-	"layout_analysis.panel.weights_note": "« तुलना करें » में तय भारों और आदर्श उँगली भार से अंक दिए गए।"
+	"layout_analysis.panel.weights_note": "« तुलना करें » में तय भारों और आदर्श उँगली भार से अंक दिए गए।",
+	"layout_analysis.corpus.word_list": "शब्द आवृत्ति सूची से बना: केवल शब्दों के भीतर और शब्द-सीमाओं पर n-ग्राम, बड़े अक्षर, विराम चिह्न या शब्दों के बीच के जोड़े नहीं।"
 }

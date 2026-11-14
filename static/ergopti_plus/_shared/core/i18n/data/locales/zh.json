@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "得分 {score} · 第 {rank} 名，共 {count} 个",
 	"layout_analysis.panel.ranking": "正在与布局库排名…",
 	"layout_analysis.panel.unavailable": "无法在此分析该布局（{reason}）。",
-	"layout_analysis.panel.weights_note": "使用「比较」中设定的权重和理想手指负荷计分。"
+	"layout_analysis.panel.weights_note": "使用「比较」中设定的权重和理想手指负荷计分。",
+	"layout_analysis.corpus.word_list": "由词频列表生成：仅包含词内和词边界处的 n 元组，没有大写字母、标点符号或跨词字符对。"
 }

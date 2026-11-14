@@ -236,6 +236,17 @@ Shipped as of 2026-11-14:
 - The Hello World programs, with and without letters: MIT.
 - The Leipzig French news and Wikipédia samples: CC BY 4.0, by the
   maintainer's choice. `strip_sentence_numbers` removes their line numbers.
+- Subtitle word frequencies in French, English, German, Spanish and Italian
+  (Hermit Dave's FrequencyWords, from OpenSubtitles2018): CC BY-SA 4.0. Their
+  `format` is `word_frequencies`: each « word count » line is counted with a
+  space on either side, so their n-grams stay inside words and at word
+  boundaries. The page says so under the corpus picker.
+- Code: JavaScript (lodash 4.17.21), Python (four modules of rich 13.7.1) and
+  Rust (three files of ripgrep 14.1.0), all MIT, each with its licence text at
+  the top of the file.
+
+`static/corpus/frequency/` holds the downloaded frequency lists, which the
+register covers like the texts.
 
 The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
 is refused, and why.

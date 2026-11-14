@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "Score {score} · rank {rank} of {count}",
 	"layout_analysis.panel.ranking": "Ranking against the library…",
 	"layout_analysis.panel.unavailable": "This layout cannot be analysed here ({reason}).",
-	"layout_analysis.panel.weights_note": "Scored with the weights and ideal finger load set in « Compare »."
+	"layout_analysis.panel.weights_note": "Scored with the weights and ideal finger load set in « Compare ».",
+	"layout_analysis.corpus.word_list": "Built from a word frequency list: n-grams inside words and at word boundaries only, with no capitals, punctuation or pairs across words."
 }

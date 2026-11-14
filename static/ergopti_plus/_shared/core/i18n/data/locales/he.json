@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "ציון {score} · מקום {rank} מתוך {count}",
 	"layout_analysis.panel.ranking": "מדרג מול הספרייה…",
 	"layout_analysis.panel.unavailable": "לא ניתן לנתח כאן את הפריסה הזו ({reason}).",
-	"layout_analysis.panel.weights_note": "הציון חושב עם המשקלים ועומס האצבעות האידיאלי שהוגדרו ב« השוואה »."
+	"layout_analysis.panel.weights_note": "הציון חושב עם המשקלים ועומס האצבעות האידיאלי שהוגדרו ב« השוואה ».",
+	"layout_analysis.corpus.word_list": "נבנה מרשימת שכיחות מילים: רק n-גרמים בתוך מילים ובגבולותיהן, בלי אותיות גדולות, סימני פיסוק או זוגות בין מילים."
 }

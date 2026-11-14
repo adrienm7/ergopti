@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "Score {score} · rang {rank} sur {count}",
 	"layout_analysis.panel.ranking": "Classement parmi la bibliothèque…",
 	"layout_analysis.panel.unavailable": "Cette disposition ne peut pas être analysée ici ({reason}).",
-	"layout_analysis.panel.weights_note": "Score calculé avec les poids et la charge idéale des doigts réglés dans « Comparer »."
+	"layout_analysis.panel.weights_note": "Score calculé avec les poids et la charge idéale des doigts réglés dans « Comparer ».",
+	"layout_analysis.corpus.word_list": "Construit à partir d’une liste de fréquences de mots : n-grammes à l’intérieur des mots et à leurs bords seulement, sans majuscules, ponctuation ni paires entre deux mots."
 }

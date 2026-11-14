@@ -136,6 +136,25 @@ for (const file of locales) {
 
 // 4/ Corpora
 check(DATA.corpora.length > 0, 'no built-in corpus');
+// A word frequency list counts each word with a space on either side.
+const { wordListCounts } = require('../codegen/codegen-layout-analysis-data-js.cjs');
+const counted = wordListCounts('ab 3\nc 2\n', 'test');
+check(
+	JSON.stringify(counted) ===
+		JSON.stringify({
+			chars: { a: 3, b: 3, ' ': 5, c: 2 },
+			bigrams: { ' a': 3, ab: 3, 'b ': 3, ' c': 2, 'c ': 2 },
+			trigrams: { ' ab': 3, 'ab ': 3, ' c ': 2 }
+		}),
+	`word list counts: ${JSON.stringify(counted)}`
+);
+let refusedLine = false;
+try {
+	wordListCounts('ab three\n', 'test');
+} catch {
+	refusedLine = true;
+}
+check(refusedLine, 'word list counts: a line without a count must be refused');
 // Each shipped corpus shows the licence and attribution static/corpus/register.json records.
 for (const corpus of DATA.corpora)
 	check(

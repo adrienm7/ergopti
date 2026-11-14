@@ -1,8 +1,53 @@
 {
-	"_description": "Licence register of every text under static/corpus/original: what it is, where it comes from, its licence, the attribution it requires, and whether Ergopti ships its n-gram tables (status ship), waits for the maintainer (hold) or must not ship them (refused), with the evidence. The layout analysis codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) reads the licence and attribution of a built-in corpus from here, refuses to build one whose status is not ship, and refuses a text with no entry here. Audit of 2026-11-14, decided by the agent, to review by the maintainer.",
+	"_description": "Licence register of every text under static/corpus/original and every frequency list under static/corpus/frequency: what it is, where it comes from, its licence, the attribution it requires, and whether Ergopti ships its n-gram tables (status ship), waits for the maintainer (hold) or must not ship them (refused), with the evidence. The layout analysis codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) reads the licence and attribution of a built-in corpus from here, refuses to build one whose status is not ship, and refuses a text with no entry here. Audit of 2026-11-14, decided by the agent, to review by the maintainer.",
 	"schema_version": 1,
 	"audited": "2026-11-14",
 	"files": {
+		"frequency/opensubtitles_2018/de_50k.txt": {
+			"title": "German word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/de/de_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/en_50k.txt": {
+			"title": "English word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/en/en_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/es_50k.txt": {
+			"title": "Spanish word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/es/es_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/fr_50k.txt": {
+			"title": "French word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/fr/fr_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/it_50k.txt": {
+			"title": "Italian word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/it/it_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
 		"original/code/corpus_johnix_prog.txt": {
 			"title": "Hello World programs in many languages",
 			"source": "« prog » of the bépo corpus by Johnix (a 2004 snapshot of the Hello World Collection)",
@@ -20,6 +65,33 @@
 			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
 			"status": "ship",
 			"note": "Derived from corpus_johnix_prog.txt; same terms."
+		},
+		"original/code/lodash_4.17.21.js.txt": {
+			"title": "JavaScript: lodash 4.17.21",
+			"source": "lodash/lodash, tag 4.17.21, lodash.js",
+			"url": "https://github.com/lodash/lodash/blob/4.17.21/lodash.js",
+			"licence": "MIT",
+			"attribution": "Copyright OpenJS Foundation and other contributors (lodash, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE of the tag (fetched 2026-11-14) is MIT; the file keeps it at its top."
+		},
+		"original/code/rich_13.7.1.py.txt": {
+			"title": "Python: rich 13.7.1 (console, text, table, progress)",
+			"source": "Textualize/rich, tag v13.7.1, four modules of rich/ concatenated",
+			"url": "https://github.com/Textualize/rich/tree/v13.7.1/rich",
+			"licence": "MIT",
+			"attribution": "Copyright (c) 2020 Will McGugan (rich, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE of the tag (fetched 2026-11-14) is MIT; the file keeps it at its top."
+		},
+		"original/code/ripgrep_14.1.0.rs.txt": {
+			"title": "Rust: ripgrep 14.1.0 (three source files)",
+			"source": "BurntSushi/ripgrep, tag 14.1.0: crates/core/main.rs, crates/searcher/src/searcher/mod.rs, crates/core/flags/defs.rs",
+			"url": "https://github.com/BurntSushi/ripgrep/tree/14.1.0",
+			"licence": "MIT (ripgrep is dual MIT or Unlicense)",
+			"attribution": "Copyright (c) 2015 Andrew Gallant (ripgrep, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE-MIT of the tag (fetched 2026-11-14); the file keeps it at its top."
 		},
 		"original/en/don_quixote_ormsby.txt": {
 			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",

@@ -4539,5 +4539,6 @@
 	"layout_analysis.panel.score": "Puan {score} · {count} içinde {rank}. sıra",
 	"layout_analysis.panel.ranking": "Kütüphaneyle sıralanıyor…",
 	"layout_analysis.panel.unavailable": "Bu düzen burada analiz edilemiyor ({reason}).",
-	"layout_analysis.panel.weights_note": "« Karşılaştır » bölümünde ayarlanan ağırlıklar ve ideal parmak yüküyle puanlandı."
+	"layout_analysis.panel.weights_note": "« Karşılaştır » bölümünde ayarlanan ağırlıklar ve ideal parmak yüküyle puanlandı.",
+	"layout_analysis.corpus.word_list": "Bir kelime sıklığı listesinden oluşturuldu: yalnızca kelime içindeki ve kelime sınırlarındaki n-gramlar; büyük harf, noktalama ve kelimeler arası çiftler yok."
 }

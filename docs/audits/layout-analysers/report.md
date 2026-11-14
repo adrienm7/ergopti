@@ -597,6 +597,7 @@ codegen refuses to ship a text it does not clear.
 | Status  | Texts                                                                                                                                                                                                                                         |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ship    | _Don Quichotte_ (Furne), _Don Quixote_ (Ormsby), _Du côté de chez Swann_, the Nemolivier anthology (public domain); _Autonomie_ (CC BY-SA 1.0); the two Hello World files (MIT); the two Leipzig samples (CC BY 4.0, the maintainer's choice) |
+| added   | Subtitle word frequencies in five languages (FrequencyWords, CC BY-SA 4.0); JavaScript (lodash), Python (rich) and Rust (ripgrep) code, all MIT                                                                                               |
 | refused | Marked for deletion by the maintainer: the 2003 e-mails, `romans.txt`, _Python for Everybody_, the GLM project, the eight KLAnext-style texts and Auxlang X                                                                                   |
 
 Notes:
@@ -613,3 +614,9 @@ Notes:
   Wikipédia's contributors.
 - The e-mails come from the bépo corpus archive (source confirmed), but no
   licence is granted and they hold personal data.
+- Sources reachable from the build container on 2026-11-14 were
+  raw.githubusercontent.com, gitlab.com, bepo.fr and storage.googleapis.com.
+  Blocked: gutenberg.org, wikisource and Wikipedia dumps, Tatoeba,
+  wortschatz.uni-leipzig.de, norvig.com, lexique.org, unicode.org and
+  huggingface.co. The Google Books Ngram files are reachable, but their
+  one-gram shards (several GB per language) are too large to process here.
