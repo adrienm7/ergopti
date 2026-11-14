@@ -350,6 +350,43 @@ return function(helpers, Json, ports)
 	end)
 
 	helpers.describe("layout composer (" .. ports.name .. "): the manager bridge", function()
+		-- The Linux page sends the source compiled straight to XKB; the bridge once dropped it,
+		-- so the install converted the .keylayout and lost the levels it cannot hold.
+		helpers.it("hands the page's converter target to the registry (direct-xkb-install)", function()
+			local ManagerBridge = require("layouts.engine.manager_bridge")
+			local registry, deps, state = fresh()
+			local pushed, received = {}, {}
+			local controller = ManagerBridge.new({
+				registry = {
+					snapshot = function() return registry.snapshot(deps) end,
+					refresh = function(done) done() end,
+					composer_save = function(payload, done)
+						received[#received + 1] = payload
+						return registry.composer_save(payload, done, deps)
+					end,
+				},
+				push = function(name, payload) pushed[#pushed + 1] = { name = name, payload = payload } end,
+				strings = function() return {} end,
+				open_url = function() end,
+				close = function() end,
+				log = function() end,
+			})
+			helpers.assert_true(not controller.on_message({ action = "composer_save", source = SOURCE,
+				target = { canonical = {} }, keylayout = SOURCE_KEYLAYOUT }), "a converter target is text")
+			local target = target_text()
+			helpers.assert_true(controller.on_message({ action = "composer_save", source = SOURCE, target = target,
+				keylayout = SOURCE_KEYLAYOUT, use = false }))
+			helpers.assert_eq(received[#received].target, target, "the target reaches the registry as sent")
+			local result
+			for _, item in ipairs(pushed) do if item.name == "composerResult" then result = item.payload end end
+			if ports.platform == "linux" then
+				helpers.assert_true(result.ok, "the save must succeed: " .. tostring(result.detail))
+				helpers.assert_eq(state.files[TARGET_PATH], target, "the Linux host stores the page's target")
+			else
+				helpers.assert_true(not result.ok, "a converter target is refused off Linux")
+			end
+		end)
+
 		helpers.it("routes the three composer messages and pushes their results (layout-composer)", function()
 			local ManagerBridge = require("layouts.engine.manager_bridge")
 			local registry, deps = fresh()
