@@ -142,7 +142,7 @@ local function install_hs_stubs()
 		end
 		return true, table.unpack(results, 2, results.n)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	return function() return state.bridge_callbacks[#state.bridge_callbacks] end, state
 end
@@ -213,7 +213,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		end
 		helpers.assert_true(browser.open(context("old")))
 		local reentered = false
-		package.loaded["infra.logger"].info = function(_, message)
+		package.loaded["core.logger.engine.logger"].info = function(_, message)
 			if not reentered and message:find("Model selected", 1, true) then
 				reentered = true
 				helpers.assert_true(browser.open(context("new")))
@@ -235,7 +235,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 		local browser = require("ui.model_browser")
 		local selected, urls, payloads = {}, {}, {}
 		local debug_messages = {}
-		package.loaded["infra.logger"].debug = function(module_name, message, ...)
+		package.loaded["core.logger.engine.logger"].debug = function(module_name, message, ...)
 			if module_name == "model_browser" then
 				debug_messages[#debug_messages + 1] = string.format(message, ...)
 			end
@@ -307,7 +307,7 @@ helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-
 			local bridge, state = install_hs_stubs()
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			local errors = {}
-			package.loaded["infra.logger"].error = function(_, fmt, ...)
+			package.loaded["core.logger.engine.logger"].error = function(_, fmt, ...)
 				errors[#errors + 1] = string.format(fmt, ...)
 			end
 			package.loaded["ui.model_browser"] = nil

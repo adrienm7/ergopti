@@ -31,7 +31,7 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local InputSourceBroker = require("adapters.input_source_broker")
 local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")

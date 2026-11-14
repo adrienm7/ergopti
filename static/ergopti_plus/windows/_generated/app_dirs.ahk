@@ -7,7 +7,7 @@
 ; MODULE: Application Folders and Log File Names (Windows)
 ; DESCRIPTION:
 ; The application folder name, the default logs folder and the log file-name
-; prefixes. infra/logger.ahk owns the one logs-folder resolver built on them;
+; prefixes. core/logger/engine/logger.ahk owns the one logs-folder resolver built on them;
 ; nothing else spells a prefix or a folder formula.
 ;
 ; Functions rather than global initialisers so include ORDER cannot matter:

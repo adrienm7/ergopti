@@ -10,7 +10,7 @@ local MODULES = {
 	"core.events.timer_scheduler",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.fs.engine.paths", "infra.timings",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
@@ -101,7 +101,7 @@ local function with_fixture(callback)
 			end,
 		})
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.shell_runner"] = {
 			run = function(executable, args, on_done)
 				local run = { executable = executable, args = args, on_done = on_done, terminated = 0 }

@@ -18,7 +18,7 @@ local TMP = (os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/t
 --- @param path string
 --- @param callback function Receives the freshly loaded bridge.
 local function with_errors_path(path, callback)
-	local LoggerSink = require("infra.logger_sink")
+	local LoggerSink = require("core.logger.engine.sink")
 	local original = LoggerSink.errors_log_path
 	LoggerSink.errors_log_path = function() return path end
 	local ok, err = pcall(callback, helpers.load_module("ui.healthcheck.bridge"))

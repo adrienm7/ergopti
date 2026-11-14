@@ -32,7 +32,7 @@ local function load_lifecycle()
 	for _, level in ipairs({ "debug", "info", "warn", "error", "start", "success", "done" }) do
 		logger[level] = function() end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.notifications"] = {
 		notify = function()
 			ctx.notifications = ctx.notifications + 1

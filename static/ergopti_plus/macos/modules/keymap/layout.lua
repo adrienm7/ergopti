@@ -29,7 +29,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 

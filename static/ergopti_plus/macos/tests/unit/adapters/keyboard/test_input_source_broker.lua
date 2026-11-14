@@ -23,7 +23,7 @@ local function load_broker()
 	logger.error = function(_module, format_string, ...)
 		context.errors[#context.errors + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local function native_setter(callback)
 		context.setter_calls = context.setter_calls + 1
 		if context.fail_setter then error("native setter exploded") end

@@ -19,8 +19,8 @@
 local helpers = require("tests.helpers")
 
 -- The shared parser logs through logger.shim; load the lib.logger stub first.
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Put _shared on the path so require("ai.engine.api.parser_core") resolves to the oracle.
 local shared_lua  = helpers.shared("/")

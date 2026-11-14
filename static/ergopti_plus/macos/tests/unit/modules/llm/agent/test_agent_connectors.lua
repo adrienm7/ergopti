@@ -19,14 +19,14 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "modules.llm.agent_connectors", "adapters.shell_runner", "core.fs.adapters.file_system", "infra.logger" }
+local MODULES = { "modules.llm.agent_connectors", "adapters.shell_runner", "core.fs.adapters.file_system", "core.logger.engine.logger" }
 
 --- Loads the connectors over a fake process launcher and file system.
 --- @param scenario function Receives (Connectors, world).
 local function with_connectors(scenario)
 	helpers.with_fresh_modules(MODULES, function()
 		local world = { spawns = {}, opens = {}, files = {}, removed = {}, next_file = 0 }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local record = { executable = executable, args = args, on_done = on_done, started = false }

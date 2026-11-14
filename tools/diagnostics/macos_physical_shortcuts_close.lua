@@ -11,7 +11,7 @@ function M.run(config, done)
  local root = config.production_root
  package.path = root .. '/macos/?.lua;' .. root .. '/macos/?/init.lua;'
   .. root .. '/_shared/?.lua;' .. root .. '/_shared/?/init.lua;' .. package.path
- local Logger = require('infra.logger')
+ local Logger = require('core.logger.engine.logger')
  local policy = assert(io.open(root .. '/_shared/diagnostics/data/redaction.json', 'rb'))
  local policy_bytes = assert(policy:read('*a')); assert(policy:close())
  Logger.initialize_privacy(policy_bytes)

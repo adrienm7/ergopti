@@ -69,7 +69,7 @@ local function load_subject()
 		end,
 	}
 	package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The start transaction is independent of which ids exist; the load-time
 	-- catalogue check has its own test (test_keyboard_shortcuts_unknown_action.lua).
 	package.loaded["modules.gestures.actions"] = {

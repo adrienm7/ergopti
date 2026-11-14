@@ -14,7 +14,7 @@ local FIXTURE_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.shared",
 	"modules.keystats",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
@@ -106,7 +106,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 				return tap
 			end
 
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = { notify = function() end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.keycodes"] = {

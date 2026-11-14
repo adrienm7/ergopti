@@ -28,7 +28,7 @@ helpers.describe("changelog construction transactions", function()
 			helpers.assert_true(changelog.open())
 			state.delete_throws = true
 			local attempts = 0
-			package.loaded["infra.logger"].error = function()
+			package.loaded["core.logger.engine.logger"].error = function()
 				attempts = attempts + 1
 				helpers.assert_eq(changelog.open(), false)
 			end
@@ -67,7 +67,7 @@ helpers.describe("changelog construction transactions", function()
 	for _, mode in ipairs({ "constructor", "registration", "geometry", "html", "factory entry", "factory allocated" }) do
 		helpers.it("rolls back " .. mode .. " failure (changelog-construction)", function()
 			with_changelog(function(changelog, state)
-				local logger, builder = package.loaded["infra.logger"], package.loaded["ui.ui_builder"]
+				local logger, builder = package.loaded["core.logger.engine.logger"], package.loaded["ui.ui_builder"]
 				local errors, successes, releases = {}, 0, 0
 				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				logger.success = function() successes = successes + 1 end

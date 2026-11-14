@@ -22,7 +22,7 @@ local function fixture()
 	for _, level in ipairs({ "info", "warn", "error" }) do
 		logger[level] = function(_, fmt, ...) logs[level][#logs[level] + 1] = string.format(fmt, ...) end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["ui.menu.click_gate"] = nil
 	local ClickGate = require("ui.menu.click_gate")
 	local f = { logs = logs, store = {}, timers = {}, clock = 1000, terminal = false,

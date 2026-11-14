@@ -28,7 +28,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local TomlReader = require("infra.toml.reader")
 local TomlScanner = require("core.text.engine.toml_codec.record_scanner")

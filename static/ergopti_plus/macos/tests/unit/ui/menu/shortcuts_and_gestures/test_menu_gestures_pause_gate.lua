@@ -26,7 +26,7 @@ local function with_toggle_fixture(previous, options, body)
 	local names = {
 		"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
-		"ui.menu.shortcut_utils", "infra.logger", "ui.menu.menu_gestures",
+		"ui.menu.shortcut_utils", "core.logger.engine.logger", "ui.menu.menu_gestures",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -73,7 +73,7 @@ local function with_toggle_fixture(previous, options, body)
 	end }
 	package.loaded["ui.action_picker"] = {}
 	package.loaded["ui.menu.shortcut_utils"] = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local state = { gestures = previous }
 	local MenuGestures = require("ui.menu.menu_gestures")

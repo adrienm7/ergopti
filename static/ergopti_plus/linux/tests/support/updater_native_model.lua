@@ -6,7 +6,7 @@
 local M = {}
 function M.with_fixture(body)
  local original_tmpname = os.tmpname -- Restore even when decoration fails before old inner cleanup.
- local names = { "modules.updater.manager", "infra.archive_output", "infra.monotonic", "core.lifecycle.engine.installation" }
+ local names = { "modules.updater.manager", "infra.archive_output", "core.logger.engine.monotonic", "core.lifecycle.engine.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local Fs = require("core.fs.adapters.file_system")
  local Move = require("core.fs.engine.no_replace_move")
@@ -150,7 +150,7 @@ function M.with_fixture(body)
   config_path = os.tmpname() -- Reserve before the original allocator override.
   local config = assert(io.open(config_path, "wb")); assert(config:close())
   package.loaded["infra.archive_output"] = { native_artifact = factory }
-  package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+  package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
    backend = function() return "luv.hrtime" end, now_ms = function() return now end }
   package.loaded["modules.updater.manager"] = nil
   manager = require("modules.updater.manager")

@@ -19,10 +19,10 @@ local function append_to(mode, on_error)
 	local previous_hs, previous_open = _G.hs, io.open
 	local result, opens, errors = nil, 0, {}
 	local ok, failure = xpcall(function()
-		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "infra.logger" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system", "core.logger.engine.logger" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local adapter = helpers.load_with_stubs("core.fs.adapters.file_system")
 			hs.fs.attributes = function(path)
 				if path ~= "/virtual/destination" then return nil end

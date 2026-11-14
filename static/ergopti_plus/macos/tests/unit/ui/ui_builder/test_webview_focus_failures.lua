@@ -16,7 +16,7 @@ local function with_focus(mode, scenario)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local records = { errors = {}, warnings = 0, successes = 0, app_focuses = 0, raises = 0, deferred = {} }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			warn = function() records.warnings = records.warnings + 1 end,
 			info = function() records.successes = records.successes + 1 end,

@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local function with_world(body)
 	return helpers.with_stub_scope({ "modules.llm", "modules.llm.api_ollama", "modules.llm.api_mlx",
-		"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "infra.logger" }, function()
+		"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "core.logger.engine.logger" }, function()
 		local Core = helpers.load_with_stubs("modules.llm")
 		local Storage = require("core.fs.adapters.storage")
 		local world = { core = Core, probes = {}, completions = {} }

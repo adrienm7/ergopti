@@ -28,7 +28,7 @@ local Window = require("adapters.window_info")
 local Detector = require("adapters.secure_field_detector")
 local Atspi = require("adapters.atspi_focus")
 local uv = require("luv")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 local Timings = require("infra.timings")
 local ffi = require("ffi")
 ffi.cdef([[typedef struct _XDisplay Display;
@@ -228,7 +228,7 @@ for command in io.lines() do
 		assert(called, detail)
 	elseif command == "benchmark" or command == "deadline" then
 		if command == "benchmark" then await_join() end
-		local clock = require("infra.monotonic")
+		local clock = require("core.logger.engine.monotonic")
 		result.probe_ms = {}
 		for _ = 1, command == "benchmark" and 20 or 1 do
 			local started = clock.now_ms()

@@ -27,8 +27,8 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local BootJournal = require("adapters.boot_journal")
+local Logger = require("core.logger.engine.logger")
+local BootJournal = require("core.logger.adapters.boot_journal")
 
 -- One flushed-and-closed writer for every durable boot channel.
 local write_now = BootJournal.write_now

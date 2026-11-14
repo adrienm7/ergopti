@@ -121,9 +121,9 @@ helpers.describe("a full lift-off still ends the gesture", function()
 		-- every drop would mean a real lift-off never terminates the gesture, so this
 		-- drives the real engine and asserts nothing fires after the fingers leave.
 		package.loaded["modules.gestures.engine"] = nil
-		package.loaded["infra.logger"]  = nil
+		package.loaded["core.logger.engine.logger"]  = nil
 		package.loaded["infra.timings"] = nil
-		local _ = helpers.load_with_stubs("infra.logger")
+		local _ = helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["infra.timings"] = {
 			count = require("tests.support.registry_count"),
 			sec = function(_, key)

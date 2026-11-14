@@ -104,12 +104,12 @@ helpers.describe("Intrinsic hotstring section-order preservation", function()
 	-- The configuration owner and conditional writer use real private files;
 	-- only Hammerspoon and logging ports are modelled in this portable fixture.
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			Outdated.reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")
@@ -316,11 +316,11 @@ helpers.describe("Explicit section-order namespace source-shape admission", func
 	local source = '[hotstrings.order_overrides]\nvalid = ["kept"]\n[future]\nkeep = "independent"\n'
 
 	local function with_admitted_file(body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local errors = {}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -391,12 +391,12 @@ helpers.describe("Obsolete scalar user-model list preservation", function()
 	local tail = '[llm.models]\nuser_models = TOKEN\nactive_backend = "ollama"\n[future]\nkeep = "independent"\nempty = []\nitems = [1, 2]\n"literal.dot" = { stamp = 2026-10-05T10:20:30Z, child = [] }\n'
 
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+			package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 			package.loaded["core.fs.adapters.file_system"] = nil
 			Outdated.reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")

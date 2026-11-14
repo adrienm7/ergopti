@@ -439,7 +439,7 @@ local function load_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Reuse the hs.json.decode stub that the test harness provides
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local ok, decoded = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(decoded) end
 	return decoded, nil
@@ -988,7 +988,7 @@ local function load_session_corpus()
 	local handle = assert(io.open(_SESSION_CORPUS_PATH, "rb"), "cannot open " .. _SESSION_CORPUS_PATH)
 	local raw = handle:read("*a")
 	handle:close()
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	return require("hs").json.decode(raw)
 end
 

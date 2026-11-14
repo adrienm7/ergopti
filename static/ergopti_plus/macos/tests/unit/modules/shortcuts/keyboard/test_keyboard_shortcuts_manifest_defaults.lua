@@ -24,7 +24,7 @@ local MODULES = {
 	"adapters.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -54,7 +54,7 @@ local function with_subject(store, scenario)
 		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"space","label":"Space"}]}' end,
 	}
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.gestures.actions"] = {
 		is_assignable = function(action_id) return OFFERED[action_id] == true end,
 		execute_single = function() return true end,

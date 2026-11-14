@@ -23,7 +23,7 @@ helpers.describe("metrics disk cache reads", function()
 					return nil, "error"
 				end
 				package.loaded["hs.json"].decode = function() return {} end
-				package.loaded["infra.logger"].warn = function() warnings = warnings + 1 end
+				package.loaded["core.logger.engine.logger"].warn = function() warnings = warnings + 1 end
 				package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 					local handle = { timer = {} }
 					pending[#pending + 1] = function() handle.timer = nil; callback() end
@@ -48,7 +48,7 @@ helpers.describe("metrics disk cache reads", function()
 				package.loaded["modules.keystats.sqlite_reader"] = {}
 				with_window("ui.metrics_apps", function(dashboard)
 					local pending, warnings, reads = {}, {}, 0
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					package.loaded["core.events.timer_scheduler"].after = function(_, callback)

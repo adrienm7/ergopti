@@ -13,7 +13,7 @@ local Json=require('core.text.engine.json');local f=assert(io.open(helpers.share
 local model=require('shortcuts.engine.physical_slots').new(registry)
 local tap,callback,source_callback,constructs,executed,timers,settings
 local log={}
-package.loaded['infra.logger']={error=function(...) log[#log+1]={...} end}
+package.loaded['core.logger.engine.logger']={error=function(...) log[#log+1]={...} end}
 local provenance={STATUS_FOREIGN='foreign',STATUS_OWNED='owned',STATUS_UNREADABLE='unreadable'}
 function provenance.classify_with_fence(event) return event.owned and {} or nil,event.status or 'foreign',event.fence end
 package.loaded['adapters.event_provenance']=provenance

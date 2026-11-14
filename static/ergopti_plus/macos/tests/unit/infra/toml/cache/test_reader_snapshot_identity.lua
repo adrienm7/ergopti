@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"infra.logger", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string",
+	"core.logger.engine.logger", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.basic_string",
 	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner", "core.lifecycle.engine.compat.utf8",
 }
 local A = '[[alpha]]\n"key" = { output = "CAPTURED" }\n'
@@ -24,7 +24,7 @@ local function with_reader(run)
 	local source = os.tmpname()
 	local ok, detail = xpcall(function()
 		helpers.with_stub_scope(OWNED, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local reader = require("core.text.engine.toml_codec.reader")
 			local state = { source = source, capture_calls = 0, reads = 0, stores = 0 }
 			function state.write(bytes)

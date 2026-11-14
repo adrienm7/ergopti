@@ -16,7 +16,7 @@ local MetricsState = require("infra.metrics_state_keys")
 --- Loads a fresh registry module with a silent logger.
 --- @return table SessionDemotions
 local function load_subject()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.menu.session_demotions"] = nil
 	return require("ui.menu.session_demotions")
 end

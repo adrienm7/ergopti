@@ -51,7 +51,7 @@ local function with_bridge(module_name, scenario)
 				end
 				return controller
 			end
-			local logger, errors = require("infra.logger"), {}
+			local logger, errors = require("core.logger.engine.logger"), {}
 			local original = logger.error
 			h.errors = errors
 			logger.error = function(tag, message, ...)
@@ -192,7 +192,7 @@ helpers.describe("close logging preserves exact callback ownership", function()
 	helpers.it("update-check close cannot unref a successor admitted by a synchronous log sink", function()
 		with_bridge("ui.update_check", function(_, h)
 			helpers.assert_true(h.show())
-			local logger = require("infra.logger")
+			local logger = require("core.logger.engine.logger")
 			local original, entered = logger.info, false
 			logger.info = function(tag, message, ...)
 				if not entered and message == "Update-check window closed." then
@@ -221,7 +221,7 @@ end)
 helpers.describe("callback custody covers native option evaluation", function()
 	helpers.it("update-check retires its bound callback when the native geometry getter raises", function()
 		with_bridge("ui.update_check", function(_, h)
-			local logger, errors = require("infra.logger"), {}
+			local logger, errors = require("core.logger.engine.logger"), {}
 			local original = logger.error
 			logger.error = function(tag, message, ...)
 				errors[#errors + 1] = string.format(message, ...)

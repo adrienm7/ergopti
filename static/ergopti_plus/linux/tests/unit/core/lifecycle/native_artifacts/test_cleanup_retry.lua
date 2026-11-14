@@ -13,7 +13,7 @@ local function fixture(options)
   stages = 0, commits = 0, cleanups = 0, disposes = 0, hashes = 0, writes = {}, bytes = "",
   timer_settled = false, timer_listeners = {}, hash_settled = false, hash_listeners = {}, callbacks = {} }
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "infra.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local function restore()
   for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -131,7 +131,7 @@ local function fixture(options)
    h.writes[#h.writes + 1] = { chunk = chunk, callback = callback }; return {}
   end }
  package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/actual-driver" end }
- package.loaded["infra.monotonic"] = { now_ms = function() return h.now end,
+ package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return h.now end,
   has_hires = function() return options.coarse ~= true end, backend = function() return "luv.hrtime" end }
  package.loaded["infra.managed_http_deadline"] = { start = function(_, callback)
   h.expire = callback
@@ -189,7 +189,7 @@ local function fixture(options)
 end
 local function controlled(options, body)
  local saved = {}
- local names = { "ffi", "luv", "core.fs.engine.paths", "infra.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
+ local names = { "ffi", "luv", "core.fs.engine.paths", "core.logger.engine.monotonic", "infra.managed_http_deadline", "infra.fd_sha256" }
  for _, name in ipairs(names) do saved[name] = package.loaded[name] end
  local ok, err = xpcall(function() body(fixture(options)) end, debug.traceback)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end

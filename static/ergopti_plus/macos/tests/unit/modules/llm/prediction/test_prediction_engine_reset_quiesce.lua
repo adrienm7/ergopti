@@ -19,7 +19,7 @@ local helpers = require("tests.helpers")
 local PortFakes = require("tests.support.port_fakes")
 
 local function load_fixture(cancel_result)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local hs_stub = _G.hs
 	package.loaded["core.events.timer_scheduler"] = nil
 	local cancel_calls = 0
@@ -303,7 +303,7 @@ helpers.describe("prediction_engine.reset() quiesces stream + deferred state", f
 	helpers.it("contains a debounce callback throw through the module logger", function()
 		local engine, _, hs_stub = load_fixture()
 		engine.set_llm_enabled(true)
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local original_error = logger.error
 		local messages = {}
 		logger.error = function(_, fmt, ...)

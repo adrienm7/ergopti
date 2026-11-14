@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 --- @param body function Receives the module, queued native completions, the
 ---   notices shown and the warnings logged.
 local function fixture(body)
-	local names = { "modules.gestures.conflicts", "infra.logger", "core.i18n.engine.i18n", "ui.gesture_conflict_notice" }
+	local names = { "modules.gestures.conflicts", "core.logger.engine.logger", "core.i18n.engine.i18n", "ui.gesture_conflict_notice" }
 	local saved, pending = {}, {}
 	local saved_shell = package.loaded["adapters.shell_runner"]
 	local notices = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local logger, warnings = helpers.make_logger_stub(), {}
 	logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["ui.gesture_conflict_notice"] = { show = function(warning) notices[#notices + 1] = warning end }
 	package.loaded["adapters.shell_runner"] = {

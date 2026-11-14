@@ -27,7 +27,7 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Defaults    = require("platform.remap.defaults")
 local Config      = require("platform.remap.config")
 local Generator   = require("platform.remap.generator")

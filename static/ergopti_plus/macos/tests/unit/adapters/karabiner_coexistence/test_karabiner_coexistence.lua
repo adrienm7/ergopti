@@ -27,7 +27,7 @@ local HELPER = "/Library/Application Support/org.pqrs/Karabiner-Elements/"
 --- @return table port
 --- @return table world
 local function load_port(script, tweak)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["adapters.karabiner_coexistence"] = nil
 	local world = { calls = {}, helper = true, timers = {}, timer_commits = true }

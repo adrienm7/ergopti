@@ -26,7 +26,7 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("core.fs.engine.paths")
 local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
@@ -481,7 +481,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.boot_journal",
+		id       = "core.logger.adapters.boot_journal",
 		contract = { "append", "write_now", "set_user_log_ready", "describe_path" },
 		wired    = true,
 	},
@@ -592,7 +592,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.log_transport",
+		id       = "core.logger.adapters.log_transport",
 		contract = { "start", "enqueue", "drain", "stop", "status" },
 		wired    = true,
 	},

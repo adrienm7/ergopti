@@ -20,7 +20,7 @@ local RESET_MODULES = {
 	"modules.diagnostics.hid_diagnostic_mailbox",
 	"adapters.synthetic_input", "adapters.event_provenance",
 	"core.events.timer_scheduler",
-	"infra.logger", "infra.perf", "infra.hotpath_profiler",
+	"core.logger.engine.logger", "core.logger.engine.perf", "infra.hotpath_profiler",
 	"infra.manifest_reader", "infra.keycodes", "layouts.engine.layers.terminators",
 }
 
@@ -249,12 +249,12 @@ local function load_fixture(prepare_input)
 		is_secure_field = function() return false, 1 end,
 	})
 	package.loaded["layouts.engine.layers.terminators"] = api({ matches_magic_event = function() return false end })
-	package.loaded["infra.logger"] = api({
+	package.loaded["core.logger.engine.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 	})
-	package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
@@ -830,7 +830,7 @@ local INPUT_MODULES = {
 	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
 	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
 	"modules.keymap.magic_key_source", "core.events.clock",
-	"infra.key_event_health", "infra.keystroke_integrity", "infra.deferred_work",
+	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "infra.deferred_work",
 	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
 	"infra.hotstring_engine", "hotstrings.engine.matcher", "infra.text_utils", "core.text.engine.utils_core",
 	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
@@ -857,7 +857,7 @@ local function with_input_fixture(callback)
 			package.loaded["adapters.event_provenance"].classify_with_fence = function()
 				return nil, "foreign", nil, controls.physical_replay == true
 			end
-			package.loaded["infra.logger"].error = function(_, message)
+			package.loaded["core.logger.engine.logger"].error = function(_, message)
 				calls.errors[#calls.errors + 1] = message
 			end
 			package.loaded["adapters.text_sender"] = {}
@@ -891,7 +891,7 @@ local function with_input_fixture(callback)
 		end)
 		local clock = require("core.events.clock")
 		clock.reset()
-		require("infra.key_event_health").reset()
+		require("core.logger.engine.key_event_health").reset()
 		local properties = hs.eventtap.event.properties
 		local function event(code, text, age, repeat_flag, is_up)
 			local raw, unicode = 0, text
@@ -1019,7 +1019,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 				helpers.assert_true(fixture.state.start_is_line_start)
 			end
 			helpers.assert_eq(fixture.quarantine_values, {})
-			helpers.assert_eq(require("infra.key_event_health").counts().stale_passed, 0)
+			helpers.assert_eq(require("core.logger.engine.key_event_health").counts().stale_passed, 0)
 			helpers.assert_eq(fixture.calls.emitted, {})
 			helpers.assert_true(fixture.down(fixture.event(1, "é")),
 				"pass-through controls must not spend the existing one-shot arm")
@@ -1035,7 +1035,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 			helpers.assert_true(fixture.down(fixture.event(1, "é", 1200)))
 			helpers.assert_eq(fixture.calls.emitted, { "É" })
 			helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
-			local counts = require("infra.key_event_health").counts()
+			local counts = require("core.logger.engine.key_event_health").counts()
 			helpers.assert_eq(counts.downs + counts.ups, 0,
 				"the already-observed physical replay must not be counted twice")
 			helpers.assert_eq(counts.stale_passed, 0)

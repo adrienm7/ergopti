@@ -13,10 +13,10 @@ local helpers = require("tests.helpers")
 --- @param callback function Receives tracker, state, native controls and emitted rows.
 local function with_capture(callback)
 	return helpers.with_stub_scope({ "modules.keystats.context_tracker",
-		"adapters.secure_field_detector", "infra.logger", "metrics.engine.view.private_window" }, function()
+		"adapters.secure_field_detector", "core.logger.engine.logger", "metrics.engine.view.private_window" }, function()
 		local native = { now = 1000, name = "Editor", bundle = "test.editor", path = "/Editor.app",
 			pid = 42, title = "Document", secure = false, available = true }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.secure_field_detector"] = {
 			refresh = function() end,
 			isSecureField = function() return native.secure end,

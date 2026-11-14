@@ -21,7 +21,7 @@ local function run()
 		logger[name] = function() end
 	end
 	logger.error = function() errors[#errors + 1] = "production reader/writer reported an error" end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.fs.engine.paths"] = { shared = function(relative) return shared .. "/" .. relative end }
 	-- Aggregate-only fixture never invokes typed-text encryption or hardware IDs.
 	package.loaded["modules.keystats.text_cipher"] = setmetatable({}, {

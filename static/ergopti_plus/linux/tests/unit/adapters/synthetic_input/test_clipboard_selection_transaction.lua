@@ -411,7 +411,7 @@ end)
 --- Exercises the production asynchronous range owner with native ACK boundaries.
 --- @param body function
 local function with_native_selection(body)
-	local names = { "adapters.selection_transaction", "adapters.atspi_focus", "infra.monotonic" }
+	local names = { "adapters.selection_transaction", "adapters.atspi_focus", "core.logger.engine.monotonic" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { now = 0, focus = "atspi::1.2:/field", allowed = true, starts = 0,
@@ -445,7 +445,7 @@ local function with_native_selection(body)
 		if world.fault == "missing-registration" then operation.on_settled = nil end
 		return operation
 	end
-	package.loaded["infra.monotonic"] = { now_ms = function() return world.now end }
+	package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return world.now end }
 	package.loaded["adapters.atspi_focus"], package.loaded["adapters.selection_transaction"] = adapter, nil
 	local owner = require("adapters.selection_transaction").new({
 		focus_id = function()

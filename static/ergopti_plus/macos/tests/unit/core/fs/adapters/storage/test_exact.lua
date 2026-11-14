@@ -99,8 +99,8 @@ helpers.describe("Storage exact operations", function()
 	-- that as an ERROR failed the release launch gate.
 	helpers.it("treats native false on an absent key as a completed delete", function()
 		local errors = {}
-		package.loaded["infra.logger"] = nil
-		local Logger = helpers.load_with_stubs("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 		local original_error = Logger.error
 		Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 		local adapter = helpers.load_with_stubs("core.fs.adapters.storage", {

@@ -20,11 +20,11 @@ local helpers = require("tests.helpers")
 --- @return boolean opened, table writer, table logs
 local function open_with_cursor(cursor)
 	local opened, writer, logs
-	helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 		logs = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) logs[#logs + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local db = {
 			exec = function() return 0 end,
 			nrows = function(_, sql)

@@ -110,7 +110,7 @@ end
 local STARTUP_MODULES = {
 	"core.events.timer_scheduler",
 	"core.fs.adapters.json_codec",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.startup_controller",
@@ -123,7 +123,7 @@ local function with_startup(body)
 	with_modules(STARTUP_MODULES, function()
 		local logger, lines = recording_logger()
 		local scheduler, timers = counting_scheduler()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.events.timer_scheduler"] = scheduler
 		package.loaded["core.fs.adapters.json_codec"] = {
 			decode = function() return { log_path = "/tmp/fixture.log" } end,
@@ -279,7 +279,7 @@ end)
 -- ==========================================
 
 local ORCHESTRATOR_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
 	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
@@ -292,7 +292,7 @@ local ORCHESTRATOR_MODULES = {
 local function with_orchestrator(body)
 	with_modules(ORCHESTRATOR_MODULES, function()
 		local logger, lines = recording_logger()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = { { id = "basic" }, { id = "advanced" } } }
 		package.loaded["keyboard.engine.chord"] = {
 			format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
@@ -414,7 +414,7 @@ end)
 
 local OLLAMA_MODULES = {
 	"infra.notifications",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.text_utils",
 	"modules.llm.ollama_binary",
@@ -448,7 +448,7 @@ local function with_ollama_manager(enabled, body)
 			},
 			task = { new = function() hs_tasks = hs_tasks + 1; return nil end },
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.text_utils"] = {}

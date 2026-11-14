@@ -79,7 +79,7 @@ for index, fault in ipairs({
 	{ table_name = "agg_app_day_hourly", phase = "AFTER", refusal = "FAIL" },
 }) do
 	local app = "derived-atomic-" .. index
-	local now = math.floor(require("infra.monotonic").now_ms())
+	local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 	assert(Writer.exec_sql("CREATE TABLE IF NOT EXISTS derived_side_effect(app TEXT);"))
 	assert(Writer.exec_sql("CREATE TRIGGER derived_refusal " .. fault.phase .. " INSERT ON " .. fault.table_name
 		.. " WHEN NEW.app='" .. app .. "' BEGIN INSERT INTO derived_side_effect VALUES (NEW.app);"

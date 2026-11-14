@@ -22,8 +22,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local State    = helpers.load_with_stubs("modules.keymap.state")
 local Registry = helpers.load_with_stubs("modules.keymap.registry")

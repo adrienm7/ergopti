@@ -28,7 +28,7 @@
 
 local M = {}
 
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 
 local LOG = "menu_llm.mlx_repair_offer"

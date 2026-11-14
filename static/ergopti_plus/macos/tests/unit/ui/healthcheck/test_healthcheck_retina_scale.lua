@@ -21,7 +21,7 @@ helpers.describe("healthcheck-retina-scale", function()
 					frame = function() return { x = 0, y = 0, w = usable_width, h = 850 } end,
 					fullFrame = function() return { x = 0, y = 0, w = 1440, h = 900 } end,
 				}
-				helpers.load_with_stubs("infra.logger", {
+				helpers.load_with_stubs("core.logger.engine.logger", {
 					screen = {
 						mainScreen = function() return screen end,
 						allScreens = function() return { screen } end,

@@ -17,8 +17,8 @@ local TOKEN = "0123456789abcdef0123456789abcdef"
 --- Builds the shipped graph and returns its CapsWord rule and legacy context.
 local function build()
 	local config, err, _legacy, context
-	helpers.with_stub_scope({ "platform.remap.generator", "infra.logger", "core.fs.adapters.file_system" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.with_stub_scope({ "platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system" }, function()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local Generator = helpers.load_with_stubs("platform.remap.generator")
 		config, err, _legacy, context = Generator.build_karabiner_json({
 			tap_hold_config = {}, mod_combos_config = {}, tap_hold_timeout_ms = 200,

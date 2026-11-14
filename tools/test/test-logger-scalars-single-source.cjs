@@ -159,16 +159,16 @@ function mustNotDeclare(file, name, pattern, why) {
 // for the tap-hold constants), and a purge running on the unloaded sentinel, which
 // _LoggerPurgeOldLogs reads as "every dated file is expired".
 mustNotDeclare(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_RETENTION_DAYS',
 	/LOGGER_RETENTION_DAYS\s*:=\s*[1-9]\d*/g,
 	'LoggerLoadTimings assigns it from [logger] retention_days'
 );
 {
-	const ahk = read('windows/infra/logger.ahk');
+	const ahk = read('windows/core/logger/engine/logger.ahk');
 	if (!/^global LOGGER_RETENTION_DAYS := 0$/m.test(ahk)) {
 		errors.push(
-			'windows/infra/logger.ahk: LOGGER_RETENTION_DAYS is no longer declared with the sentinel 0 ' +
+			'windows/core/logger/engine/logger.ahk: LOGGER_RETENTION_DAYS is no longer declared with the sentinel 0 ' +
 				'that LoggerLoadTimings replaces.'
 		);
 	}
@@ -179,7 +179,7 @@ mustNotDeclare(
 		!/Days := TimingsGet\("logger", "retention_days"\)/.test(loader[1])
 	) {
 		errors.push(
-			'windows/infra/logger.ahk: LoggerLoadTimings no longer assigns LOGGER_RETENTION_DAYS from ' +
+			'windows/core/logger/engine/logger.ahk: LoggerLoadTimings no longer assigns LOGGER_RETENTION_DAYS from ' +
 				'TimingsGet("logger", "retention_days").'
 		);
 	}
@@ -191,7 +191,7 @@ mustNotDeclare(
 	];
 	if (purges.length !== 2 || guarded.length !== purges.length) {
 		errors.push(
-			`windows/infra/logger.ahk: ${guarded.length} of ${purges.length} retention purge(s) are guarded ` +
+			`windows/core/logger/engine/logger.ahk: ${guarded.length} of ${purges.length} retention purge(s) are guarded ` +
 				'by LOGGER_RETENTION_DAYS > 0 (expected the boot and the rollover purge, both guarded). An ' +
 				'unguarded purge before LoggerLoadTimings deletes every dated log file.'
 		);
@@ -206,12 +206,12 @@ mustNotDeclare(
 		);
 	}
 	const entry = read('windows/ErgoptiPlus.ahk');
-	const loggerInclude = entry.indexOf('#Include infra/logger.ahk');
+	const loggerInclude = entry.indexOf('#Include core/logger/engine/logger.ahk');
 	const bootInclude = entry.indexOf('#Include core/lifecycle/engine/boot.ahk');
 	const init = entry.indexOf('\nLoggerInit()\n');
 	if (loggerInclude < 0 || bootInclude < 0 || loggerInclude > bootInclude) {
 		errors.push(
-			'windows/ErgoptiPlus.ahk: infra/logger.ahk must be included before core/lifecycle/engine/boot.ahk, or its ' +
+			'windows/ErgoptiPlus.ahk: core/logger/engine/logger.ahk must be included before core/lifecycle/engine/boot.ahk, or its ' +
 				'sentinel re-zeroes the retention LoggerLoadTimings just loaded.'
 		);
 	}
@@ -223,7 +223,7 @@ mustNotDeclare(
 	}
 }
 check(
-	'macos/infra/logger.lua',
+	'macos/core/logger/engine/logger.lua',
 	'max_age_days default',
 	/max_age_days\s*=\s*max_age_days\s+or\s+(\d+)/g,
 	registry.logger.retention_days,
@@ -235,7 +235,7 @@ check(
 // for the life of the install. A gate over the other two drivers' copies of a
 // number cannot see a driver that ignores the number entirely.
 {
-	const sink = read('linux/infra/logger_sink.lua');
+	const sink = read('linux/core/logger/engine/sink.lua');
 	// Matches the lookup by its arguments, not by one spelling of the call: it
 	// travels through pcall, so `Timings.count("logger", "retention_days")` and
 	// `pcall(Timings.count, "logger", "retention_days")` are both correct and only
@@ -245,7 +245,7 @@ check(
 		!/["']logger["'][\s\S]{0,24}["']retention_days["']/.test(sink)
 	) {
 		errors.push(
-			'linux/infra/logger_sink.lua: the retention window is not read ' +
+			'linux/core/logger/engine/sink.lua: the retention window is not read ' +
 				'from the shared registry — either it purges on a number of its own, which is ' +
 				'what this gate exists to prevent, or it does not purge at all.'
 		);
@@ -259,7 +259,7 @@ check(
 		/pcall\(os\.remove, path\)/.test(sink);
 	if (!agePurge) {
 		errors.push(
-			'linux/infra/logger_sink.lua: no age-based purge found. ' +
+			'linux/core/logger/engine/sink.lua: no age-based purge found. ' +
 				'Rolling a file per day and deleting none grows the log directory without ' +
 				'bound, and nothing else in this driver would ever notice.'
 		);
@@ -269,7 +269,7 @@ check(
 // ── ring_buffer_size ────────────────────────────────────────────────────────
 
 check(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_RING_BUFFER_SIZE',
 	/LOGGER_RING_BUFFER_SIZE\s*:=\s*(\d+)/g,
 	registry.logger.ring_buffer_size
@@ -281,7 +281,7 @@ check(
 	registry.logger.ring_buffer_size
 );
 mustNotDeclare(
-	'macos/infra/logger.lua',
+	'macos/core/logger/engine/logger.lua',
 	'RING_BUFFER_SIZE',
 	/\bRING_BUFFER_SIZE\s*=\s*\d+/g,
 	'the macOS driver delegates its ring to the shared core'
@@ -290,13 +290,13 @@ mustNotDeclare(
 // ── dedup_window: the same duration, in two units ───────────────────────────
 
 check(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_DEDUP_WINDOW_MS',
 	/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/g,
 	registry.logger.dedup_window_ms
 );
 mustNotDeclare(
-	'macos/infra/logger.lua',
+	'macos/core/logger/engine/logger.lua',
 	'DEDUP_WINDOW_SEC',
 	/\bDEDUP_WINDOW_SEC\s*=\s*\d+/g,
 	'the macOS driver delegates its suppression window to the shared core'
@@ -317,10 +317,11 @@ check(
 // from a driver that had it.
 {
 	const ms = Number(
-		(read('windows/infra/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) || [])[1]
+		(read('windows/core/logger/engine/logger.ahk').match(/LOGGER_DEDUP_WINDOW_MS\s*:=\s*(\d+)/) ||
+			[])[1]
 	);
 	const sec = Number(
-		(read('macos/infra/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
+		(read('macos/core/logger/engine/logger.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
 	);
 	const coreSec = Number(
 		(read('_shared/core/logger/engine/init.lua').match(/\bDEDUP_WINDOW_SEC\s*=\s*(\d+)/) || [])[1]
@@ -359,7 +360,7 @@ check(
 // driver runs the core and must not hold a copy of its own.
 
 check(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_REPEAT_WINDOW_MS',
 	/LOGGER_REPEAT_WINDOW_MS\s*:=\s*(\d+)/g,
 	registry.logger.repeat_window_ms
@@ -372,7 +373,7 @@ check(
 	'the shared core holds this in SECONDS — the registry value is milliseconds'
 );
 check(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_REPEAT_CAPACITY',
 	/LOGGER_REPEAT_CAPACITY\s*:=\s*(\d+)/g,
 	registry.logger.repeat_streak_capacity
@@ -384,7 +385,7 @@ check(
 	registry.logger.repeat_streak_capacity
 );
 mustNotDeclare(
-	'macos/infra/logger.lua',
+	'macos/core/logger/engine/logger.lua',
 	'REPEAT_WINDOW_SEC',
 	/\bREPEAT_WINDOW_SEC\s*=\s*\d+/g,
 	'the macOS driver delegates repeat collapsing to the shared core'
@@ -417,7 +418,7 @@ mustNotDeclare(
 // neither layer may withhold, so it can only be exempt by an explicit flag,
 // never by a table entry that someone later "fixes" to match info.
 {
-	const ahkSrc = read('windows/infra/logger.ahk');
+	const ahkSrc = read('windows/core/logger/engine/logger.ahk');
 	const ahkMatch = /LOGGER_REPEAT_KEY_BY\s*:=\s*Map\(([\s\S]*?)\)\s*\n/.exec(ahkSrc);
 	const coreSrc = read('_shared/core/logger/engine/init.lua');
 	const coreMatch = /local REPEAT_KEY_BY\s*=\s*\{([\s\S]*?)\}/.exec(coreSrc);
@@ -470,7 +471,7 @@ mustNotDeclare(
 // ── flush_interval_ms ───────────────────────────────────────────────────────
 
 check(
-	'windows/infra/logger.ahk',
+	'windows/core/logger/engine/logger.ahk',
 	'LOGGER_FLUSH_INTERVAL_MS',
 	/LOGGER_FLUSH_INTERVAL_MS\s*:=\s*(\d+)/g,
 	registry.logger.flush_interval_ms
@@ -486,21 +487,21 @@ check(
 
 const transportSeconds = /\s*=\s*(\d+(?:\.\d+)?)/.source;
 check(
-	'macos/adapters/log_transport.lua',
+	'macos/core/logger/adapters/log_transport.lua',
 	'ACK_RETRY_SEC',
 	new RegExp('\\bACK_RETRY_SEC' + transportSeconds, 'g'),
 	registry.logger.ack_retry_ms / 1000,
 	'the transport holds this in SECONDS — the registry value is milliseconds'
 );
 check(
-	'macos/adapters/log_transport.lua',
+	'macos/core/logger/adapters/log_transport.lua',
 	'ACK_RETRY_CAP_SEC',
 	new RegExp('\\bACK_RETRY_CAP_SEC' + transportSeconds, 'g'),
 	registry.logger.ack_retry_cap_ms / 1000,
 	'the transport holds this in SECONDS — the registry value is milliseconds'
 );
 check(
-	'macos/adapters/log_transport.lua',
+	'macos/core/logger/adapters/log_transport.lua',
 	'STALL_FATAL_SEC',
 	new RegExp('\\bSTALL_FATAL_SEC' + transportSeconds, 'g'),
 	registry.logger.stall_fatal_ms / 1000,
@@ -539,7 +540,7 @@ if (
 	);
 }
 mustNotDeclare(
-	'macos/adapters/log_transport.lua',
+	'macos/core/logger/adapters/log_transport.lua',
 	'MAX_ACK_ATTEMPTS_BEFORE_FAILURE',
 	/\bMAX_ACK_ATTEMPTS_BEFORE_FAILURE\s*=\s*\d+/g,
 	'a send count made a 1.5 s disk pause fatal; the stall budget is a duration'
@@ -550,11 +551,11 @@ mustNotDeclare(
 // The whole failure was an unnamed number. A named constant that some other
 // call site bypasses is the same failure wearing a better name.
 {
-	const hs = read('macos/infra/logger.lua');
+	const hs = read('macos/core/logger/engine/logger.lua');
 	const bare = [...hs.matchAll(/_dedup\.time\)\s*<\s*(\d+)/g)];
 	if (bare.length > 0) {
 		errors.push(
-			'macos/infra/logger.lua compares against the dedup window as a bare literal again — ' +
+			'macos/core/logger/engine/logger.lua compares against the dedup window as a bare literal again — ' +
 				'use DEDUP_WINDOW_SEC so the value stays greppable and gate-able'
 		);
 	}

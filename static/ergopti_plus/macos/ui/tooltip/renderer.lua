@@ -12,7 +12,7 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "tooltip_renderer"
 local Config = require("ui.tooltip.config")
 local AXResponsiveness = require("adapters.accessibility_permission")

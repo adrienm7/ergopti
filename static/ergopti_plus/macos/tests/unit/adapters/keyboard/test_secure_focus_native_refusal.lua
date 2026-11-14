@@ -2,8 +2,8 @@
 --- Preserve public adapter contracts while retaining confirmed native AX refusal.
 local helpers = require("tests.helpers")
 local function with_detector(callback)
- return helpers.with_stub_scope({ "adapters.secure_field_detector", "infra.logger", "hs", "tests.stubs.hs" }, function()
-  package.loaded["infra.logger"] = { debug = function() end }
+ return helpers.with_stub_scope({ "adapters.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
+  package.loaded["core.logger.engine.logger"] = { debug = function() end }
   local control = { mode = "ordinary", queries = {} }
   local focused = { attributeValue = function(_, key)
    control.queries[#control.queries + 1] = key

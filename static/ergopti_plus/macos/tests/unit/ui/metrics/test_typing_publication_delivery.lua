@@ -113,7 +113,7 @@ helpers.describe("typing request response delivery", function()
 	end
 	helpers.it("(typing-publication-delivery) reopen logging reentry cannot evaluate retired window", function()
 		with_delivery(function(dashboard, context, _, _, _, evaluations)
-			package.loaded["infra.logger"].debug = function(_, template)
+			package.loaded["core.logger.engine.logger"].debug = function(_, template)
 				if template:find("already open", 1, true) then context.on_close() end
 			end
 			helpers.assert_eq(dashboard.show(), false)

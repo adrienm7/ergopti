@@ -256,7 +256,7 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			local native_handle = native.hotkey._bound[1]
 			local callback = native_handle.pressed_fn
 			local stopped, reads, errors = nil, 0, 0
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local error_log = logger.error
 			logger.error = function(...) errors = errors + 1; return error_log(...) end
 			spec.context.replace_active = function()

@@ -97,7 +97,7 @@ local function run_action(label, outcome, options)
 			return value
 		end,
 		i18n = require("core.i18n.engine.i18n"),
-		logger = require("infra.logger"),
+		logger = require("core.logger.engine.logger"),
 	}))
 	local command_row = require("infra.manifest_menu").command_row
 	package.loaded["infra.manifest_menu"] = {

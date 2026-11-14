@@ -33,7 +33,7 @@ local source_directory = require("core.fs.engine.module_source_directory").captu
 -- descriptions; elsewhere a print shim + key-passthrough i18n take over. Hard
 -- requires on lib.logger / lib.i18n here were the impurity that forced the Linux
 -- driver to fork its own TOML parser (audit SS-2).
-local _ok_log, Logger = pcall(require, "infra.logger")
+local _ok_log, Logger = pcall(require, "core.logger.engine.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("core.logger.engine.shim")
 end

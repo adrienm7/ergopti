@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
-	"infra.logger", "adapters.log_transport", "adapters.event_provenance",
+	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
 	"adapters.synthetic_input",
 	"core.fs.engine.paths", "infra.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
@@ -195,7 +195,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			cancel = function() return true end,
 		}
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		local port = 49152

@@ -49,7 +49,7 @@ local function load_host()
 		open_http_url = function(url) ctx.urls[#ctx.urls + 1] = url; return true end,
 	}
 	ctx.Host = helpers.load_with_stubs("ui.update_check")
-	ctx.logger = require("infra.logger")
+	ctx.logger = require("core.logger.engine.logger")
 	ctx.previous_error = ctx.logger.error
 	ctx.logger.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
 	return ctx

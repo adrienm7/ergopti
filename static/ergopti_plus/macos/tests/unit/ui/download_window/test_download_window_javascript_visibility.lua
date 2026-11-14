@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_window(scenario)
 	local names = {
 		"ui.download_window", "ui.download_window.javascript", "ui.ui_builder",
-		"infra.logger", "infra.deferred_work", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "infra.deferred_work", "core.fs.engine.paths", "infra.timings", "core.i18n.engine.i18n",
 		"infra.text_utils",
 		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 	}
@@ -23,7 +23,7 @@ local function with_window(scenario)
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { errors = {}, timers = {}, callbacks = {}, failure = nil }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop,
 		error = function(_, message, ...)
 			fixture.errors[#fixture.errors + 1] = string.format(message, ...)

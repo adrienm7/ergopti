@@ -23,7 +23,7 @@ local helpers = require("tests.helpers")
 local function run_delete(remove_result)
 	return helpers.with_fresh_modules({
 		"core.fs.engine.dir",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"core.fs.adapters.file_system",
 	}, function()
 		local errors = {}
@@ -32,7 +32,7 @@ local function run_delete(remove_result)
 			local rendered_ok, rendered = pcall(string.format, message, ...)
 			errors[#errors + 1] = rendered_ok and rendered or tostring(message)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.fs.engine.dir"] = {}
 
 		local exists_calls = 0

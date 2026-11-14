@@ -21,7 +21,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Catalogue = require("hotstrings.engine.choice_catalogue")
 
 local LOG = "infra.hotstring_choice_catalogue"

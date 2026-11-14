@@ -47,14 +47,14 @@ _TestResultsBeginRun()
 #Include ../infra/hotpath_profiler.ahk
 #Include ../infra/json.ahk
 #Include ../infra/number.ahk
-#Include ../infra/wall_clock.ahk
+#Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
 global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
-#Include ../infra/logger.ahk
+#Include ../core/logger/engine/logger.ahk
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../adapters/process_lifecycle.ahk
 #Include ../adapters/shell_runner.ahk

@@ -16,7 +16,7 @@ local function run_scenario()
 	local dependency_names = {
 		"adapters.synthetic_input",
 		"core.events.timer_scheduler",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
@@ -66,7 +66,7 @@ local function run_scenario()
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}

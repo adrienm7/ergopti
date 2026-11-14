@@ -21,7 +21,7 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local dialog = require("infra.dialog_util")
 local i18n   = require("core.i18n.engine.i18n")
 local Notifier = require("adapters.application_notifier")

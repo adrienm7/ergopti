@@ -12,7 +12,7 @@ local OWNERS = {
 	"hs", "tests.stubs.hs", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"platform.remap.lease_controller", "adapters.shell_runner", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 
 local function with_observer(callback)

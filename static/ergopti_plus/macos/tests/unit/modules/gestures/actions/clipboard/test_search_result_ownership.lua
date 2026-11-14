@@ -127,7 +127,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 	for _, refusal in ipairs({ "clear-false", "mutating-throw" }) do
 		it("keeps the receipt captured before a reentrant error diagnostic after " .. refusal, function(f)
 			f.restore_mode = refusal
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local log_error = logger.error
 			logger.error = function(...)
 				log_error(...)
@@ -215,7 +215,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 		f.restore_mode = nil
 		f.external("COPY BEFORE REVOCATION LOG")
 		local admitted, business = {}, {}
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local callback = logger.callback
 		logger.callback = function(...)
 			local ok, result = callback(...)
@@ -238,7 +238,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 
 	it("does not queue or publish after the restore-failure diagnostic opens a successor", function(f)
 		f.restore_mode = "false"
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local log_error = logger.error
 		local reentered, dispatched = false, nil
 		logger.error = function(module, message, ...)

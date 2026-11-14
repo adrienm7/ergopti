@@ -66,7 +66,7 @@ local function with_guard(environment, fn)
 	local previous_hs = _G.hs
 	local previous_hs_module = package.loaded["hs"]
 	local previous_hs_stub = package.loaded["tests.stubs.hs"]
-	local previous_logger = package.loaded["infra.logger"]
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	local previous_guard = package.loaded["core.lifecycle.engine.launcher_guard"]
 	local log_lines = {}
 	local logger = helpers.make_logger_stub()
@@ -86,7 +86,7 @@ local function with_guard(environment, fn)
 	hs_stub.eventtap.new = function() error("launcher guard must not create an eventtap") end
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.lifecycle.engine.launcher_guard"] = nil
 	os.getenv = function(name)
 		return environment[name]
@@ -105,7 +105,7 @@ local function with_guard(environment, fn)
 	_G.hs = previous_hs
 	package.loaded["hs"] = previous_hs_module
 	package.loaded["tests.stubs.hs"] = previous_hs_stub
-	package.loaded["infra.logger"] = previous_logger
+	package.loaded["core.logger.engine.logger"] = previous_logger
 	package.loaded["core.lifecycle.engine.launcher_guard"] = previous_guard
 
 	if not ok then error(result, 0) end

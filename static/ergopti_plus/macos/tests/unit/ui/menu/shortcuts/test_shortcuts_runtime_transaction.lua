@@ -18,8 +18,8 @@ local helpers = require("tests.helpers")
 local function load_menu_fixture(shortcuts, enabled, options)
 	options = options or {}
 	local noop = function() end
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["infra.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {
@@ -312,8 +312,8 @@ end)
 
 helpers.describe("menu-state shortcut synchronization requires exact lifecycle success", function()
 	helpers.it("returns false when resume_bindings returns false", function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
@@ -334,8 +334,8 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 	end)
 
 	helpers.it("returns true only for an exact true pause result", function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
@@ -360,7 +360,7 @@ end)
 -- menubar. Only the logical native gate is controllable; no Karabiner deployment
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
-	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger",
+	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 		"infra.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "infra.notifications",
 		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
@@ -465,7 +465,7 @@ local function with_chord_fixture(mode, body)
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
 				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["core.i18n.engine.i18n"], logger = require("infra.logger") }))
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["core.i18n.engine.i18n"], logger = require("core.logger.engine.logger") }))
 				package.loaded["infra.manifest_menu"] = renderer
 				local context = { state = state, shortcuts = {}, script_control = facade, paused = false,
 					commit_script_chords = owner.toggle, save_prefs = function() return global.run_exclusive("Legacy chord save", raw_save) end,

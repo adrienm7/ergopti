@@ -55,7 +55,7 @@
 local M = {}
 local WebviewResult = require("adapters.webview_result")
 
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local DeferredWork = require("infra.deferred_work")
 local Paths      = require("core.fs.engine.paths")
 local ui_builder = require("ui.ui_builder")

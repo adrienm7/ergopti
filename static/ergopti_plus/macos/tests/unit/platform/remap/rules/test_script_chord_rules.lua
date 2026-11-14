@@ -19,8 +19,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 local Generator = helpers.load_with_stubs("platform.remap.generator")
 local LeaseContract = require("platform.remap.lease_contract")
 local TEST_LEASE_TOKEN = "0123456789abcdef0123456789abcdef"

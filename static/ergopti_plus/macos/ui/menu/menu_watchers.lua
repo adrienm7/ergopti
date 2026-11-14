@@ -13,7 +13,7 @@
 
 local M = {}
 local hs          = hs
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local git_status  = require("infra.git_status")
 local reload_gate = require("core.lifecycle.engine.reload.gate")
 local Timings     = require("infra.timings")

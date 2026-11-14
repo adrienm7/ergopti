@@ -1330,7 +1330,7 @@ helpers.describe("same-device third slot through original production consumers (
 		return table.concat(out," ")
 	end
 	local function with_adversarial_clock(body)
-		local previous = package.loaded["infra.monotonic"]
+		local previous = package.loaded["core.logger.engine.monotonic"]
 		local reads, now = 0, 0
 		local external = {
 			now_ms = function() reads = reads + 1; now = now + 150; return now end,
@@ -1339,10 +1339,10 @@ helpers.describe("same-device third slot through original production consumers (
 			has_hires = function() return true end,
 			backend = function() return "adversarial-fixture-clock" end,
 		}
-		package.loaded["infra.monotonic"] = external
+		package.loaded["core.logger.engine.monotonic"] = external
 		local ok, failure = pcall(body)
-		local restored = package.loaded["infra.monotonic"] == external
-		package.loaded["infra.monotonic"] = previous
+		local restored = package.loaded["core.logger.engine.monotonic"] == external
+		package.loaded["core.logger.engine.monotonic"] = previous
 		if not ok then error(failure, 0) end
 		helpers.assert_true(restored, "fixture restores the exact inherited clock owner")
 		helpers.assert_eq(reads, 0, "controlled input never borrows host elapsed time")

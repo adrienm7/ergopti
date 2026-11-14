@@ -39,7 +39,7 @@ local RESET_MODULES = {
 	"adapters.process_lifecycle", "adapters.synthetic_input",
 	"core.events.timer_scheduler", "hs", "hs.fs", "hs.json", "hs.sqlite3",
 	"hs.timer", "infra.config_paths", "infra.dialog_util", "core.i18n.engine.i18n",
-	"infra.logger", "infra.manifest_reader", "infra.timings",
+	"core.logger.engine.logger", "infra.manifest_reader", "infra.timings",
 	"metrics.engine.metrics", "modules.keystats", "modules.keystats.aggregator",
 	"modules.keystats.context_tracker", "modules.keystats.export",
 	"modules.keystats.init", "modules.keystats.kc_bridge",
@@ -115,7 +115,7 @@ local function load_fixture(options)
 	}
 	local appended = {}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats.rotation"] = {
 		init = function() return true end,
 		is_initialized = function() return true end,

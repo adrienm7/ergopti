@@ -130,7 +130,7 @@ local function fresh_harness()
 		end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local timer_scheduler = {}
 	local function schedule_after(delay, callback)
@@ -879,7 +879,7 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 	helpers.it("(same-name-app-history) tracks distinct bundle identities with the same display name", function()
 		helpers.with_stub_scope({
 			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
-			"adapters.synthetic_input", "adapters.input_source_broker", "infra.logger",
+			"adapters.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
 			"core.events.timer_scheduler", "adapters.shell_runner", "adapters.hotkey_registrar",
 			"adapters.key_state", "adapters.mouse_control", "adapters.task_lifecycle",
 			"platform.remap.ke_paths", "platform.remap.lease_contract", "platform.remap.ke_variables",

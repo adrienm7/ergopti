@@ -62,7 +62,7 @@ local function load_fixture(buffer)
 			name:match("^modules%.keymap")
 			or name == "modules.keystats"
 			or helpers.is_driver_module(name)
-			or name == "infra.logger"
+			or name == "core.logger.engine.logger"
 			or name == "infra.timings"
 		) then
 			package.loaded[name] = nil
@@ -73,7 +73,7 @@ local function load_fixture(buffer)
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = {
 		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
 		ms = function(_, key)

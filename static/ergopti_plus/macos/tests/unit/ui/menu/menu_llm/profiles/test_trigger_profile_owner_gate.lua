@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
 	"keyboard.engine.chord",
 	"adapters.hotkey_registrar",
@@ -21,7 +21,7 @@ local function with_fixture(body)
 		local prediction_calls = 0
 		local trigger_mode = "success"
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.llm"] = {
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},

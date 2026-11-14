@@ -20,7 +20,7 @@ local function child()
  local clock_calls = 0
  local function clock() clock_calls = clock_calls + 1; return case == 'budget' and clock_calls > 1 and 300000001 or 0 end
  if case == 'quarantinelease' then
-  local helpers = require('tests.helpers'); package.loaded['infra.logger'] = helpers.make_logger_stub()
+  local helpers = require('tests.helpers'); package.loaded['core.logger.engine.logger'] = helpers.make_logger_stub()
   local writer = helpers.load_with_stubs('modules.keystats.sqlite_writer', { sqlite3 = sqlite })
   for i=1,math.huge do local name=debug.getupvalue(writer.get_db,i); assert(name)
    if name == '_db' then debug.setupvalue(writer.get_db,i,owner); break end end

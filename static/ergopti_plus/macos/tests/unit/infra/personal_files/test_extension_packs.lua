@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
 local Packs = require("infra.extension_packs")
 

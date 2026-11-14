@@ -764,7 +764,7 @@ end
 --- next clock turn, as the launcher's datagram worker does.
 local function install_log_transport()
 	local pending, options = {}, nil
-	package.preload["adapters.log_transport"] = function()
+	package.preload["core.logger.adapters.log_transport"] = function()
 		local transport = {}
 		function transport.start(start_options) options = start_options; return true end
 		function transport.enqueue(line, variant)
@@ -1354,7 +1354,7 @@ end
 
 --- Delivers every queued log record to the logger's sink.
 function M.flush_logs()
-	local loaded = package.loaded["adapters.log_transport"]
+	local loaded = package.loaded["core.logger.adapters.log_transport"]
 	if type(loaded) == "table" and type(loaded.flush) == "function" then loaded.flush() end
 end
 

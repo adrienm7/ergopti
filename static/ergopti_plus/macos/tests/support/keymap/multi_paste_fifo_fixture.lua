@@ -25,7 +25,7 @@ local OWNED = {
 	"hs.styledtext", "hs.task", "hs.timer",
 	"hs.urlevent", "hs.webview", "hs.window",
 	"infra.capsword_output", "infra.hotstring_engine", "core.i18n.engine.i18n",
-	"infra.logger", "core.fs.engine.paths", "infra.text_utils",
+	"core.logger.engine.logger", "core.fs.engine.paths", "infra.text_utils",
 	"infra.timings", "infra.toml.reader", "core.text.engine.json",
 	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
 	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",

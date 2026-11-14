@@ -91,7 +91,7 @@ local function with_fixture(options, scenario)
 	options = options or {}
 	local saved_file_watchers = package.loaded["core.fs.engine.file_watchers"]
 	local saved_ui_restore = package.loaded["infra.ui_restore"]
-	local saved_logger = package.loaded["infra.logger"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_scheduler_modules = {}
 	for _, name in ipairs(SCHEDULER_OWNERS) do saved_scheduler_modules[name] = package.loaded[name] end
 	local saved_pathwatcher = hs.pathwatcher
@@ -119,7 +119,7 @@ local function with_fixture(options, scenario)
 	}
 
 	local function noop() end
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function(_, message, ...)
 			runtime.errors[#runtime.errors + 1] = string.format(message, ...)
 		end,
@@ -219,7 +219,7 @@ local function with_fixture(options, scenario)
 
 	package.loaded["core.fs.engine.file_watchers"] = saved_file_watchers
 	package.loaded["infra.ui_restore"] = saved_ui_restore
-	package.loaded["infra.logger"] = saved_logger
+	package.loaded["core.logger.engine.logger"] = saved_logger
 	for _, name in ipairs(SCHEDULER_OWNERS) do package.loaded[name] = saved_scheduler_modules[name] end
 	hs.pathwatcher = saved_pathwatcher
 	hs.timer = saved_timer

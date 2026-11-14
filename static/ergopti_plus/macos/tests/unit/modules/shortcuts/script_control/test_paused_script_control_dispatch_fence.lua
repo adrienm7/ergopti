@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local dispatched = 0
 local lifecycle_dispatches = { script_reload = 0, script_quit = 0 }
 
-package.loaded["infra.logger"] = helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 package.loaded["infra.notifications"] = { notify = function() end }
 package.loaded["infra.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,

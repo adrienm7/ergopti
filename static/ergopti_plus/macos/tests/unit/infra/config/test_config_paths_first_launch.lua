@@ -38,8 +38,8 @@ local function load_first_launch()
 		if name == "HOME" then return "/Users/test" end
 		return real_getenv(name)
 	end
-	package.loaded["infra.logger"] = nil
-	local Logger = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 	local errors = {}
 	Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 	local ok, loaded = pcall(helpers.load_with_stubs, "infra.config_paths", {

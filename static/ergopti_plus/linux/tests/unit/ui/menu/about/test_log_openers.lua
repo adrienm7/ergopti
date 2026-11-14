@@ -20,11 +20,11 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 --- @param state table { day, existing = { [path] = true } }
 --- @param body function Receives the openers module.
 local function with_openers(state, body)
-	local saved_sink = package.loaded["infra.logger_sink"]
+	local saved_sink = package.loaded["core.logger.engine.sink"]
 	local saved_openers = package.loaded["ui.log_openers"]
 	local saved_reader = package.loaded["core.fs.engine.regular_file_reader"]
 	local reader = require("core.fs.engine.regular_file_reader")
-	package.loaded["infra.logger_sink"] = {
+	package.loaded["core.logger.engine.sink"] = {
 		log_dir = function() return "/fixture/logs/" .. FOLDER end,
 		main_log_path = function() return "/fixture/logs/" .. FOLDER .. "/unified-" .. state.day .. ".log" end,
 		errors_log_path = function() return state.path or "/fixture/logs/" .. FOLDER .. "/errors-" .. state.day .. ".log" end,
@@ -43,7 +43,7 @@ local function with_openers(state, body)
 	end
 	local ok, err = pcall(function() body(require("ui.log_openers")) end)
 	package.loaded["core.fs.engine.regular_file_reader"] = saved_reader
-	package.loaded["infra.logger_sink"] = saved_sink
+	package.loaded["core.logger.engine.sink"] = saved_sink
 	package.loaded["ui.log_openers"] = saved_openers
 	if not ok then error(err, 0) end
 end
@@ -134,7 +134,7 @@ helpers.describe("log-openers-native-refusal", function()
 		helpers.assert_eq(ffi.C.mkfifo(path, 384), 0)
 		local code = string.format([[
 			package.path = %q
-			package.loaded["infra.logger_sink"] = { errors_log_path = function() return %q end }
+			package.loaded["core.logger.engine.sink"] = { errors_log_path = function() return %q end }
 			local opened, notified = 0, 0
 			local handled = require("ui.log_openers").open_today_errors(
 				function() opened = opened + 1; return true end,

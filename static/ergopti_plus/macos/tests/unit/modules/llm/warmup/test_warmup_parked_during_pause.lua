@@ -36,7 +36,7 @@ local helpers = require("tests.helpers")
 
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
 	"infra.keycodes",
@@ -73,7 +73,7 @@ local function exercise_committed_backend_pause()
 
 		local idle_callback = nil
 		local admission_fence = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = function() end }
 		package.loaded["infra.keycodes"] = {
 			F13_KARABINER_RETURN = 106,

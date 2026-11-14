@@ -10,7 +10,7 @@
 local helpers = require('tests.helpers')
 local modules = {
 	'modules.dynamic_hotstrings.personal_info', 'core.fs.adapters.file_system',
-	'infra.logger', 'adapters.synthetic_input', 'ui.personal_info_editor',
+	'core.logger.engine.logger', 'adapters.synthetic_input', 'ui.personal_info_editor',
 	'modules.keystats',
 	'infra.manifest_reader', 'infra.personal_info_fields',
 }
@@ -32,7 +32,7 @@ local function with_subject(content, run)
 				state.logs[#state.logs + 1] = string.format(format, ...)
 			end
 		end
-		package.loaded['infra.logger'] = logger
+		package.loaded['core.logger.engine.logger'] = logger
 		package.loaded['adapters.synthetic_input'] = {}
 		package.loaded['ui.personal_info_editor'] = {}
 		package.loaded['modules.keystats'] = {}

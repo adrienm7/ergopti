@@ -35,10 +35,10 @@ end
 helpers.describe("healthcheck: no network identity (no-network-identity)", function()
 	helpers.it("the whole snapshot carries no Wi-Fi name and no host name (no-network-identity)", function()
 		helpers.with_stub_scope({
-			"infra.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+			"core.logger.engine.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
 		}, function()
 			local asked = {}
-			helpers.load_with_stubs("infra.logger", {
+			helpers.load_with_stubs("core.logger.engine.logger", {
 				execute = function(command) asked[#asked + 1] = command; return HOST_NAME end,
 			})
 			hs.host.localizedName = function() asked[#asked + 1] = "localizedName"; return HOST_NAME end

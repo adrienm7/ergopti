@@ -23,13 +23,13 @@ local OWNED_MODULES = {
 helpers.describe("Registry: a group name is masked in the log", function()
 	helpers.it("(group-name-log-mask) never prints the name of a loaded, disabled, enabled or reloaded group", function()
 		local lines = {}
-		local Logger = helpers.load_with_stubs("infra.logger")
+		local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 		local previous_level = Logger.current_level
 		Logger.set_level("DEBUG")
 		Logger.set_sink(function(line) lines[#lines + 1] = tostring(line) end)
 		local ok, failure = pcall(function()
 			helpers.with_fresh_modules(OWNED_MODULES, function()
-				package.loaded["infra.logger"] = Logger
+				package.loaded["core.logger.engine.logger"] = Logger
 				package.loaded["infra.toml.reader"] = {
 					parse = function(path)
 						if path ~= PATH then return nil, false end

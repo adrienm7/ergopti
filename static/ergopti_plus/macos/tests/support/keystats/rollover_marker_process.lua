@@ -197,7 +197,7 @@ return function()
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			-- The actual modules and their normal shared data remain loaded. No
 			-- Rotation, writer, aggregator, export, or manager implementation is faked.
 			os.date = function(format, epoch)

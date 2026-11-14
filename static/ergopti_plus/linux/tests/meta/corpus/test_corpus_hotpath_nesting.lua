@@ -4,7 +4,7 @@
 --- MODULE: Hot-path Nesting Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json
---- through the shared nesting tracker that infra/perf_counters.lua drives. The
+--- through the shared nesting tracker that core/logger/engine/perf_counters.lua drives. The
 --- macOS suite replays the same vectors.
 --- ==============================================================================
 

@@ -6,7 +6,7 @@
 --- native clock; preparation/status/open remain in one capture process. Retained
 --- context and recovery belong to the future runtime owner; this never retries.
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Accounting = require("modules.keystats.physical_accounting_mode")
 local Delivery = require("modules.keystats.physical_delivery")
 local Transport = require("modules.keystats.physical_transport")

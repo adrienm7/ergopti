@@ -32,7 +32,7 @@ local OWNED = {
 	"adapters.window_info",
 	"infra.notifications",
 	"core.i18n.engine.i18n",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 
 local PARENT = "shortcut_bindings"
@@ -45,7 +45,7 @@ local function with_system(body, options)
 	options = options or {}
 	helpers.with_fresh_modules(OWNED, function()
 		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {}, listeners = {} }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.notifications"] = {
 			notify = function(message, body_text, kind)

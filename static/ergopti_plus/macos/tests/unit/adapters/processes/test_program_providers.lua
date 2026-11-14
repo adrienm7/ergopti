@@ -38,7 +38,7 @@ local function with_native(body, catalogue)
 		for _, level in ipairs({ "error", "warn", "debug" }) do
 			logger[level] = function(...) native.logs[#native.logs + 1] = { ... } end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return native.config end }
 		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/shared/" .. relative end }
 		package.loaded["infra.timings"] = Timings

@@ -38,7 +38,7 @@ local MANIFEST = [[
 
 
 --- Builds a logger stub that records every Logger.warn call's format string.
---- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
+--- @return table logger_stub Injectable package.loaded["core.logger.engine.logger"] replacement.
 --- @return table warn_messages Array of format strings passed to Logger.warn (grows live).
 local function make_warn_capturing_logger()
 	local warn_messages = {}
@@ -634,13 +634,13 @@ require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos
 
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
-	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "infra.logger",
+	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "core.logger.engine.logger",
 		"ui.menu.menu_shortcuts", "ui.menu.menu_gestures", "ui.menu.menu_tap_holds",
 		"ui.menu.menu_utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
 		return helpers.with_stub_scope(names, function()
-			helpers.load_with_stubs("infra.logger")
+			helpers.load_with_stubs("core.logger.engine.logger")
 			-- The native loader installs an i18n baseline double; reload the genuine
 			-- native locale owner after that setup, as existing presentation fixtures do.
 			package.loaded["core.i18n.engine.i18n"] = nil
@@ -655,7 +655,7 @@ local function fixed_parent_native_cohort(body)
 				assert(translator.scope_apply(owner, receipt, "en"))
 				local renderer = assert(require("menu.engine.renderer").new({platform = "hs",
 					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
-					json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("infra.logger")}))
+					json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.logger")}))
 				package.loaded["infra.manifest_menu"] = renderer
 				return body(renderer, translator)
 			end, debug.traceback)

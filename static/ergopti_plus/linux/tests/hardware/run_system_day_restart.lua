@@ -10,7 +10,7 @@
 local uv = require("luv")
 require("core.lifecycle.engine.compat.utf8").install()
 local Json = require("core.text.engine.json")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local K = require("modules.keystats.keystats")
 local Metrics = require("modules.keystats.system_metrics")

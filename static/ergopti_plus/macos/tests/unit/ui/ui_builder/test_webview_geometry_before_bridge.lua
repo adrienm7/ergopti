@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 -- =====================================
 
 local COMMON_STUBS = {
-	["infra.logger"] = {
+	["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

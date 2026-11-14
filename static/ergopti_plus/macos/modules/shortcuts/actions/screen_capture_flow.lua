@@ -62,7 +62,7 @@ local _permission_reset_pending = false
 
 local function capture_adapter() return require("adapters.screen_capture") end
 local function file_system() return require("core.fs.adapters.file_system") end
-local function logger() return require("infra.logger") end
+local function logger() return require("core.logger.engine.logger") end
 
 --- Sends one notification; a notifier failure is logged, never raised.
 --- @param title string Notification title or message.
