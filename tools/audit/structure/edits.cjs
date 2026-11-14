@@ -111,6 +111,14 @@ const SHARED_FILES = ['layouts/data/keycodes/physical_keys.json'];`
 		to: "\t\tfs.mkdirSync(path.join(driver, 'core/fs/engine'), { recursive: true });"
 	},
 	{
+		// The focus audit's overlay detector names two adapters in one pattern;
+		// S12 moves graphics_renderer to core.ui.adapters, S30 moves wpm_surface.
+		file: 'tools/test/test-ui-focus-fix.cjs',
+		moves: 'linux/adapters/graphics_renderer.lua',
+		from: `/["']adapters[./](?:graphics_renderer|wpm_surface)["']/g`,
+		to: `/["'](?:core[./]ui[./]adapters[./]graphics_renderer|adapters[./]wpm_surface)["']/g`
+	},
+	{
 		// The terminal output custody check pins the receiving test's include
 		// climb, whose start the plan cannot see from the tool; S12 moves the
 		// sender adapter to core/ui/adapters.
