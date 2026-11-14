@@ -172,7 +172,7 @@
 			"licence": "CC BY 4.0",
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
 			"status": "ship",
-			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14). The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container; third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting."
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14), kept after review because the project is not commercial. The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container (an anti-bot challenge answers automated clients); third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting."
 		},
 		"original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt": {
 			"title": "10,000 sentences of French Wikipedia, 2021",
@@ -181,7 +181,7 @@
 			"licence": "CC BY 4.0",
 			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
 			"status": "ship",
-			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14). The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container; third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14), kept after review because the project is not commercial. The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container (an anti-bot challenge answers automated clients); third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
 		},
 		"original/fr/tatoeba_fra_30k.tsv": {
 			"title": "Tatoeba — 30,000 French sentences",
