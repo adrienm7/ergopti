@@ -437,6 +437,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-host-context-menu.cjs"],
 			"repro": "npm run test:host-context-menu"
+		},
+		{
+			"id": "layout-analysis-engine",
+			"ordinal": 662,
+			"name": "layout analysis engine gives the hand-computed metrics, rebuilds the exact key n-grams, scores with editable weights and ranks the whole library in well under a second",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-analysis-engine.cjs"],
+			"repro": "npm run test:layout-analysis-engine"
 		}
 	]
 }
