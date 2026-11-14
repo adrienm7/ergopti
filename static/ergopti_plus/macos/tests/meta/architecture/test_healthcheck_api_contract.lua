@@ -56,7 +56,7 @@ local CONTRACT = {
 	{ mod = "core.i18n.engine.locale",                     fns = { "all" } },
 	{ mod = "infra.manifest_reader",            fns = { "coverage_gaps" } },
 	{ mod = "core.network.adapters.info",            fns = { "getSignalStrength" } },
-	{ mod = "ui.ui_builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",
+	{ mod = "core.ui.ui.builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",
 		"window_chrome_steps", "force_focus", "open_http_url" } },
 }
 

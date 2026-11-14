@@ -2,7 +2,7 @@
 
 --- Keeps the native nil-error sentinel distinct from real and malformed errors.
 local helpers = require("tests.helpers")
-local Result = require("adapters.webview_result")
+local Result = require("core.ui.adapters.webview_result")
 
 helpers.describe("native WebView error result", function()
 	helpers.it("accepts only an absent error or the exact nil-NSError representation", function()

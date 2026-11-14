@@ -9,7 +9,7 @@ local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.network.adapters.http_client", "core.fs.adapters.file_system",
-	"core.logger.engine.logger", "infra.notifications", "core.timing.engine.timings", "core.text.engine.utils",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "core.timing.engine.timings", "core.text.engine.utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",

@@ -28,7 +28,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.logger")
 local i18n = require("core.i18n.engine.i18n")
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local Timings = require("core.timing.engine.timings")
 local text_utils = require("core.text.engine.utils")
 local AuxOwner = require("modules.gestures.actions_aux_owner")

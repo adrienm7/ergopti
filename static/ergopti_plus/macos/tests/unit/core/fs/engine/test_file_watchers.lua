@@ -232,9 +232,9 @@ helpers.describe("infra/file_watchers — arming contract", function()
 	end))
 
 	helpers.it("(nui-005-refused-reload-notice) tells a source-change reload once while it is refused and retried", with_scheduler_scope(function()
-		local prev_notifications = package.loaded["infra.notifications"]
+		local prev_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = 0
-		package.loaded["infra.notifications"] = { notify = function() notices = notices + 1; return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() notices = notices + 1; return true end }
 		package.loaded["core.fs.engine.file_watchers"] = nil
 		local FW = require("core.fs.engine.file_watchers")
 		local prev_pw, prev_timer, prev_attr, prev_reload = hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload
@@ -276,7 +276,7 @@ helpers.describe("infra/file_watchers — arming contract", function()
 		end)
 		for _, owner in ipairs(_G.script_watchers or {}) do pcall(owner.stop, owner) end
 		hs.pathwatcher, hs.timer, hs.fs.attributes, hs.reload = prev_pw, prev_timer, prev_attr, prev_reload
-		package.loaded["infra.notifications"] = prev_notifications
+		package.loaded["core.ui.engine.notifications"] = prev_notifications
 		_G.script_watchers = nil
 		if not ok then error(err, 0) end
 	end))

@@ -130,7 +130,7 @@ REQUIRED_PAYLOAD=(
   "modules/hotstrings/engine.lua"
   "core/fs/engine/paths.lua"
   "adapters/tray_menu.lua"
-  "ui/webkit_host.lua"
+  "core/ui/ui/webkit_host.lua"
   "_shared/hotstrings/engine/matcher/init.lua"
   "_shared/hotstrings/engine/matcher/cascade.lua"
   "_shared/layouts/engine/composer/keylayout.lua"

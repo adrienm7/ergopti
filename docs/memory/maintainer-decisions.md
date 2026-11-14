@@ -990,7 +990,7 @@ shared (`Catalogue.registry_source` and `registry_changes_args` in
   `open_layer_editor`, `open_model_browser`, `open_changelog`,
   `open_healthcheck`. Closed or hidden: open and focus; covered by another
   window: bring to front, never close; frontmost: close through the page's own
-  close. Owners: macOS `ui/window_toggle.lua`, Linux `ui/webview_manager.lua`
+  close. Owners: macOS `core/ui/ui/window_toggle.lua`, Linux `core/ui/ui/webview_manager.lua`
   `toggle()`, Windows `GestureToggleOrFocusUI`. Not toggles, on purpose:
   onboarding (a shortcut would abandon a half-finished setup), the download
   window (owned by a running download), the release notes (a pane) and the

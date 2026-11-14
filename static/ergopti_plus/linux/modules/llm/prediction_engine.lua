@@ -573,7 +573,7 @@ end
 --- @return boolean
 function _debounce.preview_holds(live)
 	-- Injected by init(): whether a hotstring preview that can still expand holds
-	-- the shared tooltip window (ui/tooltip/preview.lua is_showing).
+	-- the shared tooltip window (core/ui/ui/tooltip/preview.lua is_showing).
 	local provider = _debounce.preview_showing
 	if type(provider) ~= "function" then return false end
 	local ok, showing = pcall(provider)

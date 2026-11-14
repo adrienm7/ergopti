@@ -272,7 +272,7 @@ local function capture_rows(register, buf)
 
 		-- The REAL tooltip with exactly one method neutralised (trap 3). Patched
 		-- rather than replaced: a hand-written stub has to guess the whole surface.
-		local tooltip = require("ui.tooltip")
+		local tooltip = require("core.ui.ui.tooltip")
 		local real_show_stacked = tooltip.show_stacked
 		local captured = nil
 		tooltip.show_stacked = function(rows) captured = rows; return true end

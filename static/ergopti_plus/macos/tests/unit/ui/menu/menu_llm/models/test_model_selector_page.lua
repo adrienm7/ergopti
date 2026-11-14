@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.menu.menu_llm.model_selector_page", "ui.menu.menu_llm.custom_models",
-	"ui.menu.menu_llm.backend_labels", "infra.dialog_util", "core.timing.engine.deferred_work",
+	"ui.menu.menu_llm.backend_labels", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work",
 	"modules.llm", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.mlx_repair_offer", "ui.menu.menu_llm.api_panel", "ui.download_window", "ui.model_browser",
 }
@@ -64,7 +64,7 @@ local CATALOGUE = { { label = "Alibaba", families = { { label = "Qwen", models =
 local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
-		package.loaded["infra.dialog_util"] = { block_alert = function()
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function()
 			return opts.confirm_remove and require("core.i18n.engine.i18n").get("button.remove") or "OK"
 		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }

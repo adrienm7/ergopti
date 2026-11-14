@@ -22,8 +22,8 @@ local with_api_add_locale = Fixture.with_api_add_locale
 
 
 helpers.describe("API Add: retained native admission", function()
-	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.keymap.llm_bridge", "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	local function install_add(provider_id)
 		local entry = { id = "old", provider = "openai", model = "old-model", token = "inert-old-secret" }
 		local remote, _, notices = install_doubles({ entries = { entry }, active_id = entry.id, spec = {} })
@@ -38,7 +38,7 @@ helpers.describe("API Add: retained native admission", function()
 		local observed = { prompts = 0, resets = 0, writes = 0, probes = 0, paused = false }
 		ctx.is_paused = function() return observed.paused end
 		ctx.keymap.reset_predictions_for_configuration = function() observed.resets = observed.resets + 1; return true end
-		package.loaded["infra.dialog_util"].text_prompt = function(_, _, _, affirmative)
+		package.loaded["core.ui.engine.dialog_util"].text_prompt = function(_, _, _, affirmative)
 			observed.prompts = observed.prompts + 1
 			if observed.on_prompt then observed.on_prompt(observed.prompts) end
 			if observed.cancel_at == observed.prompts then return "button.cancel", "" end
@@ -309,8 +309,8 @@ local function install_api_add_doubles(args, native)
 end
 
 helpers.describe("Shared API Add frame (api-add-controls)", function()
-	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	helpers.it("uses the shared Add label and retains the genuine provider action (api-add-controls)", function()
 		helpers.with_fresh_modules(owned, function()
 			with_api_add_locale(function(native)

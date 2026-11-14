@@ -298,7 +298,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 				end,
 				onEmitRaw = function() ctx.emitted = ctx.emitted + 1; return true end,
 			}) == true, "controlled observe source must start")
-			check(ctx, require("ui.modal"))
+			check(ctx, require("core.ui.ui.modal"))
 		end)
 		pcall(Hook.stop)
 		Reader.grab, Reader.ungrab = original_grab, original_ungrab

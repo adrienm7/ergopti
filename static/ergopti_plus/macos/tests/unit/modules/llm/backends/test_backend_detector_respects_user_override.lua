@@ -82,7 +82,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"core.events.timer_scheduler",
 		"core.process.adapters.shell_runner",
 		"core.logger.engine.logger",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"core.fs.engine.paths",
 		"core.i18n.engine.i18n",
 		"hs",
@@ -114,7 +114,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		send  = function() end,
 		error = function() end,
 	}
@@ -182,7 +182,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "core.network.adapters.http_client",
 		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.process.adapters.shell_runner",
-		"core.logger.engine.logger", "infra.notifications", "core.fs.engine.paths", "core.i18n.engine.i18n", "hs", "tests.stubs.hs",
+		"core.logger.engine.logger", "core.ui.engine.notifications", "core.fs.engine.paths", "core.i18n.engine.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
 
@@ -204,7 +204,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["infra.notifications"] = { send = function() end, error = function() end }
+	package.loaded["core.ui.engine.notifications"] = { send = function() end, error = function() end }
 
 	package.loaded["modules.llm.profiles"]         = make_profiles_stub()
 	package.loaded["modules.llm.api_ollama"]       = make_api_stub()

@@ -13,7 +13,7 @@ local Logger = require("core.logger.engine.logger")
 local Paths = require("core.fs.engine.paths")
 local DeferredWork = require("core.timing.engine.deferred_work")
 local JsonCodec = require("core.fs.adapters.json_codec")
-local OwnWindow = require("adapters.own_window")
+local OwnWindow = require("core.ui.adapters.own_window")
 local LOG = "console_window"
 
 --- Resolves the native console ratios from the shared geometry owner.

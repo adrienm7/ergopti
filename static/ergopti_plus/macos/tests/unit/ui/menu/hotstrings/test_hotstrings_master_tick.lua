@@ -222,9 +222,9 @@ local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
 		"infra.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"ui.menu.menu_state", "ui.menu.builder", "ui.menu.menu_hotstrings", "ui.menu.keymap_lifecycle",
-		"infra.notifications", "core.i18n.engine.i18n", "infra.manifest_menu",
+		"core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.manifest_menu",
 	}, function()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Manifest = require("infra.manifest_reader")
 		local TomlWriter = require("core.text.engine.toml_codec.writer")

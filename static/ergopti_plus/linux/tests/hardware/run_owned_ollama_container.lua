@@ -53,7 +53,7 @@ package.loaded["ui.llm_enable_refusal"] = { show = function(_, rows)
 	return true, false, selected
 end }
 -- The download window's WebKit page is presentation only.
-package.loaded["ui.webview_manager"] = {
+package.loaded["core.ui.ui.webview_manager"] = {
 	show = function() return true end, hide = function() return true end,
 	eval_js = function() return true end, bring_to_front = function() return true end,
 	is_visible = function() return true end, set_daemon_state = function() end,

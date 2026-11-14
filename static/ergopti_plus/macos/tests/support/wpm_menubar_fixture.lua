@@ -18,7 +18,7 @@ return function(callback)
 	local original_hs = _G.hs
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({ "ui.wpm.wpm_menubar", "ui.wpm.shared", "ui.wpm.wpm_widget",
-			"ui.tooltip", "modules.keystats", "core.logger.engine.logger", "core.events.timer_scheduler" }, function()
+			"core.ui.ui.tooltip", "modules.keystats", "core.logger.engine.logger", "core.events.timer_scheduler" }, function()
 			local state = { items = {}, timers = {}, logs = {} }
 			local logger = helpers.make_logger_stub()
 			for _, level in ipairs({ "debug", "info", "error" }) do
@@ -32,7 +32,7 @@ return function(callback)
 			package.loaded["ui.wpm.wpm_widget"] = { _load_shared_const = function() return { source_color_duration = 1 } end }
 			package.loaded["ui.wpm.shared"] = { get_active_source = function() return "none" end,
 				format_mpm_label = function() return "10" end, canon = function() return CANON end }
-			package.loaded["ui.tooltip"] = { is_visible = function() return false end }
+			package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
 			package.loaded["core.events.timer_scheduler"] = {
 				every = function(_, run)
 					local timer = { timer = {}, run = run }

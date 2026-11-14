@@ -34,7 +34,7 @@ local LAUNCHER_ENV = {
 
 local OWNED = {
 	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-	"infra.dialog_util", "infra.notifications", "core.timing.engine.deferred_work",
+	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
 	"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
@@ -251,7 +251,7 @@ local function load_world(world)
 		end
 		return classify(lines, exit_code, context)
 	end
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		-- The network failures' offer: its actions, then « Plus tard ».
 		choose = function(title, body, choices, cancel_label)
 			world.dialogs[#world.dialogs + 1] = {
@@ -274,7 +274,7 @@ local function load_world(world)
 			return secondary
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind, on_click)
 			world.notices[#world.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 			return true
@@ -1237,8 +1237,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 			calls = calls + 1
 			return original_select(...)
 		end
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())
@@ -1264,8 +1264,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 			calls = calls + 1
 			return original_select(...)
 		end
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())
@@ -1290,8 +1290,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 	helpers.it("managed-network-alternative: a newer failure rejects the retained alternate choice", scoped(function()
 		local world, checker, _, offer, first = failed_world(false, host_policy_receipt(), "host_blocked")
 		offer.set_alternative(function() world.alternatives = world.alternatives + 1; return true end)
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())

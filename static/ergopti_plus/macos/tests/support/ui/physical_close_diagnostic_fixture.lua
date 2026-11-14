@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "ui.physical_shortcuts", "ui.ui_builder", "ui.webview_close_owner", "core.timing.engine.deferred_work",
+local OWNED = { "ui.physical_shortcuts", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "shortcuts.engine.physical_slots", "shortcuts.engine.physical_editor_window",
 	"shortcuts.engine.physical_availability", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "hs.webview", "core.text.engine.json" }
@@ -127,7 +127,7 @@ local function run(blocked, scenario)
 				doAfter = function(delay, fn) return timer(delay, fn, true):start() end },
 		})
 		assert(host)
-		local builder = package.loaded["ui.ui_builder"]
+		local builder = package.loaded["core.ui.ui.builder"]
 		builder.get_app_geometry = function() return { width = 700, height = 600 } end
 		builder.get_centered_frame = function() return {} end
 		builder.build_injected_html = function() return "<html></html>" end

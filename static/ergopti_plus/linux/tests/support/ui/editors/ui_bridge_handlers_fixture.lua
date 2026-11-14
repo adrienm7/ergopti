@@ -35,7 +35,7 @@ local function with_opening_file(callback)
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 	end
 	put(OPENING_SOURCE)
-	local manager, previous = package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
+	local manager, previous = package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"]
 	local writer_previous = package.loaded["core.text.engine.toml_codec.writer"]
 	local seen = { epoch = 51, deliveries = {}, alerts = {}, reloads = 0, writes = 0 }
 	local publisher = {}
@@ -45,7 +45,7 @@ local function with_opening_file(callback)
 		return Writer.write(...)
 	end
 	package.loaded["core.text.engine.toml_codec.writer"] = publisher
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.ui.ui.webview_manager"] = {
 		current_epoch = function() return seen.epoch end,
 		page_current = function(app, epoch) return app == "hotstring_editor" and epoch == seen.epoch end,
 		eval_js = function(_, js)
@@ -70,7 +70,7 @@ local function with_opening_file(callback)
 	f.ready = function() return handler.push_init(state, context) end
 	f.save = function(output, selected) return handler.on_message({ action = "save", data = opening_model(output) }, state, selected or context) end
 	local ok, err = pcall(callback, f)
-	package.loaded["ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["core.text.engine.toml_codec.writer"] = manager, previous, writer_previous
+	package.loaded["core.ui.ui.webview_manager"], package.loaded["ui.hotstring_editor.bridge"], package.loaded["core.text.engine.toml_codec.writer"] = manager, previous, writer_previous
 	assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
 	if not ok then error(err, 0) end
 end
@@ -205,13 +205,13 @@ local function with_opened_spies(reader, writer, state, fn)
   local file = assert(io.open(path, "wb"))
   assert(file:write('[_meta]\nsections_order = ["english"]\n[english]\n"omw" = { output = "on my way", is_word = true, auto_expand = false, is_case_sensitive = true, is_case_sensitive_strict = true, final_result = false }\n"ty" = { output = "thank you", is_word = true, final_result = false }\n'))
   assert(file:close())
-  local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["ui.webview_manager"], writer.write
+  local old_dir, manager, native_write = state.config.get_config_dir, package.loaded["core.ui.ui.webview_manager"], writer.write
   local previous_prepare = writer.prepare_batch
   -- Preserve the actual planner capability while spying on its publication.
   writer.prepare_batch = RealWriter.prepare_batch
   state.config.get_config_dir = function() return directory end
   local context = { app_name = "hotstring_editor", epoch = 41 }
-  package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end,
+  package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 41 end,
     eval_js = function() return true end }
   writer.write = function(...)
     local accepted, detail = native_write(...)
@@ -224,7 +224,7 @@ local function with_opened_spies(reader, writer, state, fn)
       fn(h, context)
     end)
   end)
-  writer.write, writer.prepare_batch, state.config.get_config_dir, package.loaded["ui.webview_manager"] = native_write, previous_prepare, old_dir, manager
+  writer.write, writer.prepare_batch, state.config.get_config_dir, package.loaded["core.ui.ui.webview_manager"] = native_write, previous_prepare, old_dir, manager
   assert(Shell.run("rm -rf " .. Shell.quote(directory)) == true)
   if not ok then error(err, 0) end
 end

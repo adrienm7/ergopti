@@ -25,7 +25,7 @@ local function choose(parameter, clicked, refusal, picked)
 		return result
 	end
 	local names = {
-		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
+		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
 		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
@@ -75,7 +75,7 @@ local function choose(parameter, clicked, refusal, picked)
 	}
 	package.loaded["modules.gestures"] = gestures
 	package.loaded["ui.menu.menu_utils"] = { section = function(label) return { label = label } end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() observed.prompts = observed.prompts + 1; return "button.save", "https://example.com" end,
 		block_alert = function() observed.dialogs = observed.dialogs + 1; return clicked end,
 	}
@@ -175,7 +175,7 @@ end)
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
 	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
-	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
+	"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
 	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function refresh_json(path)
@@ -215,7 +215,7 @@ local function with_status_refresh(options, callback)
 		package.loaded["core.i18n.engine.i18n"] = i18n
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.menu_utils"] = { section = function(title) return { title = title } end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["ui.action_picker"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["core.timing.engine.deferred_work"] = {}

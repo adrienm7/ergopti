@@ -22,7 +22,7 @@ local function load_subject(open_url, alert)
 		info = function() end,
 		error = function(_tag, message) errors[#errors + 1] = message end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = alert or function(...) dialogs[#dialogs + 1] = { ... }; return "OK" end,
 	}
 	package.loaded["adapters.application_notifier"] = {

@@ -101,7 +101,7 @@ Test("meta network_info: both WLAN accessors share the single cached query point
 ; Regression: NI_ADAPTER_OFFSET_OPER_STATUS was hardcoded to 56 -- wrong on x64 (should be 104)
 ; and wrong on x86 (should be 68) (network_info.ahk)
 TestAuditV5_NetworkInfoDynamicOffsets() {
-	Src := _DriverDirsConcat("adapters", "core/process/adapters", "core/network/adapters", "core/lifecycle", "core/fs/adapters", "core/events")
+	Src := _DriverDirsConcat("adapters", "core/ui/adapters", "core/process/adapters", "core/network/adapters", "core/lifecycle", "core/fs/adapters", "core/events")
 
 	; The bug: NI_ADAPTER_OFFSET_OPER_STATUS := 56 is the DnsSuffix pointer on x64
 	; (OperStatus is at offset 104). On x86 OperStatus is at 68. Both were wrong.

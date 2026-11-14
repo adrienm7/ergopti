@@ -301,7 +301,7 @@ module.exports = function verifyPersonalSectionOwner(base, manifest) {
 	const original = source.slice(0, at) + ORIGINAL_SECTION_ROW + source.slice(last + end.length);
 	assert.equal(
 		createHash('sha256').update(original).digest('hex'),
-		'f446e00fc398aca0f4bfc42180d2c65682d4c5cdb7a1994658d64d0cf9866fbf',
+		'5d0501a60427bf1575d722008822835af458bb976cadd5381c8711165bdd8ab9',
 		'independent captured current V2 original producer, not a regenerated oracle'
 	);
 	assert.equal(

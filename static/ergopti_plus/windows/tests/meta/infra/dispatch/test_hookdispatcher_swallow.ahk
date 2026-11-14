@@ -70,7 +70,7 @@ _THS_Check() {
 ; during a Ctrl/Shift/Alt keydown. Before this fix the modifier stayed logically
 ; stuck after any subscriber exception, requiring a script restart.
 _THS_CheckModifierRelease() {
-	Src := _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	; Case-sensitive: assert the CALL ``ErgoptiGlobalErrorHandler(e, ...)`` exists,
 	; not merely the definition ``(Exc, Mode)`` now living in infra/error_net.ahk.
 	Assert(InStr(Src, "ErgoptiGlobalErrorHandler(e", true) > 0,
@@ -78,7 +78,7 @@ _THS_CheckModifierRelease() {
 }
 
 _THS_EscalationIsThrottled() {
-	Src := _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	; Find the catch region. The escalation must appear inside the throttle if-block,
 	; not after it — otherwise every exception fires the heavyweight crash handler per keystroke.
 	; Verify: the ErgoptiGlobalErrorHandler call must not appear AFTER the closing brace of
@@ -99,7 +99,7 @@ _THS_EscalationIsThrottled() {
 }
 
 _THS_DeltaIsWrapSafe() {
-	Src := _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(InStr(Src, "& 0xFFFFFFFF") > 0,
 		"error cache delta must use 32-bit wrap mask to avoid 49-day suppression")
 }
@@ -109,7 +109,7 @@ _THS_DeltaIsWrapSafe() {
 ; whose pre-ready branch ExitApp(1)s the whole driver — so one bad keystroke mid-boot
 ; killed the driver. The escalation must be gated on the ready phase.
 _THS_EscalationIsBootPhaseGated() {
-	Src := _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	EscalateIdx := InStr(Src, "ErgoptiGlobalErrorHandler(e", true)
 	Assert(EscalateIdx > 0, "HookDispatcher catch must call ErgoptiGlobalErrorHandler(e, ...)")
 	Before := SubStr(Src, 1, EscalateIdx)
@@ -129,7 +129,7 @@ Test("hook_dispatcher: subscriber-fault escalation is gated on the ready boot ph
 ; disambiguation with nothing in the log (§5.3). They must report — but throttled,
 ; since they run on every keystroke.
 _THS_TrackerFaultsAreReported() {
-	Src := _DriverDirsConcat("infra", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	Src := _DriverDirsConcat("infra", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	; Every tracker call must be paired with exactly one fault report: count both.
 	TryCount := 0, Pos := 1
 	while (Pos := InStr(Src, "try TapHoldTrack", , Pos)) {

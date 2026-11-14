@@ -66,7 +66,7 @@ package.loaded["modules.llm.api_common"] = {
 package.loaded["core.i18n.engine.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
 package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 -- set_navigate_callback and set_enter_validates are called at module load time.
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,

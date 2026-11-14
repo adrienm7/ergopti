@@ -165,7 +165,7 @@ function M.with_publication(options, callback)
 					state.saves[#state.saves + 1] = { payload = payload, accepted = accepted }
 					return accepted
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local original_show = builder.show_webview
 				builder.show_webview = function(...)
 					local fresh = setmetatable({}, { __index = original_show(...) })

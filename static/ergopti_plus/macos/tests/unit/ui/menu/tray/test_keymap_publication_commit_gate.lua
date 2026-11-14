@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 --- @return table calls
 local function run_publication(outcome)
 	local notices = 0
-	local previous = package.loaded["infra.notifications"]
-	package.loaded["infra.notifications"] = {
+	local previous = package.loaded["core.ui.engine.notifications"]
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_, _, kind)
 			helpers.assert_eq(kind, "error", "a refused save needs an error notice")
 			notices = notices + 1
@@ -53,7 +53,7 @@ local function run_publication(outcome)
 		state.hotstrings.alpha, runtime.alpha = false, false
 		return true
 	end, save)
-	package.loaded["infra.notifications"] = previous
+	package.loaded["core.ui.engine.notifications"] = previous
 	package.loaded["ui.menu.keymap_lifecycle"] = nil
 	calls.notices = notices
 	return committed, state, runtime, calls

@@ -408,7 +408,7 @@ end)
 
 -- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
 local function with_magic_frame(language, stored, mode, body)
-	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "ui.text_prompt" }
+	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "core.ui.ui.text_prompt" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local storage, restore_storage, restore_manifest
@@ -423,7 +423,7 @@ local function with_magic_frame(language, stored, mode, body)
 		local native_locale = require("core.i18n.engine.locale")
 		native_locale.set_locale(language)
 		local native_i18n = require("core.i18n.engine.i18n")
-		prompt_owner = require("ui.text_prompt")
+		prompt_owner = require("core.ui.ui.text_prompt")
 		prior_ask = prompt_owner.ask
 		prompt_owner.ask = function() effects.prompts = effects.prompts + 1; return "§" end
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux", json_decode = json.decode,

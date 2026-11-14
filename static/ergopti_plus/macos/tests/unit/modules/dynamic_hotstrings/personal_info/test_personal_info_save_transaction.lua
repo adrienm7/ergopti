@@ -124,7 +124,7 @@ local function load_editor()
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared/personal_info_editor" end }
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
 		force_focus = function() state.focuses = state.focuses + 1 end,
@@ -141,7 +141,7 @@ local function load_editor()
 		dispatch({ body = message })
 	end, state, function()
 		package.loaded["ui.personal_info_editor"] = nil
-		package.loaded["ui.ui_builder"] = nil
+		package.loaded["core.ui.ui.builder"] = nil
 		helpers.load_with_stubs("core.logger.engine.logger")
 	end
 end

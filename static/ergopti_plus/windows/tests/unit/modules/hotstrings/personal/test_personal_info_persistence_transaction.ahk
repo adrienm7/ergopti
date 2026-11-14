@@ -11,7 +11,7 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../../../../ui/editors.ahk
+#Include ../../../../../core/ui/ui/editors.ahk
 #Include ../../../../../ui/personal_info_editor/init.ahk
 global _PIPT20260813_WriterCalls := 0
 global _PIPT20260813_ReplaceCalls := 0

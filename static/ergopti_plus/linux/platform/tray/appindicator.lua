@@ -101,7 +101,7 @@ local PACKAGE_HINTS = {
 -- nil until probed, false when this machine cannot host an indicator.
 local _lib = nil
 -- The library the binding could not load, named as the start check reports
--- it (infra/gui_stack.lua); nil when every library loaded.
+-- it (core/ui/engine/gui_stack.lua); nil when every library loaded.
 local _missing = nil
 
 -- The live indicator, its current menu, and every callback keeping GTK alive.

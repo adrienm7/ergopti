@@ -29,16 +29,16 @@
 
 local M = {}
 local ManifestKeys = require("metrics.engine.view.manifest_keys")
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 local RunningApplication = require("adapters.running_application")
-local OwnWindow = require("adapters.own_window")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
 local Json       = require("core.text.engine.json")
 local FileSystem = require("core.fs.adapters.file_system")
-local ui_builder = require("ui.ui_builder")
+local ui_builder = require("core.ui.ui.builder")
 local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local i18n       = require("core.i18n.engine.i18n")

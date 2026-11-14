@@ -616,7 +616,7 @@ helpers.describe("Physical native host and menu capability admission", function(
 		with_scope(function(scope, _, controls)
 			controls.delivery_available=false
 			local native_queries, opened, captures=0,0,0
-			package.loaded["ui.webview_manager"]={native_available=function() native_queries=native_queries+1;return true end}
+			package.loaded["core.ui.ui.webview_manager"]={native_available=function() native_queries=native_queries+1;return true end}
 			package.loaded["ui.physical_shortcuts.bridge"]=nil
 			local host=require("ui.physical_shortcuts.bridge")
 			helpers.assert_eq(host.physical_delivery_available(),false)

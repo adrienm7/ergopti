@@ -22,7 +22,7 @@ local SUBJECT_MODULES = {
 	"core.process.adapters.shell_runner",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -128,7 +128,7 @@ local function with_screenshot(options, scenario)
 				if f.on_error then f.on_error() end
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind)
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind }
 				return true

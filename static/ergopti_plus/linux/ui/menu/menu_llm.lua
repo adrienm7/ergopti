@@ -12,7 +12,7 @@ local M = {}
 
 local SaveFailure = require("settings.engine.publication.save_failure")
 local Logger = require("core.logger.engine.shim")
-local TextPrompt = require("ui.text_prompt")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
 local COMMAND = require("settings.engine.keys").COMMAND
@@ -265,7 +265,7 @@ local function _build_llm(ctx)
 			local bounds = TriggerSettings.bounds(name)
 			local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
 				[require("settings.engine.keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
-					local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+					local ok_prompt, Prompt = pcall(require, "core.ui.ui.numeric_prompt")
 					if not ok_prompt then
 						Logger.error(LOG, "No numeric prompt; %s can only take a preset.", name)
 						return
@@ -855,7 +855,7 @@ local function _build_llm(ctx)
 	end
 
 	-- The dialogs the model selector page's transactions open: the menu owns
-	-- them, so they never fight the keyboard grab (ui/modal.lua).
+	-- them, so they never fight the keyboard grab (core/ui/ui/modal.lua).
 	local page_dialogs = {
 		prompt = function(title, text, initial, hidden, choices)
 			return prompt_text(title, plain_markup(text), initial, hidden, choices)
@@ -1012,7 +1012,7 @@ local function _build_llm(ctx)
 			if bounds then
 				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
 					[require("settings.engine.keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
-						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+						local ok_prompt, Prompt = pcall(require, "core.ui.ui.numeric_prompt")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
 							return

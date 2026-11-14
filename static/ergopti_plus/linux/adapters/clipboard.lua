@@ -40,7 +40,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Shell = require("core.process.adapters.shell_runner")
-local DisplayServer = require("infra.display_server")
+local DisplayServer = require("core.ui.engine.display_server")
 local EvdevCodes = require("infra.evdev_codes")
 
 local LOG = "adapters.clipboard"

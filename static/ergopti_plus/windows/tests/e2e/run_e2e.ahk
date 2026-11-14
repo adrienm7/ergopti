@@ -84,8 +84,8 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../core/text/engine/json.ahk
 #Include ../../core/lifecycle/engine/app_state.ahk
 #Include ../../_generated/window_titles.ahk
-#Include ../../infra/native_dialogs.ahk
-#Include ../../infra/ui_style.ahk
+#Include ../../core/ui/engine/native_dialogs.ahk
+#Include ../../core/ui/engine/style.ahk
 #Include ../../_generated/app_dirs.ahk
 #Include ../../infra/app_folders.ahk
 #Include ../../infra/legacy_folder_migration.ahk
@@ -93,7 +93,7 @@ global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 #Include ../../core/logger/engine/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 
-#Include ../../infra/window_utils.ahk
+#Include ../../core/ui/engine/window_utils.ahk
 #Include ../../core/text/engine/utils.ahk
 #Include ../../infra/hotstrings/hotstring_engine.ahk
 #Include ../../infra/hotstrings/hotstring_engine_main.ahk

@@ -20,9 +20,9 @@ INPUT_SCOPE = "not attempted; no physical input, synthetic key or AppleEvent"
 BUSINESS_SCOPE = "program and automation discovery controlled; no user assignment executed"
 DEPENDENCIES = (
     "static/ergopti_plus/macos/ui/action_picker/init.lua",
-    "static/ergopti_plus/macos/ui/webview_controller_pool.lua",
-    "static/ergopti_plus/macos/ui/ui_builder.lua",
-    "static/ergopti_plus/macos/ui/webview_close_owner.lua",
+    "static/ergopti_plus/macos/core/ui/ui/webview_controller_pool.lua",
+    "static/ergopti_plus/macos/core/ui/ui/builder.lua",
+    "static/ergopti_plus/macos/core/ui/ui/webview_close_owner.lua",
     "static/ergopti_plus/macos/core/events/timer_scheduler.lua",
     "static/ergopti_plus/macos/core/timing/engine/deferred_work.lua",
     "static/ergopti_plus/_shared/apps/engine/program_provider_picker.lua",

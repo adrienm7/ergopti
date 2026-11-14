@@ -17,7 +17,7 @@ local function with_layout(scenario)
 	return helpers.with_fresh_modules({ "ui.layout_manager", "layouts.engine.manager_bridge", "core.timing.engine.deferred_work",
 		"core.fs.adapters.file_system", "modules.keymap.layout_registry" }, function()
 		return References(function(_, h)
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local create = builder.show_webview
 			h.refreshes, h.focuses, h.deferred = 0, 0, {}
 			package.loaded["core.fs.adapters.file_system"] = { read = function() return '{"keys":[]}' end }

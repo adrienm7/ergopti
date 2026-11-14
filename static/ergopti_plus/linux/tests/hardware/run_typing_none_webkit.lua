@@ -55,7 +55,7 @@ assert(W.upsert_app_day('owned-webkit','2000-01-01','Editor',{chars=7,time_ms=70
 assert(W.upsert_ngrams('owned-webkit','2000-01-01','Editor',{h={c=7,td=700,cd=7}},'ngram_chars'))
 assert(W.upsert_app_day('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{chars=3,time_ms=300}))
 assert(W.upsert_ngrams('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{u={c=3,td=300,cd=3}},'ngram_chars'))
-local Manager=require('ui.webview_manager'); Manager.set_daemon_state({keystats=K})
+local Manager=require('core.ui.ui.webview_manager'); Manager.set_daemon_state({keystats=K})
 local checks,failed=0,0
 local function check(name,fn) checks=checks+1; local ok,e=xpcall(fn,debug.traceback); print((ok and 'PASS ' or 'FAIL ')..name..(ok and '' or ': '..e)); if not ok then failed=failed+1 end end
 print('ENGINE WebKit '..WK.get_major_version()..'.'..WK.get_minor_version()..'.'..WK.get_micro_version()..'; real SQLite; virtual X11; deadline180s; sandbox enabled')

@@ -53,7 +53,7 @@ local function with_pending_warmup(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_ollama", "core.network.adapters.http_client", "core.events.timer_scheduler",
 		"modules.llm", "modules.llm.warmup_controller",
-		"modules.llm.ollama_endpoint", "core.logger.engine.logger", "infra.notifications",
+		"modules.llm.ollama_endpoint", "core.logger.engine.logger", "core.ui.engine.notifications",
 	}, function()
 		local fixture = { requests = {}, timers = {}, origin = "http://localhost:16107" }
 		local function post(url, body, _, done)

@@ -25,7 +25,7 @@ local helpers = require("tests.helpers")
 
 local CONFIRM_OWNED = {
 	"modules.gestures.action_confirm",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"adapters.mouse_control",
 	"adapters.window_info",
 	"adapters.window_manager",
@@ -59,7 +59,7 @@ local function with_confirm(body, frame, focus)
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return frame end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			alert = function(...)
 				alerts[#alerts + 1] = table.pack(...)
 				return true

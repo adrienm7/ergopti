@@ -31,7 +31,7 @@ local function current(host, root)
 	assert(type(view) == "userdata" and getmetatable(view) ~= nil, "actual native view unavailable")
 	assert(type(controller) == "userdata" and getmetatable(controller) ~= nil, "actual native UCC unavailable")
 	assert(type(pool) == "table" and type(pool.bind) == "function", "actual pool unavailable")
-	assert(debug.getinfo(pool.bind, "S").source == "@" .. root .. "/macos/ui/webview_controller_pool.lua",
+	assert(debug.getinfo(pool.bind, "S").source == "@" .. root .. "/macos/core/ui/ui/webview_controller_pool.lua",
 		"foreign ControllerPool owner")
 	local leases = upvalue(pool.bind, "leases")
 	assert(type(leases) == "table", "actual pool leases unavailable")
@@ -63,7 +63,7 @@ end
 function M.native_message(host, root)
 	local view, _, _, _, entry = current(host, root)
 	local dispatch = rawget(entry, "dispatch")
-	local source = "@" .. root .. "/macos/ui/webview_controller_pool.lua"
+	local source = "@" .. root .. "/macos/core/ui/ui/webview_controller_pool.lua"
 	assert(type(dispatch) == "function" and debug.getinfo(dispatch, "S").source == source,
 		"foreign native dispatcher")
 	local frames, message, level = 0, nil, 2

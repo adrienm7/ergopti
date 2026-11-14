@@ -19,7 +19,7 @@ import sys
 import tempfile
 import types
 
-LEGACY_SHA = "dbbd87827ea2c56b1ae2fdfb4b45d6e241dd4ad569a1379fdb1f69f07fe34405"
+LEGACY_SHA = "5d4eb179a2b53d21b1969c2ba83cd59cbcacea38f7fa8bb84995053aa1d68eb7"
 BUNDLE_BUILDER = "tools/build/build_static_bundle.py"
 BUNDLE_MANIFEST = "tools/build/windows_bundle_manifest.json"
 WIN = "static/ergopti_plus/windows/"

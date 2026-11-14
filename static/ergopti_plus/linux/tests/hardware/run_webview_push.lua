@@ -118,7 +118,7 @@ local Manager
 --- Runs the original real-window checks with an owned editor source.
 --- @return integer
 local function run()
-	Manager = require("ui.webview_manager")
+	Manager = require("core.ui.ui.webview_manager")
 
 	-- The daemon state the bridges read. Without it the settings window's payload is
 	-- an empty shell — correctly, since it has nothing to describe — and the "did the

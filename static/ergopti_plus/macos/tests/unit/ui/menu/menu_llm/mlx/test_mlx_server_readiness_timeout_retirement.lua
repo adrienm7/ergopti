@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULE_NAMES = {
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"core.logger.engine.logger",
 	"core.i18n.engine.i18n",
 	"infra.config_paths",
@@ -48,7 +48,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 			local timers = {}
 			local server_tasks = {}
 
-			package.loaded["infra.notifications"] = { notify = noop }
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
 			package.loaded["core.logger.engine.logger"] = {
 				today_log_path = function() return "/tmp/ergopti-hs025.log" end,
 				debug = noop,

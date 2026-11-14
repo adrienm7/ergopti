@@ -106,7 +106,7 @@ local function load_expander(buffer)
 		set_buffer = function() end,
 		log_hotstring = function() end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() end }
 	package.loaded["core.fs.adapters.file_system"] = {
 		read = function()
 			local fh = assert(io.open(helpers.shared("shortcuts/data/actions/send_keys.json"), "r"))

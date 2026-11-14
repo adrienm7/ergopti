@@ -33,7 +33,7 @@ end
 --- @param completed function Receives (accepted, error, evaluation) for the supervisor.
 function M.post_registered_action(observation, id, completed)
 	local Json = require("core.text.engine.json")
-	local Result = require("adapters.webview_result")
+	local Result = require("core.ui.adapters.webview_result")
 	assert(type(id) == "string" and id ~= "" and type(completed) == "function")
 	assert(getmetatable(observation.view) ~= nil, "B was consumed before its real frontend post")
 	observation.view:evaluateJavaScript("doConfirm(" .. Json.quote(id) .. "); true", function(value, failure)

@@ -23,7 +23,7 @@ end
 
 local function with_world(scenario, text_token)
 	return helpers.with_fresh_modules({ "modules.llm.screen_answer", "modules.llm.local_model_offer",
-		"infra.dialog_util", "modules.shortcuts.script_control" }, function()
+		"core.ui.engine.dialog_util", "modules.shortcuts.script_control" }, function()
 		return Scope.run(function()
 			local world = Fixture.build_world()
 			local api = world.core.api_remote

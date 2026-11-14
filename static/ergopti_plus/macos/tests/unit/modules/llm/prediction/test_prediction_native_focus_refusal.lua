@@ -63,7 +63,7 @@ local OWNED = {
 	"core.text.engine.toml_codec.reader",
 	"core.text.engine.toml_codec.record_scanner",
 	"core.text.engine.toml_codec.source_open",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 }
 
 --- Runs the unchanged pipeline fixture with one exact native focus port.

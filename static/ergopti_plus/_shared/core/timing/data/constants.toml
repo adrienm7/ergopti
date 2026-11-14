@@ -934,14 +934,14 @@ wpm_menubar_update_ms = 500
 
 # How long capturing the physical magic key by pressing it waits for a key
 # before it ends with nothing changed.
-# AHK: ui/editors.ahk MagicKeySourceCapture. HS: ui/menu/magic_key_source_menu.lua.
+# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture. HS: ui/menu/magic_key_source_menu.lua.
 # Linux: modules/hotstrings/magic_key_source.lua capture.
 magic_key_capture_timeout_ms = 10000
 
 # How often that capture reads the physical key state on Windows, for a key
 # whose remap hotkey sends nothing its InputHook sees (a dead key, a tap-hold).
 # Well under a key press, so a quick tap is still caught.
-# AHK: ui/editors.ahk MagicKeySourceCapture.
+# AHK: core/ui/ui/editors.ahk MagicKeySourceCapture.
 magic_key_capture_poll_ms = 10
 
 # Windows: how often a developer driver looks for a field run request in its
@@ -973,7 +973,7 @@ user_quit_deadline_ms = 12000
 
 # How long a desktop notification stays up: long enough to read a sentence,
 # short enough not to stack up during a burst of them. HS:
-# infra/notifications.lua withdrawAfter and its owner retention. Linux:
+# core/ui/engine/notifications.lua withdrawAfter and its owner retention. Linux:
 # adapters/notifier.lua notify-send --expire-time. Windows TrayTip uses the
 # system's own duration (NUI-006).
 notification_ttl_ms = 5000
@@ -1024,7 +1024,7 @@ webview_ready_safety_flush_ms = 1500
 webview_page_safety_flush_ms = 2000
 
 # Windows: the same safety flush of the shared webview host and of onboarding.
-# AHK: infra/webview_utils.ahk, ui/onboarding/webview.ahk.
+# AHK: core/ui/engine/webview/utils.ahk, ui/onboarding/webview.ahk.
 webview_host_safety_flush_ms = 2500
 
 # macOS: the same safety flush of the download window, which waits for its own
@@ -1038,7 +1038,7 @@ download_window_flush_safety_ms = 1000
 download_window_hide_delay_ms = 4000
 
 # macOS: how long the warm-up webview is held so WebKit fully initialises.
-# HS: ui/ui_builder.lua.
+# HS: core/ui/ui/builder.lua.
 webkit_warmup_hold_ms = 5000
 
 # macOS: how often the typing metrics page is polled for its pending messages.
@@ -1050,7 +1050,7 @@ metrics_typing_poll_ms = 300
 model_manager_retry_ms = 100
 
 # macOS: delay before the dialog focus is claimed after a modal opens.
-# HS: infra/dialog_util.lua.
+# HS: core/ui/engine/dialog_util.lua.
 dialog_focus_delay_ms = 100
 
 # macOS: delay before the notice about a keyboard slot that macOS's own
@@ -1225,7 +1225,7 @@ llm_remote_request_ms = 3000
 
 # A streamed prediction: chain start to the tooltip's first display (TTFT).
 # Measured p50 1573 ms, max 1582 ms.
-# HS: ui/tooltip/tooltip_llm.lua.
+# HS: core/ui/ui/tooltip/llm.lua.
 prediction_display_ms = 2000
 
 

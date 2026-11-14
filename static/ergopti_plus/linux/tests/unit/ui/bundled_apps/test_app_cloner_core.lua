@@ -107,7 +107,7 @@ helpers.describe("Linux App Cloner", function()
 		local seen = read(dir .. "/seen")
 		helpers.assert_eq(seen, plan.profile .. "/config\n" .. plan.profile .. "/data\n" .. plan.profile .. "/cache\n"
 			.. plan.profile .. "/state\narg:--x\narg:" .. dir .. "\narg:dropped.txt\n")
-		helpers.assert_eq(require("ui.native_dialog").exit_code(os.execute("test -d " .. quote(plan.profile .. "/config"))), 0)
+		helpers.assert_eq(require("core.ui.ui.native_dialog").exit_code(os.execute("test -d " .. quote(plan.profile .. "/config"))), 0)
 		cleanup(dir)
 	end)
 

@@ -197,7 +197,7 @@ def qualify_product(repo, executable, scratch, output, version, unchanged, obser
             "source_revision": source_revision,
             "production_root": str(repo / "static/ergopti_plus"),
             "webview_result_path": str(
-                repo / "static/ergopti_plus/macos/adapters/webview_result.lua"
+                repo / "static/ergopti_plus/macos/core/ui/adapters/webview_result.lua"
             ),
             "output_dir": str(destination.resolve()),
         },

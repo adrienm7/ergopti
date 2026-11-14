@@ -273,7 +273,7 @@ const BASELINE_SHARED = 51;
 //   the focused window under Wayland, where no client may ask the compositor.
 //   Windows and macOS read focus through their own native APIs and install no
 //   desktop-shell code, so counterpart folders there would hold nothing.
-const BASELINE_UNION = 76;
+const BASELINE_UNION = 73;
 
 // ── The test trees, measured apart from the architecture ────────────────────
 //
@@ -397,7 +397,7 @@ const canonicalNowhere = CANONICAL.filter((f) => !DRIVERS.some((d) => hasFeature
 // a missing module. Raised the same day it was measured: leaving it at 16 would
 // hand the ratchet exactly one feature of slack, which is the failure the note
 // above condemns and would silently undo the tightening it describes.
-const BASELINE_CANONICAL_ON_ALL = 20;
+const BASELINE_CANONICAL_ON_ALL = 19;
 
 if (canonicalOnAll.length < BASELINE_CANONICAL_ON_ALL) {
 	errors.push(

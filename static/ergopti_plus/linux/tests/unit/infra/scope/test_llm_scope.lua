@@ -15,7 +15,7 @@ local function with_scope(body)
 		local loaded_before = {}
 		for name, value in pairs(package.loaded) do loaded_before[name] = value end
 		local names = { "infra.config_paths", "infra.llm_preferences", "infra.llm_scope",
-			"core.network.adapters.http_client", "adapters.secure_field_detector", "ui.tooltip.llm",
+			"core.network.adapters.http_client", "adapters.secure_field_detector", "core.ui.ui.tooltip.llm",
 			"core.fs.adapters.storage", "modules.hotstrings.magic_key" }
 		for _, name in ipairs({ "settings", "trigger_settings", "display_settings", "navigation_settings",
 			"profile_settings", "profiles", "prediction_engine", "api_ollama", "api_remote" }) do
@@ -45,7 +45,7 @@ local function with_scope(body)
 				end,
 			}
 			require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"])
-			local overlay = require("ui.tooltip.llm")
+			local overlay = require("core.ui.ui.tooltip.llm")
 			overlay.init({ style = {}, renderer = {
 				show = function() controls.visible = true; return true end,
 				hide = function()
@@ -180,7 +180,7 @@ helpers.describe("Linux terminal LLM scope", function()
 			helpers.assert_eq(engine.set_backend("api"), false)
 			helpers.assert_eq(require("modules.llm.settings").set("temperature", 0.6), false)
 			controls.chunk('{"message":{"content":" sunshine today everywhere around the world"},"done":false}\n')
-			helpers.assert_eq(require("ui.tooltip.llm").is_showing(), false,
+			helpers.assert_eq(require("core.ui.ui.tooltip.llm").is_showing(), false,
 				"late transport chunks cannot publish an offer while cancellation is pending")
 			controls.stop_refused = false
 			helpers.assert_true(owner.retry_restore())
@@ -194,7 +194,7 @@ helpers.describe("Linux terminal LLM scope", function()
 		with_scope(function(_, engine, controls)
 			helpers.assert_true(engine.trigger_now())
 			controls.chunk('{"message":{"content":" sunshine today everywhere around the world"},"done":false}\n')
-			helpers.assert_true(require("ui.tooltip.llm").is_showing(), "positive control for the late-chunk rejection")
+			helpers.assert_true(require("core.ui.ui.tooltip.llm").is_showing(), "positive control for the late-chunk rejection")
 		end)
 	end)
 
@@ -215,7 +215,7 @@ helpers.describe("Linux terminal LLM scope", function()
 
 	helpers.it("keeps a native hide refusal pending without discarding its offer", function()
 		with_scope(function(owner, _, controls, path)
-			local overlay = require("ui.tooltip.llm")
+			local overlay = require("core.ui.ui.tooltip.llm")
 			helpers.assert_true(overlay.show({{ to_type = "word" }}, {}))
 			controls.hide_refused = true
 			helpers.assert_eq(owner.apply("clear"), false)

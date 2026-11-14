@@ -50,7 +50,7 @@ local function with_delivery(callback, native_timers)
 			i18n.get_sorted_locales = function() return {} end
 			state.picker = picker
 			state.titles = {}
-			package.loaded["ui.ui_builder"].set_window_title = function(view, title)
+			package.loaded["core.ui.ui.builder"].set_window_title = function(view, title)
 				state.titles[#state.titles + 1] = { view = view, title = title }
 				return true
 			end
@@ -107,7 +107,7 @@ local function with_delivery(callback, native_timers)
 				package.loaded["ui.onboarding"] = nil
 				onboarding = require("ui.onboarding")
 				state.focus_attempts = 0
-				package.loaded["ui.ui_builder"].force_focus = function(view, _, options)
+				package.loaded["core.ui.ui.builder"].force_focus = function(view, _, options)
 					state.focus_attempts = state.focus_attempts + 1
 					return options.is_current() == true and state.view == view
 				end

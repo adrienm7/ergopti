@@ -449,7 +449,7 @@ helpers.describe("AI agent: native missing-model modal ownership", function()
 
 	helpers.it("real while_released resync cancellation preserves only its acknowledged consent", function()
 		local actual = native_case(nil, false)
-		helpers.assert_eq(actual.offers, 1, "actual confirm reaches the native shell boundary through ui.modal")
+		helpers.assert_eq(actual.offers, 1, "actual confirm reaches the native shell boundary through core.ui.ui.modal")
 		helpers.assert_eq(actual.desyncs, 1, "the actual hook delivers the daemon cancellation after regrab")
 		helpers.assert_eq(actual.installs, 1, "that bounded resynchronisation does not invalidate valid manual consent")
 		helpers.assert_eq(actual.posts, 0, "missing-model inference still never carries private text")

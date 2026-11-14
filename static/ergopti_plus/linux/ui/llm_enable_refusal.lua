@@ -10,7 +10,7 @@
 local M = {}
 local I18n = require("core.i18n.engine.i18n")
 local Shell = require("core.process.adapters.shell_runner")
-local Modal = require("ui.modal")
+local Modal = require("core.ui.ui.modal")
 local Logger = require("core.logger.engine.shim")
 local LOG = "ui.llm_enable_refusal"
 
@@ -39,7 +39,7 @@ function M.show(origin, replacements, modal_observer, runtime_note)
 	local keep_off = I18n.get("llm.unreachable.keep_off")
 	local retry = I18n.get("button.retry")
 	local choices = type(replacements) == "table" and #replacements > 0
-	local command = require("ui.native_dialog").command() .. " " .. (choices and "--list" or "--question")
+	local command = require("core.ui.ui.native_dialog").command() .. " " .. (choices and "--list" or "--question")
 		.. " --no-markup --title=" .. Shell.quote(title) .. " --text=" .. Shell.quote(body)
 	if choices then
 		command = command .. " --column='' --column='' --hide-column=1 --print-column=1"

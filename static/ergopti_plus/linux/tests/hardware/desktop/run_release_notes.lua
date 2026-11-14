@@ -84,7 +84,7 @@ local function pump_until(predicate)
 	return predicate()
 end
 
-local Manager = require("ui.webview_manager")
+local Manager = require("core.ui.ui.webview_manager")
 
 --- Evaluates JavaScript in the window and returns its string value.
 --- @param source string

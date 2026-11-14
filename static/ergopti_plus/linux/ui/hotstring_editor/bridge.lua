@@ -214,7 +214,7 @@ local function opening_current(opening, state, context)
 	if type(opening) ~= "table" or personal_path(state) ~= opening.path
 		or type(context) ~= "table" or context.app_name ~= APP_NAME
 		or context.epoch ~= opening.epoch then return false end
-	local ok, Manager = pcall(require, "ui.webview_manager")
+	local ok, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok or type(Manager.current_epoch) ~= "function" then return false end
 	local read_ok, epoch = pcall(Manager.current_epoch, APP_NAME)
 	return read_ok and type(epoch) == "number" and epoch > 0 and epoch % 1 == 0
@@ -581,7 +581,7 @@ end
 --- @return boolean
 function M.show_alert(message, context)
 	local ok_json, json_mod = pcall(require, "core.text.engine.json")
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_json or not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "%s", tostring(message))
 		return false
@@ -593,14 +593,14 @@ function M.show_alert(message, context)
 		if epoch == nil then return true end
 		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
 			or type(page_current) ~= "function" or Manager.current_epoch ~= current_epoch
-			or Manager.page_current ~= page_current or package.loaded["ui.webview_manager"] ~= Manager then return false end
+			or Manager.page_current ~= page_current or package.loaded["core.ui.ui.webview_manager"] ~= Manager then return false end
 		local ok, observed = pcall(current_epoch, APP_NAME)
 		if not ok or observed ~= epoch then return false end
 		local checked, live = pcall(page_current, APP_NAME, epoch)
 		if not checked or live ~= true or Manager.page_current ~= page_current
 			or Manager.current_epoch ~= current_epoch then return false end
 		local reread, final = pcall(current_epoch, APP_NAME)
-		return reread and final == epoch and package.loaded["ui.webview_manager"] == Manager
+		return reread and final == epoch and package.loaded["core.ui.ui.webview_manager"] == Manager
 			and Manager.current_epoch == current_epoch
 			and Manager.page_current == page_current
 	end
@@ -640,7 +640,7 @@ function M.push_init(state, context)
 		return false
 	end
 
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push initData(): webview_manager.eval_js is unavailable.")
 		return false

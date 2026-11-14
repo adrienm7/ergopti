@@ -63,9 +63,9 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		local saved_exit = os.exit
 		local direct_exits = 0
 		os.exit = function() direct_exits = direct_exits + 1 end
-		local saved_notifications = package.loaded["infra.notifications"]
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
 		local notices = {}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(text, _body, level) notices[#notices + 1] = { text = text, level = level }; return true end,
 		}
 		local ok, dispatched = pcall(Actions.execute_single, "script_quit")
@@ -73,7 +73,7 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		scheduled_callback()
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_do_after
-		package.loaded["infra.notifications"] = saved_notifications
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 
 		helpers.assert_eq(quit_spy.count, 1)
 		helpers.assert_eq(direct_exits, 0,

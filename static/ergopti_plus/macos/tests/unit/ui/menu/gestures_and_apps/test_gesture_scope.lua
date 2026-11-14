@@ -143,8 +143,8 @@ helpers.describe("macOS complete gesture scope", function()
 		end
 		local dialogs, opened, deferred = {}, 0, {}
 		local saved = {}
-		for _, name in ipairs({ "infra.dialog_util", "core.timing.engine.deferred_work" }) do saved[name] = package.loaded[name] end
-		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, first)
+		for _, name in ipairs({ "core.ui.engine.dialog_util", "core.timing.engine.deferred_work" }) do saved[name] = package.loaded[name] end
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, first)
 			dialogs[#dialogs + 1] = message
 			return first
 		end }

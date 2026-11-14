@@ -23,8 +23,8 @@ local function run_add_action(check_result, assertions)
 			"modules.llm",
 			"core.i18n.engine.i18n",
 			"core.logger.engine.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -82,13 +82,13 @@ local function run_add_action(check_result, assertions)
 				warn = function() end,
 				error = function() end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				text_prompt = function()
 					prompt_index = prompt_index + 1
 					return "button.ok", prompt_values[prompt_index]
 				end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, level)
 					notifications[#notifications + 1] = {
 						title = title, body = body, level = level,

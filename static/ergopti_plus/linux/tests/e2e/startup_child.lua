@@ -227,8 +227,8 @@ end
 -- WebKit windows open through the manager's native seam: the page is built and
 -- routed as in production, the GTK window is not drawn. The error window is a
 -- user-visible error like a dialog.
-package.preload["ui.webview_manager"] = function()
-	local manager = dofile("ui/webview_manager.lua")
+package.preload["core.ui.ui.webview_manager"] = function()
+	local manager = dofile("core/ui/ui/webview_manager.lua")
 	manager._create_gtk_window = function(app_name)
 		if app_name == "error_dialog" then record("DIALOG", "the error window opened") end
 		record("WINDOW", app_name)

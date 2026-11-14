@@ -554,8 +554,8 @@ try {
 	// never one found on PATH (the bare PATH here has none).
 	const dialogLog = path.join(sandbox, 'missing-dialog.log');
 	fs.mkdirSync(path.join(packaged, 'runtime/bin'), { recursive: true });
-	fs.mkdirSync(path.join(packaged, 'ui'), { recursive: true });
-	fs.writeFileSync(path.join(packaged, 'ui/dialog_host.lua'), '-- placeholder\n');
+	fs.mkdirSync(path.join(packaged, 'core/ui/ui'), { recursive: true });
+	fs.writeFileSync(path.join(packaged, 'core/ui/ui/dialog_host.lua'), '-- placeholder\n');
 	fs.writeFileSync(
 		path.join(packaged, 'runtime/bin/luajit'),
 		`#!/bin/bash\nprintf '%s|' "$@" > "${bashPath(dialogLog)}"\n`,

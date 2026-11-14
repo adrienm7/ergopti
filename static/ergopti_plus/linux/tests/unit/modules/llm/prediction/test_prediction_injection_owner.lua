@@ -113,7 +113,7 @@ local function scenario(action, phase, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_x11 = function() return true end, is_wayland = function() return false end, kind = function() return "x11" end,
 		}
 		package.loaded["adapters.keyboard_hook"] = {

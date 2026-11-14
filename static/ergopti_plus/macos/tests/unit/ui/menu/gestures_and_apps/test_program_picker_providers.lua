@@ -78,15 +78,15 @@ local function with_provider(kind, options, body)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) fixture.errors = fixture.errors + 1; fixture.last_error = string.format(message, ...); if message:find("did not commit", 1, true) then fixture.transaction_error = string.format(message, ...) end end
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["infra.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
+		package.loaded["core.ui.engine.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
 			return options.cancel and cancel or confirm, scalar
 		end }
-		local original_prompt = package.loaded["infra.dialog_util"].text_prompt
-		package.loaded["infra.dialog_util"].text_prompt = function(...)
+		local original_prompt = package.loaded["core.ui.engine.dialog_util"].text_prompt
+		package.loaded["core.ui.engine.dialog_util"].text_prompt = function(...)
 			local button, value = original_prompt(...)
 			return button, options.scalar or value
 		end
-		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
+		package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)

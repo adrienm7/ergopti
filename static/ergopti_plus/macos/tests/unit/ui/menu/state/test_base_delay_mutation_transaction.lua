@@ -32,8 +32,8 @@ end
 
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "infra.dialog_util",
-		"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config", "ui.menu.base_delay_transaction",
 		"ui.menu.preferences_transaction", "ui.menu.global_actions_transaction", "ui.menu.menu_state",
 	}, function()
@@ -145,12 +145,12 @@ local function with_fixture(outcome, callback)
 			owner = Baseline.new({ state = state, keymap = keymap, admission = global.run_exclusive,
 				paused = function() return paused end, save_prefs = raw_save })
 			local raw, button, prompt_raises = "750", "button.ok", false
-			package.loaded["infra.dialog_util"] = { text_prompt = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { text_prompt = function(...)
 				observed.prompt = table.pack(...)
 				if prompt_raises then error("injected prompt refusal", 0) end
 				return button, raw
 			end }
-			package.loaded["infra.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
 			local context = { state = state, keymap = keymap, paused = false,
 				commit_base_delay = owner.set,
 				save_prefs = function() return global.run_exclusive("Legacy save", raw_save) end,
