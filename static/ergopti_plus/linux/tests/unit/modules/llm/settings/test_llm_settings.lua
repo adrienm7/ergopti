@@ -433,10 +433,19 @@ helpers.describe("LLM shared automatic temperature control", function()
 		end)
 	end)
 
-	helpers.it("refuses stale callbacks after pause or the live AI gate closes (shared-auto-raise)", function()
-		for _, gate in ipairs({ "pause", "master" }) do
-			with_auto_menu({selected = true}, function(row, settings, _, _, observed, context, admission)
-				if gate == "pause" then context.paused = true else admission.enabled = false end
+	helpers.it("commits while paused, read on resume (shared-auto-raise)", function()
+		with_auto_menu({selected = true}, function(row, settings, _, _, _, context)
+			-- A pause stops typing, not configuration (EDD-1).
+			context.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("auto_raise_temp"), false)
+		end)
+	end)
+
+	helpers.it("refuses stale callbacks after the live AI gate closes (shared-auto-raise)", function()
+		for _, gate in ipairs({ "master" }) do
+			with_auto_menu({selected = true}, function(row, settings, _, _, observed, _, admission)
+				admission.enabled = false
 				local result = row.fn()
 				helpers.assert_eq(settings.get("auto_raise_temp"), true)
 				helpers.assert_eq(observed.writes, 0)

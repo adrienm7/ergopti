@@ -203,9 +203,10 @@ function M.build(ctx)
 		items    = exclusion_menu,
 	}
 
+	-- A pause stops typing, not configuration (EDD-1): the rows commit while
+	-- paused and the engine reads them when typing resumes.
 	local function ready()
 		return state.llm_enabled == true and ctx.is_disabled ~= true
-			and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 	end
 	local shared_ctx = {
 		commands = {

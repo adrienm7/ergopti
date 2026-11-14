@@ -35,9 +35,17 @@
 			"value": false
 		},
 		{
-			"id": "pause",
+			"id": "pause-keeps-configuration-editable",
 			"current": {
 				"paused": true
+			},
+			"admitted": true,
+			"value": true
+		},
+		{
+			"id": "pause-string",
+			"current": {
+				"paused": "true"
 			},
 			"admitted": false
 		},

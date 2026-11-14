@@ -347,9 +347,10 @@ local function _build_llm(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
+		-- A pause stops typing, not configuration (EDD-1): the rows commit while
+		-- paused and the engine reads them when typing resumes.
 		local function ready()
-			return llm.is_enabled() == true and ctx.paused ~= true
-				and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+			return llm.is_enabled() == true
 		end
 		local function toggle(name)
 			if not ready() then return false end
@@ -667,8 +668,7 @@ local function _build_llm(ctx)
 		local ProfileSettings = require("modules.llm.profile_settings")
 		local function show_all_ready()
 			return DisplayPolicy.ready(ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS),
-				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
-				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
+				type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
 		local Preferences = require("infra.llm_preferences")
 		local function streaming_snapshot()
@@ -1053,7 +1053,7 @@ local function _build_llm(ctx)
 		--- @return boolean ready
 		local function ready()
 			local count = ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS)
-			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+			return type(llm.is_enabled) == "function" and llm.is_enabled() == true
 				and type(count) == "number" and count >= 2
 		end
 		local generation_ctx = {
@@ -1077,7 +1077,7 @@ local function _build_llm(ctx)
 		-- Whether a navigation or Escape clears the AI's typing context, the row
 		-- Windows and macOS show in the same submenu.
 		local function generation_ready()
-			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+			return type(llm.is_enabled) == "function" and llm.is_enabled() == true
 		end
 		local RESET_ON_NAV = require("settings.engine.keys").LEAF.RESET_ON_NAV
 		local reset_rows = ManifestMenu.build("llm_generation_reset_navigation", "LLM", nil, nil, {

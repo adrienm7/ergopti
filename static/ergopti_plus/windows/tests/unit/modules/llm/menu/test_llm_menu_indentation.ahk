@@ -278,6 +278,12 @@ _LMT_IndentRetainedOwners() {
 				}
 				if Condition == "retired owner"
 					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
+				if Condition == "paused" {
+					; A pause stops typing, not configuration (EDD-1).
+					Callback.Call()
+					AssertEqual(1, Seen["calls"], "a paused choice reaches the native writer")
+					continue
+				}
 				Physical := FSReadUtf8Exact(Path)
 				_LMT_ApplyCalls := 0
 				AssertFalse(Callback.Call(), Condition)

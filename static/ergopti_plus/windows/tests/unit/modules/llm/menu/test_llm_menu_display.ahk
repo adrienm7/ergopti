@@ -197,9 +197,9 @@ _LMT_SharedShowAllNativeOwner() {
 		try {
 			Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Corpus["row"]["i18n"])))
 			Suspend(true)
-			AssertFalse(Callback.Call(), "a held command cannot publish across a native pause")
-			AssertEqual(0, _LMT_WriterCalls)
-			AssertFalse(_LLM_Menu["show_all_at_once"])
+			Callback.Call()
+			AssertEqual(1, _LMT_WriterCalls, "a pause stops typing, not configuration (EDD-1)")
+			_LLM_Menu["show_all_at_once"] := false
 		} finally {
 			Suspend(SavedSuspend)
 			_CTC_ReleaseMenu(Built)
@@ -598,6 +598,8 @@ _LMT_InfoBarRetainedReceipts() {
 			_LLM_Menu := _LMT_Menu()
 			Initial := _LMT_InfoBarAdmitFixture(Path, true)
 			Seen := Map("calls", 0)
+			; A pause stops typing, not configuration (EDD-1): it commits like an ACK.
+			Admitted := Condition == "ack" || Condition == "paused"
 			Mode := Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? Condition : "ack"
 			Command := _LMT_InfoBarCommit.Bind(_LMT_InfoBarWriter.Bind(Mode, Seen))
 			Built := LLM_Menu_BuildDisplayMenu(Command)
@@ -619,12 +621,12 @@ _LMT_InfoBarRetainedReceipts() {
 					_LLM_Menu := LLM_Menu_DeepClone(_LLM_Menu)
 				Before := FSReadUtf8Exact(Path)
 				_LMT_ApplyCalls := 0
-				AssertEqual(Condition == "ack", Callback.Call(), Condition)
+				AssertEqual(Admitted, Callback.Call(), Condition)
 				if Condition == "source race"
 					AssertEqual(true, Seen.Get("source_race_changed", false), "the actual terminal port must change the source outside the production-caught callback")
-				AssertEqual(Condition == "ack" || Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? 1 : 0, Seen["calls"], Condition)
-				AssertEqual(Condition == "ack" ? 1 : 0, _LMT_ApplyCalls, Condition)
-				if Condition == "ack" {
+				AssertEqual(Admitted || Condition == "false" || Condition == "nil" || Condition == "throw" || Condition == "source race" ? 1 : 0, Seen["calls"], Condition)
+				AssertEqual(Admitted ? 1 : 0, _LMT_ApplyCalls, Condition)
+				if Admitted {
 					AssertEqual(1, Seen["updates"].Length)
 					AssertEqual("llm.display", Seen["updates"][1].Section)
 					AssertEqual("show_info_bar", Seen["updates"][1].Key)

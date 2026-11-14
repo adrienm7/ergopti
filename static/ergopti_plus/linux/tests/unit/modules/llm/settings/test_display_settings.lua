@@ -371,16 +371,16 @@ helpers.describe("LLM shared Show-all check", function()
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(observed.writes, before)
 			helpers.assert_true(profiles.set("num_predictions", 2))
-			before = observed.writes
+			-- A pause stops typing, not configuration (EDD-1).
 			observed.paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(observed.writes, before)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("streaming_multi"), false)
 			observed.paused = false
+			before = observed.writes
 			observed.active = false
 			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(settings.get("streaming_multi"), true)
+			helpers.assert_eq(settings.get("streaming_multi"), false)
 			helpers.assert_eq(observed.writes, before)
-			helpers.assert_eq(observed.redraws, 0)
 		end)
 	end)
 
@@ -411,11 +411,18 @@ end)
 -- =========================================
 
 helpers.describe("LLM token streaming live admission", function()
-	for _, condition in ipairs({ "paused", "off", "backend", "retired source", "restored runtime owner" }) do
+	helpers.it("commits an existing callback while paused, read on resume (shared-token-streaming)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, "menu.llm.show_streaming")
+			observed.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("streaming"), true)
+		end)
+	end)
+	for _, condition in ipairs({ "off", "backend", "retired source", "restored runtime owner" }) do
 		helpers.it("refuses an existing callback after " .. condition .. " (shared-token-streaming)", function()
 			with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
 				local row = show_all_row(parent, "menu.llm.show_streaming")
-				if condition == "paused" then observed.paused = true end
 				if condition == "off" then observed.active = false end
 				if condition == "backend" then observed.backend = "api" end
 				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
@@ -445,7 +452,7 @@ helpers.describe("shared token streaming policy", function()
 		local policy = require("ai.engine.settings.display_policy")
 		local corpus = token_streaming_corpus()
 		helpers.assert_eq(#corpus.capabilities, 9)
-		helpers.assert_eq(#corpus.cases, 15)
+		helpers.assert_eq(#corpus.cases, 16)
 		for _, vector in ipairs(corpus.capabilities) do
 			helpers.assert_eq(policy.streaming_capable(vector.platform, vector.backend), vector.capable)
 		end
@@ -564,11 +571,18 @@ helpers.describe("shared indentation choice", function()
 		end)
 	end)
 
-	for _, condition in ipairs({"paused", "off", "single", "retired source", "restored owner"}) do
+	helpers.it("commits a retained indentation choice while paused, read on resume (shared-indentation)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed)
+			local command = assert(indentation_row(parent).menu[1].fn)
+			observed.paused = true
+			helpers.assert_eq(command(), true)
+			helpers.assert_true(settings.get("pred_indent") ~= 0, "the paused choice is stored")
+		end)
+	end)
+	for _, condition in ipairs({"off", "single", "retired source", "restored owner"}) do
 		helpers.it("refuses a retained indentation choice after " .. condition .. " (shared-indentation)", function()
 			with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed, profiles)
 				local command = assert(indentation_row(parent).menu[1].fn)
-				if condition == "paused" then observed.paused = true end
 				if condition == "off" then observed.active = false end
 				if condition == "single" then helpers.assert_true(profiles.set("num_predictions", 1)) end
 				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
@@ -660,12 +674,19 @@ helpers.describe("LLM retained Info Bar admission", function()
 		end
 	end)
 
-	for _, condition in ipairs({"paused", "master", "canonical master", "source", "runtime value", "generation", "backend"}) do
+	helpers.it("commits a retained actual native checkbox while paused, read on resume (shared-info-bar)", function()
+		with_info_menu({selected = true, count = 1, progressive = false}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, info_bar_corpus().row.i18n)
+			observed.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("show_info_bar"), false)
+		end)
+	end)
+	for _, condition in ipairs({"master", "canonical master", "source", "runtime value", "generation", "backend"}) do
 		helpers.it("refuses a retained actual native checkbox after " .. condition .. " (shared-info-bar)", function()
 			with_info_menu({selected = true, count = 1, progressive = false}, function(parent, settings, storage, observed)
 				local row = show_all_row(parent, info_bar_corpus().row.i18n)
 				helpers.assert_eq(row.disabled == true, false)
-				if condition == "paused" then observed.paused = true end
 				if condition == "master" then observed.active = false end
 				if condition == "canonical master" then assert(storage.set("llm.enabled", false)) end
 				if condition == "source" then assert(storage.set("llm.generation.temperature", 0.9)) end

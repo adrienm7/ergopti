@@ -4,7 +4,7 @@
 ; MODULE: LLM Menu Privacy Settings
 ; DESCRIPTION:
 ; The privacy booleans publish through the exact native source lease and
-; refuse stale masters, pause and malformed intents.
+; refuse stale masters and malformed intents, and commit while paused.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -164,8 +164,6 @@ _LMT_PrivacyRefusalBody(Expected, Condition) {
 		Position := _LMT_ShowAllPosition(Built, t(Expected["i18n"]))
 		Callback := _LMT_InfoBarCallback(Built, Position)
 		Before := FSReadUtf8Exact(ConfigurationFile)
-		if Condition == "paused"
-			Suspend(true)
 		if Condition == "master withdrawn" {
 			_LLM_Menu["enabled"] := false
 			_LLM_Engine["enabled"] := false
@@ -197,13 +195,31 @@ _LMT_PrivacyRefusalBody(Expected, Condition) {
 	} finally _CTC_ReleaseMenu(Built)
 }
 
+_LMT_PrivacyPausedBody(Expected) {
+	global _LMT_WriterCalls
+	Built := _LMT_PrivacyBuilder(Map())
+	try {
+		Callback := _LMT_InfoBarCallback(Built, _LMT_ShowAllPosition(Built, t(Expected["i18n"])))
+		_LMT_WriterCalls := 0
+		Suspend(true)
+		Callback.Call()
+		AssertEqual(1, _LMT_WriterCalls, "a pause stops typing, not configuration (EDD-1)")
+	} finally _CTC_ReleaseMenu(Built)
+}
+
+_LMT_SharedPrivacyPaused() {
+	for Expected in _LMT_PrivacyCorpus()["rows"]
+		_LMT_PrivacyFixture([false, false], _LMT_PrivacyPausedBody.Bind(Expected))
+}
+Test("LLM privacy: a retained callback commits while paused and applies on resume", _LMT_SharedPrivacyPaused)
+
 _LMT_SharedPrivacyRefusal() {
 	for Expected in _LMT_PrivacyCorpus()["rows"] {
-		for Condition in ["paused", "master withdrawn", "missing runtime", "runtime disagreement", "foreign source", "writer refused", "writer source race"]
+		for Condition in ["master withdrawn", "missing runtime", "runtime disagreement", "foreign source", "writer refused", "writer source race"]
 			_LMT_PrivacyFixture([false, false], _LMT_PrivacyRefusalBody.Bind(Expected, Condition))
 	}
 }
-Test("LLM privacy: retained callbacks refuse stale masters pause source runtime and native writer", _LMT_SharedPrivacyRefusal)
+Test("LLM privacy: retained callbacks refuse stale masters source runtime and native writer", _LMT_SharedPrivacyRefusal)
 
 
 _LMT_SharedPrivacyPolicy() {
