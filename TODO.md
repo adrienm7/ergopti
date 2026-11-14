@@ -1010,6 +1010,24 @@ Each closes on a named green hosted or native run, recorded here.
       Ollama (Intel) failed « The managed Ollama build handoff never arrived » because its build job waited for a
       runner from 03:24 to 04:10 Paris and finished at 04:18:45, after the consumer's wait ended at 04:17:20 (CI
       capacity, not code).
+      Worker J 2026-11-14, two Linux intermittents fixed at their cause (keep listed until they stay green):
+      (1) desktop-webview « The secure-field probe on a real accessibility bus » failed once in 16 runs
+      ([43549510667](https://github.com/adrienm7/ergopti/actions/runs/43549510667), job 132327549143):
+      `FAIL one application with a focused text field: expected role=61, got inconclusive`, the next two checks green; again in [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (job 132404013294). `run_atspi_focus.sh` probed each GTK fixture after a fixed
+      `sleep 3`; a first application slow to start on a freshly installed runner was not up yet (reproduced locally
+      by delaying the fixture's start 4 s: the old script fails that first check only, the new one passes). The
+      fixture now writes a ready file once its window is active and its field focused, the script waits for it and
+      for the accessibility bus address (`wait_a11y_bus.py`) instead of sleeping, and prints the probe's own errors.
+      Regression: `test_atspi_fixture_lifetime.py` FixtureReadinessTest. (2) network-ai
+      `run_owned_ollama_container.py` hit its 60 s ceiling in 2 of 14 runs, on a different case each time
+      (worker L's « not reproduced » entry above; `test_umask_0002...` in [43538811340](https://github.com/adrienm7/ergopti/actions/runs/43538811340), `test_unreachable_pac...` in [43504755033](https://github.com/adrienm7/ergopti/actions/runs/43504755033)), with
+      `Local Ollama repair failed (runtime_retry_refused)` and the owned daemon not running. `runtime_repair.lua` refused a delivered
+      readiness-retry timer when the budget's precise clock (`uv.hrtime`) showed less than the poll delay elapsed;
+      the timer runs on libuv's loop clock, read from the coarse monotonic clock on Linux, so it can end a few
+      milliseconds early on the budget's clock and a daemon still starting at the first probe was refused. The repair
+      now waits out that shortfall before probing (the master budget still bounds every wait). Regression:
+      `test_runtime_repair.lua` « a retry timer ending short on the budget clock waits out the shortfall, then probes ».
+      Linux only: macOS and Windows do not compose this repair.
 
 ## Maintainer decisions pending
 
