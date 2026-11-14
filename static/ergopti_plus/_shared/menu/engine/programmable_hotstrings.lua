@@ -53,8 +53,8 @@ local PROBLEMS = { missing = true, failed = true }
 ---
 --- A pause stops typing, not configuration (EDD-1): every control runs while
 --- paused. Enabling loads the source at once; its hotstrings stay inert until
---- resume because the paused driver types nothing (decided by the agent on
---- 2026-11-13, to review by the maintainer).
+--- resume because the paused driver types nothing (confirmed by the maintainer
+--- on 2026-11-14).
 ---
 --- A typed activation delay its value schema declaration refuses is passed
 --- to `ports.refusal` with the localized text naming the range (decided by the
