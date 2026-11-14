@@ -11,7 +11,7 @@
 --- location, with its own number of `..` steps. Twelve such expressions existed,
 --- at four different depths, and two of them were wrong:
 ---
----   * infra/i18n.lua walked `../../` from the driver root to reach
+---   * core/i18n/engine/i18n.lua walked `../../` from the driver root to reach
 ---     `_shared/core/i18n/data/locales`. One level too high. `ls` on the missing directory
 ---     printed nothing, the scan collected zero codes, and the fallback list
 ---     `{"en", "fr"}` took over — so the language menu offered 2 locales out of

@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"ui.permission_dialog.login_items_guide", "ui.permission_dialog", "core.events.timer_scheduler",
-	"infra.logger", "infra.i18n", "infra.notifications",
+	"infra.logger", "core.i18n.engine.i18n", "infra.notifications",
 }
 
 --- Installs the recording doubles of the guide's dependencies.
@@ -28,7 +28,7 @@ local function install_doubles(h)
 		end
 	end
 	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	h.notices = {}
 	package.loaded["infra.notifications"] = {
 		notify = function(message, _, kind)

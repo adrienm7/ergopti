@@ -16,7 +16,7 @@ local function actual_layout_binding()
 	local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
 	local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 	local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return labels[key] or key end
 	package.loaded["infra.manifest_menu"] = nil
 	return require("infra.manifest_menu")
@@ -32,7 +32,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
 			"infra.notifications",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
@@ -113,7 +113,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
 		"infra.notifications",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
@@ -246,7 +246,7 @@ helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
 			"infra.notifications",
-			"infra.i18n",
+			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")

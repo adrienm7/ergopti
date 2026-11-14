@@ -15,14 +15,14 @@ local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
 local SHORTCUT_OWNERS = {
 	"infra.dialog_util",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.logger",
 	"ui.menu.shortcut_utils",
 	"platform.input.send_input",
 	"infra.native_presentation",
 	"core.ui.engine.window_titles",
 	"menu.engine.native_presentation_core",
-	"infra.locale",
+	"core.i18n.engine.locale",
 	"core.i18n.engine.core",
 	"core.fs.adapters.json_codec",
 	"core.fs.engine.paths",
@@ -37,7 +37,7 @@ local with_delete_fixture = Fixture.with_delete_fixture
 --- @param body function Test callback receiving the real utility.
 local function with_real_shortcut_prompt_owned(raw, body)
 	local saved_dialog = package.loaded["infra.dialog_util"]
-	local saved_i18n = package.loaded["infra.i18n"]
+	local saved_i18n = package.loaded["core.i18n.engine.i18n"]
 	local saved_logger = package.loaded["infra.logger"]
 	local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
 	local ok, err = xpcall(function()
@@ -46,13 +46,13 @@ local function with_real_shortcut_prompt_owned(raw, body)
 			alert = function() return true end,
 		}
 		local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		body(require("ui.menu.shortcut_utils"), warnings)
 	end, debug.traceback)
 	package.loaded["infra.dialog_util"] = saved_dialog
-	package.loaded["infra.i18n"] = saved_i18n
+	package.loaded["core.i18n.engine.i18n"] = saved_i18n
 	package.loaded["infra.logger"] = saved_logger
 	package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
 	if not ok then error(err, 0) end
@@ -144,7 +144,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 	-- so the trigger submenu opens on its debounce row and prompts for no chord.
 	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
 		local saved_app_picker = package.loaded["infra.app_picker"]
-		local saved_i18n = package.loaded["infra.i18n"]
+		local saved_i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_logger = package.loaded["infra.logger"]
 		local saved_manifest = package.loaded["infra.manifest_menu"]
 		local saved_llm = package.loaded["modules.llm"]
@@ -153,7 +153,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local prompts = 0
 		local ok, err = xpcall(function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
 				platform = "hs",
@@ -188,7 +188,7 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")
 		end, debug.traceback)
 		package.loaded["infra.app_picker"] = saved_app_picker
-		package.loaded["infra.i18n"] = saved_i18n
+		package.loaded["core.i18n.engine.i18n"] = saved_i18n
 		package.loaded["infra.logger"] = saved_logger
 		package.loaded["infra.manifest_menu"] = saved_manifest
 		package.loaded["modules.llm"] = saved_llm

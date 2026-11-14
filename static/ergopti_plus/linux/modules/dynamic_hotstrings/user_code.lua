@@ -20,7 +20,7 @@ local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("core.logger.engine.shim")
 local Notifier = require("adapters.application_notifier")
-local I18n = require("infra.i18n")
+local I18n = require("core.i18n.engine.i18n")
 local Manifest = require("infra.manifest_reader")
 
 --- Notification options per severity on this driver's notifier.

@@ -41,7 +41,7 @@ return function(callback, options)
 		local function real_caption(key)
 			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
 		end
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if options.catalogue then return options.catalogue[key] or key end
 			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end

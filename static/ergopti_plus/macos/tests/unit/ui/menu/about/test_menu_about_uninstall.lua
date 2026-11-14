@@ -49,7 +49,7 @@ local function submenu(paused, fired, title_key, source_run, startup_enabled)
 	local About = require("ui.menu.menu_about")
 	local previous_startup = package.loaded["ui.menu.start_at_login"]
 	package.loaded["ui.menu.start_at_login"] = { enabled = function() return startup_enabled == true end }
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
 	local owner = { get = function() return "dev" end, set = function() return true end, subscribe = function() end }

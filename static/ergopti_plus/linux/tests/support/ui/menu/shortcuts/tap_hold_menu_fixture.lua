@@ -77,7 +77,7 @@ local function build(calls, picked, user_text)
 	local changed = 0
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 		on_menu_changed = function() changed = changed + 1 end })
-	local title = require("infra.i18n").get("menu.tapholds.title")
+	local title = require("core.i18n.engine.i18n").get("menu.tapholds.title")
 	local section = nil
 	for _, item in ipairs(items) do
 		if item.title == title then section = item end
@@ -96,7 +96,7 @@ end
 --- window (tap_holds.lone_modifier_tap_max_ms) is the one other submenu of the
 --- section: its choices are no key.
 local function key_rows(section)
-	local lone_tap = string.format(require("infra.i18n").get("menu.tapholds.lone_tap_title"), "")
+	local lone_tap = string.format(require("core.i18n.engine.i18n").get("menu.tapholds.lone_tap_title"), "")
 	local rows = {}
 	for _, row in ipairs(section.menu or {}) do
 		if type(row.menu) == "table" and row.title:sub(1, #lone_tap) ~= lone_tap then rows[#rows + 1] = row end

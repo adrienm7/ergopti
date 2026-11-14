@@ -41,7 +41,7 @@ local OWNED_MODULES = {
 	"tests.stubs.hs",
 	"infra.logger",
 	"infra.notifications",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.text_utils",
 	"infra.keycodes",
 	"adapters.event_provenance",
@@ -111,7 +111,7 @@ local function with_fixture(callback)
 			package.loaded["infra.notifications"] = {
 				notify = function() return true end,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.text_utils"] = {
 				shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 			}

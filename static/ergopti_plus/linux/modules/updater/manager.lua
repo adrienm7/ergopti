@@ -2123,7 +2123,7 @@ end
 --- separate "Download and install <tag>" row names and installs that release.
 --- @return string
 function M.get_menu_label()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	if _state == "checking" then
 		return i18n.get("menu.about.update_checking")
 	end

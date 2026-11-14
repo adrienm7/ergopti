@@ -44,7 +44,7 @@ local function every_category_on()
 			return { CHANNELS = real.CHANNELS, INTERVAL_PRESETS = real.INTERVAL_PRESETS, TIMING = real.TIMING,
 				current_version = function() return "9.9.9" end, get_channel = function() return "stable" end,
 				get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,
-				get_menu_label = function() return require("infra.i18n").get("menu.about.check_for_updates") end,
+				get_menu_label = function() return require("core.i18n.engine.i18n").get("menu.about.check_for_updates") end,
 				get_state = function() return "idle" end, get_cached_release = function() return nil end,
 				releases_page_url = function() return real.releases_page_url() end }
 		end)(),
@@ -57,7 +57,7 @@ end
 local function tray(locale)
 	local decode = require("core.text.engine.json").decode
 	local catalogue = check.catalogue(SHARED_ROOT, locale, decode)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local previous = i18n.get
 	i18n.get = function(key)
 		local text = catalogue[key]

@@ -16,7 +16,7 @@ local labels = assert(Json.decode_lossless(file:read("*a")))
 file:close()
 
 local function with_notice(tool, body)
-	local names = { "infra.i18n", "adapters.shell_runner", "adapters.keyboard_hook",
+	local names = { "core.i18n.engine.i18n", "adapters.shell_runner", "adapters.keyboard_hook",
 		"adapters.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -26,7 +26,7 @@ local function with_notice(tool, body)
 		world.composed_title = "Caption policy % ' — " .. caption
 		return world.composed_title
 	end }
-	package.loaded["infra.i18n"] = { get = function(key) return assert(labels[key], key) end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return assert(labels[key], key) end }
 	package.loaded["adapters.shell_runner"] = {
 		has_command = function(name) return name == tool end,
 		quote = Shell.quote,

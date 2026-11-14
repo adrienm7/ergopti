@@ -12,11 +12,11 @@ local helpers = require("tests.helpers")
 local OutputFixture = require("tests.support.toml_output_fixture")
 
 local function with_frame(body, paused)
-	local translator = require("infra.i18n")
+	local translator = require("core.i18n.engine.i18n")
 	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu",
 		"modules.hotstrings.hotstrings_config", "ui.menu.menu_hotstrings_management" }, function()
 		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.i18n"] = translator
+		package.loaded["core.i18n.engine.i18n"] = translator
 		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
 			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator,
@@ -156,7 +156,7 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 		end)
 	end)
 	helpers.it("restores exact genuine owners after a raised scenario", function()
-		local names = { "infra.i18n", "infra.manifest_menu", "modules.hotstrings.hotstrings_config",
+		local names = { "core.i18n.engine.i18n", "infra.manifest_menu", "modules.hotstrings.hotstrings_config",
 			"ui.menu.menu_hotstrings_management", "core.fs.engine.paths" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local ok, err = pcall(function()

@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
+	"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
@@ -50,7 +50,7 @@ local function build(backend, local_rows)
 			set_backend = function() return true end,
 			load_api_entries = function() return true end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key) return key end,
 		}

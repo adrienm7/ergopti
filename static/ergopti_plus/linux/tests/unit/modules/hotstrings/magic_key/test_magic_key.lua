@@ -408,7 +408,7 @@ end)
 
 -- Uses the actual native builder closure and genuine shared factory; no provider stand-in.
 local function with_magic_frame(language, stored, mode, body)
-	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "infra.i18n", "infra.locale", "core.i18n.engine.core", "ui.text_prompt" }
+	local names = { "infra.manifest_menu", "ui.menu.builder", "modules.hotstrings.magic_key", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "ui.text_prompt" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local storage, restore_storage, restore_manifest
@@ -419,10 +419,10 @@ local function with_magic_frame(language, stored, mode, body)
 		restore_manifest = stub_manifest("★")
 		local json = require("core.text.engine.json")
 		local Paths = require("core.fs.engine.paths")
-		package.loaded["infra.i18n"], package.loaded["infra.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
-		local native_locale = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
+		local native_locale = require("core.i18n.engine.locale")
 		native_locale.set_locale(language)
-		local native_i18n = require("infra.i18n")
+		local native_i18n = require("core.i18n.engine.i18n")
 		prompt_owner = require("ui.text_prompt")
 		prior_ask = prompt_owner.ask
 		prompt_owner.ask = function() effects.prompts = effects.prompts + 1; return "§" end

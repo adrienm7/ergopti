@@ -26,7 +26,7 @@ end
 --- @param options table|nil Native source and pause posture.
 local function with_personal_frame(scenario, options)
 	options = options or {}
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "core.fs.adapters.storage", "ui.hotstring_editor.bridge" }
 	local previous, saved_getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do previous[name] = value end
@@ -44,7 +44,7 @@ local function with_personal_frame(scenario, options)
 			return saved_getenv(name)
 		end
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		native = require("infra.i18n"); native.init()
+		native = require("core.i18n.engine.i18n"); native.init()
 		owner = { pending = function() return false end }
 		assert(native.scope_acquire(owner)); acquired = true
 		receipt = assert(native.scope_capture(owner))

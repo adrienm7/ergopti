@@ -31,7 +31,7 @@ local function with_factory(callback)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.locale", "core.i18n.engine.core",
+			"ui.ui_builder", "ui.webview_close_owner", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"infra.logger", "core.fs.engine.paths", "infra.deferred_work", "core.fs.adapters.json_codec",
 			"core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 			"hs", "tests.stubs.hs",
@@ -69,8 +69,8 @@ local function with_factory(callback)
 				webview = { windowMasks = { titled = 1, closable = 2, utility = 16 }, new = new_view },
 			})
 			-- The loader injects a passthrough translator; require the real one after it.
-			package.loaded["infra.i18n"] = nil
-			callback(builder, captions, require("infra.i18n"), require("infra.locale"))
+			package.loaded["core.i18n.engine.i18n"] = nil
+			callback(builder, captions, require("core.i18n.engine.i18n"), require("core.i18n.engine.locale"))
 		end)
 	end, debug.traceback)
 	rawset(_G, "_base_dir", previous_base)

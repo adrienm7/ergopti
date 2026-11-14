@@ -60,7 +60,7 @@ end
 --- @param key string Locale key of the reason.
 --- @return string
 local function reason_head(key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	local cut
 	for _, mark in ipairs({ ":", "\239\188\154" }) do
 		local at = text:find(mark, 1, true)
@@ -169,7 +169,7 @@ helpers.describe("native adopted personal file gates", function()
 			local item = f.definitions[2]
 			helpers.assert_eq(f.config.toggle_section(item.id, "probe"), true)
 			with_native_menu(f, function(render, opened, changed)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local file = assert(render("a / b ("), "the actual personal file submenu must be reachable")
 				for index, key in ipairs({ "menu.common.enabled", "hs_config.label_delay", "hs_config.label_priority",
 					"hs_config.label_color", "hs_config.label_tooltip" }) do
@@ -205,7 +205,7 @@ helpers.describe("native adopted personal file gates", function()
 				local file = assert(render("a / b ("))
 				helpers.assert_true(file.menu[2].disabled)
 				helpers.assert_nil(file.menu[2].fn)
-				helpers.assert_true(file.menu[2].title:find(require("infra.i18n").get("menu.hotstrings.personal_metadata_unavailable"), 1, true) ~= nil)
+				helpers.assert_true(file.menu[2].title:find(require("core.i18n.engine.i18n").get("menu.hotstrings.personal_metadata_unavailable"), 1, true) ~= nil)
 				helpers.assert_eq(file.menu[1].disabled == true, false, "the authoritative file gate remains usable")
 				local read = assert(io.open(item.path)); local before = assert(read:read("*a")); assert(read:close())
 				local alias = f.root .. "/hot/alias.toml"

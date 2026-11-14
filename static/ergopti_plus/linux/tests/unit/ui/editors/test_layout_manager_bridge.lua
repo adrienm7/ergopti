@@ -240,7 +240,7 @@ helpers.describe("layout editor menu row (Linux)", function()
 				calls[#calls + 1] = "show " .. name
 				return true
 			end } })
-			local I18n = require("infra.i18n")
+			local I18n = require("core.i18n.engine.i18n")
 			local row = nil
 			for _, top in ipairs(items) do
 				if top.title == I18n.get("menu.layout.title") then
@@ -262,7 +262,7 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.i18n", "modules.keymap.layout_registry" }
+	local names = { "ui.menu.builder", "infra.manifest_menu", "core.i18n.engine.i18n", "modules.keymap.layout_registry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local ok, err = xpcall(function()
@@ -289,7 +289,7 @@ local function with_empty_layout(callback)
 		callback(function()
 			local items = module.build({})
 			for _, row in ipairs(items) do
-				if row.title == require("infra.i18n").get("menu.layout.title") then
+				if row.title == require("core.i18n.engine.i18n").get("menu.layout.title") then
 					helpers.assert_eq(type(row.menu), "table")
 					return row.menu
 				end
@@ -348,7 +348,7 @@ helpers.describe("the shared empty native-layout status", function()
 			with_empty_layout(function(build, state, binding)
 				local catalogue = read_empty_layout_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
-				require("infra.i18n").get = function(key) return catalogue[key] or key end
+				require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()
 				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
 				helpers.assert_eq(count_empty_layout_caption(rows, expected), 1)
@@ -367,7 +367,7 @@ helpers.describe("the shared empty native-layout status", function()
 			with_empty_layout(function(build, state, binding)
 				local statuses = empty_layout_owner(binding).status_rows
 				local baseline = build()
-				local caption = require("infra.i18n").get(EmptyLayoutCorpus.row.i18n)
+				local caption = require("core.i18n.engine.i18n").get(EmptyLayoutCorpus.row.i18n)
 				helpers.assert_eq(count_empty_layout_caption(baseline, caption), 1)
 				local bad = {
 					empty = {}, command = { { type = "command", id = "layout_manager", i18n = "menu.layout.manage" } },

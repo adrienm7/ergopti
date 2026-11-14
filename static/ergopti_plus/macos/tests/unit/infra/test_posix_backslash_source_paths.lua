@@ -56,12 +56,12 @@ describe("macOS source-located paths keep their backslashes (posix-backslash-pat
 		local page = assert(io.open(dir .. "index.html", "wb"))
 		page:write("<html><head></head><body></body></html>")
 		page:close()
-		local html = helpers.with_fresh_modules({ "ui.ui_builder", "core.fs.engine.paths", "infra.locale", "infra.i18n" }, function()
+		local html = helpers.with_fresh_modules({ "ui.ui_builder", "core.fs.engine.paths", "core.i18n.engine.locale", "core.i18n.engine.i18n" }, function()
 			package.loaded["core.fs.engine.paths"] = setmetatable({
 				shared = function(rel) return '/x\\y "z"/_shared/' .. rel end,
 			}, { __index = require("core.fs.engine.paths") })
-			package.loaded["infra.locale"] = { catalogue = function() return { probe = "P" } end }
-			package.loaded["infra.i18n"] = { get_locale = function() return "fr" end }
+			package.loaded["core.i18n.engine.locale"] = { catalogue = function() return { probe = "P" } end }
+			package.loaded["core.i18n.engine.i18n"] = { get_locale = function() return "fr" end }
 			return require("ui.ui_builder").build_injected_html(dir, "index.html")
 		end)
 		os.execute("rm -rf '" .. dir .. "'")

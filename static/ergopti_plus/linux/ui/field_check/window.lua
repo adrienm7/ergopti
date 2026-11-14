@@ -36,7 +36,7 @@ end
 --- @param spec table The check's spec (supplies the environment).
 --- @return table
 local function native(spec)
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	local Shell = require("adapters.shell_runner")
 	return {
 		translate = I18n.get,

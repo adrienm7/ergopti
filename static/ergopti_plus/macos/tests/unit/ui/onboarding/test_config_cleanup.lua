@@ -12,7 +12,7 @@ local function with_host(controls, run)
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	local stubs = {
 		["infra.logger"] = logger,
-		["infra.i18n"] = { get = function(key) return key end },
+		["core.i18n.engine.i18n"] = { get = function(key) return key end },
 		["core.fs.engine.paths"] = { shared = function(path) return "/shared/" .. path end },
 		["settings.engine.migration.cleanup_session"] = { new = function(options)
 			if real_session then

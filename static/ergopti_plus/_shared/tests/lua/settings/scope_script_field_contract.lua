@@ -3,9 +3,9 @@
 --- Declared locale and error-flag native owners preserve their actual consumers.
 return function(helpers, driver)
 	local function with_native(kind, callback)
-		local name = kind == "locale" and "infra.i18n"
+		local name = kind == "locale" and "core.i18n.engine.i18n"
 			or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
-		local saved, names = {}, { name, "infra.locale", "core.i18n.engine.core", "core.fs.adapters.storage" }
+		local saved, names = {}, { name, "core.i18n.engine.locale", "core.i18n.engine.core", "core.fs.adapters.storage" }
 		for _, module in ipairs(names) do saved[module] = package.loaded[module]; package.loaded[module] = nil end
 		local writes = 0
 		local values = { locale = "fr", i18n_locale = "fr", ["script.show_error_dialog"] = true }
@@ -44,7 +44,7 @@ return function(helpers, driver)
 			local native = require(name)
 			local backend
 			if kind == "locale" then
-				backend = require("infra.locale")
+				backend = require("core.i18n.engine.locale")
 				if driver == "macos" then native.set_locale_injector(backend.set_locale) end
 				native.init()
 			end
@@ -103,7 +103,7 @@ return function(helpers, driver)
 			end)
 			helpers.it("keeps exact live-parent admission through an equal-valued module replacement", function()
 				with_native(kind, function(native)
-					local name = kind == "locale" and "infra.i18n"
+					local name = kind == "locale" and "core.i18n.engine.i18n"
 						or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
 					local owner = token()
 					helpers.assert_eq(native.scope_acquire(owner), true)

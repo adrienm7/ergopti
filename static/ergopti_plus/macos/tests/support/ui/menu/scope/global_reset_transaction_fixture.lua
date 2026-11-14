@@ -22,7 +22,7 @@ local MODULE_KEYS = {
 	"infra.notifications",
 	"ui.hotstring_editor",
 	"infra.text_utils",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.ui_restore",
 	"infra.preferences",
 	"ui.menu.builder",
@@ -312,7 +312,7 @@ local function with_menu_fixture(options, callback)
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.preferences"] = {
 		build_initial_state = function() return state end,

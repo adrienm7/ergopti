@@ -67,7 +67,7 @@ helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 		local builtins = Selector.load_built_in_profiles()
 		for _, profile in ipairs(builtins) do profile.label = "Label of " .. profile.id end
 		local custom = { id = "custom_42", label = "My {n} prompt{s}", system_single = "{context}" }
-		local i18n = package.loaded["infra.i18n"]
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get = i18n.get
 		local ok, err = pcall(helpers.with_fresh_modules, {
 			"modules.llm", "modules.llm.prediction_engine", "ui.menu.menu_llm.profile_label",
@@ -110,6 +110,6 @@ helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 
 	helpers.it("refuses with the llm_prompt error text", function()
 		helpers.assert_eq(Actions.parameter_error("llm_prompt_prediction"),
-			package.loaded["infra.i18n"].get("dialog.gestures.param_err_llm_prompt"))
+			package.loaded["core.i18n.engine.i18n"].get("dialog.gestures.param_err_llm_prompt"))
 	end)
 end)

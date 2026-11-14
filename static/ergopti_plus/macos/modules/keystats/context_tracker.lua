@@ -21,7 +21,7 @@
 
 local hs     = hs
 local Logger = require("infra.logger")
-local i18n   = require("infra.i18n")
+local i18n   = require("core.i18n.engine.i18n")
 local SecureFieldDetector = require("adapters.secure_field_detector")
 local TimerScheduler = require("core.events.timer_scheduler")
 local TriggerRoi = require("metrics.engine.privacy.trigger_roi")

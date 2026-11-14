@@ -18,7 +18,7 @@ function M.new()
 		platform = "hs",
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = require("core.text.engine.json").decode,
-		i18n = require("infra.i18n"), logger = helpers.make_logger_stub(),
+		i18n = require("core.i18n.engine.i18n"), logger = helpers.make_logger_stub(),
 	}))
 end
 

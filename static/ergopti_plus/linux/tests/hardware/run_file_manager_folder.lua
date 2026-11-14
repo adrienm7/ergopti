@@ -45,7 +45,7 @@ elseif mode == "new_file" then
 		end,
 	})
 	if before and #revealed == 1 then
-		local base = require("infra.i18n").get("system_actions.new_text_file_name")
+		local base = require("core.i18n.engine.i18n").get("system_actions.new_text_file_name")
 		local path = revealed[1]:match("file://([^']+)'")
 		io.write("created\t", tostring(path and path:gsub("%%(%x%x)", function(hex)
 			return string.char(tonumber(hex, 16))

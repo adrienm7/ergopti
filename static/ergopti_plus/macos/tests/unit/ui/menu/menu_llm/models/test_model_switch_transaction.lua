@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"infra.logger",
-	"infra.i18n",
+	"core.i18n.engine.i18n",
 	"infra.dialog_util",
 	"infra.notifications",
 	"ui.menu.menu_llm.profile_label",
@@ -52,7 +52,7 @@ local function with_fixture(spec, body)
 			return base_callback(module_name, label, callback, ...)
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function() return "button.confirm" end,
 		}

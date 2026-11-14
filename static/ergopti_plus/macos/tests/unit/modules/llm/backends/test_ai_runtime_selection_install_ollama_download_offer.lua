@@ -41,7 +41,7 @@ local task_api = Fixture.task_api
 
 helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 	local function load_offer(choice_key, record)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		package.loaded["infra.dialog_util"] = {
 			block_alert = function(...)
 				record.dialogs = record.dialogs + 1
@@ -98,7 +98,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		record_native_installs(checker, record)
 		helpers.assert_true(Offer.select_ollama(function() end))
 		helpers.assert_eq(record.dialogs, 1)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_eq(record.dialog_history[1][1], i18n.get("ollama.native_offer_title"))
 		helpers.assert_eq(record.dialog_history[1][2], string.format(i18n.get("ollama.native_offer_body"), "0.40.6"),
 			"the offer names the version Ergopti pins")
@@ -118,7 +118,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_eq(#record.state.tasks, 0, "a decline never downloads")
 		helpers.assert_eq(#record.urls, 0)
 		helpers.assert_eq(#record.notices, 1)
-		helpers.assert_eq(record.notices[1].body, require("infra.i18n").get("ollama.runtime_missing_body"))
+		helpers.assert_eq(record.notices[1].body, require("core.i18n.engine.i18n").get("ollama.runtime_missing_body"))
 	end))
 
 	helpers.it("a user's own Ollama is never reused, run or touched (ollama-owned-runtime)", scoped(function()
@@ -202,7 +202,7 @@ helpers.describe("Ollama download offer (ai-runtime-offer)", function()
 		helpers.assert_true(Offer.notify_if_missing("ollama"))
 		helpers.assert_eq(#record.notices, 1)
 		helpers.assert_eq(record.notices[1].body,
-			require("infra.i18n").get("ollama.runtime_missing_click"),
+			require("core.i18n.engine.i18n").get("ollama.runtime_missing_click"),
 			"the notice used to name the menu row to select, with no action of its own")
 		helpers.assert_not_nil(record.notices[1].on_click,
 			"the notice carries the click that opens its fix")

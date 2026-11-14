@@ -227,7 +227,7 @@ local MENU_ROWS_FILE = os.getenv("ERGOPTI_E2E_MENU_ROWS")
 --- @param items table Top-level rows the tray was handed.
 --- @return string receipt
 local function agent_receipt(items)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local agent_title, ai_title = i18n.get("menu.agent.title"), i18n.get("menu.llm.title")
 	local function actions(row)
 		local n = type(row.fn) == "function" and 1 or 0

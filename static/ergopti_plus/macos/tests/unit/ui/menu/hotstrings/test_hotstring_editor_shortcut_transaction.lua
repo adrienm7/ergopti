@@ -79,7 +79,7 @@ local function run_menu_action(raw, outcome)
 
 	local ok, fixture_or_err = xpcall(function()
 		local Custom = require("ui.menu.menu_hotstrings_custom")
-		local shortcut_prefix = require("infra.i18n").get("menu.hotstrings.shortcut_prefix")
+		local shortcut_prefix = require("core.i18n.engine.i18n").get("menu.hotstrings.shortcut_prefix")
 		helpers.assert_true(type(shortcut_prefix) == "string" and shortcut_prefix ~= "",
 			"the localized shortcut prefix must be available")
 		local ctx = {
@@ -297,7 +297,7 @@ end)
 --- @param timer_result boolean|nil Actual scheduler receipt.
 --- @return table observation Recorded native admissions.
 local function editor_observation(vector, deferred_pause, timer_result, label_key)
-	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "core.fs.engine.paths", "infra.i18n" }, function()
+	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n" }, function()
 		local calls, scheduled, callback = 0, 0, nil
 		local current = vector.initial_paused
 		package.loaded["core.events.timer_scheduler"] = {
@@ -332,7 +332,7 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 			declaration[1].i18n = label_key
 		end
 		local built = Custom.build_custom(ctx, { group_counts = {} })
-		local wanted = require("infra.i18n").get(label_key or "menu.hotstrings.open_editor")
+		local wanted = require("core.i18n.engine.i18n").get(label_key or "menu.hotstrings.open_editor")
 		local found
 		for _, row in ipairs(built.submenu) do if row.title == wanted then found = row end end
 		assert(found, "the shared personal editor command must be reachable")

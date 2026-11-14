@@ -39,15 +39,15 @@ local helpers = require("tests.helpers")
 local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 -- Rebound rather than required: `infra.manifest_menu` captures the i18n MODULE
--- TABLE when it is loaded, and tests/unit/infra/i18n/test_i18n_persistence.lua wipes
--- `package.loaded["infra.i18n"]` nine times. Whichever of them ran first, the
+-- TABLE when it is loaded, and tests/unit/core/i18n/test_persistence.lua wipes
+-- `package.loaded["core.i18n.engine.i18n"]` nine times. Whichever of them ran first, the
 -- renderer would then be resolving labels against an i18n instance this file
 -- cannot see, and every comparison below would be between two different
 -- catalogues. Production is unaffected — `set_locale` mutates the module in
 -- place and nothing there ever wipes the cache — so this is the harness being
 -- made to agree with itself, not a defect being worked around.
 local ManifestMenu = helpers.load_module("infra.manifest_menu")
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 
 -- The platform token this driver is declared under in the manifest.
 local PLATFORM = "linux"
@@ -231,7 +231,7 @@ end
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
 		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
-		"infra.i18n", "infra.manifest_menu"}
+		"core.i18n.engine.i18n", "infra.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
@@ -287,7 +287,7 @@ local function build_fixture_menu(context)
 		package.loaded["ui.menu.key_combinations"] = nil
 		-- Native delegates retain module tables. This fixture's new producer must
 		-- share the exact current locale/manifest cohort used by its assertions.
-		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		package.loaded["core.i18n.engine.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
 		helpers.load_module("ui.gesture_conflicts")
 		local built = with_live_source(context, function()
 			return with_api_source(function(builder) return builder.build(context) end)
@@ -514,7 +514,7 @@ local function with_agent_declaration(component, body)
 	local renderer, build, group_row, root, top, agent_index, public_agent, file
 	local ok, result = xpcall(function()
 		-- Use the same genuine locale/manifest cohort as all original assertions.
-		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		package.loaded["core.i18n.engine.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
 		renderer = require("infra.manifest_menu")
 		build, group_row = renderer.build, renderer.group_row
 		root = renderer.get_root(); top = root and root.top_level
@@ -870,9 +870,9 @@ local function absent_module_corpus()
 end
 
 local function with_absent_current(scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
-	local native = require("infra.i18n")
+	local native = require("core.i18n.engine.i18n")
 	helpers.assert_true(rawequal(native, i18n), "the original caption reader is the genuine current cohort")
 	helpers.assert_true(rawequal(require("infra.manifest_menu"), ManifestMenu))
 	local before = native.get_locale()
@@ -896,12 +896,12 @@ end
 -- Own a fresh, initialized native cohort for these new projections, then restore
 -- the exact predecessor modules and file-local readers even if construction raises.
 local function with_absent_english(scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local prior_i18n, prior_manifest = i18n, ManifestMenu
 	local ok, result = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		local native = require("infra.i18n")
+		local native = require("core.i18n.engine.i18n")
 		native.init()
 		i18n = native
 		ManifestMenu = require("infra.manifest_menu")
@@ -1349,12 +1349,12 @@ end)
 
 -- The actual initialized locale owner and root renderer, restored as one private cohort.
 local function language_parent_native(language, scenario)
-	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 	local previous_i18n, previous_manifest = i18n, ManifestMenu
 	local ok, detail = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		i18n = require("infra.i18n"); i18n.init()
+		i18n = require("core.i18n.engine.i18n"); i18n.init()
 		local owner = { pending = function() return false end }
 		assert(i18n.scope_acquire(owner))
 		local receipt = assert(i18n.scope_capture(owner))

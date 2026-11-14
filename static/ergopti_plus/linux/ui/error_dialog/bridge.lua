@@ -189,7 +189,7 @@ function M.report(record, complete, current)
 		return nil
 	end
 	local shared = require("diagnostics.engine.healthcheck.share").document(fields.snapshot, fields.documents.schema,
-		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
+		require("core.i18n.engine.i18n").get(fields.documents.schema.share_policy.notice_key))
 	if not owned() then return nil end
 	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
@@ -207,7 +207,7 @@ local function init_message(session)
 	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 	-- This pane promises the exact projected document used by Copy and Report.
 	message.text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
-		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key)).text
 	return message
 end
 
@@ -248,13 +248,13 @@ local function open_window()
 	-- The close hook normally clears the old request, but can admit a new one.
 	if (_pending ~= nil and _pending ~= record) or not M.is_enabled() then return false end
 	_busy, _pending = true, record
-	local opened = manager.show(APP, require("infra.i18n").get_locale())
+	local opened = manager.show(APP, require("core.i18n.engine.i18n").get_locale())
 	-- Native callbacks may close this request and open a successor before show returns.
 	if _pending ~= record then return false end
 	if not opened then
 		-- Without a window (no WebKitGTK, no display) the error is announced and
 		-- stays in the errors file
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		require("adapters.application_notifier").send(record.message,
 			{ title = I18n.get("common.error_title"), level = "error" })
 		Logger.warn(LOG, "The error window could not open; the error was announced by a notification.")
@@ -319,7 +319,7 @@ local function perform(name, context)
 	local shared
 	if name == "copy" or name == "report" then
 		shared = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
-			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key))
 	end
 	if name == "copy" then
 		action = { action = "copy", text = shared.text }

@@ -87,14 +87,14 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 					"the prompt lists '" .. id .. "': " .. prompt)
 			end
 			helpers.assert_true(prompt:find("rewrite \226\128\148 "
-				.. require("infra.i18n").get("llm.profile.rewrite.label"), 1, true) ~= nil,
+				.. require("core.i18n.engine.i18n").get("llm.profile.rewrite.label"), 1, true) ~= nil,
 				"each line carries the menu label")
 		end)
 	end)
 
 	helpers.it("the refusal is the kind's own", function()
 		helpers.assert_eq(Gestures.get_action_parameter_error(ACTION),
-			require("infra.i18n").get("dialog.gestures.param_err_llm_prompt"))
+			require("core.i18n.engine.i18n").get("dialog.gestures.param_err_llm_prompt"))
 	end)
 
 	helpers.it("the picker's editor gets every parameterized row, the prompt choices and the menu count", function()
@@ -121,13 +121,13 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 				"the built-ins in menu order, then the user's own")
 			helpers.assert_eq(fields.prompt_choices[12].label, "Mine", "a user prompt shows its own label")
 			helpers.assert_eq(fields.prompt_choices[5].label,
-				require("infra.i18n").get("llm.profile.rewrite.label"), "a built-in shows its menu label")
+				require("core.i18n.engine.i18n").get("llm.profile.rewrite.label"), "a built-in shows its menu label")
 			helpers.assert_eq(fields.parameter_strings.prompts.llm_prompt,
 				Gestures.get_action_parameter_prompt(ACTION))
 			helpers.assert_eq(fields.parameter_strings.errors.llm_prompt,
 				Gestures.get_action_parameter_error(ACTION))
 			helpers.assert_eq(fields.parameter_strings.prompts.url, nil, "the page does not edit a URL")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(fields.edit_current_label, i18n.get("dialog.action_picker.edit_current"))
 			helpers.assert_eq(fields.parameter_strings.promptLabel, i18n.get("dialog.action_picker.prompt_label"))
 			helpers.assert_eq(fields.parameter_strings.countLabel, i18n.get("dialog.action_picker.count_label"))

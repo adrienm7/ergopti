@@ -97,7 +97,7 @@ local function _build_initial_payload(state, captured)
 			hint = alias and ("(@" .. alias .. trigger .. ")") or "",
 		}
 	end
-	local i18n = dependency(state, "i18n", "infra.i18n")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	local function translated(key)
 		return i18n and type(i18n.get) == "function" and i18n.get(key) or key
 	end

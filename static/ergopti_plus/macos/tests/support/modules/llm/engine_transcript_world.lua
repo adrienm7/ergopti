@@ -127,8 +127,8 @@ function M.with_world(config, body)
 	}
 
 	-- The harness' i18n stub echoes keys: the labels the info bar shows are the real ones.
-	local i18n = package.loaded["infra.i18n"]
-	local Locale = require("infra.locale")
+	local i18n = package.loaded["core.i18n.engine.i18n"]
+	local Locale = require("core.i18n.engine.locale")
 	local saved_get = i18n.get
 	i18n.get = function(key) return Locale.get(key) or key end
 

@@ -127,7 +127,7 @@ local DUPLICATE_RECORDS = {
 --- @return table controls, table context, table observations
 local function menu_controls(Settings, paused, reordered)
 	local paths = require("core.fs.engine.paths")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
 	local renderer = assert(require("menu.engine.renderer").new({
@@ -213,7 +213,7 @@ end
 --- @param key string Independent translation identity.
 --- @return table|nil row
 local function custom_delete_row(rows, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(rows or {}) do
 		if type(row.title) == "string" and row.title:gsub("^%s+", "") == text then return row end
 	end

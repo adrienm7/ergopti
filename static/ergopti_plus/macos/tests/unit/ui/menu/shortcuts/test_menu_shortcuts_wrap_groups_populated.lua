@@ -58,7 +58,7 @@ wrap_file:close()
 local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "infra.i18n", "core.fs.engine.paths",
+		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
 		"infra.logger", "infra.dialog_util", "modules.shortcuts.actions.text",
 		"ui.menu.menu_utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
@@ -66,7 +66,7 @@ local function with_wrap_controls(options, callback)
 		local renderer = helpers.load_with_stubs("infra.manifest_menu")
 		-- Keys read as themselves, except the label-value join, the French template.
 		local translations = { ["common.label_value"] = "{1} : {2}" }
-		package.loaded["infra.i18n"].get = function(key) return translations[key] or key end
+		package.loaded["core.i18n.engine.i18n"].get = function(key) return translations[key] or key end
 		local calls = { saves = 0, updates = 0, prompts = 0 }
 		local responses = options.responses or {}
 		package.loaded["infra.dialog_util"] = {
@@ -295,7 +295,7 @@ helpers.describe("independent complete fixed wrap declaration coverage", functio
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(Renderer.new({ platform = platform,
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end, json_decode = WrapJson.decode,
-					i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub() }))
+					i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub() }))
 				for _, section in ipairs(wrap_expectations.sections) do
 					local definitions = renderer.get_array(section.section)
 					helpers.assert_eq(#definitions, #section.rows)
@@ -579,14 +579,14 @@ local function with_shortcut_presentation(language, scenario)
 	local names = {
 		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
-		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.renderer", "infra.logger",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "infra.logger",
 		"infra.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("infra.manifest_menu")
-		package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
-		local locale = require("infra.locale")
-		local native_i18n = require("infra.i18n")
+		package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"] = nil, nil
+		local locale = require("core.i18n.engine.locale")
+		local native_i18n = require("core.i18n.engine.i18n")
 		native_i18n.set_locale_injector(function(code) locale.set_locale(code) end)
 		native_i18n.init()
 		local owner = { pending = function() return false end }

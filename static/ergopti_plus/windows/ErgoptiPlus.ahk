@@ -542,11 +542,11 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/sticky_modifiers.ahk
 ; i18n layer — must come after toml_loader.ahk (TOML_BatchWrite), logger.ahk, and json.ahk.
 ; locale.ahk (string loading + t()) precedes i18n.ahk (locale management), which calls into it.
-#Include infra/locale.ahk
+#Include core/i18n/engine/locale.ahk
 #Include _generated/gesture_emit_actions.ahk
 #Include _generated/action_catalogue.ahk
 #Include _generated/locale_table.ahk
-#Include infra/i18n.ahk
+#Include core/i18n/engine/i18n.ahk
 #Include ui/onboarding/init.ahk
 BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include infra/hotstrings/hotstrings_config.ahk

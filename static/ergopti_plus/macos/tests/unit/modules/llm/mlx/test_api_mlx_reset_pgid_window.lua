@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
+	"infra.logger", "infra.notifications", "core.i18n.engine.i18n", "infra.config_paths",
 	"infra.text_utils", "infra.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"adapters.http_client", "core.fs.adapters.json_codec", "adapters.shell_runner",
 	"core.events.timer_scheduler", "modules.llm.profiles",
@@ -58,7 +58,7 @@ local function with_api(scenario)
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}, { __index = function() return noop end })
 		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
 		package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
 		package.loaded["infra.timings"] = { sec = function() return 1 end }

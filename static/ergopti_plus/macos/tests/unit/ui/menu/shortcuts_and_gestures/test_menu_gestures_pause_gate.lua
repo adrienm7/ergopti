@@ -25,7 +25,7 @@ local function with_toggle_fixture(previous, options, body)
 	options = options or {}
 	local names = {
 		"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "ui.action_picker",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
 		"ui.menu.shortcut_utils", "infra.logger", "ui.menu.menu_gestures",
 	}
 	local saved = {}
@@ -63,7 +63,7 @@ local function with_toggle_fixture(previous, options, body)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 	-- The switch is the command registered for the manifest's gestures_toggle
 	-- row, captured where the menu hands it to the renderer.
 	local render_ctx = nil

@@ -21,7 +21,7 @@ local AXIS   = { "swipe_3_horiz", "swipe_4_horiz" }
 local function with_commands(body)
 	local names = {
 		"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "ui.action_picker",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
 		"ui.menu.shortcut_utils", "infra.logger", "ui.menu.menu_gestures",
 	}
 	local saved = {}
@@ -55,7 +55,7 @@ local function with_commands(body)
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
 	package.loaded["infra.dialog_util"] = {}
-	package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 	local render_ctx = nil
 	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
 		render_ctx = ctx

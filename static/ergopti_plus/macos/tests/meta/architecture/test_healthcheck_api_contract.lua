@@ -53,7 +53,7 @@ local CONTRACT = {
 	{ mod = "core.fs.adapters.json_codec",              fns = { "decode" } },
 	{ mod = "adapters.clipboard",               fns = { "write" } },
 	{ mod = "adapters.notifier",                fns = { "send" } },
-	{ mod = "infra.locale",                     fns = { "all" } },
+	{ mod = "core.i18n.engine.locale",                     fns = { "all" } },
 	{ mod = "infra.manifest_reader",            fns = { "coverage_gaps" } },
 	{ mod = "adapters.network_info",            fns = { "getSignalStrength" } },
 	{ mod = "ui.ui_builder",                    fns = { "build_injected_html", "get_app_geometry", "window_title",

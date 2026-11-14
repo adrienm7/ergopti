@@ -189,7 +189,7 @@ end
 --- @param path string|nil The report path, shown when saved.
 local function _notify(saved, path)
 	pcall(function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local Notifier = require("adapters.notifier")
 		if saved then
 			Notifier.send(path, { title = i18n.get("crash.report.saved_title"), level = "info" })

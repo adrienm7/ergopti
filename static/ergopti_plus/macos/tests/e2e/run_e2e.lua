@@ -181,7 +181,7 @@ local function make_vkb(trigger, replacement, opts, others)
 	-- they MUST be in the same load wave as Expander.
 	package.loaded["infra.logger"]                 = nil
 	package.loaded["infra.text_utils"]             = nil
-	package.loaded["infra.i18n"]                   = nil
+	package.loaded["core.i18n.engine.i18n"]                   = nil
 	package.loaded["modules.keymap.terminators"] = nil
 	package.loaded["modules.keymap.utils"]       = nil
 	package.loaded["modules.keymap.registry"]    = nil

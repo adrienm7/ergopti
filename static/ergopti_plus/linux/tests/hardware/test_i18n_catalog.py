@@ -24,7 +24,7 @@ paths.shared = function(name)
   end
   return original(name)
 end
-local i18n = require('infra.i18n')
+local i18n = require('core.i18n.engine.i18n')
 local ok, codes = pcall(i18n.list_locales)
 local retained = false
 local unavailable_refused = not ok and i18n.persist_locale('en') == false

@@ -29,7 +29,7 @@
 
 local M = {}
 
-local i18n           = require("infra.i18n")
+local i18n           = require("core.i18n.engine.i18n")
 local Logger         = require("infra.logger")
 local DeferredWork   = require("infra.deferred_work")
 local Timings        = require("infra.timings")

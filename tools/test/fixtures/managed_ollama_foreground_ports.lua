@@ -25,7 +25,7 @@ function M.new(root, production, options)
 	modules["infra.logger"] = logger
 	modules["infra.text_utils"] = text_utils
 	modules["infra.notifications"] = { notify = function() return true end }
-	modules["infra.i18n"] = { get = function(key) return key end }
+	modules["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	modules["modules.llm.parser"], modules["modules.llm.profiles"] = {}, {}
 	modules["modules.llm.progressive_reveal"], modules["ai.engine.ollama.local_model_policy"] = {}, {}
 	modules["modules.llm.api_common"] = { DEFAULT_DEDUPLICATION_ENABLED = true,

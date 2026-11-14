@@ -42,7 +42,7 @@ end
 --- @param row_key string i18n key of the row label.
 --- @return table|nil row
 local function configuration_row(ctx, row_key)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	package.loaded["ui.menu.builder"] = nil
 	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string"
@@ -88,7 +88,7 @@ local function zenity_text(command)
 end
 
 helpers.describe("Configuration restore and clear failure reason (Linux)", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local cases = {
 		{ point = "rollback", kind = "rollback_pending", failed = "llm", reverted = false },
 		{ point = "finalize", kind = "release_refused", failed = "gestures" },
