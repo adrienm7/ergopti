@@ -23,7 +23,7 @@ local M = {}
 
 local hs       = hs
 local utf8     = utf8
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 local Timings  = require("infra.timings")
 local WPMActivity = require("metrics.engine.wpm.activity")
 local Manifest = require("infra.manifest_reader")

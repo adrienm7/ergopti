@@ -13,7 +13,7 @@ local State = require("modules.keymap.one_shot_shift")
 local Keycodes = require("platform.input.keycodes.core")
 local Timer = require("core.events.timer_scheduler")
 local SyntheticInput = require("adapters.synthetic_input")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
 local CapsWordOutput = require("infra.capsword_output")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",

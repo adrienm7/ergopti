@@ -10,14 +10,14 @@ local helpers = require("tests.helpers")
 
 local function with_core(callback)
 	return helpers.with_stub_scope({
-		"modules.llm", "modules.llm.profiles", "ai.engine.settings.profile_selector", "infra.logger",
+		"modules.llm", "modules.llm.profiles", "ai.engine.settings.profile_selector", "core.logger.engine.logger",
 	}, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...)
 			errors[#errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.llm.profiles"] = nil
 		package.loaded["ai.engine.settings.profile_selector"] = nil
 		return callback(helpers.load_with_stubs("modules.llm"), errors)

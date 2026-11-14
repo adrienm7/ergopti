@@ -14,7 +14,7 @@ local BindingPublication = require("settings.engine.publication.binding_publicat
 
 local hs            = hs
 local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
+local Logger        = require("core.logger.engine.logger")
 local Paths         = require("core.fs.engine.paths")
 local Timings       = require("infra.timings")
 local i18n          = require("core.i18n.engine.i18n")

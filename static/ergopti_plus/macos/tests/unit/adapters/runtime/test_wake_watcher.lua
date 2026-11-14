@@ -53,16 +53,16 @@ helpers.describe("core.events.wake_watcher", function()
 
 	helpers.it("logs a throwing callback instead of losing it", function()
 		local errors = {}
-		local previous_logger = package.loaded["infra.logger"]
-		package.loaded["infra.logger"] = nil
-		local real_logger = require("infra.logger")
+		local previous_logger = package.loaded["core.logger.engine.logger"]
+		package.loaded["core.logger.engine.logger"] = nil
+		local real_logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(real_logger)
 		local spy = setmetatable({}, { __index = real_logger })
 		spy.error = function(_, fmt, ...)
 			local formatted, text = pcall(string.format, fmt, ...)
 			errors[#errors + 1] = formatted and text or tostring(fmt)
 		end
-		package.loaded["infra.logger"] = spy
+		package.loaded["core.logger.engine.logger"] = spy
 		local finished, err = pcall(function()
 			local Adapter, native = load_adapter()
 			local watcher = Adapter.new(function() error("boom in the wake handler") end)
@@ -72,7 +72,7 @@ helpers.describe("core.events.wake_watcher", function()
 			helpers.assert_eq(#errors, 1, "the throw is logged once")
 			helpers.assert_contains(errors[1], "boom in the wake handler", "with its message")
 		end)
-		package.loaded["infra.logger"] = previous_logger
+		package.loaded["core.logger.engine.logger"] = previous_logger
 		package.loaded["core.events.wake_watcher"] = nil
 		if not finished then error(err, 0) end
 	end)

@@ -18,7 +18,7 @@ local Input = require("infra.input_event")
 local Reader = require("adapters.evdev_reader")
 local Finder = require("modules.hotstrings.device_finder")
 local Layout = require("adapters.keyboard_layout")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local keyboards, paths, chars, rows = {}, {}, {}, {}
 local original_name, original_find = Names.VIRTUAL_KEYBOARD, Finder.find_devices

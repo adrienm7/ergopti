@@ -49,7 +49,7 @@ local source_directory = require("core.fs.engine.module_source_directory").captu
 
 -- Resolved softly, like toml_codec.writer: macOS has its ring-buffer logger,
 -- the Linux daemon and the LuaJIT runners use the shim.
-local _ok_log, Logger = pcall(require, "infra.logger")
+local _ok_log, Logger = pcall(require, "core.logger.engine.logger")
 if not _ok_log or type(Logger) ~= "table" then
 	Logger = require("core.logger.engine.shim")
 end

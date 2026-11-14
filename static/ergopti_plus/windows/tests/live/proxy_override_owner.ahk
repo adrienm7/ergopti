@@ -46,7 +46,7 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, Publis
 	return true
 }
 
-#Include ..\..\infra\tick_count.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
 #Include ..\..\infra\json.ahk
 #Include ..\..\core\crypto\crypto.ahk
 #Include ..\..\core\fs\adapters\file_system.ahk

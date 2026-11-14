@@ -12,7 +12,7 @@ local fixtures = require("tests.unit.modules.shortcuts.pause_owners.fixtures")
 local reset_module = fixtures.reset_module
 
 local function load_prediction_registry()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	reset_module("ui.menu.menu_llm.prediction_lock_registry")
 	local state = { llm_enabled = true }
 	local runtime = true
@@ -139,7 +139,7 @@ end)
 helpers.describe("HS-012 real warmup-controller pause snapshot", function()
 	local function load_controller()
 		local handles = {}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.timings"] = { sec = function() return 1 end }
 		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)

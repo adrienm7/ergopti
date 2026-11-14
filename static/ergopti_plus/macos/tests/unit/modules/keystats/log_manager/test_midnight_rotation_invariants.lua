@@ -34,7 +34,7 @@ local function drive_rotation(rollover_results, paused, ticks, split_results)
 	logger.error = function(_log, format, ...)
 		errors[#errors + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.keystats.log_manager"] = {
 		flush_buffer = function()
 			calls[#calls + 1] = "flush"
@@ -152,7 +152,7 @@ helpers.describe("keystats: behavioural midnight rotation invariants", function(
 			if format:find("Midnight rotation complete", 1, true) then successes = successes + 1 end
 		end
 		local attempts, recovering = 0, true
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.keystats.log_manager"] = {
 			ROLLOVER_WAITS_FOR_RECOVERY = "recovering",
 			flush_buffer = function() return true end,

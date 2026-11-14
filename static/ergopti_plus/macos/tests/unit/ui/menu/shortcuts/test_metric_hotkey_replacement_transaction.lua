@@ -31,7 +31,7 @@ local function load_fixture(legacy)
 	local bindings = {}
 	local bind_refused = false
 	local unbind_refusals = {}
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 	hs_stub.timer = {
 		new = function(_delay, callback)
@@ -47,7 +47,7 @@ local function load_fixture(legacy)
 		secondsSinceEpoch = function() return 100 end,
 	}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
 	package.loaded["infra.text_utils"] = {

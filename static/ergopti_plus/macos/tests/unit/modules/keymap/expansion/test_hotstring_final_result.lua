@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local _     = helpers.load_with_stubs("infra.logger")
+local _     = helpers.load_with_stubs("core.logger.engine.logger")
 local State = helpers.load_with_stubs("modules.keymap.state")
 
 --- Reads the shared corpus.

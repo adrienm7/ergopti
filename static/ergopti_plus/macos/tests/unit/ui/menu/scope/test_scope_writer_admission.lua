@@ -28,11 +28,11 @@ helpers.describe("scope writer admission", function()
 	-- during the reload it triggered was a WARNING; it is expected, so INFO.
 	helpers.it("logs a writer refused during a reload or quit at INFO, a failed proof at WARNING", function()
 		local levels = {}
-		helpers.with_stub_scope({ "infra.logger", "ui.menu.global_actions_transaction" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "ui.menu.global_actions_transaction" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.info = function(_, message) levels[#levels + 1] = "info:" .. message end
 			logger.warn = function(_, message) levels[#levels + 1] = "warn:" .. message end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["ui.menu.global_actions_transaction"] = nil
 			local owner, controls = fixture()
 			controls.terminal = true

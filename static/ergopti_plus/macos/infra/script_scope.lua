@@ -18,7 +18,7 @@ local ALIAS_NAMES = {
 --- Native field owner module of each directly declared script row.
 local NATIVE_OWNERS = {
 	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
-	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "infra.logger",
+	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "core.logger.engine.logger",
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog",
 }
 
@@ -52,7 +52,7 @@ function M.adopt_configured()
 		path = require("infra.config_paths").get("ConfigTomlPath"),
 		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, platform = "hs",
 		aliases = adopted, storage = require("core.fs.adapters.storage"),
-		logger = require("infra.logger"), log = "script_scope" })
+		logger = require("core.logger.engine.logger"), log = "script_scope" })
 end
 
 --- Rewrites the config.toml row a menu or wizard change replaces, when the
@@ -66,7 +66,7 @@ function M.rewrite_configured(path, value)
 		path = require("infra.config_paths").get("ConfigTomlPath"),
 		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, key = path, value = value })
 	if committed ~= true then
-		require("infra.logger").error("script_scope", "%s was not changed: %s.", path, tostring(detail))
+		require("core.logger.engine.logger").error("script_scope", "%s was not changed: %s.", path, tostring(detail))
 	end
 	return committed == true
 end

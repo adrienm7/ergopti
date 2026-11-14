@@ -57,7 +57,7 @@ local function load_menu(start_result)
 		end
 	renderer.build = capture
 	package.loaded["infra.manifest_menu"] = renderer
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.wpm.wpm_menubar"] = {
 		start = function() ctx.menubar_starts = ctx.menubar_starts + 1 end,
 		stop = function() end, set_use_source_colors = function() end,

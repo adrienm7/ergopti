@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "adapters.own_window",
+	"core.logger.engine.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "adapters.own_window",
 	"adapters.synthetic_input", "ui.ui_builder", "modules.keymap", "infra.field_run_selftest",
 	"modules.keymap.utils",
 }
@@ -31,7 +31,7 @@ local now = 0
 local function run(world, keys, options)
 	world.emitted, world.published_at_key = {}, {}
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- A virtual clock: the earliest pending timer fires next.
 		local queue = {}
 		now = 0

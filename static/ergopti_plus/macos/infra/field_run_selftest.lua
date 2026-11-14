@@ -18,7 +18,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "infra.field_run_selftest"
 
 local _window_id = nil

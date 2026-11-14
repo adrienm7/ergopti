@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.events.timer_scheduler",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
 
@@ -91,7 +91,7 @@ local function load_fixture()
 	end
 
 	package.loaded["core.events.timer_scheduler"] = Scheduler
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["modules.diagnostics.hid_diagnostic_mailbox"] = nil
 	local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 

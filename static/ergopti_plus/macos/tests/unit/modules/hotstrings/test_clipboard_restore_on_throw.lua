@@ -49,7 +49,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 		helpers.with_stub_scope({
 			"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
 			"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
-			"core.fs.adapters.json_codec", "infra.logger", "core.fs.engine.paths", "infra.timings",
+			"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "infra.timings",
 		}, function()
 			local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })
 			local original = { ["public.utf8-plain-text"] = "USER CLIPBOARD", ["public.html"] = "<b>original</b>" }

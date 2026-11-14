@@ -16,7 +16,7 @@ local RESET_MODULES = {
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"adapters.synthetic_input", "adapters.event_provenance",
-	"infra.logger", "infra.perf",
+	"core.logger.engine.logger", "core.logger.engine.perf",
 	"infra.hotpath_profiler", "infra.manifest_reader", "infra.keycodes",
 }
 
@@ -205,7 +205,7 @@ local function load_fixture()
 		stop = function() mailbox_running = false; return true end,
 		is_running = function() return mailbox_running end,
 	}
-	package.loaded["infra.logger"] = api({
+	package.loaded["core.logger.engine.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
 		error = function(_, fmt, ...)
@@ -213,7 +213,7 @@ local function load_fixture()
 			callback_errors[#callback_errors + 1] = ok and message or tostring(fmt)
 		end,
 	})
-	package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
@@ -361,7 +361,7 @@ helpers.describe("keymap action epochs", function()
 
 	helpers.it("drops Shift attribution when the flags tap is recovered after an outage (shift-side-tap-outage)", function()
 		local fixture = load_fixture()
-		package.loaded["infra.logger"].pcall = function(_, fn, ...) return pcall(fn, ...) end
+		package.loaded["core.logger.engine.logger"].pcall = function(_, fn, ...) return pcall(fn, ...) end
 		fixture.taps[3].callback({ getKeyCode = function() return 56 end,
 			getFlags = function() return { shift = true } end })
 		helpers.assert_eq(fixture.keymap.get_shift_side(), "left")

@@ -495,7 +495,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 			nodes[name], queues[path] = path, {}
 		end
 		local clock_ms = 0
-		local stubbed = { "modules.hotstrings.device_finder", "adapters.xkb_capture", "infra.monotonic" }
+		local stubbed = { "modules.hotstrings.device_finder", "adapters.xkb_capture", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(stubbed) do saved[name] = package.loaded[name] end
 		package.loaded["modules.hotstrings.device_finder"] = {
@@ -511,7 +511,7 @@ helpers.describe("keyboard hook + tap-hold engine: a hold taken past the thresho
 			process = function() return nil, nil, nil end,
 			modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
 		}
-		package.loaded["infra.monotonic"] = {
+		package.loaded["core.logger.engine.monotonic"] = {
 			now_ms = function() return clock_ms end,
 			now_sec = function() return clock_ms / 1000 end,
 			backend = function() return "test" end,

@@ -75,14 +75,14 @@ local function new_harness()
 	local saved_absolute = hs.timer.absoluteTime
 	local saved_scheduler = package.loaded["core.events.timer_scheduler"]
 	local saved_timings = package.loaded["infra.timings"]
-	local saved_logger = package.loaded["infra.logger"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local debug_lines = {}
-	local real_logger = require("infra.logger")
+	local real_logger = require("core.logger.engine.logger")
 	local function record(fmt, ...)
 		local ok, line = pcall(string.format, fmt, ...)
 		debug_lines[#debug_lines + 1] = ok and line or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		debug = function(module_name, fmt, ...)
 			record(fmt, ...)
 			return real_logger.debug(module_name, fmt, ...)
@@ -221,7 +221,7 @@ local function new_harness()
 		hs.timer.absoluteTime = saved_absolute
 		package.loaded["core.events.timer_scheduler"] = saved_scheduler
 		package.loaded["infra.timings"] = saved_timings
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["modules.gestures.engine"] = nil
 		package.loaded["modules.gestures.frame_clock"] = nil
 	end

@@ -22,7 +22,7 @@ local M = {}
 local json = require("core.text.engine.json")
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ConfigKeys = require("settings.engine.keys")
 
 local _owned_writer = nil

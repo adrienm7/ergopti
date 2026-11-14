@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "managed_ollama_daemon"
 local Receipt = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 local MAX_PROTOCOL_BYTES = require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES

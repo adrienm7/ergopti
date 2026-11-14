@@ -40,7 +40,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "infra.logger", "infra.dialog_util",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "infra.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
@@ -66,7 +66,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 				end
 				return decoded
 			end, i18n = { get = translate, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
 		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, build = function(_, _, _, _, _, providers)

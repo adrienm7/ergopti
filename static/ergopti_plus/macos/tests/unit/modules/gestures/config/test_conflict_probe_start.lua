@@ -9,9 +9,9 @@
 local helpers = require("tests.helpers")
 
 local function with_probe(body)
-	helpers.with_fresh_modules({ "modules.gestures.conflicts", "adapters.shell_runner", "infra.logger" }, function()
+	helpers.with_fresh_modules({ "modules.gestures.conflicts", "adapters.shell_runner", "core.logger.engine.logger" }, function()
 		local tasks = {}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.shell_runner"] = { spawn = function(_, args, callback)
 			local task = { args = args, callback = callback, starts = 0, observers = {}, settled = false }
 			function task.start()

@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local Actions = helpers.load_with_stubs("modules.gestures.actions")
 
@@ -380,8 +380,8 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 	-- an actual acquisition failure through the real action registry rather than a
 	-- synthetic stub action.
 	local function make_actions_with_real_logger_and_throwing_timer()
-		package.loaded["infra.logger"] = nil
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local FreshLogger = helpers.load_with_stubs("core.logger.engine.logger")
 		FreshLogger.set_level("DEBUG")
 
 		local previous_aux = package.loaded["modules.gestures.actions_aux_owner"]

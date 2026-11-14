@@ -18,7 +18,7 @@ local function with_editor(module_name, callback)
 			module_name,
 			"ui.webview_controller_pool",
 			"ui.ui_builder",
-			"infra.logger",
+			"core.logger.engine.logger",
 			"core.fs.engine.paths",
 			"core.i18n.engine.i18n",
 			"hs",
@@ -28,7 +28,7 @@ local function with_editor(module_name, callback)
 			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
 			"infra.deferred_work", "core.lifecycle.engine.launcher_environment", "core.events.timer_scheduler", "app_dirs",
 			"lfs", "program_provider_picker", "diagnostics.engine.operation_reporter", "infra.config_paths",
-			"infra.log_folders", "program_parameter", "user_action_parameter", "text_utils", "adapters.program_providers",
+			"core.logger.engine.log_folders", "program_parameter", "user_action_parameter", "text_utils", "adapters.program_providers",
 			"core.fs.adapters.file_system", "json",
 			"infra.toml.codec", "toml_codec", "core.text.engine.toml_codec.codec", "core.text.engine.toml_codec.basic_string",
 			"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
@@ -67,7 +67,7 @@ local function with_editor(module_name, callback)
 				end
 				return true, table.unpack(results, 2, results.n)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.fs.engine.paths"] = {
 				shared = function(relative) return "/shared/" .. tostring(relative) end,
 			}

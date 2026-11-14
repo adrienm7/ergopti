@@ -100,10 +100,10 @@ end)
 local function signalled_failure(code, streamed)
 	local message, expected
 	local errors = {}
-	helpers.with_stub_scope({ "infra.logger" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger" }, function()
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		Fixture.scoped(function()
 			local state = Fixture.new_state()
 			local checker = Fixture.load_ollama_checker(state)

@@ -29,7 +29,7 @@ local function load_fixture(show_result)
 	logger.error = function(_, fmt, ...)
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.config_paths"] = {
 		is_initialized = function() return true end,
 		init = function()

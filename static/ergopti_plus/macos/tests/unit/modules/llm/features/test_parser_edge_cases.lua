@@ -44,7 +44,7 @@ end
 --- @param callback function Test body receiving the captured messages.
 --- @return table messages
 local function capture_parser_errors(callback)
-	local candidates = { require("infra.logger"), require("core.logger.engine.shim") }
+	local candidates = { require("core.logger.engine.logger"), require("core.logger.engine.shim") }
 	local patched = {}
 	local messages = {}
 	for _, logger in ipairs(candidates) do

@@ -9,7 +9,7 @@ local OWNED = {
 	"modules.llm.api_mlx_inference", "modules.llm.api_ollama", "modules.llm.api_common",
 	"modules.llm.mlx_stream_retirement", "modules.llm.ollama_endpoint", "modules.llm.parser",
 	"adapters.shell_runner", "core.events.timer_scheduler", "adapters.http_client", "core.fs.adapters.file_system",
-	"infra.logger", "infra.notifications", "infra.timings", "infra.text_utils",
+	"core.logger.engine.logger", "infra.notifications", "infra.timings", "infra.text_utils",
 	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "modules.keystats",
 	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.lifecycle.engine.compat.utf8", "infra.toml.reader", "core.text.engine.json",
 	"ai.engine.api.parser_core", "core.logger.engine", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
@@ -31,7 +31,7 @@ function M.with_stream(backend, callback)
 			errors = {}, successes = 0, failures = 0, allocations = 0 }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) h.errors[#h.errors + 1] = string.format(message, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.keystats"] = {}
 		local defaults_file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local defaults_raw = assert(defaults_file:read("*a")); assert(defaults_file:close())

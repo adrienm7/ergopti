@@ -19,7 +19,7 @@ local MODULES = {
 	"adapters.shell_runner",
 	"core.events.timer_scheduler",
 	"infra.config_paths",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.timings",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx_discovery",
@@ -41,7 +41,7 @@ local function with_fixture(run)
 	}
 	local effects = { raw_opens = {}, reads = 0, classifications = 0 }
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,

@@ -250,7 +250,7 @@ helpers.describe("keystats", function()
     it("exports zero rolling speed after the typing window expires", function()
       keystats.init({ sqlite_path = fresh_db() })
       require("tests.support.metrics_consent_fixture").enable(keystats)
-      local now = require("infra.monotonic").now_ms()
+      local now = require("core.logger.engine.monotonic").now_ms()
       local window = require("infra.timings").ms("keystats", "wpm_window_ms")
       local first = now - window - 2000
       keystats.on_keydown("a", first, "test-app")
@@ -822,7 +822,7 @@ end)
 -- typed zero milliseconds after the previous one.
 helpers.describe("linux-cross-flush-walk", function()
   it("linux-cross-flush-walk: the flushes carry one session, one word and the pair across the cut", function()
-    local Monotonic = require("infra.monotonic")
+    local Monotonic = require("core.logger.engine.monotonic")
     local previous_writer = package.loaded["modules.keystats.sqlite_writer"]
     local previous_now = Monotonic.now_ms
     local now = 10000
@@ -903,7 +903,7 @@ helpers.describe("linux-cross-flush-walk", function()
       local kl = require("modules.keystats.keystats")
       kl.init({})
       require("tests.support.metrics_consent_fixture").enable(kl)
-      local Monotonic = require("infra.monotonic")
+      local Monotonic = require("core.logger.engine.monotonic")
       local at = math.floor(Monotonic.now_ms())
       kl.on_keydown("a", at, "owned-stop")
       kl.on_keydown("b", at + 100, "owned-stop")
@@ -1032,7 +1032,7 @@ local function with_replayed_hotstring(options, callback)
   local names = { "modules.keystats.keystats", "modules.keystats.sqlite_writer", "core.fs.adapters.storage",
     "modules.hotstrings.injector", "adapters.keyboard_hook", "adapters.keyboard_layout", "adapters.xkb_capture" }
   local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
-  local Monotonic = require("infra.monotonic")
+  local Monotonic = require("core.logger.engine.monotonic")
   local previous_now, now = Monotonic.now_ms, 10000
   local world = { typing = {}, hotstrings = {}, groups = {}, app_days = {}, document = "", wire = {} }
   local injector

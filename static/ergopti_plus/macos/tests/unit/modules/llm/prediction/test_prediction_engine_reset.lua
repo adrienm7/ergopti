@@ -34,8 +34,8 @@ local helpers = require("tests.helpers")
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+package.loaded["core.logger.engine.logger"] = nil
+local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed. fetch_llm_prediction is

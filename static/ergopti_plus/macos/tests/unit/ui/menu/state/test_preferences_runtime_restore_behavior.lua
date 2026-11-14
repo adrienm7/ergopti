@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu preference rollback: restore runtime-owned values", function()
 	helpers.it("restores backend labels, ChatGPT URL, and a disabled editor shortcut", function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local noop = function() end
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = noop, info = noop, warn = noop, error = noop,
 		}
 		package.loaded["ui.menu.keymap_lifecycle"] = {

@@ -17,15 +17,15 @@ local function with_editor(scenario)
 	local result = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
 			"ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "adapters.webview_result",
-			"infra.deferred_work", "core.fs.engine.paths", "infra.logger", "core.i18n.engine.locale", "infra.log_folders",
+			"infra.deferred_work", "core.fs.engine.paths", "core.logger.engine.logger", "core.i18n.engine.locale", "core.logger.engine.log_folders",
 			"core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact", "core.ui.engine.window_titles",
-			"core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "adapters.log_transport", "core.fs.engine.app_dirs",
+			"core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport", "core.fs.engine.app_dirs",
 			"_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed", "tests.support.native_webview_close_fixture",
 		}, function()
 			local h = { windows = {}, retained = {}, deferred = {}, callbacks = {}, bridges = {}, saves = 0, unbinds = 0, errors = {}, native_delete_calls = 0 }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, text, ...) h.errors[#h.errors + 1] = string.format(text, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			local construct = require("tests.support.native_webview_close_fixture")(h)
 			local function new_window()
 				local view = construct()

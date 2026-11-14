@@ -79,7 +79,7 @@ helpers.describe("owned runtime driver approval watch", function()
 	-- MRT-006: hs.urlevent.openURL answers false when the pane did not open; only
 	-- a thrown error was reported, so a refused pane passed for an opened one.
 	helpers.it("reports a refused or unknown native pane opening (mrt-006)", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		local original = Logger.error
 		local cases = {
 			{ name = "true", opener = function() return true end, errors = 0 },

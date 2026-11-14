@@ -24,11 +24,11 @@ local CONTRACT_VERSION = "1.1.1"
 --- @param runtime_version string|nil
 --- @return table Healthcheck core module.
 local function load_healthcheck(runtime_version)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local logger = helpers.make_logger_stub()
 	logger.ring_buffer_snapshot = function() return {} end
 	logger.session_issues = function() return { warn_count = 0, err_count = 0 } end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local collectors = {}
 	for _, name in ipairs({
 		"collect_paths", "collect_versions", "collect_hardware", "collect_system", "collect_input",
@@ -43,7 +43,7 @@ local function load_healthcheck(runtime_version)
 end
 
 -- The modules each case replaces, restored after it
-local FIXTURE_MODULES = { "infra.logger", "ui.healthcheck.helpers", "adapters.system_info", "ui.healthcheck.core" }
+local FIXTURE_MODULES = { "core.logger.engine.logger", "ui.healthcheck.helpers", "adapters.system_info", "ui.healthcheck.core" }
 
 --- Runs body with the healthcheck core over empty collectors and a runtime.
 --- @param runtime_version string|nil

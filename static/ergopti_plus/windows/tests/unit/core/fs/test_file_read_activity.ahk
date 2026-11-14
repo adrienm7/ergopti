@@ -9,7 +9,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include %A_LineFile%\..\..\..\..\..\infra\file_read_activity.ahk
+#Include %A_LineFile%\..\..\..\..\..\core\logger\engine\file_read_activity.ahk
 _FRAI_Metadata() {
 	Path := A_ScriptDir . "\read-interlock-config.toml"
 	A := FileReadActivityEnter(Path)

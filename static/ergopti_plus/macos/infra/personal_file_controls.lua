@@ -15,7 +15,7 @@ local Paths = require("infra.config_paths")
 local pending
 
 local Recovery = require("hotstrings.engine.publication_recovery")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local function same(a, b)
 	return a.status == b.status and (a.status ~= "ok" or a.content == b.content)

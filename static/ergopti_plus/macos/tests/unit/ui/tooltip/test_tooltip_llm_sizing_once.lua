@@ -24,8 +24,8 @@ local helpers = require("tests.helpers")
 --- @return number width The fixed width the sizing committed.
 local function layouts_for(reserved, predictions)
 	local layouts, width = 0, nil
-	helpers.with_stub_scope({ "infra.logger", "ui.tooltip.renderer", "ui.tooltip.tooltip_llm" }, function()
-		helpers.load_with_stubs("infra.logger")
+	helpers.with_stub_scope({ "core.logger.engine.logger", "ui.tooltip.renderer", "ui.tooltip.tooltip_llm" }, function()
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["ui.tooltip.renderer"] = {
 			canvas = {
 				minimumTextSize = function()

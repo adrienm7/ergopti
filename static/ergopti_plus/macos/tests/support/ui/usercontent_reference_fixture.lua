@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 --- @param scenario function Receives the real picker and native observations.
 local function with_picker(scenario)
 	return helpers.with_stub_scope({
-		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "infra.logger",
+		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "core.logger.engine.logger",
 		"core.i18n.engine.i18n", "core.fs.engine.paths", "infra.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
 		"adapters.program_providers", "adapters.apple_shortcuts_native",
 	}, function()
@@ -22,7 +22,7 @@ local function with_picker(scenario)
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) h.errors[#h.errors + 1] = string.format(message, ...) end
 		logger.callback = function(_, _, callback, ...) return pcall(callback, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 		helpers.provide_timings()

@@ -19,7 +19,7 @@ local function load_probe(options)
 	options = options or {}
 	local spawns = {}
 	package.loaded["adapters.task_output_turn"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done, on_chunk)
 			local task = { executable = executable, args = args, on_done = on_done,
@@ -51,7 +51,7 @@ end
 --- Runs one case with every stubbed module restored afterwards.
 --- @param callback function Test body.
 local function with_probe(callback)
-	return helpers.with_stub_scope({ "adapters.task_output_turn", "adapters.shell_runner", "infra.logger" },
+	return helpers.with_stub_scope({ "adapters.task_output_turn", "adapters.shell_runner", "core.logger.engine.logger" },
 		callback)
 end
 

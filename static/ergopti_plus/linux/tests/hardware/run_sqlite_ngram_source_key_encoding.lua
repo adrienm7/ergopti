@@ -20,7 +20,7 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 assert(Clock.backend() == "luv.hrtime")
 local db = root .. "/metrics.sqlite"
 K.init({ sqlite_path = db, log_dir = root .. "/logs" })

@@ -5,7 +5,7 @@ local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 local function with_manager(body)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
-	local Process, Clock = require("adapters.owned_process"), require("infra.monotonic")
+	local Process, Clock = require("adapters.owned_process"), require("core.logger.engine.monotonic")
 	local start, now, execute = Process.start, Clock.now_ms, os.execute
 	local state = { paused = false, time = 1000, operations = {}, commands = {} }
 	local function record(command)

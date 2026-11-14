@@ -26,7 +26,7 @@ end
 local function load_menu_quit_action()
 	-- Reset the shared hs double before installing module doubles captured by
 	-- ui.menu.init at require time.
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
 	local stock_calls = { execute = 0, launch = 0, notifications = {}, timers = {}, clock = 0 }
@@ -68,7 +68,7 @@ local function load_menu_quit_action()
 		end,
 	}
 	package.loaded["ui.hotstring_editor"] = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.text_utils"] = {
 		shell_quote = function(value) return tostring(value) end,
 		escape_gsub_replacement = function(value) return tostring(value) end,

@@ -18,7 +18,7 @@ local Fixture = require("tests.support.adapters.runtime.timer_scheduler_fixture"
 --- @return function restore Restores the logger and returns the error count.
 local function load_scheduler(timer_stub)
 	local scheduler = helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
-	local logger = assert(package.loaded["infra.logger"], "the scheduler's logger must be loaded")
+	local logger = assert(package.loaded["core.logger.engine.logger"], "the scheduler's logger must be loaded")
 	local original, errors = logger.error, 0
 	logger.error = function() errors = errors + 1 end
 	return scheduler, function()

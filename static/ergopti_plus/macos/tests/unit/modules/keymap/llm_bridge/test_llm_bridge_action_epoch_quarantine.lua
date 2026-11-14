@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function load_fixture(reset_result)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 
 	local initial = { id = "initial" }
 	local current_token = initial
@@ -29,7 +29,7 @@ local function load_fixture(reset_result)
 	local tooltip_guard
 	local reset_hook
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.synthetic_input"] = {
 		current_action_epoch = function() return current_token end,
 	}

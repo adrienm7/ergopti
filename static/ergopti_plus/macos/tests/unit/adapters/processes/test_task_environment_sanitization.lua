@@ -185,10 +185,10 @@ helpers.describe("native task environment: launcher authority never reaches chil
 	helpers.it("sanitizes TaskLifecycle children before native start", function()
 		local factory, state = make_task_factory(true)
 		local saved_hs = rawget(_G, "hs")
-		local saved_logger = package.loaded["infra.logger"]
+		local saved_logger = package.loaded["core.logger.engine.logger"]
 		local saved_lifecycle = package.loaded["adapters.task_lifecycle"]
 		_G.hs = { task = { new = factory } }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.task_lifecycle"] = nil
 
 		local ok, err = xpcall(function()
@@ -201,7 +201,7 @@ helpers.describe("native task environment: launcher authority never reaches chil
 		end, debug.traceback)
 
 		_G.hs = saved_hs
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["adapters.task_lifecycle"] = saved_lifecycle
 		if not ok then error(err) end
 	end)
@@ -227,10 +227,10 @@ helpers.describe("native task environment: launcher authority never reaches chil
 	helpers.it("refuses TaskLifecycle construction after a silent native non-write", function()
 		local factory, state = make_task_factory("ignore")
 		local saved_hs = rawget(_G, "hs")
-		local saved_logger = package.loaded["infra.logger"]
+		local saved_logger = package.loaded["core.logger.engine.logger"]
 		local saved_lifecycle = package.loaded["adapters.task_lifecycle"]
 		_G.hs = { task = { new = factory } }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.task_lifecycle"] = nil
 
 		local ok, err = xpcall(function()
@@ -241,7 +241,7 @@ helpers.describe("native task environment: launcher authority never reaches chil
 		end, debug.traceback)
 
 		_G.hs = saved_hs
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["adapters.task_lifecycle"] = saved_lifecycle
 		if not ok then error(err) end
 	end)

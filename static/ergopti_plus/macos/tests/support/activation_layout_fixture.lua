@@ -22,7 +22,7 @@ local TOKENS = {
 }
 
 local STUB_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.config_paths",
 	"infra.timings",
 	"platform.remap.defaults",
@@ -130,7 +130,7 @@ local function with_remap(options, body)
 				}
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 		package.loaded["infra.config_paths"] = {
 			get = function() return "tests/unit/platform/remap/activation-layout-barrier.toml" end,

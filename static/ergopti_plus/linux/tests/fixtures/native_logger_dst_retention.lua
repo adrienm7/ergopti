@@ -13,7 +13,7 @@ os.date = function(format, stamp) return date(format, stamp or now) end
 package.loaded["infra.timings"] = { count = function(group, key)
 	assert(group == "logger" and key == "retention_days"); return 1
 end }
-local Sink = require("infra.logger_sink")
+local Sink = require("core.logger.engine.sink")
 local logger = { set_sink = function() end, enable_repeat_collapsing = function() end,
 	disable_repeat_collapsing = function() end }
 

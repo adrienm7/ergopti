@@ -15,14 +15,14 @@ local function with_editor(scenario)
 	local prior_hs = _G.hs
 	local records = { views = {}, bridges = {}, deletes = 0, errors = {} }
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.layer_editor", "ui.ui_builder", "infra.logger", "core.i18n.engine.i18n",
+		helpers.with_stub_scope({ "ui.layer_editor", "ui.ui_builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
 			"core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system", "infra.keycodes",
 			"platform.remap.nav_layer", "layouts.engine.layers.editor", "layouts.engine.layers.layers" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...)
 				records.errors[#records.errors + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.fs.engine.paths"] = {
 				shared_root = function() return helpers.shared() end,

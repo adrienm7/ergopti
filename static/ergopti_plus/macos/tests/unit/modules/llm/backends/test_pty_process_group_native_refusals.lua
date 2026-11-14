@@ -18,7 +18,7 @@ local function with_fixture(options, callback)
 	local original_open = io.open
 	local original_tmpname = os.tmpname
 	local original_remove = os.remove
-	local original_logger = package.loaded["infra.logger"]
+	local original_logger = package.loaded["core.logger.engine.logger"]
 	local original_module = package.loaded["modules.llm.pty_process_group"]
 	local fixture = {
 		write_mode = options.write_mode or "true",
@@ -72,7 +72,7 @@ local function with_fixture(options, callback)
 		return file
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm.pty_process_group"] = nil
 	local module = require("modules.llm.pty_process_group")
 	local ok, result = xpcall(function()
@@ -81,7 +81,7 @@ local function with_fixture(options, callback)
 	io.open = original_open
 	os.tmpname = original_tmpname
 	os.remove = original_remove
-	package.loaded["infra.logger"] = original_logger
+	package.loaded["core.logger.engine.logger"] = original_logger
 	package.loaded["modules.llm.pty_process_group"] = original_module
 	if not ok then error(result, 0) end
 	return result

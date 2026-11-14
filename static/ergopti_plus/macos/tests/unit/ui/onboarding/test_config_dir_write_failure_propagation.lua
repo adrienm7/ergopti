@@ -25,7 +25,7 @@ local function load_refusing_editor()
 	logger.error = function(_, fmt, ...)
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.config_paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/old/hammerspoon/config.toml" end,

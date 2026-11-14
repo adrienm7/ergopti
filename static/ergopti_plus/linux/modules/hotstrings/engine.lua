@@ -47,7 +47,7 @@ end
 -- match counter and (at DEBUG) timing span, kept here so the shared engine,
 -- which the other drivers load, carries no Linux-only instrumentation.
 local Shared = require("hotstrings.engine.matcher")
-local Perf = require("infra.perf_counters")
+local Perf = require("core.logger.engine.perf_counters")
 
 local M = setmetatable({}, { __index = Shared })
 

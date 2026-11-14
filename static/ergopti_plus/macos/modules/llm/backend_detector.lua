@@ -25,7 +25,7 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Storage = require("core.fs.adapters.storage")
 local SystemInfo = require("adapters.system_info")
 

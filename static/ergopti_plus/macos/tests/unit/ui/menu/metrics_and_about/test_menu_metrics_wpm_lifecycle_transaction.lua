@@ -76,7 +76,7 @@ local function load_menu(options)
 	if options.mutate_source then options.mutate_source(renderer.get_root()) end
 	if options.source_throw then renderer.get_root = function() error("actual source read refused") end end
 	package.loaded["infra.manifest_menu"] = renderer
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local menubar_start = options.menubar_start or function() return true end
 	local menubar_stop = options.menubar_stop or function() return true end

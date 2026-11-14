@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 local Gesture = require("tests.support.gesture_actions_fixture")
 local Native = require("tests.support.synthetic_input_fixture")
-require("infra.logger")
+require("core.logger.engine.logger")
 local M = {}
 function M.with_world(options, callback)
 	return helpers.with_stub_scope({ "adapters.window_manager", "core.ui.engine.native_app_switcher_owner",

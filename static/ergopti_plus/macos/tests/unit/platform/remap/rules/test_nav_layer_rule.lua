@@ -35,8 +35,8 @@ local Json      = require("core.text.engine.json")
 local TomlCodec = require("core.text.engine.toml_codec")
 local Layers    = require("layouts.engine.layers.layers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
 
 local LEGACY_PATH = helpers.driver_root() .. "/platform/remap/data/legacy_layer_keys.json"
@@ -425,8 +425,8 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
 			capture[level] = function() levels[#levels + 1] = level end
 		end
-		local saved_logger = package.loaded["infra.logger"]
-		package.loaded["infra.logger"] = capture
+		local saved_logger = package.loaded["core.logger.engine.logger"]
+		package.loaded["core.logger.engine.logger"] = capture
 		local ok, err = pcall(function()
 			local Fresh = helpers.load_with_stubs("platform.remap.nav_layer")
 			local layer = Fresh.load({ shared_root = helpers.shared(), config_dir = dir })
@@ -435,7 +435,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 			-- so no SUCCESS may follow it.
 			helpers.assert_eq(table.concat(levels, " "), "start warn error")
 		end)
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["platform.remap.nav_layer"] = nil
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
@@ -644,7 +644,7 @@ helpers.describe("navigation source close acknowledgement", function()
 			for _, level in ipairs({ "start", "success", "warn", "error" }) do
 				capture[level] = function() levels[#levels + 1] = level end
 			end
-			package.loaded["infra.logger"] = capture
+			package.loaded["core.logger.engine.logger"] = capture
 			package.loaded["platform.remap.nav_layer"] = nil
 			local Fresh = require("platform.remap.nav_layer")
 			local target = source == "user" and user_path or helpers.shared("layouts/data/keycodes/physical_keys.json")
@@ -765,8 +765,8 @@ helpers.describe("navigation configured input observations", function()
 		end
 		write(text)
 		local called, detail = xpcall(function()
-			helpers.with_stub_scope({ "platform.remap.nav_layer", "infra.logger" }, function()
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+			helpers.with_stub_scope({ "platform.remap.nav_layer", "core.logger.engine.logger" }, function()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["platform.remap.nav_layer"] = nil
 				local subject = require("platform.remap.nav_layer")
 				callback(subject, { shared_root = helpers.shared(), config_dir = directory }, write, path)
@@ -842,7 +842,7 @@ helpers.describe("navigation configured input observations", function()
 
 	helpers.it("nav-configured rejoins original source bytes after the load logger callback", function()
 		with_source(function(subject, options, write)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.success = function() write(text .. "# logger successor\n") end
 			local layer, observation = subject.load(options)
 			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))

@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks" }
 
 --- Loads the engine over a recording logger and a scripted check table.
 --- @param body function(Engine, world)
@@ -26,7 +26,7 @@ local function with_engine(body)
 		logger.info = function(_, message, ...)
 			world.info_lines[#world.info_lines + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.field_check_checks"] = { checks = {} }
 		package.loaded["infra.field_check"] = nil
 		local Engine = require("infra.field_check")

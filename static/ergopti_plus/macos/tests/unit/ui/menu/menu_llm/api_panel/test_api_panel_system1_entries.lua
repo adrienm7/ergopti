@@ -29,7 +29,7 @@ local CATALOGUE = (function()
 end)()
 
 local FRESH = {
-	"modules.llm", "core.i18n.engine.i18n", "infra.logger", "infra.dialog_util",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.dialog_util",
 	"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 }
 
@@ -83,7 +83,7 @@ local function install(args)
 		if key == "menu.llm.api_remove_confirm_title" then return "Remove %s?" end
 		return key
 	end }
-	package.loaded["infra.logger"] = { debug = function() end, info = function() end, warn = function() end,
+	package.loaded["core.logger.engine.logger"] = { debug = function() end, info = function() end, warn = function() end,
 		error = function() end }
 	package.loaded["infra.dialog_util"] = {
 		text_prompt = function()

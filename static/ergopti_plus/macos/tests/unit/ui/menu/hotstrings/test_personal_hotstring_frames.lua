@@ -24,7 +24,7 @@ local function with_personal_frame(body, options)
 		local driver = helpers.driver_root():gsub("/+$", "")
 		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname()); assert(os.remove(scratch))
 		assert(hs.fs.mkdir(scratch)); assert(hs.fs.mkdir(scratch .. "/metrics"))
 		local ledger = assert(io.open(scratch .. "/metrics/karabiner_kc.log", "wb")); assert(ledger:close())

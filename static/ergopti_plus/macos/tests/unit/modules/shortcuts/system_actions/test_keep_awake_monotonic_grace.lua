@@ -20,8 +20,8 @@ local OWNED_MODULES = {
 	"modules.gestures",
 	"modules.keystats.log_manager",
 	"infra.notifications",
-	"infra.key_event_health",
-	"infra.logger",
+	"core.logger.engine.key_event_health",
+	"core.logger.engine.logger",
 	"infra.text_utils",
 	"infra.timings",
 	"core.i18n.engine.i18n",
@@ -107,7 +107,7 @@ local function with_awake(callback)
 
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["infra.timings"] = {
 				sec = function(group, key)
 					local seconds = { tick_min_ms = 1, tick_max_ms = 5, return_delay_ms = 0.2 }
@@ -127,7 +127,7 @@ local function with_awake(callback)
 			for _, name in ipairs({
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-				"modules.gestures", "infra.notifications", "infra.key_event_health",
+				"modules.gestures", "infra.notifications", "core.logger.engine.key_event_health",
 				"infra.text_utils", "modules.keymap.control_sentinels", "adapters.key_state",
 				"adapters.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end

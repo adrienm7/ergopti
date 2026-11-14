@@ -36,7 +36,7 @@ local M = {}
 local ok, real = pcall(require, "core.logger.engine")
 if not ok or not real then
 	-- Try the macOS driver logger as a secondary fallback.
-	ok, real = pcall(require, "infra.logger")
+	ok, real = pcall(require, "core.logger.engine.logger")
 end
 
 if ok and real then

@@ -34,7 +34,7 @@ local function load_coordinator(options)
 		observe_log(...)
 		if options.logger_info_raises then error("synthetic post-fence logger failure") end
 	end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = observe_log, debug = observe_log, info = observe_info, warn = observe_log,
 		error = observe_log, success = observe_log, done = observe_log,
 	}

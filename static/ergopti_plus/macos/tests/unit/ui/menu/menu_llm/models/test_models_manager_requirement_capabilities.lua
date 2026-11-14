@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"infra.dialog_util",
 	"core.i18n.engine.i18n",
@@ -76,7 +76,7 @@ local function with_fixture(callback)
 			return manager
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.fs.engine.paths"] = {
@@ -299,8 +299,8 @@ end)
 
 helpers.describe("RequirementRegistry passive exact snapshots (issue94)", function()
 	local function with_registry(callback)
-		helpers.with_fresh_modules({ "infra.logger", "ui.menu.menu_llm.requirement_operation_registry" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_fresh_modules({ "core.logger.engine.logger", "ui.menu.menu_llm.requirement_operation_registry" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local Registry = require("ui.menu.menu_llm.requirement_operation_registry")
 			callback(Registry.new({ backend = "mlx", require_owned = true }), Registry)
 		end)

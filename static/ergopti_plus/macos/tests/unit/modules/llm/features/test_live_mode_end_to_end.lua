@@ -89,10 +89,10 @@ local function build_world()
 		path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The native clock only feeds the backend's request floor: each request is
 	-- made far enough from the previous one, as a human types
 	_G.hs.timer.secondsSinceEpoch = function() return world.clock end
@@ -694,7 +694,7 @@ helpers.describe("llm-control-boundaries: actual live prompt owner", function()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
 					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-					json_decode = require("core.fs.adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = native, logger = require("core.logger.engine.logger") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
 				end

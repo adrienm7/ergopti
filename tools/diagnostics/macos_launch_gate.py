@@ -188,7 +188,7 @@ CONSENT_BUILD_TIMEOUT_SECONDS = 180
 # A no-prompt send answers at once; the bound only catches a wedged sender.
 CONSENT_SEND_TIMEOUT_SECONDS = 30
 CONSENT_DIAGNOSTIC_LIMIT = 4000
-# adapters/boot_journal.lua writes this line before onboarding can defer boot.
+# core/logger/adapters/boot_journal.lua writes this line before onboarding can defer boot.
 SCRIPTING_STATE = re.compile(
     r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] \[init\] Native scripting server: "
     r"pid=(\d+); getter=(\w+); allowed=(\w+); bridge=(\w+); "

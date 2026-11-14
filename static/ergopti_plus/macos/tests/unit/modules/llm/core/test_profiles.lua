@@ -11,8 +11,8 @@
 local helpers = require("tests.helpers")
 local saved_core = package.loaded["modules.llm"]
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub lib.i18n: profiles.lua calls i18n.get() at module load time to
 -- decorate each built-in profile with its label. The real lib.i18n depends
@@ -342,7 +342,7 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	end)
 
 	helpers.it("resolves every placeholder and warns on degraded fallback", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_warn = Logger.warn
 		local warnings = {}

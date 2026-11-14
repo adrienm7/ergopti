@@ -23,7 +23,7 @@ local TOKENS = {
 local STUB_MODULES = {
 	"core.fs.adapters.file_system",
 	"core.fs.engine.dir",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.config_paths",
 	"infra.timings",
 	"platform.remap.defaults",
@@ -190,7 +190,7 @@ local function with_remap(options, body)
 			}
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- at start. The folder exists, as the product's does, so choosing the
 	-- layer hold imports the recommended layer the way a Mac would.

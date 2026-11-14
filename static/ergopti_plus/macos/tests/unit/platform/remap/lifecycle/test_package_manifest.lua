@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 
 local function with_manifest_decoder(decode, callback)
-	return helpers.with_stub_scope({ "core.fs.adapters.json_codec", "infra.logger" }, function()
+	return helpers.with_stub_scope({ "core.fs.adapters.json_codec", "core.logger.engine.logger" }, function()
 		helpers.load_with_stubs("core.fs.adapters.json_codec", { json = { decode = decode } })
 		return callback()
 	end)

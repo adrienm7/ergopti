@@ -14,7 +14,7 @@ local BRIDGE_PORT = 7878
 local RESTORED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.vscode_bridge",
 }
 
@@ -152,7 +152,7 @@ local function load_fixture(behavior)
 			logs[captured_level][#logs[captured_level] + 1] = format_log(format_value, ...)
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local candidate = nil
 	local constructor_calls = 0

@@ -18,7 +18,7 @@ local LOG = "metrics_typing"
 --- @return table logs { warnings = string[], infos = string[] }
 function M.capture()
 	local logs = { warnings = {}, infos = {} }
-	local logger = package.loaded["infra.logger"]
+	local logger = package.loaded["core.logger.engine.logger"]
 	logger.warn = function(tag, template, ...)
 		local line = string.format(template, ...)
 		if tag == LOG and line:find("read incomplete", 1, true) then logs.warnings[#logs.warnings + 1] = line end

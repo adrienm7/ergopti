@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local M = {}
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local TableUtil = require("core.text.engine.table_util")
 local StorageOwned = require("core.fs.engine.storage_owned")
 local Logger = require("core.logger.engine.shim")

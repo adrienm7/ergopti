@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local function load_runner()
 	local clock = { now_ns = 0 }
 	local queue = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn)
 			local handle = { timer = {} }
@@ -38,7 +38,7 @@ local function load_runner()
 end
 
 helpers.describe("infra.paced_job", function()
-	local owners = { "infra.paced_job", "infra.logger", "core.events.timer_scheduler" }
+	local owners = { "infra.paced_job", "core.logger.engine.logger", "core.events.timer_scheduler" }
 
 	helpers.it("rejects non-finite budgets and gaps before arming a timer", function()
 		helpers.with_fresh_modules(owners, function()
@@ -138,7 +138,7 @@ helpers.describe("infra.paced_job", function()
 
 	helpers.it("retains every delivered slice timer after completion (paced-job-delivered-cleanup)", function()
 		helpers.with_stub_scope(owners, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.events.timer_scheduler"] = nil
 			local natives, completions, steps = {}, 0, 0
 			local clock, allow_stop = 0, false

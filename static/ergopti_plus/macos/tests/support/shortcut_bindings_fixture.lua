@@ -217,7 +217,7 @@ function M.with_bindings(callback)
 		"modules.shortcuts.tap_keys",
 		"modules.gestures.actions",
 		"core.i18n.engine.i18n",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}, function()
 		package.loaded["adapters.hotkey_registrar"] = nil
 		local facades = build_facades(ctx)
@@ -251,7 +251,7 @@ function M.with_bindings(callback)
 		logger.error = function(_, message, ...)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
 			hotkey = {
 				bind = function(mods, key)

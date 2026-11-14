@@ -31,7 +31,7 @@ local function fresh_apps()
 		"adapters.window_manager",
 		"adapters.synthetic_input",
 		"adapters.clipboard",
-		"infra.logger",
+		"core.logger.engine.logger",
 		"infra.notifications",
 		"core.i18n.engine.i18n",
 		"infra.text_utils",
@@ -291,7 +291,7 @@ local function fresh_apps()
 		end,
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.notifications"] = {
 		notify = function(...)
 			fixture.notifications[#fixture.notifications + 1] = table.pack(...)
@@ -639,7 +639,7 @@ end)
 helpers.describe("ChatGPT URL diagnostics", function()
 	helpers.it("opens the exact conversation URL without logging it", function()
 		local fixture = fresh_apps()
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local original, logs = logger.debug, {}
 		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
 		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"
