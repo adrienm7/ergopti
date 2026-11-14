@@ -51,20 +51,26 @@ now hands it to `modules.llm.warmup_controller.defer_to_resume`, which
 (`warmup_target` is nil while paused); Windows defers the bridge start
 (`bootstrap_pending`, `LLM_Menu_OnResume`).
 
-Left for (1), with the gates found so far:
+Done for (1), proof run 43628135718 on 9cc9b2b1: the macOS model page opens
+while paused and its choices, downloads and API entry changes run (a key test,
+a server rescan, an MLX port change and a runtime install wait for resume:
+`model_selector_page.handle_action`, `api_panel` `runtime_is_paused`); Linux
+removes an installed model while paused. Windows keeps both refused while
+paused: its pause retires every AI operation (`LLM_AuxInvalidate("suspend")`
+in `aux_ownership.ahk`) and its tray greys the AI submenu; that is the EDD-1 on
+AHK item.
 
-- macOS: `ui/menu/menu_llm/model_selector_page.lua` (`ctx.is_paused()` at the
-  page build, install state, selection and the bridge entry points, about six
-  sites), `ui/menu/menu_llm/api_panel.lua` (`paused` and `native_unpaused`,
-  about twelve sites) and the `llm_model` row in `ui/menu/menu_llm/init.lua`
-  (`MenuLayout.row_disabled("llm_model", is_disabled, paused)`).
-- Linux: `ui/menu/llm_backend_rows.lua` (two sites) and `delete_model` in
-  `ui/menu/menu_llm.lua`.
-- Windows: `ui/menu/menu_llm/menu_models.ahk` and `menu_api_entries.ahk` (ten
-  `A_IsSuspended` sites); the tray still greys the whole AI submenu while
-  paused (`TrayMenu_ApplyPauseGreying`, the EDD-1 on AHK item).
-- Downloads and deletions are installs: EDD-1 keeps them available while
-  paused, but each must not start a runtime (warmup, server) until resume.
+Notes for (2), from reading `macos/ui/menu/menu_shortcuts.lua`:
+
+- Script-chord slot rows (`script_control_shortcuts` provider): the
+  script-control tap stays live during a pause by design, and it carries the
+  resume chord; reassigning a chord while paused could move the chord that
+  resumes. Decide first whether a paused reassignment applies at once or on
+  resume.
+- Keyboard slot rows (`KeyboardSlots.provide_rows(ctx, … or paused …)`): an
+  edit rebinds a hotkey under `KeyboardShortcuts`' lifecycle; trace how the
+  pause stops those hotkeys and how resume rebinds them before ungating.
+- Tap-key rows already follow EDD-1 (`reconcile_tap_keys`, bound on resume).
 
 Then (2), (3) and (4) as listed above.
 
