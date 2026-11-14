@@ -2220,6 +2220,10 @@ function scanFile(file, text, ctx) {
 		for (const m of text.matchAll(
 			/(?<![\w\\])(_shared|windows)?(?:\\\\[\w-]+)+(?:\\\.[A-Za-z0-9]+)(?![\w\\])/g
 		)) {
+			// %A_LineFile%\\\.\.\\\.\.\\adapters\\x\.ahk: after a climb the path
+			// is relative to the including file, not to a root; when both move
+			// together, as S12 moved them, it holds as written.
+			if (/\\\.\\\.$/.test(text.slice(0, m.index))) continue;
 			// _shared\\data\\x\.json or windows\\infra\\x\.ahk: the root named
 			// first, without a separator.
 			const lead = m[1] ? `${m[1]}\\\\` : '';
