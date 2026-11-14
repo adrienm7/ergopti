@@ -409,6 +409,13 @@ async function exerciseLayerSelector(browser, origin) {
 	);
 	await page.click('[data-layer="option"]');
 	assert.equal(await page.getAttribute('[data-layer="option"]', 'aria-selected'), 'true');
+	// The analysis panel lives in the side slot and survives a render.
+	const panel = await page.$('#le-side-slot > .la-panel');
+	assert.ok(panel, 'the analysis panel is in the side slot');
+	await page.click('[data-layer="base"]');
+	assert.ok(
+		await panel.evaluate((node) => node.isConnected && node.parentElement.id === 'le-side-slot')
+	);
 	// Every section reaches the page as an element: a hidden one is not printed as « null ».
 	assert.deepEqual(
 		await page.$$eval('#layout-editor', ([root]) =>

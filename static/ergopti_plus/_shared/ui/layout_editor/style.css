@@ -378,6 +378,13 @@ body {
 	min-width: 0;
 }
 
+/* The slot sizes what it holds: the analysis panel fills it in any column. */
+.le-side-slot > * {
+	flex: none;
+	max-width: none;
+	width: 100%;
+}
+
 @container layout-editor (min-width: 900px) {
 	.le-workspace {
 		grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
