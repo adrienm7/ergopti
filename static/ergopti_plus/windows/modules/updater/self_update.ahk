@@ -2644,8 +2644,9 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 	} finally _Updater_ReleaseDownloadRetirement(Retirement)
 	; Process teardown wins before the visible terminal. RequestMayPublish queues
 	; exactly one manual notice for resume; a second cancellation has no Request.
+	; The install policy keeps that notice, which a manual check no longer gets (UPD-2).
 	if SurfacePausedRequest and IsObject(Request)
-		_Updater_RequestMayPublish(Request, true)
+		_Updater_RequestMayPublish(Request, true, 0, true)
 	if HadTransaction {
 		try LoggerError("Updater", LogMessage)
 		if _Updater_InstallObservationValid(Observation)
