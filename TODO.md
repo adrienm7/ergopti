@@ -356,7 +356,7 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       key_state_polling 69/58. The excess is already on `dev` (Build was skipped on every earlier run), at most +2
       key_state_polling from ILD-2 `_KLE_RealCtrlHeld`. The maintainer sets the new ceilings; they guard the antivirus
       surface, so no agent raises them alone.
-      Done 2026-11-13 by worker I without raising a ceiling (d5f80fcff3): the new key-state reads of the
+      Done 2026-11-13 by worker I without raising a ceiling (d10ad40fbc): the new key-state reads of the
       physical-shortcut capture and ILD-2 go through `adapters/key_state.ahk`, the gesture menu and onboarding share
       one elevated launch (`GestureRestartRunElevated`), and the touchpad reader loads `hid.dll` with `#DllLoad`.
       Same landing: Windows Integration Driver startup, red on `dev` since run 43306862276 (realistic-hotstrings
