@@ -813,7 +813,7 @@
 		},
 		{
 			"id": "personal-info-tags-single-source",
-			"ordinal": 637,
+			"ordinal": 638,
 			"name": "personal-info named tags are one table: the shared Lua tags and the Windows map and order",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-tags-single-source.cjs"],
