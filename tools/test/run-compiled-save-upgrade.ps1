@@ -132,11 +132,11 @@ try {
     $nativeProfileFile = Join-Path $EvidenceDirectory 'prior.native-profile.json'
     $editReceiptFile = Join-Path $EvidenceDirectory 'installed-user-edit.json'
     & node (Join-Path $PSScriptRoot 'compiled-upgrade-contract.cjs') prepare-installed-user-profile $configFile `
-        (Join-Path $bundleRoot 'static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml') $nativeProfileFile $editReceiptFile
+        (Join-Path $bundleRoot 'static/ergopti_plus/_shared/core/config_schema/migrations.toml') $nativeProfileFile $editReceiptFile
     if ($LASTEXITCODE -ne 0) { throw 'The explicit offline installed-user edit was refused.' }
     $priorProfileFile = Join-Path $sandbox 'prior.saved-profile.json'
     & node (Join-Path $PSScriptRoot 'compiled-upgrade-contract.cjs') inspect-profile $configFile `
-        (Join-Path $bundleRoot 'static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml') $priorProfileFile
+        (Join-Path $bundleRoot 'static/ergopti_plus/_shared/core/config_schema/migrations.toml') $priorProfileFile
     if ($LASTEXITCODE -ne 0) { throw 'The edited installed upgrade input did not retain all five source records.' }
     $priorInstall = [ordered]@{ package_sha256 = $priorDigest; asset_id = [long]$contract.asset_id;
         version = $contract.version; commit = $contract.commit; bundle_identity = $priorMarker;
