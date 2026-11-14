@@ -242,13 +242,15 @@ function hotstringsRenderTimes(configRoot) {
 // modifiers (11 values, parsed once and cached), the config migrations gained
 // the schema v22 import_companion step (5 values, 23860b1e00), and the timing
 // registry gained tap_hold.max_activation_ms (1 value, 0aa18f15f1). The
-// neutral-defaults boot reads the same documents: 2250 -> 2267.
+// neutral-defaults boot reads the same documents and seeds the generated
+// template, which gained [tap_holds] sticky_timeout_ms (c125313940): measured
+// 2250 -> 2271 on run 43514634523, its slow steps 12841 -> 12838.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },
 	'toml.document_parse': { all: 15, [REALISTIC_HOTSTRINGS_FIXTURE]: 18 },
 	'config_migrate.registry_deep_compares': { all: 14, [REALISTIC_HOTSTRINGS_FIXTURE]: 17 },
 	'toml.document_slow_steps': { all: 12841, [REALISTIC_HOTSTRINGS_FIXTURE]: 13582 },
-	'toml.flat_values': { all: 2267, [REALISTIC_HOTSTRINGS_FIXTURE]: 1212 }
+	'toml.flat_values': { all: 2271, [REALISTIC_HOTSTRINGS_FIXTURE]: 1212 }
 };
 
 /**
