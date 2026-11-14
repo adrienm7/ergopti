@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function with_picker(scenario)
 	return helpers.with_stub_scope({
 		"ui.action_picker", "ui.webview_controller_pool", "ui.ui_builder", "infra.logger",
-		"infra.i18n", "infra.paths", "infra.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
+		"infra.i18n", "core.fs.engine.paths", "infra.timings", "core.text.engine.json", "apps.engine.program_provider_picker",
 		"adapters.program_providers", "adapters.apple_shortcuts_native",
 	}, function()
 		local h = { controllers = {}, userdata_refs = {}, callback_refs = {}, views = {}, errors = {}, nil_calls = 0 }
@@ -24,7 +24,7 @@ local function with_picker(scenario)
 		logger.callback = function(_, _, callback, ...) return pcall(callback, ...) end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return "/virtual/" .. relative end }
 		helpers.provide_timings()
 		package.loaded["adapters.program_providers"] = {}
 		package.loaded["adapters.apple_shortcuts_native"] = {}

@@ -38,7 +38,7 @@ local PAIRS = {
 	{ adapter = "adapters.uinput_writer",   make = function() return Fakes.uinput_writer() end },
 	{ adapter = "adapters.evdev_reader",    make = function() return Fakes.evdev_reader() end },
 	{ adapter = "adapters.shell_runner",    make = function() return Fakes.shell_runner() end },
-	{ adapter = "adapters.storage",         make = function() return Fakes.storage() end },
+	{ adapter = "core.fs.adapters.storage",         make = function() return Fakes.storage() end },
 	{ adapter = "adapters.clipboard",       make = function() return Fakes.clipboard() end },
 	{ adapter = "core.events.timer_scheduler", make = function() return Fakes.timer_scheduler() end },
 	{ adapter = "adapters.notifier",        make = function() return Fakes.notifier() end },

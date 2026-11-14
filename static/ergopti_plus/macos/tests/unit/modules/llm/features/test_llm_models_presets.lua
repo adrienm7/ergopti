@@ -23,7 +23,7 @@ local Models = helpers.load_with_stubs("ui.menu.menu_llm.models_manager")
 
 helpers.describe("LLM Models Catalogue", function()
 	helpers.it("keeps equal model metadata independent when one catalogue entry changes", function()
-		helpers.with_fresh_modules({ "adapters.json_codec" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.json_codec" }, function()
 			local fresh_models = helpers.load_with_stubs("ui.menu.menu_llm.models_manager")
 			local tags = { "chat" }
 			local model = { name = "fixture", capabilities = { tags = tags } }

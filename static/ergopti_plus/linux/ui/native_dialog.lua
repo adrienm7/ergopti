@@ -35,7 +35,7 @@ local DEFAULT_DEPS = {
 	-- (`luajit ergopti_hotstrings.lua` from the driver folder, or a child the
 	-- tray starts with that path): this file's own source path is then
 	-- "./ui/native_dialog.lua", and every dialog refused to open.
-	driver_root = function() return require("infra.paths").driver_root() end,
+	driver_root = function() return require("core.fs.engine.paths").driver_root() end,
 	quote = function(value) return require("core.text.engine.utils_core").shell_quote(value) end,
 }
 

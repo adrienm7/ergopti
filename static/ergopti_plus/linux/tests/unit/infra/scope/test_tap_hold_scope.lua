@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
 	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
 
@@ -109,7 +109,7 @@ local function with_scope(tap_text, config_text, body)
 	local s = { dir = dir, tap_path = tap_path, config_path = config_path, manager = Manager,
 		installed = installed, paused = false, controls = {} }
 	s.parameters = fake_parameters({ tap_hold__open_url = "https://tap.example", tap_4__open_url = "https://keep.example" })
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	s.files = setmetatable({
 		write_if_unchanged = function(path, content, expected)
 			if s.controls.before_publish then s.controls.before_publish(path) end
@@ -313,7 +313,7 @@ end)
 -- restored left_alt entered an empty navigation layer. The restore now brings
 -- Ergopti's recommended layer along, never over a file the user has.
 helpers.describe("Linux tap-hold scope: the recommended navigation layer", function()
-	local PRESET = read(require("infra.paths").shared("layouts/data/layers.recommended.toml"))
+	local PRESET = read(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 
 	helpers.it("(nav-layer-fresh-install-default) a restore creates layers.toml and the engine runs its layer", function()
 		with_scope(nil, nil, function(s)
@@ -381,7 +381,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 		{ id = "exception", run = function() error("controlled removal refusal") end },
 	}
 	local function removal(s, receipt)
-		local native = require("adapters.file_system").delete
+		local native = require("core.fs.adapters.file_system").delete
 		local calls = { layer = 0 }
 		s.files.delete = function(path)
 			if path == s.dir .. "/layers.toml" then
@@ -553,7 +553,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 	end
 	helpers.it("keeps the public scope owner until its refused layer cleanup settles", function()
 		with_scope(nil, '[gesture_parameters]\ntap_hold__open_url = "https://tap.example"\n', function(s)
-			local names = { "infra.config_paths", "modules.gestures.manager", "adapters.file_system" }
+			local names = { "infra.config_paths", "modules.gestures.manager", "core.fs.adapters.file_system" }
 			local saved = {}
 			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local owned_backups = {}
@@ -579,7 +579,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				return s.config_path
 			end }
 			package.loaded["modules.gestures.manager"] = s.parameters
-			package.loaded["adapters.file_system"] = s.files
+			package.loaded["core.fs.adapters.file_system"] = s.files
 			local ok, err = pcall(function()
 				s.controls.refuse = s.config_path
 				helpers.assert_eq(Scope.apply("recommended", function() return false end), false)

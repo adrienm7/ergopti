@@ -86,7 +86,7 @@ end
 --- @return table sampler
 function M.start(record)
 	local uv = require("luv")
-	local NativeDirectory = require("infra.native_directory")
+	local NativeDirectory = require("core.fs.engine.native_directory")
 	local function read(path)
 		local handle = io.open(path, "rb")
 		if not handle then return nil end

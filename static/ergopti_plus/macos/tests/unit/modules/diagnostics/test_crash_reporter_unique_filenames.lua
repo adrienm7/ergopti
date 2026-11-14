@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local function with_fixture(callback)
 	local module_names = {
 		"modules.diagnostics.crash_reporter",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"infra.config_paths",
 		"infra.i18n",
 		"infra.logger",
@@ -28,7 +28,7 @@ local function with_fixture(callback)
 		local files = {}
 		local attempts = {}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				attempts[#attempts + 1] = path
 				if files[path] ~= nil then return false, "exists" end

@@ -23,7 +23,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 
 --- Loads a fresh reload_guard with a clean stubbed persistent store.
 local function fresh()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["infra.reload_guard"] = nil
 	return helpers.load_with_stubs("infra.reload_guard")
 end
@@ -54,21 +54,21 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		local rg = fresh()
 		-- Plant a sentinel far in the past, bypassing mark_reload(), so the TTL
 		-- window is exceeded and a later genuine quit is not misread as a reload.
-		local storage = require("adapters.storage")
+		local storage = require("core.fs.adapters.storage")
 		storage.set("reload_in_progress", os.time() - 100000)
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 
 	helpers.it("ignores a non-numeric sentinel value", function()
 		local rg = fresh()
-		local storage = require("adapters.storage")
+		local storage = require("core.fs.adapters.storage")
 		storage.set("reload_in_progress", "garbage")
 		helpers.assert_eq(rg.is_reloading(), false)
 	end)
 
 	helpers.it("uses the monotonic clock and rejects an unowned or expired sentinel", function()
 		local rg = fresh()
-		local storage = require("adapters.storage")
+		local storage = require("core.fs.adapters.storage")
 		local timer = require("core.events.timer_scheduler")
 		local previous_clock, previous_wall = timer.now_ns, os.time
 		local tick, wall = 1000000000, 100000
@@ -90,7 +90,7 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 
 	helpers.it("keeps the live reload marked when storage refuses to clear it", function()
 		local rg = fresh()
-		local storage = require("adapters.storage")
+		local storage = require("core.fs.adapters.storage")
 		rg.mark_reload()
 		local previous_delete = storage.delete
 		storage.delete = function() return false end
@@ -126,7 +126,7 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		-- when it loads; every level counts as reopening the logger.
 		local function count() debug_calls = debug_calls + 1 end
 		package.loaded["infra.logger"] = { debug = count, info = count, warn = count, error = count }
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.reload_guard"] = nil
 		local rg = require("infra.reload_guard")
 		rg.mark_reload()
@@ -138,7 +138,7 @@ helpers.describe("reload_guard: reload-vs-quit signal", function()
 		helpers.assert_eq(debug_calls, 0,
 			"post-finalizer sentinel cleanup must not reopen the synchronous logger")
 		package.loaded["infra.reload_guard"] = nil
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.logger"] = previous_logger
 	end)
 end)

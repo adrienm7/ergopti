@@ -110,9 +110,9 @@ local function fresh_resolver(bootstrap_content)
 	local logger = helpers.make_logger_stub()
 	logger.follow_config_dir = function(dir) followed[#followed + 1] = dir end
 	local previous_logger = package.loaded["infra.logger"]
-	local previous_file_system = package.loaded["adapters.file_system"]
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
 	package.loaded["infra.logger"] = logger
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function()
 			if bootstrap_content ~= nil then return bootstrap_content, "ok" end
 			return nil, "absent"
@@ -138,7 +138,7 @@ local function fresh_resolver(bootstrap_content)
 	})
 	_G.hs = previous_hs
 	os.getenv = real_getenv
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	package.loaded["infra.logger"] = previous_logger
 	package.loaded["infra.config_paths"] = nil
 	if not ok then error(ConfigPaths, 0) end

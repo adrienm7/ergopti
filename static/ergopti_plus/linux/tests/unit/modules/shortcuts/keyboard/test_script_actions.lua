@@ -96,7 +96,7 @@ helpers.describe("script lifecycle actions", function()
 	end)
 
 	helpers.it("holds every keyboard slot back while paused, a script action included (scd1-slot-paused)", function()
-		local storage_before = package.loaded["adapters.storage"]
+		local storage_before = package.loaded["core.fs.adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local gestures_before = package.loaded["modules.gestures.manager"]
 		local paths_before = package.loaded["infra.config_paths"]
@@ -105,7 +105,7 @@ helpers.describe("script lifecycle actions", function()
 			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
-		package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+		package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 			["shortcuts.keyboard.primary_j"] = "select_line",
 			["shortcuts.keyboard.primary_k"] = "script_pause_toggle",
 		} })
@@ -123,7 +123,7 @@ helpers.describe("script lifecycle actions", function()
 		local running = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = false })
 		local resumed = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = true })
 		local chatgpt = shortcuts.dispatch({ key = "g", mods = { ctrl = true } }, { only_script = true })
-		package.loaded["adapters.storage"] = storage_before
+		package.loaded["core.fs.adapters.storage"] = storage_before
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = module_before
 		package.loaded["modules.gestures.manager"] = gestures_before
 		package.loaded["infra.config_paths"] = paths_before

@@ -71,10 +71,10 @@ helpers.describe("modules.updater.manager", function()
 	end)
 
 	helpers.it("keeps the durable channel and interval when persistence fails", function()
-		local previous_storage = package.loaded["adapters.storage"]
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		local storage = Fakes.storage({ writes_fail = true })
-		package.loaded["adapters.storage"] = storage
+		package.loaded["core.fs.adapters.storage"] = storage
 		package.loaded["modules.updater.manager"] = nil
 		local failing = require("modules.updater.manager")
 		-- A config.toml whose directory does not exist: the writer must refuse.
@@ -89,7 +89,7 @@ helpers.describe("modules.updater.manager", function()
 		local interval = failing.get_check_interval()
 		failing.stop_background_checks()
 
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		package.loaded["modules.updater.manager"] = previous_manager
 		helpers.assert_eq(channel_changed, false)
 		helpers.assert_eq(interval_changed, false)
@@ -237,12 +237,12 @@ helpers.describe("modules.updater.manager", function()
 
 	for _, mode in ipairs({ "transport", "conditional-transport", "conditional-false", "conditional-number", "conditional-table", "http-error", "invalid-json", "wrong-root", "oversized-page", "entries-mismatch", "dispatch-refusal", "cancel" }) do
 		helpers.it("linux-updater-etag: " .. mode .. " forces a fresh page after an unknown native validator", function()
-			local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
-			local real_fs = require("adapters.file_system")
-			package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+			local previous_fs, previous_manager = package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"]
+			local real_fs = require("core.fs.adapters.file_system")
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
 			package.loaded["modules.updater.manager"] = nil
 			local loaded, fresh = pcall(require, "modules.updater.manager")
-			package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+			package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
 			helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
 			local old = '[{"tag_name":"v1.0.0"}]'
 			local new = '[{"tag_name":"v2.0.0"}]'

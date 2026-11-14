@@ -49,7 +49,7 @@ local US_INTL = keymap("dead_grave, dead_tilde", "minus, underscore", "NoSymbol,
 local function fresh(stored)
 	local log = { deferred = {}, executed = {} }
 	local previous = {}
-	for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+	for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 		previous[name] = package.loaded[name]
 	end
 	local prefs = {}
@@ -62,7 +62,7 @@ local function fresh(stored)
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
 	log.path = path
 	package.loaded["infra.config_paths"] = { config = function() return path end }
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
 		set = function(key, value) prefs[key] = value return true end,
 	}
@@ -78,7 +78,7 @@ local function fresh(stored)
 		defer = function(fn) log.deferred[#log.deferred + 1] = fn return true end,
 	})
 	log.restore = function()
-		for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+		for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 			package.loaded[name] = previous[name]
 		end
 		os.remove(path)
@@ -128,7 +128,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 	helpers.it("tap-config-owner: absent overrides stay native despite legacy storage", function()
 		local TapKeys, log = fresh()
 		local ok, err = pcall(function()
-			package.loaded["adapters.storage"].get = function() return "screen_capture" end
+			package.loaded["core.fs.adapters.storage"].get = function() return "screen_capture" end
 			os.remove(log.path)
 			helpers.assert_eq(TapKeys.get_action("number_row_left"), "none")
 			helpers.assert_true(TapKeys.set_action("number_row_left", "send_text"))

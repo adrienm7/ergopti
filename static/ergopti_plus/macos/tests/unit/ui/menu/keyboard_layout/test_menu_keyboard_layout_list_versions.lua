@@ -196,12 +196,12 @@ local function with_layout_fixture(listing, plists, callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			"modules.keymap.layout_install",
-			"adapters.file_system",
-			"infra.fs_dir",
+			"core.fs.adapters.file_system",
+			"core.fs.engine.dir",
 		}, function()
-			package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
+			package.loaded["core.fs.engine.dir"] = { try_entries = function() return {}, false end }
 			local reads = {}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					reads[#reads + 1] = path
 					if plists[path] then return plists[path], "ok" end
@@ -405,7 +405,7 @@ helpers.describe("canonical no-bundle status reaches the actual native layout me
 		end)
 	end)
 	helpers.it("uses each of the 21 existing real catalogue captions", function()
-		local codec = require("adapters.json_codec")
+		local codec = require("core.fs.adapters.json_codec")
 		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
 		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
 		helpers.assert_eq(#locales, 21)

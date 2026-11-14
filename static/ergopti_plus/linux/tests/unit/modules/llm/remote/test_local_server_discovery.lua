@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 -- The shipped catalogue. These cases drive four of its servers; the others
 -- are stopped by the scan fake below, so a longer catalogue changes no case.
-local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
+local CATALOGUE = Json.decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 local DRIVEN = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 --- The probed sources of one sweep: the driven servers and configured rows.
 --- @param servers table modules.llm.local_servers
@@ -1246,7 +1246,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
-				local catalogue=require("core.text.engine.json").decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"),"rb")):read("*a"))
+				local catalogue=require("core.text.engine.json").decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"),"rb")):read("*a"))
 				local labels={}
 				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
 				local none=require("infra.i18n").get("menu.llm.local_servers.none_detected")

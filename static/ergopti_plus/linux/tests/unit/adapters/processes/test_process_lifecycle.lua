@@ -159,15 +159,15 @@ end)
 
 helpers.describe("linux-process-poll-demand", function()
 	local function with_demand(body)
-		local names = { "adapters.window_info", "infra.native_directory", "adapters.process_lifecycle" }
+		local names = { "adapters.window_info", "core.fs.engine.native_directory", "adapters.process_lifecycle" }
 		local saved, queries, listing = {}, 0, { "existing" }
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		package.loaded["adapters.window_info"] = {
 			focused_snapshot = function() return { appId = "editor", windowTitle = "stable" }, "x11:1" end,
 		}
 		local proc = fake_proc()
-		local real_directory = helpers.load_module("infra.native_directory")
-		package.loaded["infra.native_directory"] = {
+		local real_directory = helpers.load_module("core.fs.engine.native_directory")
+		package.loaded["core.fs.engine.native_directory"] = {
 			entries = function(path)
 				queries = queries + 1
 				proc.set(listing)

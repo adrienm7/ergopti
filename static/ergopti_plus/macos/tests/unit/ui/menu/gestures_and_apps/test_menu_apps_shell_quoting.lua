@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_apps: native discovery preserves pathnames", function()
 	helpers.it("enumerates app and icon directories without shell execution", function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.fs_dir" }, function()
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.fs.engine.dir" }, function()
 			local base = "/tmp/Ergopti $HOME `injected` O'Brien"
 			local app = base .. "/apps/Fixture.app"
 			local directories, metadata = {}, {}
-			package.loaded["infra.fs_dir"] = { try_entries_quiet = function(dir)
+			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(dir)
 				directories[#directories + 1] = dir
 				if dir == base .. "/apps" then return { "Fixture.app" }, true end
 				return {}, true

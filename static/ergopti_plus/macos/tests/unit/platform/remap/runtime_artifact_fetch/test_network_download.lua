@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+local MODULES = { "core.fs.adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
 	"platform.remap.network_download" }
 
 --- Loads the route over the real shared files.
@@ -27,14 +27,14 @@ local function with_route(body)
 		file:close()
 		return bytes
 	end
-	package.loaded["adapters.file_system"] = setmetatable({
+	package.loaded["core.fs.adapters.file_system"] = setmetatable({
 		exists = function(path) local file = io.open(path, "rb"); if file then file:close() end; return file ~= nil end,
 		read = read,
 		read_with_status = function(path)
 			local bytes = read(path)
 			return bytes, bytes and "ok" or "missing"
 		end,
-	}, { __index = saved["adapters.file_system"] })
+	}, { __index = saved["core.fs.adapters.file_system"] })
 	local ok, err = pcall(function() body(require("platform.remap.network_download")) end)
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end

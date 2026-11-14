@@ -22,7 +22,7 @@ local Manifest = require("infra.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local SPACE = 57
-local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS_PATH = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 -- The keys of the field report, each with the shipped 200 ms threshold.
 local KEYS = {

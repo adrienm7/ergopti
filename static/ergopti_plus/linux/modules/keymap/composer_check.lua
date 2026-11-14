@@ -18,8 +18,8 @@
 ---    wiring without a desktop session or a home folder.
 --- ==============================================================================
 
-local Paths       = require("infra.paths")
-local FileSystem  = require("adapters.file_system")
+local Paths       = require("core.fs.engine.paths")
+local FileSystem  = require("core.fs.adapters.file_system")
 local Report      = require("diagnostics.engine.field_check.report")
 
 local M = {}

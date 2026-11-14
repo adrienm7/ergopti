@@ -38,7 +38,7 @@ local function load_dialog(controls)
 	local sharing_schema = require("diagnostics.engine.healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
 		"infra.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -74,7 +74,7 @@ local function load_dialog(controls)
 		now_ns = function() return (context.now or 0) * 1e9 end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default)
 			if controls.stored ~= nil and key == "script.show_error_dialog" then return controls.stored end
 			return default

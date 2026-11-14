@@ -122,7 +122,7 @@ local function run_case(family, change, route)
 					engine:load_mappings(mappings)
 					local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
 						reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
-					local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+					local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 					logger.set_sink(function() end)
 					local metrics = setmetatable({ on_keydown = function(char)
 						if change == "metrics" and char == "★" then retire() end

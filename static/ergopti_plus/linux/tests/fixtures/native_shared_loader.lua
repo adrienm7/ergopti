@@ -10,7 +10,7 @@ local source, installed, module, target, mode, receipt = arg[1], arg[2], arg[3],
 package.path = installed .. '/?.lua;' .. source .. '/?.lua;' .. source .. '/?/init.lua;' .. source .. '/../_shared/?.lua;' .. source .. '/../_shared/?/init.lua;' .. package.path
 require('core.lifecycle.engine.compat.utf8').install()
 local uv, Json = require('luv'), require('core.text.engine.json')
-local Paths = require('infra.paths')
+local Paths = require('core.fs.engine.paths')
 assert(Paths.shared_root() == installed .. '/_shared', 'actual resolver must admit the installed child layout')
 assert(Paths.shared('ai/data/' .. target) == installed .. '/_shared/ai/data/' .. target)
 local target_path = Paths.shared('ai/data/' .. target)

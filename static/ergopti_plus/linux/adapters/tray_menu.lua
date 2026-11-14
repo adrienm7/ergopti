@@ -97,7 +97,7 @@ local _paused = false
 --- @param paused boolean|nil True for the greyed logo.
 --- @return string
 local function resolve_icon(paused)
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths and type(Paths.shared_root) == "function" then
 		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), paused)
 		if ok and type(icon) == "string" and icon ~= "" then return icon end

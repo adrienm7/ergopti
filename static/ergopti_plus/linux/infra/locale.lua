@@ -29,7 +29,7 @@ local Core   = require("core.i18n.engine.core")
 local ok_json, json = pcall(require, "core.text.engine.json")
 assert(ok_json and type(json) == "table" and type(json.decode) == "function", "locale: JSON decoder unavailable")
 
--- Resolves _shared/core/i18n/data/locales/<code>.json through infra/paths.lua, the one
+-- Resolves _shared/core/i18n/data/locales/<code>.json through core/fs/engine/paths.lua, the one
 -- resolver that knows both shipped layouts. This used to cut three levels off
 -- this file's own chunk name, which is right only in the checkout and the
 -- tarball: on the .deb and .rpm (/usr/lib/ergopti/infra/locale.lua) it named
@@ -37,7 +37,7 @@ assert(ok_json and type(json) == "table" and type(json.decode) == "function", "l
 -- nothing. Either way every lookup returned its raw key, so the tray menu and
 -- every notification read "menu.global.reload" instead of text.
 local function resolve_locale_path(code)
-	local ok, Paths = pcall(require, "infra.paths")
+	local ok, Paths = pcall(require, "core.fs.engine.paths")
 	if not ok or type(Paths.shared) ~= "function" then return "" end
 	return Paths.shared("core/i18n/data/locales/" .. code .. ".json") or ""
 end

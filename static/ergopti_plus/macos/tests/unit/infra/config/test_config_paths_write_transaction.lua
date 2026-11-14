@@ -51,9 +51,9 @@ end
 --- @return table observations
 local function fresh_resolver(write_error)
 	local base_dir = make_tmp_dir()
-	local previous_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = nil
-	local real_file_system = require("adapters.file_system")
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = nil
+	local real_file_system = require("core.fs.adapters.file_system")
 	local observations = { writes = 0 }
 	local injected_file_system = setmetatable({
 		create_if_absent = function()
@@ -68,7 +68,7 @@ local function fresh_resolver(write_error)
 			return false, write_error
 		end,
 	}, { __index = real_file_system })
-	package.loaded["adapters.file_system"] = injected_file_system
+	package.loaded["core.fs.adapters.file_system"] = injected_file_system
 	local real_getenv = os.getenv
 	os.getenv = function(name)
 		if name == "ERGOPTI_PATHS_FILE" then return nil end
@@ -76,7 +76,7 @@ local function fresh_resolver(write_error)
 	end
 	local ok, ConfigPaths = pcall(helpers.load_with_stubs, "infra.config_paths")
 	os.getenv = real_getenv
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	if not ok then error(ConfigPaths, 0) end
 	helpers.assert_true(ConfigPaths.init(base_dir))
 	return ConfigPaths, observations
@@ -89,8 +89,8 @@ end
 --- @return boolean initialized
 local function fresh_validation_resolver(bootstrap_content)
 	local observations = { writes = 0, mkdirs = 0, executes = 0 }
-	local previous_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function()
 			if bootstrap_content ~= nil then return bootstrap_content, "ok" end
 			return nil, "absent"
@@ -132,7 +132,7 @@ local function fresh_validation_resolver(bootstrap_content)
 	})
 	_G.hs = previous_hs
 	os.getenv = real_getenv
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	if not ok then error(ConfigPaths, 0) end
 	local initialized = ConfigPaths.init("/fixture/driver/")
 	return ConfigPaths, observations, initialized
@@ -217,9 +217,9 @@ helpers.describe("ConfigPaths protects the exact bootstrap snapshot", function()
 		local foreign_b = '# foreign exact bytes\nConfigDirPath = "' .. foreign_b_dir .. '"\n'
 		write_exact(paths_path, source_a)
 
-		local previous_file_system = package.loaded["adapters.file_system"]
-		package.loaded["adapters.file_system"] = nil
-		local real_file_system = require("adapters.file_system")
+		local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+		package.loaded["core.fs.adapters.file_system"] = nil
+		local real_file_system = require("core.fs.adapters.file_system")
 		local observations = { publications = 0 }
 		local injected_file_system = setmetatable({
 			write = function(path, content)
@@ -236,7 +236,7 @@ helpers.describe("ConfigPaths protects the exact bootstrap snapshot", function()
 				return false, "source changed before publication"
 			end,
 		}, { __index = real_file_system })
-		package.loaded["adapters.file_system"] = injected_file_system
+		package.loaded["core.fs.adapters.file_system"] = injected_file_system
 		local real_getenv = os.getenv
 		os.getenv = function(name)
 			if name == "ERGOPTI_PATHS_FILE" then return nil end
@@ -246,7 +246,7 @@ helpers.describe("ConfigPaths protects the exact bootstrap snapshot", function()
 		local ConfigPaths = require("infra.config_paths")
 		local init_ok = ConfigPaths.init(base_dir)
 		os.getenv = real_getenv
-		package.loaded["adapters.file_system"] = previous_file_system
+		package.loaded["core.fs.adapters.file_system"] = previous_file_system
 		helpers.assert_true(init_ok)
 
 		local changed, err = ConfigPaths.set_config_dir(make_tmp_dir())

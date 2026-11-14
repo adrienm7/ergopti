@@ -35,7 +35,7 @@ local InferenceClient = nil
 local Logger = require("core.logger.engine.shim")
 local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Timings = require("infra.timings")
 local HttpClient = require("adapters.http_client")
 local Ports = require("ai.engine.request_plan.ports")
@@ -695,7 +695,7 @@ local thinking_families
 local function thinking_refused()
 	if _thinking_refused then return _thinking_refused end
 	local path = thinking_refused_path()
-	local fh, _, errno = require("infra.regular_file_reader").open_source(path)
+	local fh, _, errno = require("core.fs.engine.regular_file_reader").open_source(path)
 	local stored = nil
 	if fh then
 		local read_ok, text = pcall(fh.read, fh, "*a")
@@ -722,7 +722,7 @@ local function save_thinking_refused()
 	local temp = path .. ".tmp"
 	-- An existing staging entry has no retained owner; exclusive creation
 	-- refuses it without opening or deleting an unrelated file.
-	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("core.fs.engine.regular_file_writer").open, temp, "wx")
 	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" or type(text) ~= "string" then
 		if opened and fh then
 			pcall(fh.close, fh)

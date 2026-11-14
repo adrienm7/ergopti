@@ -7,7 +7,7 @@
 #Include ../test_framework.ahk
 #Include ../../infra/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
-#Include ../../adapters/file_system.ahk
+#Include ../../core/fs/adapters/file_system.ahk
 #Include ../../infra/toml/toml_helpers.ahk
 
 _TBCS_Child() {

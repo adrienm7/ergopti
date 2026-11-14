@@ -1,7 +1,7 @@
 {
 	"_comment": "Constant names declared in more than one production file (tools/test/test-duplicate-constant-names.cjs). Shrink it with --update-baseline as copies move to the timing registry or one defining module; never add to it.",
 	"BOOT_SUPPRESS_SEC": {
-		"files": ["macos/infra/file_watchers.lua", "macos/ui/menu/init.lua"],
+		"files": ["macos/core/fs/engine/file_watchers.lua", "macos/ui/menu/init.lua"],
 		"divergent": false
 	},
 	"CHUNK_BYTES": {

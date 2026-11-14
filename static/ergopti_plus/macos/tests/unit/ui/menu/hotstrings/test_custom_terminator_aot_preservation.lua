@@ -47,7 +47,7 @@ end
 --- @param callback function Observations asserted outside production catches.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger", "infra.preferences",
 		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"infra.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_state", "ui.menu.menu_hotstrings_management",
@@ -117,7 +117,7 @@ local function with_fixture(callback)
 			helpers.assert_eq(applied, true, "the real boot replay accepts both valid delimiters")
 			helpers.assert_eq(report.repairs, {}, "valid records need no repair")
 			local initial_state = Transaction.clone(state)
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			local writer = FileSystem.write_if_unchanged
 			FileSystem.write_if_unchanged = function(...)
 				calls.writes = calls.writes + 1

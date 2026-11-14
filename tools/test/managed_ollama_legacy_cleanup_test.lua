@@ -11,7 +11,7 @@ local function check(actual, expected)
 	assertions = assertions + 1
 end
 local function scenario(options, run)
-	local saved_fs, saved_adapter, saved_logger, saved_hs = package.loaded["adapters.file_system"],
+	local saved_fs, saved_adapter, saved_logger, saved_hs = package.loaded["core.fs.adapters.file_system"],
 		package.loaded["adapters.managed_ollama_pull"], package.loaded["infra.logger"], _G.hs
 	local present, inode, raw, removals, releases = true, 2, "", 0, 0
 	local physical = options.physical == true
@@ -20,7 +20,7 @@ local function scenario(options, run)
 	local receipt = { removed = marker }
 	package.loaded["infra.logger"] = { error = function() end }
 	package.loaded["adapters.managed_ollama_pull"] = nil
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function() return true end,
 		create_secure_temp_file = function() return "/private/legacy-vector" end,
 		classify_no_follow = function()
@@ -73,7 +73,7 @@ local function scenario(options, run)
 		settle = function() return handle.settle(0) end,
 	}
 	local ok, failure = xpcall(function() run(f) end, debug.traceback)
-	package.loaded["adapters.file_system"], package.loaded["adapters.managed_ollama_pull"],
+	package.loaded["core.fs.adapters.file_system"], package.loaded["adapters.managed_ollama_pull"],
 		package.loaded["infra.logger"], _G.hs = saved_fs, saved_adapter, saved_logger, saved_hs
 	if not ok then error(failure, 0) end
 	cases = cases + 1

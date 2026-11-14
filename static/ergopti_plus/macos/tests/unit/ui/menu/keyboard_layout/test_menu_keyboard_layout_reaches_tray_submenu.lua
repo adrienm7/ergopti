@@ -116,7 +116,7 @@ end)
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
 	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
+		"core.fs.adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
 		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 		install_legacy_layout_formats()
 		local binding = require("infra.manifest_menu")
@@ -390,7 +390,7 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 		end)
 	end)
 	helpers.it("consumes every existing real locale caption without a native literal", function()
-		local codec = require("adapters.json_codec")
+		local codec = require("core.fs.adapters.json_codec")
 		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
 		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
 		helpers.assert_eq(#locales, 21)
@@ -507,7 +507,7 @@ helpers.describe("layout switching consumes its complete shared presentation fra
 		end)
 	end)
 	helpers.it("preserves all 21 independently frozen old captions through actual renderer", function()
-		local codec = require("adapters.json_codec")
+		local codec = require("core.fs.adapters.json_codec")
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/layout_switching_captions.json"), "rb"))
 		local vectors = assert(codec.decode(file:read("*a"))); assert(file:close())
 		local count = 0

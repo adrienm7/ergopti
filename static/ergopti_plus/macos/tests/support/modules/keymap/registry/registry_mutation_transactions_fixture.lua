@@ -30,7 +30,7 @@ end
 --- @return table state
 --- @return table registry
 local function fresh_registry()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	local registry = helpers.load_with_stubs("modules.keymap.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
@@ -96,7 +96,7 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 	local original = "[hotstrings]\nenabled = false\n[hotstrings.modules]\npersonal_info = "
 		.. tostring(not enabled) .. "\nfuture_module = { retained = 17 }\n"
 	local files = { config = original }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 		write_if_unchanged = function(path, content, expected)
 			if files.refuse or expected.status ~= (files[path] and "ok" or "absent")

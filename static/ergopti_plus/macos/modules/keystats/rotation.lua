@@ -25,7 +25,7 @@
 local M = {}
 
 local json = require("hs.json")
-local LedgerAppend = require("adapters.ledger_append")
+local LedgerAppend = require("core.fs.adapters.ledger_append")
 local JournalSeal = require("metrics.engine.journal.seal")
 local TextCrypto = require("metrics.engine.privacy.text_crypto")
 local TextCipher = require("modules.keystats.text_cipher")

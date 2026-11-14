@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local function fixture(body)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.hotstrings.hotstrings_config",
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.hotstrings.hotstrings_config",
 		"hotstrings.engine.catalogue.common_autocorrection_migration", "hotstrings.engine.publication_recovery" }, function()
 		local f = { path = "overrides", configured_path = "overrides", route = "owned", writes = 0,
 			retries = 0, release = false, acknowledge = false, records = {} }
@@ -42,7 +42,7 @@ local function fixture(body)
 			if f.acknowledge then r.settled = true; return true, nil, native end
 			return false, "independent native release refusal", native
 		end
-		package.loaded["adapters.file_system"] = files
+		package.loaded["core.fs.adapters.file_system"] = files
 		local Writer = require("core.text.engine.toml_codec.writer")
 		local original_publish = Writer.publish_if_unchanged
 		Writer.publish_if_unchanged = function(path, candidate, adapter, expected, on_error)

@@ -12,8 +12,8 @@
 local helpers = require("tests.helpers")
 
 local function reader()
-	package.loaded["infra.openstep_plist"] = nil
-	return require("infra.openstep_plist")
+	package.loaded["core.fs.engine.openstep_plist"] = nil
+	return require("core.fs.engine.openstep_plist")
 end
 
 helpers.describe("openstep-plist-reader", function()

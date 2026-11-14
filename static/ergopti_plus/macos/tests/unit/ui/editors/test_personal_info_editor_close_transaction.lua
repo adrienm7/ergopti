@@ -47,7 +47,7 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.paths"] = { shared = function() return "/virtual/shared" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/shared" end }
 	package.loaded["infra.deferred_work"] = { after = function() return true end }
 	package.loaded["ui.ui_builder"] = {
 		force_focus = function(owner)

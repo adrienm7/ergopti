@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local M = {}
-local Paths = require("infra.paths")
-local Reader = require("infra.regular_file_reader")
+local Paths = require("core.fs.engine.paths")
+local Reader = require("core.fs.engine.regular_file_reader")
 local Json = require("core.text.engine.json")
 local Timings = require("infra.timings")
 local SharedRelay = require("core.network.engine.proxy_auth_relay_core")

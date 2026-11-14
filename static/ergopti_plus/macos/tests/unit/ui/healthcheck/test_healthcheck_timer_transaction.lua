@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"infra.logger", "core.fs.engine.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -79,7 +79,7 @@ local function load_healthcheck(scheduler, title_label)
 	package.loaded["ui.healthcheck.helpers"] = {}
 	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
 	local compose_title = require("ui.ui_builder").window_title
-	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
 	package.loaded["infra.i18n"] = { get = function(key)
 		return key == "menu.debug.healthcheck" and title_label or key
 	end }

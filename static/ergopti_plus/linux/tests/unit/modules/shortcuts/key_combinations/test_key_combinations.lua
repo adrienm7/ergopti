@@ -222,13 +222,13 @@ helpers.describe("ordered pairs through actual native consumers", function()
 	end)
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
 		local Loader = require("platform.remap.tap_hold_loader")
-		local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
+		local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["platform.remap.nav_layer"]={load=function() return {} end},
-			["adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
+			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
 			["infra.config_paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
 			-- requires it; previous cache identity is restored by the outer guard.
@@ -256,7 +256,7 @@ helpers.describe("combination binding canonical program dispatch",function()
 		publish()
 		local ok,err = pcall(function()
 			protected_modules({ ["modules.gestures.manager"]=false,
-				["adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
+				["core.fs.adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
 				["modules.shortcuts.key_combinations"]={ get_action=state.owner.get_action,capture_action=state.owner.capture_action },
 				["modules.gestures.program_owner"]={new=function(capture) return {
 					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
@@ -311,7 +311,7 @@ end)
 helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
+		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
 		local hook={};hook.set_remapper=function(engine,callback)
@@ -324,7 +324,7 @@ helpers.describe("configured pair publication lifecycle",function()
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
@@ -393,7 +393,7 @@ end)
 helpers.describe("independent pair enablement across empty configuration",function()
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
+		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
 		local hook={};hook.set_remapper=function(engine,callback)
@@ -405,7 +405,7 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,

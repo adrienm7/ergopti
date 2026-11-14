@@ -31,7 +31,7 @@ local Logger = require("infra.logger")
 local DeferredWork = require("infra.deferred_work")
 local text_utils = require("infra.text_utils")
 local i18n   = require("infra.i18n")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
 local LOG    = "menu_paths"
 

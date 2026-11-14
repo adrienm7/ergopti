@@ -31,7 +31,7 @@ local file = assert(io.open(regular, "w"))
 assert(file:write("[s]\nk = \"v\"\n"))
 assert(file:close())
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Reader = require("core.text.engine.toml_codec.reader")
 local Writer = require("core.text.engine.toml_codec.writer")
 local checks, failures = 0, 0

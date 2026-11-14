@@ -104,7 +104,7 @@ local function run_tool(args, input)
 	if not dir then return nil, "", "secret-tool result directory unavailable" end
 	local err_path, status_path = dir .. "/stderr", dir .. "/status"
 	local function reserve(path)
-		local opened, fh, _, _, remove = pcall(require("infra.regular_file_writer").open, path, "wx")
+		local opened, fh, _, _, remove = pcall(require("core.fs.engine.regular_file_writer").open, path, "wx")
 		if not opened or not fh then return nil end
 		local closed, ack = pcall(fh.close, fh)
 		if not closed or ack ~= true or type(remove) ~= "function" then

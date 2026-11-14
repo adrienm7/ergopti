@@ -32,12 +32,12 @@ local function with_factory(callback)
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
 			"ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.locale", "core.i18n.engine.core",
-			"infra.logger", "infra.paths", "infra.deferred_work", "adapters.json_codec",
-			"core.events.timer_scheduler", "adapters.storage", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
+			"infra.logger", "core.fs.engine.paths", "infra.deferred_work", "core.fs.adapters.json_codec",
+			"core.events.timer_scheduler", "core.fs.adapters.storage", "core.ui.engine.webview.i18n_seed", "core.ui.engine.window_titles",
 			"hs", "tests.stubs.hs",
 		}, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.paths"] = { shared = helpers.shared }
+			package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 			package.loaded["infra.deferred_work"] = { after = function() return true end }
 			local captions = {}
 			local function new_view()

@@ -110,7 +110,7 @@ local BasicString = require("core.text.engine.toml_codec.basic_string")
 local RecordScanner = require("core.text.engine.toml_codec.record_scanner")
 local Bom = require("core.text.engine.toml_codec.bom")
 local SourceOpen = require("core.text.engine.toml_codec.source_open")
-local NATIVE_WRITER = "infra.regular_file_writer"
+local NATIVE_WRITER = "core.fs.engine.regular_file_writer"
 local has_native_writer = (package.loaded["infra.literal_module_loader"] or package).searchpath(NATIVE_WRITER, package.path) ~= nil
 -- The Linux stage namer, bound with the native writer it serves (CFD-1).
 local StageOwner = has_native_writer and require("infra.stage_owner") or nil
@@ -461,8 +461,8 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 	local admitted_publisher
 	local captured_reader = type(file_adapter) == "table" and rawget(file_adapter, "read_with_status")
 	local adapter_alias
-	if type(file_adapter) == "table" and rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter) then
-		adapter_alias = "adapters.file_system"
+	if type(file_adapter) == "table" and rawequal(rawget(package.loaded, "core.fs.adapters.file_system"), file_adapter) then
+		adapter_alias = "core.fs.adapters.file_system"
 	end
 	if admission ~= nil and type(file_adapter) == "table" then
 		-- Capture the advertised owner before its classified reader can reenter.
@@ -1768,11 +1768,11 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	if admission ~= nil and type(conditional_remover) == "function" then
 		local schema_check = admission
 		local reader = rawget(file_adapter, "read_with_status")
-		local native_alias = rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter)
+		local native_alias = rawequal(rawget(package.loaded, "core.fs.adapters.file_system"), file_adapter)
 		admission = function()
 			return schema_check() == true and rawequal(rawget(file_adapter, "read_with_status"), reader)
 				and rawequal(rawget(file_adapter, "remove_if_unchanged_admitted"), conditional_remover)
-				and (not native_alias or rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter))
+				and (not native_alias or rawequal(rawget(package.loaded, "core.fs.adapters.file_system"), file_adapter))
 		end
 	end
 	if type(conditional_remover) == "function" then

@@ -411,7 +411,7 @@ helpers.describe("original configured Navigation source reservations", function(
 			Manager = require("platform.remap.tap_hold_manager")
 			write_source(dir .. "/layers.toml", nav_text)
 			write_source(dir .. "/tap_hold.toml", tap_text or TAP_NAV)
-			local opts = { shared_root = require("infra.paths").shared_root(), config_dir = dir }
+			local opts = { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir }
 			local function start()
 				return Manager.init({ keyboard_hook = hook,
 					execute_action = function() hook.actions = hook.actions + 1 end,

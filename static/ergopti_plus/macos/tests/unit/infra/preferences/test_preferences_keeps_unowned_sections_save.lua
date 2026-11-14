@@ -104,13 +104,13 @@ helpers.describe("Intrinsic hotstring section-order preservation", function()
 	-- The configuration owner and conditional writer use real private files;
 	-- only Hammerspoon and logging ports are modelled in this portable fixture.
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-			package.loaded["adapters.file_system"] = nil
+			package.loaded["core.fs.adapters.file_system"] = nil
 			Outdated.reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -316,12 +316,12 @@ helpers.describe("Explicit section-order namespace source-shape admission", func
 	local source = '[hotstrings.order_overrides]\nvalid = ["kept"]\n[future]\nkeep = "independent"\n'
 
 	local function with_admitted_file(body)
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local errors = {}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-			package.loaded["adapters.file_system"] = nil
+			package.loaded["core.fs.adapters.file_system"] = nil
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
 			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
@@ -391,13 +391,13 @@ helpers.describe("Obsolete scalar user-model list preservation", function()
 	local tail = '[llm.models]\nuser_models = TOKEN\nactive_backend = "ollama"\n[future]\nkeep = "independent"\nempty = []\nitems = [1, 2]\n"literal.dot" = { stamp = 2026-10-05T10:20:30Z, child = [] }\n'
 
 	local function with_file(source, body)
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 			local warnings, errors = {}, {}
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
 			package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
-			package.loaded["adapters.file_system"] = nil
+			package.loaded["core.fs.adapters.file_system"] = nil
 			Outdated.reset_for_tests()
 			local preferences = helpers.load_with_stubs("infra.preferences")
 			local path = os.tmpname()
@@ -474,7 +474,7 @@ helpers.describe("Obsolete scalar user-model list preservation", function()
 				helpers.assert_eq(preferences.save(path, state, {}, {}), true)
 				local snapshot = preferences.source_snapshot(path)
 				local rows = preferences.prepare_llm_updates(snapshot, clear_rows())
-				helpers.assert_eq(TomlWriter.batch_write(path, rows, require("adapters.file_system"), snapshot), true)
+				helpers.assert_eq(TomlWriter.batch_write(path, rows, require("core.fs.adapters.file_system"), snapshot), true)
 				helpers.assert_eq(TomlCodec.decode(read()).llm.models, { user_models = false, active_backend = "ollama" })
 				helpers.assert_eq(#warnings, 1)
 			end)
@@ -488,7 +488,7 @@ helpers.describe("Obsolete scalar user-model list preservation", function()
 			local rows = clear_rows(); rows[#rows + 1] = { section = "llm.models", key = "active_backend", value = "ollama" }
 			local prepared = preferences.prepare_llm_updates(snapshot, rows)
 			helpers.assert_eq(#prepared, 1, "only the declared neutral list delete is suppressed")
-			helpers.assert_eq(TomlWriter.batch_write(path, prepared, require("adapters.file_system"), snapshot), true)
+			helpers.assert_eq(TomlWriter.batch_write(path, prepared, require("core.fs.adapters.file_system"), snapshot), true)
 			helpers.assert_eq(TomlCodec.decode(read()), { llm = { models = { user_models = false, active_backend = "ollama" } }, future = { empty = {} } })
 			helpers.assert_contains(read(), "empty = []")
 		end)

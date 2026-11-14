@@ -573,27 +573,27 @@ end)
 require("tests.lua.settings.toml_quoted_headers_contract")(helpers)
 require("tests.lua.settings.toml_batch_existing_key_contract")(helpers)
 do
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/inline_scalar_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/toml/inline_scalar_vectors.json"), "rb"))
 	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
 	require("tests.lua.settings.toml_inline_scalar_vectors_contract")(helpers, corpus, 50)
 end
 do
 	local Json = require("core.text.engine.json")
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/batch_write_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/toml/batch_write_vectors.json"), "rb"))
 	local corpus = assert(Json.decode_lossless(file:read("*a")))
 	file:close()
 	require("tests.lua.settings.toml_batch_write_vectors_contract")(helpers, corpus, 144)
 end
 require("tests.lua.settings.toml_leaf_rows_contract")(helpers)
 do
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/hotstring_reader_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/toml/hotstring_reader_vectors.json"), "rb"))
 	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
 	require("tests.lua.settings.toml_hotstring_reader_vectors_contract")(helpers, corpus, 55)
 end
 do
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/toml/leaf_rows_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/toml/leaf_rows_vectors.json"), "rb"))
 	local corpus = assert(require("core.text.engine.json").decode_lossless(file:read("*a")))
 	file:close()
 	require("tests.lua.settings.toml_leaf_rows_vectors_contract")(helpers, corpus, 12)

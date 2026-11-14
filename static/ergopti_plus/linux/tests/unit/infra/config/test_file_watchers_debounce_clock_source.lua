@@ -1,7 +1,7 @@
 --- tests/unit/infra/config/test_file_watchers_debounce_clock_source.lua
 
 ---
---- Unit tests for infra/file_watchers.lua. Exercises the public API —
+--- Unit tests for core/fs/engine/file_watchers.lua. Exercises the public API —
 --- has_inotify(), start/stop lifecycle, debounce deadline logic, and
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
@@ -42,7 +42,7 @@ helpers.describe("file_watchers debounce clock source", function()
 	end
 
 	helpers.it("computes the debounce deadline from the monotonic clock, not os.clock", function()
-		local restore = helpers.keep_loaded({ "infra.monotonic", "infra.file_watchers" })
+		local restore = helpers.keep_loaded({ "infra.monotonic", "core.fs.engine.file_watchers" })
 		local Monotonic = require("infra.monotonic")
 		local wall, fired = 1000000, 0
 		local clock = setmetatable({ now_ms = function() return wall end }, { __index = Monotonic })
@@ -57,7 +57,7 @@ helpers.describe("file_watchers debounce clock source", function()
 			assert(native_luv.fs_utime(source, 1700000000, 1700000000))
 			package.loaded["infra.monotonic"] = clock
 			os.clock = function() return 0 end
-			watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
+			watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", false)
 			watcher.start({ personal_dir = root, on_reload = function() fired = fired + 1 end })
 			watcher.pump()
 			helpers.assert_eq(fired, 0, "the unmodified source must not reload")
@@ -131,7 +131,7 @@ helpers.describe("file_watchers Linux directory identity", function()
 				"the prescribed names must denote distinct real directories")
 		end
 		function fixture.start(path)
-			watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv",
+			watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv",
 				backend == "native" and native_luv or false)
 			watcher.start({ personal_dir = path, now_ms = function() return now end,
 				on_reload = function() fired = fired + 1 end })
@@ -159,12 +159,12 @@ helpers.describe("file_watchers Linux directory identity", function()
 			watcher.pump()
 			helpers.assert_eq(fired, before + expected, "unchanged source must not repeat the reload")
 		end
-		local previous = package.loaded["infra.file_watchers"]
+		local previous = package.loaded["core.fs.engine.file_watchers"]
 		local ok, err = xpcall(function() callback(fixture) end, debug.traceback)
 		local stopped, stop_error = true, nil
 		if watcher then stopped, stop_error = pcall(watcher.stop) end
 		native_luv.run("nowait")
-		package.loaded["infra.file_watchers"] = previous
+		package.loaded["core.fs.engine.file_watchers"] = previous
 		local removed = true
 		for path in pairs(files) do
 			if native_luv.fs_unlink(path) ~= true then removed = false end

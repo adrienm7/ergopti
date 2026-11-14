@@ -286,7 +286,7 @@ function M.with_manager_session(options, body)
 	options = options or {}
 	M.with_session(options, function(s)
 		local ConfigPaths = require("infra.config_paths")
-		local Files = require("adapters.file_system")
+		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
 		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -322,7 +322,7 @@ function M.with_manager_session(options, body)
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
 					return true
 				end, action_names = function() return options.action_names or { "copy" } end, on_text_injected = function() end,
-				defaults_path = require("infra.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }) == true)
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }) == true)
 			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
 			s.arm_deadline = function() return s.engine.one_shot_until end
 			body(s)

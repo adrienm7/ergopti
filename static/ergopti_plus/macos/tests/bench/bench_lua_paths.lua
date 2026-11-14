@@ -189,7 +189,7 @@ assert(os.execute("mkdir -p '" .. scratch .. "/toml_cache'"), "cannot create the
 --- Builds a fresh registry whose every section is enabled.
 --- @return table registry
 local function fresh_registry()
-	for _, name in ipairs({ "adapters.storage", "modules.keymap.registry", "modules.keymap.registry_groups",
+	for _, name in ipairs({ "core.fs.adapters.storage", "modules.keymap.registry", "modules.keymap.registry_groups",
 		"modules.keymap.registry_index", "modules.keymap.terminators" }) do
 		package.loaded[name] = nil
 	end
@@ -241,7 +241,7 @@ workload("toml_parse_magickey", function()
 end)
 
 workload("hotstring_load_warm", function()
-	local Cache = helpers.load_with_stubs("adapters.toml_cache")
+	local Cache = helpers.load_with_stubs("core.fs.adapters.toml_cache")
 	Cache.init(scratch .. "/toml_cache")
 	require("infra.toml.reader").set_cache_provider(Cache)
 	load_packs(fresh_registry())

@@ -75,7 +75,7 @@ function M.with(body)
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
 		package.loaded["core.logger.engine.shim"] = logger
 		local injector

@@ -123,7 +123,7 @@ local function load_editor()
 		end,
 	}
 	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.paths"] = { shared = function() return "/shared/personal_info_editor" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared/personal_info_editor" end }
 	package.loaded["ui.ui_builder"] = {
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
@@ -184,7 +184,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			assert(file:close())
 
 			local personal_info, fence = load_personal_info(config_path, logs)
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local live_info = personal_info.get_info()
 			helpers.assert_eq(live_info.first_name, "Alice")
 
@@ -298,7 +298,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 
 				local logs = {}
 				local personal_info, fence = load_personal_info(config_path, logs)
-				local file_system = require("adapters.file_system")
+				local file_system = require("core.fs.adapters.file_system")
 				local live_info = personal_info.get_info()
 				local old_iban = live_info.iban
 				local writes = 0
@@ -347,7 +347,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 
 			local logs = {}
 			local personal_info, fence = load_personal_info(config_path, logs)
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local live_info = personal_info.get_info()
 			local private_key = "PRIVATE-LEGACY-KEY"
 			local private_value = "PRIVATE-LEGACY-VALUE"
@@ -392,7 +392,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			assert(file:close())
 
 			local personal_info, fence = load_personal_info(config_path, {})
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local captured = nil
 			fence.allow = true
 			local committed = with_adapter_overrides(file_system, {
@@ -441,7 +441,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			assert(file:close())
 
 			local personal_info, fence = load_personal_info(config_path, {})
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local live_info = personal_info.get_info()
 			local publications = 0
 			fence.allow = true
@@ -511,7 +511,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			package.loaded["infra.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local registrations = 0
 			local publications = 0
 			local keymap = {
@@ -565,7 +565,7 @@ helpers.describe("PersonalInfo.save_info transaction (personal-info-save-commit-
 			package.loaded["infra.logger"] = Logger
 			package.loaded["modules.dynamic_hotstrings.personal_info"] = nil
 			local personal_info = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
-			local file_system = require("adapters.file_system")
+			local file_system = require("core.fs.adapters.file_system")
 			local registrations = 0
 			local publications = 0
 			local keymap = {

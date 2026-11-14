@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local TEMP = "/tmp/lua_screen_reading"
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
@@ -55,7 +55,7 @@ local function with_subject(scenario)
 	local saved_hs = _G.hs
 	local fixture = { tasks = {}, notifications = {}, removed = {}, infos = {}, file = nil }
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			fixture.file = ""
 			return TEMP

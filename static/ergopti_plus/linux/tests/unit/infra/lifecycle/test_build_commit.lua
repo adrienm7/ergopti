@@ -144,7 +144,7 @@ describe("Build commit: the shared stamp parser and resolver", function()
 	end)
 
 	it("the source tree ships no stamp, so a checkout reports its real HEAD", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local stamp = Paths.shared(Snapshot.BUILD_STAMP_FILE)
 		local fh = stamp and io.open(stamp, "r")
 		if fh then fh:close() end
@@ -206,7 +206,7 @@ end)
 describe("Build commit: the healthcheck reports the commit and the real config dir", function()
 	it("sends the resolved commit, its source, the config dir and the script dir", function()
 		local ConfigPaths = require("infra.config_paths")
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local handler = helpers.load_module("ui.healthcheck.bridge")
 		local result
 		with_module("infra.diagnostic_snapshot", {

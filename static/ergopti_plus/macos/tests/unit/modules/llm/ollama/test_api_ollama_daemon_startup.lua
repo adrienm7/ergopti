@@ -29,7 +29,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
 			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.http_client", "core.events.timer_scheduler", "adapters.json_codec",
+			"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 			"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
@@ -47,7 +47,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				after = function() error("foreground startup must not acquire a launch timer") end,
 				cancel = function() return true end,
 			}
-			package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+			package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 			}
@@ -131,7 +131,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 				fixture.posts[#fixture.posts + 1] = { url = url, body = body, done = done }
 			end
 			local json = require("core.text.engine.json")
-			fixture.codec = package.loaded["adapters.json_codec"]
+			fixture.codec = package.loaded["core.fs.adapters.json_codec"]
 			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
 			package.loaded["core.events.timer_scheduler"].now = function() return 1 end
 			package.loaded["modules.llm.parser"].strip_thinking = require("ai.engine.api.parser_core").strip_thinking
@@ -249,7 +249,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			with_owned_responses(function(api, fixture)
 				fixture.request()
 				fixture.tags(1, { { name = "qwen2.5:7b" } })
-				local storage = require("adapters.storage")
+				local storage = require("core.fs.adapters.storage")
 				local read_setting = storage.get
 				storage.get = function(key)
 					if key ~= "llm.ollama_owned_port" then return read_setting(key) end

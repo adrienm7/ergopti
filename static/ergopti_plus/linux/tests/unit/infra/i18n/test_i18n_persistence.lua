@@ -39,7 +39,7 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("locale discovery", function()
     helpers.it("(locale-order-close) falls back when the order stream close is refused", function()
-      local reader, directory, paths = require("infra.regular_file_reader"), require("infra.native_directory"), require("infra.paths")
+      local reader, directory, paths = require("core.fs.engine.regular_file_reader"), require("core.fs.engine.native_directory"), require("core.fs.engine.paths")
       local original_open, original_entries, original_shared = reader.open_source, directory.entries, paths.shared
       reader.open_source = function()
         return { read = function() return '{"order":["fr","en"]}' end, close = function() return nil, "close failed" end }
@@ -108,7 +108,7 @@ helpers.describe("i18n persistence", function()
       return {
         retry_locale = function() return true end,
         edit_locale = function(value)
-          if require("adapters.storage").set("locale", value) ~= true then return false end
+          if require("core.fs.adapters.storage").set("locale", value) ~= true then return false end
           local native = require("infra.i18n")
           local token = { pending = function() return false end }
           assert(native.scope_acquire(token))
@@ -123,11 +123,11 @@ helpers.describe("i18n persistence", function()
     helpers.it("set_locale + get_locale round-trips", function()
       -- An in-memory store that acknowledges every write: the round trip must
       -- not depend on whichever storage adapter an earlier test file left loaded.
-      local saved_storage = package.loaded["adapters.storage"]
+      local saved_storage = package.loaded["core.fs.adapters.storage"]
       local saved_scope = package.loaded["infra.script_scope"]
       package.loaded["infra.script_scope"] = stub_scope_for_store()
       local stored = {}
-      package.loaded["adapters.storage"] = {
+      package.loaded["core.fs.adapters.storage"] = {
         get = function(key) return stored[key] end,
         set = function(key, value) stored[key] = value; return true end,
       }
@@ -146,17 +146,17 @@ helpers.describe("i18n persistence", function()
         i18n.set_locale(before)
         helpers.assert_eq(i18n.get_locale(), before, "locale restored")
       end)
-      package.loaded["adapters.storage"] = saved_storage
+      package.loaded["core.fs.adapters.storage"] = saved_storage
       package.loaded["infra.script_scope"] = saved_scope
       package.loaded["infra.i18n"] = nil
       if not ok then error(err, 0) end
     end)
 
 		helpers.it("does not publish a locale whose durable write failed", function()
-			local saved_storage = package.loaded["adapters.storage"]
+			local saved_storage = package.loaded["core.fs.adapters.storage"]
 			local saved_scope = package.loaded["infra.script_scope"]
 			package.loaded["infra.script_scope"] = stub_scope_for_store()
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function() return "fr" end,
 				set = function() return false end,
 			}
@@ -169,7 +169,7 @@ helpers.describe("i18n persistence", function()
 				helpers.assert_eq(i18n.get_locale(), "fr",
 					"the active locale must remain aligned with durable storage")
 			end)
-			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["core.fs.adapters.storage"] = saved_storage
 			package.loaded["infra.script_scope"] = saved_scope
 			package.loaded["infra.i18n"] = nil
 			if not ok then error(err, 0) end
@@ -192,14 +192,14 @@ helpers.describe("i18n persistence", function()
 		end)
 
 		helpers.it("(lcy-002-system-locale) a first run and an unknown saved code follow the session language", function()
-			local saved_storage = package.loaded["adapters.storage"]
+			local saved_storage = package.loaded["core.fs.adapters.storage"]
 			local saved_scope = package.loaded["infra.script_scope"]
 			local saved_getenv = os.getenv
 			package.loaded["infra.script_scope"] = stub_scope_for_store()
 			local ok, err = pcall(function()
 				os.getenv = function(name) if name == "LANG" then return "de_DE.UTF-8" end return nil end
 				for _, saved in ipairs({ false, "xx" }) do
-					package.loaded["adapters.storage"] = {
+					package.loaded["core.fs.adapters.storage"] = {
 						get = function() return saved or nil end,
 						set = function() return true end,
 					}
@@ -211,7 +211,7 @@ helpers.describe("i18n persistence", function()
 				end
 			end)
 			os.getenv = saved_getenv
-			package.loaded["adapters.storage"] = saved_storage
+			package.loaded["core.fs.adapters.storage"] = saved_storage
 			package.loaded["infra.script_scope"] = saved_scope
 			package.loaded["infra.i18n"] = nil
 			if not ok then error(err, 0) end
@@ -304,7 +304,7 @@ end)
 
 helpers.describe("i18n explicit wizard persistence", function()
 	local function with_owned_store(options, body)
-		local names = { "infra.i18n", "infra.locale", "adapters.storage", "infra.config_paths", "infra.script_settings", "ui.error_dialog.bridge" }
+		local names = { "infra.i18n", "infra.locale", "core.fs.adapters.storage", "infra.config_paths", "infra.script_settings", "ui.error_dialog.bridge" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -333,7 +333,7 @@ helpers.describe("i18n explicit wizard persistence", function()
 				default_config_dir = function() return root .. "/" .. FOLDER end,
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["infra.locale"] = nil
-			package.loaded["adapters.storage"] = nil
+			package.loaded["core.fs.adapters.storage"] = nil
 			package.loaded["infra.script_settings"] = nil
 			package.loaded["ui.error_dialog.bridge"] = nil
 			package.loaded["infra.i18n"] = nil

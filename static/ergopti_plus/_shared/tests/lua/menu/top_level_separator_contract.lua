@@ -9,7 +9,7 @@ local function read_json(path)
 	return assert(Json.decode(data))
 end
 local function scenario(platform, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local strings = read_json(Paths.shared("core/i18n/data/locales/en.json"))
 	local renderer = assert(Renderer.new({platform = platform,
 		manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
@@ -25,7 +25,7 @@ local function plain_boundary(helpers, row)
 end
 function M.register(helpers, driver)
 	local platform = driver == "macos" and "hs" or "linux"
-	local oracle = read_json(require("infra.paths").shared("tests/corpus/menus/top_level_separators_original.json"))
+	local oracle = read_json(require("core.fs.engine.paths").shared("tests/corpus/menus/top_level_separators_original.json"))
 	helpers.describe("actual declared top-level boundaries (declared-top-level-separator)", function()
 		helpers.it("keeps every original source position and platform owner (declared-top-level-separator)", function()
 			scenario(platform, function(renderer)

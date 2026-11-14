@@ -9,8 +9,8 @@
 
 local M = {}
 local task_receipts = setmetatable({}, { __mode = "k" })
-local FileSystem = require("adapters.file_system")
-local FsDir = require("infra.fs_dir")
+local FileSystem = require("core.fs.adapters.file_system")
+local FsDir = require("core.fs.engine.dir")
 local Json = require("core.text.engine.json")
 local Receipt = require("core.lifecycle.engine.core.managed_ollama_pull_receipt")
 local Logger = require("infra.logger")

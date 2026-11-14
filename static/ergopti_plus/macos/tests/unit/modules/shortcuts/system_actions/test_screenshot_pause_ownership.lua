@@ -16,7 +16,7 @@ local function fresh_screenshot()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.screenshot_save",
 		"adapters.shell_runner",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"adapters.screen_capture",
 		"modules.shortcuts.actions.screen_capture_flow",
 		"infra.logger",
@@ -105,7 +105,7 @@ local function fresh_screenshot()
 	-- Every capture produced its image and the clipboard accepted it: this file
 	-- exercises lifecycle ownership, not the capture verdict.
 	local temp_files = 0
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		expand_path = function() return "/tmp/hs012-home" end,
 		create_secure_temp_file = function()
 			temp_files = temp_files + 1

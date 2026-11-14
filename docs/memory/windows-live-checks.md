@@ -154,7 +154,7 @@ user's real `A_Startup` shortcut, and every `ST_*` value (WPM widget position,
 LLM refusal and agent state, updater cadence) went to the real
 `HKCU\Software\Ergopti\Storage`. `infra/start_at_login.ahk` takes its folder
 and approval reader from `_StartAtLoginIsolate` (private `startup_private\`,
-no Windows approval) and `adapters/storage.ahk` swaps every registry port in
+no Windows approval) and `core/fs/adapters/storage.ahk` swaps every registry port in
 `_ST_Isolate` for `storage_private.txt`, a caller's included. Each logs one
 `Isolated profile:` line. No live check clicks start at login, and the real
 Storage key is not a leak oracle: the user's own driver writes it meanwhile.

@@ -191,7 +191,7 @@ helpers.describe("gestures.actions: get_label", function()
 	helpers.it("names shared modifier chords in the user's language", function()
 		local i18n = require("infra.i18n")
 		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
-		local french = assert(require("adapters.json_codec").decode(assert(file:read("*a"))))
+		local french = assert(require("core.fs.adapters.json_codec").decode(assert(file:read("*a"))))
 		file:close()
 		local saved = i18n.get
 		i18n.get = function(key) return french[key] or key end

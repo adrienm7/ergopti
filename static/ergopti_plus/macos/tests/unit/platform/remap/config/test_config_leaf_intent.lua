@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "adapters.file_system", "infra.logger", "core.logger.engine.shim",
+local MODULES = { "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim",
 	"core.text.engine.toml_codec", "infra.toml.codec" }
 
 --- Runs body against one real source file; publication is captured in place.
@@ -41,7 +41,7 @@ local function with_file(original, body)
 		original, original_config = Text.file(original)
 		write(original)
 		Text.write_config(path, original_config)
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local native_write = files.write_if_unchanged
 		local controls = { writes = 0 }
 		-- The source fence is the writer's; this fixture records the exact

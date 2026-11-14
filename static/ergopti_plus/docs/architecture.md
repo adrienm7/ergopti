@@ -52,9 +52,6 @@ graph TD
         LINUX_desktop_opener["DesktopOpener.lua"]
         LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
-        LINUX_file_digest["FileDigest.lua"]
-        LINUX_file_manager_folder["FileManagerFolder.lua"]
-        LINUX_file_system["FileSystem.lua"]
         LINUX_graphics_renderer["GraphicsRenderer.lua"]
         LINUX_http_client["HttpClient.lua"]
         LINUX_input_source_group_worker["InputSourceGroupWorker.lua"]
@@ -75,7 +72,6 @@ graph TD
         LINUX_shell_runner["ShellRunner.lua"]
         LINUX_spotlight_overlay["SpotlightOverlay.lua"]
         LINUX_sqlite_process_worker["SqliteProcessWorker.lua"]
-        LINUX_storage["Storage.lua"]
         LINUX_system_proxy["SystemProxy.lua"]
         LINUX_tap_to_click_setting["TapToClickSetting.lua"]
         LINUX_tcp_probe["TcpProbe.lua"]
@@ -108,7 +104,6 @@ graph TD
         MACOS_field_check_ports["FieldCheckPorts.lua"]
         MACOS_field_probe_ports["FieldProbePorts.lua"]
         MACOS_field_run_ports["FieldRunPorts.lua"]
-        MACOS_file_system["FileSystem.lua"]
         MACOS_foreign_ledger_snapshot["ForeignLedgerSnapshot.lua"]
         MACOS_graphics_renderer["GraphicsRenderer.lua"]
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
@@ -116,15 +111,12 @@ graph TD
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_installed_physical_source["InstalledPhysicalSource.lua"]
-        MACOS_json_codec["JsonCodec.lua"]
         MACOS_karabiner_coexistence["KarabinerCoexistence.lua"]
         MACOS_key_state["KeyState.lua"]
         MACOS_keyboard_geometry["KeyboardGeometry.lua"]
         MACOS_keyboard_hook["KeyboardHook.lua"]
         MACOS_keyboard_layout_files["KeyboardLayoutFiles.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
-        MACOS_ledger_append["LedgerAppend.lua"]
-        MACOS_legacy_folder_migration["LegacyFolderMigration.lua"]
         MACOS_log_transport["LogTransport.lua"]
         MACOS_managed_ollama_bootstrap["ManagedOllamaBootstrap.lua"]
         MACOS_managed_ollama_daemon["ManagedOllamaDaemon.lua"]
@@ -158,7 +150,6 @@ graph TD
         MACOS_screen_capture["ScreenCapture.lua"]
         MACOS_secure_field_detector["SecureFieldDetector.lua"]
         MACOS_shell_runner["ShellRunner.lua"]
-        MACOS_storage["Storage.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
         MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
         MACOS_system_curl["SystemCurl.lua"]
@@ -171,7 +162,6 @@ graph TD
         MACOS_task_output_turn["TaskOutputTurn.lua"]
         MACOS_tcc_grant["TccGrant.lua"]
         MACOS_text_sender["TextSender.lua"]
-        MACOS_toml_cache["TomlCache.lua"]
         MACOS_tooltip_renderer["TooltipRenderer.lua"]
         MACOS_tray_menu["TrayMenu.lua"]
         MACOS_unicode_carrier["UnicodeCarrier.lua"]
@@ -179,7 +169,6 @@ graph TD
         MACOS_webview_result["WebviewResult.lua"]
         MACOS_window_info["WindowInfo.lua"]
         MACOS_window_manager["WindowManager.lua"]
-        MACOS_write_lock_path["WriteLockPath.lua"]
     end
 
     subgraph WINDOWS_Adapters["Windows (AutoHotkey) Adapters — windows/adapters/"]
@@ -191,9 +180,6 @@ graph TD
         WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_driver_control["DriverControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
-        WINDOWS_file_publication["FilePublication.ahk"]
-        WINDOWS_file_system["FileSystem.ahk"]
-        WINDOWS_file_system_ports["FileSystemPorts.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
         WINDOWS_hotkey_registrar["HotkeyRegistrar.ahk"]
         WINDOWS_http_client["HttpClient.ahk"]
@@ -222,8 +208,6 @@ graph TD
         WINDOWS_screen_capture["ScreenCapture.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
-        WINDOWS_sqlite_native["SqliteNative.ahk"]
-        WINDOWS_storage["Storage.ahk"]
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_system_locale["SystemLocale.ahk"]
         WINDOWS_system_time_zone["SystemTimeZone.ahk"]
@@ -253,21 +237,18 @@ graph TD
 
     %% Port implementations: Linux (Lua)
     P_Clipboard -->|implements| LINUX_clipboard
-    P_FileSystem -->|implements| LINUX_file_system
     P_GraphicsRenderer -->|implements| LINUX_graphics_renderer
     P_HttpClient -->|implements| LINUX_http_client
     P_KeyboardHook -->|implements| LINUX_keyboard_hook
     P_Notifier -->|implements| LINUX_notifier
     P_ProcessLifecycle -->|implements| LINUX_process_lifecycle
     P_SecureFieldDetector -->|implements| LINUX_secure_field_detector
-    P_Storage -->|implements| LINUX_storage
     P_TrayMenu -->|implements| LINUX_tray_menu
     P_WindowInfo -->|implements| LINUX_window_info
 
     %% Port implementations: macOS (Hammerspoon)
     P_AppLauncher -->|implements| MACOS_app_launcher
     P_Clipboard -->|implements| MACOS_clipboard
-    P_FileSystem -->|implements| MACOS_file_system
     P_GraphicsRenderer -->|implements| MACOS_graphics_renderer
     P_HotkeyRegistrar -->|implements| MACOS_hotkey_registrar
     P_HttpClient -->|implements| MACOS_http_client
@@ -278,7 +259,6 @@ graph TD
     P_Notifier -->|implements| MACOS_notifier
     P_ProcessLifecycle -->|implements| MACOS_process_lifecycle
     P_SecureFieldDetector -->|implements| MACOS_secure_field_detector
-    P_Storage -->|implements| MACOS_storage
     P_TextSender -->|implements| MACOS_text_sender
     P_TooltipRenderer -->|implements| MACOS_tooltip_renderer
     P_TrayMenu -->|implements| MACOS_tray_menu
@@ -288,7 +268,6 @@ graph TD
     %% Port implementations: Windows (AutoHotkey)
     P_AppLauncher -->|implements| WINDOWS_app_launcher
     P_Clipboard -->|implements| WINDOWS_clipboard
-    P_FileSystem -->|implements| WINDOWS_file_system
     P_GraphicsRenderer -->|implements| WINDOWS_graphics_renderer
     P_HotkeyRegistrar -->|implements| WINDOWS_hotkey_registrar
     P_HttpClient -->|implements| WINDOWS_http_client
@@ -299,7 +278,6 @@ graph TD
     P_Notifier -->|implements| WINDOWS_notifier
     P_ProcessLifecycle -->|implements| WINDOWS_process_lifecycle
     P_SecureFieldDetector -->|implements| WINDOWS_secure_field_detector
-    P_Storage -->|implements| WINDOWS_storage
     P_TextSender -->|implements| WINDOWS_text_sender
     P_TooltipRenderer -->|implements| WINDOWS_tooltip_renderer
     P_TrayMenu -->|implements| WINDOWS_tray_menu

@@ -19,7 +19,7 @@ local TIMESTAMP = "2026-10-26 00:00:00.000"
 --- @param check function Inspect the pending writer and recover its exact entry.
 local function with_receipt(count, check, options)
 	options = options or {}
-	helpers.with_stub_scope({ "modules.keystats.rotation", "adapters.ledger_append", "infra.logger" }, function()
+	helpers.with_stub_scope({ "modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger" }, function()
 		local path, original_open = os.tmpname(), io.open
 		local prefix = '{"type":"typing","timestamp":"' .. TIMESTAMP .. '","text":"prior"}\n'
 		if options.unterminated_prefix then prefix = prefix:sub(1, -2) end
@@ -32,7 +32,7 @@ local function with_receipt(count, check, options)
 			assert(file:seek("set", offset)); assert(file:write(bytes)); assert(file:close())
 		end
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.ledger_append"] = { rollover = function(_, _, _, _, date, reset)
+		package.loaded["core.fs.adapters.ledger_append"] = { rollover = function(_, _, _, _, date, reset)
 			owner_calls = owner_calls + 1
 			return reset(date, {})
 		end }
@@ -187,12 +187,12 @@ helpers.describe("rotation exact refused append receipt", function()
 	for _, invalid in ipairs({ { name = "zero", value = 0 }, { name = "EOF-only", value = 1 },
 		{ name = "fractional", value = 2.5 }, { name = "missing" } }) do
 		helpers.it("(journal-append-injected-budget) refuses a " .. invalid.name .. " init budget before journal IO", function()
-			helpers.with_stub_scope({ "modules.keystats.rotation", "infra.logger", "adapters.ledger_append" }, function()
+			helpers.with_stub_scope({ "modules.keystats.rotation", "infra.logger", "core.fs.adapters.ledger_append" }, function()
 				local logger = helpers.make_logger_stub()
 				local errors, opens = 0, 0
 				logger.error = function() errors = errors + 1 end
 				package.loaded["infra.logger"] = logger
-				package.loaded["adapters.ledger_append"] = {}
+				package.loaded["core.fs.adapters.ledger_append"] = {}
 				local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 				local original_open = io.open
 				io.open = function() opens = opens + 1; return nil, "unexpected journal IO" end

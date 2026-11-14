@@ -97,7 +97,7 @@ function M.report(deps, detail)
 	if deps.program then
 		body = body:gsub("{1}", function() return deps.program end)
 	elseif body:find("{1}", 1, true) then
-		local root = deps.script_dir or require("infra.paths").driver_root()
+		local root = deps.script_dir or require("core.fs.engine.paths").driver_root()
 		local command = "bash " .. require("adapters.shell_runner").quote(root .. "/install.sh") .. " --setup-perms"
 		body = body:gsub("{1}", function() return command end)
 	end

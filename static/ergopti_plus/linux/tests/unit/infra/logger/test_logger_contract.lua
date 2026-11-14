@@ -45,7 +45,7 @@ local assert_true = helpers.assert_true
 
 local json   = require("core.text.engine.json")
 
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 -- Format vectors own a private instance of the actual shared core. A live
 -- singleton can carry a pending dedup summary from earlier native-owner tests;

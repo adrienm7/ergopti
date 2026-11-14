@@ -14,7 +14,7 @@ local target, endpoint, kind = os.getenv("HC_TARGET"), os.getenv("HC_SOURCE_PATH
 local regular = os.getenv("HC_REGULAR") == "1"
 local old_open = io.open
 io.open = function(path, mode) if path == target then return old_open(endpoint, mode) end return old_open(path, mode) end
-local reader = require("infra.regular_file_reader")
+local reader = require("core.fs.engine.regular_file_reader")
 local old_source = reader.open_source
 reader.open_source = function(path) return old_source(path == target and endpoint or path) end
 local bridge = require("ui.healthcheck.bridge")

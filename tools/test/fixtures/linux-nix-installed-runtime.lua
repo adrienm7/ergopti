@@ -10,7 +10,7 @@ if native_path ~= nil then
  end
 end
 local uv = require("luv")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 assert(Paths.driver_root() == out .. "/lib/ergopti", "Exact installed driver root required")
 assert(Paths.shared_root() == out .. "/lib/ergopti/_shared", "Exact installed shared root required")
 assert(uv.exepath():match("^/nix/store/"), "Packaged interpreter required")

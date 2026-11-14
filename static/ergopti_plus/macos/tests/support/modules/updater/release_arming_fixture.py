@@ -20,13 +20,13 @@ local Json = require('core.text.engine.json')
 local logger = {}
 for _, name in ipairs({'start','success','trace','done','info','debug','warn','error'}) do logger[name]=function() end end
 package.preload['infra.logger']=function() return logger end
-package.preload['infra.paths']=function() return {shared=function(path)
+package.preload['core.fs.engine.paths']=function() return {shared=function(path)
     assert(path=='../macos/adapters/release_stage.sh');return driver..'/adapters/release_stage.sh'
 end} end
-package.preload['adapters.file_system']=function() return {read=function(path)
+package.preload['core.fs.adapters.file_system']=function() return {read=function(path)
     local file=assert(io.open(path,'rb'));local body=assert(file:read('a'));assert(file:close());return body
 end} end
-package.preload['adapters.json_codec']=function() return Json end
+package.preload['core.fs.adapters.json_codec']=function() return Json end
 package.preload['adapters.shell_runner']=function() return {} end
 local installer=require('modules.updater.release_installer')
 installer._getenv=function(name)

@@ -11,9 +11,9 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.fs_dir",
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths", "core.fs.engine.dir",
 			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
-			"adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
+			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
 				output = "", status = true, kind = "exit", code = 0 }
 			local logger = helpers.make_logger_stub()
@@ -21,9 +21,9 @@ local function with_apps(callback)
 				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
 			package.loaded["infra.logger"] = logger
-			package.loaded["infra.paths"] = { shared = function() return "/virtual/locales" end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/locales" end }
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 				state.calls[#state.calls + 1] = directory
 				if directory:find("/Contents/Resources", 1, true) then
 					if state.icon_failure then return {}, false end
@@ -276,8 +276,8 @@ local function with_native_apps_parent(language, body)
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
 		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "core.i18n.engine.core",
-			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.engine.renderer",
-			"adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }) do
+			"infra.manifest_menu", "infra.config_paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
+			"adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
 		end
 		helpers.load_with_stubs("infra.logger")
@@ -304,7 +304,7 @@ local function with_native_apps_parent(language, body)
 			if path == "/virtual/Apps/apps" then return { mode = "directory" } end
 			return old_attributes(path)
 		end
-		package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+		package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 			state.scans = state.scans + 1
 			if state.on_scan then state.on_scan() end
 			if directory:find("/Contents/Resources", 1, true) then return {}, true end
@@ -362,7 +362,7 @@ helpers.describe("the complete shared Apps parent", function()
 		helpers.it("(apps-parent-native) retains actual complete installed rows and callbacks in " .. language, function()
 			with_native_apps_parent(language, function(module, renderer, state, ctx, native)
 				local file = assert(io.open(helpers.shared("tests/corpus/menus/apps_parent.json"), "rb"))
-				local expected = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+				local expected = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 				local parent = assert(module.build(ctx))
 				helpers.assert_eq(parent.label, expected.captions[language])
 				helpers.assert_eq(rawequal(parent.submenu, state.finished), true)
@@ -393,12 +393,12 @@ helpers.describe("Apps parent declaration admission", function()
 	helpers.it("(apps-parent-native) owns every actual caption and the declared platform presence", function()
 		with_native_apps_parent("en", function(_, renderer)
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/apps_parent.json"), "rb"))
-			local expected = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+			local expected = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			helpers.assert_eq(actual_parent(renderer), expected.row)
 			local count = 0
 			for language, caption in pairs(expected.captions) do
 				local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. language .. ".json"), "rb"))
-				local locale = assert(require("adapters.json_codec").decode(locale_file:read("*a"))); assert(locale_file:close())
+				local locale = assert(require("core.fs.adapters.json_codec").decode(locale_file:read("*a"))); assert(locale_file:close())
 				helpers.assert_eq(locale["menu.apps.title"], caption); count = count + 1
 			end
 			helpers.assert_eq(count, 21)

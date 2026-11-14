@@ -94,7 +94,7 @@ local function fresh_bridge(options)
 	package.loaded["platform.remap.ke_variables"] = nil
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.json_codec"] = nil
+	package.loaded["core.fs.adapters.json_codec"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_contract"] = nil
 	package.loaded["platform.remap.lease_controller"] = nil
@@ -137,7 +137,7 @@ local function fresh_bridge(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.json_codec"] = {
+	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function(values)
 			local payload = "payload-" .. tostring(#ctx.payloads + 1)
 			ctx.payloads[#ctx.payloads + 1] = {
@@ -999,7 +999,7 @@ end)
 package.loaded["platform.remap.ke_variables"] = nil
 package.loaded["adapters.shell_runner"] = nil
 package.loaded["core.events.timer_scheduler"] = nil
-package.loaded["adapters.json_codec"] = nil
+package.loaded["core.fs.adapters.json_codec"] = nil
 package.loaded["platform.remap.ke_paths"] = nil
 package.loaded["platform.remap.lease_contract"] = nil
 package.loaded["platform.remap.lease_controller"] = nil

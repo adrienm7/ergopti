@@ -15,8 +15,8 @@ require("core.logger.engine")
 local function with_host(scenario)
 	helpers.with_stub_scope({ "ui.physical_shortcuts", "shortcuts.engine.physical_editor_window",
 		"shortcuts.engine.physical_slots", "shortcuts.engine.physical_availability", "ui.ui_builder", "ui.webview_close_owner",
-		"infra.logger", "infra.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "adapters.file_system",
-		"core.ui.engine.window_titles", "core.text.engine.json", "adapters.json_codec", "infra.deferred_work", "core.events.timer_scheduler",
+		"infra.logger", "core.fs.engine.paths", "infra.i18n", "core.ui.engine.webview.i18n_seed", "core.fs.adapters.file_system",
+		"core.ui.engine.window_titles", "core.text.engine.json", "core.fs.adapters.json_codec", "infra.deferred_work", "core.events.timer_scheduler",
 		"infra.locale", "core.i18n.engine.core", "core.ui.engine.webview.presentation", "tests.support.webview_recursive_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, errors = {}, notification_depth = 0,
@@ -28,10 +28,10 @@ local function with_host(scenario)
 			if h.on_error then h.on_error() end
 		end
 		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = function(path) return path end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return path end }
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.webview.i18n_seed"] = {}
-		package.loaded["adapters.file_system"] = { read = function() return "{}" end }
+		package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(key) return key end }
 		package.loaded["core.text.engine.json"] = { encode = function() return "{}" end }
 		package.loaded["shortcuts.engine.physical_slots"] = { new = function() return { candidates = function() return {} end } end }

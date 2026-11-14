@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- The shared file, decoded independently of the module under test.
 local function shared_brands()
 	local Json = require("core.text.engine.json")
-	local path = require("infra.paths").shared("ai/data/backends.json")
+	local path = require("core.fs.engine.paths").shared("ai/data/backends.json")
 	local fh = assert(io.open(path, "r"))
 	local root = Json.decode(fh:read("*a"))
 	fh:close()

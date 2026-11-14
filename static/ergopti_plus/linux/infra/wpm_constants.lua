@@ -17,7 +17,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local Codec  = require("core.text.engine.toml_codec")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local Model  = require("metrics.engine.wpm_widget_model")
 
 local LOG = "infra.wpm_constants"

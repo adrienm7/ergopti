@@ -24,7 +24,7 @@ local function head(text)
 end
 
 local function with_menu(driver, body)
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local corpus = assert(Json.decode(read(Paths.shared("tests/corpus/menus/disabled_reasons.json"))))
 	local captions = assert(Json.decode(read(Paths.shared("core/i18n/data/locales/en.json"))))
 	local path = os.tmpname()

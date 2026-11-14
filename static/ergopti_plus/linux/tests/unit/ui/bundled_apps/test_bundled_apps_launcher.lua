@@ -69,7 +69,7 @@ helpers.describe("Linux bundled apps launcher", function()
 	-- Under a relative package.path this module's source path is relative, and
 	-- the dialog command used to refuse every dialog for want of a driver root.
 	helpers.it("bundled apps: an app dialog opens under a relative module path", function()
-		local root = require("infra.paths").driver_root()
+		local root = require("core.fs.engine.paths").driver_root()
 		local code = 'package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;"'
 			.. ' .. package.path; io.write(require("ui.native_dialog").command())'
 		local pipe = assert(io.popen("cd " .. quote(root) .. " && " .. quote(require("luv").exepath())

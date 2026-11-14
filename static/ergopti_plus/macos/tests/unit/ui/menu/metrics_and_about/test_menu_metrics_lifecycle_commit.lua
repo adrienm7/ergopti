@@ -46,7 +46,7 @@ local function load_menu(start_result)
 		manifest_path = function()
 			return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 		end,
-		json_decode = require("adapters.json_codec").decode,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = renderer_i18n,
 		logger = helpers.make_logger_stub(),
 	}))

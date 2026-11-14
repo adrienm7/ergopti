@@ -19,19 +19,19 @@ local function run_window(module_name, scenario)
 		"ui.config_cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
 		"ui.metrics_apps", "infra.dialog_util", "infra.toml.writer", "infra.toml.codec", "infra.manifest_reader",
-		"tests.support.onboarding_shared_data", "adapters.file_system", "hs.spaces",
+		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
 		"core.text.engine.toml_codec.writer", "settings.engine.migration.unused_keys", "diagnostics.engine.operation_reporter", "core.text.engine.toml_codec.record_list",
 		"settings.engine.migration.outdated", "core.fs.engine.module_source_identity", "core.text.engine.toml_codec.leaf_rows", "lfs", "core.fs.engine.module_source_directory",
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
 		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.cleanup_roots", "settings.engine.publication.user_models",
 		"infra.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
-		"infra.fs_dir", "adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
+		"core.fs.engine.dir", "adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
 		"ai.engine.local_servers.model_catalogue", "adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
 		"adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
 		"ui.model_browser", "ui.changelog",
 		"ui.ui_builder", "ui.webview_close_owner", "core.events.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
-		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "adapters.json_codec", "diagnostics.engine.reports.redact",
+		"infra.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"core.fs.engine.app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",
 		"modules.keystats.log_manager", "tests.support.native_webview_close_fixture",
@@ -81,7 +81,7 @@ local function run_window(module_name, scenario)
 		if module_name == "ui.config_cleanup" then package.loaded["infra.i18n"] = nil end
 		if module_name == "ui.onboarding" then require("tests.support.onboarding_shared_data").install() end
 		if module_name == "ui.changelog" then
-			local files = require("adapters.file_system")
+			local files = require("core.fs.adapters.file_system")
 			local original = files.read
 			files.read = function(path, ...)
 				for _, name in ipairs({ "channels", "defaults" }) do

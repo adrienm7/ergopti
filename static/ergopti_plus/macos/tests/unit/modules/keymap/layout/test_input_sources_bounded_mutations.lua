@@ -181,7 +181,7 @@ local function status_test(name, body)
 		helpers.with_stub_scope({
 			"modules.keymap.input_sources", "modules.keymap.layout_install",
 			"adapters.shell_runner", "core.events.timer_scheduler", "adapters.task_lifecycle",
-			"adapters.python_interpreter", "infra.openstep_plist",
+			"adapters.python_interpreter", "core.fs.engine.openstep_plist",
 			"adapters.input_source_selector", "platform.remap.lease_helper",
 		}, body)
 	end)

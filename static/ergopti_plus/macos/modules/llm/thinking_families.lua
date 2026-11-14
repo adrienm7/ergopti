@@ -17,8 +17,8 @@
 local M = {}
 
 local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
-local JsonCodec   = require("adapters.json_codec")
+local Paths       = require("core.fs.engine.paths")
+local JsonCodec   = require("core.fs.adapters.json_codec")
 local ThinkingOff = require("ai.engine.policy.thinking_off")
 
 local LOG = "llm.thinking_families"

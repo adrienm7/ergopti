@@ -14,7 +14,7 @@ local function action_scope(fresh, body)
 			source_snapshot = function() return { status = "ok", content = "canonical source" } end,
 			capture_source_delivery_guard = function() return function() return source_current end end,
 		}
-		package.loaded["adapters.file_system"].read_with_status = function() return content, "ok" end
+		package.loaded["core.fs.adapters.file_system"].read_with_status = function() return content, "ok" end
 		local native = { requests = 0, paused = {}, pending = {} }
 		function native.request(parent, input)
 			native.requests, publication = native.requests + 1, input

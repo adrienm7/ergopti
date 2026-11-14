@@ -121,10 +121,10 @@ helpers.describe("prediction digit accept: the engine", function()
 
 	helpers.it("requires the modifier chosen in the AI menu", function()
 		with_offer(1, function(engine, state)
-			local previous_storage = package.loaded["adapters.storage"]
-			package.loaded["adapters.storage"] = Fakes.storage()
+			local previous_storage = package.loaded["core.fs.adapters.storage"]
+			package.loaded["core.fs.adapters.storage"] = Fakes.storage()
 			helpers.assert_true(require("modules.llm.navigation_settings").set({ "alt" }))
-			package.loaded["adapters.storage"] = previous_storage
+			package.loaded["core.fs.adapters.storage"] = previous_storage
 			helpers.assert_true(not engine.handle_shortcut({ key = "1", mods = {} }), "a bare 1 now types")
 			helpers.assert_true(engine.handle_shortcut({ key = "1", mods = { alt = true } }))
 			helpers.assert_eq(#state.applied, 1)

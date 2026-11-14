@@ -58,7 +58,7 @@ return function(helpers)
 		end)
 
 		helpers.it("replays the qualified native Windows lowercase corpus through all ROI text keys", function()
-			local path = require("infra.paths").shared("tests/corpus/keystats/roi_lowercase_vectors.json")
+			local path = require("core.fs.engine.paths").shared("tests/corpus/keystats/roi_lowercase_vectors.json")
 			local handle = assert(io.open(path, "rb"))
 			local bytes = assert(handle:read("*a")); assert(handle:close())
 			local corpus = assert(require("core.text.engine.json").decode(bytes))

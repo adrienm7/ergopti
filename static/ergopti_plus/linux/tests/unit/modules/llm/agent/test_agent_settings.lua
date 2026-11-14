@@ -21,7 +21,7 @@ local i18n = require("infra.i18n")
 
 helpers.it("refuses fractional agent count limits", function()
 	local Json = require("core.text.engine.json")
-	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local settings = require("modules.llm.agent_settings")
 	for _, item in ipairs({
@@ -40,7 +40,7 @@ end)
 
 helpers.it("refuses a malformed Jev triage configuration", function()
 	local Json = require("core.text.engine.json")
-	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.system1.jev = nil end,
@@ -57,7 +57,7 @@ end)
 
 helpers.it("refuses malformed action schemas before accepting agent output", function()
 	local Json = require("core.text.engine.json")
-	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.actions.calendar = false end,
@@ -75,7 +75,7 @@ end)
 
 helpers.it("refuses missing and invalid agent source labels", function()
 	local Json = require("core.text.engine.json")
-	local path = assert(require("infra.paths").shared("ai/data/agent.json"))
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, case in ipairs({ { "selection" }, { "selection", false }, { "typing", "" }, { "command", 5 } }) do
 		local config = assert(Json.decode(source)); config.source_kinds[case[1]] = case[2]
@@ -87,7 +87,7 @@ end)
 
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local original_shared, original_settings = Paths.shared, package.loaded["modules.llm.agent_settings"]
 	local source = assert(original_shared("ai/data/agent.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-agent-config-XXXXXX"))
@@ -463,7 +463,7 @@ end)
 
 --- Reads independent mode expectations rather than generated menu data.
 local function mode_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	local corpus = assert(require("core.text.engine.json").decode(raw))
@@ -618,7 +618,7 @@ end)
 
 --- Replays the independent fixed-system row contract through the actual menu.
 local function system_off_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -739,7 +739,7 @@ end)
 
 --- Independently authored model-control rows, loaded from physical shared data.
 local function system_model_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))
@@ -1023,7 +1023,7 @@ end
 
 --- Loads captions frozen from prior physical locale bytes, never from new menu output.
 local function disabled_apps_frame_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
 	local file = assert(io.open(path, "rb"))
 	local content = assert(file:read("*a")); assert(file:close())
 	return assert(require("core.text.engine.json").decode(content))
@@ -1248,7 +1248,7 @@ end)
 
 --- Frozen old captions; no output of the candidate renderer defines expectations.
 local function agent_system_frames_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_system_frames.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/agent_linux_system_frames.json")
 	local file = assert(io.open(path, "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
 	return assert(require("core.text.engine.json").decode(raw))

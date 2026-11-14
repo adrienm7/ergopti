@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
-	"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n", "infra.paths",
+	"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
 	"adapters.event_provenance", "adapters.synthetic_input", "core.events.timer_scheduler",
-	"adapters.key_state", "modules.shortcuts.script_control", "adapters.file_system",
-	"adapters.hotkey_registrar", "adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
+	"adapters.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
+	"adapters.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
 	"infra.config_paths", "infra.preferences",
 }
 
@@ -26,7 +26,7 @@ helpers.describe("Script control callback fixture isolation", function()
 				helpers.with_stub_scope(OWNERS, function()
 					helpers.load_with_stubs("hs")
 					local prior_hs = _G.hs
-					local identity_name = kind == "sentinel" and "infra.keycodes" or "adapters.storage"
+					local identity_name = kind == "sentinel" and "infra.keycodes" or "core.fs.adapters.storage"
 					local prior_identity = {}
 					package.loaded[identity_name] = prior_identity
 					package.loaded["infra.logger"] = false

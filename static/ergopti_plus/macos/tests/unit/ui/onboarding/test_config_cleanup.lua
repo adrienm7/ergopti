@@ -13,7 +13,7 @@ local function with_host(controls, run)
 	local stubs = {
 		["infra.logger"] = logger,
 		["infra.i18n"] = { get = function(key) return key end },
-		["infra.paths"] = { shared = function(path) return "/shared/" .. path end },
+		["core.fs.engine.paths"] = { shared = function(path) return "/shared/" .. path end },
 		["settings.engine.migration.cleanup_session"] = { new = function(options)
 			if real_session then
 				local session = real_session.new(options)

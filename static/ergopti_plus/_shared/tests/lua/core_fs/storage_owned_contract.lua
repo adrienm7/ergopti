@@ -276,8 +276,8 @@ end
 --- @param helpers table Driver test API.
 function M.register_adapter(helpers)
 	helpers.describe("the Storage adapter uses the shared owned-alias protocol (storage-owned-protocol)", function()
-		helpers.it("adapters.storage installs the shared gates", function()
-			local storage = require("adapters.storage")
+		helpers.it("core.fs.adapters.storage installs the shared gates", function()
+			local storage = require("core.fs.adapters.storage")
 			for _, method in ipairs(SHARED_METHODS) do
 				local fn = rawget(storage, method)
 				helpers.assert_type(fn, "function", method)

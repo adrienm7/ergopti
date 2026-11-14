@@ -132,7 +132,7 @@ function H.collect_versions()
 		-- ships no version file to read
 		karabiner       = read("the Karabiner-Elements version", function()
 			local manifest = require("vendor.karabiner-elements.manifest")
-			local installed = require("adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
+			local installed = require("core.fs.adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
 			return tostring(manifest.version) .. (installed and "" or " (not installed)")
 		end),
 	}

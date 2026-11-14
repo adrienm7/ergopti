@@ -549,7 +549,7 @@ end)
 --- Reads event expectations independent of the production display condition.
 --- @return table
 local function display_events_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
 	return assert(require("core.text.engine.json").decode(raw))

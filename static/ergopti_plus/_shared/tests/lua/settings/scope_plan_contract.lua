@@ -16,7 +16,7 @@ return function(helpers)
 		return meta and type(meta.parameter) == "string" and meta.parameter ~= "" and domain or nil
 	end
 	local owners = { action_parameter_domain = parameter_domain }
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/config_scope/plan_vectors.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/config_scope/plan_vectors.json"), "rb"))
 	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	assert(#corpus.stored_paths == 5 and #corpus.inventories == 4 and #corpus.refusals == 6

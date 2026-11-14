@@ -88,7 +88,7 @@ end
 --- it and the menu module is loaded again, as a restart does.
 --- @return table ctx, table menu, table preferences
 local function start_session()
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	Outdated.reset_for_tests()
 	local preferences = helpers.load_with_stubs("infra.preferences")
 	local values, status = preferences.load(PATH)
@@ -128,7 +128,7 @@ end
 
 helpers.describe("hotstring-section-order: menu, config.toml and restart round trip", function()
 	helpers.it("persists a move, shows it after a restart, refuses a stale menu and resets", function()
-		helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "infra.logger", "core.logger.engine.shim" }, function()
 		local logger = helpers.make_logger_stub()
 		package.loaded["infra.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		local file = assert(io.open(PATH, "wb"))

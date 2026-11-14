@@ -112,10 +112,10 @@ local function load_paths(opts)
 
 	package.loaded["ui.menu.menu_paths"] = nil
 	package.loaded["infra.config_paths"] = nil
-	local previous_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = make_bootstrap_file_system()
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = make_bootstrap_file_system()
 	local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_paths")
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	os.getenv = real_getenv
 	if not ok then error(mod, 0) end
 	return mod

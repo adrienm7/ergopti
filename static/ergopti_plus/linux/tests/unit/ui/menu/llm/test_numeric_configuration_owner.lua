@@ -378,7 +378,7 @@ helpers.describe("numeric menu originating configuration", function()
 		end)
 	end)
 	helpers.it("returns reloaded original Paths and Storage to the runner's locator", function()
-		local names = { "infra.config_paths", "adapters.storage" }
+		local names = { "infra.config_paths", "core.fs.adapters.storage" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local function selected()
 			for _, name in ipairs(names) do package.loaded[name] = nil end

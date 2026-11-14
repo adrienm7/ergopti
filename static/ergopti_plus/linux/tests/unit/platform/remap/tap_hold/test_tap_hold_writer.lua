@@ -15,7 +15,7 @@
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- A writer bound to a throwaway file.
 --- @param reload_ok boolean|nil What the reload reports (true by default).
@@ -76,7 +76,7 @@ local function with_folder_writer(opts, body)
 			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS, nil).hold_picker)
 		end,
 		layers = opts.layers ~= false
-			and { shared_root = require("infra.paths").shared_root(), config_dir = dir } or nil,
+			and { shared_root = require("core.fs.engine.paths").shared_root(), config_dir = dir } or nil,
 	})
 	local ok, err = pcall(body, writer, dir, state)
 	for _, name in ipairs({ "tap_hold.toml", "tap_hold.toml.tmp", "tap_hold.toml.config.toml", "layers.toml" }) do
@@ -109,7 +109,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 				close = function() closes = closes + 1; file:close(); return nil, "close refused" end,
 			}
 		end
-		local ok = pcall(require("layouts.engine.layers.preset").read, require("infra.paths").shared_root(),
+		local ok = pcall(require("layouts.engine.layers.preset").read, require("core.fs.engine.paths").shared_root(),
 			require("core.text.engine.toml_codec").decode)
 		io.open = original_open
 		helpers.assert_eq(ok, false)
@@ -118,7 +118,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 	helpers.it("refuses an unreadable recommended layer without writing", function()
 		local writes = 0
 		local result, err = require("layouts.engine.layers.preset").import_if_absent({
-			shared_root = require("infra.paths").shared_root(), config_dir = "/unreadable",
+			shared_root = require("core.fs.engine.paths").shared_root(), config_dir = "/unreadable",
 			toml_decode = require("core.text.engine.toml_codec").decode,
 			file_adapter = {
 				read_with_status = function() return nil, "error", "permission denied" end,
@@ -206,7 +206,7 @@ helpers.describe("tap-hold writer: a tray change reaches the engine", function()
 	-- else: in a folder with no layers.toml the key entered a layer that binds
 	-- no key. The pick brings the recommended layer along, as the restore does.
 	helpers.it("(hold-picker-brings-the-layer-2026-10-01) picking the layer as a hold creates layers.toml from the recommended layer", function()
-		local preset = read_or_nil(require("infra.paths").shared("layouts/data/layers.recommended.toml"))
+		local preset = read_or_nil(require("core.fs.engine.paths").shared("layouts/data/layers.recommended.toml"))
 		helpers.assert_type(preset, "string", "the shipped layer must be readable")
 		with_folder_writer(nil, function(writer, dir, state)
 			helpers.assert_true(writer.set_hold("caps_lock", "modifier", "ctrl"))
@@ -461,7 +461,7 @@ helpers.describe("tap-hold writer: the wizard imports only the checked keys", fu
 		local original = '[tap_hold]\ninherit_defaults = false\n'
 		write_file(path, original)
 		local backup = path .. ".tap_holds-20260101-000000-1.bak"
-		local date, Native = os.date, require("infra.regular_file_writer")
+		local date, Native = os.date, require("core.fs.engine.regular_file_writer")
 		local native_open = Native.open
 		local ok, err = pcall(function()
 			os.date = function(format, ...)
@@ -707,7 +707,7 @@ helpers.describe("tap-hold writer: staging write and close acknowledgement", fun
 	local function observe_staging(fault)
 		local writer, path, state = fresh_writer()
 		write_file(path, original)
-		local NativeWriter = require("infra.regular_file_writer")
+		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local real_open, real_rename = NativeWriter.open, os.rename
 		local observed = { opens = 0, writes = 0, closes = 0, renames = 0, removals = 0 }
 		local handle, proxy

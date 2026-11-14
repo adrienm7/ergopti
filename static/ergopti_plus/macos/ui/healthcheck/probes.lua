@@ -174,7 +174,7 @@ end
 --- @return table|nil
 local function decode(body)
 	if type(body) ~= "string" or body == "" then return nil end
-	local ok, data = pcall(require("adapters.json_codec").decode, body)
+	local ok, data = pcall(require("core.fs.adapters.json_codec").decode, body)
 	return (ok and type(data) == "table") and data or nil
 end
 

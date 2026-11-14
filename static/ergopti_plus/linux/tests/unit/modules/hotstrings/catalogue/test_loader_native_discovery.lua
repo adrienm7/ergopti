@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The loader's three discovery walks (find_toml_files, list_subdirs,
 --- unavailable_directories) run in this process through
---- infra/native_directory.lua instead of forking `find`.
+--- core/fs/engine/native_directory.lua instead of forking `find`.
 ---
 --- ROOT CAUSE ENCODED:
 --- A daemon start forked find five times to discover the hotstring packs
@@ -31,7 +31,7 @@ local Shell = require("adapters.shell_runner")
 local ON_WINDOWS = package.config:sub(1, 1) == "\\"
 
 helpers.it("linux-native-directory-nul: rejects paths before native truncation", function()
-	local directory = require("infra.native_directory")
+	local directory = require("core.fs.engine.native_directory")
 	for _, name in ipairs({ "stat", "kind", "target_kind", "entries" }) do
 		local value, _, code = directory[name]("/tmp\0/not-the-same-directory")
 		helpers.assert_nil(value, name .. " must not inspect /tmp instead")
@@ -50,7 +50,7 @@ helpers.describe("extension manifest native read", function()
 		assert(file:close())
 		local code = string.format([[package.path = %q
 local loader = require("modules.hotstrings.loader")
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
 paths.shared = function(name) if name == "hotstrings/data/catalogue/priority.json" then return %q end; return original(name) end
 local result = loader.load_catalogue({ %q })
@@ -268,7 +268,7 @@ helpers.describe("hotstring discovery forks nothing", function()
 				Loader.find_toml_files(root, 2)
 				Loader.list_subdirs(root)
 				Loader.unavailable_directories(root, 2)
-				Loader.find_toml_files(require("infra.paths").shared("hotstrings/data/catalogue"))
+				Loader.find_toml_files(require("core.fs.engine.paths").shared("hotstrings/data/catalogue"))
 			end)
 			helpers.assert_eq(forks, 0, "discovery must not fork find or any other process")
 			helpers.assert_true(#found > 150, "the counted walk discovered the fixture")
@@ -294,7 +294,7 @@ end)
 --- @param kinds table Map of path to lstat type.
 --- @param body function(Loader, Walker)
 local function with_scripted_native(listing, kinds, body)
-	local previous_walker = package.loaded["infra.native_directory"]
+	local previous_walker = package.loaded["core.fs.engine.native_directory"]
 	local fake = {
 		fs_opendir = function(path)
 			if listing[path] == nil then return nil, "ENOENT: " .. path, "ENOENT" end
@@ -315,10 +315,10 @@ local function with_scripted_native(listing, kinds, body)
 		-- Required by the module's backend check; discovery never follows a link.
 		fs_stat = function() error("the hotstring discovery must not follow links") end,
 	}
-	local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", fake)
-	package.loaded["infra.native_directory"] = Walker
+	local Walker = helpers.load_module_with_dependency("core.fs.engine.native_directory", "luv", fake)
+	package.loaded["core.fs.engine.native_directory"] = Walker
 	local ok, err = pcall(body, helpers.load_module("modules.hotstrings.loader"), Walker)
-	package.loaded["infra.native_directory"] = previous_walker
+	package.loaded["core.fs.engine.native_directory"] = previous_walker
 	helpers.load_module("modules.hotstrings.loader")
 	if not ok then error(err, 0) end
 end
@@ -369,9 +369,9 @@ helpers.describe("hotstring discovery refuses what a directory cannot hold", fun
 	end)
 
 	helpers.it("raises when the runtime has no libuv directory listing", function()
-		local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", false)
+		local Walker = helpers.load_module_with_dependency("core.fs.engine.native_directory", "luv", false)
 		local admitted, reason = pcall(Walker.walk, "/isolated", nil, function() end)
-		helpers.load_module("infra.native_directory")
+		helpers.load_module("core.fs.engine.native_directory")
 		helpers.assert_eq(admitted, false, "no backend must not read as an empty folder")
 		helpers.assert_true(tostring(reason):find("luv", 1, true) ~= nil, tostring(reason))
 	end)

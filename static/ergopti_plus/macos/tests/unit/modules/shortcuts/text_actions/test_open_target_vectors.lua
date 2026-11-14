@@ -41,7 +41,7 @@ end
 --- recording port never reaches the next test file the runner loads.
 local OWNED_MODULES = {
 	"modules.shortcuts.actions.apps", "adapters.window_info", "adapters.shell_runner",
-	"adapters.file_system", "infra.notifications", "infra.logger",
+	"core.fs.adapters.file_system", "infra.notifications", "infra.logger",
 }
 
 --- Runs a case against the apps actions with recording ports.
@@ -55,7 +55,7 @@ local function with_apps(existing, body)
 		package.loaded["infra.notifications"] = {
 			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 			exists = function(path) return (existing or {})[path] == true end,
 		}
@@ -170,7 +170,7 @@ helpers.describe('selected existing path with punctuation', function()
   end)
   helpers.it('refuses the cleaned path when exact metadata cannot be read', function()
     with_apps({ ['/tmp/report']=true }, function(world)
-      package.loaded['adapters.file_system'].path_status = function() return 'error' end
+      package.loaded['core.fs.adapters.file_system'].path_status = function() return 'error' end
       helpers.assert_eq(world.apps._open_or_search('/tmp/report.'), false)
       helpers.assert_eq(world.opened, {})
     end)

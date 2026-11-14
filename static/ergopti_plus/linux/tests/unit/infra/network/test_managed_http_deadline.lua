@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Loads the production deadline ledger with independent native receipts.
 --- @param config table|nil

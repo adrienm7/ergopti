@@ -581,7 +581,7 @@ end)
 local function with_wrap_inventory(body, options)
 	options = options or {}
 	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
-	local Routes, Paths = require("infra.config_paths"), require("infra.paths")
+	local Routes, Paths = require("infra.config_paths"), require("core.fs.engine.paths")
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()

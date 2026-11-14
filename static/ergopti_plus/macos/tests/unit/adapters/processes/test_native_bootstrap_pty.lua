@@ -59,7 +59,7 @@ local function receiving(body, options)
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 		end }
 		package.loaded["core.crypto.crypto"] = { sha256_bytes = function() return string.rep("b", 64) end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function() return RECEIPT_PATH end,
 			classify_no_follow = function(path)
 				if path ~= RECEIPT_PATH or not native.exists then return nil, "absent" end

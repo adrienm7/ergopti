@@ -94,7 +94,7 @@ helpers.describe("linux/infra/i18n.lua", function()
 	-- every such reader on Linux.
 	helpers.it("every locale catalogue decodes losslessly, with no key written twice", function()
 		local Json = require("core.text.engine.json")
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local directory = Paths.shared("core/i18n/data/locales")
 		local listing = assert(io.popen("ls " .. require("core.text.engine.utils_core").shell_quote(directory)))
 		local names = {}
@@ -123,7 +123,7 @@ helpers.describe("linux/infra/i18n.lua", function()
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local logs = {}
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["infra.locale"] = nil

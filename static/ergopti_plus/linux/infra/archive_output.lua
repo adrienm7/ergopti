@@ -617,7 +617,7 @@ end
 local function native_artifact_backend()
  local loaded, backend = pcall(function()
   local ffi, uv = require("ffi"), require("luv")
-  local Paths, Clock = require("infra.paths"), require("infra.monotonic")
+  local Paths, Clock = require("core.fs.engine.paths"), require("infra.monotonic")
   local hrtime = rawget(uv, "hrtime")
   local has_hires, clock_backend = rawget(Clock, "has_hires"), rawget(Clock, "backend")
   if ffi.os ~= "Linux" or type(hrtime) ~= "function" or type(has_hires) ~= "function"

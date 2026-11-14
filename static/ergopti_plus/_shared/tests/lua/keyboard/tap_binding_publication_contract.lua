@@ -48,7 +48,7 @@ function M.register(helpers, driver)
 	end
 	local function shared_file(relative)
 		if driver == "macos" then return helpers.shared(relative) end
-		return require("infra.paths").shared(relative)
+		return require("core.fs.engine.paths").shared(relative)
 	end
 	local vectors = assert(require("core.text.engine.json").decode(bytes(shared_file("tests/corpus/config_binding_identity/tap_vectors.json"))))
 	helpers.describe("tap-binding: shared identity and native publication", function()
@@ -133,7 +133,7 @@ function M.register(helpers, driver)
 		--- @return boolean refused_as_expected
 		--- @return string detail Observed outcome.
 		local function refuses_real_source(owner, row)
-			local paths = require("infra.paths")
+			local paths = require("core.fs.engine.paths")
 			local original_shared = paths.shared
 			local path = os.tmpname()
 			local file = assert(io.open(path, "wb")); assert(file:write(row.source)); assert(file:close())
@@ -201,7 +201,7 @@ function M.register(helpers, driver)
 		helpers.it("refuses an actual duplicate-ID file and publishes only after manual repair", function()
 			scope(function()
 				local owner = fresh_catalogue()
-				local paths = require("infra.paths")
+				local paths = require("core.fs.engine.paths")
 				local original_shared = paths.shared
 				local path = os.tmpname()
 				local invalid = '{"keys":[{"id":"same","hs":[50],"linux":41},{"id":"same","hs":[27],"linux":12}]}'

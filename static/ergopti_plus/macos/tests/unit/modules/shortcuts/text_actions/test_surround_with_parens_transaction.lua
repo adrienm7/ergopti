@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local MUTATED = {
 	"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-	"core.events.timer_scheduler", "infra.logger", "infra.paths", "infra.timings",
+	"core.events.timer_scheduler", "infra.logger", "core.fs.engine.paths", "infra.timings",
 }
 
 
@@ -25,7 +25,7 @@ local function fresh_fixture(options)
 	options = options or {}
 	for _, name in ipairs(MUTATED) do package.loaded[name] = nil end
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.paths"] = { shared = function() return nil end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
 	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
 
 	local emitted = {}

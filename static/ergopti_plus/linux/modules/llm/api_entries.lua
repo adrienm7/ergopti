@@ -232,7 +232,7 @@ local function state()
 	if type(root) ~= "table" or type(root.entries) ~= "table" then
 		-- Never os.rename: it replaces an older set-aside, or one a second
 		-- process makes at the same instant.
-		local aside = require("infra.corrupt_aside").preserve(M.path())
+		local aside = require("core.fs.engine.corrupt_aside").preserve(M.path())
 		if aside ~= nil then
 			_state.source = { status = "absent", content = "" }
 			Logger.error(LOG, "API entries file is malformed — kept at %s, starting empty.", aside)

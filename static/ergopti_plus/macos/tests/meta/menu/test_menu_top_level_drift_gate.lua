@@ -166,7 +166,7 @@ end
 local function native_language_provider()
 	return helpers.with_stub_scope({
 		"infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
-		"adapters.storage", "core.events.timer_scheduler",
+		"core.fs.adapters.storage", "core.events.timer_scheduler",
 	}, function()
 		helpers.load_with_stubs("infra.i18n")
 		rawset(package.loaded, "infra.i18n", nil)
@@ -452,7 +452,7 @@ end)
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
 		local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
-			"adapters.storage", "core.events.timer_scheduler", "infra.paths", "infra.logger" }
+			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 		local provider = native_language_provider()
@@ -462,7 +462,7 @@ helpers.describe("topology fixture owns genuine native Language data", function(
 		helpers.assert_true(rawequal(rawget(_G, "hs"), old_hs), "native fixture globals restored")
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a")); assert(file:close())
-		local corpus = assert(require("adapters.json_codec").decode(raw))
+		local corpus = assert(require("core.fs.adapters.json_codec").decode(raw))
 		local rows = provider()
 		helpers.assert_eq(#rows, #corpus.locales, "a genuine complete catalogue is not an empty stand-in")
 		for index, expected in ipairs(corpus.locales) do

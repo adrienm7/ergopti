@@ -22,7 +22,7 @@
 
 local helpers = require("tests.helpers")
 
-local Paths = helpers.load_module("infra.paths")
+local Paths = helpers.load_module("core.fs.engine.paths")
 
 --- Every `list` id the built manifest declares for this platform.
 --- @return table Array of { menu = string, id = string }.
@@ -68,8 +68,8 @@ local function genuine_shared_providers(damage)
 	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key_source",
 		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "infra.config_paths",
-		"adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
-		"menu.engine.renderer", "infra.paths", "core.text.engine.json" }
+		"core.fs.adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
+		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local found, restore = {}, function() end
 	local ok, result = xpcall(function()
@@ -173,8 +173,8 @@ local function genuine_trigger_providers(damage, default_source)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
-		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
-		"menu.engine.renderer", "infra.paths", "core.text.engine.json" }
+		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local restore, found = function() end, {}
 	local observed = { provider_calls = 0, reset_rows = 0, effects = 0 }
@@ -315,7 +315,7 @@ local function genuine_gesture_providers(damage)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "ui.gesture_conflicts", "modules.gestures.manager",
-		"adapters.storage", "infra.paths", "core.text.engine.json", "menu.engine.renderer" }
+		"core.fs.adapters.storage", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer" }
 	local directory, filesystem, created
 	local restore = function() end
 	local observed = { calls = 0, effects = 0, status_calls = 0 }
@@ -446,8 +446,8 @@ local function genuine_language_providers(damage, exercise)
 	local loaded, getenv, original_safe = {}, os.getenv, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
-		"ui.menu.builder", "infra.paths", "core.text.engine.json", "menu.engine.renderer",
-		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
+		"ui.menu.builder", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer",
+		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
 		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
 	local directory, path, filesystem, created
 	local restore = function() end

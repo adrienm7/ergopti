@@ -55,7 +55,7 @@ helpers.describe("login startup", function()
 		local previous_logger = package.loaded["core.logger.engine.shim"]
 		local previous_subject = package.loaded["ui.menu.start_at_login"]
 		local logs = {}
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 		package.loaded["core.logger.engine.shim"] = logger
 		local okay, detail = pcall(function()
@@ -92,7 +92,7 @@ end)
 --- @param mode string Native metadata/retirement outcome supplied by systemctl.
 --- @param body function Receives the menu, desktop path and actual command ledger.
 local function with_installed_startup(mode, body)
-	local uv, Paths = require("luv"), require("infra.paths")
+	local uv, Paths = require("luv"), require("core.fs.engine.paths")
 	local loaded = { "adapters.shell_runner", "ui.menu.start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
@@ -196,7 +196,7 @@ end)
 --- Runs the genuine menu and helper against a private source checkout (SAD-1).
 --- @param body function Receives the menu, the checkout's launcher, the entry path and a writer.
 local function with_source_startup(body)
-	local uv, Paths = require("luv"), require("infra.paths")
+	local uv, Paths = require("luv"), require("core.fs.engine.paths")
 	local loaded = { "adapters.shell_runner", "ui.menu.start_at_login" }
 	local previous = {}
 	for _, name in ipairs(loaded) do previous[name] = package.loaded[name] end
@@ -271,7 +271,7 @@ helpers.describe("login startup on a source run (SAD-1)", function()
 				.. 'Terminal=false\nHidden=false\nX-Ergopti-Startup=true\n')
 			local previous_logger = package.loaded["core.logger.engine.shim"]
 			local logs = {}
-			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
 			local ok, failure = pcall(function()

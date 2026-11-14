@@ -37,7 +37,7 @@ local CORPUS_RELATIVE = "tests/corpus/hotstrings/config_resolve_vectors.json"
 --- Reads and decodes the shared corpus.
 --- @return table|nil corpus, string|nil error
 local function read_corpus()
-	local Paths = helpers.load_module("infra.paths")
+	local Paths = helpers.load_module("core.fs.engine.paths")
 	local path = Paths.shared and Paths.shared(CORPUS_RELATIVE) or nil
 	if not path then return nil, "the shared tree could not be located" end
 	local fh = io.open(path, "r")

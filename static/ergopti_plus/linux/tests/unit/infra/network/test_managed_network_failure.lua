@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads one corpus resource through the existing Linux path owner.
 --- @param relative string Shared resource path.

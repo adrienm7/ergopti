@@ -507,7 +507,7 @@ package.preload["core.events.loop"] = function()
 		local bindings = 0
 		local ok_nav, layer = pcall(function()
 			return require("platform.remap.nav_layer").load({
-				shared_root = require("infra.paths").shared_root(),
+				shared_root = require("core.fs.engine.paths").shared_root(),
 				config_dir = TapHold.user_path():match("^(.*)[/\\][^/\\]+$"),
 			})
 		end)

@@ -192,7 +192,7 @@ local function start_real_keystats()
 	-- LogManager. TimerScheduler owns native timer capabilities, so retaining it
 	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keystats.log_manager"] = nil
-	package.loaded["adapters.ledger_append"] = nil
+	package.loaded["core.fs.adapters.ledger_append"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
@@ -302,8 +302,8 @@ local function start_real_keystats()
 		execute  = function() return "" end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -315,9 +315,9 @@ package.loaded["adapters.file_system"] = {
 	read_with_status = function() return nil, "absent" end,
 }
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local km = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	local synthetic_input = require("adapters.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }

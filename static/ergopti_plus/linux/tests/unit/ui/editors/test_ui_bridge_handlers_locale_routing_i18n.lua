@@ -754,21 +754,21 @@ helpers.describe("ui.bridge_handlers", function()
         "an undeclared preference key must be refused, not written")
     end)
     helpers.it("(hotstring-pref-invalid) falls back for mistyped stored preferences", function()
-      local previous_storage = package.loaded["adapters.storage"]
+      local previous_storage = package.loaded["core.fs.adapters.storage"]
       local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
       local values = { ["hotstring_editor.compact_view"] = "false",
         ["hotstring_editor.auto_close"] = 1, ["hotstring_editor.default_section"] = { "foreign" } }
-      package.loaded["adapters.storage"] = { get = function(key) return values[key] end }
+      package.loaded["core.fs.adapters.storage"] = { get = function(key) return values[key] end }
       package.loaded["ui.hotstring_editor.bridge"] = nil
       local bridge = require("ui.hotstring_editor.bridge")
       local observed = { bridge.get_pref("compact_view"), bridge.get_pref("auto_close"), bridge.get_pref("default_section") }
-      package.loaded["adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
+      package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = previous_storage, previous_handler
       helpers.assert_eq(observed, { false, false, "" })
     end)
     helpers.it("'save_pref' reports a storage failure and rejects the wrong value type", function()
-      local previous_storage = package.loaded["adapters.storage"]
+      local previous_storage = package.loaded["core.fs.adapters.storage"]
       local previous_handler = package.loaded["ui.hotstring_editor.bridge"]
-      package.loaded["adapters.storage"] = {
+      package.loaded["core.fs.adapters.storage"] = {
         get = function(_key, default_value) return default_value end,
         set = function() return false end,
       }
@@ -780,7 +780,7 @@ helpers.describe("ui.bridge_handlers", function()
       local mistyped = failing.on_message(
         { action = "save_pref", data = { key = "compact_view", value = "true" } }, state)
 
-      package.loaded["adapters.storage"] = previous_storage
+      package.loaded["core.fs.adapters.storage"] = previous_storage
       package.loaded["ui.hotstring_editor.bridge"] = previous_handler
       helpers.assert_eq(failed.saved, false,
         "the page must not receive saved=true when the durable write failed")
@@ -824,7 +824,7 @@ end)
 restore_loaded()
 
 helpers.it("download window refuses FIFO managed network policy without blocking", function()
-	local uv, Paths = require("luv"), require("infra.paths")
+	local uv, Paths = require("luv"), require("core.fs.engine.paths")
 	local previous_bridge, previous_manager, original_shared = package.loaded["ui.download_window.bridge"],
 		package.loaded["ui.webview_manager"], Paths.shared
 	local source = assert(original_shared("core/network/data/managed_network.json"))

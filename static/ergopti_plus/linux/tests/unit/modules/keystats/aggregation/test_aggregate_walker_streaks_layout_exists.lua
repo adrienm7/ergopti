@@ -65,7 +65,7 @@ helpers.describe("aggregate walker: the streaks the layout exists to reduce", fu
 	--- a ratchet for. So it is asserted once, loudly, rather than skipped.
 	--- \1return table
 	local function require_catalogue()
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local root = Paths.shared_root()
 		helpers.assert_not_nil(root, "the shared tree must be findable")
 		local handle = io.open(root .. "/layouts/data/keycodes/azerty.json", "r")
@@ -506,7 +506,7 @@ end)
 -- the n-grams around a correction. Each flush is one walk over a carried context.
 helpers.describe("aggregate walker: shared correction sequence corpus", function()
 	local Json = require("core.text.engine.json")
-	local file = assert(io.open(assert(require("infra.paths").shared(
+	local file = assert(io.open(assert(require("core.fs.engine.paths").shared(
 		"tests/corpus/keystats/correction_sequence_vectors.json")), "rb"))
 	local data = Json.decode(assert(file:read("*a")))
 	assert(file:close())
@@ -568,7 +568,7 @@ helpers.it("refuses a FIFO finger catalogue without blocking aggregation", funct
 	local file = assert(io.open(script, "wb"))
 	assert(file:write(string.format([[
 package.path = %q
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local previous = paths.shared
 paths.shared = function(name)
   if name == "layouts/data/keycodes/azerty.json" then return arg[1] end

@@ -33,7 +33,7 @@ end
 local function with_wrap(options, body)
 	-- Manager's lazy writer/i18n path can construct Storage. Bind its genuine
 	-- shell/logger dependencies before this model installs recording doubles.
-	require("adapters.storage")
+	require("core.fs.adapters.storage")
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
 	Fixture.with(function(guard, focus, _, _, watch)
@@ -44,7 +44,7 @@ local function with_wrap(options, body)
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { primary = "baseline", clipboard = "SAVED", wire = {}, writes = {}, stops = 0, resets = 0,
 			reads = 0, errors = 0, logs = {}, documents = { ["/field/original"] = "selected", ["/field/successor"] = "SAFE" } }
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace"); logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function() state.errors = state.errors + 1 end)
 		package.loaded["core.logger.engine.shim"] = logger
@@ -321,11 +321,11 @@ if os.getenv("ERGOPTI_WRAP_STORAGE_CHILD") ~= "1" then
 				assert(script:write("package.path = " .. string.format("%q", package.path) .. "\n"
 					.. "package.cpath = " .. string.format("%q", package.cpath) .. "\n"
 					.. "require('core.lifecycle.engine.compat.utf8').install()\n"
-					.. "assert(package.loaded['adapters.storage'] == nil, 'the child store must start cold')\n"
+					.. "assert(package.loaded['core.fs.adapters.storage'] == nil, 'the child store must start cold')\n"
 					.. "require('tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner')\n"
 					.. "local results = require('tests.helpers').get_results()\n"
 					.. "assert(results.passed == 37 and results.failed == 0, 'all actual wrap scenarios must pass')\n"
-					.. "local storage = require('adapters.storage')\n"
+					.. "local storage = require('core.fs.adapters.storage')\n"
 					.. "assert(storage.path() == os.getenv('XDG_CONFIG_HOME') .. '/' .. require('core.fs.engine.app_dirs').linux.folder_name .. '/storage.json', 'the store must remain private')\n"
 					.. "assert(storage.set('wrap_fixture_sentinel', 'kept') == true, 'the real store must acknowledge publication')\n"
 					.. "local file = assert(io.open(storage.path(), 'rb'))\n"

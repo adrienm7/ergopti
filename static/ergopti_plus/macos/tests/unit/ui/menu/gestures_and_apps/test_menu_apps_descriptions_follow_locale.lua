@@ -17,21 +17,21 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 	helpers.it("relabels a cached app after a language change", function()
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
-			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "infra.paths",
-				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }, function()
+			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "core.fs.engine.paths",
+				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
 					en = { ["menu.apps.clone_desc"] = "Duplicate an app" },
 				}
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.paths"] = {}
+				package.loaded["core.fs.engine.paths"] = {}
 				package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, _, providers)
 					return providers.apps_installed()
 				end }
 				package.loaded["adapters.task_lifecycle"] = {}
 				local scans = 0
-				package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+				package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 					if directory:find("/Contents/Resources", 1, true) then return {}, true end
 					scans = scans + 1
 					return { "App Cloner.app" }, true

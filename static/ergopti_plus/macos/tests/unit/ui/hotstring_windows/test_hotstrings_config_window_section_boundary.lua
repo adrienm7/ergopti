@@ -124,8 +124,8 @@ helpers.describe("Hotstrings configuration section boundary", function()
 			Fixture.with_window(function()
 				local content = "[_meta]\ndelay = 0.33\n[abbreviations]\npriority = 3\n"
 				local writes = 0
-				package.loaded["infra.fs_dir"].entries = function() return { "sample.toml" } end
-				package.loaded["adapters.file_system"] = {
+				package.loaded["core.fs.engine.dir"].entries = function() return { "sample.toml" } end
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function() return content, "ok" end,
 					write_if_unchanged = function(path, candidate, expected_source)
 						helpers.assert_eq(path, "/personal/sample.toml")

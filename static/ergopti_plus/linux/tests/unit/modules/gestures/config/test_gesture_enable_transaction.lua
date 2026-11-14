@@ -89,7 +89,7 @@ helpers.describe("gestures: enabling after disabled boot", function()
 		os.remove(path)
 		assert(shell.run("mkfifo -- " .. shell.quote(path)))
 		local code = string.format([[package.path = %q
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
 paths.shared = function(name) if name == "shortcuts/data/actions/modifier_chords.json" then return %q end; return original(name) end
 local manager = require("modules.gestures.manager")

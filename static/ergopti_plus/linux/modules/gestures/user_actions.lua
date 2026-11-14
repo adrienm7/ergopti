@@ -31,7 +31,7 @@ local Logger = require("core.logger.engine.shim")
 local i18n = require("infra.i18n")
 local Timings = require("infra.timings")
 local ShellRunner = require("adapters.shell_runner")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Unicode = require("core.lifecycle.engine.compat.utf8")
 local Parameter = require("shortcuts.engine.user_action_parameter")
 

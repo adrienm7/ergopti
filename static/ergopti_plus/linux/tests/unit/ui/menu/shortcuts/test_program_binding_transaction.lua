@@ -86,7 +86,7 @@ local function with_case(spec, body)
 			end
 			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
 			package.loaded["adapters.shell_runner"] = { has_command = function() return true end,
@@ -148,7 +148,7 @@ local function with_case(spec, body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			local called, err = pcall(body, callback(logger), gestures, provider, controls, path, source)
 			for _, backup in ipairs(controls.backups) do os.remove(backup); os.remove(backup .. ".tmp") end
 			if not called then error(err, 0) end

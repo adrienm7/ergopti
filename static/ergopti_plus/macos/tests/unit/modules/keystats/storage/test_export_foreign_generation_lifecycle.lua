@@ -17,16 +17,16 @@ local LEDGER = "/generation-lifecycle/by_device/foreign/data.sql"
 --- Hold one production verification reader over independently observed native IO.
 --- @param check function Receives export and controlled native state.
 local function observe(check)
-	helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "adapters.file_system", "modules.keystats.export" }, function()
+	helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "core.fs.adapters.file_system", "modules.keystats.export" }, function()
 		local digest = ContentDigest.create()
 		local runloop = RunloopTimers.create()
 		local state = { ledger_opens = 0, ledger_closes = 0, live = false, sql = {} }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local files = {}
-		for key, value in pairs(require("adapters.file_system")) do files[key] = value end
+		for key, value in pairs(require("core.fs.adapters.file_system")) do files[key] = value end
 		files.classify_no_follow = function() return nil, "absent" end
-		package.loaded["adapters.file_system"] = files
-		package.loaded["infra.fs_dir"] = { try_entries = function()
+		package.loaded["core.fs.adapters.file_system"] = files
+		package.loaded["core.fs.engine.dir"] = { try_entries = function()
 			if state.enumeration_failed then return {}, false, "controlled enumeration refusal" end
 			return state.folder_removed and {} or { "foreign" }, true
 		end }
@@ -115,13 +115,13 @@ helpers.describe("foreign-ledger-generation-lifecycle", function()
 			.. tostring(process_exit) .. ")", function()
 			observe(function(_, state)
 				helpers.with_stub_scope({ "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
-					"adapters.ledger_append" }, function()
+					"core.fs.adapters.ledger_append" }, function()
 					local closes = 0
 					package.loaded["modules.keystats.sqlite_writer"] = {
 						get_db = function() return nil end,
 						close_db = function() closes = closes + 1; return true end,
 					}
-					package.loaded["adapters.ledger_append"] = { cleanup = function() return true end }
+					package.loaded["core.fs.adapters.ledger_append"] = { cleanup = function() return true end }
 					local manager = helpers.load_with_stubs("modules.keystats.log_manager")
 					helpers.assert_eq(manager.stop({ process_exit = process_exit }), true)
 					helpers.assert_eq(state.live, false)

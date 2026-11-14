@@ -15,12 +15,12 @@ local FusedMetadataCommand = require("tests.support.fused_metadata_command")
 local function with_fixture(callback, native_overrides)
 	local saved_open, saved_rename = io.open, os.rename
 	local outcome = table.pack(xpcall(function()
-		return helpers.with_stub_scope({ "adapters.file_system", "infra.fs_dir", "infra.logger" }, function()
+		return helpers.with_stub_scope({ "core.fs.adapters.file_system", "core.fs.engine.dir", "infra.logger" }, function()
 			-- Capture a fresh host before installing this transaction's filesystem doubles.
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local host = helpers.load_with_stubs("hs", native_overrides)
 			local STAGING_LOCK_SUFFIX = ".ergoptiplus-stage-lock"
-			local WriteLockPath = require("adapters.write_lock_path")
+			local WriteLockPath = require("core.fs.adapters.write_lock_path")
 			local WRITE_LOCK_SUFFIX = WriteLockPath.SUFFIX
 			local HOST_ATTRIBUTES = host.fs.attributes
 			local HOST_SYMLINK_ATTRIBUTES = host.fs.symlinkAttributes
@@ -81,9 +81,9 @@ local function with_fixture(callback, native_overrides)
 					for argument in command:gmatch("'([^']*)'") do arguments[#arguments + 1] = argument end
 					return arguments
 				end
-				package.loaded["adapters.file_system"] = nil
-				package.loaded["infra.fs_dir"] = nil
-				local adapter = helpers.load_with_stubs("adapters.file_system", {
+				package.loaded["core.fs.adapters.file_system"] = nil
+				package.loaded["core.fs.engine.dir"] = nil
+				local adapter = helpers.load_with_stubs("core.fs.adapters.file_system", {
 					execute = FusedMetadataCommand.answering(function(command)
 						local arguments = quoted_arguments(command)
 						if command:find("/bin/cp -p ", 1, true) then

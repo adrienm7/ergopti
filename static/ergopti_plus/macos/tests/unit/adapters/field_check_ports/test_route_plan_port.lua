@@ -178,7 +178,7 @@ helpers.describe("network check relay probe port", function()
 	local function probe(script, launcher, present)
 		local calls, answers = {}, {}
 		helpers.with_stub_scope({ "infra.logger", "adapters.field_check_ports", "adapters.shell_runner",
-			"core.events.timer_scheduler", "platform.remap.lease_helper", "adapters.file_system" }, function()
+			"core.events.timer_scheduler", "platform.remap.lease_helper", "core.fs.adapters.file_system" }, function()
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["core.events.timer_scheduler"] = {
 				after = function() return { stopped = false } end, cancel = function() return true end,
@@ -193,9 +193,9 @@ helpers.describe("network check relay probe port", function()
 			package.loaded["platform.remap.lease_helper"] = {
 				resolve = function() return launcher, nil, {} end,
 			}
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			local real_exists = FileSystem.exists
-			package.loaded["adapters.file_system"] = setmetatable({
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				exists = function(path)
 					if path:find("ergopti-proxy-relay", 1, true) then return present end
 					return real_exists(path)

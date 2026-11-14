@@ -85,7 +85,7 @@ function M.new(options)
 	local chords = options.chords or require("modules.shortcuts.script_chords")
 	local parameters = options.parameters or require("modules.gestures.manager")
 	local url = options.url or require("modules.shortcuts.chatgpt")
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local manifest = options.manifest or Manifest
 	local pair_feature = manifest.find_entry_by_path("category_enabled.key_combinations")
 	local admitted_pairs = options.combinations ~= nil or (type(pair_feature) == "table"

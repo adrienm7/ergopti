@@ -41,7 +41,7 @@ local OWNED = {
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
-	"adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+	"core.fs.adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
 	"adapters.native_bootstrap_pty", "ui.menu.menu_llm",
 }
 
@@ -192,7 +192,7 @@ local function load_world(world)
 	end
 	package.loaded["infra.logger"] = logger
 	-- Only native boundaries are doubled: the policy bytes and parser remain real.
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function(path) return fake_fs(world).attributes(path, "mode") ~= nil end,
 		read = function(path)
 			helpers.assert_true(path:find("/_shared/", 1, true) ~= nil, "native fixture reads actual shared source data")
@@ -245,8 +245,8 @@ local function load_world(world)
 		if world.native_network_receipt ~= nil then
 			context = context or {}
 			context.network_receipt = world.native_network_receipt
-			local raw = package.loaded["adapters.file_system"].read(
-				require("infra.paths").shared("core/network/data/managed_network.json"))
+			local raw = package.loaded["core.fs.adapters.file_system"].read(
+				require("core.fs.engine.paths").shared("core/network/data/managed_network.json"))
 			context.network_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(raw))
 		end
 		return classify(lines, exit_code, context)
@@ -1439,7 +1439,7 @@ helpers.describe("MLX native bootstrap admission", function()
 		helpers.assert_true(command:find("managed_bootstrap_http.py", 1, true) ~= nil,
 			"the native branch requires the actual installed staging helper")
 		local Network = package.loaded["modules.llm.network_env"]
-		local FileSystem = package.loaded["adapters.file_system"]
+		local FileSystem = package.loaded["core.fs.adapters.file_system"]
 		local exists = FileSystem.exists
 		FileSystem.exists = function(path)
 			if path:sub(-#"/platform/network/native_http.py") == "/platform/network/native_http.py" then return false end

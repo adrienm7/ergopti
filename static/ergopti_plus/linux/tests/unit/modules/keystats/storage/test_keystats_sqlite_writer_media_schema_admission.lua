@@ -748,7 +748,7 @@ end)
 
 for _, fault in ipairs({ "seek_throw", "close_throw" }) do
 	it("SQLite open safely refuses file inspection " .. fault, function()
-		local Reader = require("infra.regular_file_reader")
+		local Reader = require("core.fs.engine.regular_file_reader")
 		local open, execute, popen = Reader.open, os.execute, io.popen
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write("existing database fixture") and file:close())

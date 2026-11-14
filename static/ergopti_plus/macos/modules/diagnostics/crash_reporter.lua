@@ -135,14 +135,14 @@ end
 --- stays. A refusal is logged and never fails the save that triggered it.
 --- @param dir string Absolute report directory ending in a separator.
 local function _enforce_retention(dir)
-	local names, listed, list_err = require("infra.fs_dir").try_entries(dir)
+	local names, listed, list_err = require("core.fs.engine.dir").try_entries(dir)
 	if not listed then
 		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(list_err))
 		return
 	end
 	local expired = CrashReport.expired(names)
 	if #expired == 0 then return end
-	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	local adapter_ok, FileSystem = pcall(require, "core.fs.adapters.file_system")
 	if not adapter_ok or type(FileSystem) ~= "table" or type(FileSystem.remove_exact) ~= "function" then
 		Logger.error(LOG, "Crash report retention cannot delete: the file system adapter is unavailable.")
 		return
@@ -165,7 +165,7 @@ end
 --- @return string|nil path
 --- @return string|nil error_message
 local function _create_unique_report(dir, stem, json_str)
-	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	local adapter_ok, FileSystem = pcall(require, "core.fs.adapters.file_system")
 	if not adapter_ok or type(FileSystem) ~= "table"
 		or type(FileSystem.create_if_absent) ~= "function" then
 		return nil, "atomic create-if-absent persistence is unavailable"

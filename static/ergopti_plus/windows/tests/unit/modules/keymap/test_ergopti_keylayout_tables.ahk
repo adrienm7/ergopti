@@ -483,7 +483,7 @@ _EKT_PlusRollScript() {
 	Code := "#Requires AutoHotkey v2.0`n"
 	Code .= "#SingleInstance Off`n"
 	Code .= '#Include ' . _DriverDir . '\infra\json.ahk' . "`n"
-	Code .= '#Include ' . _DriverDir . '\adapters\file_system.ahk' . "`n"
+	Code .= '#Include ' . _DriverDir . '\core\fs\adapters\file_system.ahk' . "`n"
 	AssertEqual(_DriverProductionFileForSymbol("ErgoptiLayout_BuiltinVariant"),
 		_DriverProductionFileForSymbol("ErgoptiLayout_PlusIsActive"), "both source-intent helpers have the same unique production owner")
 	for Name in ["_RollChevronEqualEmit", "AddRollEqual", "_RollEmitCritical", "AltGrLayerShiftHeld",

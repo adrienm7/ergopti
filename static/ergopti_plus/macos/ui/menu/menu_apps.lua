@@ -23,11 +23,11 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local NativePath = require("core.fs.engine.native_path")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local i18n   = require("infra.i18n")
 local ManifestMenu = require("infra.manifest_menu")
 local TaskLifecycle = require("adapters.task_lifecycle")
-local FsDir = require("infra.fs_dir")
+local FsDir = require("core.fs.engine.dir")
 
 local LOG = "menu_apps"
 

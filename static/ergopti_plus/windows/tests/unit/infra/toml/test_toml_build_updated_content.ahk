@@ -15,7 +15,7 @@
 #Requires AutoHotkey v2.0
 #Include ../../../test_framework.ahk
 #Include ../../../test_stubs.ahk
-#Include ../../../../adapters/file_system.ahk
+#Include ../../../../core/fs/adapters/file_system.ahk
 #Include ../../../../_generated/app_dirs.ahk
 #Include ../../../../infra/app_folders.ahk
 #Include ../../../../infra/toml/toml_helpers.ahk

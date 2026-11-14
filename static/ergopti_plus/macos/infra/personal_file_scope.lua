@@ -10,7 +10,7 @@
 local M = {}
 local Policy = require("hotstrings.engine.catalogue.personal_scope")
 local Files = require("hotstrings.engine.catalogue.personal_files")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local MenuPaths = require("infra.config_paths")
 
 --- Captures an acknowledged registry binding without menu-build filesystem work.

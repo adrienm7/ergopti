@@ -530,7 +530,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 	helpers.it("a background check announces a newer release and downloads nothing", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local saved = {}
-		for _, name in ipairs({ "core.events.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+		for _, name in ipairs({ "core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager" }) do
 			saved[name] = package.loaded[name]
 		end
 		local timers = {}
@@ -543,7 +543,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 			end,
 			cancel = function(handle) handle.armed = false; return true end,
 		}
-		package.loaded["adapters.storage"] = Fakes.storage({ initial = {} })
+		package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 		package.loaded["modules.updater.manager"] = nil
 		local M = require("modules.updater.manager")
 		local Installer = require("modules.updater.installer")

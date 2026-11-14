@@ -35,7 +35,7 @@ local M = {}
 -- =========================================
 
 local Logger = require("core.logger.engine.shim")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 
 local LOG = "modules.hotstrings.input_reader"
 

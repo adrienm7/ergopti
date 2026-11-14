@@ -35,7 +35,7 @@ end
 --- The old actor expectations remain independent of this source dependency.
 local function with_boundary_owner(helpers, platform, source, top_level, body)
 	local renderer = assert(require("menu.engine.renderer").new({platform = platform,
-		manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+		manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = require("core.text.engine.json").decode,
 		i18n = {get = function(key) return key end, section = function(key) return key end},
 		logger = {error = function() end, warn = function() end}}))

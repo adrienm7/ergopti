@@ -11,7 +11,7 @@
 --- These are model receipts, not proof of a real child image or retirement.
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local ExactPorts = require("tests.support.exact_identity_ports")
 local helper = assert(package.searchpath("platform.network.system_proxy_probe", package.path))
 local shared_root = assert(Paths.shared_root())
@@ -81,12 +81,12 @@ local function observe(config)
 	end
 	state.fd_state = fd_state
 	local request = Json.encode({ url = "https://corporate.invalid/private", probe_curl = true })
-	local real_reader = require("infra.regular_file_reader")
+	local real_reader = require("core.fs.engine.regular_file_reader")
 	local saved = { luv = package.loaded.luv, ffi = package.loaded.ffi,
-		reader = package.loaded["infra.regular_file_reader"], stdin = io.stdin, stdout = io.stdout, arguments = arg }
+		reader = package.loaded["core.fs.engine.regular_file_reader"], stdin = io.stdin, stdout = io.stdout, arguments = arg }
 	-- The policy is an actual installed file, independent of the modeled curl
 	-- descriptor ledger below. Admit it through the real native reader.
-	package.loaded["infra.regular_file_reader"] = { open_source = function(path)
+	package.loaded["core.fs.engine.regular_file_reader"] = { open_source = function(path)
 		assert(path == shared_root .. "/core/network/data/proxy_policy.json")
 		local fake_luv, fake_ffi = package.loaded.luv, package.loaded.ffi
 		package.loaded.luv, package.loaded.ffi = saved.luv, saved.ffi
@@ -106,7 +106,7 @@ local function observe(config)
 	arg = { [1] = shared_root }
 	local ok, err = pcall(dofile, helper)
 	package.loaded.luv, package.loaded.ffi = saved.luv, saved.ffi
-	package.loaded["infra.regular_file_reader"] = saved.reader
+	package.loaded["core.fs.engine.regular_file_reader"] = saved.reader
 	io.stdin, io.stdout, arg = saved.stdin, saved.stdout, saved.arguments
 	if not ok then error(err) end
 	helpers.assert_eq(#state.handles, 3)

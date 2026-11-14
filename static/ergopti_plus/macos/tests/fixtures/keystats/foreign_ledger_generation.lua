@@ -98,10 +98,10 @@ end
 function db:errmsg() return self.last_error end
 
 local receipt
-Helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+Helpers.with_stub_scope({ "infra.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 	local runloop = RunloopTimers.create()
 	package.loaded["infra.logger"] = Helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.fs.engine.dir"] = nil
 	local export = Helpers.load_with_stubs("modules.keystats.export", {
 		fs = { attributes = physical_attributes, dir = physical_directory }, hash = { new = new_hash }, timer = runloop.api,
 	})

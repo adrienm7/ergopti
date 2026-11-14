@@ -70,7 +70,7 @@ helpers.describe("remote multi-step error envelopes", function()
 		helpers.assert_eq(describe(nil), "details withheld")
 	end)
 	helpers.it("does not log arbitrary keys in a malformed Backboard answer", function()
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)

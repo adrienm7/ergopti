@@ -13,7 +13,7 @@ local OWNERS = {
 	"hs", "tests.stubs.hs", "ui.tooltip.config", "ui.tooltip.renderer",
 	"ui.tooltip.tooltip_llm", "ui.tooltip.tooltip_hotstring", "ui.tooltip", "ui.tooltip.init",
 	"adapters.event_provenance", "adapters.key_state", "adapters.synthetic_input",
-	"core.events.timer_scheduler", "adapters.storage", "infra.hotpath_profiler", "infra.logger",
+	"core.events.timer_scheduler", "core.fs.adapters.storage", "infra.hotpath_profiler", "infra.logger",
 }
 
 local function with_observer(callback)
@@ -107,7 +107,7 @@ helpers.describe("Tooltip fixture isolation", function()
 				local previous_storage, previous_profiler
 				for attempt = 1, 2 do
 					fixture.load_tooltip(support.CASES[1])
-					local storage = require("adapters.storage")
+					local storage = require("core.fs.adapters.storage")
 					local profiler = require("infra.hotpath_profiler")
 					helpers.assert_type(storage.get, "function")
 					helpers.assert_type(profiler.now, "function")

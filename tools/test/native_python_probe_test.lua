@@ -30,7 +30,7 @@ local function with_case(options, callback)
 	package.loaded["core.lifecycle.engine.core.managed_python_locator"] = locator
 	package.loaded["modules.llm.bootstrap_retry_generated"] = { admission_seconds = 30, idle_seconds = 60, retirement_seconds = 600 }
 	package.loaded["infra.logger"] = { error = function() end }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() error("GUI catalogue byte reads are forbidden") end,
 		classify_no_follow = function()
 			if not fixture.snapshot_delayed then

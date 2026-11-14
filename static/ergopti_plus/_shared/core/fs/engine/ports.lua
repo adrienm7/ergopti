@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: FileSystem Port Spec — Lease and Atomic Write
 --- DESCRIPTION:
---- What a driver's file-system owner (adapters/file_system.lua) must offer
+--- What a driver's file-system owner (core/fs/adapters/file_system.lua) must offer
 --- besides the five plain operations that FileSystem.spec.js pins by arity: the
 --- classified read, the publication that refuses a source that changed since it
 --- was read, the optional conditional removal, the write lease and the
@@ -22,7 +22,7 @@
 ---    toml_codec.writer inside the single-threaded daemon, so it holds no lease
 ---    and issues no receipt. Absence is a capability the caller branches on.
 --- 3. Windows cannot load this file: tools/codegen/codegen-file-system-ports.cjs
----    projects the method names for its owner (adapters/file_system.ahk), which
+---    projects the method names for its owner (core/fs/adapters/file_system.ahk), which
 ---    checks itself against them when it loads.
 ---
 --- Pinned by file_system_ports_contract (corpus file_system/port_vectors.json)

@@ -41,11 +41,11 @@ local Logger     = require("infra.logger")
 local KeyEventHealth = require("infra.key_event_health")
 local NativePath = require("core.fs.engine.native_path")
 local Keycodes   = require("infra.keycodes")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local TimerScheduler = require("core.events.timer_scheduler")
 local PhaseStats = require("infra.phase_stats")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
-local JsonCodec  = require("adapters.json_codec")
+local JsonCodec  = require("core.fs.adapters.json_codec")
 local LeaseContract = require("platform.remap.lease_contract")
 local LegacyReleaseFixtures = require("platform.remap.legacy_release_fixtures")
 local ActionCatalogue = require("platform.remap.action_catalogue")
@@ -384,7 +384,7 @@ end
 --- Validation completes before mutation so malformed generated data cannot
 --- leave a partially gated configuration in the caller's table. A rule,
 --- manipulator or conditions list reached twice would take the gate twice
---- (hs.json.decode shares equal JSON values, see adapters/json_codec.lua):
+--- (hs.json.decode shares equal JSON values, see core/fs/adapters/json_codec.lua):
 --- it is refused here, where the graph is built, instead of deploying a
 --- manipulator with duplicated gates.
 --- @param rules table Independently owned raw rule graph.

@@ -11,12 +11,12 @@ local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local MODULE_KEYS = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.timings",
 	"metrics.engine.metrics",
 	"modules.keystats.aggregator",
 	"modules.keystats.export",
-	"adapters.ledger_append", "modules.keystats.log_manager",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	"modules.keystats.rotation",
 	"modules.keystats.sqlite_writer",
 	"infra.logger",
@@ -64,7 +64,7 @@ local function run_refused_transaction(failure)
 			end,
 		}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function() return true, "created" end,
 			read = function() return nil end,
 			write = function() return true end,

@@ -12,7 +12,7 @@
  * This is not hypothetical. Extracting platform/ on 2026-08-02 moved 19 Windows
  * files out of modules/ and infra/, and the AHK suite went from 3626 tests to
  * 3607 with ZERO failures: test_ahk_brace_balance registers one case per file
- * under ["infra", "modules", "ui"], so nineteen cases simply stopped existing.
+ * under ["infra", "modules", "ui", "core"], so nineteen cases simply stopped existing.
  * Nothing reported it. The suite's own floor ("at least one file checked") could
  * not fire, because the other three trees still had files.
  *
@@ -108,7 +108,7 @@ const tracked = trackedPaths
 // is carved out of modules/ and infra/, so a list naming either of those and
 // not platform/ has a hole created by that migration, whatever it meant to
 // cover. That is the exact shape that silently dropped 19 tests.
-const REQUIRES_PLATFORM = ['modules', 'infra'];
+const REQUIRES_PLATFORM = ['modules', 'infra', 'core'];
 
 const incomplete = [];
 for (const rel of tracked) {

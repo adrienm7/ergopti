@@ -32,7 +32,7 @@ function M.with_manifest(content, logger, callback)
 		return helpers.with_stub_scope({ "infra.manifest_menu", "infra.logger" }, function()
 			package.loaded["infra.logger"] = logger or helpers.make_logger_stub()
 			local renderer = helpers.load_with_stubs("infra.manifest_menu")
-			package.loaded["infra.paths"].shared = function(relative)
+			package.loaded["core.fs.engine.paths"].shared = function(relative)
 				assert(relative == "menu/data/menu_manifest.json", "unexpected manifest fixture path")
 				return path
 			end

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local FactoryResetJournal = require("infra.factory_reset_journal")
 
 local function memory_file_system()

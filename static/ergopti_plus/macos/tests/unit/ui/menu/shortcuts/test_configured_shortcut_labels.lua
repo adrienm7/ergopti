@@ -16,7 +16,7 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.engine.renderer",
+	"core.fs.engine.paths", "menu.engine.renderer",
 }
 
 helpers.describe("configured shortcut row labels", function()
@@ -67,7 +67,7 @@ helpers.describe("configured shortcut row labels", function()
 				package.loaded["infra.deferred_work"] = {}
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.menu_utils"] = {}
-				package.loaded["infra.paths"] = { shared = helpers.shared }
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				-- The Shortcuts submenu opens the script chords' group, whose rows
 				-- are its provider's.
 				local actual_manifest = require("infra.manifest_menu")
@@ -118,7 +118,7 @@ helpers.describe("real script-action catalogue projection", function()
 		helpers.it("preserves every genuine script action and heading in " .. language, catalogue_scope(function()
 			-- Establish the existing controlled native environment before publishing translation.
 			helpers.load_with_stubs("shortcuts.engine.action_parameter_label")
-			local Json = require("adapters.json_codec")
+			local Json = require("core.fs.adapters.json_codec")
 			local function read(relative)
 				local file = assert(io.open(helpers.shared(relative), "rb"))
 				local bytes = assert(file:read("*a")); assert(file:close())

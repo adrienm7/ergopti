@@ -27,7 +27,7 @@ local OWNED = {
 	"modules.gestures.actions_aux_owner",
 	"adapters.clipboard",
 	"adapters.mouse_control",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.tcc_grant",
 	"adapters.window_info",
 	"infra.notifications",
@@ -78,7 +78,7 @@ local function with_system(body, options)
 			end,
 		}
 		local statuses = options.create_statuses or { "created" }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				record.created[#record.created + 1] = { path = path, content = content }
 				local status = statuses[#record.created] or "created"

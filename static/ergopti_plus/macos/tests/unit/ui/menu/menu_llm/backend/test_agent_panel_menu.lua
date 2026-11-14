@@ -389,7 +389,7 @@ local function system_off_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_system_off.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("AI agent shared system Off row (agent-system-off)", function()

@@ -3,7 +3,7 @@
 --- Native bounded script discovery; private paths never pass through a shell.
 local Shared = require("apps.engine.program_providers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local ConfigPaths = require("infra.config_paths")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end

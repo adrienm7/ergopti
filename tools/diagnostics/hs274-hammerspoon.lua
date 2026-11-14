@@ -28,7 +28,7 @@ end
 
 local function run()
 	local ShellRunner = require("adapters.shell_runner")
-	local JsonCodec = require("adapters.json_codec")
+	local JsonCodec = require("core.fs.adapters.json_codec")
 	local Delivery = require("modules.keystats.physical_delivery")
 	local Transport = require("modules.keystats.physical_transport")
 	local convert_ticks = require("modules.keystats.physical_clock").new(config.clock)

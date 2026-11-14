@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- hs.json.decode returns one Lua table for every JSON value equal to one met
 --- earlier in the same document (LuaSkin looks up the objects it already
---- pushed by isEqual:). adapters/json_codec.lua turns its result into a tree;
+--- pushed by isEqual:). core/fs/adapters/json_codec.lua turns its result into a tree;
 --- a module calling hs.json.decode itself gets the shared graph, where editing
 --- one value edits every equal one.
 ---
@@ -25,7 +25,7 @@ local DRIVER_ROOT = helpers.driver_root()
 -- Production modules that still call hs.json.decode directly, with their
 -- count of calls. Only ever lower these.
 local DIRECT_DECODE_BASELINE = {
-	["adapters.json_codec"] = 1,
+	["core.fs.adapters.json_codec"] = 1,
 }
 
 --- Lists production Lua files recursively without relying on LuaFileSystem.
@@ -97,6 +97,6 @@ helpers.describe("JSON decoding goes through the codec (json-shared-tables)", fu
 			end
 		end
 		table.sort(drift)
-		helpers.assert_eq(#drift, 0, "decode through adapters.json_codec instead:\n" .. table.concat(drift, "\n"))
+		helpers.assert_eq(#drift, 0, "decode through core.fs.adapters.json_codec instead:\n" .. table.concat(drift, "\n"))
 	end)
 end)

@@ -27,7 +27,7 @@
 --- ==============================================================================
 
 local Logger = require("core.logger.engine.shim")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local i18n   = require("infra.i18n")
 local json   = require("core.text.engine.json")
 local Renderer = require("menu.engine.renderer")

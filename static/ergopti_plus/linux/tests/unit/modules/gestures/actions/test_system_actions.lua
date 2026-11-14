@@ -20,7 +20,7 @@
 --- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
 ---    confirmed in a dialog must target the window active before the question.
 --- 7. open_terminal_here and new_text_file_here had no Linux handler: they act
----    only in the folder adapters/file_manager_folder.lua proved, start the
+---    only in the folder core/fs/adapters/file_manager_folder.lua proved, start the
 ---    terminal detached in it, create the file exclusively under the first free
 ---    name, reveal it in the same Nautilus process, and say why otherwise.
 --- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color,
@@ -349,7 +349,7 @@ helpers.describe("Linux system actions", function()
 			reveal_command = function(folder, path) return "reveal " .. folder.bus .. " " .. path end,
 		}
 		with_modules({
-			["adapters.file_manager_folder"] = folder_port,
+			["core.fs.adapters.file_manager_folder"] = folder_port,
 			["adapters.application_notifier"] = { send = function(message) notices[#notices + 1] = message; return true end },
 		}, function() body(notices) end)
 	end
@@ -388,7 +388,7 @@ helpers.describe("Linux system actions", function()
 	helpers.it("(nui-007-failure-level) a terminal or new-file failure is an error notice", function()
 		local levels = {}
 		with_modules({
-			["adapters.file_manager_folder"] = {
+			["core.fs.adapters.file_manager_folder"] = {
 				available = function() return true end,
 				read_active_folder = function() return { path = "/nonexistent/ergopti-nui-007", bus = ":1.9" } end,
 				reveal_command = function() return "reveal" end,

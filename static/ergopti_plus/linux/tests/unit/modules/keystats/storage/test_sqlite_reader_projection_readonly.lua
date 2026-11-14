@@ -989,7 +989,7 @@ end)
 
 helpers.describe("linux-sqlite-system-day", function()
 	helpers.it("linux-sqlite-system-day: manifest key codec follows shared vectors", function()
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
 		local vectors = Json.decode(file:read("*a"))
 		file:close()
 		local keys = require("metrics.engine.view.manifest_keys")

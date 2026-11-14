@@ -30,11 +30,11 @@ local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 --- @param stored table Initial storage values.
 --- @param body function Receives (handler, state, values, pushed).
 local function with_bridge(stored, body)
-	local saved_storage = package.loaded["adapters.storage"]
+	local saved_storage = package.loaded["core.fs.adapters.storage"]
 	local saved_paths = package.loaded["infra.config_paths"]
 	local saved_picker = package.loaded["ui.config_dir_picker"]
 	local values = stored
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, fallback)
 			if values[key] == nil then return fallback end
 			return values[key]
@@ -80,7 +80,7 @@ local function with_bridge(stored, body)
 		}
 		body(handler, state, values, pushed)
 	end)
-	package.loaded["adapters.storage"] = saved_storage
+	package.loaded["core.fs.adapters.storage"] = saved_storage
 	package.loaded["infra.config_paths"] = saved_paths
 	package.loaded["ui.config_dir_picker"] = saved_picker
 	package.loaded["ui.paths_editor.bridge"] = nil
@@ -197,7 +197,7 @@ helpers.describe("paths-editor-atomic: related directory overrides", function()
 	for _, refusal in ipairs({ "false", "throw", "missing" }) do
 		helpers.it("paths-editor-atomic: refuses " .. refusal .. " batch without a partial first folder", function()
 			with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/" .. FOLDER }, function(handler, state, values)
-				local storage = package.loaded["adapters.storage"]
+				local storage = package.loaded["core.fs.adapters.storage"]
 				local set, writes = storage.set, 0
 				storage.set = function(key, value)
 					writes = writes + 1
@@ -217,7 +217,7 @@ helpers.describe("paths-editor-atomic: related directory overrides", function()
 	end
 	helpers.it("paths-editor-atomic: resets both overrides in one acknowledged batch", function()
 		with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/" .. FOLDER }, function(handler, state, values)
-			local storage = package.loaded["adapters.storage"]
+			local storage = package.loaded["core.fs.adapters.storage"]
 			local many, calls = storage.set_many, 0
 			storage.set_many = function(...) calls = calls + 1; return many(...) end
 			local result = handler.on_message({ action = "save", configDir = "", logsDir = "" }, state)

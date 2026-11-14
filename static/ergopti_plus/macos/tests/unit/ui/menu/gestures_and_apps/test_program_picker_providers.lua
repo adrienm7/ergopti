@@ -353,7 +353,7 @@ helpers.describe("program fixture final publication admission", function()
 	for _, mode in ipairs({ "false", "nil", "table", "throw" }) do
 		helpers.it("keeps the exact source after final admission " .. mode, function()
 			with_provider("script", {}, function()
-				local port = package.loaded["adapters.file_system"]
+				local port = package.loaded["core.fs.adapters.file_system"]
 				local before, status = port.read_with_status("config")
 				local called = 0
 				local result = port.write_if_unchanged_admitted("config", "candidate", { status = status, content = before }, nil,
@@ -372,7 +372,7 @@ helpers.describe("program fixture final publication admission", function()
 	end
 	helpers.it("refuses a genuine external write even when the caller mutates its expected source", function()
 		with_provider("script", {}, function()
-			local port = package.loaded["adapters.file_system"]
+			local port = package.loaded["core.fs.adapters.file_system"]
 			local before, status = port.read_with_status("config")
 			local expected, external_ack = { status = status, content = before }, nil
 			local result = port.write_if_unchanged_admitted("config", "candidate", expected, nil, function()

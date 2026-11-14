@@ -43,7 +43,7 @@ function M.prefer_all(bindings)
 	end
 	-- Some lifecycle harnesses use real TapKeys, others inject its stateful double.
 	-- Configure either without allowing the real writer to reach the host config.
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	local paths = require("infra.config_paths")
 	local saved = { read = files.read_with_status, write = files.write,
 		conditional = files.write_if_unchanged, path = paths.get }

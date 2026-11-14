@@ -34,7 +34,7 @@ local TextUtils = require("core.text.engine.utils_core")
 local OpenTarget = require("shortcuts.engine.open_target")
 local FileSelection = require("core.fs.engine.file_selection")
 local Logger = require("core.logger.engine.shim")
-local FileManagerFolder = require("adapters.file_manager_folder")
+local FileManagerFolder = require("core.fs.adapters.file_manager_folder")
 
 local LOG = "shortcuts.open_selection"
 
@@ -48,8 +48,8 @@ local REPORT_KEYS = {
 
 local DEFAULT_DEPS = {
 	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
-	exists = function(path) return require("adapters.file_system").exists(path) end,
-	path_status = function(path) return require("adapters.file_system").path_status(path) end,
+	exists = function(path) return require("core.fs.adapters.file_system").exists(path) end,
+	path_status = function(path) return require("core.fs.adapters.file_system").path_status(path) end,
 	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
 	message = function(key) return require("infra.i18n").get(key) end,
 	getenv = os.getenv,

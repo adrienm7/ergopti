@@ -14,7 +14,7 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local RESET_MODULES = {
 	"modules.keystats.physical_accounting_mode",
-	"modules.keystats", "modules.keystats.init", "adapters.ledger_append", "modules.keystats.log_manager",
+	"modules.keystats", "modules.keystats.init", "core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	"modules.keystats.rotation", "modules.keystats.sqlite_writer",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"modules.keystats.timestamp",
@@ -166,8 +166,8 @@ local function load_timer_allocation_failure_fixture()
 		return handle
 	end
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -180,7 +180,7 @@ package.loaded["adapters.file_system"] = {
 		},
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	local hs_stub = _G.hs
 	hs_stub.keycodes.currentLayout = function() return "ABC" end
 	hs_stub.caffeinate = {

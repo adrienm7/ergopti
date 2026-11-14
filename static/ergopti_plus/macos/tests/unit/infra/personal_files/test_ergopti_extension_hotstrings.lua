@@ -165,7 +165,7 @@ helpers.describe("Ergopti extension hotstrings: shipped with the app", function(
 		Packs._reset()
 		Packs.discover(roots(true), real_io())
 		local magickey = static_dir() .. "/ergopti_plus/_shared/hotstrings/data/catalogue/magickey.toml"
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local function sections_of(with_resolver)
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local Config = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
@@ -268,12 +268,12 @@ helpers.describe("Ergopti extension distance reduction", function()
 	helpers.it("(ergopti-distance-ext) loads the reference through the registry and preserves disabled sections on reload", function()
 		helpers.with_stub_scope({
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
+			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
 		}, function()
 			local State = helpers.load_with_stubs("modules.keymap.state")
 			local Registry = helpers.load_with_stubs("modules.keymap.registry")
-			local Storage = require("adapters.storage")
+			local Storage = require("core.fs.adapters.storage")
 			local reference = distance_reference()
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 			Registry.init(state)
@@ -329,13 +329,13 @@ helpers.describe("Ergopti suffix and native-feature relocation", function()
 	helpers.it("(ergopti-suffixes-ext) registers every suffix through the actual bound-source registry and supports live withdrawal", function()
 		helpers.with_stub_scope({
 			"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-			"modules.keymap.state", "modules.keymap.terminators", "adapters.storage",
+			"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage",
 			"modules.hotstrings.hotstrings_config", "infra.toml.reader",
 		}, function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = { get_user_override = function() return nil end }
 			local State = helpers.load_with_stubs("modules.keymap.state")
 			local Registry = helpers.load_with_stubs("modules.keymap.registry")
-			local Storage = require("adapters.storage")
+			local Storage = require("core.fs.adapters.storage")
 			local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 			helpers.assert_true(Registry.init(state))
 			Packs._reset()

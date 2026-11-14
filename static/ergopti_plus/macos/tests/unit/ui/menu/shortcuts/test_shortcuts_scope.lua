@@ -468,7 +468,7 @@ helpers.describe("shortcut fixture final script publication admission", function
 	end)
 	helpers.it("retains a real callback's external source instead of accepting its caller alias", function()
 		Fixture.run(function(f)
-			local port = package.loaded["adapters.file_system"]
+			local port = package.loaded["core.fs.adapters.file_system"]
 			local expected = { status = "ok", content = f.files.config }
 			local writes, calls = f.controls.writes, 0
 			f.controls.during_write = function()

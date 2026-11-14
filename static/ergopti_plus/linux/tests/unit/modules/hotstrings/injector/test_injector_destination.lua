@@ -21,7 +21,7 @@ local function injection(boundary, body)
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local rows, writes, commands, held, stopped = {}, {}, {}, {}, 0
 		local errors = {}
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
 		logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
 		package.loaded["core.logger.engine.shim"] = logger

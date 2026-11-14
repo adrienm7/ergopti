@@ -18,7 +18,7 @@ local function load_preferences(file_system)
 		function(path, content, _expected_source)
 			return file_system.write(path, content)
 		end
-	package.loaded["adapters.file_system"] = file_system
+	package.loaded["core.fs.adapters.file_system"] = file_system
 	package.loaded["infra.preferences"] = nil
 	return require("infra.preferences")
 end
@@ -638,7 +638,7 @@ end)
 
 -- Do not leak the final FileSystem double into later test modules in the same
 -- Lua process; those modules intentionally exercise the real atomic adapter.
-package.loaded["adapters.file_system"] = nil
+package.loaded["core.fs.adapters.file_system"] = nil
 package.loaded["infra.preferences"] = nil
 
 return true

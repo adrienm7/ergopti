@@ -15,7 +15,7 @@ M.bridge_name = "model_browser_bridge"
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local Shell = require("adapters.shell_runner")
 
 local APP_NAME = "model_browser"
@@ -38,7 +38,7 @@ local normalise_name = ModelCatalogue.normalise_name
 local function load_catalogue()
 	if _catalogue then return _catalogue end
 	local path = Paths.shared("ai/data/models.json")
-	local body = path and require("infra.regular_file_reader").read_source(path) or nil
+	local body = path and require("core.fs.engine.regular_file_reader").read_source(path) or nil
 	if not body then return nil end
 	local ok, decoded = pcall(Json.decode, body)
 	if not ok or type(decoded) ~= "table" then

@@ -31,7 +31,7 @@ end
 --- Changes a fixture's deliberate fault only after its refused operation has
 --- physically retired. It does not bypass the production writer's debt fence.
 function M.control(writer, sql)
-	local request = assert(require("infra.sqlite_batch_process").start(writer.get_db_path(), sql,
+	local request = assert(require("core.fs.engine.sqlite_batch_process").start(writer.get_db_path(), sql,
 		{ owner = "native-sqlite-fault-controller", timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") }))
 	local deadline = uv.hrtime() + 4000000000
 	local result

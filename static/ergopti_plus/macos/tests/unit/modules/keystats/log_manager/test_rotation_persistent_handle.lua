@@ -43,7 +43,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 	helpers.it("keeps a single open across N appends and reopens once after rollover", function()
 		local opens_after_appends, opens_after_rollover
 		helpers.with_stub_scope({
-			"modules.keystats.rotation", "adapters.ledger_append", "infra.logger",
+			"modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger",
 			"modules.keystats.timestamp", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
 		}, function()
 			local real_open, real_remove, real_date = io.open, os.remove, os.date
@@ -58,7 +58,7 @@ helpers.describe("rotation — persistent today.log handle (no per-append open/c
 				return content == ""
 			end
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.ledger_append"] = {
+			package.loaded["core.fs.adapters.ledger_append"] = {
 				rollover = function(data_sql, today, offset, previous_date, next_date, checked_reset, passed_origin)
 					owner_calls = owner_calls + 1
 					helpers.assert_eq(data_sql, DATASQL, "owner must receive the canonical ledger path")

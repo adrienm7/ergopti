@@ -30,7 +30,7 @@
 ---    still belongs to it: a window closed meanwhile leaves no XID to resolve,
 ---    and its freed process id may already be another program's.
 --- 4. open_terminal_here and new_text_file_here act only in a folder whose
----    owner adapters/file_manager_folder.lua proved: the active Nautilus
+---    owner core/fs/adapters/file_manager_folder.lua proved: the active Nautilus
 ---    window showing one local folder. Every other case is refused with a
 ---    notice that names why, never guessed from a title or a working
 ---    directory. The new file is created exclusively (O_EXCL) under the first
@@ -279,7 +279,7 @@ M.NEW_FILE_NAME_ATTEMPTS = Timings.count("gestures", "new_text_file_name_attempt
 --- The extension of the file new_text_file_here creates.
 M.NEW_FILE_EXTENSION = ".txt"
 
---- The notice of each reason adapters/file_manager_folder.lua refuses a folder.
+--- The notice of each reason core/fs/adapters/file_manager_folder.lua refuses a folder.
 M.FOLDER_REFUSALS = {
 	no_window = "system_actions.no_folder",
 	not_file_manager = "system_actions.no_folder",
@@ -297,7 +297,7 @@ M.FOLDER_REFUSALS = {
 --- @param action string The action id, for the log.
 --- @param on_folder function Receives the folder and the adapter.
 local function with_file_manager_folder(action, on_folder)
-	local Folder = require("adapters.file_manager_folder")
+	local Folder = require("core.fs.adapters.file_manager_folder")
 	local available, missing = Folder.available()
 	if not available then
 		Logger.warn(LOG, "%s: the file manager folder cannot be read in this session (%s).", action, tostring(missing))
@@ -321,7 +321,7 @@ end
 --- @param write_new function|nil path, content -> written, reason (tests).
 --- @return string|nil path The created file, nil when none could be created.
 function M.create_new_text_file(folder, write_new)
-	write_new = write_new or require("adapters.file_system").write_new
+	write_new = write_new or require("core.fs.adapters.file_system").write_new
 	local base = i18n.get("system_actions.new_text_file_name")
 	local prefix = folder:sub(-1) == "/" and folder or (folder .. "/")
 	for attempt = 1, M.NEW_FILE_NAME_ATTEMPTS do

@@ -17,7 +17,7 @@ local SETTINGS_URL =
 	"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.screen_capture",
 	"adapters.shell_runner",
 	"infra.i18n",
@@ -58,7 +58,7 @@ local function with_screenshot(options, scenario)
 			pasteboard = { count = 3, image = nil, writes = {} },
 		}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			expand_path = function(path)
 				if path == "~" then return "/Users/alice" end
 				return path

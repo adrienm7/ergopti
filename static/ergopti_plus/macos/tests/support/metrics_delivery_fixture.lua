@@ -10,9 +10,9 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader",
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
 		"modules.keystats.context_tracker" }, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if path:find("ergopti_metrics_apps_cache_v3.json", 1, true) then
 					if cached then return "cache", "ok" end

@@ -348,10 +348,10 @@ end)
 -- real regular-file write and close failures through the production save effect.
 helpers.describe("healthcheck checked save receipts (linux)", function()
 	local function default_save(write, mkdir_ok, reveal_ok)
-		local saved_fs = package.loaded["adapters.file_system"]
+		local saved_fs = package.loaded["core.fs.adapters.file_system"]
 		local saved_shell = package.loaded["adapters.shell_runner"]
 		local writes, directories = {}, {}
-		package.loaded["adapters.file_system"] = { write_new = function(path, text)
+		package.loaded["core.fs.adapters.file_system"] = { write_new = function(path, text)
 			writes[#writes + 1] = { path = path, text = text }
 			return write(path, text)
 		end }
@@ -365,7 +365,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 				if reveal_ok == false then overrides.reveal = function(_, done) done({ ok = false, code = 23 }) end end
 			end)
 		end)
-		package.loaded["adapters.file_system"] = saved_fs
+		package.loaded["core.fs.adapters.file_system"] = saved_fs
 		package.loaded["adapters.shell_runner"] = saved_shell
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, writes, directories
@@ -614,7 +614,7 @@ local function with_native_opener(script, controls, body)
 	local state = { outcomes = {}, requests = 0, current = true, root = root, target = target }
 	Desktop._set_deps_for_test({ start = function(program, args, options, done)
 		helpers.assert_eq(program, uv.exepath())
-		helpers.assert_eq(args, { require("infra.paths").driver_root() .. "/adapters/desktop_opener_worker.lua", target, tostring(timeout) })
+		helpers.assert_eq(args, { require("core.fs.engine.paths").driver_root() .. "/adapters/desktop_opener_worker.lua", target, tostring(timeout) })
 		helpers.assert_eq(options.timeout_ms, timeout)
 		state.requests = state.requests + 1
 		if controls.refuse then return nil, "controlled opener admission refused" end

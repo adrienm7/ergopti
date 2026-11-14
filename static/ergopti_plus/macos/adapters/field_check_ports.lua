@@ -23,7 +23,7 @@ local M = {}
 local Logger = require("infra.logger")
 local ShellRunner = require("adapters.shell_runner")
 local Timer = require("core.events.timer_scheduler")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "adapters.field_check_ports"
@@ -190,7 +190,7 @@ local function tap_hold_threshold_facts()
 		facts.reason = "unreadable"
 		return facts
 	end
-	local decoded = require("adapters.json_codec").decode(text)
+	local decoded = require("core.fs.adapters.json_codec").decode(text)
 	if type(decoded) ~= "table" then
 		facts.reason = "not_json"
 		return facts
@@ -482,9 +482,9 @@ M.exec = exec
 --- @param installed function|nil fn(model) -> boolean.
 --- @return table|nil model { name, runtime_name, download_gb }
 function M.smallest_model(backend, installed)
-	local path = require("infra.paths").shared_llm_path("models.json")
+	local path = require("core.fs.engine.paths").shared_llm_path("models.json")
 	-- Resolved per call: the field run's ports and these share the caller's adapters.
-	local text = path and require("adapters.file_system").read(path) or nil
+	local text = path and require("core.fs.adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return nil end
 	return require("infra.field_run").smallest_model(require("core.text.engine.json").decode(text), backend, installed)
 end

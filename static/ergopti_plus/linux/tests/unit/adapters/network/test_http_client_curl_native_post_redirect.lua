@@ -211,11 +211,11 @@ end)
 
 helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("linux-http-transport-policy: unavailable shared policy refuses before allocation", function()
-		local previous_paths, previous_binding = package.loaded["infra.paths"], package.loaded["infra.http_transport_policy"]
-		package.loaded["infra.paths"] = { shared = function() return "/nonexistent-ergopti-transport-policy/policy.json" end }
+		local previous_paths, previous_binding = package.loaded["core.fs.engine.paths"], package.loaded["infra.http_transport_policy"]
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/nonexistent-ergopti-transport-policy/policy.json" end }
 		package.loaded["infra.http_transport_policy"] = nil
 		local ok, binding = pcall(require, "infra.http_transport_policy")
-		package.loaded["infra.paths"] = previous_paths
+		package.loaded["core.fs.engine.paths"] = previous_paths
 		helpers.assert_true(ok and type(binding) == "table" and type(binding.resolve) == "function", tostring(binding))
 		local client, state = fresh_client()
 		package.loaded["infra.http_transport_policy"] = previous_binding
@@ -319,11 +319,11 @@ end)
 
 helpers.describe("http_client: asynchronous curl ownership", function()
 	helpers.it("linux-http-header-policy: unavailable policy cannot retire a valid owner", function()
-		local previous_paths, previous_binding = package.loaded["infra.paths"], package.loaded["infra.http_header_policy"]
-		package.loaded["infra.paths"] = { shared = function() return "/nonexistent-ergopti-header-policy/policy.json" end }
+		local previous_paths, previous_binding = package.loaded["core.fs.engine.paths"], package.loaded["infra.http_header_policy"]
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/nonexistent-ergopti-header-policy/policy.json" end }
 		package.loaded["infra.http_header_policy"] = nil
 		local ok, binding = pcall(require, "infra.http_header_policy")
-		package.loaded["infra.paths"] = previous_paths
+		package.loaded["core.fs.engine.paths"] = previous_paths
 		helpers.assert_true(ok and type(binding) == "table" and type(binding.validate) == "function", tostring(binding))
 		local client, state = fresh_client()
 		package.loaded["infra.http_header_policy"] = previous_binding

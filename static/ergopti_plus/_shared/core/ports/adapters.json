@@ -16,9 +16,9 @@
 			"linux": "static/ergopti_plus/linux/core/crypto/crypto.lua"
 		},
 		"FileSystem": {
-			"windows": "static/ergopti_plus/windows/adapters/file_system.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/file_system.lua",
-			"linux": "static/ergopti_plus/linux/adapters/file_system.lua"
+			"windows": "static/ergopti_plus/windows/core/fs/adapters/file_system.ahk",
+			"macos": "static/ergopti_plus/macos/core/fs/adapters/file_system.lua",
+			"linux": "static/ergopti_plus/linux/core/fs/adapters/file_system.lua"
 		},
 		"GraphicsRenderer": {
 			"windows": "static/ergopti_plus/windows/adapters/graphics_renderer.ahk",
@@ -67,9 +67,9 @@
 			"linux": "static/ergopti_plus/linux/adapters/secure_field_detector.lua"
 		},
 		"Storage": {
-			"windows": "static/ergopti_plus/windows/adapters/storage.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/storage.lua",
-			"linux": "static/ergopti_plus/linux/adapters/storage.lua"
+			"windows": "static/ergopti_plus/windows/core/fs/adapters/storage.ahk",
+			"macos": "static/ergopti_plus/macos/core/fs/adapters/storage.lua",
+			"linux": "static/ergopti_plus/linux/core/fs/adapters/storage.lua"
 		},
 		"TextSender": {
 			"windows": "static/ergopti_plus/windows/adapters/text_sender.ahk",

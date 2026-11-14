@@ -79,7 +79,7 @@ end
 --- Native filesystem ownership is covered by run_logger_write_receipts.lua.
 local function with_probe_receipts(failure, test)
 	local Sink = helpers.load_module("infra.logger_sink")
-	local saved_writer = package.loaded["infra.regular_file_writer"]
+	local saved_writer = package.loaded["core.fs.engine.regular_file_writer"]
 	local shell = require("adapters.shell_runner")
 	local previous_capture = shell.exec_checked
 	local previous_execute, previous_remove = os.execute, os.remove
@@ -119,11 +119,11 @@ local function with_probe_receipts(failure, test)
 		if failure == "remove" then return nil, "cleanup refused" end
 		return true
 	end
-	package.loaded["infra.regular_file_writer"] = { open = open_file }
+	package.loaded["core.fs.engine.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function() test(Sink, state, path) end, debug.traceback)
 	shell.exec_checked = previous_capture
 	os.execute, os.remove = previous_execute, previous_remove
-	package.loaded["infra.regular_file_writer"] = saved_writer
+	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
@@ -179,7 +179,7 @@ end)
 --- Uses the real sink's write/flush interface; file and console receipts are simulated.
 local function with_write_receipts(channel, refusal, body)
 	local Sink = helpers.load_module("infra.logger_sink")
-	local saved_writer = package.loaded["infra.regular_file_writer"]
+	local saved_writer = package.loaded["core.fs.engine.regular_file_writer"]
 	local dir = "/owned-logger-receipts"
 	local state = { files = {}, diagnostics = {}, console = {}, failing = true }
 	local logger = {}
@@ -223,7 +223,7 @@ local function with_write_receipts(channel, refusal, body)
 		state.files[kind] = file
 		return file
 	end
-	package.loaded["infra.regular_file_writer"] = { open = open_file }
+	package.loaded["core.fs.engine.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function()
 		helpers.assert_true(Sink.install(logger, { log_dir = dir, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }))
 		body(Sink, state, logger)
@@ -232,7 +232,7 @@ local function with_write_receipts(channel, refusal, body)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
 	package.loaded["infra.config_paths"] = previous_paths
-	package.loaded["infra.regular_file_writer"] = saved_writer
+	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
@@ -304,7 +304,7 @@ end)
 --- independently by the registered run_logger_write_receipts.lua fixture.
 local function with_repoint_receipts(case, body)
 	local Sink = helpers.load_module("infra.logger_sink")
-	local saved_writer = package.loaded["infra.regular_file_writer"]
+	local saved_writer = package.loaded["core.fs.engine.regular_file_writer"]
 	local old, target = "/owned-repoint-old", "/owned-repoint-candidate"
 	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {}, diagnostics = {} }
 	local original_open, original_execute = io.open, os.execute
@@ -353,7 +353,7 @@ local function with_repoint_receipts(case, body)
 		end
 		return file
 	end
-	package.loaded["infra.regular_file_writer"] = { open = open_file }
+	package.loaded["core.fs.engine.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function()
 		if case.mode ~= "none" then
 			helpers.assert_eq(Sink.install(logger, { log_dir = old, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }), case.mode ~= "stdout")
@@ -366,7 +366,7 @@ local function with_repoint_receipts(case, body)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
 	package.loaded["infra.config_paths"] = previous_paths
-	package.loaded["infra.regular_file_writer"] = saved_writer
+	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
 
@@ -712,11 +712,11 @@ end)
 --- @param options table Controlled admission/channel failure.
 --- @param body function Receives the actual sink and observed port effects.
 local function with_private_log_sink(options, body)
-	local policy_path = require("infra.paths").shared("diagnostics/data/redaction.json")
+	local policy_path = require("core.fs.engine.paths").shared("diagnostics/data/redaction.json")
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
-	local names = { "infra.paths", "infra.config_paths", "infra.timings", "infra.logger_sink", "infra.regular_file_reader", "infra.regular_file_writer" }
+	local names = { "core.fs.engine.paths", "infra.config_paths", "infra.timings", "infra.logger_sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
@@ -727,7 +727,7 @@ local function with_private_log_sink(options, body)
 	local DirectoryResolver = helpers.load_module("infra.config_paths")
 	state.account_home, state.directory_home = DirectoryResolver.account_home, DirectoryResolver.home
 	state.home_resolutions = 0
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		driver_root = function() return "/owned-driver" end,
 		shared_root_from = function(root)
 			helpers.assert_eq(root, "/owned-driver")
@@ -780,8 +780,8 @@ local function with_private_log_sink(options, body)
 			return true
 		end, flush = function() return true end, close = function() return true end }
 	end
-	package.loaded["infra.regular_file_reader"] = { open_source = function(path) return open_file(path, "rb") end }
-	package.loaded["infra.regular_file_writer"] = { open = open_file }
+	package.loaded["core.fs.engine.regular_file_reader"] = { open_source = function(path) return open_file(path, "rb") end }
+	package.loaded["core.fs.engine.regular_file_writer"] = { open = open_file }
 	local ok, err = xpcall(function() body(Sink, state, logger) end, debug.traceback)
 	Sink.uninstall(logger)
 	io.open, os.execute, os.getenv = saved_open, saved_execute, saved_getenv

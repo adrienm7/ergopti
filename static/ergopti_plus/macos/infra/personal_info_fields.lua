@@ -30,7 +30,7 @@ local M = {}
 local Logger = require("infra.logger")
 local Codec  = require("infra.toml.codec")
 local Mask   = require("hotstrings.engine.personal_info.mask")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "infra.personal_info_fields"

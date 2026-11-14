@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local planner = helpers.load_with_stubs("hotstrings.engine.bulk_scope")
-local Json = require("adapters.json_codec")
+local Json = require("core.fs.adapters.json_codec")
 local path = helpers.shared("tests/corpus/hotstrings/bulk_scope_vectors.json")
 local file = assert(io.open(path, "r"))
 local content = assert(file:read("*a"))

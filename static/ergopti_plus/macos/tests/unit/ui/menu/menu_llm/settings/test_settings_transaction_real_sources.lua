@@ -29,8 +29,8 @@ helpers.describe("macOS real-source indentation compensation", function()
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-		package.loaded["adapters.file_system"] = {
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
 				return disk, "ok"
@@ -113,7 +113,7 @@ helpers.describe("macOS real-source indentation compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -172,8 +172,8 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-		package.loaded["adapters.file_system"] = {
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
 				return disk, "ok"
@@ -256,7 +256,7 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -344,8 +344,8 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local path = require("infra.config_paths").get("ConfigTomlPath")
 				local disk = case.source
-				local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-				package.loaded["adapters.file_system"] = {
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function() return disk, "ok" end,
 					write = function() error("a privacy row never writes unconditionally") end,
 					write_if_unchanged = function(_, content, source)
@@ -376,7 +376,7 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 						end
 					end)
 				end, debug.traceback)
-				package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)
@@ -396,8 +396,8 @@ helpers.describe("Privacy native publication source ownership", function()
 				local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.trigger]\nurl_bar_filter_enabled = false\nsecure_filter_enabled = false\n[private]\nfuture = 42\n'
 				local external = initial:gsub('enabled = true', 'enabled = false'):gsub('future = 42', 'future = 73')
 				local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-				local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-				package.loaded["adapters.file_system"] = {
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function(read_path)
 						if read_path ~= path then wrong_path = true end
 						return disk, "ok"
@@ -467,7 +467,7 @@ helpers.describe("Privacy native publication source ownership", function()
 						helpers.assert_eq(disk, external)
 					end)
 				end, debug.traceback)
-				package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)
@@ -640,7 +640,7 @@ end)
 
 helpers.describe("LLM fixed parents: independent original full physical hierarchy", function()
 	helpers.it("retains every original native child, flag and callback through the real outer renderer", function()
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
 		local corpus = assert(require("core.text.engine.json").decode(file:read("*a"))); assert(file:close())
 		with_fixture({parent_only = true}, function(fixture)
 			local rows = fixture.top_level_callbacks().rebuild()

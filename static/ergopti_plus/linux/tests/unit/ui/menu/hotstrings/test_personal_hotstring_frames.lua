@@ -27,7 +27,7 @@ end
 local function with_personal_frame(scenario, options)
 	options = options or {}
 	local names = { "infra.i18n", "infra.locale", "core.i18n.engine.core", "infra.manifest_menu",
-		"ui.menu.builder", "adapters.storage", "ui.hotstring_editor.bridge" }
+		"ui.menu.builder", "core.fs.adapters.storage", "ui.hotstring_editor.bridge" }
 	local previous, saved_getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local scratch, native, owner, receipt, acquired, store
@@ -53,7 +53,7 @@ local function with_personal_frame(scenario, options)
 		local bridge = require("ui.hotstring_editor.bridge")
 		local builder = require("ui.menu.builder")
 		local build_hotstrings = upvalue(builder.build, "_build_hotstrings")
-		local files = require("infra.paths")
+		local files = require("core.fs.engine.paths")
 		local corpus_file = assert(io.open(files.shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
 		local corpus = assert(require("core.text.engine.json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
 		local sections = options.empty and {} or { "alpha", "-", "module", "beta" }
@@ -214,13 +214,13 @@ helpers.describe("complete personal hotstring shared frames (Linux)", function()
 			local bytes = f.read_source()
 			local model = assert(require("core.text.engine.json").decode(bytes))
 			helpers.assert_eq(model.future.keep, "bytes")
-			local old_storage = package.loaded["adapters.storage"]
+			local old_storage = package.loaded["core.fs.adapters.storage"]
 			local old_bridge = package.loaded["ui.hotstring_editor.bridge"]
-			package.loaded["adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = nil, nil
+			package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = nil, nil
 			local reload = require("ui.hotstring_editor.bridge")
 			helpers.assert_eq(reload.get_pref("default_section"), "")
 			helpers.assert_eq(reload.get_pref("auto_close"), true)
-			package.loaded["adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = old_storage, old_bridge
+			package.loaded["core.fs.adapters.storage"], package.loaded["ui.hotstring_editor.bridge"] = old_storage, old_bridge
 		end)
 	end)
 	helpers.it("refuses missing whole declarations and held commands without native effects", function()

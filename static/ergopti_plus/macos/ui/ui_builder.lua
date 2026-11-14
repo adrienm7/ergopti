@@ -17,13 +17,13 @@
 local M = {}
 local hs = hs
 local Logger = require("infra.logger")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 local NativePath = require("core.fs.engine.native_path")
 local TextUtils = require("core.text.engine.utils_core")
 local I18nSeed = require("core.ui.engine.webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("core.events.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local OwnWindow = require("adapters.own_window")
 local WebviewCloseOwner = require("ui.webview_close_owner").new(DeferredWork, Logger)
 

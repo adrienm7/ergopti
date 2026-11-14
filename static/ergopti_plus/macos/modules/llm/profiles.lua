@@ -25,7 +25,7 @@ local Logger   = require("infra.logger")
 local i18n     = require("infra.i18n")
 local Manifest = require("infra.manifest_reader")
 local Selector = require("ai.engine.settings.profile_selector")
-local Storage  = require("adapters.storage")
+local Storage  = require("core.fs.adapters.storage")
 local ConfigKeys = require("settings.engine.keys")
 local LOG      = "llm.profiles"
 

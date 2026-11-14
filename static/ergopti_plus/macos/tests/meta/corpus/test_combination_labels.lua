@@ -16,7 +16,7 @@ local function corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/tap_hold/combination_labels.json"), "r"))
 	local text = file:read("*a")
 	file:close()
-	return require("adapters.json_codec").decode(text)
+	return require("core.fs.adapters.json_codec").decode(text)
 end
 
 helpers.describe("shared canonical combination label policy", function()

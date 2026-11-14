@@ -80,7 +80,7 @@ end
 --- @return table manager
 local function build_mlx_requirements_manager(task_records, start_records)
 	install_common_stubs()
-	package.loaded["infra.fs_dir"] = {entries = function() return {} end}
+	package.loaded["core.fs.engine.dir"] = {entries = function() return {} end}
 	package.loaded["modules.llm.api_mlx"] = {get_port = function() return 8080 end}
 	package.loaded["modules.llm.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
 	package.loaded["ui.menu.menu_llm.models_manager_mlx_hf"] = {
@@ -141,7 +141,7 @@ end
 helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-backend-stale) delivers one stale handoff from a real MLX check", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "infra.logger", "infra.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
 			"adapters.task_lifecycle", "infra.dialog_util",
@@ -209,7 +209,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-a-b-order) prevents late A from reaching the server after B commits", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "infra.logger", "infra.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
 			"adapters.task_lifecycle", "infra.dialog_util",
@@ -507,7 +507,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-invalidation-stale) invokes one stale callback after a native check expires", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "infra.logger", "infra.i18n", "infra.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "adapters.task_lifecycle",
 			"ui.menu.menu_llm.models_manager_mlx_hf",
@@ -548,7 +548,7 @@ helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
 			"hs", "adapters.shell_runner", "core.events.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths", "infra.timings",
+			"infra.dialog_util", "core.fs.engine.paths", "infra.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -592,7 +592,7 @@ helpers.describe("model manager generation fences", function()
 				return "menu.llm.btn_download"
 			end}
 			helpers.provide_timings()
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared_llm_path = function() return helpers.shared("ai/data/models.json") end,
 			}
 			package.loaded["modules.llm"] = {get_backend = function() return "ollama" end}
@@ -779,14 +779,14 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-download-publication-yield) drops stale detached-download continuations", function()
 		local modules = {
-			"adapters.json_codec",
+			"core.fs.adapters.json_codec",
 			"hs", "infra.logger", "infra.i18n", "infra.notifications",
 			"adapters.task_lifecycle", "core.events.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			-- Storage captures hs too: the prelude reads the proxy override through it.
-			"adapters.storage",
+			"core.fs.adapters.storage",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
@@ -1025,9 +1025,9 @@ helpers.describe("model manager generation fences", function()
 			"adapters.task_lifecycle", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			-- Storage captures hs too: the prelude reads the proxy override through it.
-			"adapters.storage",
+			"core.fs.adapters.storage",
 		}
 		local pull_done
 		local pull_tasks, progress_shows = {}, 0

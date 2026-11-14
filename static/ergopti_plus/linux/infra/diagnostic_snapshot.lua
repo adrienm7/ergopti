@@ -25,9 +25,9 @@ local Snapshot      = require("diagnostics.engine.snapshot")
 local Version       = require("infra.version")
 local ConfigPaths   = require("infra.config_paths")
 local LoggerSink    = require("infra.logger_sink")
-local Paths         = require("infra.paths")
+local Paths         = require("core.fs.engine.paths")
 local DisplayServer = require("infra.display_server")
-local FileSystem    = require("adapters.file_system")
+local FileSystem    = require("core.fs.adapters.file_system")
 local ConfigKeys = require("settings.engine.keys")
 
 M.DRIVER = "linux"

@@ -18,7 +18,7 @@ FOLDER = tomllib.loads(APP_DIRS.read_text(encoding="utf-8"))["app"]["linux_folde
 
 
 WORKER = r"""
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 print("ready"); io.stdout:flush()
 assert(Storage.get("value", "default") == "default")
 local recovery = assert(Storage.recovery_status())

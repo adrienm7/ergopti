@@ -66,7 +66,7 @@ local ADAPTERS_UNDER_TEST = {
 	{ module = "adapters.notifier", port = "Notifier" },
 	{ module = "adapters.hotkey_registrar", port = "HotkeyRegistrar" },
 	{ module = "adapters.tray_menu", port = "TrayMenu" },
-	{ module = "adapters.file_system", port = "FileSystem" },
+	{ module = "core.fs.adapters.file_system", port = "FileSystem" },
 	{ module = "adapters.window_info", port = "WindowInfo" },
 }
 
@@ -133,4 +133,4 @@ for _, entry in ipairs(ADAPTERS_UNDER_TEST) do
 end
 
 require("tests.lua.core_fs.file_system_ports_contract").register(helpers, "macos", 8,
-	function() return helpers.load_with_stubs("adapters.file_system") end)
+	function() return helpers.load_with_stubs("core.fs.adapters.file_system") end)

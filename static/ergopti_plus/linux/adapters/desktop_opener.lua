@@ -16,7 +16,7 @@ local stopping, checking_shutdown = false, false
 local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
 	update_time = function() return require("luv").update_time() end,
-	worker = function() return require("infra.paths").driver_root() .. "/adapters/desktop_opener_worker.lua" end,
+	worker = function() return require("core.fs.engine.paths").driver_root() .. "/adapters/desktop_opener_worker.lua" end,
 	timeout = function() return require("infra.timings").ms("ui", "desktop_open_timeout_ms") end,
 	start = function(...) return require("adapters.owned_process").start(...) end,
 }

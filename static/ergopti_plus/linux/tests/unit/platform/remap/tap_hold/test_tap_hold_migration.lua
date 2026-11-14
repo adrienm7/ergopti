@@ -15,10 +15,10 @@
 local helpers = require("tests.helpers")
 local Loader = require("platform.remap.tap_hold_loader")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 require("tests.lua.keyboard.tap_hold_migrate_contract").register(helpers,
-	{ driver = "linux", platform = "linux", shared_root = require("infra.paths").shared_root() })
+	{ driver = "linux", platform = "linux", shared_root = require("core.fs.engine.paths").shared_root() })
 
 local OLD_FILE = '[tap_hold]\nenabled = true\ninherit_defaults = false\n'
 	.. '[tap_hold.keys.caps_lock]\ntap_action = "enter"\nhold_modifier = "ctrl"\ntime_activation_seconds = 0.35\n'

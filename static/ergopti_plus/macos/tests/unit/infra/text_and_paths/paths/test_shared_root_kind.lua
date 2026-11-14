@@ -17,7 +17,7 @@ local function with_tree(scenario)
 	local previous_hs = rawget(_G, "hs")
 	rawset(_G, "lfs", nil)
 	local okay, failure = xpcall(function()
-		helpers.with_fresh_modules({ "infra.paths", "infra.logger", "lfs" }, function()
+		helpers.with_fresh_modules({ "core.fs.engine.paths", "infra.logger", "lfs" }, function()
 			local fs = require("lfs")
 			local script_shared = helpers.driver_root():gsub("[/\\]$", ""):gsub("/macos$", "/_shared")
 			local base = os.tmpname():gsub("\\", "/")
@@ -58,7 +58,7 @@ local function with_tree(scenario)
 						return fs.attributes(path)
 					end },
 				}
-				scenario(require("infra.paths"), state)
+				scenario(require("core.fs.engine.paths"), state)
 			end, debug.traceback)
 			local cleaned, cleanup_error = xpcall(clean, debug.traceback)
 			if not ran then error(err, 0) end

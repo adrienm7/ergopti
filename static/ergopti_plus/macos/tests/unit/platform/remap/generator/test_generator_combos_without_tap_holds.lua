@@ -155,7 +155,7 @@ local function describe(keys)
 end
 
 helpers.with_fresh_modules({
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
 	"infra.keycodes",
 	"infra.logger",
@@ -180,7 +180,7 @@ helpers.with_fresh_modules({
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
 	package.loaded["core.text.engine.toml_codec"] = toml_stub
 	package.loaded["infra.toml.codec"] = toml_stub
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = SourceFile.read,
 		read_with_status = function(path) return SourceFile.read(path), "ok" end,
 	}

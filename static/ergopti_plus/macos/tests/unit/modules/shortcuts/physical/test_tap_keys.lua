@@ -21,17 +21,17 @@ local helpers = require("tests.helpers")
 --- @return table TapKeys, function restore
 local function fresh(stored, characters)
 	local content = stored and require("core.text.engine.toml_codec").encode({ shortcuts = { tap_keys = stored } }) or nil
-	local owned = { "adapters.storage", "infra.keycodes", "adapters.file_system",
-		"infra.paths", "infra.preferences", "infra.config_paths", "modules.shortcuts.tap_keys" }
+	local owned = { "core.fs.adapters.storage", "infra.keycodes", "core.fs.adapters.file_system",
+		"core.fs.engine.paths", "infra.preferences", "infra.config_paths", "modules.shortcuts.tap_keys" }
 	local saved = {}
 	for _, name in ipairs(owned) do saved[name] = package.loaded[name] end
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["infra.config_paths"] = { get = function() return "tap-key-test-config" end }
 	package.loaded["infra.keycodes"] = {
 		character_for = function(code) return characters and characters[code] or nil end,
 	}
-	package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function() return content, content and "ok" or "absent" end,
 		write = function() error("conditional publication required") end,
 		write_if_unchanged = function(_, candidate, expected)

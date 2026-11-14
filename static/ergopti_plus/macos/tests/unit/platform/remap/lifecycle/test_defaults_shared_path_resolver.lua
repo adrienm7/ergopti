@@ -42,11 +42,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("karabiner/defaults: shared path resolution", function()
 
-	helpers.it("uses infra.paths when it resolves", function()
+	helpers.it("uses core.fs.engine.paths when it resolves", function()
 		-- A resolver that answers with a marker path: if defaults.lua asks it and
 		-- uses the answer, the marker is what gets parsed.
 		local asked_for = nil
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(rel)
 				asked_for = rel
 				return "/probe/_shared/" .. tostring(rel)
@@ -86,7 +86,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 
 		package.loaded["infra.timings"] = nil
 		package.loaded["tap_hold.engine.key_catalog"] = saved_catalog
-		package.loaded["infra.paths"] = nil
+		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
 
@@ -98,7 +98,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		helpers.assert_eq(rollover_path, parsed_path, "both readers must use the same resolved defaults path")
 		local ctx = ok and "" or (" — load raised: " .. tostring(err))
 		helpers.assert_eq("tap_hold/data/defaults.toml", asked_for,
-			"defaults.lua must ask infra.paths for the shared-relative path, not walk up itself" .. ctx)
+			"defaults.lua must ask core.fs.engine.paths for the shared-relative path, not walk up itself" .. ctx)
 		helpers.assert_eq("/probe/_shared/tap_hold/data/defaults.toml", parsed_path,
 			"the resolver's answer must be the path actually parsed — asking and then "
 				.. "ignoring it is the same bug with an extra call" .. ctx)
@@ -107,7 +107,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 	helpers.it("falls back to the parent walk when the resolver has no answer", function()
 		-- shared_root() returns nil when it cannot find the tree. Losing the walk
 		-- would trade one single point of failure for another.
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared      = function() return nil end,
 			shared_root = function() return nil end,
 		}
@@ -126,7 +126,7 @@ helpers.describe("karabiner/defaults: shared path resolution", function()
 		package.loaded["platform.remap.defaults"] = nil
 		local ok, err = pcall(require, "platform.remap.defaults")
 
-		package.loaded["infra.paths"] = nil
+		package.loaded["core.fs.engine.paths"] = nil
 		package.loaded["infra.toml.reader"] = nil
 		package.loaded["platform.remap.defaults"] = nil
 

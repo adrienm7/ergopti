@@ -130,7 +130,7 @@ end
 --- @return number kept Stages of ours whose owner lives or that are too young.
 function M.reap(directory, opts)
 	opts = opts or {}
-	local Directory = opts.directory or require("infra.native_directory")
+	local Directory = opts.directory or require("core.fs.engine.native_directory")
 	local max_age_ms = opts.max_age_ms or require("infra.timings").ms("adapters", "stale_temp_age_ms")
 	local now = opts.now or os.time()
 	local entries, message, code = Directory.entries(directory)
@@ -173,7 +173,7 @@ end
 --- @return number removed
 function M.reap_settings()
 	local folders, seen, removed = {}, {}, 0
-	for _, file in ipairs({ require("infra.config_paths").config("config.toml"), require("adapters.storage").path() }) do
+	for _, file in ipairs({ require("infra.config_paths").config("config.toml"), require("core.fs.adapters.storage").path() }) do
 		local folder = type(file) == "string" and require("core.fs.engine.native_path").dirname(file) or nil
 		if folder and folder ~= "" and not seen[folder] then
 			seen[folder] = true

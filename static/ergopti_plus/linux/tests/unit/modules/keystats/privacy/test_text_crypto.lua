@@ -264,7 +264,7 @@ end)
 
 for _, fault in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
 	helpers.it("text cipher refuses an incomplete machine identity " .. fault, function()
-		local Reader = require("infra.regular_file_reader")
+		local Reader = require("core.fs.engine.regular_file_reader")
 		local original = Reader.open_source
 		local previous_shell, previous_cipher = package.loaded["adapters.shell_runner"], package.loaded["modules.keystats.text_cipher"]
 		local shell = helpers.load_module("adapters.shell_runner")
@@ -302,7 +302,7 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 	}
 	for index, case in ipairs(cases) do
 		helpers.it("uses the canonical native machine-ID candidate " .. index .. " (machine-id-fallback-receipts)", function()
-			local Reader = require("infra.regular_file_reader")
+			local Reader = require("core.fs.engine.regular_file_reader")
 			local previous_open = Reader.open_source
 			local previous_shell = package.loaded["adapters.shell_runner"]
 			local previous_cipher = package.loaded["modules.keystats.text_cipher"]

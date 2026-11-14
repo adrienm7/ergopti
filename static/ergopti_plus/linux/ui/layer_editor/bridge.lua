@@ -86,7 +86,7 @@ end
 --- @return string shared_root
 --- @return string config_dir
 local function folders(state)
-	local paths = dependency(state, "paths", "infra.paths")
+	local paths = dependency(state, "paths", "core.fs.engine.paths")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	if not paths or not config_paths then error("the shared tree or the configuration folder is unknown", 0) end
 	return paths.shared_root(), config_paths.get_config_dir()

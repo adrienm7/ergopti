@@ -176,7 +176,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 
 	helpers.it("does not log private text echoed by a failing provider", function()
 		local previous = package.loaded["core.logger.engine.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
@@ -197,7 +197,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 
 	helpers.it("does not log arbitrary model-provided action type or field text", function()
 		local previous = package.loaded["core.logger.engine.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)

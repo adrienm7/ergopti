@@ -14,7 +14,7 @@ local OWNED = {
 	"infra.launcher_environment", "infra.notifications", "infra.i18n",
 	"infra.config_paths", "infra.text_utils", "modules.llm.api_common",
 	"adapters.task_lifecycle", "adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.json_codec", "modules.llm.api_mlx",
+	"core.fs.adapters.json_codec", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
 
@@ -69,7 +69,7 @@ local function with_adoption(scenario)
 				after = function() return { timer = {} }, true end,
 				cancel = function(handle) handle.timer = nil; return true end,
 			}
-			package.loaded["adapters.json_codec"] = {
+			package.loaded["core.fs.adapters.json_codec"] = {
 				decode = function() return { data = { { id = "org/Model-A" } } } end,
 			}
 			package.loaded["adapters.shell_runner"] = { spawn = function() error("unexpected process dispatch") end }

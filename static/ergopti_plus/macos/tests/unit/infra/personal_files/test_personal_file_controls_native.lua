@@ -33,7 +33,7 @@ end
 local function fixture(body, options)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"adapters.file_system", "adapters.storage", "infra.config_paths", "infra.fs_dir", "infra.toml.reader",
+		"core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths", "core.fs.engine.dir", "infra.toml.reader",
 		"infra.personal_hotstrings", "infra.personal_file_adoption", "infra.personal_file_controls",
 		"modules.hotstrings.hotstrings_config", "modules.keymap", "modules.keymap.state",
 		"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
@@ -103,7 +103,7 @@ future = "keep every neighbor"
 			if key == "ConfigTomlPath" then return preferences end
 			return native_paths.get(key)
 		end }, { __index = native_paths })
-		package.loaded["infra.fs_dir"] = { entries = function(path)
+		package.loaded["core.fs.engine.dir"] = { entries = function(path)
 			observations.enumerations[#observations.enumerations + 1] = path
 			local names = {}; for name in lfs.dir(path) do names[#names + 1] = name end; return names
 		end }
@@ -155,11 +155,11 @@ future = "keep every neighbor"
 			-- The native adapter fixture reloads its own directory port. Source boot
 			-- discovery owns an actual physical enumeration rather than that port's
 			-- synthetic missing-path listing used by native writer primitives.
-			package.loaded["infra.fs_dir"] = { entries = function(path)
+			package.loaded["core.fs.engine.dir"] = { entries = function(path)
 				local names = {}; for name in lfs.dir(path) do names[#names + 1] = name end; return names
 			end }
 		end
-		package.loaded["adapters.file_system"] = adapter
+		package.loaded["core.fs.adapters.file_system"] = adapter
 		local native_state, state = require("modules.keymap.state")
 		package.loaded["modules.keymap.state"] = setmetatable({ new = function(...)
 			state = native_state.new(...); return state

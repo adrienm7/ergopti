@@ -16,7 +16,7 @@ local function write(path, bytes)
 	assert(handle:close())
 end
 local function with_source(source, callback)
-	return helpers.with_stub_scope({ "infra.preferences", "infra.logger", "adapters.file_system", "infra.fs_dir",
+	return helpers.with_stub_scope({ "infra.preferences", "infra.logger", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"menu.engine.wrap_preferences", "menu.engine.wrap_mutation", "core.lifecycle.engine.compat.utf8" }, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		local preferences = helpers.load_with_stubs("infra.preferences")

@@ -18,7 +18,7 @@ local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Codec = require("core.text.engine.toml_codec")
 
 local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[other]\nvalue = 42\n'
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- Runs `body` with zenity answering No to every question.
 --- @param body function Clicks the rows under test.

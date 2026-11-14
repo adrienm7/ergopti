@@ -15,12 +15,12 @@ local References = require("tests.support.ui.usercontent_reference_fixture")
 --- @param scenario function Receives the real host and pinned native observations.
 local function with_layout(scenario)
 	return helpers.with_fresh_modules({ "ui.layout_manager", "layouts.engine.manager_bridge", "infra.deferred_work",
-		"adapters.file_system", "modules.keymap.layout_registry" }, function()
+		"core.fs.adapters.file_system", "modules.keymap.layout_registry" }, function()
 		return References(function(_, h)
 			local builder = package.loaded["ui.ui_builder"]
 			local create = builder.show_webview
 			h.refreshes, h.focuses, h.deferred = 0, 0, {}
-			package.loaded["adapters.file_system"] = { read = function() return '{"keys":[]}' end }
+			package.loaded["core.fs.adapters.file_system"] = { read = function() return '{"keys":[]}' end }
 			package.loaded["infra.deferred_work"] = { after = function(_, callback)
 				h.deferred[#h.deferred + 1] = callback; return true
 			end }

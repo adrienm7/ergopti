@@ -19,7 +19,7 @@
 ---    (defer_report), so the notification cannot re-enter the tap.
 --- ==============================================================================
 local Driver = require("hotstrings.engine.dynamic.user_code_driver")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local SyntheticInput = require("adapters.synthetic_input")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("infra.logger")

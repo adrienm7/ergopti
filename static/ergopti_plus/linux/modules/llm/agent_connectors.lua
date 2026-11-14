@@ -151,7 +151,7 @@ local DEFAULT_DEPS = {
 	has_command = function(name) return ShellRunner.has_command(name) end,
 	private_dir = private_dir,
 	write_file = function(path, content)
-		local fh, _, _, remove_owned, current_image = require("infra.regular_file_writer").open(path, "wx")
+		local fh, _, _, remove_owned, current_image = require("core.fs.engine.regular_file_writer").open(path, "wx")
 		if not fh then return false, nil, nil, false end
 		-- Retain the native cleanup receipt even on an incomplete write.
 		local wrote, written = pcall(fh.write, fh, content)
@@ -194,7 +194,7 @@ function M.cleanup()
 				removed_file = called and removed == true
 				if not removed_file then
 					local checked, kind, _, code = pcall(function()
-						return require("infra.native_directory").target_kind(file.path)
+						return require("core.fs.engine.native_directory").target_kind(file.path)
 					end)
 					removed_file = checked and kind == nil and code == "ENOENT"
 				end

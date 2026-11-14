@@ -173,7 +173,7 @@ end
 -- original provider even when a test installs another one for the next call.
 local DEFAULT_PRIVATE_STDIN_NATIVE = {
 	popen = io.popen, tmpname = os.tmpname, open = io.open, remove = os.remove,
-	classify_no_follow = function(path) return require("adapters.file_system").classify_no_follow(path) end,
+	classify_no_follow = function(path) return require("core.fs.adapters.file_system").classify_no_follow(path) end,
 }
 local _private_stdin_native = DEFAULT_PRIVATE_STDIN_NATIVE
 local _private_stdin_cleanup = nil

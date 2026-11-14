@@ -25,7 +25,7 @@ local Json = require("core.text.engine.json")
 --- Reads the shared redaction rules, the single source of the placeholders.
 --- @return table rules
 local function rules()
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local path = Paths.shared_root_from(Paths.driver_root()) .. "/diagnostics/data/redaction.json"
 	local file = assert(io.open(path, "r"))
 	local raw = file:read("*a")
@@ -131,8 +131,8 @@ helpers.describe("config_paths: hands its folder to the log sink (linux-logger-c
 	helpers.it("hands over the folder the user moves to", function()
 		with_sink(nil, function(Sink)
 			local stored = {}
-			local saved_storage, saved_shell = package.loaded["adapters.storage"], package.loaded["adapters.shell_runner"]
-			package.loaded["adapters.storage"] = {
+			local saved_storage, saved_shell = package.loaded["core.fs.adapters.storage"], package.loaded["adapters.shell_runner"]
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 				set = function(key, value) stored[key] = value; return true end,
 				delete = function(key) stored[key] = nil; return true end,
@@ -148,7 +148,7 @@ helpers.describe("config_paths: hands its folder to the log sink (linux-logger-c
 				helpers.assert_eq(redact("Loaded /srv/Moved/Jean Dupont/famille.toml"), "Loaded " .. CONFIG .. "/" .. NAME,
 					"the committed folder must reach the sink, or lines after the move show its names")
 			end)
-			package.loaded["adapters.storage"], package.loaded["adapters.shell_runner"] = saved_storage, saved_shell
+			package.loaded["core.fs.adapters.storage"], package.loaded["adapters.shell_runner"] = saved_storage, saved_shell
 			if not ok then error(err, 0) end
 		end)
 	end)

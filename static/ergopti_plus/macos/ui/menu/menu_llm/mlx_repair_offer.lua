@@ -81,9 +81,9 @@ local _last_repair_failure = nil
 --- Loads shared policy data without a per-driver action or cause fallback.
 local function network_contract()
 	if _network_contract then return _network_contract end
-	local path = require("infra.paths").shared("core/network/data/managed_network.json")
+	local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
 	assert(type(path) == "string", "the shared managed network policy path is unavailable")
-	local text = assert(require("adapters.file_system").read(path), "the shared managed network policy is unreadable")
+	local text = assert(require("core.fs.adapters.file_system").read(path), "the shared managed network policy is unreadable")
 	_network_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(text))
 	return _network_contract
 end
@@ -106,7 +106,7 @@ end
 --- Capabilities describe actual native openers and the current failed intent.
 local function network_capabilities(cause)
 	local shell = require("adapters.shell_runner")
-	local fs = require("adapters.file_system")
+	local fs = require("core.fs.adapters.file_system")
 	local function regular_file(path)
 		if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return false end
 		local status, attributes = fs.path_status(path)

@@ -3,7 +3,7 @@
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("core.text.engine.toml_codec")
-local FS = require("adapters.file_system")
+local FS = require("core.fs.adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 
 local function clone(value)
@@ -27,7 +27,7 @@ local function fixture(demoted)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	local Preferences = helpers.load_with_stubs("infra.preferences")
 	package.loaded["ui.menu.metrics_scope"] = nil
 	Preferences.load("config")
@@ -167,7 +167,7 @@ helpers.describe("macOS complete Metrics scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FS
+package.loaded["core.fs.adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("Metrics scope provider", function()

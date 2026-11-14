@@ -8,7 +8,7 @@ package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef("int mkfifo(const char *pathname, unsigned int mode);")
 local Scheduler = require("core.events.timer_scheduler")
-local Digest = require("adapters.file_digest")
+local Digest = require("core.fs.adapters.file_digest")
 local Http = require("adapters.http_client")
 local Shell = require("adapters.shell_runner")
 local Loop = require("core.events.loop")

@@ -45,7 +45,7 @@ helpers.describe("Config manager: a category name is masked in the log", functio
 	end)
 
 	helpers.it("(category-name-log-mask) pins the placeholder to the redaction policy", function()
-		local file = assert(io.open(require("infra.paths").shared("diagnostics/data/redaction.json"), "rb"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("diagnostics/data/redaction.json"), "rb"))
 		local policy = require("core.text.engine.json").decode(file:read("*a"))
 		file:close()
 		require("tests.lua.private_label_contract")(helpers, policy)

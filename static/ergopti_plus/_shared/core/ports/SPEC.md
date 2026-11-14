@@ -88,10 +88,10 @@ Each `.spec.js` file exports:
 | TimerScheduler      | `core/events/timer_scheduler.ahk`    | `core/events/timer_scheduler.lua`    |
 | Notifier            | `adapters/notifier.ahk`              | `adapters/notifier.lua`              |
 | TrayMenu            | `adapters/tray_menu.ahk`             | `adapters/tray_menu.lua`             |
-| FileSystem          | `adapters/file_system.ahk`           | `adapters/file_system.lua`           |
+| FileSystem          | `core/fs/adapters/file_system.ahk`   | `core/fs/adapters/file_system.lua`   |
 | SecureFieldDetector | `adapters/secure_field_detector.ahk` | `adapters/secure_field_detector.lua` |
 | Clipboard           | `adapters/clipboard.ahk`             | `adapters/clipboard.lua`             |
-| Storage             | `adapters/storage.ahk`               | `adapters/storage.lua`               |
+| Storage             | `core/fs/adapters/storage.ahk`       | `core/fs/adapters/storage.lua`       |
 | ProcessLifecycle    | `adapters/process_lifecycle.ahk`     | `adapters/process_lifecycle.lua`     |
 | KeyState            | `adapters/key_state.ahk`             | `adapters/key_state.lua`             |
 | MouseControl        | `adapters/mouse_control.ahk`         | `adapters/mouse_control.lua`         |

@@ -8,8 +8,8 @@
 local helpers = require("tests.helpers")
 
 local NATIVE_CONSUMERS = {
-	"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "infra.fs_dir",
+	"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+	"infra.deferred_work", "core.fs.engine.dir",
 }
 
 local function refresh_native_consumers()
@@ -31,10 +31,10 @@ local function with_fixture(callback)
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
 		"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
-		"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
+		"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
 		"adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
-		"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-		"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
+		"core.fs.adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
+		"infra.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
 		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
 	}, function()
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -173,7 +173,7 @@ local function make_sys_screenshot_spies(window_override)
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
@@ -337,7 +337,7 @@ local function load_h01_system(options)
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	if options.logger then package.loaded["infra.logger"] = options.logger end
 	if options.text_actions then

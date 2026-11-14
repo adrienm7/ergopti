@@ -55,7 +55,7 @@ local function load_editor(writer, reader, file_system)
 		return { setCallback = function(_, callback) dispatch = callback end }
 	end
 	_G.hs = hs_stub
-	package.loaded["adapters.file_system"] = file_system
+	package.loaded["core.fs.adapters.file_system"] = file_system
 	package.loaded["infra.toml.writer"] = writer
 	package.loaded["core.text.engine.toml_codec.writer"] = nil
 	package.loaded["infra.toml.reader"] = reader

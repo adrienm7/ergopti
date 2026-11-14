@@ -4,7 +4,7 @@ package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" ..
 local helpers = require("tests.helpers")
 package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 local uv, ffi = require("luv"), require("ffi")
-assert(require("infra.paths").driver_root():find("[;?]"), "test driver must retain its literal delimiter")
+assert(require("core.fs.engine.paths").driver_root():find("[;?]"), "test driver must retain its literal delimiter")
 ffi.cdef[[
 struct _XDisplay;
 struct _XDisplay *XOpenDisplay(const char *);

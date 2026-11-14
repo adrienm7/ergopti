@@ -27,7 +27,7 @@ local Agent       = require("ai.engine.agent.agent")
 local Logger      = require("infra.logger")
 local Errors      = require("diagnostics.engine.adapter_errors")
 local ShellRunner = require("adapters.shell_runner")
-local FileSystem  = require("adapters.file_system")
+local FileSystem  = require("core.fs.adapters.file_system")
 local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "llm.agent_connectors"

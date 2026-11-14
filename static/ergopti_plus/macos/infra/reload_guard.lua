@@ -31,7 +31,7 @@ local M = {}
 
 local Logger  = require("infra.logger")
 local LOG     = "reload_guard"
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 
 

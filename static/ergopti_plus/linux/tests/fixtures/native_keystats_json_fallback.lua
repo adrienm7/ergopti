@@ -31,7 +31,7 @@ for _, program in ipairs({ "mkdir" }) do
 	assert(found and path:sub(1, 1) == "/"); assert(uv.fs_symlink(path:gsub("\n$", ""), bin .. "/" .. program))
 end
 assert(uv.os_setenv("PATH", bin)); assert(Shell.has_command("sqlite3") == false)
-local Writer = require("infra.regular_file_writer")
+local Writer = require("core.fs.engine.regular_file_writer")
 local native_open = Writer.open
 local Keystats, Sqlite = require("modules.keystats.keystats"), require("modules.keystats.sqlite_writer")
 require("tests.support.metrics_preferences_fixture").with(function()

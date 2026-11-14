@@ -102,7 +102,7 @@ local function log_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/log_level_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 --- Builds the actual Debug row with its real logger threshold.
@@ -179,7 +179,7 @@ local function check_log_commit(receipt)
 	local ok, detail = pcall(function()
 		local fixture = require("tests.support.menu_boot_fixture").boot()
 		local actions = fixture.global_actions()
-		local logger, storage = require("infra.logger"), require("adapters.storage")
+		local logger, storage = require("infra.logger"), require("core.fs.adapters.storage")
 		storage_owner, previous_storage_set = storage, storage.set
 		local threshold, writes, published, rebuilt = "INFO", 0, 0, 0
 		local stored_key, stored_value, detached_threshold
@@ -242,7 +242,7 @@ end)
 local function debug_parent_fixture(body)
 	local saved = {}
 	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
-	helpers.load_with_stubs("infra.paths")
+	helpers.load_with_stubs("core.fs.engine.paths")
 	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
@@ -266,8 +266,8 @@ local function debug_parent_fixture(body)
 	if not ok then error(detail, 0) end
 end
 
-local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
+local debug_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
 local debug_parent_raw = debug_parent_file:read("*a")
 debug_parent_file:close()
 require("tests.lua.debug_parent_contract").register(helpers, debug_parent_fixture,
-	assert(require("adapters.json_codec").decode(debug_parent_raw)), "hs")
+	assert(require("core.fs.adapters.json_codec").decode(debug_parent_raw)), "hs")

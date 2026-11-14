@@ -29,13 +29,13 @@
 
 local M = {}
 local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
+local Paths      = require("core.fs.engine.paths")
 local TomlReader = require("infra.toml.reader")
 local TomlScanner = require("core.text.engine.toml_codec.record_scanner")
 local TomlKeyPath = require("core.text.engine.toml_codec.key_path")
 local Extensions = require("hotstrings.engine.extensions")
 local TomlRecordEditor = require("infra.toml.record_editor")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local ConfigSchema = require("modules.hotstrings.hotstrings_config_schema")
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Overrides = require("hotstrings.engine.overrides")

@@ -32,7 +32,7 @@ local M = {}
 
 local hs      = hs
 local Logger  = require("infra.logger")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local Timings = require("infra.timings")
 local TimerScheduler = require("core.events.timer_scheduler")
 

@@ -141,7 +141,7 @@ function M.open(options)
 			-- The factory names the window from the shared manifest and brands it once.
 			frame = frame, app_id = "config_cleanup",
 			style_masks = masks.titled + masks.closable + masks.resizable,
-			assets_dir = require("infra.paths").shared("ui/config_cleanup") .. "/",
+			assets_dir = require("core.fs.engine.paths").shared("ui/config_cleanup") .. "/",
 			usercontent = owner.controller, allow_new_windows = false,
 			is_current = function() return active == owner end,
 			on_webview_created = function(view)

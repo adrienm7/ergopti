@@ -27,7 +27,7 @@ local function choose(parameter, clicked, refusal, picked)
 	local names = {
 		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
-		"infra.logger", "infra.deferred_work", "adapters.storage", "ui.gesture_conflict_notice",
+		"infra.logger", "infra.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
 		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
@@ -101,7 +101,7 @@ local function choose(parameter, clicked, refusal, picked)
 	}
 	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.storage"] = { get = function() return false end }
+	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
 	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
 	package.loaded["adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
 	local ok, err = xpcall(function()

@@ -15,13 +15,13 @@ local TIMESTAMP = "2026-10-26 00:00:00.000"
 --- @param prefix string Physical bytes left by the previous process.
 --- @param expected string[] Text values of the complete recoverable records.
 local function replay(prefix, expected)
-	helpers.with_stub_scope({ "modules.keystats.rotation", "adapters.ledger_append", "infra.logger" }, function()
+	helpers.with_stub_scope({ "modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger" }, function()
 		local path = os.tmpname()
 		local seed = assert(io.open(path, "w"))
 		assert(seed:write(prefix)); assert(seed:close())
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		-- This owner is used only to close the real append stream during cleanup.
-		package.loaded["adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
+		package.loaded["core.fs.adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
 			return reset(next_date, {})
 		end }
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
@@ -49,12 +49,12 @@ end
 
 helpers.describe("rotation restart framing", function()
 	helpers.it("refuses EOF if the journal pathname disappears while its writer is open", function()
-		helpers.with_stub_scope({ "modules.keystats.rotation", "adapters.ledger_append", "infra.logger" }, function()
+		helpers.with_stub_scope({ "modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger" }, function()
 			local path = os.tmpname()
 			local seed = assert(io.open(path, "w"))
 			assert(seed:write("previous\n")); assert(seed:close())
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
+			package.loaded["core.fs.adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
 				return reset(next_date, {})
 			end }
 			local rotation = helpers.load_with_stubs("modules.keystats.rotation")
@@ -92,14 +92,14 @@ helpers.describe("rotation restart framing", function()
 	end)
 	for _, failed_stage in ipairs({ "size_query", "tail_seek", "tail_read", "append_seek" }) do
 		helpers.it("(journal-restart-boundary) refuses " .. failed_stage .. " before acknowledging any new bytes", function()
-			helpers.with_stub_scope({ "modules.keystats.rotation", "adapters.ledger_append", "infra.logger" }, function()
+			helpers.with_stub_scope({ "modules.keystats.rotation", "core.fs.adapters.ledger_append", "infra.logger" }, function()
 				local path, prefix = os.tmpname(), '{"torn":'
 				local seed = assert(io.open(path, "w")); assert(seed:write(prefix)); assert(seed:close())
 				local errors, handles, writes = {}, {}, 0
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 				package.loaded["infra.logger"] = logger
-				package.loaded["adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
+				package.loaded["core.fs.adapters.ledger_append"] = { rollover = function(_, _, _, _, next_date, reset)
 					return reset(next_date, {})
 				end }
 				local rotation = helpers.load_with_stubs("modules.keystats.rotation")

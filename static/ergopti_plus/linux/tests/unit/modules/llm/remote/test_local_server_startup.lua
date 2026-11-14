@@ -21,7 +21,7 @@ local function isolated(body)
 	-- The four servers these cases drive run; every other catalogue server is
 	-- stopped, so a longer catalogue changes no case.
 	local stopped = {}
-	local catalogue = Json.decode(assert(io.open(require("infra.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
+	local catalogue = Json.decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 	local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 	for _, id in ipairs(catalogue.server_order) do
 		if not driven[id] then stopped[id] = { running = false, pids = {} } end

@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
-local FS = require("adapters.file_system")
+local FS = require("core.fs.adapters.file_system")
 local function clone(value)
 	if type(value) ~= "table" then return value end
 	local out = {}; for key, child in pairs(value) do out[key] = clone(child) end; return out
@@ -24,7 +24,7 @@ local function fixture(demoted)
 			files[path], writes = content, writes + 1; return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	local Preferences = helpers.load_with_stubs("infra.preferences")
 	for _, name in ipairs({ "ui.menu.llm_scope", "ui.menu.menu_llm.scope_runtime", "ui.menu.scoped_preferences" }) do package.loaded[name] = nil end
 	Preferences.load("config")
@@ -193,5 +193,5 @@ helpers.describe("macOS complete LLM scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FS
+package.loaded["core.fs.adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil

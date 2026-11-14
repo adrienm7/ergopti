@@ -50,7 +50,7 @@ end
 
 local uv = require("luv")
 assert(debug.getinfo(uv.new_fs_event, "S").what == "C", "actual native watchers required")
-local watcher = require("infra.file_watchers")
+local watcher = require("core.fs.engine.file_watchers")
 local original_pump, original_stop = watcher.pump, watcher.stop
 local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-watcher-runtime-XXXXXX"))
 local path = directory .. "/owned.toml"

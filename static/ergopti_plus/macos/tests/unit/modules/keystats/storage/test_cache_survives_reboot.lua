@@ -120,7 +120,7 @@ local function start(root, prepare, revision)
 	}
 	package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end,
 		sync_foreign_data_sql = function() return {} end }
-	package.loaded["adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
+	package.loaded["core.fs.adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
 	package.loaded["modules.keystats.rotation"] = {
 		init = function(options) seen.rotation_offset = options.today_log_offset end,
 		is_initialized = function() return seen.rotation_offset ~= nil end,

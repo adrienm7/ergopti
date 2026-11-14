@@ -878,7 +878,7 @@ local function register_schema_admission(h, driver)
 			for _, kind in ipairs({ 'copied adapter', 'withdrawn actual reader' }) do
 				h.it('refuses ' .. kind .. ' before whole-write reader invocation: create_only=' .. tostring(operation), function()
 					with_config(current(false), function(path)
-						local adapter = require('adapters.file_system')
+						local adapter = require('core.fs.adapters.file_system')
 						h.assert_eq(admitted(path).status, 'current')
 						local reader = rawget(adapter, 'read_with_status')
 						local calls = 0
@@ -901,7 +901,7 @@ local function register_schema_admission(h, driver)
 			for _, timing in ipairs({ 'before boot', 'after boot' }) do
 				h.it('refuses replacement native removal identity ' .. field .. ' ' .. timing, function()
 					with_config(current(false), function(path)
-						local adapter = require('adapters.file_system')
+						local adapter = require('core.fs.adapters.file_system')
 						local original, calls = rawget(adapter, field), 0
 						local function fake() calls = calls + 1; return true end
 						if timing == 'before boot' then rawset(adapter, field, fake) end
@@ -923,7 +923,7 @@ local function register_schema_admission(h, driver)
 		end
 		h.it('refuses a genuine same-file native method aliased as delete before boot', function()
 			with_config(current(false), function(path)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				local original = rawget(adapter, 'delete')
 				rawset(adapter, 'delete', assert(rawget(adapter, 'exists')))
 				local boot_called, boot = pcall(admitted, path)
@@ -937,7 +937,7 @@ local function register_schema_admission(h, driver)
 		end)
 		h.it('refuses raw native issuer withdrawal before publication without invoking its accessor', function()
 			with_config(current(false), function(path)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				h.assert_eq(admitted(path).status, 'current')
 				local issuer, meta = rawget(adapter, 'configuration_ports'), getmetatable(adapter)
 				local reached = 0
@@ -957,7 +957,7 @@ local function register_schema_admission(h, driver)
 
 		h.it('refuses a replacement native identity getter before invoking it at boot', function()
 			with_config(current(false), function(path)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				local issuer, calls = rawget(adapter, 'configuration_ports'), 0
 				rawset(adapter, 'configuration_ports', function() calls = calls + 1; return adapter end)
 				local called, boot = pcall(admitted, path)
@@ -969,13 +969,13 @@ local function register_schema_admission(h, driver)
 		end)
 		h.it('refuses a copied native module borrowing the actual initializer getter', function()
 			with_config(current(false), function(path)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				local copy, calls = {}, 0
 				for key, value in pairs(adapter) do copy[key] = value end
 				copy.read_with_status = function() calls = calls + 1; return current(false), 'ok' end
-				rawset(package.loaded, 'adapters.file_system', copy)
+				rawset(package.loaded, 'core.fs.adapters.file_system', copy)
 				local called, boot = pcall(admitted, path)
-				rawset(package.loaded, 'adapters.file_system', adapter)
+				rawset(package.loaded, 'core.fs.adapters.file_system', adapter)
 				h.assert_true(called); h.assert_true(boot.read_only)
 				h.assert_eq(calls, 0, 'the borrowed getter returns its real owner, never the copied module')
 				h.assert_eq(read_bytes(path), current(false))
@@ -985,7 +985,7 @@ local function register_schema_admission(h, driver)
 		for _, timing in ipairs({ 'before boot', 'during start callback' }) do
 			h.it('refuses a replaced native registry reader ' .. timing .. ' before invoking it', function()
 				with_config(current(false), function(path)
-					local adapter = require('adapters.file_system')
+					local adapter = require('core.fs.adapters.file_system')
 					local reader, calls = rawget(adapter, 'read_with_status'), 0
 					local function replaced(...) calls = calls + 1; return reader(...) end
 					local logger = recording_logger()
@@ -1009,7 +1009,7 @@ local function register_schema_admission(h, driver)
 
 		h.it('refuses a withdrawn actual admitted native export even with accessor fallback', function()
 			with_config(current(false), function(path)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				h.assert_eq(admitted(path).status, 'current')
 				local publisher, previous = rawget(adapter, 'write_if_unchanged_admitted'), getmetatable(adapter)
 				local reached = 0
@@ -1256,7 +1256,7 @@ local function register_version_refused_reads(h, driver)
 					h.assert_eq(TomlWriter.remove_if_unchanged(path, nil, { status = 'ok', content = original }), false)
 					local effects = 0
 					local scope = require('settings.engine.scope.transaction').new({ path = path, backup_path = path .. '.scope-backup',
-						manifest = require('infra.manifest_reader'), files = require('adapters.file_system'),
+						manifest = require('infra.manifest_reader'), files = require('core.fs.adapters.file_system'),
 						capture = function() effects = effects + 1; return {} end,
 						apply = function() effects = effects + 1; return true end,
 						restore = function() effects = effects + 1; return true end })
@@ -1288,7 +1288,7 @@ local function register_version_refused_reads(h, driver)
 		h.it('refuses a withdrawn raw native issuer without invoking its replacement', function()
 			with_config(source('true'), function(path)
 				h.assert_true(boot(path).read_only)
-				local adapter = require('adapters.file_system')
+				local adapter = require('core.fs.adapters.file_system')
 				local issuer, calls = rawget(adapter, 'configuration_ports'), 0
 				rawset(adapter, 'configuration_ports', function() calls = calls + 1; return issuer() end)
 				local called, bytes, status = pcall(TomlWriter.read_classified, path)
@@ -1300,13 +1300,13 @@ local function register_version_refused_reads(h, driver)
 		h.it('refuses a raw native owner replacement rather than lending its readable image', function()
 			with_config(source('4'), function(path)
 				h.assert_true(boot(path).read_only)
-				local adapter = rawget(package.loaded, 'adapters.file_system')
+				local adapter = rawget(package.loaded, 'core.fs.adapters.file_system')
 				local calls = 0
-				package.loaded['adapters.file_system'] = { read_with_status = function()
+				package.loaded['core.fs.adapters.file_system'] = { read_with_status = function()
 					calls = calls + 1; return source('4'), 'ok'
 				end }
 				local called, bytes, status = pcall(TomlWriter.read_classified, path)
-				package.loaded['adapters.file_system'] = adapter
+				package.loaded['core.fs.adapters.file_system'] = adapter
 				h.assert_true(called); h.assert_nil(bytes); h.assert_eq(status, 'error'); h.assert_eq(calls, 0)
 				h.assert_eq(TomlWriter.read_classified(path), source('4'))
 			end)

@@ -6,7 +6,7 @@ local eq = helpers.assert_eq
 local function with_input(body, setup)
 	local names = { "adapters.system_switcher_input", "adapters.system_switcher_sampler",
 		"core.events.timer_scheduler", "modules.gestures.native_app_switcher", "adapters.synthetic_input",
-		"adapters.window_manager", "adapters.storage", "infra.logger", "infra.timings",
+		"adapters.window_manager", "core.fs.adapters.storage", "infra.logger", "infra.timings",
 		"modules.gestures.native_app_switcher_action", "adapters.system_switcher_runtime" }
 	local saved, old_hs = {}, hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -137,7 +137,7 @@ local function with_input(body, setup)
 		native.mouse = { absolutePosition = function() return { x = 0, y = 0 } end }
 		native.application = {}
 		local store = {}
-		package.loaded["adapters.storage"] = { get = function(key) return store[key] end,
+		package.loaded["core.fs.adapters.storage"] = { get = function(key) return store[key] end,
 			set = function(key, value) store[key] = value; return true end }
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["adapters.synthetic_input"] = nil

@@ -37,7 +37,7 @@ local with_panel = Fixture.with_panel
 local function empty_status_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_empty_status.json"), "rb"))
 	local raw = file:read("*a"); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 --- Holds the real native data, renderer and locale owners over private bootstrap paths.
@@ -218,7 +218,7 @@ end)
 local function panel_frame_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_panel_frames.json"), "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("Agent complete declared presentation frames", function()
@@ -378,7 +378,7 @@ end
 local function agent_model_caption_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_linux_system_frames.json"), "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("Agent canonical model caption getter (agent-model-caption-getter)", function()

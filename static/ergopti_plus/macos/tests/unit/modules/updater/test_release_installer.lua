@@ -649,14 +649,14 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_nil(captured.on_chunk)
 		local raw = captured.environment.ERGOPTI_RELEASE_STAGE_REQUEST
 		helpers.assert_true(type(raw) == "string" and #raw < 65536)
-		local request = require("adapters.json_codec").decode(raw)
+		local request = require("core.fs.adapters.json_codec").decode(raw)
 		helpers.assert_eq(request.version, 1)
 		helpers.assert_eq(request.url, URL)
 		helpers.assert_eq(request.sha256, DIGEST)
 		helpers.assert_eq(request.output, captured.args[6] .. "/release.tar.xz")
 		-- (release-archive-budget) the shared bounds, aligned on Windows.
-		local limits = require("updater.engine.transfer_budget").archive_limits(require("adapters.json_codec").decode(
-			assert(io.open(require("infra.paths").shared("updater/data/defaults.json"), "rb")):read("*a")))
+		local limits = require("updater.engine.transfer_budget").archive_limits(require("core.fs.adapters.json_codec").decode(
+			assert(io.open(require("core.fs.engine.paths").shared("updater/data/defaults.json"), "rb")):read("*a")))
 		helpers.assert_eq(request.timeout_ms, limits.absolute_ms)
 		helpers.assert_eq(request.idle_timeout_ms, limits.idle_ms)
 		helpers.assert_eq(captured.environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS, string.format("%d", limits.absolute_ms))
@@ -667,7 +667,7 @@ helpers.describe("release_installer: the native stage request", function()
 		helpers.assert_eq(asset.format, "tar.xz")
 	end)
 	helpers.it("refuses failed or oversized serialization before native acquisition", function()
-		local Codec = require("adapters.json_codec")
+		local Codec = require("core.fs.adapters.json_codec")
 		local original = Codec.encode
 		local calls = 0
 		Installer._spawn = function() calls = calls + 1; return nil end

@@ -357,7 +357,7 @@ end)
 
 helpers.describe("SQLite flush native capability", function()
 	it("refuses absent luv before any reservation or native ownership", function()
-		local name = "infra.sqlite_batch_process"
+		local name = "core.fs.engine.sqlite_batch_process"
 		local previous = package.loaded[name]
 		package.loaded[name] = { is_available = function() return false end,
 			start = function() error("unavailable transport dispatched") end }
@@ -378,7 +378,7 @@ end)
 
 helpers.describe("SQLite terminal flush retry fence", function()
 	it("cannot acquire another child after committed cleanup dispatch is refused", function()
-		local name, calls = "infra.sqlite_batch_process", 0
+		local name, calls = "core.fs.engine.sqlite_batch_process", 0
 		local previous = package.loaded[name]
 		package.loaded[name] = { is_available = function() return true end,
 			start = function()

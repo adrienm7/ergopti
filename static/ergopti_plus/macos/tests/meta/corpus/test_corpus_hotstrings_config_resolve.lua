@@ -90,7 +90,7 @@ local function fresh_module_for_vector(vector)
 	os.remove(override_path)
 	write_toml_meta(toml_path, vector.toml_category, vector.section, vector.toml_section)
 
-	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+	package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = override_path, toml_resolver = function() return toml_path end })
@@ -176,7 +176,7 @@ helpers.describe("hotstrings base delay corpus (macOS): every vector stores and 
 		for _, vector in ipairs(corpus.vectors) do
 			local override_path = temp_path("base_" .. vector.id)
 			os.remove(override_path)
-			package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+			package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 			local base = 0.75

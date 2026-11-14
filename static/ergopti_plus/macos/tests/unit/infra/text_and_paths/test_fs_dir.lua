@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("infra/fs_dir.entries — directory listing", function()
 	helpers.it("rejects embedded NUL before calling the native directory iterator (fs-dir-nul)", function()
-		local fs_dir = require("infra.fs_dir")
+		local fs_dir = require("core.fs.engine.dir")
 		local previous, calls = hs.fs.dir, 0
 		hs.fs.dir = function(path)
 			calls = calls + 1
@@ -41,8 +41,8 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 	end)
 
 	helpers.it("exposes entries() and lists registered names in order", function()
-		package.loaded["infra.fs_dir"] = nil
-		local fs_dir = require("infra.fs_dir")
+		package.loaded["core.fs.engine.dir"] = nil
+		local fs_dir = require("core.fs.engine.dir")
 		helpers.assert_true(type(fs_dir.entries) == "function", "must expose entries()")
 		helpers.assert_true(type(fs_dir.try_entries) == "function", "must expose try_entries()")
 		hs.fs.__set_entries("/fake/fsdir", { "a.toml", "b.toml" })
@@ -56,7 +56,7 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 	end)
 
 	helpers.it("returns an empty table for nil / non-string input", function()
-		local fs_dir = require("infra.fs_dir")
+		local fs_dir = require("core.fs.engine.dir")
 		helpers.assert_eq(fs_dir.entries(nil), {}, "nil dir -> empty list")
 		helpers.assert_eq(fs_dir.entries(""), {}, "empty-string dir -> empty list")
 		local _, nil_listed = fs_dir.try_entries(nil)
@@ -66,7 +66,7 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 	end)
 
 	helpers.it("survives a throwing hs.fs.dir (returns empty, never propagates)", function()
-		local fs_dir = require("infra.fs_dir")
+		local fs_dir = require("core.fs.engine.dir")
 		local prev = hs.fs.dir
 		hs.fs.dir = function(_) error("permission denied") end
 		local ok, got = pcall(fs_dir.entries, "/inaccessible")
@@ -81,7 +81,7 @@ helpers.describe("infra/fs_dir.entries — directory listing", function()
 	end)
 
 	helpers.it("quiet listing preserves refusal without logging private details", function()
-		local fs_dir = require("infra.fs_dir")
+		local fs_dir = require("core.fs.engine.dir")
 		local logger, previous_dir = require("infra.logger"), hs.fs.dir
 		local previous_error, calls = logger.error, 0
 		logger.error = function() calls = calls + 1 end

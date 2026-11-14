@@ -78,12 +78,12 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"modules.llm.api_common",
 		"modules.llm.parser",
 		"adapters.http_client",
-		"adapters.json_codec",
+		"core.fs.adapters.json_codec",
 		"core.events.timer_scheduler",
 		"adapters.shell_runner",
 		"infra.logger",
 		"infra.notifications",
-		"infra.paths",
+		"core.fs.engine.paths",
 		"infra.i18n",
 		"hs",
 		"tests.stubs.hs",
@@ -104,7 +104,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)
@@ -181,8 +181,8 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
 		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
-		"adapters.json_codec", "core.events.timer_scheduler", "adapters.shell_runner",
-		"infra.logger", "infra.notifications", "infra.paths", "infra.i18n", "hs", "tests.stubs.hs",
+		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "adapters.shell_runner",
+		"infra.logger", "infra.notifications", "core.fs.engine.paths", "infra.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
 
@@ -196,7 +196,7 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name) return helpers.shared("ai/data/" .. name) end,

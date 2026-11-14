@@ -222,7 +222,7 @@ end)
 local function configuration_parent_fixture(body)
 	local saved = {}
 	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
-	helpers.load_with_stubs("infra.paths")
+	helpers.load_with_stubs("core.fs.engine.paths")
 	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
 	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
@@ -246,8 +246,8 @@ local function configuration_parent_fixture(body)
 	if not ok then error(detail, 0) end
 end
 
-local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
+local configuration_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
 require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
-	assert(require("adapters.json_codec").decode(configuration_parent_raw)), "hs")
+	assert(require("core.fs.adapters.json_codec").decode(configuration_parent_raw)), "hs")

@@ -613,7 +613,7 @@ function M.load(opts)
 		sources[#sources + 1] = { path = path, content = content, status = status }
 	end
 	opts = opts or {}
-	local shared_root = opts.shared_root or require("infra.paths").shared_root()
+	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
 	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
 	if type(shared_root) ~= "string" then error("nav_layer: the _shared tree is unreachable", 2) end
 	if type(config_dir) ~= "string" then error("nav_layer: the configuration folder is unknown", 2) end
@@ -741,7 +741,7 @@ end
 --- @return table|nil failed Private refused-import cleanup record.
 function M.import_recommended(opts)
 	opts = opts or {}
-	local shared_root = opts.shared_root or require("infra.paths").shared_root()
+	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
 	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
 	local LayerPreset = require("layouts.engine.layers.preset")
 	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
@@ -749,7 +749,7 @@ function M.import_recommended(opts)
 		shared_root  = shared_root,
 		config_dir   = config_dir,
 		toml_decode  = require("core.text.engine.toml_codec").decode,
-		file_adapter = opts.file_adapter or require("adapters.file_system"),
+		file_adapter = opts.file_adapter or require("core.fs.adapters.file_system"),
 	})
 	if not ok then import, err = nil, tostring(import) end
 	if not import then
@@ -770,7 +770,7 @@ end
 --- @param file_adapter table|nil The adapter it wrote through; the driver's own by default.
 --- @return boolean undone
 function M.undo_import(import, file_adapter)
-	local undone, err = require("layouts.engine.layers.preset").undo(import, file_adapter or require("adapters.file_system"))
+	local undone, err = require("layouts.engine.layers.preset").undo(import, file_adapter or require("core.fs.adapters.file_system"))
 	if undone ~= true then
 		Logger.error(LOG, "The navigation layer '%s' could not be removed again: %s.",
 			tostring(import and import.path), tostring(err))

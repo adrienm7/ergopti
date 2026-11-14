@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 require("tests.lua.settings.migrate_contract").register(helpers, { driver = "linux" })
 require("tests.lua.settings.migrate_records_contract").register(helpers, { driver = "linux" })
-require("tests.lua.common_autocorrection_migration_contract").register(helpers, require("infra.paths").shared)
+require("tests.lua.common_autocorrection_migration_contract").register(helpers, require("core.fs.engine.paths").shared)
 
 --- The daemon entry point with line comments removed: main() cannot run
 --- headless, so its order is read from the source.
@@ -55,7 +55,7 @@ helpers.describe("trusted normal-loader source spelling preserves constructor id
 		local vectors = {
 			{ "@/r/_shared/settings/engine/migration/migrate.lua", nil, "@/r/_shared/settings/engine/migration/migrate.lua" },
 			{ "@../_shared/settings/engine/migration/migrate.lua", "/r/linux", "@/r/_shared/settings/engine/migration/migrate.lua" },
-			{ "@./adapters/file_system.lua", "/r/linux", "@/r/linux/adapters/file_system.lua" },
+			{ "@./core/fs/adapters/file_system.lua", "/r/linux", "@/r/linux/core/fs/adapters/file_system.lua" },
 			{ "@/r//./native.lua", nil, "@/r/native.lua" },
 			{ "@../native.lua", "/r/driver", "@/r/native.lua" },
 			{ "@./native.lua", nil, false },
@@ -76,12 +76,12 @@ helpers.describe("trusted normal-loader source spelling preserves constructor id
 	helpers.it("derives only exact platform sibling paths and retains captured pure helper behavior", function()
 		local identity = require("core.fs.engine.module_source_identity")
 		local same, sibling, normalize = identity.same, identity.sibling, identity.normalize
-		local before = sibling("@./adapters/file_system.lua", "linux/adapters/file_system.lua",
+		local before = sibling("@./core/fs/adapters/file_system.lua", "linux/core/fs/adapters/file_system.lua",
 			"_shared/settings/engine/migration/migrate.lua", "/r/linux")
 		local ok, detail = xpcall(function()
 			identity.normalize = function() error("withdrawn public normalizer must not run") end
 			helpers.assert_eq(before, "@/r/_shared/settings/engine/migration/migrate.lua")
-			helpers.assert_eq(sibling("@./adapters/file_system.lua", "macos/adapters/file_system.lua",
+			helpers.assert_eq(sibling("@./core/fs/adapters/file_system.lua", "macos/core/fs/adapters/file_system.lua",
 				"_shared/settings/engine/migration/migrate.lua", "/r/linux"), nil)
 			helpers.assert_eq(same("@./native.lua", "@/r/linux/native.lua", "/r/linux"), true)
 		end, debug.traceback)
@@ -96,12 +96,12 @@ helpers.describe("trusted normal-loader source spelling preserves constructor id
 		local own_checkout = "@/repo/static/ergopti_plus/_shared/settings/engine/migration/migrate.lua"
 		local own_package = "@/usr/lib/ergopti/_shared/settings/engine/migration/migrate.lua"
 		local own_appimage = "@/tmp/.mount_Ergo12/usr/lib/ergopti/_shared/settings/engine/migration/migrate.lua"
-		helpers.assert_eq(inside("@/repo/static/ergopti_plus/linux/adapters/file_system.lua", own_checkout, "linux"), true)
-		helpers.assert_eq(inside("@/usr/lib/ergopti/adapters/file_system.lua", own_package, "linux"), true)
-		helpers.assert_eq(inside("@/tmp/.mount_Ergo12/usr/lib/ergopti/adapters/file_system.lua", own_appimage, "linux"), true)
-		helpers.assert_eq(inside("@/tmp/elsewhere/adapters/file_system.lua", own_package, "linux"), false,
+		helpers.assert_eq(inside("@/repo/static/ergopti_plus/linux/core/fs/adapters/file_system.lua", own_checkout, "linux"), true)
+		helpers.assert_eq(inside("@/usr/lib/ergopti/core/fs/adapters/file_system.lua", own_package, "linux"), true)
+		helpers.assert_eq(inside("@/tmp/.mount_Ergo12/usr/lib/ergopti/core/fs/adapters/file_system.lua", own_appimage, "linux"), true)
+		helpers.assert_eq(inside("@/tmp/elsewhere/core/fs/adapters/file_system.lua", own_package, "linux"), false,
 			"an adapter outside this module's own root is never admitted")
-		helpers.assert_eq(inside("@/repo/static/ergopti_plus/macos/adapters/file_system.lua", own_checkout, "linux"), false)
+		helpers.assert_eq(inside("@/repo/static/ergopti_plus/macos/core/fs/adapters/file_system.lua", own_checkout, "linux"), false)
 		helpers.assert_eq(inside(nil, own_package, "linux"), false)
 	end)
 
@@ -131,7 +131,7 @@ local canonical = driver:gsub('/linux$', '/_shared') .. '/?.lua;'
 package.path = mode == 'mixed_cached' and canonical .. absolute .. package.path or (mode == 'relative' and relative or absolute) .. package.path
 local engine = require('settings.engine.migration.migrate')
 if mode == 'mixed_cached' then package.path = relative .. package.path end
-local writer, files = require('core.text.engine.toml_codec.writer'), require('adapters.file_system')
+local writer, files = require('core.text.engine.toml_codec.writer'), require('core.fs.adapters.file_system')
 local registry = assert(engine.load_registry(driver .. '/../_shared/settings/data/config_schema/migrations.toml'))
 local path = os.tmpname(); os.remove(path)
 local ok, detail = xpcall(function()

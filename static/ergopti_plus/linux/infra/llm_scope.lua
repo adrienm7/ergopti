@@ -39,7 +39,7 @@ function M.new(options)
 	end
 	transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"), manifest = Manifest,
+		files = options.files or require("core.fs.adapters.file_system"), manifest = Manifest,
 		capture = capture, restore = restore,
 		apply = function(_, _, _, candidate)
 			local applied = Preferences.with_configuration(native_token, { status = "ok", content = candidate }, function()

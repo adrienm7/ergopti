@@ -9,7 +9,7 @@
 		{
 			"source": "static/ergopti_plus/_shared",
 			"target": "ergopti_plus/_shared",
-			"reason": "Shared Lua modules, WebView applications, locales, hotstrings, database schema and defaults, resolved through infra/paths.lua (Paths.shared)."
+			"reason": "Shared Lua modules, WebView applications, locales, hotstrings, database schema and defaults, resolved through core/fs/engine/paths.lua (Paths.shared)."
 		},
 		{
 			"source": "static/img",

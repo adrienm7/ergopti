@@ -41,7 +41,7 @@ class SessionKeymapExitTests(unittest.TestCase):
 local native_require = require
 require = function(name)
   local module = native_require(name)
-  if name == 'infra.regular_file_reader' and not module.private_reads then
+  if name == 'core.fs.engine.regular_file_reader' and not module.private_reads then
     local open_source = module.open_source
     module.open_source = function(path)
       if path == '/etc/default/keyboard' then return open_source(arg[2]) end

@@ -12,7 +12,7 @@ local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
 local text_utils = require("infra.text_utils")
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local i18n   = require("infra.i18n")
 local LOG    = "vscode_bridge"
 

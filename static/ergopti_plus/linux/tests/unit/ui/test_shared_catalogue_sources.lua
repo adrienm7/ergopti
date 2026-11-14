@@ -27,7 +27,7 @@ helpers.describe("shared UI catalogue sources", function()
 
 	for _, mode in ipairs({ "read_throw", "read_nil", "close_throw", "close_false" }) do
 		helpers.it("(ui-catalogue-source) rejects " .. mode .. " and closes the acquired stream", function()
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original, closes = reader.open_source, 0
 			reader.open_source = function()
 				return {

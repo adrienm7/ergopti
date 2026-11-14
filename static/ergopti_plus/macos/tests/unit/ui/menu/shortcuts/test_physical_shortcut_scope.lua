@@ -64,7 +64,7 @@ helpers.describe('Mac actual physical scope edits',function()
     helpers.assert_eq(f.controls.physical_input(),true,'queue an admitted committed frame')
     local token,entered={},false
     local snapshot=f.prefs.source_snapshot
-    local files=package.loaded['adapters.file_system'];local read=files.read_with_status
+    local files=package.loaded['core.fs.adapters.file_system'];local read=files.read_with_status
     local function reenter()
      if entered then return end;entered=true
      if seam=='parameter_change' then helpers.assert_eq(f.gestures.set_action_parameter('keyboard__physical_none_KeyJ','send_text','changed'),true)

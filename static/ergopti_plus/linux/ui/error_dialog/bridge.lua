@@ -106,7 +106,7 @@ M.defer = function(fn, delay_ms) return require("core.events.loop").defer(fn, de
 function M.init()
 	if not _scope.admit_change() then return false end
 	return DialogCore.init(Logger, LOG, _policy ~= nil,
-		function() return require("infra.paths").shared("diagnostics/data/error_policy.json") end,
+		function() return require("core.fs.engine.paths").shared("diagnostics/data/error_policy.json") end,
 		function(policy, decisions)
 			_policy, _decisions = policy, decisions
 			_enabled = M.is_enabled()
@@ -118,7 +118,7 @@ end
 --- @return boolean
 function M.is_enabled()
 	if _enabled ~= nil then return _enabled end
-	return DialogCore.stored_enabled(require("adapters.storage"),
+	return DialogCore.stored_enabled(require("core.fs.adapters.storage"),
 		function(path) return require("infra.manifest_reader").default_for(path) end, SETTING)
 end
 

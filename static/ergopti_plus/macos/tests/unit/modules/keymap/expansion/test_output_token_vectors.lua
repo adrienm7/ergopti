@@ -107,7 +107,7 @@ local function load_expander(buffer)
 		log_hotstring = function() end,
 	}
 	package.loaded["adapters.tooltip_renderer"] = { hide = function() end }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function()
 			local fh = assert(io.open(helpers.shared("shortcuts/data/actions/send_keys.json"), "r"))
 			local raw = fh:read("*a")
@@ -115,7 +115,7 @@ local function load_expander(buffer)
 			return raw
 		end,
 	}
-	package.loaded["adapters.json_codec"] = { decode = json.decode }
+	package.loaded["core.fs.adapters.json_codec"] = { decode = json.decode }
 	local synthetic = require("adapters.synthetic_input")
 	local expander = require("modules.keymap.expander")
 	local state = {

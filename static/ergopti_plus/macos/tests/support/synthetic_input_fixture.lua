@@ -507,11 +507,11 @@ local function make_fixture(options)
 
 	function fixture.load()
 		package.loaded["infra.logger"] = fixture.logger
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		local synthetic = helpers.load_with_stubs(
 			"adapters.synthetic_input", fixture.hs_overrides)
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.logger"] = fixture.logger
 		package.loaded["adapters.event_provenance"] = nil
 		local provenance = require("adapters.event_provenance")

@@ -39,23 +39,23 @@ end
 --- @return any Callback results, or rethrows its error.
 local function with_filesystem(attributes, file_system, fs_dir, callback)
 	local saved_attributes = hs.fs.attributes
-	local saved_files = package.loaded["adapters.file_system"]
-	local saved_dirs = package.loaded["infra.fs_dir"]
+	local saved_files = package.loaded["core.fs.adapters.file_system"]
+	local saved_dirs = package.loaded["core.fs.engine.dir"]
 	hs.fs.attributes = attributes
-	package.loaded["adapters.file_system"] = file_system
-	package.loaded["infra.fs_dir"] = fs_dir
+	package.loaded["core.fs.adapters.file_system"] = file_system
+	package.loaded["core.fs.engine.dir"] = fs_dir
 	local outcome = table.pack(pcall(callback))
 	hs.fs.attributes = saved_attributes
-	package.loaded["adapters.file_system"] = saved_files
-	package.loaded["infra.fs_dir"] = saved_dirs
+	package.loaded["core.fs.adapters.file_system"] = saved_files
+	package.loaded["core.fs.engine.dir"] = saved_dirs
 	if not outcome[1] then error(outcome[2], 0) end
 	return table.unpack(outcome, 2, outcome.n)
 end
 
 helpers.describe("Extension packs: discovery roots and scanning", function()
 	helpers.it("(layout-extension-macos) orders bundled, committed layout and user roots through their owners", function()
-		helpers.with_stub_scope({ "infra.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
-			package.loaded["infra.paths"] = { shared_root = function() return "/app/_shared" end }
+		helpers.with_stub_scope({ "core.fs.engine.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
+			package.loaded["core.fs.engine.paths"] = { shared_root = function() return "/app/_shared" end }
 			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
 			package.loaded["modules.keymap.layout_registry"] = {
 				extension_roots = function() return { "/installed/generation" } end,
@@ -67,8 +67,8 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 	end)
 
 	helpers.it("(layout-extension-macos) boots without installed layouts' packs when their record is unreadable", function()
-		helpers.with_stub_scope({ "infra.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
-			package.loaded["infra.paths"] = { shared_root = function() return "/app/_shared" end }
+		helpers.with_stub_scope({ "core.fs.engine.paths", "infra.config_paths", "modules.keymap.layout_registry" }, function()
+			package.loaded["core.fs.engine.paths"] = { shared_root = function() return "/app/_shared" end }
 			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/user/" end }
 			package.loaded["modules.keymap.layout_registry"] = {
 				extension_roots = function() error("the installed-layouts record has schema version 99", 0) end,
@@ -117,8 +117,8 @@ helpers.describe("Extension packs: discovery roots and scanning", function()
 	end)
 
 	helpers.it("(layout-extension-macos) refuses an unresolvable shared root instead of dropping bundled packs", function()
-		helpers.with_stub_scope({ "infra.paths" }, function()
-			package.loaded["infra.paths"] = { shared_root = function() return nil end }
+		helpers.with_stub_scope({ "core.fs.engine.paths" }, function()
+			package.loaded["core.fs.engine.paths"] = { shared_root = function() return nil end }
 			local ok, failure = pcall(Packs.roots)
 			helpers.assert_eq(ok, false)
 			helpers.assert_true(tostring(failure):find("shared extension directory", 1, true) ~= nil, tostring(failure))
@@ -248,8 +248,8 @@ helpers.describe("Extension packs: one catalogue per boot", function()
 
 	helpers.it("(layout-extension-macos) commits an empty catalogue when no root can be resolved", function()
 		Packs._reset()
-		helpers.with_stub_scope({ "infra.paths" }, function()
-			package.loaded["infra.paths"] = { shared_root = function() return nil end }
+		helpers.with_stub_scope({ "core.fs.engine.paths" }, function()
+			package.loaded["core.fs.engine.paths"] = { shared_root = function() return nil end }
 			local errors, found = capturing_errors(function() return Packs.discover() end)
 			helpers.assert_eq(found, {})
 			helpers.assert_eq(#errors, 1)

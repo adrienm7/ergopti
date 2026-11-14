@@ -80,7 +80,7 @@ function M.new(options)
 		and type(WordReset) == "table"
 		and type(MagicKey) == "table" and type(PreviewSettings) == "table" and type(Terminators) == "table",
 		"hotstrings scope owners are incomplete")
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local remove = options.remove or function(target) return os.remove(target) == true end
 	local owner, current_mode = {}, nil
 	local source, secondary, owned_set = nil, nil, nil
@@ -252,7 +252,7 @@ function M.new_magic(options)
 	local owner, snapshot = {}, nil
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"),
+		files = options.files or require("core.fs.adapters.file_system"),
 		manifest = { scope_plan = function() return { presets = {}, operations = {} } end },
 		validate_update = function(scope, row)
 			return scope == "magic" and row.section == "hotstrings" and row.key == ConfigKeys.LEAF.TRIGGER_CHAR

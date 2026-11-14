@@ -84,7 +84,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			require("tests.support.input_owner_fixture").with_session({ public_chords = true, source_ids = { "a" }, keys = {}, capture = capture }, function(session)
 				assert(session.hook.set_remapper(nil))
 				local world = { reads = 0, writes = 0, lifecycle = 0, resets = 0, errors = {} }
-				local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+				local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 				logger.set_sink(function() end)
 				logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
 				package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger

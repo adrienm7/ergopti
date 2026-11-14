@@ -95,16 +95,16 @@ local function load_keyboard()
 		unbind = function(handle) enabled[handle] = nil return true end,
 		setEnabled = function(handle, want) enabled[handle] = want == true return true end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}' end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.gestures.actions"] = {
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.ai_actions"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	require("tests.support.keyboard_config_fixture").install(
@@ -150,8 +150,8 @@ helpers.describe("AI tap keys (ai-off-inert-macos)", function()
 	helpers.it("lets the key through while the AI is off, runs the action once on", function()
 		with_ai(function(state)
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.file_system"] = nil
-			package.loaded["infra.paths"] = nil
+			package.loaded["core.fs.adapters.file_system"] = nil
+			package.loaded["core.fs.engine.paths"] = nil
 			package.loaded["modules.shortcuts.ai_actions"] = nil
 			package.loaded["modules.shortcuts.tap_keys"] = nil
 			local TapKeys = require("modules.shortcuts.tap_keys")

@@ -19,9 +19,9 @@
 --- nine functions on the value returned here.
 --- ==============================================================================
 
-local JsonCodec = require("adapters.json_codec")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local Logger = require("infra.logger")
-local Paths  = require("infra.paths")
+local Paths  = require("core.fs.engine.paths")
 local i18n   = require("infra.i18n")
 local Renderer = require("menu.engine.renderer")
 

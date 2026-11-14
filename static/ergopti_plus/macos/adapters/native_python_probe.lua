@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Interpreter = require("adapters.python_interpreter")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")

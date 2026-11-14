@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 --- Reads one shared JSON file.
 --- @param relative string

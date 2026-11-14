@@ -89,7 +89,7 @@ local function fresh(config)
 		state.exit(code or 0, 0)
 	end
 	local saved = package.loaded.luv
-	local saved_paths = package.loaded["infra.paths"]
+	local saved_paths = package.loaded["core.fs.engine.paths"]
 	local saved_logger = package.loaded["core.logger.engine.shim"]
 	local ok, adapter = pcall(function()
 	if config.throw_logger then
@@ -100,7 +100,7 @@ local function fresh(config)
 		package.loaded["core.logger.engine.shim"] = { error = function(_, message) state.logs[#state.logs + 1] = message end }
 	end
 	if config.nil_driver_root then
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			driver_root = function() return nil end,
 			shared_root = function() return "/private/shared" end,
 		}
@@ -109,7 +109,7 @@ local function fresh(config)
 	return helpers.fresh_module("adapters.system_proxy")
 	end)
 	package.loaded.luv = saved
-	package.loaded["infra.paths"] = saved_paths
+	package.loaded["core.fs.engine.paths"] = saved_paths
 	package.loaded["core.logger.engine.shim"] = saved_logger
 	if not ok then error(adapter, 0) end
 	return adapter, state, config

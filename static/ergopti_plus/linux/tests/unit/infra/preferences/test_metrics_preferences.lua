@@ -14,7 +14,7 @@ local Codec = require("core.text.engine.toml_codec")
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
 		local names = { "infra.config_paths", "infra.metrics_preferences", "modules.keystats.keystats",
-			"adapters.storage", "ui.wpm.widget", "ui.wpm.tray_readout" }
+			"core.fs.adapters.storage", "ui.wpm.widget", "ui.wpm.tray_readout" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = pcall(function()
@@ -69,7 +69,7 @@ helpers.describe("canonical metrics preferences", function()
 
 	helpers.it("both WPM surfaces read canonical choices and persist their own leaves", function()
 		with_config('[metrics]\nwpm_widget_colors = false\nwpm_menubar_colors = false\n', function(_, path)
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["wpm_widget.source_colors"] = true, ["wpm_menubar.colors"] = true,
 				["wpm_widget.pos_x"] = 300, ["wpm_widget.pos_y"] = 400,
 			} })
@@ -89,14 +89,14 @@ helpers.describe("canonical metrics preferences", function()
 			-- 2026-11-03), so choosing colours again drops each leaf.
 			helpers.assert_eq(metrics.wpm_widget_colors, nil)
 			helpers.assert_eq(metrics.wpm_menubar_colors, nil)
-			helpers.assert_eq(package.loaded["adapters.storage"].get("wpm_widget.pos_x"), 300)
-			helpers.assert_eq(package.loaded["adapters.storage"].get("wpm_widget.pos_y"), 400)
+			helpers.assert_eq(package.loaded["core.fs.adapters.storage"].get("wpm_widget.pos_x"), 300)
+			helpers.assert_eq(package.loaded["core.fs.adapters.storage"].get("wpm_widget.pos_y"), 400)
 		end)
 	end)
 
 	helpers.it("collector reads canonical consent and never imports the legacy store", function()
 		with_config('[metrics]\nenabled = true\nprivate_filter_enabled = false\n', function(_, path)
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["metrics.enabled"] = false, ["metrics.private_filter_enabled"] = true,
 			} })
 			package.loaded["modules.keystats.keystats"] = nil
@@ -194,7 +194,7 @@ helpers.describe("canonical metrics preferences", function()
 
 	helpers.it("an excluded application is kept out of the metrics and nothing else", function()
 		with_config('[metrics]\nenabled = true\ndisabled_apps = ["Firefox"]\n', function(_, path)
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {} })
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {} })
 			package.loaded["modules.keystats.keystats"] = nil
 			local collector = require("modules.keystats.keystats")
 			collector.init({ sqlite_path = path .. ".sqlite", log_dir = path .. ".logs" })

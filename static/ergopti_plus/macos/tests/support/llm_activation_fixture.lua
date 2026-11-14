@@ -433,7 +433,7 @@ local function build_fixture(backend, save_results, options)
 	local presentation_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
-		json_decode = require("adapters.json_codec").decode,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
 		logger = package.loaded["infra.logger"],
 	}))

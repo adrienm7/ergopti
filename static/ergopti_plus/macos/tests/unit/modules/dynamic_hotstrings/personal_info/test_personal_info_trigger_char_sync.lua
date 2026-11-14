@@ -33,7 +33,7 @@ local function with_dynamic_fixture(body)
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
 		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "adapters.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
-		"adapters.file_system", "infra.config_paths", "adapters.application_notifier" }, function()
+		"core.fs.adapters.file_system", "infra.config_paths", "adapters.application_notifier" }, function()
 		local previous = active_fixture
 		local fixture = { captures = 0, factory_loads = 0 }
 		active_fixture = fixture

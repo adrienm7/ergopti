@@ -25,8 +25,8 @@ local M = {}
 
 local Logger     = require("infra.logger")
 local Manifest   = require("infra.manifest_reader")
-local Paths      = require("infra.paths")
-local FileSystem = require("adapters.file_system")
+local Paths      = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
 local Json       = require("core.text.engine.json")
 local Shared     = require("layouts.engine.layers.magic_key_source")
 local Geometry   = require("adapters.keyboard_geometry")

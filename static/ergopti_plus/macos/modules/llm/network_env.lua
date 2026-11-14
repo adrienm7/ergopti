@@ -30,11 +30,11 @@
 local M = {}
 
 local text_utils = require("infra.text_utils")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Json = require("core.text.engine.json")
 local Admission = require("modules.llm.opaque_network_admission")
 local NativePath = require("core.fs.engine.native_path")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local ProxyOverride = require("core.network.engine.proxy_override")
 
 -- The shared policy, relative to the driver root.

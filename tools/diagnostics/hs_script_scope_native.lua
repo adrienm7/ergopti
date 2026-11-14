@@ -28,7 +28,7 @@ function M.run(receipt_path, destination, nonce)
 	local owner = { nonce = nonce }
 	_G[GLOBAL_KEY] = owner
 	local Json = require("core.text.engine.json")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local Writer = require("core.text.engine.toml_codec.writer")
 	local Scope, Runtime, Manifest, I18n, Locale, Logger, Dialog, Preferences, Checkpoint, Storage
 	local info = hs.processInfo
@@ -99,7 +99,7 @@ function M.run(receipt_path, destination, nonce)
 		Dialog = require("ui.error_dialog")
 		Preferences = require("infra.preferences")
 		Checkpoint = require("ui.menu.preferences_transaction")
-		Storage = require("adapters.storage")
+		Storage = require("core.fs.adapters.storage")
 		assert(current_native(), "Native settings provider differs")
 		local _, source_status = FileSystem.read_with_status(destination)
 		assert(source_status == "absent", "Private Script source must initially be absent")

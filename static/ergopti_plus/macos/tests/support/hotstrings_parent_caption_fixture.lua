@@ -20,7 +20,7 @@ function M.install(translator)
 	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local bytes = assert(file:read("*a"))
 	assert(file:close())
-	local source = assert(require("adapters.json_codec").decode(bytes))
+	local source = assert(require("core.fs.adapters.json_codec").decode(bytes))
 	assert(source["_meta.locale"] == "en", "actual English catalogue unavailable")
 	local caption = source["menu.hotstrings.title"]
 	assert(type(caption) == "string" and caption ~= "" and caption ~= "menu.hotstrings.title",

@@ -113,7 +113,7 @@ helpers.describe("shared application native window titles", function()
 				end,
 			}, { __index = native_manager })
 			local function read_json(relative)
-				local path = assert(require("infra.paths").shared(relative))
+				local path = assert(require("core.fs.engine.paths").shared(relative))
 				local file = assert(io.open(path, "rb"))
 				local text = file:read("*a")
 				file:close()

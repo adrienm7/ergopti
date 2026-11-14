@@ -230,7 +230,7 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
+		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
 		"infra.i18n", "infra.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
@@ -251,7 +251,7 @@ local function build_fixture_menu(context)
 			if name == "XDG_CONFIG_HOME" then return editor_directory end
 			return original_getenv(name)
 		end
-		rawset(package.loaded, "adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
+		rawset(package.loaded, "core.fs.adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
 		helpers.assert_eq(require("ui.hotstring_editor.bridge").get_pref("default_section"), "",
 			"the real editor reads the independent neutral default-section source")
 		if context.magic_key_source == nil then
@@ -263,7 +263,7 @@ local function build_fixture_menu(context)
 			context.magic_key_source = helpers.load_module("modules.hotstrings.magic_key_source")
 			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
 		end
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local file = assert(io.open(Paths.shared("tap_hold/data/defaults.toml"), "rb"))
 		local defaults = assert(require("core.text.engine.toml_codec").decode(file:read("*a"))); assert(file:close())
 		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
@@ -430,7 +430,7 @@ local function full_context()
 			-- The shipped catalogue, so both hand lists have their rows.
 			key_catalog   = function()
 				return require("tap_hold.engine.key_catalog").load(
-					require("infra.paths").shared("tap_hold/data/defaults.toml"), "linux")
+					require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), "linux")
 			end,
 		},
 		dyn_hotstrings = {
@@ -863,7 +863,7 @@ end)
 
 -- Actual inert absent-module projections, preserving the original whole-tray prefix.
 local function absent_module_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_absent_modules.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_absent_modules.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
 	return assert(require("core.text.engine.json").decode(bytes))
@@ -985,7 +985,7 @@ helpers.describe("linux-absent-module templates: actual native branches", functi
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(require("menu.engine.renderer").new({
 					platform = platform,
-					manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.text.engine.json").decode,
 					i18n = i18n,
 					logger = require("core.logger.engine.shim"),
@@ -1040,7 +1040,7 @@ end)
 
 
 local function control_boundary_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
 	return assert(require("core.text.engine.json").decode(bytes))
 end
@@ -1124,7 +1124,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 	-- Only user changes are stored, so at their shipped values neither filter nor
 	-- the backend is in the file. The macOS rows greyed exactly there.
 	helpers.it("keeps both privacy rows enabled over a sparse source and persists a click (shared-privacy-triggers)", function()
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
 		local corpus = assert(require("core.text.engine.json").decode(file:read("*a"))); assert(file:close())
 		for _, expected in ipairs(corpus.rows) do
 			with_absent_english(function()
@@ -1155,7 +1155,7 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 			local expected = control_boundary_corpus()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
-					manifest_path = function() return require("infra.paths").shared("menu/data/menu_manifest.json") end,
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 					json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = require("core.logger.engine.shim") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
@@ -1181,7 +1181,7 @@ end)
 
 
 helpers.describe("selection boundary fragments in the complete native tray", function()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
 	local corpus = assert(require("core.text.engine.json").decode(bytes))
@@ -1361,7 +1361,7 @@ local function language_parent_native(language, scenario)
 		assert(i18n.scope_apply(owner, receipt, language))
 		assert(i18n.scope_release(owner)); assert(i18n.scope_forget(owner, receipt))
 		ManifestMenu = require("infra.manifest_menu")
-		local path = require("infra.paths").shared("tests/corpus/menus/language_parent.json")
+		local path = require("core.fs.engine.paths").shared("tests/corpus/menus/language_parent.json")
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
 		local corpus = assert(require("core.text.engine.json").decode(bytes))
 		assert(i18n.get("menu.global.language") == corpus.parent[language], "genuine locale file is initialized")
@@ -1652,7 +1652,7 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 					-- Header projections delegate genuinely, while this counter keeps its
 					-- original feature-child meaning and exact zero-refusal assertion.
 					local feature_template, header_reads, header_label = ManifestMenu.template_rows, 0, nil
-					local oracle_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/linux_tray_header_original.json"), "rb"))
+					local oracle_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_tray_header_original.json"), "rb"))
 					local oracle_bytes = assert(oracle_file:read("*a")); assert(oracle_file:close())
 					local header_oracle = assert(require("core.text.engine.json").decode(oracle_bytes))
 					ManifestMenu.template_rows = function(key, ...)

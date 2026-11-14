@@ -53,7 +53,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "core.logger.engine.shim", "infra.i18n", "adapters.shell_runner",
-	"adapters.application_notifier", "adapters.clipboard", "adapters.file_system", "modules.shortcuts.manager",
+	"adapters.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
 }
 
 --- Runs body with every owner of the user actions recorded.
@@ -79,7 +79,7 @@ local function with_world(body)
 			capture_text_destination = function() return { current = function() return true end, cached = function() return true end } end,
 			insert_text = function(text) world.typed[#world.typed + 1] = text; return true end,
 		}
-		package.loaded["adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
+		package.loaded["core.fs.adapters.file_system"] = { exists = function(path) return world.present[path] == true end }
 		package.loaded["adapters.shell_runner"] = {
 			quote = require("core.text.engine.utils_core").shell_quote,
 			has_command = function(binary) return world.installed[binary] == true end,
@@ -354,7 +354,7 @@ helpers.describe("private user-action notification fallback", function()
 				"adapters.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
-			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_level("trace"); logger.set_sink(function(line) logs[#logs + 1] = line end)
 			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["infra.i18n"] = { get = function() return "Command failed: {1}: {2}" end }

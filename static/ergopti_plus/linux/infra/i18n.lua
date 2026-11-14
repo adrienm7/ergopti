@@ -24,8 +24,8 @@ local locale_mod = require("infra.locale")
 local Logger     = require("core.logger.engine.shim")
 -- The shared section-header decoration, the same one macOS and AutoHotkey draw.
 local Labels     = require("menu.engine.labels")
-local NativeDirectory = require("infra.native_directory")
-local RegularFileReader = require("infra.regular_file_reader")
+local NativeDirectory = require("core.fs.engine.native_directory")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
 local LOG        = "i18n"
 
 local _locale    = "fr"   -- active locale code
@@ -43,7 +43,7 @@ local _available = {}     -- cached list of available locale codes
 --- @return table|nil
 local function _get_storage()
 	if _storage then return _storage end
-	local ok, mod = pcall(require, "adapters.storage")
+	local ok, mod = pcall(require, "core.fs.adapters.storage")
 	if ok then _storage = mod end
 	return _storage
 end
@@ -119,7 +119,7 @@ end
 local function _scan_locales()
 	local codes = {}
 
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local locales_dir = Paths.shared("core/i18n/data/locales")
 	assert(locales_dir, "i18n: shared locale directory is unavailable")
 	-- Availability is established only by a complete native enumeration. Shell

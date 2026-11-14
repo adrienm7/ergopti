@@ -16,7 +16,7 @@ local function with_editor(scenario)
 	local records = { views = {}, bridges = {}, deletes = 0, errors = {} }
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.layer_editor", "ui.ui_builder", "infra.logger", "infra.i18n",
-			"infra.paths", "infra.config_paths", "adapters.file_system", "infra.keycodes",
+			"core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system", "infra.keycodes",
 			"platform.remap.nav_layer", "layouts.engine.layers.editor", "layouts.engine.layers.layers" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...)
@@ -24,7 +24,7 @@ local function with_editor(scenario)
 			end
 			package.loaded["infra.logger"] = logger
 			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared_root = function() return helpers.shared() end,
 				shared = function(path) return helpers.shared(path) end,
 			}

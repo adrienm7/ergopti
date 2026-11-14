@@ -73,7 +73,7 @@ local json_encode = bridge_mod.json_encode
 --- @param relative string Path under _shared/.
 --- @return table|nil
 local function read_shared_json(relative)
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if not ok_paths or not Paths then return nil end
 	local root = Paths.shared_root()
 	if not root then return nil end

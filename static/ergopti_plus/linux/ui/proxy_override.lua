@@ -14,7 +14,7 @@ local M = {}
 local Dialogs = require("ui.menu.menu_dialogs")
 local I18n = require("infra.i18n")
 local Logger = require("core.logger.engine.shim")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local Binding = require("infra.proxy_policy")
 local Override = require("core.network.engine.proxy_override")
 

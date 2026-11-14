@@ -5,7 +5,7 @@
  * MODULE: Linux Shared-Tree Resolver Guard
  * DESCRIPTION:
  * No Linux module may derive the `_shared` tree by counting `..` steps of its
- * own. It asks infra/paths.lua, which derives the root once.
+ * own. It asks core/fs/engine/paths.lua, which derives the root once.
  *
  * ROOT CAUSE ENCODED — TWO SHIPPED BUGS, SAME SHAPE:
  * Twelve independent `_shared` expressions existed across the Linux driver, at
@@ -36,7 +36,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVER = path.join(ROOT, 'static', 'ergopti_plus', 'linux');
-const RESOLVER = path.join(DRIVER, 'infra', 'paths.lua');
+const RESOLVER = path.join(DRIVER, 'core', 'fs', 'engine', 'paths.lua');
 
 /** Every production Lua file in the Linux driver. */
 function walk(dir, acc = []) {
@@ -56,7 +56,7 @@ const errors = [];
 
 if (!fs.existsSync(RESOLVER)) {
 	errors.push(
-		'linux/infra/paths.lua is missing — every module would go back to counting ".." itself'
+		'linux/core/fs/engine/paths.lua is missing — every module would go back to counting ".." itself'
 	);
 }
 
@@ -65,7 +65,7 @@ if (!fs.existsSync(RESOLVER)) {
 //   - ui/webkit_host.lua probes a candidate list for the file:// base a webview
 //     needs before any module has loaded.
 const EXEMPT = new Set([
-	'infra/paths.lua',
+	'core/fs/engine/paths.lua',
 	'ui/webkit_host.lua',
 	// The two bootstraps, whose depth is asserted separately below rather than
 	// trusted: they run before package.path includes the shared tree.
@@ -95,7 +95,7 @@ if (files.length < 40) {
 // mattered: infra/timings.lua, infra/wpm_constants.lua,
 // infra/personal_info_fields.lua and modules/gestures/manager.lua all used it,
 // none was exempt, and none was ever reported — this guard printed "All 99
-// Linux module(s) reach _shared through infra/paths.lua" while four did not.
+// Linux module(s) reach _shared through core/fs/engine/paths.lua" while four did not.
 // On an installed package the driver sits flat in /usr/lib/ergopti, so three
 // levels up is /usr, and the daemon died on its first timing lookup.
 const HARDCODED = [
@@ -112,7 +112,7 @@ for (const abs of files) {
 		const hit = HARDCODED.find((h) => h.re.test(line));
 		if (!hit) return;
 		errors.push(
-			`${rel}:${i + 1}: derives the shared tree by ${hit.why} — require("infra.paths") and ` +
+			`${rel}:${i + 1}: derives the shared tree by ${hit.why} — require("core.fs.engine.paths") and ` +
 				'call Paths.shared(…). A per-file depth cannot be verified, and a wrong one degrades ' +
 				'silently: this is how the language menu came to offer 2 locales of 21, and how every ' +
 				'installed package came to read its timings from /usr/_shared.'
@@ -185,6 +185,6 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`\x1b[32m[OK] All ${files.length} Linux module(s) reach _shared through infra/paths.lua ` +
+	`\x1b[32m[OK] All ${files.length} Linux module(s) reach _shared through core/fs/engine/paths.lua ` +
 		`(${EXEMPT.size} documented exemption(s)).\x1b[0m`
 );

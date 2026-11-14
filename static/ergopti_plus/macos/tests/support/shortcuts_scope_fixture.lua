@@ -39,9 +39,9 @@ local function run_fixture(body, source)
 		if status ~= (files[path] and "ok" or "absent") or status == "ok" and files[path] ~= content then return false end
 		files[path] = value; controls.writes = controls.writes + 1; return true
 	end
-	package.loaded["adapters.file_system"] = file_port
+	package.loaded["core.fs.adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
-	package.loaded["infra.paths"] = { shared = helpers.shared }
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end

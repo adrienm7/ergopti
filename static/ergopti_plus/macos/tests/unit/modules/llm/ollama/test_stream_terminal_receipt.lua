@@ -33,8 +33,8 @@ local function run_case(case)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm",
 		"modules.keystats", "modules.llm.api_common", "modules.llm.profiles",
 		"modules.llm.ollama_endpoint", "modules.llm.progressive_reveal",
-		"adapters.storage", "adapters.file_system", "infra.notifications",
-		"adapters.shell_runner", "core.events.timer_scheduler", "adapters.json_codec",
+		"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.notifications",
+		"adapters.shell_runner", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.parser", "infra.logger" }, function()
 		-- The parser only reads the core's defaults. Keep that data port truthful
 		-- without booting unrelated backends or acquiring their module lifetimes.

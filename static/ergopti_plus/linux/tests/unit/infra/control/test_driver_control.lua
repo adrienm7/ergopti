@@ -306,7 +306,7 @@ end)
 helpers.describe("driver-control-declaration", function()
 	for _, refusal in ipairs({ "read-nil", "read-throw", "close-nil", "close-false", "close-throw" }) do
 		helpers.it("(driver-control-declaration) closes and refuses " .. refusal, function()
-			local Reader = require("infra.regular_file_reader")
+			local Reader = require("core.fs.engine.regular_file_reader")
 			local open, new, stdio_open = Reader.open, DriverControl.new, io.open
 			local closes, acquired = 0, 0
 			Reader.open = function()
@@ -351,7 +351,7 @@ helpers.describe("driver-control-declaration", function()
 			for _, collision in ipairs({ false, true }) do
 				helpers.it("(native-control-owned-stage) " .. kind .. " collision=" .. tostring(collision), function()
 					local uv = require("luv")
-					local Writer = require("infra.regular_file_writer")
+					local Writer = require("core.fs.engine.regular_file_writer")
 					local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/erg-control-stage-XXXXXX"))
 					local folder = root .. "/control"
 					assert(uv.fs_mkdir(folder, 448))
@@ -436,8 +436,8 @@ helpers.describe("driver-control-declaration", function()
 					local admitted = variant == "explicit-file" or variant == "default-file-link"
 					local code = string.format([[package.path = %q
 local uv = require("luv")
-local paths = require("infra.paths")
-package.loaded["infra.paths"] = setmetatable({ shared = function(relative)
+local paths = require("core.fs.engine.paths")
+package.loaded["core.fs.engine.paths"] = setmetatable({ shared = function(relative)
  if relative == "diagnostics/data/control/driver_control.json" then return %q end
  return paths.shared(relative)
 end }, { __index = paths })

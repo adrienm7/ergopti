@@ -52,7 +52,7 @@ test("forged equality token cannot borrow installation deadline", function()
  setmetatable(token, nil); if not ok then error(err, 0) end
 end)
 test("canonical install data declares literal three minute local cap", function()
- local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
+ local path = assert(require("core.fs.engine.paths").shared("updater/data/defaults.json"))
  local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
  local d = assert(require("core.text.engine.json").decode(raw))
  assert(d.release_install.install_timeout_ms == 180000)
@@ -73,7 +73,7 @@ end)
 -- Additive listing-policy controls retain all original deadline assertions.
 local listing_tests = {
  { "canonical listing ceiling covers the independently measured release", function()
-  local path = assert(require("infra.paths").shared("updater/data/defaults.json"))
+  local path = assert(require("core.fs.engine.paths").shared("updater/data/defaults.json"))
   local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
   local d = assert(require("core.text.engine.json").decode(raw))
   local cap = assert(Budget.capture_listing(d))

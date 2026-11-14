@@ -5,21 +5,21 @@ local helpers = require("tests.helpers")
 local Codec = require("core.text.engine.toml_codec")
 
 local function with_fixture(source, body)
-	local names = { "adapters.file_system", "adapters.storage", "infra.preferences",
-		"infra.config_paths", "infra.paths", "modules.shortcuts.tap_keys", "adapters.keyboard_geometry" }
+	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.preferences",
+		"infra.config_paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "adapters.keyboard_geometry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0 }
 	local ok, err = pcall(function()
 		helpers.load_with_stubs("infra.preferences")
-		package.loaded["adapters.storage"] = setmetatable({}, { __index = function()
+		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical assignments must not consult legacy storage") end
 		end })
 		package.loaded["infra.config_paths"] = { get = function(name)
 			assert(name == "ConfigTomlPath"); return "config"
 		end }
-		package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local file = assert(io.open(path, "rb")); local value = file:read("*a"); file:close(); return value
 			end,

@@ -4,7 +4,7 @@
 #SingleInstance Off
 #Warn VarUnset, Off
 #Include infra/file_read_activity.ahk
-#Include adapters/file_system.ahk
+#Include core/fs/adapters/file_system.ahk
 #Include infra/config_write_lease.ahk
 global _FRC_Handle := -1
 _FRC_RefuseClose(Handle) {

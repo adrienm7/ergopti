@@ -55,7 +55,7 @@ function buildCommand(fakeBinary, logFile) {
 	const sharedRoot = SHARED_LUA_ROOT.replace(/\\/g, '/');
 	const source = [
 		`package.path = ${JSON.stringify(`${moduleRoot}/?.lua;${moduleRoot}/?/init.lua;${sharedRoot}/?.lua;${sharedRoot}/?/init.lua;`)} .. package.path`,
-		'package.loaded["adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
+		'package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }', // no proxy override stored
 		// Hammerspoon always provides hs.fs.attributes, and FileSystem.exists
 		// refuses to classify a path without a metadata probe. Plain Lua has no
 		// stat, so this host stand-in reports the regular files the builder
@@ -64,7 +64,7 @@ function buildCommand(fakeBinary, logFile) {
 		// The prelude reads the shared route inventory through read_with_status,
 		// whose symlink-safe walk needs hs.fs.dir and symlinkAttributes. Plain Lua
 		// has neither, so the stand-in serves that one file's real bytes.
-		'local FileSystem = require("adapters.file_system")',
+		'local FileSystem = require("core.fs.adapters.file_system")',
 		'local read_with_status = FileSystem.read_with_status',
 		'FileSystem.read_with_status = function(p, ...) if p:match("/core/network/data/route_origins%.json$") then local f = assert(io.open(p, "rb")); local bytes = f:read("*a"); f:close(); return bytes, "ok" end; return read_with_status(p, ...) end',
 		// Native Windows Lua expands module dots with backslashes. Load this

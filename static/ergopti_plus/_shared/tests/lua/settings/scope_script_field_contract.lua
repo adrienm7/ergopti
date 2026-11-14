@@ -5,12 +5,12 @@ return function(helpers, driver)
 	local function with_native(kind, callback)
 		local name = kind == "locale" and "infra.i18n"
 			or (driver == "macos" and "ui.error_dialog" or "ui.error_dialog.bridge")
-		local saved, names = {}, { name, "infra.locale", "core.i18n.engine.core", "adapters.storage" }
+		local saved, names = {}, { name, "infra.locale", "core.i18n.engine.core", "core.fs.adapters.storage" }
 		for _, module in ipairs(names) do saved[module] = package.loaded[module]; package.loaded[module] = nil end
 		local writes = 0
 		local values = { locale = "fr", i18n_locale = "fr", ["script.show_error_dialog"] = true }
 		local storage_owner
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.storage"] = {
 			get = function(alias, default)
 				if values[alias] == nil then return default end
 				return values[alias]

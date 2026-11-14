@@ -21,7 +21,7 @@ local function load_controller(options)
 	package.loaded["platform.remap.lease_controller"] = nil
 	package.loaded["adapters.task_output_turn"] = nil
 	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["platform.remap.ke_paths"] = nil
 	package.loaded["platform.remap.lease_helper"] = nil
@@ -346,7 +346,7 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "adapters.storage",
+		"platform.remap.lease_controller", "adapters.task_output_turn", "adapters.shell_runner", "core.fs.adapters.storage",
 		"core.events.timer_scheduler", "platform.remap.ke_paths", "platform.remap.lease_helper",
 		"infra.logger",
 	}, function()

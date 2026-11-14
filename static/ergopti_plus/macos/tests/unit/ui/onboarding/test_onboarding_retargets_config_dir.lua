@@ -139,7 +139,7 @@ end)
 
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
-		helpers.with_fresh_modules({ "infra.toml.writer", "adapters.file_system", "ui.menu.menu_paths",
+		helpers.with_fresh_modules({ "infra.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
 			"infra.notifications" }, function()
 			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
@@ -155,7 +155,7 @@ helpers.describe("onboarding commit() honours the retarget", function()
 					return destination
 				end,
 			}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
 			package.loaded["infra.toml.writer"] = {
@@ -216,9 +216,9 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 	local function fresh_menu_paths()
 		package.loaded["ui.menu.menu_paths"] = nil
 		package.loaded["infra.config_paths"] = nil
-		local saved_file_system = package.loaded["adapters.file_system"]
+		local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 		local bootstrap_content = nil
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function()
 				if bootstrap_content == nil then return nil, "absent" end
 				return bootstrap_content, "ok"
@@ -243,7 +243,7 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 			},
 		})
 		local initialized = MP.init(make_real_base_dir(), function() end)
-		package.loaded["adapters.file_system"] = saved_file_system
+		package.loaded["core.fs.adapters.file_system"] = saved_file_system
 		helpers.assert_eq(initialized, true,
 			"the real menu_paths fixture must commit its bootstrap before retargeting")
 		return MP
@@ -286,13 +286,13 @@ helpers.describe("the controlled onboarding migration context retains no native 
 	local Context = require("tests.support.onboarding_finish_fixture")
 
 	helpers.it("uses the real registry and custom reader without admitting the virtual destination", function()
-		helpers.with_fresh_modules({ "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 			local reads, writes = 0, 0
 			local adapter = {
 				read_with_status = function() reads = reads + 1; return nil, "absent" end,
 				write_if_unchanged = function() writes = writes + 1; return true end,
 			}
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			Context.with_migration_reader(function()
 				local migration = require("settings.engine.migration.migrate")
 				local registry = assert(migration.load_registry(helpers.shared(migration.REGISTRY_PATH)))

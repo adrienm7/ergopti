@@ -16,7 +16,7 @@ local file = assert(io.open(path, "w")); assert(file:write("native identity fixt
 local original = {}
 for _, name in ipairs({ "fs_open", "fs_fstat", "fs_lstat", "fs_stat", "fs_close" }) do original[name] = uv[name] end
 local native = assert(original.fs_stat(path))
-assert(require("infra.private_sqlite_file").admit(path), "actual backend identifiers must remain admissible")
+assert(require("core.fs.engine.private_sqlite_file").admit(path), "actual backend identifiers must remain admissible")
 local integer_abi = rawget(_G, "jit") == nil
 local vectors = {
 	{ "zero", 0, true }, { "negative zero", -0.0, true }, { "one", 1, true },
@@ -52,7 +52,7 @@ local ok, failure = xpcall(function()
 				return stat and represented(stat), detail, code
 			end
 			uv.fs_close = function(descriptor) closes = closes + 1; return original.fs_close(descriptor) end
-			local private = assert(loadfile(root .. "/infra/private_sqlite_file.lua"))()
+			local private = assert(loadfile(root .. "/core/fs/engine/private_sqlite_file.lua"))()
 			local admitted = private.admit(path)
 			for name, operation in pairs(original) do uv[name] = operation end
 			assert(admitted == vector[3], field .. ": " .. vector[1] .. " must preserve exact numeric identity")

@@ -289,7 +289,7 @@ helpers.describe("paths restart live pause", function()
           local result = save()
           helpers.assert_eq(state.request_paused, paused, "the callback must sample the live controller")
           helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
-          local file = assert(io.open(require("adapters.storage").path() .. ".restart-pause", "rb"))
+          local file = assert(io.open(require("core.fs.adapters.storage").path() .. ".restart-pause", "rb"))
           local marker = assert(file:read("*a")); assert(file:close())
           helpers.assert_contains(marker, "paused=" .. tostring(paused) .. "\n")
           helpers.assert_eq(f.paths.get_config_dir(), f.dirs.b)
@@ -929,7 +929,7 @@ end
 helpers.it("metrics storage warning explains blocked collection in every locale", function()
   local json = require("core.text.engine.json")
   for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-    local path = assert(require("infra.paths").shared("core/i18n/data/locales/" .. lang .. ".json"))
+    local path = assert(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. lang .. ".json"))
     local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
     local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]
     helpers.assert_true(type(message) == "string" and message:find("SQLite", 1, true) ~= nil)

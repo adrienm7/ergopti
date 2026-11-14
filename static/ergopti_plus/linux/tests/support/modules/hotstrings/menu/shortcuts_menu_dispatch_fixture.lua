@@ -124,12 +124,12 @@ local function with_keyboard_slot_picker(prompt, body)
 				"infra.manifest_menu" }) do package.loaded[name] = nil end
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
 			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("menu fixture must not close input") end }
 			local scene = { events = {} }
 			local events, backups, publications = scene.events, {}, 0
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = function(target) return Writer.read_classified(target) end,
 				read_with_status = function(target) return Writer.read_classified(target) end,
 				write = function() error("menu fixture forbids unconditional publication") end,

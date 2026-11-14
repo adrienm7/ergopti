@@ -259,7 +259,7 @@ helpers.describe("local model presence: independent shared corpus", function()
 	helpers.it("replays normalization, exact model errors and strict listing receipts", function()
 		local Policy = require("ai.engine.ollama.local_model_policy")
 		local Json = require("core.text.engine.json")
-		local fh = assert(io.open(require("infra.paths").shared("tests/corpus/llm/local_model_presence.json"), "rb"))
+		local fh = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/llm/local_model_presence.json"), "rb"))
 		local corpus = assert(Json.decode_lossless(fh:read("*a")))
 		fh:close()
 		for _, vector in ipairs(corpus.normalization) do

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Interpreter = require("modules.llm.managed_native_python")
 local Timer = require("core.events.timer_scheduler")
 local Settings = require("modules.llm.bootstrap_retry_generated")

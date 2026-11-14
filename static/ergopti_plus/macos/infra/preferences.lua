@@ -62,7 +62,7 @@ local function schema_read_admitted(check, content, status)
 	return called and accepted == true
 end
 local Logger    = require("infra.logger")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
 local Manifest = require("infra.manifest_reader")
 local LEAF = require("settings.engine.keys").LEAF

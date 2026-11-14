@@ -44,7 +44,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\hotpath_profiler.ahk
 #Include ..\..\infra\redact.ahk
 #Include ..\..\core\crypto\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk

@@ -142,7 +142,7 @@ end)
 --- @param body function Receives a genuine build closure, root, i18n and actions.
 local function with_lifecycle_root(body)
 	return helpers.with_stub_scope({ "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
-		"menu.engine.renderer", "infra.i18n", "infra.paths", "infra.logger" }, function()
+		"menu.engine.renderer", "infra.i18n", "core.fs.engine.paths", "infra.logger" }, function()
 		local logger = make_error_capturing_logger()
 		package.loaded["infra.logger"] = logger
 		helpers.load_with_stubs("ui.menu.builder")

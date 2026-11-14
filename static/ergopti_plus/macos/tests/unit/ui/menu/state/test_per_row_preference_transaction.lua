@@ -24,7 +24,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		"ui.menu.menu_shortcuts",
 		"infra.logger",
 		"infra.deferred_work",
-		"infra.fs_dir",
+		"core.fs.engine.dir",
 		"infra.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
@@ -63,7 +63,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		}
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 		package.loaded["infra.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },

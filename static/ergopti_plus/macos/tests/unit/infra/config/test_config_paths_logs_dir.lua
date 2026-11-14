@@ -33,8 +33,8 @@ local APP = AppDirs.macos.folder_name
 --- @return boolean initialized
 local function fresh_resolver(bootstrap_content)
 	local observations = { writes = {} }
-	local previous_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function()
 			if bootstrap_content ~= nil then return bootstrap_content, "ok" end
 			return nil, "absent"
@@ -68,7 +68,7 @@ local function fresh_resolver(bootstrap_content)
 	})
 	_G.hs = previous_hs
 	os.getenv = real_getenv
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	if not ok then error(ConfigPaths, 0) end
 	local initialized = ConfigPaths.init("/fixture/driver/")
 	return ConfigPaths, observations, initialized

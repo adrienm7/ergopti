@@ -117,7 +117,7 @@ local function with_fixture(callback)
 		"adapters.key_state",
 		"adapters.synthetic_input",
 		"core.events.timer_scheduler",
-		"adapters.storage",
+		"core.fs.adapters.storage",
 		"infra.hotpath_profiler",
 		"infra.logger",
 	}, function()
@@ -146,7 +146,7 @@ local function with_fixture(callback)
 				package.loaded["adapters.key_state"] = nil
 				package.loaded["adapters.synthetic_input"] = nil
 				package.loaded["core.events.timer_scheduler"] = nil
-				package.loaded["adapters.storage"] = nil
+				package.loaded["core.fs.adapters.storage"] = nil
 				package.loaded["infra.hotpath_profiler"] = nil
 
 				local renderer

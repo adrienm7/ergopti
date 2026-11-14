@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
 local MODULES = {
 	"adapters.keyboard_source_probe", "adapters.shell_runner", "core.events.timer_scheduler",
-	"adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "infra.logger",
+	"core.fs.adapters.json_codec", "platform.remap.lease_helper", "infra.timings", "infra.logger",
 }
 local SOURCE = "com.apple.keylayout.US"
 
@@ -80,7 +80,7 @@ local function fixture(options)
 			return "/signed/ErgoptiPlus", nil, { ERGOPTI_LAUNCHER_EXECUTABLE = "/signed/ErgoptiPlus" }
 		end,
 	}
-	package.loaded["adapters.json_codec"] = { decode = Json.decode }
+	package.loaded["core.fs.adapters.json_codec"] = { decode = Json.decode }
 	package.loaded["adapters.shell_runner"] = {
 		spawn = function(executable, args, callback, chunks, environment)
 			context.calls.spawned = (context.calls.spawned or 0) + 1

@@ -24,8 +24,8 @@ package.cpath = native_luv
 package.loaded.lfs = nil
 assert(not pcall(require, "lfs"), "restricted native C path must exclude optional lfs")
 local baseline = os.getenv("ERGOPTI_NATIVE_FILE_SYSTEM_BASELINE")
-if baseline then package.preload["adapters.file_system"] = assert(loadfile(baseline)) end
-local Files = require("adapters.file_system")
+if baseline then package.preload["core.fs.adapters.file_system"] = assert(loadfile(baseline)) end
+local Files = require("core.fs.adapters.file_system")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-exists-receipts-XXXXXX"))
 local paths, directories = {}, {}
 local checks, failures = 0, 0
@@ -60,10 +60,10 @@ local function child_exists(path, cpath, runtime)
 	local exited, timed_out, output, child, status = false, false, "", nil, nil
 	local program = "package.cpath=" .. string.format("%q", cpath) .. ";"
 	if baseline then
-		program = program .. "package.preload['adapters.file_system']=assert(loadfile("
+		program = program .. "package.preload['core.fs.adapters.file_system']=assert(loadfile("
 			.. string.format("%q", baseline) .. "));"
 	end
-	program = program .. "if require('adapters.file_system').exists(" .. string.format("%q", path)
+	program = program .. "if require('core.fs.adapters.file_system').exists(" .. string.format("%q", path)
 		.. ") then io.write('present');os.exit(0) else os.exit(1) end"
 	child = assert(uv.spawn(runtime or "luajit", { args = { "-e", program }, stdio = { nil, stdout, nil } }, function(code)
 		exited, status = true, code

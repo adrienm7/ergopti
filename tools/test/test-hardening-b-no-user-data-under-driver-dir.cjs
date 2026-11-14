@@ -170,7 +170,7 @@ const ANCHORS = [
 		name: 'hs.configdir'
 	},
 	{
-		re: /Paths\.driver_root\(\)|require\("infra\.paths"\)\.driver_root\(\)/g,
+		re: /Paths\.driver_root\(\)|require\("core\.fs\.engine\.paths"\)\.driver_root\(\)/g,
 		root: (d) => `ergopti_plus/${d}`,
 		name: 'driver_root()'
 	},

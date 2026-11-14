@@ -143,7 +143,7 @@ helpers.describe("ui.webkit_host", function()
 			local driver = '/tmp/ergopti\\checkout/linux'
 			local ui = driver .. "/../_shared/ui"
 			local locales = driver .. "/../_shared/core/i18n/data/locales"
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original_open = reader.open_source
 			reader.open_source = function(path)
 				if path == ui .. "/host_bridge.js" or path == locales .. "/fr.json" then
@@ -161,7 +161,7 @@ helpers.describe("ui.webkit_host", function()
 		end)
 
 		helpers.it("(webview-asset-source) rejects a probe whose stream close fails", function()
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original, closes = reader.open_source, 0
 			reader.open_source = function()
 				return { close = function() closes = closes + 1; return nil end }
@@ -287,7 +287,7 @@ helpers.describe("ui.webkit_host", function()
 		helpers.it("fails closed when a required local vendor is absent", function()
 			local ui_root = WH.resolve_ui_root(DRIVER_ROOT)
 			local app_dir = WH.resolve_app_dir(ui_root, "metrics_apps")
-			local reader = require("infra.regular_file_reader")
+			local reader = require("core.fs.engine.regular_file_reader")
 			local original_read = reader.read_source
 			reader.read_source = function(path)
 				if tostring(path):find("vendor/chart.umd.js", 1, true) then return nil end

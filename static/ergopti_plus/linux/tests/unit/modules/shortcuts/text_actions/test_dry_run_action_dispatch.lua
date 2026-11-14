@@ -63,7 +63,7 @@ local function with_action(route, mode, action, body)
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
 		require("tests.support.text_owner_fixture").with(function(guard)
 			local world = { keys = {}, held = {}, reads = 0, writes = 0, lifecycle = 0, errors = {} }
-			local logger = assert(dofile(require("infra.paths").shared("core/logger/engine/init.lua")))
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_sink(function() end)
 			logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
 			package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger

@@ -20,10 +20,10 @@ local helpers = require("tests.helpers")
 local RESET_MODULES = {
 	"infra.logger", "adapters.log_transport", "adapters.event_provenance",
 	"adapters.synthetic_input",
-	"infra.paths", "infra.timings",
+	"core.fs.engine.paths", "infra.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
 	"ui.tooltip", "modules.hotstrings.hotstrings_config", "adapters.tooltip_renderer",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
@@ -100,7 +100,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		instrument_timer(hs_stub.timer, "new", "timer_new")
 		instrument_timer(hs_stub.timer.delayed, "new", "timer_delayed_new")
 		local file_system_write_calls = 0
-		package.loaded["adapters.file_system"] = setmetatable({
+		package.loaded["core.fs.adapters.file_system"] = setmetatable({
 			write = function()
 				file_system_write_calls = file_system_write_calls + 1
 				return false, "filesystem publication is forbidden from keyDown"
@@ -114,7 +114,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			ms = function() return 100 end,
 			sec = function() return 0.1 end,
 		}
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative) return helpers.shared(relative) end,
 			shared_llm_path = function(relative)
 				return helpers.shared("ai/data/" .. tostring(relative or ""))

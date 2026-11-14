@@ -65,7 +65,7 @@ local function production()
 		start_process = OwnedProcess.start,
 		command = function()
 			local uv = require("luv")
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local soname = require("_generated.native_runtime").x11
 			return assert(uv.exepath(), "native interpreter identity unavailable"), {
 				Paths.driver_root() .. "/adapters/x11_keymap_watch_worker.lua",

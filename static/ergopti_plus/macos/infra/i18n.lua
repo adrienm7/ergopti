@@ -26,7 +26,7 @@ local _scope = require("settings.engine.scope.owner").new({ name = "infra.i18n",
 
 local hs     = hs
 local Logger = require("infra.logger")
-local Storage = require("adapters.storage")
+local Storage = require("core.fs.adapters.storage")
 local TimerScheduler = require("core.events.timer_scheduler")
 local LOG    = "i18n"
 
@@ -239,7 +239,7 @@ local function settle_locale_storage_inner(keep)
 	local debt = _locale_storage_debt
 	if debt == nil then return true end
 	if debt.keep == nil then debt.keep = keep == true end
-	if not rawequal(package.loaded["adapters.storage"], Storage) then return false end
+	if not rawequal(package.loaded["core.fs.adapters.storage"], Storage) then return false end
 	if debt.receipt and not debt.keep and not debt.restored then
 		if Storage.restore_owned(debt.owner, debt.receipt) ~= true then return false end
 		debt.restored = true
@@ -285,7 +285,7 @@ local function persist_selected_locale(code)
 	_locale_storage_serial = _locale_storage_serial + 1
 	debt.backup_path = path .. ".locale-" .. tostring(hs.timer.absoluteTime()) .. "-"
 		.. tostring(_locale_storage_serial) .. ".settings"
-	debt.files = require("adapters.file_system")
+	debt.files = require("core.fs.adapters.file_system")
 	debt.backup_bytes = require("core.text.engine.json").encode({ format = "ergopti-owned-settings-v1", cells = debt.cells })
 	if type(debt.backup_bytes) ~= "string" then return false end
 	return Storage.publish_owned(debt.owner, debt.receipt,

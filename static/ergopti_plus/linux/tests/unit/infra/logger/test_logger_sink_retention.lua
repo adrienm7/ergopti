@@ -83,7 +83,7 @@ end
 --- @return table names
 local function names(dir)
 	local list = {}
-	for _, entry in ipairs(assert(require("infra.native_directory").entries(dir))) do list[#list + 1] = entry.name end
+	for _, entry in ipairs(assert(require("core.fs.engine.native_directory").entries(dir))) do list[#list + 1] = entry.name end
 	table.sort(list)
 	return list
 end
@@ -283,15 +283,15 @@ helpers.describe("log retention purge reports a refused folder and keeps logging
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
-		local previous = package.loaded["infra.native_directory"]
-		local real = require("infra.native_directory")
-		package.loaded["infra.native_directory"] = {
+		local previous = package.loaded["core.fs.engine.native_directory"]
+		local real = require("core.fs.engine.native_directory")
+		package.loaded["core.fs.engine.native_directory"] = {
 			entries = function() return { { name = "ErgoptiPlus_2000-01-01.log", kind = "file" } } end,
 			join = real.join,
 			stat = function() return { kind = "file", modified = 0 } end,
 		}
 		local Sink = helpers.load_module("infra.logger_sink")
-		package.loaded["infra.native_directory"] = previous
+		package.loaded["core.fs.engine.native_directory"] = previous
 		local logger, stderr, original_remove, reported = fake_logger(), io.stderr, os.remove, {}
 		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
 		os.remove = function(path)
@@ -311,15 +311,15 @@ helpers.describe("log retention purge reports a refused folder and keeps logging
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
-		local previous = package.loaded["infra.native_directory"]
-		local real = require("infra.native_directory")
-		package.loaded["infra.native_directory"] = {
+		local previous = package.loaded["core.fs.engine.native_directory"]
+		local real = require("core.fs.engine.native_directory")
+		package.loaded["core.fs.engine.native_directory"] = {
 			entries = function() return { { name = "ErgoptiPlus_2000-01-01.log", kind = "file" } } end,
 			join = real.join,
 			stat = function() error("controlled metadata failure") end,
 		}
 		local Sink = helpers.load_module("infra.logger_sink")
-		package.loaded["infra.native_directory"] = previous
+		package.loaded["core.fs.engine.native_directory"] = previous
 		local logger, stderr, reported = fake_logger(), io.stderr, {}
 		io.stderr = { write = function(_, text) reported[#reported + 1] = text; return true end }
 		local ok, result = pcall(Sink.install, logger, { log_dir = dir, redaction_context = IDENTITY })
@@ -339,11 +339,11 @@ helpers.describe("log retention purge reports a refused folder and keeps logging
 		local refusing = setmetatable({
 			fs_opendir = function() return nil, "EIO: i/o error", "EIO" end,
 		}, { __index = uv })
-		local previous = package.loaded["infra.native_directory"]
-		local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", refusing)
-		package.loaded["infra.native_directory"] = Walker
+		local previous = package.loaded["core.fs.engine.native_directory"]
+		local Walker = helpers.load_module_with_dependency("core.fs.engine.native_directory", "luv", refusing)
+		package.loaded["core.fs.engine.native_directory"] = Walker
 		local Sink = helpers.load_module("infra.logger_sink")
-		package.loaded["infra.native_directory"] = previous
+		package.loaded["core.fs.engine.native_directory"] = previous
 		local logger = fake_logger()
 		local stderr = io.stderr
 		local reported = {}
@@ -368,11 +368,11 @@ helpers.describe("log retention purge reports a refused folder and keeps logging
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(Shell.run("mkdir -p " .. Shell.quote(dir)))
-		local previous = package.loaded["infra.native_directory"]
-		local Walker = helpers.load_module_with_dependency("infra.native_directory", "luv", false)
-		package.loaded["infra.native_directory"] = Walker
+		local previous = package.loaded["core.fs.engine.native_directory"]
+		local Walker = helpers.load_module_with_dependency("core.fs.engine.native_directory", "luv", false)
+		package.loaded["core.fs.engine.native_directory"] = Walker
 		local Sink = helpers.load_module("infra.logger_sink")
-		package.loaded["infra.native_directory"] = previous
+		package.loaded["core.fs.engine.native_directory"] = previous
 		local logger = fake_logger()
 		local stderr = io.stderr
 		local reported = {}

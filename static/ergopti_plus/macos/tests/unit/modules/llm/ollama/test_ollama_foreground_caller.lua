@@ -10,7 +10,7 @@ local function with_api(kind, callback)
 	nonce = string.format("%032x", nonce_counter)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "adapters.managed_ollama_daemon",
 		"adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-		"adapters.http_client", "core.events.timer_scheduler", "adapters.json_codec",
+		"adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
 		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
 		"modules.shortcuts.script_control" }, function()
@@ -59,7 +59,7 @@ local function with_api(kind, callback)
 			after = function() error("no launch delay or readiness timer is admitted") end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+		package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 		package.loaded["modules.llm.ollama_binary"] = { resolve = function() return "/fixture/ollama", nil, kind end }
 		package.loaded["modules.llm.ollama_server_command"] = { build = function(_, _, _, _, caller_nonce)
 			helpers.assert_eq(caller_nonce, nonce)

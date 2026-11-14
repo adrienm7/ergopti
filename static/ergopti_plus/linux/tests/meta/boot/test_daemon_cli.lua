@@ -289,7 +289,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
           if type(item) == "table" then return item end
           return nil, "fixture error", item
         end } end
-        if name == "infra.paths" then return { shared = function() return "/shared" end } end
+        if name == "core.fs.engine.paths" then return { shared = function() return "/shared" end } end
         error("unexpected dependency " .. name)
       end }, { __index = _G })
       local code = source:sub(first, last - 1) .. "\nreturn resolve_config_path"

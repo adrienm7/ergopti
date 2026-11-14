@@ -46,12 +46,12 @@ local function with_owner(body, managed, prepare)
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
-			local defaults=require("infra.paths").shared("tap_hold/data/defaults.toml")
+			local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
-			package.loaded["adapters.file_system"]=files
+			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["infra.config_paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.refuse_native then return false end

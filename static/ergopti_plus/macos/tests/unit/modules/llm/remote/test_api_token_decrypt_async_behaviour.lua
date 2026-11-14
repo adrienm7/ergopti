@@ -682,7 +682,7 @@ helpers.describe("API menu metadata path", function()
 		local names = {
 			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
 			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
-			"menu.engine.renderer", "adapters.json_codec",
+			"menu.engine.renderer", "core.fs.adapters.json_codec",
 		}
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -690,7 +690,7 @@ helpers.describe("API menu metadata path", function()
 		local entry = { id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" }
 		local ok, err = xpcall(function()
 			local Renderer = require("menu.engine.renderer")
-			local JsonCodec = require("adapters.json_codec")
+			local JsonCodec = require("core.fs.adapters.json_codec")
 			local command_renderer = assert(Renderer.new({
 				platform = "hs",
 				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
@@ -736,7 +736,7 @@ helpers.describe("API menu metadata path", function()
 		if not ok then error(err) end
 		helpers.assert_eq(package.loaded["menu.engine.renderer"], saved["menu.engine.renderer"],
 			"the borrowed renderer cache identity must be restored")
-		helpers.assert_eq(package.loaded["adapters.json_codec"], saved["adapters.json_codec"],
+		helpers.assert_eq(package.loaded["core.fs.adapters.json_codec"], saved["core.fs.adapters.json_codec"],
 			"the borrowed JSON adapter cache identity must be restored")
 	end)
 end)

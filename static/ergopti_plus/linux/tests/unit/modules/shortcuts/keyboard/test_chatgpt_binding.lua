@@ -18,7 +18,7 @@ local function with_binding(body, options)
 		Sandbox.with_config(SOURCE, function(path)
 			local seen = { commands = {}, other = 0, queue = {} }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end,
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end,
 				set = function() error("canonical bindings must not write legacy storage") end }
 			package.loaded["adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
@@ -51,11 +51,11 @@ local function with_binding(body, options)
 				local combinations = require("modules.shortcuts.key_combinations")
 				if not options or options.initialize_pairs ~= false then
 					local Loader = require("platform.remap.tap_hold_loader")
-					local defaults = require("infra.paths").shared("tap_hold/data/defaults.toml")
+					local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 					local catalogue = Loader.load_document(defaults,
 						{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 					helpers.assert_true(combinations.install({ keys = catalogue.catalog, hold_picker = catalogue.hold_picker,
-						files = require("adapters.file_system"), route = function() return path end,
+						files = require("core.fs.adapters.file_system"), route = function() return path end,
 						is_paused = function() return false end,
 						actions = { is_assignable = function(action)
 							return action ~= "one_shot_shift" and gestures.is_assignable(action) == true

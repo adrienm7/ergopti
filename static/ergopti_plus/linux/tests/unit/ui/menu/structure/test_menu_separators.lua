@@ -10,4 +10,4 @@
 local helpers = require("tests.helpers")
 
 require("tests.lua.menu.separators_contract").register(helpers,
-	require("infra.paths").shared("tests/corpus/menus/separator_normalization_vectors.json"))
+	require("core.fs.engine.paths").shared("tests/corpus/menus/separator_normalization_vectors.json"))

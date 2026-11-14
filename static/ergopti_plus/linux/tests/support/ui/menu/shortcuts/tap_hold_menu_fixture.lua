@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/data/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 local WRITER = "platform.remap.tap_hold_writer"
 

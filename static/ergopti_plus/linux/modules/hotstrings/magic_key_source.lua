@@ -39,8 +39,8 @@ local M = {}
 local Logger      = require("core.logger.engine.shim")
 local Preferences = require("infra.hotstring_preferences")
 local Manifest    = require("infra.manifest_reader")
-local Paths       = require("infra.paths")
-local FileSystem  = require("adapters.file_system")
+local Paths       = require("core.fs.engine.paths")
+local FileSystem  = require("core.fs.adapters.file_system")
 local Json        = require("core.text.engine.json")
 local EvdevCodes  = require("infra.evdev_codes")
 local Timings     = require("infra.timings")
@@ -638,7 +638,7 @@ collision_factory = function()
 		end end
 		return rawequal(package.loaded["infra.hotstring_preferences"], Preferences)
 			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
-			and rawequal(package.loaded["adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
+			and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
 			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
 	end
 	local function current()

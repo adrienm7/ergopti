@@ -40,10 +40,10 @@ end
 
 local function fresh(path)
 	assert(uv.os_setenv("XDG_CONFIG_HOME", path))
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	-- Lua 5.4 also returns loader data. A final table-list call would expand
 	-- that path into a second owner; expose exactly the adapter to the fixture.
-	return (require("adapters.storage"))
+	return (require("core.fs.adapters.storage"))
 end
 
 --- Restores only this fixture's private paths, even after a regression fails.

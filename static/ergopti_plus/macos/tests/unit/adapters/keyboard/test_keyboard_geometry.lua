@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Json = require("core.text.engine.json")
-local MODULES = { "adapters.keyboard_geometry", "adapters.json_codec", "infra.logger" }
+local MODULES = { "adapters.keyboard_geometry", "core.fs.adapters.json_codec", "infra.logger" }
 local ENVIRONMENT = "ERGOPTI_KEYBOARD_GEOMETRY_V1"
 local PROPERTY = 42
 
@@ -246,7 +246,7 @@ helpers.describe("native keyboard geometry adapter", function()
 				state.decode = state.decode + 1
 				return native_value(assert(Json.decode_lossless(raw)))
 			end
-			local decoded, detail = require("adapters.json_codec").decode(Json.encode(value))
+			local decoded, detail = require("core.fs.adapters.json_codec").decode(Json.encode(value))
 			helpers.assert_nil(detail)
 			helpers.assert_eq(#decoded.ranges, 4, "the actual adapter copy must reach the old length-census branch")
 			helpers.assert_nil(decoded.ranges[2])

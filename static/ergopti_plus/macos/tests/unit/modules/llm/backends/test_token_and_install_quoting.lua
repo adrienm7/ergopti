@@ -58,10 +58,10 @@ end)
 helpers.describe("layout_install: user installation is POSIX-quoted", function()
 	helpers.it("install_user quotes every interpolated path", function()
 		local saved_helper, saved_dir, saved_fs = package.loaded["platform.remap.lease_helper"],
-			package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"]
+			package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"]
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end }
-		package.loaded["infra.fs_dir"] = { try_entries = function() return {}, true end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
+		package.loaded["core.fs.engine.dir"] = { try_entries = function() return {}, true end }
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function() return { mode = "directory" }, "ok" end }
 		local ok, err = xpcall(function()
 			local dispatched
 			local install = helpers.load_with_stubs("modules.keymap.layout_install", {
@@ -74,7 +74,7 @@ helpers.describe("layout_install: user installation is POSIX-quoted", function()
 			helpers.assert_true(dispatched:find("source=" .. text_utils.shell_quote(source_dir .. bundle_name) .. ";", 1, true) ~= nil)
 			helpers.assert_true(dispatched:find("target=" .. text_utils.shell_quote(install.USER_LAYOUTS_DIR:gsub("/+$", "")) .. ";", 1, true) ~= nil)
 		end, debug.traceback)
-		package.loaded["platform.remap.lease_helper"], package.loaded["infra.fs_dir"], package.loaded["adapters.file_system"] = saved_helper, saved_dir, saved_fs
+		package.loaded["platform.remap.lease_helper"], package.loaded["core.fs.engine.dir"], package.loaded["core.fs.adapters.file_system"] = saved_helper, saved_dir, saved_fs
 		if not ok then error(err, 0) end
 	end)
 

@@ -129,14 +129,14 @@ local function activation_fixture(receipt)
 	end
 	local replacements = {
 		{ "luv", backend }, { "posix", { stat = function() return { type = "directory" } end } },
-		{ "core.logger.engine.shim", logger }, { "infra.file_watchers", nil },
+		{ "core.logger.engine.shim", logger }, { "core.fs.engine.file_watchers", nil },
 	}
 	local saved = {}
 	for _, entry in ipairs(replacements) do
 		saved[#saved + 1] = { entry[1], package.loaded[entry[1]] }
 		package.loaded[entry[1]] = entry[2]
 	end
-	local ok, watcher = pcall(require, "infra.file_watchers")
+	local ok, watcher = pcall(require, "core.fs.engine.file_watchers")
 	for _, entry in ipairs(saved) do package.loaded[entry[1]] = entry[2] end
 	if not ok then error(watcher, 0) end
 	return watcher, state

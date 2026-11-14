@@ -163,7 +163,7 @@ helpers.describe("the shared engine and output tokens", function()
 	helpers.it("output token: the shipped {U+XXXX} symbols reach the engine as characters", function()
 		local loader = helpers.load_module("modules.hotstrings.loader")
 		local catalogue = loader.load_catalogue({
-			require("infra.paths").shared("hotstrings/data/catalogue/magickey.toml"),
+			require("core.fs.engine.paths").shared("hotstrings/data/catalogue/magickey.toml"),
 		})
 		local found = 0
 		for _, mapping in ipairs(catalogue.mappings) do

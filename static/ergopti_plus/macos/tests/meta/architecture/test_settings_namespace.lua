@@ -16,7 +16,7 @@ local PRODUCTION_SOURCE_FLOOR = 200
 -- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_SETTINGS_OWNERS = {
 	["adapters.log_transport"] = true,
-	["adapters.storage"] = true,
+	["core.fs.adapters.storage"] = true,
 }
 
 --- Lists production Lua files recursively without LuaFileSystem.

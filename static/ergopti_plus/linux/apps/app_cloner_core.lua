@@ -44,7 +44,7 @@ local quote = TextUtils.shell_quote
 --- @param path string|nil Absolute path; the shared tree's by default.
 --- @return table catalogue
 function M.load_families(path)
-	path = path or require("infra.paths").shared("apps/data/app_cloner/families.json")
+	path = path or require("core.fs.engine.paths").shared("apps/data/app_cloner/families.json")
 	assert(type(path) == "string", "the shared App Cloner families are unavailable")
 	local file = assert(io.open(path, "rb"), "cannot read " .. path)
 	local raw = file:read("*a")

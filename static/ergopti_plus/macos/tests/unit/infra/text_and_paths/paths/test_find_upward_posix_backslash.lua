@@ -22,7 +22,7 @@ local POSIX_CONFIG = "/\n;\n?\n!\n-\n"
 local function on_posix(existing, scenario)
 	local saved_config, saved_hs = package.config, rawget(_G, "hs")
 	local ok, failure = xpcall(function()
-		helpers.with_fresh_modules({ "infra.paths", "infra.logger" }, function()
+		helpers.with_fresh_modules({ "core.fs.engine.paths", "infra.logger" }, function()
 			package.config = POSIX_CONFIG
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			local probed = {}
@@ -31,7 +31,7 @@ local function on_posix(existing, scenario)
 				if existing[path] then return { mode = "directory" } end
 				return nil, "No such file or directory"
 			end } }
-			scenario(require("infra.paths"), probed)
+			scenario(require("core.fs.engine.paths"), probed)
 		end)
 	end, debug.traceback)
 	package.config, _G.hs = saved_config, saved_hs
