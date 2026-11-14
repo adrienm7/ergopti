@@ -182,6 +182,18 @@ async function exerciseManager(browser, origin) {
 	// The host answers the window's ready with the last saved source.
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
+	// (layout-editor-no-null-text) A section that renders nothing (the « Start
+	// from » panel when no start is open) leaves no text node behind: the root
+	// once received null and showed « null » under the toolbar.
+	assert.deepEqual(
+		await page.evaluate(() =>
+			Array.from(document.getElementById('layout-editor').childNodes)
+				.filter((node) => node.nodeType === Node.TEXT_NODE)
+				.map((node) => node.textContent)
+		),
+		[],
+		'the editor root holds elements only'
+	);
 	// The inline host lists the names table: the magnifier names a character at once.
 	assert.equal(await page.evaluate(() => typeof UNICODE_NAMES_DATA), 'object');
 	await page.click('#le-board [data-code="KeyQ"]');
