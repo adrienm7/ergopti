@@ -450,6 +450,12 @@ def phase_main():
                 final_status = 0 if primary is None and not cancelled[0] and status == 0 else 1
                 protocol.publish("closed", final_status, cancelled[0])
                 if not protocol.debt:
+                    # The receipt is final. Python resets its own handlers to
+                    # SIG_DFL while the interpreter finalizes, so a late owner
+                    # TERM (a capture bound noticed after the command ended)
+                    # would turn this published exit into a signal death.
+                    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                    signal.signal(signal.SIGINT, signal.SIG_IGN)
                     return final_status
         except BaseException as error:
             # No new waiter, destructive census action or guessed cleanup.

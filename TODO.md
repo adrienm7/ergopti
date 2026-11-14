@@ -1147,6 +1147,13 @@ Each closes on a named green hosted or native run, recorded here.
       modes over 7 runs needed 71.5 attempts on average, up to 432, so 512 missed one mode in about 150 runs. The bound is
       2048 (about 3e-12 per run; a run pays it only on a miss), and `test-windows-config-timer-custody-bound.cjs`
       recomputes the chance from that sample and fails at 512. Keep it listed until the config-transition shard stays green.
+      Worker C, 2026-11-14 (Paris): `test-linux-nix-native.cjs` (« 0 !== null » at `inventoryPhaseControls`, Release ci,
+      run 43604680663, one local run in three) is fixed at its cause: the phase owner's capture watcher can send its
+      TERM after the worker (`run-linux-managed-http-phase.py`) published `closed.json` with status 0, and Python
+      resets its handlers to SIG*DFL while it finalizes, so the worker died by signal and the owner read status null.
+      The worker now ignores TERM and INT once its closure receipt is final; regression
+      `test-linux-managed-phase-late-term.cjs` floods the real worker with TERM after its receipt (fails on attempt 1
+      with the old worker, 3 runs of 3), and the original test passed 8 runs of 8.
       Worker G, 2026-11-13 (Paris): the baseline flake `TestCancellationAndConcurrentClosePhysicallyRetirePeer` (macOS
       Intel Managed Ollama) is fixed at its cause in 9496d32980: a 120 ms deadline and a 200 ms idle clock could end
       the request before a slow runner had started the peer, so the retirement check found no receipt. Each case now
@@ -1159,7 +1166,7 @@ Each closes on a named green hosted or native run, recorded here.
       not end both processes within 10 s (the Quit AppleEvent was never answered)" while the same build quit in
       0.3–0.4 s in every other row. Its re-run (attempt 2, job 130295289361) passed and the macOS Verdict of
       42929436137 is green (job 130295941982); keep it listed until it stays green.
-      Scan 2026-11-12 of ci.yml runs 2026-11-07..12 on dev, claude/_ and tmp/_ (282 of 353 runs listed, 71 runs of
+      Scan 2026-11-12 of ci.yml runs 2026-11-07..12 on dev, claude/* and tmp/\_ (282 of 353 runs listed, 71 runs of
       2026-11-07..10 and the second job pages of ten large runs not read; logs read for the A/B buckets and one sample
       per other failure group): `symlink_logs_dir` Quit timeout only once (job 130257482167 above); its failed-launch
       artifact (launch-gate-failed-ci-macos-15-symlink_logs_dir\_\_tilde_paths-attempt-1, with the launcher and

@@ -12,6 +12,7 @@
 		"test:web-text-admission": "node ./tools/test/test-web-text-admission.cjs",
 		"test:linux:nix-native": "node ./tools/test/run-linux-nix-native.cjs",
 		"test:linux:nix-source": "node ./tools/test/test-linux-nix-native.cjs",
+		"test:linux-managed-phase-late-term": "node ./tools/test/test-linux-managed-phase-late-term.cjs",
 		"predev": "node ./tools/dev/write-branch.js",
 		"dev": "vite dev",
 		"prebuild": "node ./tools/build/build-menu-manifest.js && node ./tools/codegen/codegen-feature-inventory.cjs && node ./tools/dev/write-branch.js",
