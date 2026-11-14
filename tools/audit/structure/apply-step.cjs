@@ -319,6 +319,52 @@ function dropCoveredScopeLines(text, rows) {
 	return lines.filter((_, i) => !drop.has(i)).join('\n');
 }
 
+// Driver . "\core\lifecycle\engine\bundle.ahk": an AutoHotkey path joined
+// onto a base, with the folder it names.
+const AHK_BASE_PATH = /(\b\w+) \. "\\((?:[\w.-]+\\)+)[\w.-]+\.\w+"/g;
+
+/**
+ * An AutoHotkey fixture creates its tree with DirCreate(Base . "\infra") and
+ * writes files under it. A step that respells a written path into a folder
+ * that fixture never creates (S06: Driver . "\core\lifecycle\engine\x.ahk"
+ * under DirCreate(Driver . "\infra")) left the write without a folder, and
+ * FileAppend failed. The new folder is created right after the DirCreate
+ * that made the old one.
+ * @param {string} before The file's text before the step.
+ * @param {string} after The rewritten text.
+ * @returns {string}
+ */
+function repairAhkDirCreate(before, after) {
+	const was = [...before.matchAll(AHK_BASE_PATH)];
+	const now = [...after.matchAll(AHK_BASE_PATH)];
+	if (was.length === 0 || was.length !== now.length) return after;
+	let out = after;
+	// Last to first, so an inserted line never moves a write still to repair.
+	for (let i = now.length - 1; i >= 0; i--) {
+		const [, base, oldDir] = was[i];
+		const newDir = now[i][2];
+		if (now[i][1] !== base || oldDir === newDir) continue;
+		const folder = (dir) => dir.replace(/\\$/, '');
+		const create = (dir) => `DirCreate(${base} . "\\${folder(dir)}")`;
+		const head = out.slice(0, now[i].index);
+		// The DirCreate before this write that made the old folder, or the
+		// nearest folder above it.
+		const parts = folder(oldDir).split('\\');
+		let at = -1;
+		let made = '';
+		for (let n = parts.length; n > 0 && at < 0; n--) {
+			made = `DirCreate(${base} . "\\${parts.slice(0, n).join('\\')}")`;
+			at = head.lastIndexOf(made);
+		}
+		if (at < 0 || head.slice(at).includes(create(newDir))) continue;
+		const lineEnd = out.indexOf('\n', at);
+		const lineStart = out.lastIndexOf('\n', at) + 1;
+		const indent = out.slice(lineStart, at).match(/^[ \t]*/)[0];
+		out = `${out.slice(0, lineEnd)}\n${indent}${create(newDir)}${out.slice(lineEnd)}`;
+	}
+	return out;
+}
+
 // x:sub(1, 12) == "_shared/lua/": a length written beside the literal it measures.
 const SUB_PREFIX =
 	/(:sub\(\s*1\s*,\s*|\bstring\.sub\(\s*[\w.]+\s*,\s*1\s*,\s*)(\d+)(\s*\)\s*[=~]=\s*)(["'])([^"'\n]*)\4/g;
@@ -397,7 +443,7 @@ function repairCoupled(before, after) {
 		const trail = body.match(/\s*$/)[0];
 		return `${head}${lead}${ordered.join(', ')}${trail}${tail}`;
 	});
-	return out;
+	return repairAhkDirCreate(before, out);
 }
 
 /**
