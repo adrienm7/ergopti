@@ -2245,6 +2245,36 @@ function scanFile(file, text, ctx) {
 				}
 			);
 		}
+	// _DriverFileSource("network_info.ahk") in a Windows test, directly or
+	// through a test's own reader: a production file found by its base name.
+	// A step that renames the file renames the lookup; a new name another
+	// production file shares would find neither, so it is refused.
+	if (file.endsWith('.ahk') && inTree === 'windows')
+		for (const m of text.matchAll(/"([\w.-]+\.ahk)"/g)) {
+			const owners = [...map.keys()].filter(
+				(o) => o.startsWith('windows/') && !o.startsWith('windows/tests/') && o.endsWith(`/${m[1]}`)
+			);
+			if (owners.length !== 1) continue;
+			const target = map.get(owners[0]);
+			if (!target || target === owners[0]) continue;
+			const fresh = target.slice(target.lastIndexOf('/') + 1);
+			if (fresh === m[1]) continue;
+			const sharing = [...map.values()].filter(
+				(t) =>
+					t &&
+					t.startsWith('windows/') &&
+					!t.startsWith('windows/tests/') &&
+					t.endsWith(`/${fresh}`)
+			);
+			if (sharing.length !== 1) {
+				add('dir-split', m[0], '(split)', { oldRepo: `${PREFIX}${owners[0]}` });
+				continue;
+			}
+			add('lua-module-quoted', m[0], m[0].replace(`"${m[1]}"`, `"${fresh}"`), {
+				oldRepo: `${PREFIX}${owners[0]}`,
+				newRepo: `${PREFIX}${target}`
+			});
+		}
 	// "im)^#Include\s+\.\./_shared/modules/x\.ahk\s*$" in an AutoHotkey meta
 	// test: a regular expression over an #Include the driver's entry spells
 	// from its own root. It follows the file, escaped the same way.
