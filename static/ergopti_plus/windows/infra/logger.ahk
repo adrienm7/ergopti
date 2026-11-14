@@ -563,10 +563,12 @@ LoggerInit() {
 		}
 		; Enum admission accepts case variants; native severity keys are exact.
 		; Resolve with the same comparison and publish the owning native name.
+		LevelKnown := false
 		if Value is String {
 				for Level in LOGGER_SEVERITY {
 						if Level = Value {
 								LOGGER_MIN_LEVEL := Level
+								LevelKnown := true
 								break
 						}
 				}
@@ -576,6 +578,10 @@ LoggerInit() {
 		; everything the permissive pre-init defaults let through. This is the half
 		; of logger-preinit-level-drop that keeps the fail-open default honest.
 		_LoggerDropPreInitBelowLevel()
+		; An outdated or mistyped stored level is reported, never dropped silently.
+		if !LevelKnown
+				try LoggerWarn("Logger", "script.log_level '{1}' is not a log level — using {2}.",
+						IsObject(Value) ? Type(Value) : String(Value), LOGGER_DEFAULT_LEVEL)
 
 		; Start the background flusher once. LoggerInit may be called again when
 		; the user toggles the log level via the menu — we do not restart the

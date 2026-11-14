@@ -391,15 +391,20 @@ _FeatureStateValidateKanaOverride(Value) {
 ; so a value the loader applies is never read here as another key.
 _FeatureStateMagicKeySource(Raw) {
 	Default := _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	if Raw == "_" || !(Raw is String)
+	if Raw == "_"
 		return Default
 	Entry := ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if !(Entry is Map) || !Entry.Has("enum_values")
 		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
-	for Allowed in Entry["enum_values"] {
-		if Allowed = Raw
-			return Allowed
+	if Raw is String {
+		for Allowed in Entry["enum_values"] {
+			if Allowed = Raw
+				return Allowed
+		}
 	}
+	; An outdated or mistyped stored value is reported, never dropped silently.
+	try LoggerWarn("Config", "hotstrings.magic_key_source '{1}' is not one of its manifest values — using {2}.",
+		IsObject(Raw) ? Type(Raw) : String(Raw), Default)
 	return Default
 }
 

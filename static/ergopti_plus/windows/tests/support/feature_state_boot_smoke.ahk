@@ -365,12 +365,20 @@ _FeatureStateSmokeInvalidValue(Section, Key, Value) {
 ; case-insensitive enum rule is followed, in the manifest's spelling.
 _FeatureStateSmokeOutdatedSourceKey() {
 	global ScriptInformation
+	; Each refused value is reported once, by its own line (value-validation).
+	Reports := []
+	LoggerSetTestSink((Line) => InStr(Line, "hotstrings.magic_key_source '") ? Reports.Push(Line) : 0)
 	for Value in ["SC03B", "not-a-key", 46, ""] {
 		ReadScriptConfig(Map("hotstrings", Map("magic_key_source", Value)))
 		_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "outdated source key")
 		_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "outdated source key choice")
+		_FeatureStateSmokeAssert(A_Index, Reports.Length, "outdated source key report")
 	}
+	if !InStr(Reports[2], "'not-a-key'")
+		throw Error("the report must name the refused value: " . Reports[2])
 	ReadScriptConfig(Map("hotstrings", Map("magic_key_source", "keyj")))
+	_FeatureStateSmokeAssert(4, Reports.Length, "an accepted source key is not reported")
+	LoggerClearTestSink()
 	; _FeatureStateSmokeAssert compares with the case-insensitive !=.
 	if (ScriptInformation["MagicKeySource"] !== "KeyJ")
 		throw Error("loader-accepted spelling: expected KeyJ, got " . ScriptInformation["MagicKeySource"])
