@@ -255,12 +255,9 @@ local function _build_tap_holds(ctx)
 		local value = prompt_text(i18n_safe("menu.tapholds.sticky_dialog_title"),
 			i18n_safe("menu.tapholds.sticky_dialog_prompt"), tostring(current_ms))
 		if value == nil then return false end
-		local ms = require("tap_hold.engine.one_shot_timeout").parse(value)
-		if ms == nil then
-			Logger.warn(LOG, "Invalid one-shot timeout '%s' — ignored.", tostring(value))
-			show_error(plain_markup(tostring(value)), i18n_safe("dialog.gestures.param_error_title"))
-			return false
-		end
+		-- The shared value check names the accepted range in its refusal.
+		local ms = read_typed(require("settings.engine.value_check").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, value)
+		if ms == nil then return false end
 		if guard() ~= true then changed(false); return false end
 		local call_ok, persisted = pcall(setter, ms, guard)
 		if not call_ok or persisted ~= true then

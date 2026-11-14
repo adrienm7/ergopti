@@ -126,13 +126,13 @@ TapHoldLoneTapReadConfig(Cache) {
 }
 
 ; Refuses a one-shot timeout that is neither 0 (no time limit, decision of
-; 2026-11-13) nor a positive whole number of milliseconds
-; (tap_holds.sticky_timeout_ms, the leaf macOS reads). The one rule on Windows,
-; the AHK port of _shared/tap_hold/engine/one_shot_timeout.lua.
+; 2026-11-13) nor a positive whole number of milliseconds within its shared
+; value schema declaration (tap_holds.sticky_timeout_ms, the leaf macOS reads).
+; The one rule on Windows, as _shared/tap_hold/engine/one_shot_timeout.lua.
 ; @param Ms {Number} Milliseconds.
 ; @returns {Integer}
 TapHoldValidOneShotTimeoutMs(Ms) {
-	if !(Ms is Integer) || Ms < 0
+	if !(Ms is Integer) || !ValueCheckValue(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Ms)["ok"]
 		throw ValueError("tap_holds.sticky_timeout_ms must be 0 (no time limit) or a positive whole number of milliseconds.",
 			-1, (Ms is Object) ? Type(Ms) : String(Ms))
 	return Ms

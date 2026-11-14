@@ -145,6 +145,15 @@ function M.register(helpers, shared_path)
 			end
 			helpers.assert_true(count > 0, "value_schema.json declares no setting")
 		end)
+		helpers.it("value-check: the one-shot timeout admits 0 (no time limit) up to the declared maximum", function()
+			local OneShot = require("tap_hold.engine.one_shot_timeout")
+			local max = ValueCheck.declaration(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS).max
+			helpers.assert_eq(max, 2147483647)
+			for _, ok in ipairs({ 0, 1, 3000, max }) do helpers.assert_true(OneShot.is_valid(ok), tostring(ok)) end
+			for _, bad in ipairs({ -1, 12.5, max + 1, "1000", math.huge, 0 / 0, true }) do
+				helpers.assert_eq(OneShot.is_valid(bad), false, tostring(bad))
+			end
+		end)
 		helpers.it("value-check: the gesture step coercer admits exactly the declared 1..60 mm", function()
 			local Sensitivity = require("gestures.engine.sensitivity")
 			helpers.assert_eq(Sensitivity.coerce(1), 1)
