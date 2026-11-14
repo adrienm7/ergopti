@@ -767,6 +767,14 @@ const PUBLISHED_RECORDS = [
 		why: 'reads of the prior release bundle, at the paths it ships'
 	},
 	{
+		file: 'tools/build/add-linux-legacy-update-probes.sh',
+		why: 'the paths the Linux updaters released before the structure move probe'
+	},
+	{
+		file: 'tools/test/test-linux-legacy-update-probes.cjs',
+		why: 'the staged-tree checks of the released v1.0.9 and v1.0.10-dev.175 updaters'
+	},
+	{
 		prefix: 'static/ergopti_plus/linux/tests/hardware/desktop/receipts/',
 		why: 'receipts of past hardware runs at a named base commit'
 	}
