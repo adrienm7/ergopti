@@ -723,6 +723,20 @@ local function pause_all()
 		if not ok_step then return false, step_reason end
 	end
 
+	-- The foreground application's time stops with the pause (EDD-1): its open
+	-- interval is credited up to here, and the resume opens a new one. Read only
+	-- once loaded; without keystats no interval is open.
+	local keystats_owner = package.loaded["modules.keystats"]
+	if type(keystats_owner) == "table" and type(keystats_owner.close_app_interval_for_pause) == "function" then
+		ok_step, step_reason = add_required_step(
+			"keystats.close_app_interval_for_pause",
+			keystats_owner.close_app_interval_for_pause,
+			nil,
+			"a closed interval is not reopened on rollback: the resume opens a new one"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
 	local tt, tt_reason = require_pause_module("core.ui.ui.tooltip")
 	if tt_reason then return false, tt_reason end
 	if tt then

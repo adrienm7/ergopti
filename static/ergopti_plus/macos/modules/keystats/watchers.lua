@@ -304,7 +304,12 @@ end
 --- When midnight passes, flushes and archives the previous day's data.
 function M.perform_maintenance()
 	if not require_state("perform_maintenance") then return end
-	if _is_paused() then return end
+	-- A paused script polls no sensor, and the first poll after the resume is a
+	-- fresh seed: kept, the last position credited the travel of the pause.
+	if _is_paused() then
+		_state.last_mouse_pos = nil
+		return
+	end
 	local today = os.date("%Y-%m-%d")
 	if _current_day ~= today then
 		-- One START per rotation: a recovery can hold it for many ticks.
