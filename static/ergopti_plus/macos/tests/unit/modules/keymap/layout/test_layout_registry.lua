@@ -1308,6 +1308,18 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(loaded[2], "studio_unreadable")
 	end)
 
+	helpers.it("runs the layout editor's export step with the shipped bounds (lua-export-host)", function()
+		local LayoutRegistry, deps = manager({ files = shipped_files() })
+		local answer
+		helpers.assert_true(LayoutRegistry.source_export_step({ step = "read", input = '{"xml":"<keyboard/>"}' },
+			function(...) answer = { ... } end, deps))
+		helpers.assert_true(answer[1], tostring(answer[3]))
+		helpers.assert_eq(require("core.text.engine.json").decode(answer[2]).ok, false)
+		LayoutRegistry.source_export_step({ step = "write", input = "{}" }, function(...) answer = { ... } end, deps)
+		helpers.assert_eq(answer[1], false)
+		helpers.assert_eq(answer[2], "target_export_refused")
+	end)
+
 	helpers.it("reads only a generated corpus file for the Studio page (studio-corpus-tables)", function()
 		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
 		deps.config_dir, deps.shared_dir = "/cfg/", "/shared/"

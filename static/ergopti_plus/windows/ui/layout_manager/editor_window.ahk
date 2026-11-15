@@ -52,7 +52,7 @@ global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
 	"nav_save", true, "keystats_ngrams", true, "open_link", true,
 	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true,
-	"studio_profile_load", true, "studio_profile_save", true)
+	"studio_profile_load", true, "studio_profile_save", true, "lua_export", true)
 
 
 
@@ -116,6 +116,14 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 		return LayoutEditorWindow_StudioCorpus(Payload, Deps)
 	if (Action == "studio_profile_load" || Action == "studio_profile_save")
 		return LayoutEditorWindow_StudioProfile(Action, Payload, Deps)
+	; The macOS and Linux hosts run the downloads' export adapter with their own
+	; Lua (lua_export); this host has none and offers no lua_export in initData:
+	; its WebView2 pages carry no content policy that refuses the page's fengari
+	; VM, so the page builds XKB and KLC itself and never asks.
+	if (Action == "lua_export") {
+		LoggerWarn("LayoutEditorWindow", "Refused an export step: the Windows host runs no Lua; the page builds its downloads.")
+		return false
+	}
 	; The Studio's analysis panels open their « i » links in the system browser:
 	; an https URL only.
 	if (Action == "open_link") {

@@ -290,6 +290,30 @@ helpers.describe("Ergopti Studio personal layouts (Linux bridge)", function()
 		helpers.assert_true(ok, tostring(err))
 	end)
 
+	helpers.it("forwards the editor's export step to the registry and answers it (lua-export-host)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		local asked
+		daemon_state.layout_registry.source_export_step = function(payload, on_done)
+			asked = payload
+			on_done(true, '{"ok":true}')
+		end
+		local Editor = Bridge.editor
+		Editor._reset()
+		local ok, err = pcall(function()
+			helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[1].js, '"lua_export":true')
+			helpers.assert_true(Editor.on_message({ action = "lua_export", request = 9, step = "xkb", input = '{"a":1}' },
+				daemon_state).handled)
+			helpers.assert_eq(asked, { step = "xkb", input = '{"a":1}' })
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.luaExportResult(")
+			helpers.assert_contains(state.pushes[#state.pushes].js, '"request":9')
+		end)
+		Editor._reset()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
 	helpers.it("runs the chosen corpus's generated tables in the Studio page, then answers (studio-corpus-tables)", function()
 		local Bridge, state, daemon_state = bridge()
 		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
@@ -900,5 +924,70 @@ helpers.describe("Ergopti Studio personal layouts (studio-layout-store)", functi
 		helpers.assert_eq(call(operations.save, { id = "user_c", text = '{"id":"user_c"}' })[2], small.failures.invalid)
 		helpers.assert_eq(call(operations.save, { id = "user_a", text = '{"id":"user_a","n":2}' })[1], true,
 			"replacing a stored layout is not one more")
+	end)
+end)
+
+helpers.describe("Layout editor export step (lua-export-host)", function()
+	local ExportStep = require("layouts.engine.composer.export_step")
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
+	local defaults = Json.decode(assert(io.open(Paths.shared("layouts/data/defaults.json"), "rb")):read("*a"))
+
+	helpers.it("runs the shared adapter's steps on JSON text, bounded, and refuses anything else", function()
+		local settings = assert(ExportStep.settings(defaults))
+		local ok, output = ExportStep.run(settings, "read", '{"xml":"<keyboard/>"}')
+		helpers.assert_true(ok, tostring(output))
+		local result = Json.decode(output)
+		helpers.assert_eq(result.ok, false, "the adapter's own refusal is passed on as it is")
+		helpers.assert_eq(type(result.reason), "string")
+		for _, case in ipairs({ { "write", '{"xml":""}' }, { "read", "" }, { "read", "[1]" }, { "read", "{broken" },
+			{ nil, '{"xml":""}' } }) do
+			local refused, code = ExportStep.run(settings, case[1], case[2])
+			helpers.assert_eq(refused, false, tostring(case[1]) .. " " .. tostring(case[2]))
+			helpers.assert_eq(code, "target_export_refused")
+		end
+		local small = { max_bytes = 8, failure = settings.failure }
+		local over, code, detail = ExportStep.run(small, "read", '{"xml":"<keyboard/>"}')
+		helpers.assert_eq(over, false)
+		helpers.assert_eq(code, "target_export_refused")
+		helpers.assert_true(detail:find("bound", 1, true) ~= nil, detail)
+		helpers.assert_eq(ExportStep.settings({ source = { failures = {} } }), nil, "settings without a bound")
+	end)
+
+	helpers.it("the editor window answers lua_export with its request number, the manager refuses it", function()
+		local ManagerBridge = require("layouts.engine.manager_bridge")
+		local settings = assert(ExportStep.settings(defaults))
+		local registry = {
+			snapshot = function() return { platform = "test", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			source_export_step = function(payload, on_done) on_done(ExportStep.run(settings, payload.step, payload.input)) end,
+		}
+		local function controller(editor_window)
+			local pushes = {}
+			local instance = ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+				strings = function() return {} end, open_url = function() end, close = function() end,
+				log = function() end })
+			return instance, pushes
+		end
+		local instance, pushes = controller(true)
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(pushes[1].payload.lua_export == true, "the editor window offers lua_export")
+		helpers.assert_true(instance.on_message({ action = "lua_export", request = 3, step = "read",
+			input = '{"xml":"<keyboard/>"}' }) == true)
+		local answer = pushes[#pushes]
+		helpers.assert_eq(answer.name, "luaExportResult")
+		helpers.assert_eq(answer.payload.request, 3)
+		helpers.assert_eq(answer.payload.ok, true)
+		helpers.assert_eq(Json.decode(answer.payload.output).ok, false)
+		helpers.assert_true(instance.on_message({ action = "lua_export", request = 4, step = "write", input = "{}" }) == true)
+		helpers.assert_eq(pushes[#pushes].payload, { request = 4, ok = false, code = "target_export_refused",
+			detail = "the export step is not read or xkb" })
+		helpers.assert_true(instance.on_message({ action = "lua_export", step = "read", input = "{}" }) == false,
+			"a request number is required")
+		local manager, manager_pushes = controller(false)
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_pushes[1].payload.lua_export == false)
+		helpers.assert_true(manager.on_message({ action = "lua_export", request = 1, step = "read", input = "{}" }) == false)
 	end)
 end)

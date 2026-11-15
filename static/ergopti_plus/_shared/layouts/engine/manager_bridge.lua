@@ -59,7 +59,12 @@
 ---    studio_profile_load and studio_profile_save {request, text | reset} keep the
 ---    user's fingering profile (the Comparer's « Doigté ») as the JSON text the
 ---    page sent; the page receives studioProfile and studioProfileResult.
---- 11. PURE Lua: the driver injects the layout registry client, the push to the
+--- 11. The editor window's XKB and KLC downloads run the shared export adapter
+---    with the driver's own Lua (lua_export {request, step, input}, through
+---    registry.source_export_step, composer/export_step.lua): the window's
+---    content policy refuses the page's fengari VM. The page receives
+---    luaExportResult {request, ok, output} or {request, ok = false, code, detail}.
+--- 12. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
 
@@ -92,6 +97,7 @@ M.ACTIONS = {
 	studio_corpus = true,
 	studio_profile_load = true,
 	studio_profile_save = true,
+	lua_export = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -529,7 +535,8 @@ function M.new(deps)
 				nav_apply = type(deps.apply_nav) == "function",
 				emulate = offers_emulate(deps),
 				keystats = editor_window and type(deps.read_keystats) == "function",
-				studio_store = editor_window and offers_studio(deps.registry) })
+				studio_store = editor_window and offers_studio(deps.registry),
+				lua_export = editor_window and type(deps.registry.source_export_step) == "function" })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
 			if editor_wanted then
@@ -561,6 +568,23 @@ function M.new(deps)
 		end
 		if action == "source_export" then
 			return M.handle_export(deps, payload)
+		end
+		if action == "lua_export" then
+			local request = payload.request
+			if not editor_window or type(deps.registry.source_export_step) ~= "function"
+				or type(request) ~= "number" or request < 1 or request % 1 ~= 0 then
+				deps.log("warn", "Refused an export step: only the editor window of a host that runs them offers it, with a request number.")
+				return false
+			end
+			deps.registry.source_export_step({ step = payload.step, input = payload.input }, function(ok, output_or_code, detail)
+				if ok then
+					deps.push("luaExportResult", { request = request, ok = true, output = output_or_code })
+				else
+					deps.push("luaExportResult", { request = request, ok = false, code = tostring(output_or_code),
+						detail = detail ~= nil and tostring(detail) or nil })
+				end
+			end)
+			return true
 		end
 		if action == "studio_corpus" then
 			if not editor_window or type(deps.registry.studio_corpus) ~= "function" or type(deps.run_script) ~= "function" then

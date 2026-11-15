@@ -502,3 +502,14 @@ _KLRSource_StudioProfileMessages() {
 }
 Test("Layout editor window: Ergopti Studio keeps the Comparer's fingering profile (studio-fingering-profile)",
 	_KLRSource_StudioProfileMessages)
+
+; The Windows host runs no Lua: it offers no lua_export and refuses the message.
+_KLRSource_LuaExportRefused() {
+	Pushed := []
+	Deps := Map("push", (Name, Payload) => (Pushed.Push(Name), true))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 1, "step", "xkb",
+		"input", "{}"), Deps), "the Windows host refuses lua_export")
+	AssertEqual(0, Pushed.Length, "nothing is pushed for a refused export step")
+}
+Test("Layout editor window: the Windows host builds downloads in the page, not with lua_export (lua-export-host)",
+	_KLRSource_LuaExportRefused)
