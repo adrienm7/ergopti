@@ -1,0 +1,56 @@
+{
+	"_description": "The Project Gutenberg ebooks of static/corpus/original: one entry per text, read by tools/build/import-corpus-texts.cjs, which downloads https://www.gutenberg.org/cache/epub/<gutenberg_id>/pg<gutenberg_id>.txt (or takes it from --archive-dir), refuses it unless its SHA-256 is sha256, keeps the work between its START and END markers (without the Project Gutenberg header, licence footer or name) and writes output. The licence, attribution and status of each text are in static/corpus/register.json, its one source, under the ebook's page URL https://www.gutenberg.org/ebooks/<gutenberg_id>.",
+	"schema_version": 1,
+	"texts": [
+		{
+			"output": "original/en/austen_pride_and_prejudice.txt",
+			"gutenberg_id": 1342,
+			"sha256": "3f6bb9d6f78e0293b56acd4714dd68cb7d6d1d293402031ce9d5a216bcaf9d75"
+		},
+		{
+			"output": "original/fr/hugo_les_miserables_1.txt",
+			"gutenberg_id": 17489,
+			"sha256": "a5de514ba7b9f2e1790e7e259c4e8b7a35ae1d29e4bf9a5f8767039c58b80503"
+		},
+		{
+			"output": "original/fr/verne_tour_du_monde.txt",
+			"gutenberg_id": 800,
+			"sha256": "bd89ef4c406ae063a1eeba2ec0689532e8c83ecfb1fce742cdd22bc47cb888da"
+		},
+		{
+			"output": "original/fr/zola_germinal.txt",
+			"gutenberg_id": 5711,
+			"sha256": "7bbd0d116a119b0626b88d7f8e7e5196831e348395249df6d0ec61abc30e583b"
+		},
+		{
+			"output": "original/de/fontane_effi_briest.txt",
+			"gutenberg_id": 5323,
+			"sha256": "fc2cc841038004b845426452f808e6537045604d66d2878c7007a8909e9240df"
+		},
+		{
+			"output": "original/de/kafka_die_verwandlung.txt",
+			"gutenberg_id": 22367,
+			"sha256": "359d3f5983c812393f4bd7ee49a350ffffc7d476015e58d6b84b6c848dd2b0e9"
+		},
+		{
+			"output": "original/es/cervantes_don_quijote.txt",
+			"gutenberg_id": 2000,
+			"sha256": "8a3738c61aa507f2319fad526a886c2de74c17c7ba1d64726c53d3591fa62321"
+		},
+		{
+			"output": "original/es/galdos_marianela.txt",
+			"gutenberg_id": 17340,
+			"sha256": "ec6e5dbd4260583360ab7bd29738505ad5f0dfdf58db3dcbbc401c5ce4fea03f"
+		},
+		{
+			"output": "original/it/collodi_pinocchio.txt",
+			"gutenberg_id": 52484,
+			"sha256": "b51a398da257709bfd2c0007e42980935751276cdca4178d738fa4c92f799ae6"
+		},
+		{
+			"output": "original/it/de_amicis_ricordi_d_infanzia.txt",
+			"gutenberg_id": 61885,
+			"sha256": "5f4ca693f86b641891ce4dfc89636f9428ffb7434056f17ed59c1ab0f98be446"
+		}
+	]
+}

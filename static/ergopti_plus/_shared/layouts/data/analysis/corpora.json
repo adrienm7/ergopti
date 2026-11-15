@@ -129,6 +129,48 @@
 			"restore_dead_key_pairs": false
 		},
 		{
+			"id": "de_fontane_effi_briest",
+			"title": "Effi Briest (Theodor Fontane)",
+			"language": "de",
+			"file": "static/corpus/original/de/fontane_effi_briest.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "de_kafka_verwandlung",
+			"title": "Die Verwandlung (Franz Kafka)",
+			"language": "de",
+			"file": "static/corpus/original/de/kafka_die_verwandlung.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "es_cervantes_quijote",
+			"title": "Don Quijote de la Mancha (Miguel de Cervantes)",
+			"language": "es",
+			"file": "static/corpus/original/es/cervantes_don_quijote.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "es_galdos_marianela",
+			"title": "Marianela (Benito Pérez Galdós)",
+			"language": "es",
+			"file": "static/corpus/original/es/galdos_marianela.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "it_collodi_pinocchio",
+			"title": "Le avventure di Pinocchio (Carlo Collodi)",
+			"language": "it",
+			"file": "static/corpus/original/it/collodi_pinocchio.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "it_de_amicis_ricordi",
+			"title": "Ricordi d'infanzia e di scuola (Edmondo De Amicis)",
+			"language": "it",
+			"file": "static/corpus/original/it/de_amicis_ricordi_d_infanzia.txt",
+			"restore_dead_key_pairs": false
+		},
+		{
 			"id": "fr_verne_tour_du_monde",
 			"title": "Le Tour du monde en quatre-vingts jours (Jules Verne)",
 			"language": "fr",

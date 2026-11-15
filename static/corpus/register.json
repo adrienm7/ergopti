@@ -115,6 +115,24 @@
 			"status": "ship",
 			"note": "LICENSE-MIT of the tag (fetched 2026-11-14); the file keeps it at its top."
 		},
+		"original/de/fontane_effi_briest.txt": {
+			"title": "Effi Briest (Theodor Fontane, 1895)",
+			"source": "Project Gutenberg ebook 5323",
+			"url": "https://www.gutenberg.org/ebooks/5323",
+			"licence": "Public domain",
+			"attribution": "Theodor Fontane",
+			"status": "ship",
+			"note": "Theodor Fontane died in 1898. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/de/kafka_die_verwandlung.txt": {
+			"title": "Die Verwandlung (Franz Kafka, 1915)",
+			"source": "Project Gutenberg ebook 22367",
+			"url": "https://www.gutenberg.org/ebooks/22367",
+			"licence": "Public domain",
+			"attribution": "Franz Kafka",
+			"status": "ship",
+			"note": "Franz Kafka died in 1924. The ebook reproduces the 1915 Kurt Wolff edition, title page included. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
 		"original/en/austen_pride_and_prejudice.txt": {
 			"title": "Pride and Prejudice (Jane Austen, 1813)",
 			"source": "Project Gutenberg ebook 1342",
@@ -150,6 +168,24 @@
 			"attribution": "English Wikipedia contributors; the articles and revisions are listed in the note",
 			"status": "ship",
 			"note": "Wikipedia's text is licensed CC BY-SA 4.0; each article's authors are in its history at https://en.wikipedia.org/. Articles: United Kingdom (revision 1385707382); London (revision 1385705591); English language (revision 1385405086); French Revolution (revision 1384853060); William Shakespeare (revision 1383380297); Computer science (revision 1380596843); Mathematics (revision 1385556937); Classical music (revision 1385484715); Cuisine (revision 1385138448); Association football (revision 1384532641); Climate change (revision 1385272921); European Union (revision 1384741164); History of art (revision 1385167240); Chemistry (revision 1384268382); Biology (revision 1383003680); Astronomy (revision 1377879713); Internet (revision 1384979951); English literature (revision 1381089443); Film (revision 1384636104); Philosophy (revision 1385238382)."
+		},
+		"original/es/cervantes_don_quijote.txt": {
+			"title": "El ingenioso hidalgo don Quijote de la Mancha (Miguel de Cervantes, 1605–1615)",
+			"source": "Project Gutenberg ebook 2000",
+			"url": "https://www.gutenberg.org/ebooks/2000",
+			"licence": "Public domain",
+			"attribution": "Miguel de Cervantes Saavedra",
+			"status": "ship",
+			"note": "Miguel de Cervantes died in 1616. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/es/galdos_marianela.txt": {
+			"title": "Marianela (Benito Pérez Galdós, 1878)",
+			"source": "Project Gutenberg ebook 17340",
+			"url": "https://www.gutenberg.org/ebooks/17340",
+			"licence": "Public domain",
+			"attribution": "Benito Pérez Galdós",
+			"status": "ship",
+			"note": "Benito Pérez Galdós died in 1920. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		},
 		"original/fr/corpus_johnix_autonomy.txt": {
 			"title": "Autonomie, la liberté de pensée (J.-M. Smith, French translation)",
@@ -249,6 +285,24 @@
 			"attribution": "Émile Zola",
 			"status": "ship",
 			"note": "Émile Zola died in 1902. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/it/collodi_pinocchio.txt": {
+			"title": "Le avventure di Pinocchio (Carlo Collodi, 1883)",
+			"source": "Project Gutenberg ebook 52484",
+			"url": "https://www.gutenberg.org/ebooks/52484",
+			"licence": "Public domain",
+			"attribution": "Carlo Collodi",
+			"status": "ship",
+			"note": "Carlo Collodi died in 1890. The ebook's edition was illustrated by Carlo Chiostri (died 1939): only the text ships, with the illustration captions and the transcriber's note. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/it/de_amicis_ricordi_d_infanzia.txt": {
+			"title": "Ricordi d'infanzia e di scuola (Edmondo De Amicis, 1901)",
+			"source": "Project Gutenberg ebook 61885",
+			"url": "https://www.gutenberg.org/ebooks/61885",
+			"licence": "Public domain",
+			"attribution": "Edmondo De Amicis",
+			"status": "ship",
+			"note": "Edmondo De Amicis died in 1908. The ebook keeps the 1901 Treves edition's closing list of the publisher's titles and the transcriber's note. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
 		}
 	}
 }
