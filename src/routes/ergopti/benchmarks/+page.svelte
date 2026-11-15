@@ -4,7 +4,9 @@
 	import SFB from '#lib/components/SFB.svelte';
 
 	import { version } from '#lib/stores_infos.js';
-	import { asset } from '$app/paths';
+	import { asset, resolve } from '$app/paths';
+	import { onMount } from 'svelte';
+	import SiteFrame from '#lib/components/SiteFrame.svelte';
 	import IntroductionBenchmarks from './introduction_benchmarks.svelte';
 	import AnalyseErgoptiPlus from './analyse_ergopti_plus.svelte';
 	import CommentComparer from './comment_comparer.svelte';
@@ -17,64 +19,37 @@
 		versionValue = value;
 	});
 
-	function toggleClavier() {
-		if (clavier === 'iso') {
-			clavier = 'ergodox';
-		} else {
-			clavier = 'iso';
-		}
-	}
+	// The live comparison is the Studio's own Comparer (static/ergopti_plus/_shared/ui/
+	// layout_analysis): the shared layout library, the shared engine and the shared
+	// corpora, with no list or metric of its own here. It opens on a French corpus on
+	// an ISO keyboard; every choice stays the visitor's.
+	const BENCHMARK_CORPUS = 'fr_nemolivier';
+	const BENCHMARK_KEYBOARD = 'iso';
+	const comparerSrc =
+		asset('ergopti_plus/_shared/ui/layout_analysis/index.html') +
+		`?lang=fr&corpus=${BENCHMARK_CORPUS}&keyboard=${BENCHMARK_KEYBOARD}`;
+	// The framed Comparer posts its height ({type, height}, comparer_page.js) so the
+	// frame grows with it instead of scrolling inside the page.
+	const HEIGHT_MESSAGE = 'ergopti-layout-analysis:height';
+	let comparerFrame;
+	let comparerHeight = 900;
 
-	let liste_benchmarks_fr = [
-		['Panaché (Pyjam)', 'panache'],
-		['Essais (Pyjam)', 'essais'],
-		['Corpus Johnix Mails', 'corpus_johnix_mails'],
-		['Romans (24M)', 'romans'],
-		['Corpus Nemolivier', 'corpus_nemolivier'],
-		['Don Quichotte', 'don_quichotte'],
-		['Corpus Leipzig news', 'leipzig_fra_news_2023_10K-sentences'],
-		['Corpus Leipzig Wikipedia', 'leipzig_fra_wikipedia_2021_10K-sentences']
-	];
-
-	let liste_benchmarks_en = [
-		['Chained English Bigrams 9 (3M)', 'chained_english_bigrams_9'],
-		['Chained English Bigrams 7 (1M)', 'chained_english_bigrams_7'],
-		['Chained Proglish Bigrams 7 (1M)', 'chained_proglish_bigrams_7'],
-		['500 Common Words in Prose (664K)', '500_common_words_in_prose'],
-		['Common English Words (6K)', 'common_english_words'],
-		['Common SAT Words (9K)', 'common_sat_words'],
-		['Basic Words (5K)', 'basic_words'],
-		['Difficult Words (11K)', 'difficult_words']
-	];
-
-	let liste_benchmarks_code = [
-		['Chained Code Bigrams 7 (1M)', 'chained_code_bigrams_7'],
-		['Programming Punctuation (10K)', 'programming_punctuation'],
-		['Python for Everybody (437K)', 'python_for_everybody'],
-		['Think C++ (330K)', 'think_c++'],
-		['Think Java (380K)', 'think_java'],
-		['Data Munging with Perl (600K)', 'data_munging_with_perl'],
-		['Practical PHP Testing  (95K)', 'practical_php_testing'],
-		['Random Text (30K)', 'random_text']
-	];
-
-	let clavier = 'iso';
-	let corpus = 'fr/panache';
 	let ergol = 'en_fr';
 	let version_1dfh = '_1dk';
 
-	const images = import.meta.glob('/src/lib/images/benchmarks/**/*.jpg', {
-		eager: true,
-		query: {
-			enhanced: true
-		}
+	onMount(() => {
+		const resize = (event) => {
+			if (!comparerFrame || event.source !== comparerFrame.contentWindow) return;
+			const data = event.data;
+			if (data && data.type === HEIGHT_MESSAGE && Number.isFinite(data.height))
+				comparerHeight = Math.ceil(data.height);
+		};
+		window.addEventListener('message', resize);
+		return () => window.removeEventListener('message', resize);
 	});
 
 	function getErgolPdf() {
 		return asset(`benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`);
-	}
-	function getImagePath(clavier, corpus) {
-		return images[`/src/lib/images/benchmarks/${clavier}/${corpus}.jpg`].default;
 	}
 </script>
 
@@ -127,52 +102,25 @@
 			emplacements.
 		</p>
 
-		<h3>Analyse KLAnext</h3>
+		<h3 id="comparaison">Comparaison en direct</h3>
 		<p>
-			À noter que la version 2.2 d’<Ergopti></Ergopti> n’est pas présente sur ces benchmarks, car les
-			changements sont si minimes que cela n’impacte pas les résultats. La version 2.1 a donc les mêmes
-			métriques que la version 2.2.
+			Ces résultats sont calculés dans votre navigateur, avec le même moteur d’analyse, la même
+			bibliothèque de dispositions et les mêmes corpus que l’onglet <a
+				class="link"
+				href={resolve('/studio/comparer')}>Comparer</a
+			>
+			d’Ergopti Studio et que le Studio d’<ErgoptiPlus></ErgoptiPlus>. Choisissez le corpus
+			(français, anglais, code…), le clavier (ISO, Ergodox, Corne…) et les dispositions comparées.
+			Chaque métrique est expliquée par son bouton « i », et les colonnes des autres analyseurs
+			(KLAnext, Ergo‑L, Oxeylyzer…) donnent le score que chacun de ces outils calculerait.
 		</p>
-		<p>
-			De plus, on peut se demander pourquoi les scores diminuent légèrement plus la version de la
-			disposition évolue. C’est tout simplement car KLAnext ne mesure pas toutes les métriques d’une
-			disposition clavier et que certaines de celles qu’il mesure sont pénalisées par des
-			changements qui au contraire améliorent beaucoup des métriques non mesurées.
-		</p>
-
-		<div style="background: #00000091; padding: 0.5rem; margin:0 auto; text-align: center;">
-			<button onclick={toggleClavier} style="height:2.5rem;">
-				{#if clavier === 'ergodox'}
-					{@html '<p><strong class="ergodox-text-gradient">Ergodox</strong> ➜&nbsp;ISO</p>'}
-				{:else}
-					{@html '<p><strong>ISO</strong> ➜ <span class="">Ergodox</span></p>'}
-				{/if}
-			</button>
-
-			<div style="display:inline-block;">
-				<select bind:value={corpus} style="height:2.5rem;">
-					<option disabled>Français</option>
-					{#each liste_benchmarks_fr as infos_benchmark}<option value={'fr/' + infos_benchmark[1]}
-							>{infos_benchmark[0]}</option
-						>{/each}
-					<option disabled>Anglais</option>
-					{#each liste_benchmarks_en as infos_benchmark}<option value={'en/' + infos_benchmark[1]}
-							>{infos_benchmark[0]}</option
-						>{/each}
-					<option disabled>Code</option>
-					{#each liste_benchmarks_code as infos_benchmark}<option
-							value={'code/' + infos_benchmark[1]}>{infos_benchmark[0]}</option
-						>{/each}
-				</select>
-			</div>
-		</div>
-		<tiny-space></tiny-space>
-		<image-block>
-			<enhanced:img
-				src={getImagePath(clavier, corpus)}
-				alt="Screenshot de benchmark sur le clavier {clavier} et le corpus {corpus}"
-			/>
-		</image-block>
+		<SiteFrame
+			class="benchmark-frame"
+			title="Benchmarks — comparaison des dispositions"
+			src={comparerSrc}
+			height={comparerHeight}
+			bind:frame={comparerFrame}
+		/>
 
 		<h3>Analyse Ergo‑L</h3>
 		<p>
@@ -207,3 +155,12 @@
 		<ComparateursDispositions></ComparateursDispositions>
 	</div>
 </PageWrapper>
+
+<style>
+	/* The Comparer frame spans the text column; its height follows the framed page. */
+	:global(.benchmark-frame) {
+		border: 0;
+		display: block;
+		width: 100%;
+	}
+</style>

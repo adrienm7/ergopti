@@ -356,7 +356,13 @@ report.
 the page), keyboard, layout selection, the global score chart, the sortable
 ranking, each layout's contributions, finger load and metrics, and the weights
 editor with « restore the defaults ». The site embeds it like the editor
-(`?lang=<code>`); the app's Studio window loads the same page. A host may
+(`?lang=<code>`); the app's Studio window loads the same page. A link may add
+`corpus=<built-in id>`, `keyboard=<id>` and `format=<id>`: the page opens on them over the
+visitor's saved choice without saving them, and names an unknown value in the
+console, keeping the saved choice. The site's benchmark page
+(`/ergopti/benchmarks`) frames it this way (`fr_nemolivier`, `iso`), so its
+results are the Studio's: the shared library, engine and corpora, with no
+list or metric of its own. A host may
 define, before the page script runs (or pass as `mount`'s `host`):
 
 ```js

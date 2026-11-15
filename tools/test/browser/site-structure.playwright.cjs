@@ -204,6 +204,42 @@ async function expectSingleFrameLoads(
 }
 
 /** Version selector only on the layout pages; section navigation marks the page. */
+/**
+ * (benchmarks-shared-engine) The benchmark page's results are the Studio's own
+ * Comparer, framed: the shared library ranked by the shared engine on a shared
+ * corpus, opened on French text on an ISO keyboard, with no screenshot or list
+ * of its own; the frame grows to the Comparer's height.
+ * @param {import('playwright').Page} page - On /ergopti/benchmarks.
+ */
+async function exerciseBenchmarks(page) {
+	const frame = page.locator('iframe.benchmark-frame');
+	await frame.waitFor({ state: 'attached' });
+	await frame.scrollIntoViewIfNeeded();
+	assert.match(
+		(await frame.getAttribute('src')) || '',
+		/layout_analysis\/index\.html\?lang=fr&corpus=fr_nemolivier&keyboard=iso$/
+	);
+	const comparer = page.frameLocator('iframe.benchmark-frame');
+	await page.waitForFunction(() => {
+		const doc = document.querySelector('iframe.benchmark-frame').contentDocument;
+		return Boolean(doc && doc.querySelectorAll('#la-table tbody tr').length > 0);
+	});
+	assert.equal(await comparer.locator('#la-corpus').inputValue(), 'fr_nemolivier');
+	assert.equal(await comparer.locator('#la-keyboard').inputValue(), 'iso');
+	assert.ok(
+		await comparer.locator('#la-table tbody tr', { hasText: 'Ergopti' }).count(),
+		'Ergopti is ranked among the library layouts'
+	);
+	await page.waitForFunction(
+		() => document.querySelector('iframe.benchmark-frame').getBoundingClientRect().height > 600
+	);
+	assert.equal(
+		await page.locator('img[alt^="Screenshot de benchmark sur le clavier"]').count(),
+		0,
+		'No result screenshot beside the live comparison'
+	);
+}
+
 async function exerciseSections(page, origin, basePath) {
 	for (const route of VERSION_SELECTOR.present) {
 		await visit(page, origin, basePath, route);
@@ -229,6 +265,7 @@ async function exerciseSections(page, origin, basePath) {
 	await visit(page, origin, basePath, '/ergopti/benchmarks');
 	const current = page.locator('nav.subnav a[aria-current="page"]');
 	assert.equal(await current.textContent(), 'Benchmarks');
+	await exerciseBenchmarks(page);
 	await Promise.all([
 		page.waitForURL(origin + basePath + '/ergopti/informations'),
 		page.locator('nav.subnav a[href$="ergopti/informations"]').click()
