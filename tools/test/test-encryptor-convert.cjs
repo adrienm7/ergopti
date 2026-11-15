@@ -53,6 +53,37 @@ function passwordFile(name, secret) {
 	return file;
 }
 
+// AES-CBC carries no authentication: a wrong password is refused only when
+// the padding it decrypts to is invalid, which fails about once in 256 tries
+// with a random salt. A fixed salt makes each wrong-password case one known
+// ciphertext, checked to be refused, so the scenarios cannot flake.
+const FIXED_SALT = '0123456789abcdef';
+
+/** Seals `clear` as the helper does, with FIXED_SALT instead of a random one. */
+function sealFixed(clear, sealed, password) {
+	const done = spawnSync(
+		openssl,
+		[
+			'enc',
+			'-e',
+			'-aes-256-cbc',
+			'-pbkdf2',
+			'-iter',
+			'600000',
+			'-S',
+			FIXED_SALT,
+			'-in',
+			clear,
+			'-out',
+			sealed,
+			'-pass',
+			`file:${password}`
+		],
+		{ encoding: 'utf8' }
+	);
+	assert.equal(done.status, 0, `fixed-salt seal failed: ${done.stderr}`);
+}
+
 /** Runs the helper through the recording shim. */
 function convert(mode, input, output, password) {
 	return spawnSync('/bin/sh', [helper, mode, input, output, password], {
@@ -150,7 +181,7 @@ try {
 		const clear = path.join(work, 'wrong.txt');
 		const sealed = `${clear}.enc`;
 		fs.writeFileSync(clear, 'x'.repeat(64));
-		assert.equal(convert('encrypt', clear, sealed, passwordFile('right.pw', SENTINEL)).status, 0);
+		sealFixed(clear, sealed, passwordFile('right.pw', SENTINEL));
 		const refused = convert(
 			'decrypt',
 			sealed,
@@ -167,7 +198,7 @@ try {
 			const clear = path.join(folder, 'notes.txt');
 			const sealed = `${clear}.enc`;
 			fs.writeFileSync(clear, 'sealed\n');
-			assert.equal(convert('encrypt', clear, sealed, passwordFile('r.pw', SENTINEL)).status, 0);
+			sealFixed(clear, sealed, passwordFile('r.pw', SENTINEL));
 			const wrong = convert(
 				'decrypt',
 				sealed,
