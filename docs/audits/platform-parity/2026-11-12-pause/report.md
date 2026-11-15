@@ -106,22 +106,48 @@ while paused is warmed on resume (`warmup_controller.defer_to_resume`). Linux
 removes an installed model while paused. Windows keeps both refused: its pause
 retires every AI operation and its tray greys the AI submenu (EDD-1 on AHK).
 
+## Fifth pass (2026-11-14, worker P): shortcut slots changed while paused
+
+Decided by the maintainer on 2026-11-14: a shortcut slot changed while paused
+is saved at once and takes effect only on resume; the chord that resumes stays
+the one active when the pause began.
+
+| Sequence                                                                | Before                                                                                      | Regression                                                                                         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| macOS: pause, then a script chord slot, the chords' switch or a restore | Slot rows greyed; a scope restore or clear applied at once and could move the resume chord  | `test_paused_chord_change_waits_for_resume`, `test_shortcuts_runtime_transaction`                  |
+| macOS: pause, then a keyboard slot (Add, edit, group restore and clear) | Rows greyed and `keyboard_shortcuts.set_action` refused while paused                        | `test_keyboard_canonical` `(paused-slot-change)`, `test_menu_keyboard_slots_declared_group_frames` |
+| macOS: pause, then the personal editor's legacy shortcut row            | The row had no action while paused                                                          | `test_hotstring_editor_shortcut_transaction` `(paused-slot-change)`                                |
+| Linux: pause, then a script chord slot, the switch or a restore         | Applied at once: moving the pause toggle off AltGr+Enter left the daemon with no chord back | `test_script_chords` `(paused-chord-change)`                                                       |
+
+macOS: `script_control` keeps a change made while paused, or while a pause or
+resume is settling, in a deferred table that `get_shortcut_actions` and
+`chords_enabled` report, while dispatch, `slot_runs` and the Karabiner plan
+keep the chords of pause time; the table is applied once the resume settles.
+Keyboard slots hold no hotkey while paused, so an edit is only published and
+the resume start binds it from the file. The editor shortcut is saved without
+binding; the menu's resume listener binds it. A parameterized action (a link,
+a program) is admitted while paused too (`program_parameter_transaction`), as
+the paused driver runs none.
+
+Linux: `script_chords` copies the chords live at pause time before a paused
+change replaces them, and answers presses from that copy while the same pause
+lasts (`pause_epoch`). Its keyboard slots already follow SCD-1: no Linux slot
+runs through a pause, and each press reads the configuration.
+
+Windows: the tray greys the Shortcuts submenu while paused, so no slot row
+changes then. A global restore or clear from the Configuration menu while
+paused rewrites the chords and reloads born suspended with them; it is put to
+the maintainer through the coordinator.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
 paused driver act at once instead of « on resume », or the change needs its
 source proofs reworked first:
 
-- macOS Shortcuts: the script-chord slot rows and the keyboard slot rows. The
-  script-control tap stays live during a pause by design, and the keyboard
-  slots' rebinding under `KeyboardShortcuts`' lifecycle pause is not yet
-  traced; each shortcut's own row, the wrap rows, the ChatGPT URL editor and
-  the tap-key rows run while paused.
 - AI menus: turning the AI on (it starts model warmups and may offer an
   install), and on Windows the model and API entry rows, the whole-scope
   restore and clear, and the tray's greying of the AI submenu.
-- macOS hotstrings submenus: the personal legacy shortcut row (it binds a
-  hotkey).
 - macOS magic key source capture: it listens to a physical key press.
 - The audit that every typing feature is inert while paused, and that a
   setting changed while paused applies on resume. Layout emulation is done:

@@ -92,6 +92,13 @@ available and nothing that acts on typing is active.
   streaming, warmups, the local inference server used for predictions, and
   the activation pause owner itself).
 - A setting changed during a pause applies on resume, not before.
+- Shortcut slots (decided by the maintainer on 2026-11-14): a script chord,
+  a keyboard slot or the editor shortcut changed while paused is saved at once
+  and takes effect only on resume; the chord that resumes stays the one active
+  when the pause began. macOS keeps the change in `script_control`'s deferred
+  table until the resume settles; Linux `script_chords` answers presses from
+  the chords live at pause time while that pause lasts. Do not apply a paused
+  chord change at once: moving the pause toggle would strand a paused driver.
 
 macOS and Linux follow it through `edd1-paused-writes` regressions (the
 LMH-003 layout manager gate reverted, the prompt editor's create and clone

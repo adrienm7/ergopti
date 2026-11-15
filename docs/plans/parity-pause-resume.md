@@ -82,6 +82,23 @@ Notes for (2), from reading `macos/ui/menu/menu_shortcuts.lua`:
 
 Then (2), (3) and (4) as listed above.
 
+## Worker P (from 2026-11-14 at 21:45 Paris)
+
+Took over from worker H on `claude/ergopti-todo-pause-parity-2`.
+
+Done for (2), not landed: see the report's fifth pass. macOS
+`script_control` defers a chord or switch change made while paused (or while a
+pause or resume settles) to the settled resume, and its menu rows, the switch,
+keyboard slots, parameterized actions and the editor legacy shortcut run while
+paused. Linux `script_chords` answers presses from the chords live at pause
+time. Windows greys the Shortcuts submenu while paused; its global restore or
+clear while paused reloads with the new chords at once, a question sent to the
+coordinator at 22:03 Paris (recommended: record under « EDD-1 on AHK »).
+
+Traps met in (2): `tools/test/test-script-chords-three-os.cjs` pins the Linux
+`ScriptChords.runs` call; `test_hotstring_editor_shortcut_transaction` needs
+the whole `menu_input` group's stubs (`--only` alone fails on `hs.fs`).
+
 ## Traps met
 
 - Structural JS proofs pin exact source text:
