@@ -9,9 +9,9 @@ helpers.describe("sparse preference transactions", function()
 			local source = '[future]\nkeep = 99\n'
 			package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 			local modules = {}
-			for key, name in pairs({ keymap = "keymap", dyn_hot_mod = "dynamic_hotstrings",
-				shortcuts_mod = "shortcuts", gestures = "gestures", keystats = "keystats" }) do
-				modules[key] = helpers.load_with_stubs("modules." .. name)
+			for key, name in pairs({ keymap = "modules.keymap", dyn_hot_mod = "modules.dynamic_hotstrings",
+				shortcuts_mod = "modules.shortcuts", gestures = "modules.gestures", keystats = "modules.keystats" }) do
+				modules[key] = helpers.load_with_stubs(name)
 			end
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,

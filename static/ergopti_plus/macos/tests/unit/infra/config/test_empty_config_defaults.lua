@@ -76,8 +76,10 @@ helpers.describe("empty configuration boot projection", function()
 		-- fixture supplies only that boundary, never any feature/default values.
 		package.loaded["modules.keystats.kc_bridge"] = { init = function() return true end }
 		local modules = {}
-		for _, name in ipairs({ "keymap", "dynamic_hotstrings", "shortcuts", "gestures", "keystats" }) do
-			modules[name] = helpers.load_with_stubs("modules." .. name)
+		-- Literal module names, in load order, so each follows its file when it moves.
+		for _, entry in ipairs({ { "keymap", "modules.keymap" }, { "dynamic_hotstrings", "modules.dynamic_hotstrings" },
+			{ "shortcuts", "modules.shortcuts" }, { "gestures", "modules.gestures" }, { "keystats", "modules.keystats" } }) do
+			modules[entry[1]] = helpers.load_with_stubs(entry[2])
 		end
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		local state = preferences.build_initial_state({ "french_autocorrection.toml" }, {}, modules)
