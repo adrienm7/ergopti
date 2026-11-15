@@ -63,17 +63,34 @@ check() {
 # it has resigned. Each fixture learns it lost activation in its own process,
 # after the new window's ready file can exist; until then two frames report
 # ACTIVE and the probe answers inconclusive (CI run 43679709990, third probe).
+#
+# Every fixture outlives the whole run: three openings and their resign waits
+# can take 2 × READY_TIMEOUT_SECONDS each on a slow runner, and a window that
+# quits mid-run changes the desktop under test (the default lifetime, 30 s,
+# was shorter than a slow run).
+FIXTURE_LIFETIME_SECONDS=$((READY_TIMEOUT_SECONDS * 8))
 OPENED=""
+# Says what each window opened so far reports, and whether it still runs.
+report_windows() {
+	local opened
+	for opened in ${OPENED} "$1"; do
+		local pid
+		pid="$(cat "${WORK}/${opened}.pid" 2>/dev/null)"
+		echo "       ${opened}: $(cat "${WORK}/${opened}.state" 2>/dev/null || echo 'no state'), process $( [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null && echo running || echo gone)"
+	done
+}
 open_fixture() {
 	local name="$1"
 	shift
 	python3 "${FIXTURE}" "${name}" "$@" --ready-file "${WORK}/${name}.ready" \
-		--state-file "${WORK}/${name}.state" >/dev/null 2>&1 &
+		--state-file "${WORK}/${name}.state" --lifetime-seconds "${FIXTURE_LIFETIME_SECONDS}" >/dev/null 2>&1 &
 	PIDS="${PIDS} $!"
+	echo "$!" >"${WORK}/${name}.pid"
 	local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
 	until [ -e "${WORK}/${name}.ready" ]; do
 		if [ "${SECONDS}" -ge "${deadline}" ]; then
 			echo "  FAIL the ${name} window was not active and focused within ${READY_TIMEOUT_SECONDS} s"
+			report_windows "${name}"
 			FAILURES=$((FAILURES + 1))
 			return 1
 		fi
@@ -84,6 +101,7 @@ open_fixture() {
 		until [ "$(cat "${WORK}/${earlier}.state" 2>/dev/null)" = inactive ]; do
 			if [ "${SECONDS}" -ge "${deadline}" ]; then
 				echo "  FAIL the ${earlier} window still reported itself active ${READY_TIMEOUT_SECONDS} s after ${name} opened"
+				report_windows "${name}"
 				FAILURES=$((FAILURES + 1))
 				return 1
 			fi
