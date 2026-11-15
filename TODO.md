@@ -643,8 +643,11 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       mark on the editor's and Comparer's keys (look decided by the agent, to review by the maintainer); proof:
       test-key-legend.cjs, `dead-key-legend` in layout-editor.playwright.cjs (board, magnifier, Comparer
       heatmap) and site-structure.playwright.cjs (the /ergopti keyboard).
-      8 [ ] « Essayer » as one input bar in the site's style with the clear button inside the field, the same
-      component on the site and in the app, light and dark.
+      8 [x] « Essayer » as one input bar in the site's style with the clear button inside the field, the same
+      component on the site and in the app, light and dark. Done 2026-11-15 (`claude/ergopti-todo-try-bar`): the
+      editor page's one bar (rounded border, accent focus ring, placeholder, its own caret, × inside at the end, no
+      « Effacer » button), in the theme's light and dark colours; proof: `try-input-bar` in
+      layout-editor.playwright.cjs.
       5 [ ] Proper display names for every library layout, from the library's single data source; ids stay keys.
       3 [ ] A « Format » dropdown (100 % / TKL / 75 % / 65 % / 60 %) instead of « Pavé numérique », hiding the
       blocks each format lacks; the same value feeds the Comparer's keyboard model and the compact-keyboard bonus.
@@ -655,7 +658,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
       installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
       review by the maintainer.
-      [CODE] Left (2026-11-15): remarks 8, 5, 3, 4, 9 and 1.
+      [CODE] Left (2026-11-15): remarks 5, 3, 4, 9 and 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is

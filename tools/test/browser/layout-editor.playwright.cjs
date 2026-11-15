@@ -1272,6 +1272,52 @@ async function exercisePhoneWidth(browser, origin) {
 		await page.keyboard.press('BracketLeft');
 		await page.keyboard.press('BracketLeft');
 		assert.equal(await page.textContent('#le-preview-output'), 'ǣ^');
+		// (try-input-bar) « Essayer » is one input bar: the result shows inside it,
+		// the clear button sits inside it at its end, there is no separate
+		// « Clear » button, and the focused bar shows the accent ring.
+		const bar = await page.evaluate(() => {
+			const box = (node) => node.getBoundingClientRect();
+			const outer = box(document.getElementById('le-try'));
+			const inside = (node) => {
+				const inner = box(node);
+				return (
+					inner.left >= outer.left &&
+					inner.right <= outer.right &&
+					inner.top >= outer.top &&
+					inner.bottom <= outer.bottom
+				);
+			};
+			const style = getComputedStyle(document.getElementById('le-try'));
+			return {
+				output: inside(document.getElementById('le-preview-output')),
+				clear: inside(document.getElementById('le-preview-clear')),
+				field: inside(document.getElementById('le-preview-input')),
+				clearAtEnd: box(document.getElementById('le-preview-clear')).right > outer.right - 40,
+				rounded: parseFloat(style.borderTopLeftRadius) >= 8,
+				ring: style.boxShadow !== 'none',
+				buttons: document.querySelectorAll('.le-preview button').length
+			};
+		});
+		assert.deepEqual(
+			bar,
+			{
+				output: true,
+				clear: true,
+				field: true,
+				clearAtEnd: true,
+				rounded: true,
+				ring: true,
+				buttons: 1
+			},
+			'one input bar with its clear button inside'
+		);
+		await page.click('#le-preview-clear');
+		assert.equal(await page.textContent('#le-preview-output'), '', 'the bar is cleared');
+		assert.equal(
+			await page.$eval('#le-preview-clear', (node) => getComputedStyle(node).visibility),
+			'hidden',
+			'an empty bar shows no clear button'
+		);
 
 		const saved = await downloaded(page, () => page.click('#le-save'));
 		assert.equal(saved.name, 'my_layout.toml');

@@ -2641,9 +2641,12 @@ var LayoutEditorPage = (function () {
 			const result = LayoutSourceIO.isPreserved(doc())
 				? { text: '', pending: null }
 				: LayoutEditorModel.simulate(doc(), state.presses, state.platform || null);
+			// What the layout types, shown inside the bar; the placeholder while empty.
 			const output = el('output', {
 				class: 'le-preview-output',
 				id: 'le-preview-output',
+				'data-placeholder': tl('preview.placeholder'),
+				'aria-live': 'polite',
 				text: result.text
 			});
 			const typed = (entries) => {
@@ -2654,7 +2657,9 @@ var LayoutEditorPage = (function () {
 			const pad = el('input', {
 				type: 'text',
 				id: 'le-preview-input',
-				placeholder: tl('preview.placeholder'),
+				class: 'le-try-keys',
+				'aria-label': tl('preview.placeholder'),
+				autocomplete: 'off',
 				onkeydown: (event) => {
 					event.preventDefault();
 					const engine = typist();
@@ -2692,23 +2697,35 @@ var LayoutEditorPage = (function () {
 					if (modifier && modifier.mode === 'held') state.heldCustom.delete(modifier.id);
 				}
 			});
-			return el('section', { class: 'le-preview' }, [
-				el('h2', { text: tl('preview.title') }),
-				pad,
+			// « Essayer »: one input bar (maintainer, 2026-11-15), the same on the site and
+			// in the app windows. The transparent field over it takes the key presses
+			// (each one is simulated, never typed); the result shows in the bar, and the
+			// clear button sits inside it, at the end.
+			const bar = el('div', { class: 'le-try', id: 'le-try' }, [
 				output,
-				result.pending
-					? el('p', { class: 'le-note', text: tl('preview.pending', { id: result.pending }) })
-					: null,
+				pad,
 				el('button', {
 					type: 'button',
+					class: 'le-try-clear',
 					id: 'le-preview-clear',
-					text: tl('btn.clear'),
+					text: '×',
+					title: tl('btn.clear'),
+					'aria-label': tl('btn.clear'),
 					onclick: () => {
 						state.presses = [];
 						state.typist = null;
 						render();
+						const field = root.querySelector('#le-preview-input');
+						if (field) field.focus();
 					}
 				})
+			]);
+			return el('section', { class: 'le-preview' }, [
+				el('h2', { text: tl('preview.title') }),
+				bar,
+				result.pending
+					? el('p', { class: 'le-note', text: tl('preview.pending', { id: result.pending }) })
+					: null
 			]);
 		}
 

@@ -647,18 +647,119 @@ body {
 	padding: 12px;
 }
 
-.le-preview input {
-	width: min(100%, 420px);
+/*
+ * « Essayer »: one input bar (maintainer, 2026-11-15). The bar looks like the
+ * site's fields (rounded border, padding, placeholder, accent focus ring) in
+ * the theme's light and dark colours; the transparent field over it takes the
+ * key presses, the result shows inside it, and the clear button sits at its end.
+ */
+.le-try {
+	align-items: flex-start;
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: 999px;
+	display: flex;
+	gap: 8px;
+	min-height: 40px;
+	padding: 8px 8px 8px 16px;
+	position: relative;
+	transition:
+		border-color 0.12s,
+		box-shadow 0.12s;
+}
+
+.le-try:focus-within {
+	border-color: var(--le-accent);
+	box-shadow: 0 0 0 3px var(--le-accent-soft);
+}
+
+.le-try:hover {
+	border-color: var(--le-accent);
+}
+
+/* A result over several lines (Enter) turns the pill into a rounded box. */
+.le-try:has(.le-preview-output:not(:empty)) {
+	border-radius: 20px;
 }
 
 .le-preview-output {
-	background: var(--le-surface);
-	border-radius: var(--le-radius);
-	display: block;
-	margin: 8px 0;
-	min-height: 2.2em;
-	padding: 6px 8px;
+	flex: 1;
+	line-height: 22px;
+	min-height: 22px;
+	min-width: 0;
+	overflow-wrap: anywhere;
 	white-space: pre-wrap;
+}
+
+/* Out of the flow, so the caret of an empty bar sits at its start, as in a field. */
+.le-preview-output:empty::before {
+	color: var(--le-sub);
+	content: attr(data-placeholder);
+	left: 16px;
+	overflow: hidden;
+	pointer-events: none;
+	position: absolute;
+	right: 40px;
+	text-overflow: ellipsis;
+	top: 8px;
+	white-space: nowrap;
+}
+
+/* The caret the transparent field cannot show. */
+.le-try:focus-within .le-preview-output::after {
+	animation: le-caret 1s steps(1) infinite;
+	border-left: 2px solid var(--le-accent);
+	content: '';
+	margin-left: 1px;
+}
+
+@keyframes le-caret {
+	50% {
+		border-color: transparent;
+	}
+}
+
+.layout-editor .le-try-keys {
+	background: transparent;
+	border: 0;
+	caret-color: transparent;
+	color: transparent;
+	cursor: text;
+	height: 100%;
+	inset: 0;
+	min-height: 0;
+	opacity: 0;
+	padding: 0;
+	position: absolute;
+	width: 100%;
+}
+
+.layout-editor .le-try-clear {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	border-radius: 50%;
+	color: var(--le-sub);
+	display: flex;
+	flex: none;
+	font-size: 18px;
+	height: 24px;
+	justify-content: center;
+	line-height: 1;
+	padding: 0;
+	position: relative;
+	width: 24px;
+	z-index: 1;
+}
+
+.layout-editor .le-try-clear:hover:not(:disabled) {
+	background: var(--le-surface-2);
+	color: var(--le-text);
+}
+
+/* Nothing to clear: the button gives its place back to the placeholder. */
+.le-preview-output:empty ~ .le-try-clear {
+	visibility: hidden;
 }
 
 .le-report {
