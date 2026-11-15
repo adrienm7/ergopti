@@ -333,6 +333,9 @@ var LayoutEditorPage = (function () {
 			shortcutView: false,
 			// The override loaded in the shortcut form by « Edit » (null: a new one).
 			shortcutDraft: null,
+			// The choices made so far in that form ({key, modifiers, send_key,
+			// send_modifiers}), kept here so a render before « Add » keeps them.
+			shortcutForm: null,
 			// The key whose shortcut_key the next board click chooses (null: none).
 			pickingShortcutKey: null,
 			// The keyboard an imported .keylayout is described on, and the key
@@ -404,6 +407,11 @@ var LayoutEditorPage = (function () {
 			state.dirty = false;
 			state.deadKey = null;
 			state.approximate = false;
+			// A shortcut being edited or chosen belongs to the document replaced: an
+			// « Edit » kept across an open once applied to the new file's override.
+			state.shortcutDraft = null;
+			state.shortcutForm = null;
+			state.pickingShortcutKey = null;
 		}
 
 		// ============================
@@ -803,6 +811,7 @@ var LayoutEditorPage = (function () {
 		function showShortcuts() {
 			state.shortcutView = true;
 			state.shortcutDraft = null;
+			state.shortcutForm = null;
 			state.pickingShortcutKey = null;
 			render();
 		}
@@ -1842,31 +1851,43 @@ var LayoutEditorPage = (function () {
 			const shortcuts = keyShortcuts(code);
 			const draft =
 				state.shortcutDraft && state.shortcutDraft.key === code ? state.shortcutDraft : null;
-			const modifierChecks = (prefix, chosen) =>
+			// The form's choices live in the state, not only in its inputs: any render
+			// before « Add » (another key, a late analysis) rebuilt the form empty and
+			// « Add » then refused the combination for want of a modifier.
+			if (!state.shortcutForm || state.shortcutForm.key !== code)
+				state.shortcutForm = {
+					key: code,
+					modifiers: draft ? draft.modifiers.slice() : [],
+					send_key: draft ? draft.send_key : code,
+					send_modifiers: draft ? draft.send_modifiers.slice() : []
+				};
+			const form = state.shortcutForm;
+			const modifierChecks = (prefix, field) =>
 				modifierOptions().map((id) =>
 					el('label', { class: 'le-check', title: id }, [
 						el('input', {
 							type: 'checkbox',
 							value: id,
 							'data-group': prefix,
-							checked: chosen.includes(id)
+							checked: form[field].includes(id),
+							onchange: (event) => {
+								const others = form[field].filter((chosen) => chosen !== id);
+								form[field] = event.target.checked ? others.concat(id) : others;
+							}
 						}),
 						modifierLabel(id)
 					])
 				);
-			const from = modifierChecks('from', draft ? draft.modifiers : []);
-			const to = modifierChecks('to', draft ? draft.send_modifiers : []);
+			const from = modifierChecks('from', 'modifiers');
+			const to = modifierChecks('to', 'send_modifiers');
 			const sendKey = select(
 				data.keys.filter((k) => k.kind === 'key').map((k) => [k.code, keyName(k.code)]),
-				draft ? draft.send_key : code,
-				() => {},
+				form.send_key,
+				(value) => {
+					form.send_key = value;
+				},
 				{ id: 'le-shortcut-send' }
 			);
-			const checked = (list) =>
-				list
-					.map((c) => c.firstChild)
-					.filter((c) => c.checked)
-					.map((c) => c.value);
 			const group = state.shortcutView
 				? (id, children) =>
 						el(
@@ -1923,6 +1944,7 @@ var LayoutEditorPage = (function () {
 								text: tl('btn.edit'),
 								onclick: () => {
 									state.shortcutDraft = JSON.parse(JSON.stringify(s));
+									state.shortcutForm = null;
 									render();
 								}
 							}),
@@ -1946,7 +1968,7 @@ var LayoutEditorPage = (function () {
 					class: 'primary',
 					text: tl(draft ? 'btn.apply' : 'btn.add'),
 					onclick: () => {
-						const modifiers = checked(from);
+						const modifiers = form.modifiers.slice();
 						if (!modifiers.length) return notify('error', tl('shortcut.need_modifier'));
 						// An edited override whose combination changed replaces the old one.
 						const replaced =
@@ -1954,7 +1976,9 @@ var LayoutEditorPage = (function () {
 							draft.modifiers.slice().sort().join('+') !== modifiers.slice().sort().join('+')
 								? draft
 								: null;
+						const chord = { send_key: form.send_key, send_modifiers: form.send_modifiers.slice() };
 						state.shortcutDraft = null;
+						state.shortcutForm = null;
 						apply((d) => {
 							const base = replaced
 								? LayoutEditorModel.removeShortcut(d, code, replaced.modifiers)
@@ -1962,8 +1986,8 @@ var LayoutEditorPage = (function () {
 							return LayoutEditorModel.setShortcut(base, {
 								key: code,
 								modifiers,
-								send_key: sendKey.value,
-								send_modifiers: checked(to)
+								send_key: chord.send_key,
+								send_modifiers: chord.send_modifiers
 							});
 						});
 					}
@@ -1975,6 +1999,7 @@ var LayoutEditorPage = (function () {
 							text: tl('btn.cancel'),
 							onclick: () => {
 								state.shortcutDraft = null;
+								state.shortcutForm = null;
 								render();
 							}
 						})

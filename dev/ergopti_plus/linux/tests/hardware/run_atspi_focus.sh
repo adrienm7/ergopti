@@ -58,12 +58,17 @@ check() {
 		FAILURES=$((FAILURES + 1))
 	fi
 }
-# Opens one fixture window and waits until the window manager made it active
-# with its field focused, the state a probe reads; a fixed sleep raced it.
+# Opens one fixture window and waits for the state a probe reads: the window
+# manager made it active with its field focused, AND every window opened before
+# it has resigned. Each fixture learns it lost activation in its own process,
+# after the new window's ready file can exist; until then two frames report
+# ACTIVE and the probe answers inconclusive (CI run 43679709990, third probe).
+OPENED=""
 open_fixture() {
 	local name="$1"
 	shift
-	python3 "${FIXTURE}" "${name}" "$@" --ready-file "${WORK}/${name}.ready" >/dev/null 2>&1 &
+	python3 "${FIXTURE}" "${name}" "$@" --ready-file "${WORK}/${name}.ready" \
+		--state-file "${WORK}/${name}.state" >/dev/null 2>&1 &
 	PIDS="${PIDS} $!"
 	local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
 	until [ -e "${WORK}/${name}.ready" ]; do
@@ -74,6 +79,18 @@ open_fixture() {
 		fi
 		sleep 0.05
 	done
+	local earlier
+	for earlier in ${OPENED}; do
+		until [ "$(cat "${WORK}/${earlier}.state" 2>/dev/null)" = inactive ]; do
+			if [ "${SECONDS}" -ge "${deadline}" ]; then
+				echo "  FAIL the ${earlier} window still reported itself active ${READY_TIMEOUT_SECONDS} s after ${name} opened"
+				FAILURES=$((FAILURES + 1))
+				return 1
+			fi
+			sleep 0.05
+		done
+	done
+	OPENED="${OPENED} ${name}"
 }
 
 echo "=== secure-field probe on a real accessibility bus ==="
