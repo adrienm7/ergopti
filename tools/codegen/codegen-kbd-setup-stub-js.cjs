@@ -14,7 +14,9 @@
  * FEATURES & RATIONALE:
  * 1. One owner: the stub is only ever built here; the page never edits it.
  * 2. Deterministic: makensis gives the same bytes for the same script and
- *    version (CI installs NSIS through tools/ci/ubuntu_apt.py), no timestamp.
+ *    release, with no timestamp; the release is pinned
+ *    (installer.cjs STUB_MAKENSIS_VERSION, the one CI installs through
+ *    tools/ci/ubuntu_apt.py), and any other one is refused.
  * 3. Fail fast: no makensis, or a script it refuses, stops the generation.
  * ==============================================================================
  */
@@ -49,7 +51,7 @@ function buildSource() {
 		'',
 		'// ==========================================',
 		'// AUTO-GENERATED — do not edit manually',
-		'// Source: tools/lib/kbd-dll/installer.cjs (emitStubNsis), built by makensis',
+		`// Source: tools/lib/kbd-dll/installer.cjs (emitStubNsis), built by makensis ${Installer.STUB_MAKENSIS_VERSION}`,
 		'// Run: npm run codegen:kbd-setup-stub:js',
 		'// ==========================================',
 		'',

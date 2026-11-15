@@ -37,6 +37,12 @@ const Model = require('./model.cjs');
 const { layoutIni, STUB_INI_KEYS, STUB_MAX_TEXT } = require('./layout-ini.cjs');
 
 const MAKENSIS = 'makensis';
+// The makensis release the generic installer is built with: its bytes depend on
+// the release (3.09 and 3.10 give different files), and the committed stub
+// (layout_editor/_generated/kbd_setup_stub.js) must equal a fresh build. This
+// is the release CI installs (ubuntu-26.04 runners, nsis 3.10-2ubuntu2); a
+// runner whose makensis differs is refused by name instead of reading « stale ».
+const STUB_MAKENSIS_VERSION = 'v3.10-2';
 const UNINSTALL_ROOT = 'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall';
 const LAYOUTS_KEY = 'SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts';
 // InstallLayoutOrTip flags (input.dll): 0 adds the profile, ILOT_UNINSTALL removes it.
@@ -529,6 +535,13 @@ function emitStubNsis() {
  * @returns {{script: string, file: string, bytes: Buffer}}
  */
 function buildStub() {
+	const version = makensisVersion();
+	if (version !== STUB_MAKENSIS_VERSION)
+		throw new Error(
+			`kbd_installer_version: makensis ${version} builds other bytes than the pinned ` +
+				`${STUB_MAKENSIS_VERSION}; build the stub with that release, or move the pin ` +
+				'(installer.cjs STUB_MAKENSIS_VERSION) and regenerate with npm run codegen:kbd-setup-stub:js'
+		);
 	const script = emitStubNsis();
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kbd-stub-'));
 	try {
@@ -549,6 +562,20 @@ function buildStub() {
 /** Whether makensis can be run. */
 function makensisAvailable() {
 	return spawnSync(MAKENSIS, ['-VERSION'], { encoding: 'utf8' }).status === 0;
+}
+
+/**
+ * The release of the makensis on PATH, as it prints it (e.g. v3.10-2).
+ * @returns {string}
+ * @throws {Error} When makensis cannot be run.
+ */
+function makensisVersion() {
+	const run = spawnSync(MAKENSIS, ['-VERSION'], { encoding: 'utf8' });
+	if (run.error || run.status !== 0)
+		throw new Error(
+			`kbd_installer_tool: ${run.error ? run.error.message : 'makensis -VERSION failed'}`
+		);
+	return run.stdout.trim();
 }
 
 /**
@@ -591,6 +618,8 @@ module.exports = {
 	registrationLines,
 	unregistrationLines,
 	makensisAvailable,
+	makensisVersion,
+	STUB_MAKENSIS_VERSION,
 	LAYOUTS_KEY,
 	STUB_FILE,
 	STUB_INI_KEYS
