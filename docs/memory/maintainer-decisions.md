@@ -1219,7 +1219,7 @@ autocorrection); the Lua trackers still owe that change.
 
 Aligned on macOS and Linux: Windows shows the live typing speed as a second
 notification-area icon with the number painted on the source colour, shown
-while typing (`ui/wpm/wpm_tray_readout.ahk`, `adapters/notify_icon.ahk`). The
+while typing (`ui/wpm/wpm_tray_readout.ahk`, `tray/adapters/notify_icon.ahk`). The
 `metrics_menu.wpm_menubar` / `menubar_colors` rows and the two
 `metrics.wpm_menubar_*` keys are declared on `ahk`;
 `platform_reason.wpm_readout_needs_a_menubar` is retired. Windows alone decides

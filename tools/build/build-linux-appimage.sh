@@ -129,7 +129,7 @@ REQUIRED_PAYLOAD=(
   "ergopti_hotstrings.lua"
   "modules/hotstrings/engine.lua"
   "core/fs/engine/paths.lua"
-  "adapters/tray_menu.lua"
+  "tray/adapters/menu.lua"
   "core/ui/ui/webkit_host.lua"
   "_shared/hotstrings/engine/matcher/init.lua"
   "_shared/hotstrings/engine/matcher/cascade.lua"

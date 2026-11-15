@@ -693,7 +693,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
   helpers.describe("adapter modules", function()
     local adapters = {
       "core.network.adapters.http_client",
-      "adapters.tray_menu",
+      "tray.adapters.menu",
     }
     for _, name in ipairs(adapters) do
       helpers.it(name .. " loads", function()

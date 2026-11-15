@@ -381,7 +381,7 @@ read-only folder needs a non-root user: report it as SKIP under root.
 
 ### project-linux-tray-submenus-fill-on-activate-not-show
 
-`platform/tray/appindicator.lua` builds a submenu's rows only when it is
+`tray/adapters/appindicator.lua` builds a submenu's rows only when it is
 opened. libdbusmenu-gtk 0.4 turns a client's `AboutToShow` on a parent row
 into that GtkMenuItem's `activate`, and rows added in the handler are in the
 next `GetLayout`. The submenu GtkMenu's `show` is useless as a trigger: the

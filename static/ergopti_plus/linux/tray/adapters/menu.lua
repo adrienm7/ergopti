@@ -1,4 +1,4 @@
---- adapters/tray_menu.lua
+--- tray/adapters/menu.lua
 
 --- ==============================================================================
 --- MODULE: TrayMenu Adapter (Linux)
@@ -21,7 +21,7 @@
 ---   - pump() blocked on a pipe read, from the daemon's idle callback, so the
 ---     keystroke path stalled until someone clicked an icon that was not there.
 --- SNI is not a call you make. It is an object you HOST, and a command-line tool
---- cannot host one. The hosting now happens in platform/tray/appindicator.lua.
+--- cannot host one. The hosting now happens in tray/adapters/appindicator.lua.
 ---
 --- The yad fallback is gone with it. It was reachable only when gdbus was
 --- absent, it crashed on first use (a `_yad_kill()` call thirty-four lines above
@@ -41,11 +41,11 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Indicator = require("platform.tray.appindicator")
+local Indicator = require("tray.adapters.appindicator")
 local Protocol = require("tray.protocol")
 local Perf = require("core.logger.engine.perf_counters")
 
-local LOG = "adapters.tray_menu"
+local LOG = "tray.adapters.menu"
 
 -- The application id panels use to remember this icon's position between
 -- sessions. Stable on purpose: a generated one makes the icon jump every start.

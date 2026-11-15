@@ -413,7 +413,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include ../_shared/shortcuts/data/magic_editor.ahk
 #Include infra/magic_editor.ahk
 #Include platform/system/notifier.ahk
-#Include adapters/tray_menu.ahk
+#Include tray/adapters/menu.ahk
 #Include platform/input/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
 #Include core/network/adapters/http_client.ahk
@@ -434,7 +434,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include platform/focus/window_manager.ahk
 #Include platform/system/control.ahk
 #Include core/ui/adapters/graphics_renderer.ahk
-#Include adapters/notify_icon.ahk
+#Include tray/adapters/notify_icon.ahk
 #Include core/ui/adapters/tooltip_renderer.ahk
 #Include core/process/adapters/shell_runner.ahk
 #Include ../_shared/shortcuts/data/actions/brightness.ahk
@@ -737,9 +737,9 @@ try {
 		ExitApp(1)
 }
 BootProfile_Stamp("Personal shortcuts file ensured")
-#Include infra/tray_bootstrap.ahk
-#Include adapters/tray_startup_click.ahk
-#Include adapters/tray_startup_commands.ahk
+#Include tray/bootstrap.ahk
+#Include tray/adapters/startup_click.ahk
+#Include tray/adapters/startup_commands.ahk
 
 ; AHK-21: atomically replace the stock AHK tray items
 ; (Pause/Suspend/Reload/Exit/Edit) BEFORE the blocking onboarding wizard so

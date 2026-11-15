@@ -154,7 +154,7 @@ end
 --- Loads the indicator with a recording backend.
 --- @return table indicator, table log
 local function with_fake()
-	local ind = helpers.load_module("platform.tray.appindicator")
+	local ind = helpers.load_module("tray.adapters.appindicator")
 	local binding, log = fake_binding()
 	ind._set_binding_for_test(binding)
 	return ind, log
@@ -237,7 +237,7 @@ helpers.describe("tray indicator: creation", function()
 	end)
 
 	helpers.it("reports unavailability instead of pretending", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		ind._set_binding_for_test(false)
 		helpers.assert_eq(ind.is_available(), false, "no library means no tray")
 		helpers.assert_eq(ind.create("x", "y", "z"), false,
@@ -468,7 +468,7 @@ helpers.describe("tray indicator: pump", function()
 	end)
 
 	helpers.it("is bounded even when events never stop arriving", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		local binding, log = fake_binding()
 		binding.gtk.gtk_events_pending = function() return 1 end
 		ind._set_binding_for_test(binding)
@@ -528,7 +528,7 @@ helpers.describe("tray indicator: destroy", function()
 	end)
 
 	helpers.it("refused extra-item removal retains its native handle and actions for retry", function()
-		local ind = helpers.load_module("platform.tray.appindicator")
+		local ind = helpers.load_module("tray.adapters.appindicator")
 		local binding, log = fake_binding()
 		ind._set_binding_for_test(binding)
 		local clicks = 0

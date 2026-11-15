@@ -102,7 +102,7 @@ end
 
 local function tray()
 	if _tray then return _tray end
-	local ok, Indicator = pcall(require, "platform.tray.appindicator")
+	local ok, Indicator = pcall(require, "tray.adapters.appindicator")
 	if not ok or type(Indicator) ~= "table" then return nil end
 	_tray = Indicator
 	return _tray

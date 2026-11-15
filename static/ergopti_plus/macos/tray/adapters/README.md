@@ -11,7 +11,7 @@ there is nothing to put here.
 
 ## What macOS uses instead
 
-`hs.menubar`, through `adapters/tray_menu.lua`. Hammerspoon owns the status-item
+`hs.menubar`, through `tray/adapters/menu.lua`. Hammerspoon owns the status-item
 lifecycle: `hs.menubar.new()` returns a live item and `setMenu()` takes a Lua
 table of rows. There is no protocol to speak, no bus to stay on and no library
 to bind, so a `platform/` seam would be a folder containing one call.
@@ -25,4 +25,4 @@ practical way to host one is to bind `libayatana-appindicator` and build a
 `GtkMenu`. That is a genuine OS mechanism with a genuine choice behind it, which
 is what `platform/` is for.
 
-See `linux/platform/tray/appindicator.lua`.
+See `linux/tray/adapters/appindicator.lua`.

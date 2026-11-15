@@ -39,6 +39,7 @@ const ROOT = path.join(__dirname, '../..');
 const CONTRACTS_PATH = shared('core/ports/contracts.json');
 const AHK_ADAPTERS_DIRS = [
 	path.join(ROOT, 'static/ergopti_plus/windows/adapters'),
+	path.join(ROOT, 'static/ergopti_plus/windows/tray/adapters'),
 	path.join(ROOT, 'static/ergopti_plus/windows/platform/system'),
 	path.join(ROOT, 'static/ergopti_plus/windows/platform/input'),
 	path.join(ROOT, 'static/ergopti_plus/windows/platform/focus'),

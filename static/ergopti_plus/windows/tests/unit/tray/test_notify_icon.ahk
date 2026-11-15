@@ -1,9 +1,9 @@
-﻿; tests/unit/adapters/test_notify_icon.ahk
+﻿; tests/unit/tray/test_notify_icon.ahk
 
 ; ==============================================================================
 ; MODULE: Notification Icon Adapter Tests
 ; DESCRIPTION:
-; The WPM readout's notification icon (adapters/notify_icon.ahk) against the
+; The WPM readout's notification icon (tray/adapters/notify_icon.ahk) against the
 ; real shell and real GDI+: a painted number yields a usable icon handle at the
 ; shell's small-icon size, and an icon added beside the script window is
 ; reported by the shell until it is deleted, then can be added again, as after

@@ -114,7 +114,7 @@ _AOPR_IsUiSource(Path) {
 ; platform\<domain>\ is the home of a driver's OS bindings and has no adapters\
 ; role folder, so its files are the isolation layer as adapters\ is (decided by
 ; the coordinator on 2026-11-14, to review by the maintainer). Today's
-; platform\remap\ and platform\tray\ are layer folders, not platform domains.
+; platform\remap\ and tray\adapters\ are layer folders, not platform domains.
 _AOPR_PLATFORM_DOMAINS := ["desktop_focus", "focus", "input", "native", "system"]
 
 _AOPR_IsPlatformAdapter(Path) {
@@ -232,7 +232,7 @@ _AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -376,7 +376,7 @@ _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 

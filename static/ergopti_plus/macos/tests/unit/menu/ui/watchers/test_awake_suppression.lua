@@ -25,7 +25,7 @@ local OWNED_MODULES = {
 	"core.fs.adapters.storage",
 	"core.process.adapters.task_environment",
 	"core.events.timer_scheduler",
-	"adapters.tray_menu",
+	"tray.adapters.menu",
 	"adapters.update_launcher",
 	"core.fs.engine.app_dirs",
 	"keyboard.engine.caps_word_auto_off",

@@ -378,7 +378,7 @@ module.exports = [
 	},
 	{
 		path: 'macos/menu/ui/init.lua',
-		before: 'local TrayMenu      = require("adapters.tray_menu")',
+		before: 'local TrayMenu      = require("tray.adapters.menu")',
 		after: 'local TrayMenu      = require("adapters.unrelated_menu")',
 		expected: false,
 		reason: 'static native publication adapter import changed'

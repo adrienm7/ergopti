@@ -25,7 +25,7 @@
 --- reason a feature can be fully tested and entirely unreachable.
 ---
 --- WHY THE TOGGLE IS A ROW AND NOT A CLICKABLE PARENT:
---- macOS puts it on the parent item. `platform/tray/appindicator.lua` binds
+--- macOS puts it on the parent item. `tray/adapters/appindicator.lua` binds
 --- `item.fn` only when a row has NO submenu (`if item.menu … elseif item.fn …`),
 --- so a parent that both opens a submenu and acts is not representable on this
 --- backend. Windows' placement — first row inside — is the one that works here,

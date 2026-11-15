@@ -1,4 +1,4 @@
-﻿; infra/tray_bootstrap.ahk
+﻿; tray/bootstrap.ahk
 
 ; ==============================================================================
 ; MODULE: Safe Cold-Start Tray Bootstrap

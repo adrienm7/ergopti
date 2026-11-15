@@ -65,7 +65,7 @@ local ADAPTERS_UNDER_TEST = {
 	{ module = "core.events.timer_scheduler", port = "TimerScheduler" },
 	{ module = "platform.system.notifier", port = "Notifier" },
 	{ module = "platform.input.hotkey_registrar", port = "HotkeyRegistrar" },
-	{ module = "adapters.tray_menu", port = "TrayMenu" },
+	{ module = "tray.adapters.menu", port = "TrayMenu" },
 	{ module = "core.fs.adapters.file_system", port = "FileSystem" },
 	{ module = "platform.focus.window_info", port = "WindowInfo" },
 }

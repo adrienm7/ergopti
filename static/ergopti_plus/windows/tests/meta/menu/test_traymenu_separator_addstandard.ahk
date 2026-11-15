@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the finding traymenu-separator-addstandard.
 ;
-; adapters/tray_menu.ahk TrayMenuSetMenu() builds the tray context menu from
+; tray/adapters/menu.ahk TrayMenuSetMenu() builds the tray context menu from
 ; the shared Items array. A separator entry must be added with a zero-argument
 ; A_TrayMenu.Add(). The original code called A_TrayMenu.AddStandard() instead —
 ; a distinct API that appends the WHOLE default AHK script-control menu (a live
@@ -15,7 +15,7 @@
 ;
 ; The fix: the separator branch calls A_TrayMenu.Add() (no args) and never
 ; A_TrayMenu.AddStandard(). This is a meta-static test (scans source text)
-; because adapters/tray_menu.ahk's setMenu mutates the live A_TrayMenu and its
+; because tray/adapters/menu.ahk's setMenu mutates the live A_TrayMenu and its
 ; actionable-item path now references RegisterMenuItem, which is not in the
 ; headless run_all include graph — calling it would be a load-time error.
 ; ==============================================================================
@@ -45,16 +45,16 @@ _TMSAS_ReadSource(RelPath) {
 ; ===================================================
 
 _TMSAS_SeparatorUsesBareAdd() {
-	Src := _TMSAS_ReadSource("adapters/tray_menu.ahk")
+	Src := _TMSAS_ReadSource("tray/adapters/menu.ahk")
 	Seg := _DriverFuncBody("TrayMenuSetMenu")
-	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in adapters/tray_menu.ahk")
+	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in tray/adapters/menu.ahk")
 	Assert(InStr(Seg, "A_TrayMenu.Add()") > 0,
 		"TrayMenuSetMenu separator branch must call A_TrayMenu.Add() (no args) for a separator")
 }
 Test("tray_menu: separator uses A_TrayMenu.Add() not AddStandard() (traymenu-separator-addstandard)", _TMSAS_SeparatorUsesBareAdd)
 
 _TMSAS_NoAddStandard() {
-	Src := _TMSAS_ReadSource("adapters/tray_menu.ahk")
+	Src := _TMSAS_ReadSource("tray/adapters/menu.ahk")
 	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	; Match the real call form A_TrayMenu.AddStandard so the explanatory
 	; source comment (which names the bare AddStandard API) is not a false hit.

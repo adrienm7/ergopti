@@ -382,8 +382,8 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		return false;
 	if (
 		!imported(init, 'Builder', 'menu.ui.builder.builder', start) ||
-		!imported(init, 'TrayMenu', 'adapters.tray_menu', publish) ||
-		!imported(init, 'TrayMenu', 'adapters.tray_menu', start) ||
+		!imported(init, 'TrayMenu', 'tray.adapters.menu', publish) ||
+		!imported(init, 'TrayMenu', 'tray.adapters.menu', start) ||
 		!imported(builder, 'CanvasBadge', 'menu.ui.builder.canvas_badge', generate) ||
 		!imported(builder, 'ManifestMenu', 'menu.engine.manifest_menu', generate) ||
 		!imported(badge, 'ManifestMenu', 'menu.engine.manifest_menu', prepend) ||

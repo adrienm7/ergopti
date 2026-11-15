@@ -118,7 +118,7 @@ end
 --- @return integer|nil The exit status when the daemon must not start, nil to continue.
 function M.check_at_start(deps)
 	local Logger = deps.logger or require("core.logger.engine.shim")
-	local tray = M.tray_missing(deps.indicator or require("platform.tray.appindicator"))
+	local tray = M.tray_missing(deps.indicator or require("tray.adapters.appindicator"))
 	if tray then
 		Logger.error(LOG, "Start refused: the tray needs %s, which this system does not provide.", tray)
 		tell(deps, M.TRAY_BODY_KEY, tray, "error")

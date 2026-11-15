@@ -19,14 +19,14 @@
 local helpers = require("tests.helpers")
 -- Every case installs its own indicator double; the module end puts the real
 -- entries back so no later module meets the double.
-local restore_loaded = helpers.keep_loaded({ "platform.tray.appindicator", "adapters.tray_menu" })
+local restore_loaded = helpers.keep_loaded({ "tray.adapters.appindicator", "tray.adapters.menu" })
 
 --- Installs a stand-in indicator and loads the adapter over it.
 --- @param available boolean Whether the machine can host a tray.
 --- @return table adapter, table log
 local function with_indicator(available)
 	local log = { menus = {}, icons = {}, pumps = 0, created = nil, destroyed = 0 }
-	package.loaded["platform.tray.appindicator"] = {
+	package.loaded["tray.adapters.appindicator"] = {
 		is_available = function() return available end,
 		create = function(id, icon, title)
 			if not available then return false end
@@ -39,7 +39,7 @@ local function with_indicator(available)
 		destroy = function() log.destroyed = log.destroyed + 1 end,
 		is_live = function() return log.created ~= nil end,
 	}
-	return helpers.load_module("adapters.tray_menu"), log
+	return helpers.load_module("tray.adapters.menu"), log
 end
 
 

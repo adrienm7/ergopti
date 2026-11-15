@@ -34,7 +34,7 @@ local MODULE_KEYS = {
 	"modules.updater",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.storage",
-	"adapters.tray_menu",
+	"tray.adapters.menu",
 	"keyboard.engine.chord",
 	"platform.input.hotkey_registrar",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
@@ -386,7 +386,7 @@ local function with_menu_fixture(options, callback)
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = noop,
 		setMenu = function(items)
 			if type(items) == "function" then observations.dynamic_menu_callback = items end

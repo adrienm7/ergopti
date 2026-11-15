@@ -742,7 +742,7 @@ def recipient_base(name):
     }
 
 
-# The tray binding (platform/tray/appindicator.lua) and the libraries it pulls
+# The tray binding (tray/adapters/appindicator.lua) and the libraries it pulls
 # in that are not GTK itself. The AppImage catalogue runs Ubuntu 22.04 with GTK 3
 # but without libayatana, and v1.0.3 exited there with no icon. Bundled, the
 # library shows a StatusNotifierItem when the session has a watcher and falls

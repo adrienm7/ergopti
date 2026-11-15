@@ -192,7 +192,7 @@ function M.boot(opts)
 		get_check_interval = function() return 3600 end,
 		start_background_checks = noop,
 	}
-	package.loaded["adapters.tray_menu"] = {
+	package.loaded["tray.adapters.menu"] = {
 		adopt = function() return true end,
 		setMenu = function(provider)
 			if type(provider) == "function" then fixture.menu_provider = provider end

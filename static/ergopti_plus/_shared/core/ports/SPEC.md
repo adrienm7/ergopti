@@ -87,7 +87,7 @@ Each `.spec.js` file exports:
 | HttpClient          | `core/network/adapters/http_client.ahk`    | `core/network/adapters/http_client.lua`    |
 | TimerScheduler      | `core/events/timer_scheduler.ahk`          | `core/events/timer_scheduler.lua`          |
 | Notifier            | `platform/system/notifier.ahk`             | `platform/system/notifier.lua`             |
-| TrayMenu            | `adapters/tray_menu.ahk`                   | `adapters/tray_menu.lua`                   |
+| TrayMenu            | `tray/adapters/menu.ahk`                   | `tray/adapters/menu.lua`                   |
 | FileSystem          | `core/fs/adapters/file_system.ahk`         | `core/fs/adapters/file_system.lua`         |
 | SecureFieldDetector | `platform/focus/secure_field_detector.ahk` | `platform/focus/secure_field_detector.lua` |
 | Clipboard           | `adapters/clipboard.ahk`                   | `adapters/clipboard.lua`                   |

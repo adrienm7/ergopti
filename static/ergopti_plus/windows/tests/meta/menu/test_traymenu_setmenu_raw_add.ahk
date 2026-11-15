@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the finding traymenu-setmenu-raw-add-drops-clicks.
 ;
-; adapters/tray_menu.ahk TrayMenuSetMenu() is the contract-sanctioned path the
+; tray/adapters/menu.ahk TrayMenuSetMenu() is the contract-sanctioned path the
 ; cross-platform shared layer drives the Windows tray menu through. AHK 2.0's
 ; WM_COMMAND -> menu-callback dispatch intermittently drops ~1 click in 3 with
 ; no error. menu/engine/dispatcher.ahk installs a parallel WM_COMMAND retry path,
@@ -48,16 +48,16 @@ _TMRA_ReadSource(RelPath) {
 ; ===================================================
 
 _TMRA_ActionableRoutesThroughRegister() {
-	Src := _TMRA_ReadSource("adapters/tray_menu.ahk")
+	Src := _TMRA_ReadSource("tray/adapters/menu.ahk")
 	Seg := _DriverFuncBody("TrayMenuSetMenu")
-	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in adapters/tray_menu.ahk")
+	Assert(Seg != "", "TrayMenuSetMenu(Items) must exist in tray/adapters/menu.ahk")
 	Assert(InStr(Seg, "RegisterMenuItem(A_TrayMenu") > 0,
 		"TrayMenuSetMenu must route actionable items through RegisterMenuItem(A_TrayMenu, ...) so they join the WM_COMMAND retry path")
 }
 Test("tray_menu: actionable items routed through RegisterMenuItem (traymenu-setmenu-raw-add-drops-clicks)", _TMRA_ActionableRoutesThroughRegister)
 
 _TMRA_NoRawActionableAdd() {
-	Src := _TMRA_ReadSource("adapters/tray_menu.ahk")
+	Src := _TMRA_ReadSource("tray/adapters/menu.ahk")
 	Seg := _DriverFuncBody("TrayMenuSetMenu")
 	; The two-argument raw Add bypasses the dispatch retry and is the bug.
 	; Separators keep the zero-argument A_TrayMenu.Add(), which is fine.

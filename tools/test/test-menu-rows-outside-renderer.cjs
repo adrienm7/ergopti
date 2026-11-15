@@ -475,7 +475,7 @@ const DRIVER_SPEC = {
 		//     Menu.Add in it is a replay of a decision made elsewhere — and the
 		//     equivalent layer on the other two drivers (tray_menu.setMenu,
 		//     hs.menubar:setMenu) takes a finished table and is not counted at all.
-		//   adapters/tray_menu.ahk is the adapter, which is that boundary by
+		//   tray/adapters/menu.ahk is the adapter, which is that boundary by
 		//     definition.
 		//
 		// This is a definition change, not a migration: the rows those files touch
@@ -487,7 +487,7 @@ const DRIVER_SPEC = {
 			'menu/ui/builder/engine.ahk',
 			'menu/engine/dispatcher.ahk',
 			'menu/ui/builder/rebuild.ahk',
-			'adapters/tray_menu.ahk'
+			'tray/adapters/menu.ahk'
 		])
 	},
 	macos: {

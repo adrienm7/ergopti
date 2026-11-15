@@ -14,7 +14,7 @@
 --- acquired a bus name in a process that then exited, releasing it. SNI is an
 --- object a process HOSTS, not a call it makes, so none of it could ever have
 --- produced a tray icon. The hosting now happens through
---- linux/platform/tray/appindicator.lua, and nothing needs a serialiser.
+--- linux/tray/adapters/appindicator.lua, and nothing needs a serialiser.
 ---
 --- What remains is the one question that outlived the transport: which file is
 --- the icon.

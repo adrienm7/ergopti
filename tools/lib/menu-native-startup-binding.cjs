@@ -7,8 +7,8 @@ const { scriptTokens, stripComments } = require('./script-source.cjs');
 const projection = require('./codegen-startup-tray.cjs');
 const keys = Object.freeze({
 	entry: 'windows/ErgoptiPlus.ahk',
-	bootstrap: 'windows/infra/tray_bootstrap.ahk',
-	adapter: 'windows/adapters/tray_menu.ahk',
+	bootstrap: 'windows/tray/bootstrap.ahk',
+	adapter: 'windows/tray/adapters/menu.ahk',
 	dispatcher: 'windows/menu/engine/dispatcher.ahk',
 	safe: 'windows/menu/engine/startup_commands.ahk'
 });
@@ -187,9 +187,9 @@ const safeClass = `
   }
 `;
 const coldEntry = `
-  #Include infra/tray_bootstrap.ahk
-  #Include adapters/tray_startup_click.ahk
-  #Include adapters/tray_startup_commands.ahk
+  #Include tray/bootstrap.ahk
+  #Include tray/adapters/startup_click.ahk
+  #Include tray/adapters/startup_commands.ahk
   _InstallSafeBootstrapTray()
   global _TrayStartupCommands := TrayStartupCommands(
     () => IsSet(_DriverReady) && _DriverReady, TrayStartupCommand)
@@ -423,7 +423,7 @@ function nativeStartupRows(inputs, platform) {
 	if (
 		!entry ||
 		!sourceInclude(bootstrap, '../../_shared/menu/data/startup_tray_projection.ahk') ||
-		!sourceInclude(sources[keys.entry], 'adapters/tray_menu.ahk') ||
+		!sourceInclude(sources[keys.entry], 'tray/adapters/menu.ahk') ||
 		!sourceInclude(sources[keys.entry], 'menu/engine/dispatcher.ahk') ||
 		!sourceInclude(dispatcher, 'startup_commands.ahk') ||
 		matches(entry, coldEntry, 0).length !== 1 ||

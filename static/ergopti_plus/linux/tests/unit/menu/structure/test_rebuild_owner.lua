@@ -416,7 +416,7 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 		local indicator = { is_available = function() return available end,
 			create = function() return true end, set_menu = function() return accepted end }
 		local environment = setmetatable({ require = function(name)
-			if name == "platform.tray.appindicator" then return indicator end
+			if name == "tray.adapters.appindicator" then return indicator end
 			if name == "core.logger.engine.shim" then return { debug = function() end, warn = function() end } end
 			if name == "tray.protocol" then return { resolve_tray_icon = function() return "input-keyboard" end } end
 			if name == "core.fs.engine.paths" then return { shared_root = function() return "/synthetic" end } end

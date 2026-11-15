@@ -196,7 +196,7 @@ end)
 -- =========================================
 
 helpers.describe("Adapter contract vectors: TrayMenu", function()
-	local adapter = helpers.load_with_stubs("adapters.tray_menu")
+	local adapter = helpers.load_with_stubs("tray.adapters.menu")
 
 	-- The tray adapter has no readable state beyond its own continued usability,
 	-- so each case asserts the thing a pcall could not: that the adapter still
