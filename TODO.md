@@ -1031,6 +1031,18 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Cause still unproven, no code changed.
       [CODE] Left (2026-11-15): read the artifacts `swift-launcher-failure-43277967473-1` and the number-row artifact of
       43276494558 before they expire (agent pid and run count), then find the cause.
+      2026-11-15, worker X: both artifacts read (`swift-launcher-failure-43277967473-1`, kept until 2027-02-10;
+      `number-row-carbon-arm64-43276494558-1`, expiring 2026-11-19). The TextInputMenuAgent pid and run count are the
+      same before and after both cohorts (423/1 and 419/1): the agent did not restart. Their TIS records show one
+      mechanism, on Apple silicon macOS 26.7.2 and 15.8.2 alike: the French selection is seen at +219 ms and
+      +221 ms, then the first restore to US returns 0 and, 6 s later, US reads enabled and selected while
+      `TISCopyCurrentKeyboardInputSource` in the test process still returns French, now unselected. The system
+      applied the restore; this process's current-source cache never followed, and every later case captured the
+      stale French as its original (hence the cascade of "unavailable"). The receipt now names it
+      `process_current_source_stale`, from the refused case's own records, with the wanted and current sources in
+      the annotation (test-macos-tsm-refusal.cjs). Still unproven: why the process misses that one change (the
+      notification that refreshes its cache, or the run-loop mode the fixture pumps), and whether the launcher's own
+      long-lived process can be left on a stale source the same way.
 
 ## Native runtime, editor and diagnostics parity follow-up
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # tools/diagnostics/macos_tsm_refusal.py
-"""Name a native keyboard-source refusal caused by the text-input UI server.
+"""Name the state behind a native keyboard-source refusal.
 
 TISSelectInputSource returns noErr, but the selection is applied only after
 HIToolbox reaches com.apple.tsm.uiserver, the port TextInputMenuAgent serves.
@@ -20,8 +20,17 @@ unanswered server is therefore the state the refusals share, not their cause.
 This owner reads the cohort transcript and the agent snapshot taken around it
 (macos_text_input_agents.sh) and writes a receipt whose state is one of:
 
+- process_current_source_stale: the refused case's own records show a select
+  or restore call after which the source it selected reads enabled and
+  selected, yet TISCopyCurrentKeyboardInputSource in the test process still
+  names another source: the system applied the selection and this process's
+  current-source cache never followed. Both refusals whose records were read
+  (runs 43277967473 and 43276494558, 2026-11-12) are this, on the first
+  restore from French to US, with the TextInputMenuAgent pid and run count
+  unchanged; every later case then captured the stale French as its original.
+  It names the mechanism, not why the cache missed the change;
 - tsm_uiserver_unanswered: a fixture refusal follows an unanswered message;
-- fixture_refusal_unclassified: a fixture refusal without that line;
+- fixture_refusal_unclassified: a fixture refusal without either;
 - no_fixture_refusal: the cohort holds no selection refusal.
 
 With --tis-session, it also reads the bounded diagnostic records the cohort's
@@ -61,6 +70,12 @@ RECORD_PREFIX = b"TIS_TEST_EVIDENCE "
 RECORD_NAME = re.compile(r"^record-\d{6}\.dat$")
 # Probe reads around each synthesized event say nothing about the selection.
 TIMELINE_SKIPPED = re.compile(r"^event\.")
+# The source each selecting call asks for: its target, or the original it restores.
+SELECTING_CALLS = {
+    "select.after": "target",
+    "restore.inner.after": "original",
+    "restore.outer.after": "original",
+}
 AGENT_FIELDS = re.compile(r"^\s*(state|pid|runs|last exit code|last terminating signal) = (.+)$")
 
 
@@ -122,11 +137,10 @@ def source_state(state):
     return f"{name} enabled={flag('enabled')} selected={flag('selected')}"
 
 
-def selection_timeline(receipts, case):
-    """The selection calls of every receipt for test method `case`, in record order.
+def case_events(receipts, case):
+    """The events of every receipt for test method `case`, in record order, or None.
 
-    A case that selects several sources publishes one receipt per selection;
-    offsets count from the first event of the first such receipt.
+    A case that selects several sources publishes one receipt per selection.
     """
     matching = [
         receipt
@@ -135,7 +149,49 @@ def selection_timeline(receipts, case):
     ]
     if not matching:
         return None
-    events = [event for receipt in matching for event in receipt["events"]]
+    return [event for receipt in matching for event in receipt["events"]]
+
+
+def present(state, field):
+    """The value of one recorded field, or None when it was not read."""
+    if state is None or state.get(field, {}).get("state") != "present":
+        return None
+    return state[field]["value"]
+
+
+def stale_current(events):
+    """The first selecting call the system applied but the process did not see, or None.
+
+    After the call, the source it asked for reads enabled and selected, while the
+    process's current source is another one.
+    """
+    if not events:
+        return None
+    start = events[0]["uptime"]
+    for event in events:
+        role = SELECTING_CALLS.get(event["phase"])
+        if role is None or event.get("status") != 0:
+            continue
+        wanted, current = event.get(role), event.get("current")
+        if (
+            present(wanted, "enabled") is True
+            and present(wanted, "selected") is True
+            and present(current, "id") is not None
+            and present(current, "id") != present(wanted, "id")
+        ):
+            return {
+                "phase": event["phase"],
+                "offset_ms": round((event["uptime"] - start) * 1000),
+                "wanted": source_state(wanted),
+                "current": source_state(current),
+            }
+    return None
+
+
+def selection_timeline(events):
+    """The selection calls of a case's events; offsets count from its first event."""
+    if events is None:
+        return None
     if not events:
         return []
     start = events[0]["uptime"]
@@ -145,6 +201,7 @@ def selection_timeline(receipts, case):
             "offset_ms": round((event["uptime"] - start) * 1000),
             "status": event.get("status"),
             "target": source_state(event.get("target")),
+            "original": source_state(event.get("original")),
             "current": source_state(event.get("current")),
         }
         for event in events
@@ -158,8 +215,10 @@ def timeline_text(timeline):
     for event in timeline:
         status = "" if event["status"] is None else f" status={event['status']}"
         target = "" if event["target"] is None else f" target={event['target']};"
+        restored = event["phase"].startswith("restore.") and event["original"] is not None
+        original = f" original={event['original']};" if restored else ""
         steps.append(
-            f"{event['phase']} +{event['offset_ms']}ms{status}{target} current={event['current']}"
+            f"{event['phase']} +{event['offset_ms']}ms{status}{target}{original} current={event['current']}"
         )
     return " | ".join(steps)
 
@@ -180,17 +239,20 @@ def evaluate(transcript, snapshot="", receipts=None):
             continue
         if any(refusal in line for refusal in REFUSALS):
             refusals.append({"case": case, "line": line})
+    events = None
+    if refusals and receipts is not None:
+        events = case_events(receipts, refusals[0]["case"])
+    stale = stale_current(events)
     if not refusals:
         state = "no_fixture_refusal"
+    elif stale is not None:
+        state = "process_current_source_stale"
     elif unanswered and transcript.find(unanswered[0]["line"]) < transcript.find(
         refusals[0]["line"]
     ):
         state = "tsm_uiserver_unanswered"
     else:
         state = "fixture_refusal_unclassified"
-    timeline = None
-    if refusals and receipts is not None:
-        timeline = selection_timeline(receipts, refusals[0]["case"])
     return {
         "schema": 1,
         "state": state,
@@ -201,7 +263,8 @@ def evaluate(transcript, snapshot="", receipts=None):
         "agent": agent_phases(snapshot),
         "tis_session": "absent" if receipts is None else "read",
         "tis_record_count": None if receipts is None else len(receipts),
-        "selection_timeline": timeline,
+        "selection_timeline": selection_timeline(events),
+        "stale_current": stale,
     }
 
 
@@ -225,6 +288,14 @@ def annotation(receipt):
 def state_annotation(receipt):
     """The state sentence of a refused cohort's annotation."""
     refusal = receipt["first_refusal"]
+    if receipt["state"] == "process_current_source_stale":
+        stale = receipt["stale_current"]
+        return (
+            "::error::Native keyboard-source refusal: process_current_source_stale. "
+            f"In {refusal['case']}, {stale['phase']} (+{stale['offset_ms']}ms) left "
+            f"{stale['wanted']} while this process's current source stayed {stale['current']}: "
+            "the system applied the selection and the test process never saw it."
+        )
     if receipt["state"] == "tsm_uiserver_unanswered":
         first = receipt["first_unanswered"]
         return (
