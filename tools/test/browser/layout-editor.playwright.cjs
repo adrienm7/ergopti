@@ -326,6 +326,29 @@ async function exerciseSiteOpensOnErgopti(browser, origin) {
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
 	await page.waitForSelector('#le-board .le-legend.key-legend-dead');
+	// (keyboard-format) « Format » replaces the numeric keypad checkbox: each
+	// format hides the blocks it lacks, TKL by default.
+	assert.equal(await page.locator('#le-numpad').count(), 0, 'no numeric keypad checkbox');
+	const shown = (code) => page.locator(`#le-board [data-code="${code}"]`).count();
+	assert.equal(await page.inputValue('#le-board-format'), 'tkl');
+	assert.deepEqual(
+		[await shown('Numpad5'), await shown('ArrowUp'), await shown('Insert'), await shown('F5')],
+		[0, 1, 1, 1],
+		'TKL: no keypad'
+	);
+	await page.selectOption('#le-board-format', 'full');
+	assert.equal(await shown('Numpad5'), 1, '100 %: the keypad');
+	await page.selectOption('#le-board-format', '75');
+	assert.deepEqual([await shown('Insert'), await shown('F5')], [0, 1], '75 %: no editing block');
+	await page.selectOption('#le-board-format', '65');
+	assert.deepEqual([await shown('F5'), await shown('ArrowUp')], [0, 1], '65 %: no F row');
+	await page.selectOption('#le-board-format', '60');
+	assert.deepEqual(
+		[await shown('ArrowUp'), await shown('KeyQ'), await shown('Escape')],
+		[0, 1, 1],
+		'60 %: no arrows'
+	);
+	await page.selectOption('#le-board-format', 'tkl');
 	// (centred-legend) A character key's legend is centred in its key, both ways.
 	const offsets = await page.evaluate(() =>
 		['KeyA', 'KeyQ', 'Digit5'].map((code) => {
@@ -596,6 +619,12 @@ async function exerciseManager(browser, origin) {
 	// The host answers the window's ready with the last saved source.
 	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
 	await page.waitForSelector('#layout-editor #le-board');
+	// (keyboard-format) The editor's « Format » is the Comparer's.
+	await page.selectOption('#le-board-format', '65');
+	await page.click('#studio-tab-compare');
+	assert.equal(await page.inputValue('#la-format'), '65', "the Comparer takes the editor's format");
+	await page.click('#studio-tab-edit');
+	await page.selectOption('#le-board-format', 'tkl');
 	// (layout-editor-no-null-text) A section that renders nothing (the « Start
 	// from » panel when no start is open) leaves no text node behind: the root
 	// once received null and showed « null » under the toolbar.

@@ -132,6 +132,10 @@
 		</div>
 		<select id="la-keyboard" data-i18n-option-prefix="layout_analysis.keyboard"></select>
 	</div>
+	<div class="la-field">
+		<label for="la-format" data-i18n="layout_analysis.format.label"></label>
+		<select id="la-format" data-i18n-option-prefix="layout_analysis.format"></select>
+	</div>
 </section>
 
 <section class="la-layouts" aria-labelledby="la-layouts-label">
@@ -246,7 +250,7 @@
 	 * @param {{host?: object, reportHeight?: boolean}} [options] - host: the
 	 *   LAYOUT_ANALYSIS_HOST contract (window.LAYOUT_ANALYSIS_HOST when absent);
 	 *   reportHeight: post the page height to a framing parent (the site).
-	 * @returns {{setCorpus: function, addLayouts: function, onResults: function}}
+	 * @returns {{setCorpus: function, addLayouts: function, setFormat: function, onResults: function}}
 	 * @throws {Error} On a missing root or a second mount.
 	 */
 	function mount(root, options) {
@@ -306,6 +310,7 @@
 					JSON.stringify({
 						corpus: state.corpus,
 						keyboard: state.keyboard,
+						format: state.format,
 						selected: Array.from(state.selected),
 						weights: state.weights,
 						idealLoad: state.idealLoad,
@@ -338,6 +343,10 @@
 		const state = {
 			corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
 			keyboard: DATA.model.keyboards[saved.keyboard] ? saved.keyboard : 'iso',
+			// The keyboard format (the editor's « Format » too): compact_fit measures on it.
+			format: E.keyboardFormats().some((f) => f.id === saved.format)
+				? saved.format
+				: E.defaultKeyboardFormat(),
 			selected: new Set(
 				Array.isArray(saved.selected)
 					? saved.selected.filter((id) => byId.has(id))
@@ -444,6 +453,7 @@
 			const start = performance.now();
 			state.results = E.compare(chosen, tables, {
 				keyboard: state.keyboard,
+				format: state.format,
 				weights: state.weights,
 				idealLoad: state.idealLoad,
 				profile: FINGERING.current() || undefined
@@ -947,6 +957,15 @@
 				save();
 				analyse();
 			});
+			$('la-format').replaceChildren(
+				...E.keyboardFormats().map((entry) => {
+					const option = el('option', '', t(`layout_analysis.format.${entry.id}`));
+					option.value = entry.id;
+					return option;
+				})
+			);
+			$('la-format').value = state.format;
+			$('la-format').addEventListener('change', (event) => setFormat(event.target.value));
 			let timer = null;
 			$('la-text').addEventListener('input', (event) => {
 				clearTimeout(timer);
@@ -1054,6 +1073,20 @@
 		}
 
 		/** Adds the host's layouts (e.g. the user's own from « Éditer ») to the list, ticked. */
+		/**
+		 * Chooses the keyboard format (the Studio passes the editor's « Format »).
+		 * @param {string} id A keyboard_formats id.
+		 * @throws {Error} On an unknown format.
+		 */
+		function setFormat(id) {
+			E.formatHiddenKeys(id);
+			if (state.format === id) return;
+			state.format = id;
+			$('la-format').value = id;
+			save();
+			analyse();
+		}
+
 		function addLayouts(list) {
 			for (const value of list) {
 				const layout = E.layoutFromRows(Object.assign({ origin: 'user' }, value));
@@ -1127,7 +1160,7 @@
 		window.LAYOUT_ANALYSER_TAB.attach(root.querySelector('#la-analysers'), {
 			comparer: { onResults }
 		});
-		mounted = { setCorpus, addLayouts, onResults };
+		mounted = { setCorpus, addLayouts, setFormat, onResults };
 		return mounted;
 	}
 
@@ -1141,6 +1174,7 @@
 		mount,
 		setCorpus: (corpus) => instance().setCorpus(corpus),
 		addLayouts: (list) => instance().addLayouts(list),
+		setFormat: (id) => instance().setFormat(id),
 		onResults: (listener) => instance().onResults(listener)
 	};
 	// Keystats tables that arrive before the mount wait for it.

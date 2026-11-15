@@ -673,6 +673,39 @@ function buildBoards(model) {
 }
 
 /**
+ * Rejects keyboard formats the editor and the Comparer could not show: each
+ * block names physical keys, each format hides known blocks, the ids are
+ * unique, the default is one of them, and the full-size format hides nothing.
+ * @param {object} model - analysis_model.json.
+ * @throws {Error} On a broken format.
+ */
+function checkKeyboardFormats(model) {
+	const physical = JSON.parse(fs.readFileSync(PHYSICAL_KEYS_PATH, 'utf8')).keys;
+	const known = new Set(Object.keys(physical));
+	for (const [block, codes] of Object.entries(model.keyboard_blocks || {})) {
+		if (!Array.isArray(codes) || codes.length === 0)
+			throw new Error(`keyboard_blocks.${block}: no keys`);
+		for (const code of codes)
+			if (!known.has(code)) throw new Error(`keyboard_blocks.${block}: unknown key ${code}`);
+	}
+	const formats = model.keyboard_formats;
+	if (!Array.isArray(formats) || formats.length === 0) throw new Error('keyboard_formats: none');
+	const ids = new Set();
+	for (const format of formats) {
+		if (typeof format.id !== 'string' || ids.has(format.id))
+			throw new Error(`keyboard_formats: missing or repeated id ${format.id}`);
+		ids.add(format.id);
+		for (const block of format.hides)
+			if (!model.keyboard_blocks[block])
+				throw new Error(`keyboard_formats.${format.id}: unknown block ${block}`);
+	}
+	if (formats[0].hides.length !== 0)
+		throw new Error('keyboard_formats: the first must hide nothing');
+	if (!ids.has(model.default_keyboard_format))
+		throw new Error(`default_keyboard_format ${model.default_keyboard_format} is not a format`);
+}
+
+/**
  * Rejects an ideal finger load that breaks the maintainer's rule: each hand
  * sums to half, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %.
  * @param {object} load - finger → %.
@@ -748,6 +781,7 @@ function buildData() {
 	checkIdealLoad(model.ideal_finger_load);
 	// The engine keeps an edited load in the same order (analysis_engine.js idealLoad).
 	model.ideal_finger_load_hands = HAND_FINGERS;
+	checkKeyboardFormats(model);
 	delete model._description;
 	return {
 		schema_version: 1,

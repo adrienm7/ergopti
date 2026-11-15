@@ -756,6 +756,8 @@ function showTab(tab) {
 		// Its charts lay out again once visible.
 		window.dispatchEvent(new Event('resize'));
 	}
+	// One keyboard format for both tabs: the editor's « Format » is the Comparer's.
+	if (_editor) window.LAYOUT_ANALYSIS_COMPARER.setFormat(_editor.format());
 }
 
 /**

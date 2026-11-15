@@ -635,12 +635,13 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Measures one layout.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, weights?: object, idealLoad?: object, profile?: object,
-	 *   keyGroups?: boolean}} [options] - Board, weights, the ideal finger load of
-	 *   finger_imbalance (finger → % of the non-thumb presses; the model's
-	 *   ideal_finger_load when absent), the fingering profile, and whether each
-	 *   key's worst groups are counted for every event (keys[code].worst; the
-	 *   SFB ones always are).
+	 * @param {{keyboard?: string, format?: string, weights?: object, idealLoad?: object,
+	 *   profile?: object, keyGroups?: boolean}} [options] - Board, keyboard format
+	 *   (keyboard_formats id: compact_fit measures the per-format form factors on
+	 *   it alone), weights, the ideal finger load of finger_imbalance (finger → %
+	 *   of the non-thumb presses; the model's ideal_finger_load when absent), the
+	 *   fingering profile, and whether each key's worst groups are counted for
+	 *   every event (keys[code].worst; the SFB ones always are).
 	 * @returns {object} {layout, keyboard, metrics, fingers, rows, coverage,
 	 *   trigramClasses, keys, score}.
 	 */
@@ -865,7 +866,7 @@ var LAYOUT_ANALYSIS = (function () {
 			dead_key_usage: pct(c.dead, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
-			compact_fit: compactFit(layout, board, table),
+			compact_fit: compactFit(layout, board, table, opts.format),
 			char_coverage: charCoverage(best),
 			direct_digits: directDigits(layout, board),
 			shortcut_left: shortcutLeft(layout, board)
@@ -1183,14 +1184,69 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
+	 * The keyboard formats (100 %, TKL, 75 %, 65 %, 60 %), each with the keys
+	 * it lacks: the one table the editor's « Format », the Comparer's and the
+	 * compact form factors read (analysis_model.json).
+	 * @returns {Array<{id: string, hidden: Set<string>}>} In the model's order.
+	 */
+	function keyboardFormats() {
+		const model = data().model;
+		return model.keyboard_formats.map((format) => ({
+			id: format.id,
+			hidden: new Set(format.hides.flatMap((block) => model.keyboard_blocks[block]))
+		}));
+	}
+
+	/** The format a keyboard has when nothing chose one. */
+	function defaultKeyboardFormat() {
+		return data().model.default_keyboard_format;
+	}
+
+	/**
+	 * The keys one keyboard format lacks.
+	 * @param {string} id A keyboard_formats id.
+	 * @returns {Set<string>} The hidden key codes.
+	 * @throws {Error} On an unknown format.
+	 */
+	function formatHiddenKeys(id) {
+		const format = keyboardFormats().find((entry) => entry.id === id);
+		if (!format) throw new Error(`unknown keyboard format ${id}`);
+		return format.hidden;
+	}
+
+	/**
+	 * The compact form factors measured: the model's, a form factor marked
+	 * per_keyboard_format split over the keyboard formats (its weight shared
+	 * equally) or, when one format is chosen, measured on that one alone.
+	 * @param {string|undefined} format The chosen keyboard format, if any.
+	 * @returns {Array<{weight: number, missing: string[]}>} The form factors.
+	 */
+	function compactForms(format) {
+		const formats =
+			format === undefined ? keyboardFormats() : [{ hidden: formatHiddenKeys(format) }];
+		const forms = [];
+		for (const form of Object.values(data().model.form_factors)) {
+			if (!form.per_keyboard_format) {
+				forms.push(form);
+				continue;
+			}
+			for (const entry of formats)
+				forms.push({
+					weight: form.weight / formats.length,
+					missing: form.missing.concat([...entry.hidden])
+				});
+		}
+		return forms;
+	}
+
+	/**
 	 * Frequency-weighted share of the characters still typed on each compact
 	 * form factor, averaged with the form factors' weights.
 	 */
-	function compactFit(layout, board, table) {
-		const forms = data().model.form_factors;
+	function compactFit(layout, board, table, format) {
 		let sum = 0;
 		let weights = 0;
-		for (const form of Object.values(forms)) {
+		for (const form of compactForms(format)) {
 			const reachable = compileLayout(layout, board, new Set(form.missing));
 			let kept = 0;
 			let all = 0;
@@ -1374,6 +1430,9 @@ var LAYOUT_ANALYSIS = (function () {
 		layoutFromRows,
 		layoutFromComposerSource,
 		typingCodes,
+		keyboardFormats,
+		defaultKeyboardFormat,
+		formatHiddenKeys,
 		libraryLayouts,
 		compileLayout,
 		keyNgrams,

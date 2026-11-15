@@ -101,6 +101,7 @@ for (const file of [
 for (const id of Object.keys(E.METRICS)) keys.add(`${PREFIX}metric.${id}`);
 for (const id of DATA.model.fingers) keys.add(`${PREFIX}finger.${id}`);
 for (const id of Object.keys(DATA.model.keyboards)) keys.add(`${PREFIX}keyboard.${id}`);
+for (const format of E.keyboardFormats()) keys.add(`${PREFIX}format.${format.id}`);
 // The fingering editor's base choices and the errors it reports.
 for (const id of Object.keys(DATA.model.fingerings)) keys.add(`${PREFIX}fingering.base_${id}`);
 for (const m of fs
@@ -267,6 +268,43 @@ for (const layout of DATA.layouts) {
 	);
 	shownNames.set(layout.name, layout.id);
 }
+
+// Keyboard formats (maintainer, 2026-11-15): one table for the editor's
+// « Format », the Comparer's and the compact form factors; each smaller format
+// hides what the larger one hides, and more.
+const formats = E.keyboardFormats();
+check(
+	JSON.stringify(formats.map((f) => f.id)) === JSON.stringify(['full', 'tkl', '75', '65', '60']),
+	`keyboard formats: ${formats.map((f) => f.id).join(', ')}`
+);
+for (let i = 1; i < formats.length; i++)
+	check(
+		[...formats[i - 1].hidden].every((code) => formats[i].hidden.has(code)) &&
+			formats[i].hidden.size > formats[i - 1].hidden.size,
+		`keyboard format ${formats[i].id} does not hide more than ${formats[i - 1].id}`
+	);
+check(E.formatHiddenKeys('tkl').has('Numpad5'), 'TKL hides the numeric keypad');
+check(
+	E.formatHiddenKeys('60').has('ArrowUp') && E.formatHiddenKeys('60').has('F5'),
+	'60 % hides the arrows and the F row'
+);
+check(!E.formatHiddenKeys('65').has('ArrowUp'), '65 % keeps the arrows');
+let unknownFormat = false;
+try {
+	E.formatHiddenKeys('50');
+} catch {
+	unknownFormat = true;
+}
+check(unknownFormat, 'an unknown keyboard format must be refused');
+check(page.includes('id="la-format"'), 'the Comparer has no « Format »');
+// The format feeds compact_fit: the per-format form factors are measured on it.
+const ergopti = DATA.layouts.find((l) => l.id === 'ergopti');
+const tablesForFit = E.prepareNgrams(E.ngramsFromText('le clavier ergonomique 2026 !'));
+for (const format of formats)
+	check(
+		Number.isFinite(E.analyse(ergopti, tablesForFit, { format: format.id }).metrics.compact_fit),
+		`compact_fit on ${format.id}`
+	);
 
 // 5/ Globals
 const lexical = new Set();

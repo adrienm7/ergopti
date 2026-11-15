@@ -1,5 +1,5 @@
 {
-	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
+	"_description": "Shared parameters of the layout analysis engine (_shared/ui/layout_analysis/analysis_engine.js): which finger types each physical key (KeyboardEvent.code), which keys are home (the space bar rests both thumbs: shared_home_keys) or outer (7th right-hand column); lateral keys are derived from each finger's home column, the keyboards it measures on, the reference character set, the keyboard formats (100 %, TKL, 75 %, 65 %, 60 %: the blocks each lacks, shown by the editor and the Comparer and measured by the compact form factors), the compact form factors and the shortcut letters. Every value is defined in docs/design/layout-analysis.md. Geometry comes from _shared/layouts/data/keycodes/physical_keys.json. « substitutions » lists the plain character typed instead of a typographic one the layout lacks (the Kalamine analyser's rule).",
 	"schema_version": 1,
 	"key_unit_mm": 19.05,
 	"fingers": ["lp", "lr", "lm", "li", "lt", "rt", "ri", "rm", "rr", "rp"],
@@ -182,16 +182,50 @@
 		"rr": 11.5,
 		"rp": 6.5
 	},
+	"keyboard_blocks": {
+		"numpad": [
+			"NumLock",
+			"NumpadDivide",
+			"NumpadMultiply",
+			"NumpadSubtract",
+			"Numpad7",
+			"Numpad8",
+			"Numpad9",
+			"NumpadAdd",
+			"Numpad4",
+			"Numpad5",
+			"Numpad6",
+			"Numpad1",
+			"Numpad2",
+			"Numpad3",
+			"NumpadEnter",
+			"Numpad0",
+			"NumpadDecimal"
+		],
+		"editing": ["Insert", "Delete", "Home", "End", "PageUp", "PageDown"],
+		"function": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
+		"arrows": ["ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]
+	},
+	"keyboard_formats": [
+		{ "id": "full", "hides": [] },
+		{ "id": "tkl", "hides": ["numpad"] },
+		{ "id": "75", "hides": ["numpad", "editing"] },
+		{ "id": "65", "hides": ["numpad", "editing", "function"] },
+		{ "id": "60", "hides": ["numpad", "editing", "function", "arrows"] }
+	],
+	"default_keyboard_format": "tkl",
 	"form_factors": {
 		"iso_60_to_100": {
 			"label": "ISO 60–100 %",
 			"weight": 1,
-			"missing": []
+			"missing": [],
+			"per_keyboard_format": true
 		},
 		"ansi_60_to_100": {
 			"label": "ANSI 60–100 %",
 			"weight": 1,
-			"missing": ["IntlBackslash"]
+			"missing": ["IntlBackslash"],
+			"per_keyboard_format": true
 		},
 		"40": {
 			"label": "40 % (4 rows × 12)",

@@ -294,7 +294,9 @@ var LayoutEditorPage = (function () {
 			layer: 'base',
 			platform: '',
 			selected: null,
-			numpad: false,
+			// The keyboard format shown (analysis_model.json keyboard_formats, the
+			// Comparer's too): each hides the blocks it lacks.
+			format: LAYOUT_ANALYSIS.defaultKeyboardFormat(),
 			deadKey: null,
 			paletteBlock: PALETTE_BLOCKS[0].id,
 			// Whether the palette is unfolded, so a render keeps it open.
@@ -377,7 +379,8 @@ var LayoutEditorPage = (function () {
 		const analysisPanel =
 			typeof window.LAYOUT_ANALYSIS_PANEL === 'object'
 				? window.LAYOUT_ANALYSIS_PANEL.create({
-						onCompare: typeof host.compare === 'function' ? host.compare : null
+						onCompare: typeof host.compare === 'function' ? host.compare : null,
+						format: () => state.format
 					})
 				: null;
 
@@ -1372,10 +1375,21 @@ var LayoutEditorPage = (function () {
 							{ id: 'le-board-form' }
 						)
 					]),
-					checkbox('le-numpad', tl('numpad'), state.numpad, (on) => {
-						state.numpad = on;
-						render();
-					})
+					el('label', { class: 'le-inline' }, [
+						t('layout_analysis.format.label'),
+						select(
+							LAYOUT_ANALYSIS.keyboardFormats().map((format) => [
+								format.id,
+								t(`layout_analysis.format.${format.id}`)
+							]),
+							state.format,
+							(value) => {
+								state.format = value;
+								render();
+							},
+							{ id: 'le-board-format' }
+						)
+					])
 				])
 			]);
 		}
@@ -1621,17 +1635,15 @@ var LayoutEditorPage = (function () {
 
 		function board() {
 			const form = state.board;
+			const hidden = LAYOUT_ANALYSIS.formatHiddenKeys(state.format);
 			const keys = data.keys.filter(
-				(k) =>
-					k.kind === 'key' &&
-					k.geometry &&
-					k.geometry[form] &&
-					(state.numpad || k.group !== 'numpad')
+				(k) => k.kind === 'key' && k.geometry && k.geometry[form] && !hidden.has(k.code)
 			);
 			const width = Math.max(...keys.map((k) => k.geometry[form].col + k.geometry[form].width));
-			const height = Math.max(
-				...keys.map((k) => k.geometry[form].row + (k.geometry[form].height || 1))
-			);
+			// A format without the function row starts at the number row.
+			const top = Math.min(...keys.map((k) => k.geometry[form].row));
+			const height =
+				Math.max(...keys.map((k) => k.geometry[form].row + (k.geometry[form].height || 1))) - top;
 			const container = el('div', {
 				class: 'le-board',
 				id: 'le-board',
@@ -1679,7 +1691,7 @@ var LayoutEditorPage = (function () {
 								: label
 									? `${keyName(key.code)}: ${label}`
 									: keyName(key.code),
-							style: `--x:${g.col};--y:${g.row};--w:${g.width};--h:${g.height || 1}`,
+							style: `--x:${g.col};--y:${g.row - top};--w:${g.width};--h:${g.height || 1}`,
 							draggable: editableLayer() ? 'true' : null,
 							onclick: () => {
 								// « Pick on the board »: this click chooses the key to act as.
@@ -3770,6 +3782,8 @@ var LayoutEditorPage = (function () {
 			current: () => doc(),
 			// Saves the tabs now instead of after the delay.
 			flushAutosave,
+			// The keyboard format shown, which the Studio passes on to its Comparer.
+			format: () => state.format,
 			sideSlot,
 			render
 		};

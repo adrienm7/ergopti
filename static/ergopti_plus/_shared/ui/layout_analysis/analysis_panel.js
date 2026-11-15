@@ -168,11 +168,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
 	/**
-	 * @param {{onCompare?: function(object): void}} [options] - onCompare receives
-	 *   the edited layout in the library shape when the user asks to compare it.
+	 * @param {{onCompare?: function(object): void, format?: function(): string}} [options]
+	 *   - onCompare receives the edited layout in the library shape when the user
+	 *   asks to compare it; format gives the editor's keyboard format, which
+	 *   compact_fit measures on (the engine's default format when absent).
 	 */
 	function create(options) {
 		const onCompare = options && typeof options.onCompare === 'function' ? options.onCompare : null;
+		const keyboardFormat =
+			options && typeof options.format === 'function' ? options.format : E.defaultKeyboardFormat;
 		const saved = readStorage(STORAGE_KEY);
 		const corpora = DATA.corpora.map((c) => ({ id: c.id, title: c.title, builtin: c }));
 		const state = {
@@ -319,10 +323,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		/** The library's scores on these settings, computed once for them. */
 		function libraryScores(prepared, settings) {
-			const key = JSON.stringify([state.corpus, state.keyboard, settings]);
+			const key = JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings]);
 			if (state.libraryKey !== key) {
 				state.library = E.compare(E.libraryLayouts(), prepared, {
 					keyboard: state.keyboard,
+					format: keyboardFormat(),
 					weights: settings.weights,
 					idealLoad: settings.idealLoad,
 					profile: settings.profile
@@ -367,6 +372,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			const settings = comparerSettings();
 			const result = E.analyse(layout, prepared, {
 				keyboard: state.keyboard,
+				format: keyboardFormat(),
 				weights: settings.weights,
 				idealLoad: settings.idealLoad,
 				profile: settings.profile,
@@ -377,7 +383,10 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			note.textContent = settings.profile
 				? `${t('layout_analysis.panel.weights_note')} ${t('layout_analysis.fingering.custom')}`
 				: t('layout_analysis.panel.weights_note');
-			if (state.libraryKey !== JSON.stringify([state.corpus, state.keyboard, settings]))
+			if (
+				state.libraryKey !==
+				JSON.stringify([state.corpus, state.keyboard, keyboardFormat(), settings])
+			)
 				headline.textContent = t('layout_analysis.panel.ranking');
 			// The first ranking of a corpus takes a moment: let the page paint first.
 			await new Promise((resolve) => setTimeout(resolve, 0));
