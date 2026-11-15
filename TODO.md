@@ -253,6 +253,9 @@ runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (3e619b3ba
       Scope (maintainer, 2026-11-14 night): remove EVERY mention of Claude from the history, not only the author and
       committer: Co-Authored-By and Claude-Session trailers, session links, and any other reference to Claude or
       Anthropic in commit messages, on every branch that keeps history (dev, and main if any appears there).
+      [LATER] Left (2026-11-15): the whole rewrite; dev still has 1297 commits authored by « Claude » (1343 committed),
+      main none. It waits for every worker to stop, then needs the maintainer's one authorized force-push (also
+      [RELEASE]).
 
 ## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
 
@@ -270,7 +273,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       `apps.manifest.json` `window_title.product_names`, which the generated composers show without the brand
       prefix (`window-title-product-name`). Real-machine checks: the `layout_editor_window` lines of the three
       TODO-tests files.
-- [ ] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
+- [x] **Live analysis from the user's own typing.** The Studio reads the local keystats SQLite store (read only, never
       sent anywhere) and shows, for the layout being edited, the metrics computed on what this user really types:
       SFBs (same-finger bigrams), hand alternation, rolls, redirects, finger and row load. The numbers update as keys
       are moved. Reuse one shared metrics engine (the site's benchmark computation, `src/routes/benchmarks`, and
@@ -279,8 +282,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       Bridge done 2026-11-14 (`claude/ergopti-todo-studio-app`): « Analyse my typing » reads the store read only on
       the three OS (docs/design/layout-editor.md, « Ergopti Studio: My typing »); the metrics wait for the shared
       engine.
+      Checked 2026-11-15: done on dev (ec4d567ff8, 36b578b627, c054a781fa, 5f198ec52d): the editor's analysis panel
+      shows the metrics and finger load on « My typing » on the three OS, so « the metrics wait for the shared engine »
+      above is out of date; proof: test_layout_manager_bridge.lua (Linux, macOS),
+      test_keystats_reader_ngram_sources.ahk, tools/test/test-layout-manager-page.cjs. Real-machine checks: the
+      `layout_editor_window` lines of the three TODO-tests files.
 - [ ] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
       metrics; keep the corpora the site already uses as built-in choices.
+      [CODE] Left (2026-11-15): the Comparer reads a local file or pasted text (6e798c9afb, 1fb3330e32, be84e5ba93;
+      test-layout-comparer-page.cjs), but the edited layout cannot be analysed on it: the editor's panel offers only the
+      built-in corpora and « My typing ».
 - [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
       (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
@@ -290,12 +301,19 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       the user's data folder, the built-in corpus tables are served by the host on request, and « My typing » is
       the default corpus once loaded (docs/design/layout-editor.md). Tabs and embedding decided by the agent, to
       review by the maintainer.
+      [CODE] Left (2026-11-15): the library (115 layouts, fea99ea2ab), the Comparer tables and charts and the app tabs
+      are done (f0854d0f46, b200e583eb; test-layout-analysis-engine.cjs, test-layout-comparer-page.cjs); the layout
+      being edited is not in the Comparer's tables, only ranked in the editor panel. [DECISION] the ergopti/benchmarks
+      pages do not read layout_library.json: rebuild them on the shared library, or drop that requirement.
 
 - [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
       comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine
       as the app, so ergopti.fr is a full alternative to the online layout analysers. No upload of the user's text to
       a server: the analysis runs in the page.
-- [ ] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
+      [CODE] Left (2026-11-15): /studio and /studio/comparer analyse in the page, nothing uploaded (ceac641ab5,
+      7ddb151ab8, 6e798c9afb; layout-editor.playwright.cjs); the layout being edited does not enter the comparison (same
+      gap as the item above).
+- [x] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
       (`docs/audits/layout-analysers/`): Keyboard Layout Analyzer (KLA), KLAnext, the Ergo-L site's analyser and the
       other public analysers and generators found (online sites and open-source tools), including the Kalamine
       repository (the open-source tool that builds Windows, macOS and Linux layouts from a TOML description and has
@@ -307,13 +325,20 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       SFBs and same-finger skipgrams, rolls (inward and outward, two- and three-key), alternation, redirects (one-hand
       direction changes), lateral stretches and scissors, trigram classes, and any other one the study shows to be
       useful. Every metric is shown per layout and compared across layouts, in the app's Studio and on the site.
+      Checked 2026-11-15: done on dev (de5e0a1058, 90bbd06108, fea99ea2ab, 16e183c748):
+      docs/audits/layout-analysers/report.md and every metric defined in docs/design/layout-analysis.md; proof:
+      tools/test/test-layout-analysis-engine.cjs over metric_vectors.json, tools/test/test-analyser-scores.cjs. The
+      report's section 15 « to review by the maintainer » stays for the maintainer.
 
-- [ ] **One global score with editable weights.** Aggregate the metrics (SFB %, roll %, alternation, redirects,
+- [x] **One global score with editable weights.** Aggregate the metrics (SFB %, roll %, alternation, redirects,
       finger load balance, home-row usage, travel distance, skipgrams…) into one global score per layout. Default
       weights chosen and justified in the analyser study (cite what each source tool weighs and why), stored in one
       shared data file; the Studio (app and site) shows the score, the contribution of each metric, and lets the user
       change every weight (and restore the defaults), the ranking updating live. Score and weights tested on the
       reference corpus.
+      Checked 2026-11-15: done on dev (fea99ea2ab, de5e0a1058, 5d5f424542): score_weights.json, weights editor with
+      restore, live rescore and per-metric contributions; proof: tools/test/test-layout-analysis-engine.cjs (total
+      equals the sum of contributions, rescore). The default weights still await the maintainer's review.
 
 - [ ] **Shortcut placement metric (maintainer, 2026-11-14), worth about 5-10 % of the global score.** Rewards a
       layout whose useful Ctrl/Cmd shortcut letters sit on the left hand (the right hand stays on the mouse). One
@@ -323,37 +348,59 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       better on easy keys (home and lower row, near the index) than on hard ones. The table and the metric weight are
       editable in the Studio like the other weights. Goal of the whole analyser (maintainer): do better than every
       existing tool, Kalamine included.
+      [CODE] Left (2026-11-15): `shortcut_left` and its editable weight are done (fea99ea2ab, 5d5f424542;
+      metric_vectors.json); the letter usefulness table and key ease cannot be edited, saved or reset in the Studio yet
+      (only an « i » popover).
 
-- [ ] **Instant analysis (maintainer, 2026-11-14, very important).** Analysing and comparing layouts must feel
+- [x] **Instant analysis (maintainer, 2026-11-14, very important).** Analysing and comparing layouts must feel
       instant, unlike KLAnext, which re-processes the corpus for every selected layout. Pre-process each corpus once
       into character, bigram, trigram and skipgram frequency tables (the way Kalamine does), cache them (built-in
       corpora shipped pre-computed; a user's corpus or keystats data processed once and kept in the browser/app
       cache with a content hash), then score any layout by mapping those tables onto its keys: no pass over the text
       per layout. Target: a hundred layouts compared on a large corpus in well under a second; measure it and keep a
       performance test.
-- [ ] **Direct-access digits metric (maintainer, 2026-11-14), a small bonus in the global score.** A layout whose
+      Checked 2026-11-15: done on dev (fea99ea2ab, 1fb3330e32, 36b578b627): pre-computed corpus tables, hashed user
+      texts kept in the cache, about 0.3 s for 115 layouts on 2.5 MB; proof: the speed gate of
+      tools/test/test-layout-analysis-engine.cjs (budget 1500 ms, could be tightened below 1 s).
+- [x] **Direct-access digits metric (maintainer, 2026-11-14), a small bonus in the global score.** A layout whose
       digits are typed without a modifier (direct access) scores a little better; weight editable like the others.
+      Checked 2026-11-15: done on dev (fea99ea2ab): `direct_digits`, weight 0.03, editable; proof: metric_vectors.json
+      through tools/test/test-layout-analysis-engine.cjs.
 
-- [ ] **Character coverage bonus (maintainer, 2026-11-14).** The more characters a layout gives access to (on its
+- [x] **Character coverage bonus (maintainer, 2026-11-14).** The more characters a layout gives access to (on its
       layers and dead keys), the better; layouts such as Bépo or Optimot gain on this criterion. Weight editable.
-- [ ] **Outer-column penalty (maintainer, 2026-11-14).** Using a 7th right-hand column (keys beyond the right pinky's
+      Checked 2026-11-15: done on dev (fea99ea2ab, de5e0a1058): `char_coverage` over `reference_characters`, weight 0.1,
+      editable; proof: metric_vectors.json through tools/test/test-layout-analysis-engine.cjs.
+- [x] **Outer-column penalty (maintainer, 2026-11-14).** Using a 7th right-hand column (keys beyond the right pinky's
       normal column) is penalised twice: in finger travel distance, and through a compact-keyboard criterion below.
+      Checked 2026-11-15: done on dev (fea99ea2ab): `outer_column`, the travel in `distance` and the 40 % and 3×10 form
+      factors of `compact_fit`; proof: metric_vectors.json through tools/test/test-layout-analysis-engine.cjs.
 - [ ] **Compact-keyboard fitness bonus (maintainer, 2026-11-14).** The more of a layout works on a compact keyboard
       (80 %, 75 %, 65 %, 60 %, 40 %…), the better: score each layout by the share of its characters (weighted by
       frequency) still reachable on each form factor without extra keys, and fold it into the global score. Weights
       and form factors editable.
+      [CODE] Left (2026-11-15): `compact_fit` is done with an editable weight (fea99ea2ab; metric_vectors.json); the
+      form factors and their weights cannot be edited in the Studio, and 80/75/65/60 % are one combined entry
+      ([DECISION] only if they must be scored apart).
 
 - [ ] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
       time from green to red by how much the character placed on it costs (its share of SFBs, same-finger skipgrams,
       redirects, finger overload, distance…), with a selectable metric (or the global score) and a tooltip naming the
       worst pairs it causes; moving or swapping a key updates the colours and the score at once. Same view in the
       app's Studio and on the site.
+      [CODE] Left (2026-11-15): a heatmap exists only in the Comparer's layout details, with SFB partners in its tooltip
+      (test-layout-comparer-page.cjs); the editor's own keys are not coloured live, and there is no metric or
+      global-score selector nor worst pairs for the other metrics.
 
 - [ ] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
       « Éditer » (the editor, with a right-hand side panel showing the current layout's metrics, its global score and
       its rank against all library layouts or a chosen selection, updated live) and « Comparer » (layout battles: pick
       layouts, see every metric, the global score and the ranking side by side, with charts). A layout being edited
       enters the comparison in one click. Site routes: /studio and /studio/comparer.
+      [CODE] Left (2026-11-15): both tabs, the routes and the live side panel are done (ceac641ab5, 7ddb151ab8,
+      23019c0fb2, f0854d0f46, 5f198ec52d; layout-editor.playwright.cjs, site-structure.playwright.cjs); the panel ranks
+      against the whole library only, not a chosen selection, and no one-click « send to Comparer » exists. Real-machine
+      tab checks: the three TODO-tests files.
 
 - [ ] **Read every common layout format (maintainer, 2026-11-14).** A layout is only what each physical key types
       (base, Shift, AltGr, AltGr+Shift, dead keys). The Studio (app and site) imports, at least: the Keyboard Layout
@@ -370,10 +417,19 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       sources and states the limits (not legal advice). So the library
       re-encodes each arrangement as our own TOML (what each key types), never copies another tool's files verbatim,
       and credits each layout's author and source.
-- [ ] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
+      [CODE] Left (2026-11-15): layout_formats.js reads KLA, Kalamine, XKB, KLC, DOF, cmini, rows and .keylayout and
+      reports what it drops (14ec36aded, 5eeae785ab; tools/test/test-layout-formats.cjs); import is wired only in the
+      Comparer, not « Éditer », the KLA JSON and Kalamine TOML writers have no UI, the library comes only from Oxeylyzer
+      and cmini, and no importer is tested on third-party files. [DECISION] confirm the KLA JSON and Kalamine TOML
+      exports.
+- [x] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
       two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
       (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such
       as KLAnext lack, since they only produce JSON.
+      Checked 2026-11-15: done on dev (5f198ec52d, d01fa08ff4 and the `hostInstall` path of
+      layout_editor_window/script.js): start from AZERTY and the built-ins, drag-swap two keys, live score, downloads
+      and one-click install on the three OS; proof: tools/test/browser/layout-editor.playwright.cjs. Real-machine
+      install checks: the three TODO-tests files.
 
 - [ ] **« Comparer » is a full analyser on its own (maintainer, 2026-11-14), like KLAnext.** Most visitors only run
       battles, so the tab stands alone: select a list of layouts to analyse or analyse all of them at once; pick a
@@ -382,6 +438,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       never uploaded). Built-in corpora in the repository must be free to redistribute (public domain or an open
       licence), each with its source and licence recorded; others are linked, not shipped. The user's own layouts
       made in « Éditer » (several personal layouts, saved locally) appear in the comparison list beside the library.
+      [CODE] Left (2026-11-15): layout checkboxes, 25 built-in corpora with their register, paste and file reading are
+      done (f7b366f6ba, 07b19db438, bd5f162320; test-layout-comparer-page.cjs); PDF text is not read, and layouts made
+      in « Éditer » do not appear in the comparison list.
 
 - [ ] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
       tabs; a « + » button opens a new one (blank, from a library layout, or from a file). Everything is saved
@@ -389,10 +448,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       navigator.storage.persist() requested), in the app in the user's data folder; a reload, a crash or F5 restores
       every tab and its unsaved edits; export/import of all personal layouts as files for backup. Nothing is sent to a
       server.
+      [CODE] Left (2026-11-15): not started; the editor holds one document with no tabs, no « + », no IndexedDB or
+      storage.persist(), no autosave or restore, no bulk export or import.
 - [ ] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
       keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
       defaults to a built-in corpus).
-- [ ] **Each layout's score as every major analyser computes it (maintainer, 2026-11-14).** Besides Ergopti's own
+      [CODE] Left (2026-11-15): « My typing » becomes the default once loaded (ec4d567ff8, 36b578b627;
+      test-layout-manager-page.cjs), but it loads only on « Analyse my typing »; load it when the window opens if
+      keystats exist.
+- [x] **Each layout's score as every major analyser computes it (maintainer, 2026-11-14).** Besides Ergopti's own
       global score, « Comparer » and the « Éditer » side panel show each layout's score as KLAnext, Oxeylyzer, genkey,
       cmini, the Ergo-L analyser / Kalamine statistics, KLA, a200, Keyboard Layout Optimizer (dariogoetz) and any
       other widely used analyser would compute it: the most complete comparison available anywhere. Each analyser is
@@ -401,19 +465,31 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       revision read, licence and fidelity (exact, close or approximate) in `docs/design/layout-analysis.md`, and a
       test vector reproducing a published result where one exists. A column or tab per analyser, with an « i »
       popover giving the source and a link.
+      Checked 2026-11-15: done on dev (16e183c748, 0275c9fc9a, e9eaae7998, bf63e361f5, 0c197c6ce8): eleven scorers on
+      the shared tables, documented in docs/design/analyser-scores.md with fidelity (KLAnext and genkey approximate);
+      proof: tools/test/test-analyser-scores.cjs over analyser_vectors.json. Same work as « Scores of the other
+      analysers » below.
 
 - [ ] **Analysis review decisions (maintainer, 2026-11-14 evening).** Digit6 typed by the right index; the space
       bar by the LEFT thumb; the default global-score weights kept as justified in the study. Ideal finger load: the
       pinky below 8 % (about 6-7 %), with index >= middle >= ring >= pinky enforced (worker R proposed 6.5 / 11.5 /
       15.5 / 16.5 % per hand, editable). Every sourced value, metric, weight, fingering, load and table gets a small
       « i » button opening a popover that names its source with a link (site and app, 21 locales).
-- [ ] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
+      [CODE] Left (2026-11-15): Digit6, the space bar, the weights, the 6.5/11.5/15.5/16.5 % load and the « i » popovers
+      are done (5d5f424542, 0c197c6ce8; test-layout-analysis-engine.cjs); index >= middle >= ring >= pinky is checked on
+      the default only, not on a user-edited load. [LATER] the 19 other locales keep pending English.
+- [x] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
       for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
       (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
       like B, I and U on the left hand. Justified in the study behind an « i » popover.
+      Checked 2026-11-15: done on dev (5d5f424542): all 26 letters scored, B/I/U/K/Y included, justified at study anchor
+      `17-shortcut-letters`; proof: tools/test/test-layout-analysis-engine.cjs (`shortcut_letters` info value).
 - [ ] **Layout library credits (maintainer, 2026-11-14 evening).** Keep the 35 cmini-sourced layouts, credited; show
       credits known « from knowledge » now and verify each against the author's own page in a later pass.
-- [ ] **Scores of the other analysers (maintainer, 2026-11-14 evening).** Besides Ergopti's own global score, show
+      [LATER] Left (2026-11-15): the 35 cmini layouts and 25 credits are shown (4ba4944a46;
+      test-layout-analysis-engine.cjs); the later pass that checks each « knowledge » credit on its author's page
+      remains.
+- [x] **Scores of the other analysers (maintainer, 2026-11-14 evening).** Besides Ergopti's own global score, show
       each layout's score as every major analyser computes it (KLAnext, Oxeylyzer, Genkey, cmini, the Ergo-L
       analyser / Kalamine, KLA, a200, dariogoetz's optimizer and any other widely used one), reproduced from their
       published source, docs and default weights (reverse-engineered from published results only where nothing else
@@ -421,6 +497,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       per analyser in « Comparer » and in the « Éditer » side panel, each with an « i » popover (worker Q).
       Decided 2026-11-14 night: every analyser shows two numbers, its official score (the tool's own fingering) and
       the score under the user's custom finger model.
+      Checked 2026-11-15: done on dev (16e183c748, 0275c9fc9a, e9eaae7998, bf63e361f5, 0c197c6ce8): official and
+      custom-fingering scores of eleven analysers in « Comparer » and the « Éditer » panel, with « i » popovers; proof:
+      tools/test/test-analyser-scores.cjs, tools/test/test-layout-comparer-page.cjs.
 - [ ] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
       without a clearly compatible, recorded licence, or that could expose the project to a claim; starting from zero
       is acceptable. Deleted by decision: romans.txt, Python for Everybody, Projet GLM, Auxlang_X, the unverified
@@ -428,15 +507,25 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       books, Autonomie (CC BY-SA), the Hello World files (MIT), Leipzig (kept by the maintainer's choice, the
       project being non-commercial; its licence page blocks automated readers). Every shipped corpus is in
       static/corpus/register.json with source, licence and attribution, shown in the UI.
+      [DECISION] Left (2026-11-15): the refused texts are deleted and every register entry ships with its licence shown
+      (9c862ce3a2, f7b366f6ba, b6deb3d9db, d8d88f3481; test-layout-comparer-page.cjs); static/corpus/frequences_lettres/
+      (LdS tables, xlsx, images) has no licence or register entry: delete it or record a licence; and the Johnix « prog
+      » file predates its MIT grant: rebuild it from the upstream helloworld repository or accept it.
 - [ ] **More corpora from the internet (maintainer, 2026-11-14 evening).** Rebuild a rich set of built-in corpora under
       compatible licences (public domain, CC0, CC BY, CC BY-SA): French first, then English and the other languages
       Ergopti users type; prose, e-mail and chat-like text, code. Candidates: Wikisource, Project Gutenberg, Wikipedia
       extracts, Tatoeba, permissively licensed code.
+      [CODE] Left (2026-11-15): French and English books, Tatoeba, Wikipedia and MIT code are in (07b19db438,
+      bd5f162320, 720aa72212, be84e5ba93); no text corpus in another language, nothing from Wikisource, no e-mail or
+      chat register.
 - [ ] **Large published frequency tables (maintainer, 2026-11-14 evening).** Use existing large-scale language
       analyses as built-in corpora: char, bigram and trigram counts from huge corpora (Google Books Ngram and Peter
       Norvig's counts, Wikipedia-derived frequency data per language, the Leipzig frequency lists, Lexique for French,
       FrequencyWords, Tatoeba), imported as count tables through a generator with source, version, licence and
       attribution; word-level lists miss cross-word bigrams, said in their popover.
+      [CODE] Left (2026-11-15): only FrequencyWords word lists are imported (be84e5ba93) with the cross-word caveat; no
+      char, bigram or trigram count-table format, and none of Norvig, Leipzig lists, Lexique or Wikipedia frequency
+      data.
 
 - [ ] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
       and app) the user sets, per physical key, the finger and hand that press it; then, for each finger, its home key
@@ -448,19 +537,32 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       ANSI, ortholinear/matrix, column-staggered ergonomic splits (Ergodox, Corne, Moonlander, Kinesis-like thumb
       clusters), with real key positions and thumb keys, a default fingering and home keys per geometry; keys a
       geometry lacks are reported per layout, never dropped silently.
-- [ ] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
+      [CODE] Left (2026-11-15): per-key fingers and home keys, nine QMK geometries, missing keys reported, profile
+      saved, exported and reset are done (b53b32b712, c4a9ecf295, 0275c9fc9a, f50a9aafbe, b200e583eb;
+      test-layout-analysis-engine.cjs); the fingering is editable only in the Comparer, one profile serves every
+      geometry, and a home key is not checked to lie in its finger's zone.
+- [x] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
       /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
+      Checked 2026-11-15: done on dev (ceac641ab5, fc0239c80e): src/routes/editeur redirects to /studio, the site
+      navigation and docs point to /studio; proof: tools/test/browser/site-structure.playwright.cjs (`/editeur` →
+      `/studio`).
 
-- [ ] **Redesign the layout editor (maintainer, 2026-11-14 night).** Today it is cluttered: buttons everywhere,
+- [x] **Redesign the layout editor (maintainer, 2026-11-14 night).** Today it is cluttered: buttons everywhere,
       everything packed together. Rework « Éditer » (site and app, one shared page) into a clean, responsive, well
       designed UI: tabs or collapsible sections for the secondary tools (stickers, navigation layer import, export,
       metadata), more horizontal space, clear hierarchy, works from phone width to wide screens, light and dark.
       Add a visible layer selector to show and edit the Base, Shift, AltGr and Shift+AltGr layers (and other layers
       the layout defines); the maintainer could not find how to display them.
+      Checked 2026-11-15: done on dev (b18f1dc857, 75df5821b7): layer selector for Base, Shift, AltGr, Shift+AltGr and
+      extra layers, tool tabs, container queries, light and dark; proof:
+      tools/test/browser/layout-editor.playwright.cjs.
 
 - [ ] **Studio and editor i18n: English and French first (maintainer, 2026-11-14 night).** Every user-facing string
       of Studio, the layout editor and the analyser goes through the i18n system, written in English and French only
       for now; improve the labels first, translate into the other locales afterwards.
+      [CODE] Left (2026-11-15): Studio labels go through i18n with English and French (145df235e1, b9117767e7;
+      test-locale-catalogue-complete.cjs); the fingering refusal embeds the engine's raw English error
+      (analysis_engine.js), and no label-improvement pass has been made.
 
 - [ ] **Site keyboard display from a layout file, later (maintainer, 2026-11-14 night; not now).** The site's
       Ergopti keyboard display is hand-coded today. Make it render from a layout source instead (the Ergopti TOML
@@ -468,18 +570,27 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       of the raw layout (labels, visual adjustments) become code: a documented display patch applied after loading
       the TOML or keylayout, reproducing today's Ergopti display exactly (pixel or DOM comparison test against the
       current hand-coded rendering). Not started: queued after the current Studio work.
+      [LATER] Left (2026-11-15): not started, by the maintainer's choice.
 
-- [ ] **Studio site page uses all the space (maintainer, 2026-11-14 night).** No hero title, introduction or
+- [x] **Studio site page uses all the space (maintainer, 2026-11-14 night).** No hero title, introduction or
       « Contenu de la page » column on /studio and /studio/comparer: a full-width, full-height workspace under the
       header with a slim « Éditer » / « Comparer » bar. Sticker printing, size and levels move out of the main toolbar
       into a secondary export/print place. Key labels never overflow their key (fit, wrap or ellipsis with tooltip).
-- [ ] **Floating Ergopti layout button only on /ergopti (maintainer, 2026-11-14 night).** The fixed bottom-right
+      Checked 2026-11-15: done on dev (7ddb151ab8, 31d6dad5bd, 75df5821b7, b18f1dc857): full-screen workspace without
+      hero, sidebar or footer, stickers in the tool tabs, labels fit or ellipsis; proof: `expectStudioWorkspace` in
+      site-structure.playwright.cjs, the label-overflow check of layout-editor.playwright.cjs.
+- [x] **Floating Ergopti layout button only on /ergopti (maintainer, 2026-11-14 night).** The fixed bottom-right
       button that shows the Ergopti layout appears on /ergopti pages only, not on the home, Ergopti+, Studio or others.
+      Checked 2026-11-15: done on dev (41932cdf08): src/routes/+layout.svelte shows it inside /ergopti only; proof:
+      tools/test/browser/site-structure.playwright.cjs (present on four /ergopti pages, absent from home, Ergopti+ and
+      both Studio tabs).
 
-- [ ] **Editor feedback, 2026-11-14 night (maintainer).** On phones the board keeps a minimum key size and gets
+- [x] **Editor feedback, 2026-11-14 night (maintainer).** On phones the board keeps a minimum key size and gets
       its own horizontal scroll bar (the page itself never scrolls sideways). Non-base layer views show only that
       layer's value, without the small base-layer hint. Extra layer chips read as their modifiers, not raw ids.
-- [ ] **Custom shortcuts in the editor (maintainer, 2026-11-14 night).** No layer view per modifier combination.
+      Checked 2026-11-15: done on dev (f8eb6a2429, c73869466c, 1b749133ab): own scroll bar and minimum key size on
+      phones, no base hint, chips named by modifiers; proof: tools/test/browser/layout-editor.playwright.cjs.
+- [x] **Custom shortcuts in the editor (maintainer, 2026-11-14 night).** No layer view per modifier combination.
       One « Raccourcis » view gives each key its default shortcut rule for every non-text modifier combination
       (e.g. same as the base key, or acts as physical key X); the key inspector adds overrides for any specific
       combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
@@ -507,11 +618,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [ ] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
       exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
       .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
+      [CODE] Left (2026-11-15): every format reports `shortcut_key` as omitted and the export note says so, which covers
+      Linux; the shortcut VK in the KLC and built DLL, and the .keylayout Command level, are not written. Real-OS proof
+      is [HARDWARE].
 - [ ] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
       Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
       regression test that fails on the old behaviour.
+      [CODE] Left (2026-11-15): not started; json.lua still decodes `null` to `{}` and drops array holes.
 - [ ] **Google Books Ngram letter tables, later (2026-11-14 night).** The 1-gram files are several GB per language:
       a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
+      [LATER] Left (2026-11-15): not started.
 
 ## Windows CI reliability (2026-11-07)
 
@@ -522,9 +638,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       `remap-runtime-v16.3.0-ergopti.3` and the dev.166 launcher carry the same leaf (759d8aae…), so the leaf is not
       the cause. Next: the `remap.runtime_owner` lines (« unavailable: <reason> ») and `launcher.log` « owned runtime
       install: refused (…) » of a build with these fixes.
+      [HARDWARE] Left (2026-11-15): the fixes are in v1.0.10-dev.175 (f71d6eb884, 84090226ab); the `remap.runtime_owner`
+      and `launcher.log` lines of an affected Mac on dev.175 or later are needed (the latest runtime is now ergopti.6).
 - [ ] **[RELEASE] Dev naming handoff:** everything is on `dev`. `v0.0.0-dev.169` is the bridge (ci.yml keeps the
       legacy core up to counter 169), then `v1.0.10-dev.170`; the next merge to `main` carries
       `Release-As: 1.0.10`. Delete the orphan draft `v0.0.0-dev.167` by hand (this session cannot delete releases).
+      [RELEASE] Left (2026-11-15): dev.174 and dev.175 are published as v1.0.10; main is still at 4d834c866a: merge with
+      `Release-As: 1.0.10`, and delete the draft dev.167 by hand if it still exists.
 
 ## Layout generator from an Ergopti TOML source (maintainer request, 2026-11-06)
 
@@ -550,9 +670,13 @@ into an exported `.keylayout`, since macOS may refuse to load it.
 
 - [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller and `<dll>-setup.exe` (SHA-256,
       RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » says.
+      [RELEASE] Left (2026-11-15): not started; tools/kbd-dll.cjs reports `signed: false` until SignPath or the PFX
+      exists (the job wiring itself is [CODE] once it does).
 
 - [ ] **Keyboard types JIS and ABNT.** Deferred on 2026-11-11: their keys (Yen, Ro, Henkan, Muhenkan, Kana, keypad
       comma) would enter `physical_keys.json`, which the Windows driver parses at boot; add them once that cost is measured.
+      [DECISION] Left (2026-11-15): not started; physical_keys.json has none of those keys; measure their Windows boot
+      parse cost, then decide.
 
 - [ ] **Retire the composer and the navigation layer editor.** The Windows host takes a source since 2026-11-12: delete
       the composer section (`layout_composer/composer_page.js` and its markup), then retire `_shared/ui/layer_editor` and
@@ -562,6 +686,8 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       both through the registry). Left: the navigation layer editor, which waits until every driver reads the
       source's `nav` layer instead of `layers.toml` (today the editor's « Apply the navigation layer » still writes
       `layers.toml` through it).
+      [CODE] Left (2026-11-15): the composer part is done (0f23c3fee9); `_shared/ui/layer_editor` and `nav_save` remain,
+      and no driver reads the source's `nav` layer yet (Linux nav_layer.lua reads layers.toml).
 
 ## Parity audit pause and resumption
 
@@ -578,6 +704,10 @@ and the next module candidates. The audit is paused at the maintainer's request.
       while paused on all three OS, the key inert until resume; the Windows tray stops greying the rows the pause
       allows; macOS ends CapsWord at pause like Windows and Linux. Keep-awake / activity simulation stops at pause and is restored
       on resume on all three OS (maintainer, 2026-11-14 night).
+      [CODE] Left (2026-11-15): the census rows all stop (3b4a582c7b, 8cf30f45ce, 095ec8ddfa, dd3a289fb1, a1b5c909b0,
+      0d83cf67b5, 3efc983b86, e4fc280c4a; test_keepawake_restored_on_resume.ahk, test_pause_closes_app_interval,
+      test_paused_driver_records_no_keys); the Windows tray still greys 11 rows (`greyed_when_paused` in menu.toml,
+      menu_init.ahk), overlapping EDD-1 below.
 - [ ] **[CODE] Parity audit continuation** (claimed by worker H, 2026-11-13)**:** on resumption, reconcile current source areas with the linked coverage register, then deepen tap-holds/chords/layers as one bounded module across Windows/macOS/Linux/shared before moving to another. Keep native receiving and implementation of existing finding IDs separate; do not restart completed focused campaigns without source drift or a new hypothesis.
       Progress (10 November 2026, [tap-hold campaign](docs/audits/platform-parity/2026-11-10-tap-holds/report.md)): census reconciled (375 areas, 12 new and 206 changed since the last pinned census, still to review outside tap-holds). Fixed on Linux/shared: LAlt's Tab tap with no hold is tap-only (THL-001), the Alt-Tab and RCtrl Tab taps keep their strict threshold (THL-002), a pair starts from the earliest held first key (THL-003), a pair's release tap respects the decided tap minimum (THL-004), chord defaults pinned across drivers (THS-001). Decisions pending: THD-1, THD-3, THD-4 (pair tap and the layer, layer-hold pair activity, macOS thumb Backspace under modifiers) and THD-2's lone window. Minimum tap (decided 2026-11-10): Linux complete; macOS needs a Karabiner mechanism qualified on a Mac (`to_if_alone` has no minimum); Windows is the maintainer's change. Left: the report's Linux and macOS remaining rows; native receiving unqualified. Next module after this one: hotstring cascade.
       Progress (12 November 2026, [tap-hold follow-up](docs/audits/platform-parity/2026-11-12-tap-holds-followup/report.md)): register reconciled with the 24 campaigns since the pause (381 areas). Drift since `637c017a` reviewed: fixed a single foreign chord action turning every Linux key combination off (TCL-003). Open for the shared tap-hold file series (`wt/taphold-landed`): TCL-001 (manifest rows still in `tap_hold.toml`), TCL-002 (action ids not translated between macOS and Linux), TCL-004 (Mac thumb-key ids, a decision), TCL-005 to 007; the two 2026-11-10 macOS rows are fixed in the generator, proven on the model (Left Command's one-shot Shift holds Shift and stands down under modifiers; a pair takes the first key held earliest), with field points `lalt_one_shot` and `pair_press_order`.
@@ -618,6 +748,9 @@ and the next module candidates. The audit is paused at the maintainer's request.
       Progress (14 November 2026, [pause, fourth pass](docs/audits/platform-parity/2026-11-12-pause/report.md#fourth-pass-2026-11-14-worker-h-shared-rows-on-all-three-drivers), worker H): on Windows, macOS and Linux together, the personal hotstrings editor opens while paused, and the word expander, custom terminator and extension scope rows commit while paused, as do the AI privacy, trigger, display and generation rows. The shared policies, their AutoHotkey twins and corpora admit a paused snapshot and still refuse a malformed pause. Left: the AI enable switch, model, profile and API rows, the macOS legacy shortcut and slot rows, the magic key capture, the typing-inertness audit.
       Progress (14 November 2026, [pause, fifth pass](docs/audits/platform-parity/2026-11-12-pause/report.md#fifth-pass-2026-11-14-worker-p-shortcut-slots-changed-while-paused), worker P): a shortcut slot changed while paused is saved at once and takes effect on resume, the resume chord staying the one of pause time (decided by the maintainer on 2026-11-14). macOS: the script chord slots, switch and restore, the keyboard slots and the editor legacy shortcut; Linux: the script chords; Windows: a global restore while paused keeps the chords of pause time across its reload (the Shortcuts submenu is greyed while paused). Then (sixth pass, decided by the coordinator on 2026-11-14) « capture the next key » for the physical magic key runs while paused on the three OS, saved at once and inert until resume; the Windows Layout submenu stays live while paused, only the layout manager and editor greyed with why. Typing-inertness audit done (report): every typing feature is gated on the three OS; fixed on Linux, metrics recorded keys and chords while paused; fixed on macOS, a pause ends a running CapsWord and its CapsLock, as on Windows and Linux (field point `pause_ends_capsword`). Background behaviours census (report): Linux metrics (application time, pointer, network, topology, system rows) and its spotlight now stop at pause; macOS forgets the distance seed. Keep-awake is restored on resume on the three OS (decided by the maintainer on 2026-11-14). Fixed (eighth pass): the macOS pause closes the foreground interval, so the time before it is credited. Fixed (seventh pass): the number-row choice is admitted while paused on the three OS (the shared policy and its Windows twin), saved at once and applied on resume; a pause edge between the capture and the write retires the capture.
       Progress (13 November 2026, [tooltips and WPM campaign](docs/audits/platform-parity/2026-11-13-tooltips-wpm/report.md), worker H): the editors campaign's tooltip and WPM rows. Fixed on Linux: the preview hides before its trigger window closes (TWL-001), the WPM widget and tray readout hide while paused (TWL-002), an AI suggestion left alone runs out after the shared lifetime (TWL-003). Open: the Linux `llm_prediction` delay row, decisions TWD-1 (a zero-delay preview's 3 s safety hide, Windows only) and TWD-2 (« 0 » shown on a non-typing key on macOS and Linux).
+      [CODE] Left (2026-11-15): census areas outside the campaigned modules, the macOS bindings.lua and Linux
+      key_combinations.lua deep pass, and the Windows rows of each report. [DECISION] THD-1 to THD-4, HCD-1/2/4/5,
+      TCL-004, and the agent's GSD-1 and HCD-3.
 
 ## Dead-key composition parity follow-up
 
@@ -636,9 +769,17 @@ and the next module candidates. The audit is paused at the maintainer's request.
 
 - [ ] **Windows/Linux diagnostics:** (claimed by worker F, 2026-11-13: the section is published on both; the feed-only fallback stays blocked on the empty `public_key_spki_base64` and `off` enforcement, a maintainer key-provisioning step, so no code step can run before it) add the manifest-derived unavailable-features explanation already collected and rendered on macOS. Evaluate authenticated fallback metadata for feed-only update installation; retain current refusal without authenticated assets (macOS uses signed Sparkle metadata for newest-channel updates). Progress: Linux and Windows now publish the section through one shared Lua collector and its AHK mirror (AHK test written, not run on Linux); the feed-only fallback evaluation remains. Decided 2026-11-06 (align on macOS): a feed-only list may install the channel's newest release only through authenticated metadata, otherwise the refusal stays. Windows/Linux design: download the asset under its conventional name, compute size and SHA-256 locally, rebuild the `asset_signing.json` record and verify `<asset>.sig` against the pinned key before installing. Blocked: `public_key_spki_base64` is empty and enforcement is `off`, so every such install would refuse today; build it once the key is provisioned (docs/tooling/update-signing.md).
       PC run 2026-11-11: the AHK mirror of the unavailable-features section (`test_healthcheck_core.ahk`, ui group) passed natively.
+      [RELEASE] Left (2026-11-15): the feed-only fallback waits on the release signing key (`public_key_spki_base64`
+      empty, enforcement `off` in asset_signing.json).
 - [ ] **Windows/macOS/Linux:** (claimed by worker F, 2026-11-13: macOS and Linux code is done, both getters true; the Windows collision and delivery owners are written, 2026-11-13: `ui/physical_shortcuts/delivery.ahk` ports the shared policy (replaying `_shared/tests/corpus/shortcuts/physical_conflict_vectors.json`, as macOS and Linux now do), takes claims from the other physical slots, the tap keys, every live registrar binding and any AutoHotkey variant already on the key, and registers nothing while the getter answers false; `test_physical_shortcut_delivery.ahk`. The getter stays false until the real-PC check in TODO-tests-windows.md) qualify physical shortcut delivery and its editor; Windows has its host, its delivery refused. Decided by the maintainer on 2026-11-11: both Lua production getters (`keyboard_shortcuts.physical_delivery_available`, Linux and macOS) answer true, every source, collision and output-custody refusal kept; the Mac field report validates it. Before that, both answered false. Preserve the safety refusal until source/collision/output custody is qualified; see LIN-004 in the deep input audit. Windows token-by-token prediction display also remains unvalidated (`platform_reason.token_streaming_unvalidated_on_windows`). Progress (code, 6 November 2026): the refusal is now pinned on the real chain, not an injected answer: on Linux and macOS a test drives the production `keyboard_shortcuts.physical_delivery_available` (false), the real editor host and the shared menu port with the GUI ready, and the editor stays closed with no scope captured. The greyed editor row no longer says « Try reopening it »: it names the cause, `physical_shortcuts.delivery_unqualified` (21 locales, `disabled_reasons` on the row). Left: the Windows host, and the qualification itself, which needs real hardware (under "To confirm on Linux" and "To confirm on the Mac"); only then may a getter turn true. Done (2026-11-11): both getters true; the pinned tests now pin true and keep each refusal under an explicit false answer (`test_physical_delivery_available.lua` on both drivers, `test_physical_shortcuts_row_available.lua`, the scope fixtures); the Windows row reason (`physical_shortcuts.windows_unavailable`, 21 locales) said Windows had no host, neither the editor nor the delivery. Done (Windows host, decided by the maintainer on 2026-11-11): the WebView2 host of the shared page, its scope, the menu port and the key capture (`windows/ui/physical_shortcuts/`, `KHCapturePosition`); the production `PhysicalShortcutDeliveryAvailable` answers false, the row lost its Windows restriction and `windows_unavailable`, and greys with `delivery_unqualified` (`test_physical_shortcut_host.ahk` pins the real chain). Left on Windows (maintainer, real hardware), before the getter may turn true: (1) build the collision owner (the Linux `physical_collisions` counterpart: tap-hold keys, key combinations, script and keyboard slots, layer remaps) and pass it to `PhysicalShortcutsScope`, and a delivery owner that registers each bound slot's scan code with its exact modifiers and dispatches the action; (2) flip the getter in an isolated driver only, open the editor from the tray: the page shows positions by name (A, 1, Pavé num. 7), never `KeyA` or `SC01E`; (3) Capture a key with Ctrl, Shift, Win and none held, on an ISO and an ANSI board, with AZERTY and Ergopti layouts: the captured position is the physical key, AltGr is refused, a key sent by another program (SendInput) is not captured, and the key still types in the focused app; (4) save an action, then edit, move and remove it: config.toml gets one backup and one write each, the reload keeps it, and an external edit of config.toml between opening and saving shows « Configuration changed »; (5) press the bound key: the action runs once, the key's character is not typed, nothing runs while paused, after the driver quit, or for the same key sent synthetically; (6) bind a combination already owned by a tap-hold, a script shortcut or a key combination: the save is refused with `collision`; (7) close the window during a capture and while the picker is open: no capture survives, no draft is saved. Only then may the getter turn true.
+      [HARDWARE] Left (2026-11-15): Windows `PhysicalShortcutDeliveryAvailable()` still returns false until steps (2) to
+      (7) pass on the PC, and token streaming is unvalidated there.
 - [ ] **Windows and Linux:** (claimed by worker F, 2026-11-13: code done on both, only the real touchpad checks below are left) evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement while the other drivers handle discrete gestures. Linux done (follow macOS, decision of 2026-11-06): `linux/modules/gestures/incremental_tracker.lua` fires an incremental slot's action while the fingers move, from the decoder's live travel (`mt_decoder` `live()`), with the step rule and reversal shared with macOS (`_shared/gestures/engine/incremental.lua`, `_shared/gestures/engine/sensitivity.lua`); travel is converted to millimetres with the touchpad's own resolution (EVIOCGABS, `touchpad_finder.read_resolution`), the unit of the macOS sensitivities, so the manifest's modes and steps (`gestures.modes`, `gestures.sensitivities`, now declared for `linux`) apply unchanged; a pad that reports no resolution fires once, as x1, said in the log. Modes and steps are read from and written to `[gestures.modes]` / `[gestures.sensitivities]` and offered in each swipe slot's submenu through the shared templates (`test_gesture_incremental.lua`). Windows done (code, decision of 2026-11-11): the driver owns a raw HID digitizer reader (`modules/gestures/raw_touchpad.ahk` over `platform/system/raw_input.ahk`: RegisterRawInputDevices for usage page 0x0D usage 0x05 with RIDEV_INPUTSINK and RIDEV_DEVNOTIFY, the preparsed descriptor read with HidP_GetCaps/HidP_GetValueCaps, contact X/Y, identifier, tip and contact count read with HidP_GetUsageValue/HidP_GetUsages, parallel and hybrid reports assembled into frames by `modules/gestures/touchpad_hid.ahk`); travel is turned into millimetres with the descriptor's logical-to-physical scale (centimetre or inch units and the HID unit exponent), and `modules/gestures/incremental_tracker.ahk` fires an incremental slot while the fingers move through the AutoHotkey ports of the shared direction and step rules (`direction.ahk`, `incremental.ahk`, which replay `_shared/tests/corpus/gestures/incremental_steps.json` and `direction_vectors.json`; the rule numbers come from the timings registry's [gestures] keys). The 3- and 4-finger straight slots of `gestures.modes` / `gestures.sensitivities` are declared for `ahk` and offered through the shared swipe-slot template (`menu_gestures.ahk`); `platform_reason.gesture_modes_and_steps_need_finger_travel` is retired from the 21 locales, the other entries keep `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`. Coexistence with the registry-mapped shortcut: a touch that stepped swallows its swipe's shortcut, before or after the lift (`[gestures] incremental_handoff_ms`), a touch that did not step lets it fire once (decision recorded in docs/memory/maintainer-decisions.md). A descriptor without a physical size fires once, as x1. Tests: `test_gesture_incremental_rule.ahk`, `test_touchpad_hid.ahk`, `test_raw_touchpad_owner.ahk`, `test_gesture_swipe_slot_menu.ahk`. Left: a real touchpad check on Linux (see "To confirm on Linux") and on Windows (see "To confirm on the Windows PC").
+      [HARDWARE] Left (2026-11-15): code done (65b21ccab4; test_touchpad_hid.ahk, test_gesture_incremental.lua); only
+      the real touchpad checks on Linux and Windows.
 - [ ] **Linux Wayland:** focused-application identity on GNOME, KDE and COSMIC, from the findings above: an Ergopti GNOME Shell extension exposing the focused window's WM class, title and pid on the session bus (installed and enabled by the installer), a persistent KWin script calling back a session-bus name the daemon owns on `workspace.windowActivated`, and a native `zcosmic_toplevel_info_v1` client for COSMIC. Each needs its desktop to be qualified on real hardware. Code done for GNOME and KDE (10 November 2026): the GNOME Shell extension (`linux/platform/desktop_focus/gnome/`, `focus@ergopti.fr`, GNOME 45 and later) and the KWin script (`linux/platform/desktop_focus/kwin/`, Plasma 5 and 6) call `org.ergopti.Focus1.Activated(class, title, pid, id)` on the session-bus name `org.ergopti.Focus`, owned by a resident worker (`linux/platform/focus/compositor_focus_worker.lua`, libgio) that admits only the current owner of `org.gnome.Shell` or `org.kde.KWin`; the daemon reads its lines (`linux/platform/focus/compositor_focus.lua`) and `window_info` answers the 4×/s poll from memory, no fork, unknown before the first report, after a malformed one or once the worker exits. `install/compositor_focus.sh` installs and enables them for the running desktop (once: an update keeps a user's off switch; GNOME for the next login when the Shell refuses), run by install.sh and by launch.sh at every start (so .deb, .rpm and AppImage users get them too; Flatpak's private data folder cannot), removed by uninstall.sh. Tests: `test_compositor_focus.lua`, `test_compositor_focus_assets.lua`, `tools/test/test-linux-compositor-focus-install.cjs`, and the worker on a real dbus-daemon (`tests/hardware/run_compositor_focus_bus.lua`). Left: COSMIC (a `zcosmic_toplevel_info_v1` client means hand-built libwayland-client interface tables over FFI that nothing here can run against without cosmic-comp; it stays unknown), and the real-desktop check under « To confirm on Linux ». COSMIC code done (11 November 2026): `linux/platform/focus/cosmic_toplevel_worker.lua` binds `zcosmic_toplevel_info_v1` version 1 through libwayland-client with hand-built interface tables (the clipboard owner's pattern), commits each window on `done` and prints the single activated window as a focus record (app_id as class, no pid; none or two activated is a clear, `finished` ends the worker); `compositor_focus` starts it for `XDG_CURRENT_DESKTOP` COSMIC and `window_info` answers from memory as for GNOME and KDE (identity `cosmic::<id>`). Proved through the real libwayland-client against a LuaJIT protocol fake (`tests/hardware/run_cosmic_toplevel_fake.lua`, 7 receipts, run in the compositor-focus CI step) plus the tracker unit tests; version 1 (rather than v2 and later, which announce windows through ext-foreign-toplevel-list) decided by the coordinator on 2026-11-11 overnight; superseded 2026-11-13 by the maintainer's decision: both generations, chosen by what the compositor offers. Left: a real cosmic-comp run under « To confirm on Linux ».
+      [HARDWARE] Left (2026-11-15): code done (12dac001c1, e87c68be33; test_compositor_focus.lua,
+      run_cosmic_toplevel_fake.lua); only the GNOME, KDE and cosmic-comp desktop checks.
 
 ## Sequential WPM, wrap and personal-info parity follow-up
 
@@ -693,6 +834,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
       question needs the artifacts `swift-launcher-failure-43277967473-1` and the `number-row-carbon-arm64-…` artifact of
       43276494558 before they expire; this session's network could not reach the artifact store.
       Cause still unproven, no code changed.
+      [CODE] Left (2026-11-15): read the artifacts `swift-launcher-failure-43277967473-1` and the number-row artifact of
+      43276494558 before they expire (agent pid and run count), then find the cause.
 
 ## Native runtime, editor and diagnostics parity follow-up
 
@@ -701,6 +844,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 ### Qualification and policy follow-up
 
 - [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Worker B 2026-11-14: the Windows and macOS boundaries need a real PC and a real Mac, so they stay for the maintainer; the Linux runtime, editor and diagnostics flows can run in the hosted desktop-webview CI shard and are still to be written there. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain. Mac part routed by worker F (2026-11-13): the field point `native_ui_receiving` in TODO-tests-macos.md.
+      [HARDWARE] Left (2026-11-15): the Windows and macOS boundaries need the machines; [CODE] the Linux live runtime
+      and editor flows in the desktop-webview shard are still to write.
 
 ## Migration and update parity follow-up
 
@@ -709,6 +854,7 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 ### Linux
 
 - [ ] **[PHYS-M]:** receive the recovery audit scenarios on isolated macOS: Darwin migration/permission/rename contracts, selected-profile restart adoption and Versions ARMED/refused-exit reconciliation. Linux physical ports do not close Hammerspoon/APFS qualification.
+      [HARDWARE] Left (2026-11-15): not started; needs an isolated Mac.
 
 ## End-to-end parity follow-up
 
@@ -719,6 +865,8 @@ Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/re
 - [ ] **[PHYS-W] / [PHYS-M] / [PHYS-L]:** execute only the receiving scenarios named by each flow report on isolated native hosts. Source/recording-port tests do not close native focus, selection, keyring, application or device qualification. Linux, partly (2026-11-11, [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)): linux-clipboard X11 target negotiation (`run_clipboard_owner.lua x11`) and the AI selection read and replacement on a real accessibility server (`run_llm_selection_focus.py`, 31 cases) now run in the desktop-webview CI shard. The locked/unlocked keyring and its password prompt (linux-crypto) are received too: a real gnome-keyring and its prompter, answered and dismissed (`run_keyring_receipts.sh`, in CI); it found and fixed a dismissed prompt read as an absent key and a clear on a locked keyring read as done (a6fa8892). The linux-desktop trash and pointer mutations run for real too (`run_desktop_actions_live.sh`: empty_trash cancelled and confirmed on a real gio trash, center_mouse, overlapping toggle_dark_mode; in CI), which found and fixed an empty-trash reported done without GVfs (3da58645). Remaining Linux: a native terminal for LCP-004, chmod (make-executable from a file manager) and eject of a real device (linux-desktop), the case/wrap transforms inside a native editor field. The Wayland clipboard protocol is received too: the clipboard owner over data-control in headless sway (`run_clipboard_owner_wayland.sh`, in CI).
       PC run 2026-11-11: the Windows WCP/WCR/WCF/WDS regressions (`test_clipboard_paste_transaction_ownership.ahk`, `test_keystats_text_cipher.ahk`, `test_wpm_config_types.ahk`, `test_system_actions.ahk`) passed natively on the maintainer's PC, which is not an isolated host.
       Windows, received 2026-11-12 (`tools/test/run-windows-receiving-scenarios.ps1`, temp profile, hosted step « Receive the recovery and flow scenarios »): WCP-001 with two real windows and the real clipboard, a foreground change during the snapshot refusing before any clear or copy chord (the chord is the one recorded port, so nothing is typed), and its control delivering and restoring; WCR on the real DPAPI (round trip read back by an independent Windows PowerShell process; tampered, other-entropy and marker-shaped envelopes refused and never re-persisted) and the metrics cipher sealing marker-shaped typing with the real MachineGuid key; WCF-001 with the widget pair in the real Registry under a private key, read back by the boot loader, and a refused write keeping the previous pair; WDS-002 with the real Clear-RecycleBin failing natively after launch (scoped to an absent drive letter, so the user's bin is never emptied) reaching one error line, and a zero exit reported as done. 8 of 8 passed on the maintainer's PC; every scenario failed once with its owner broken (startup foreground and focus checks, envelope validation, marker skip, pair publication, worker exit observer). Remaining Windows: WCP-002 (the paste into a new foreground window needs real key emission) and a DPAPI blob of another Windows account (a second account).
+      [HARDWARE] Left (2026-11-15): Windows WCP-002 and the DPAPI second account, and every macOS scenario; [CODE] Linux
+      LCP-004 native terminal, chmod, eject (maybe a loop device) and case/wrap in a native editor field.
 
 ## Deep OS × module follow-up
 
@@ -728,6 +876,8 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
 
 - [ ] **Native acceptance:** run the unexecuted AHK/account-context/PnP and actual Mac/Linux device/provider scenarios from each module coverage register. Lua/PowerShell recording-port probes are not native desktop certification. Linux, partly (2026-11-11): the metrics privacy owner on a real GTK/AT-SPI desktop (`run_secure_focus_watch.py`, linux-metrics register) now runs in the desktop-webview CI shard, and the installed daemon grabs and re-emits a real uinput keyboard under systemd ([PHYS-L] proof). Remaining Linux: touchpad hotplug and SYN_DROPPED re-query (gestures), multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer metrics, live Wayland layout apply, desktop connectors and real mail/calendar (llm). Live Wayland layout apply on GNOME, received 2026-11-13 (worker D): a headless GNOME Shell 46 loads two builds under alternating slots through the Ergopti extension (`run_input_sources_live.sh gnome tests/hardware/run_user_layout_wayland_live.lua`, W1 to W3, run as an unprivileged user; not in CI, which installs no GNOME Shell); KDE stays.
       PC run 2026-11-11: Windows ran the whole AHK suite natively (14 module groups, 20,286 tests) and `e2e/run_e2e.ahk` 90/90; the account-context and PnP scenarios remain.
+      [HARDWARE] Left (2026-11-15): Windows account-context and PnP, macOS device and provider scenarios; [CODE] Linux
+      touchpad hotplug and SYN_DROPPED, multi-field Tab and grapheme deletion, pointer metrics, KDE live layout apply.
 
 ## Carried over from the 1.0.9 requests (1-2 November)
 
@@ -788,9 +938,12 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
       (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
       on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
+      [HARDWARE] Left (2026-11-15): the Windows PC timings and the macOS field points `rerun_2026_11_02` and
+      `main_thread_holds`; [CODE] a proven cache for the macOS `menu_keyboard_layout.sources` read.
 - [ ] **Before publishing.** (checked by worker F, 2026-11-13: a release gate for the maintainer, no code step) Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
       all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
       PC run 2026-11-11: the whole AHK suite ran natively on the maintainer's PC (20,286 tests, reds fixed or reported not executed except TakeNote different-folder) and `e2e/run_e2e.ahk` 90/90; the live checks were 21 pass / 7 fail.
+      [RELEASE] Left (2026-11-15): the whole gate, run on the quiet PC before a release.
 
 ## Remaining code work
 
@@ -799,6 +952,7 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       coordinator on 2026-11-12, to review by the maintainer); its commit body lists every old→new pin with the
       move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once the
       migration has landed, and confirm the re-pinned frames.
+      [HARDWARE] Left (2026-11-15): both cohorts on the real PC.
 - [x] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
       43291765266 (artifact `ergoptiplus-av-surface-43291765266-1`), exceeds four ceilings of
       `tools/ci/windows-exe-av-surface.json`: elevated_run 4/3, elevation_wording 4/3, injection_wording 13/11,
@@ -927,6 +1081,9 @@ between workers) green alone. All live checks pass, typed by the harness.
       (`infra/hotstrings/personal_toml_io.ahk` among them) refuse too, and the tray root rebuild is refused while
       suspended, which must change before the rows stop greying. See `docs/memory/maintainer-decisions.md`.
       Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
+      [CODE] Left (2026-11-15): the personal info and TOML slice is done (392ae998); the suspend gates of prompt_editor,
+      paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker, model_browser, menu_llm and
+      `greyed_when_paused` remain, each classified against windows-inventory.md; a PC run confirms ([HARDWARE]).
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
@@ -968,6 +1125,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       the undo burst must go through the same owned output as the expansion (the clipboard owner of
       `_HSE_BeginOwnedNotepadTransaction`, the paced capture of `_HSE_BeginOwnedTerminalTransaction`), which only a
       PC run in Notepad and a terminal can qualify. Until then `HSE_UndoExpansion` keeps refusing both hosts.
+      [HARDWARE] Left (2026-11-15): not started (c448c6d1ff); the Notepad and terminal owners keep no undo record, and
+      only a PC run can qualify the fix.
 
 - [x] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
       like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
@@ -999,6 +1158,9 @@ between workers) green alone. All live checks pass, typed by the harness.
       in the launcher/helper proof, then land the rows of branch `claude/ergopti-todo-ci-acceptance-3` (faa1ade6,
       13af8690, b74741e8, 14d21718, 365dae29) with a green macOS 26 Install-and-launch row. Needs a Mac or the hosted
       macOS 26 lane; the failed-launch artifact (13983003738) holds the launcher logs.
+      [CODE] Left (2026-11-15): f420cf6620 proves the helper by device and inode (test_lease_helper_identity.lua); the
+      relocation-row commits of `claude/ergopti-todo-ci-acceptance-3` are not on dev: rebase and land them with a green
+      macOS 26 Install-and-launch row.
 
 - **Field report 2026-11-03 (`mac-2026-11-03_102716`), branch `fix/macos-field-2026-11-03`.** Done: ai_local no
   longer lists the owned endpoint without its binary (no ERROR); n-gram history merges paced (458 ms slice); the
@@ -1051,6 +1213,8 @@ between workers) green alone. All live checks pass, typed by the harness.
 - [ ] **Owned runtime rebuild (macOS release step).** The next runtime build ships the MRT-004 « Réparer le service »
       helper role and the helper's one-hash report rule (`OwnedVirtualHIDDaemonReportStageOwner.admitImage`); rebuild it
       and update its manifest pin.
+      [RELEASE] Left (2026-11-15): not started; the pinned runtime (16.3.0-ergopti.6, 8900bb55f7) predates MRT-004
+      (a0136c24c3).
 
 - [x] **`events_typing.rich_text` in clear (AHK-005 / WM-002 left).** With metrics encryption on, Windows and Linux
       store it empty; macOS still writes the typed text to SQLite. Done 2026-11-13 (worker F): the macOS writer stores
@@ -1069,6 +1233,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       Start trigger: the go comes from the maintainer, as soon as the maintainer's AHK session has pushed its last
       feature commits; the coordinator then launches phase 2 at once, one step per commit with
       `tools/audit/structure/apply-step.cjs` (`--check-all` must be clean first).
+      [DECISION] Left (2026-11-15): phase 2 steps S1 to S17 are on dev (8b38ac9ec7 … d5aecab176); S18 to S38 remain, to
+      launch only with the maintainer's go ([CODE] after that).
 - **Provider flags inferred, not read.** Checked against the docs on 1 November (90344262aa): Featherless and
   Qianfan confirmed. Rechecked on 10 November (7ae1147b): the Perplexity, `dashscope-intl` and Moonshot K2 watches
   are closed and guarded by `test-llm-provider-retirements.cjs`. Left, both only provable with a live key (the docs
@@ -1113,6 +1279,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       workers and caches are the installed build's). The live updater E2E step installs this checkout and updates
       it to the newest published prerelease, so it stays red until a post-move dev prerelease exists. Landed by worker G on 2026-11-14; its check passed in CI run
       [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (Common Packaging and boot, 25/26).
+      [LATER] Left (2026-11-15): remove the probe step, its call, its test and the pre-move fixtures once a post-move
+      release has served a full cycle.
 - [x] **GNOME input source switch.** GNOME Shell 46 ignores runtime writes of `mru-sources` and `current`: on a
       `sources` change it keeps its in-memory MRU and activates its first entry, and a non-interactive activation
       writes no `mru-sources`. Done 2026-11-11 in `adapters/input_source_switch.lua`, decided by the coordinator on
@@ -1160,6 +1328,8 @@ coordinator on 2026-11-11, to review by the maintainer.
       Lua (native `hs.hash.SHA256` of the source, a typed codec that evaluates no cached code, validation kept on a
       hit) rather than a generated mirror, whose staleness only a gate would catch; it needs a Mac to measure the
       30 ms it would save, and config migration is the place a wrong cache would rewrite a user's settings.
+      [DECISION] Left (2026-11-15): port the Windows typed SHA-256 registry cache to Lua or not; the saving can only be
+      measured on a Mac ([HARDWARE]).
 - [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
@@ -1177,6 +1347,8 @@ coordinator on 2026-11-11, to review by the maintainer.
       receive no event time (only `vk`, `sc` or the character); only the opt-in input probe's low-level hook sees
       `KBDLLHOOKSTRUCT.time`, and a second permanent low-level hook for a metric would add a hook timeout risk to
       every key.
+      [HARDWARE] Left (2026-11-15): code done (fa8175e636; test_hotpath_span_lines.ahk); the field read on the PC, and
+      the maintainer's review of shipping no `input.latency` on Windows ([DECISION]).
 
 - [x] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
       cost about 30 ms of sqlite3 processes.
@@ -1198,6 +1370,8 @@ coordinator on 2026-11-11, to review by the maintainer.
       A design for the maintainer (worker D and worker L agree, 2026-11-13). Bench note: the session bench's tray
       panel needs the Python that has GObject (`/usr/bin/python3.12` on Ubuntu 24.04 when `python3` is a newer
       build); run the Lua suite as an unprivileged user, root passes every EACCES probe.
+      [DECISION] Left (2026-11-15): approve the persistent sqlite3 child of
+      docs/design/linux-sqlite-persistent-child.md, then implement it ([CODE]).
 
 ## CI acceptance
 
@@ -1214,6 +1388,8 @@ Each closes on a named green hosted or native run, recorded here.
       gate takes effect once `main` carries this change (the maintainer's merge); until then a manual Deploy site
       dispatch on `dev` with a run ID uses it. Worker G. Closes on the first `dev` push that deploys with ergopti.fr/dev/editeur
       in gh-pages `dev/`.
+      [RELEASE] Left (2026-11-15): the gate is on dev (8e1544e6ed) and a manual dispatch deployed /dev; the automatic
+      deploy needs this change on main.
 - [ ] **16/38.** One complete non-release three-OS checkpoint on the final source (units, E2E, packaging,
       installation, launch) with exact receipts; it also carries the first hosted run of: the Linux X11 window list
       (962a25a973), AppImage Build and `install-linux` rows (dce846a0bd), the Linux per-step installs (17e80f2882),
@@ -1221,6 +1397,8 @@ Each closes on a named green hosted or native run, recorded here.
       and the run-timing summary (`run-timing.cjs --step-summary`; Flatpak under 5 min).
       Initial audit preflight [42099804561](https://github.com/adrienm7/ergopti/actions/runs/42099804561) failed Arch native server detection, shared UI browser installation and macOS stubbed replay. Follow-up [42108198520](https://github.com/adrienm7/ergopti/actions/runs/42108198520) at `4ca161c3e512eecc4c78499db0465139c9a71861` is green: 114 successful jobs, with only Release / Publish skipped; Arch integration, shared UI rendering and all OS verdicts passed. Later dead-key preflight [42121216727](https://github.com/adrienm7/ergopti/actions/runs/42121216727), at `04ebe1089bf387ccbfef43bbfd3b2f3e9b1cd6d9`, failed Common / Install and launch (Stable site) at Install production site browsers, followed by its mandatory verdicts. Requalify that browser installation and the final source checkpoint; no successful browser/render receipt follows from the failed step. Hosted results remain separate from physical dead-key receiving.
       2026-11-11 Linux and macOS lanes at `85f3dfee20` (Linux [43012051378](https://github.com/adrienm7/ergopti/actions/runs/43012051378), macOS [43012056158](https://github.com/adrienm7/ergopti/actions/runs/43012056158)): every Linux job is green (Unit, five distribution rows, Integration, five E2E shards, Build, all 20 Install-and-launch rows), including the installed managed Ollama route plan and its Go twin (network-ai, job 130500747601), the X11 cursor-display window switching step (input-display, job 130500747586), the AppImage Build and `install-linux` AppImage row and the per-distribution installs. The run-timing summary ran in Release / Verify (job 130525465817). Flatpak was 378 s cold (over 5 min): 986a3d5629 caches the flatpak-builder module state: cold 568 s, cache saved ([43105583384](https://github.com/adrienm7/ergopti/actions/runs/43105583384) attempt 2, job 130839886024), then warm 58 s with the module cache restored ([43126416939](https://github.com/adrienm7/ergopti/actions/runs/43126416939) at `7188928a48`, Linux Build job 130890961113); Flatpak under 5 min done. That run's Linux lane is green end to end (Linux Verdict job 130894504733). Both runs' Common lot "Distribution and updates" fails only on `test-windows-updater-original-source` (a90dce3444 changed `test_framework.ahk` without resealing: the maintainer's reseal), so Common and Release Verify are red. Still open: Windows, the final source.
+      [RELEASE] Left (2026-11-15): Windows, macOS and Common are green (run 43693237215); the Linux updater E2E stays
+      red until a post-move prerelease exists, then one all-green run on the final source.
 - [ ] **macOS lane.** Claimed by worker K (2026-11-13). L32 and L42 Swift in the Build stage; the Issue #101
       Swift and Go cells; native qualification of the Hotstrings category boot publication and the obsolete-leaf
       setters; item 31's lane once its runtime build is green. Already green (run 41257389239): Launcher XCTest,
@@ -1239,17 +1417,22 @@ Each closes on a named green hosted or native run, recorded here.
       Worker K 2026-11-13: no hosted code work is left here. L32 and L42 are closed above; what remains needs an
       installed driver on a real Mac (Hotstrings category boot publication, obsolete-leaf setters) or item 31's runtime
       build, which the pinned runtime rules keep out of reach: hardware and maintainer only.
+      [HARDWARE] Left (2026-11-15): nothing hosted is left; the Hotstrings boot publication and obsolete-leaf setters
+      need an installed driver on a Mac, and item 31 waits on the runtime build ([RELEASE]).
 - [ ] **Ollama Go cell** Claimed by worker K (2026-11-13). (cda1e10c5e) on the final source before a release (passed on run 40021624397).
       Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
       it closes only on the release candidate's own source, which tonight's no-release rule excludes.
       Worker K 2026-11-13: release-only, nothing to change in code; the known macOS Intel flake
       `TestCancellationAndConcurrentClosePhysicallyRetirePeer` stays with worker G (CI baseline reds).
+      [RELEASE] Left (2026-11-15): a pass on the release candidate's own source.
 - [ ] **40.** Signed native execution of the eight Karabiner default/recommended/switch variants.
       A hosted runner runs the eight variants only against the ad hoc signed app of the "karabiner config"
       Install-and-launch row (`hs_native_bootstrap_probe.py`); the Developer ID signature exists only on a release
       build, which tonight's no-release rule forbids, so the signed run needs the next release candidate.
       Ad hoc receipt 2026-11-11: `macOS launch gate [karabiner_config] passed on arm64` in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (job 130257482253),
       which requires all eight variants to build, merge and publish on the installed app.
+      [RELEASE] Left (2026-11-15): the ad hoc signed receipt passed (run 42929436137); the eight variants on a Developer
+      ID signed build remain.
 - [ ] **104, 105.** (claimed by worker F, 2026-11-13) Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
       hotstrings on macOS.
       Per-section E2E on Linux (2026-11-13, worker F): the daemon E2E types `chatgpt adn adaboost` against the shipped
@@ -1257,6 +1440,8 @@ Each closes on a named green hosted or native run, recorded here.
       names publishes 34 rules and gives only ChatGPT, abbreviations 95 and only ADN, technical terms 11 and only
       AdaBoost (`AUTOCORRECT_SCENARIOS`, `ERGOPTI_E2E_AUTOCORRECT`). Left: the native Windows and macOS cases and the
       macOS dynamic hotstrings on a real machine (maintainer).
+      [HARDWARE] Left (2026-11-15): Linux per-section E2E is done (e13cf14a03, run_e2e.lua); the native Windows and
+      macOS cases and macOS dynamic hotstrings remain.
 - [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
       Windows native cases and Fedora/Alpine ShellRunner fixtures (Linux done in the start-up E2E).
       macOS packaging received 2026-11-11: 85f3dfee20 makes the macOS and Linux builds require every hotstring file the
@@ -1266,12 +1451,16 @@ Each closes on a named green hosted or native run, recorded here.
       received: the full Linux unit suite passes on Fedora's and Alpine's own LuaJIT in 43012051378 (jobs 130494409773, 130494409706) and their Integration rows too. Still open: native macOS delimiter transactions (typing into an
       installed driver on a real Mac) and the Windows native cases (maintainer; Windows counterpart of the payload check:
       run it from the Windows packaging against the registry `windows_bundle_manifest.json` ships).
+      [HARDWARE] Left (2026-11-15): native macOS delimiter transactions and the Windows native cases; [CODE] the payload
+      check (85f3dfee20) runs in the Linux and macOS builds only, not in the Windows packaging.
 - [ ] **121, 123, 137.** (claimed by worker F, 2026-11-13: the CI part is green below; only the installed Mac menu and the Windows part are left, both native) AI Agent submenu composed-menu qualification on macOS and Windows; provider published before
       model loading on macOS (Linux done).
       macOS part on hosted CI: the macOS Unit lots (menu_llm, ui) that hold the composed-menu and provider-order tests
       are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
+      [HARDWARE] Left (2026-11-15): the composed menu on an installed Mac, and the Windows part.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
+      [RELEASE] Left (2026-11-15): main is still at 4d834c866a; push main, then check the alerts close.
 - [ ] **CodeQL Go.** Claimed by worker K (2026-11-13). After the `native_http` Go module is published, re-enable Go and check a non-empty analysis.
       Worker K 2026-11-13, code side: there is no CodeQL workflow in the repository (default setup, a repository
       setting), so re-enabling Go is the maintainer's. Both shared modules carry their own `go.mod` at the package root
@@ -1283,6 +1472,8 @@ Each closes on a named green hosted or native run, recorded here.
       2026-11-13, to review by the maintainer: no `require` is added, because it would let CI fetch a module
       (`GOPROXY=off`, "never injected" in `tools/test/fixtures/native-http-receiving/go.mod`); check after enabling
       that the analysis lists the root package, and pin x/sys v0.37.0 there only if it does not.
+      [RELEASE] Left (2026-11-15): CodeQL is GitHub's default setup, a repository setting: re-enable Go after
+      `native_http` is published.
 - [ ] **Native Windows TLS fixture.** Claimed by worker K (2026-11-13). `X509Store.Add` on the CurrentUser root store blocks on the Windows security
       warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
       Worker K 2026-11-13: no code change. Windows shows that warning for every CurrentUser root and offers no silent
@@ -1290,6 +1481,7 @@ Each closes on a named green hosted or native run, recorded here.
       report the cases NOT EXECUTED at `ChangeTrust(true)` and `--interactive` gives a person 10 s to click; the
       LocalMachine scope stays refused outside hosted CI. Hardware only: a person runs the native cases with
       `--interactive` on the Windows PC.
+      [HARDWARE] Left (2026-11-15): a person runs the native cases with `--interactive` on the PC; no code is needed.
 - [ ] **Intermittent fixtures.** Claimed by worker K (2026-11-13). Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.
@@ -1386,6 +1578,7 @@ Each closes on a named green hosted or native run, recorded here.
       now waits out that shortfall before probing (the master budget still bounds every wait). Regression:
       `test_runtime_repair.lua` « a retry timer ending short on the budget clock waits out the shortfall, then probes ».
       Linux only: macOS and Windows do not compose this repair.
+      [LATER] Left (2026-11-15): no known code left; keep watching each listed fixture over further runs.
 
 ## Maintainer decisions pending
 
@@ -1414,3 +1607,5 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
       `/ergopti` pages. Ergopti Studio has two tabs, « Éditer » (`/studio`) and « Comparer » (`/studio/comparer`,
       framing the shared layout analysis page and fitting its reported height). The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark disc of the
       logos) is new.
+      [DECISION] Left (2026-11-15): all of it is implemented (c7b5e2c28d, ceac641ab5); the maintainer approves or
+      changes the placements listed above.
