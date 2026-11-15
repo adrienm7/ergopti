@@ -165,6 +165,33 @@ step() {
 	return 0
 }
 
+# A step that runs for minutes says so: its label first, then a line every
+# 20 s with the elapsed time and the last line of its output, then its
+# verdict. The input-source probe stayed silent for minutes and a tester
+# could not tell it from a hang (field report 2026-11-15).
+# $1: label printed, $2: step name, then the command.
+loud_step() {
+	local label="$1" name="$2"; shift 2
+	local file="${out}/${name}.txt" started ticker status
+	started="$(date +%s)"
+	log "${label}..."
+	(
+		while sleep 20; do
+			last="$(tail -n 1 "${file}" 2>/dev/null | cut -c1-100)"
+			log "  ... ${name} still running ($(( $(date +%s) - started )) s)${last:+: ${last}}"
+		done
+	) &
+	ticker=$!
+	step "${name}" "$@"
+	kill "${ticker}" 2>/dev/null; wait "${ticker}" 2>/dev/null
+	status="$(sed -n "s/^${name}  *exit=\([0-9]*\)$/\1/p" "${steps}" | tail -n 1)"
+	if [ "${status}" = 0 ]; then
+		log "  ✅ ${name} done in $(( $(date +%s) - started )) s."
+	else
+		log "  ❌ ${name} exited ${status:-?} after $(( $(date +%s) - started )) s (see ${name}.txt)."
+	fi
+}
+
 # Reads one value of the field run declaration.
 spec_value() {
 	plutil -extract "$1" raw -o - "${REPO_ROOT}/${FIELD_RUN_SPEC}"
@@ -855,8 +882,8 @@ probe_src="tools/diagnostics/macos_tis_register_probe.swift"
 # A unique binary per run: a failed build must never leave an older probe to run.
 probe_bin="/tmp/ep_tis_probe_${stamp}"
 if [ -f "${probe_src}" ]; then
-	log "Compiling and running the input-source probe (a few minutes, silent)..."
-	step probe_compile swiftc -O -o "${probe_bin}" "${probe_src}"
+	log "Input-source probe: 1 compile + 3 runs, a few minutes in all; each prints its progress."
+	loud_step "Probe 1/4: compiling the Swift probe" probe_compile swiftc -O -o "${probe_bin}" "${probe_src}"
 	if [ -x "${probe_bin}" ]; then
 		# A previous --write-prefs run kept one enabled layout and a marker for
 		# the after-logout questions (P10, P8 a, P6). The probe names its own
@@ -864,7 +891,7 @@ if [ -f "${probe_src}" ]; then
 		# layout, and it only says so when no logout happened since.
 		probe_marker="$("${probe_bin}" marker-path)"
 		if [ -n "${probe_marker}" ] && [ -f "${probe_marker}" ]; then
-			step probe_after_logout "${probe_bin}" after-logout
+			loud_step "Probe: answering the after-logout questions of the previous run" probe_after_logout "${probe_bin}" after-logout
 		else
 			printf '%-28s skipped (no marker from an earlier run)\n' "probe_after_logout" >> "${steps}"
 		fi
@@ -873,9 +900,9 @@ if [ -f "${probe_src}" ]; then
 		# for the next run), then a layout added inside the enabled Ergopti
 		# bundle and that bundle's content replaced in place (both backed up
 		# and restored).
-		step probe_run "${probe_bin}"
-		step probe_write_prefs "${probe_bin}" --write-prefs
-		step probe_replace_ergopti "${probe_bin}" --replace-ergopti --write-prefs
+		loud_step "Probe 2/4: plain run" probe_run "${probe_bin}"
+		loud_step "Probe 3/4: preferences route (writes then restores the input sources)" probe_write_prefs "${probe_bin}" --write-prefs
+		loud_step "Probe 4/4: Ergopti layout bundle replaced in place (backed up and restored)" probe_replace_ergopti "${probe_bin}" --replace-ergopti --write-prefs
 		rm -f "${probe_bin}"
 	else
 		printf '%-28s skipped (the probe did not compile)\n' "probe_runs" >> "$steps"
