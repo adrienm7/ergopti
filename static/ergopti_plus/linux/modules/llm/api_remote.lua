@@ -1081,14 +1081,18 @@ local function post_json(scope, epoch, url, headers, payload, fail, on_answer, a
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
-		local root = type(result.body) == "string" and Json.decode(result.body) or nil
+		-- The envelope is read losslessly, as the chat path's classifier reads it:
+		-- the default decode drops a null member, and an explicit "error": null
+		-- still names an error (remote_formats.response_has_error).
+		local envelope = type(result.body) == "string" and Json.decode_lossless(result.body) or nil
+		local root = type(envelope) == "table" and Json.decode(result.body) or nil
 		if type(root) ~= "table" then
 			fail("the answer is not a JSON object")
 			return
 		end
 		-- Multi-step providers must reject the same explicit error envelope as
 		-- chat completions before its text, typed answers or assistant id escapes.
-		if Formats.response_has_error(root) then
+		if Formats.response_has_error(envelope) then
 			fail("the provider returned an error envelope")
 			return
 		end

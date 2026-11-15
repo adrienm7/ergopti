@@ -195,7 +195,10 @@ local function decode(raw, lossless, source_members)
 				local value_last = recording and pos - 1
 				if val == nil then return nil end
 				if lossless and obj[key] ~= nil then return nil end
-				obj[key] = (val == NULL) and nil or val
+				-- A null member is absent (lossless keeps its token). The old
+				-- `(val == NULL) and nil or val` always gave val: every null
+				-- decoded to one shared empty table.
+				if lossless or val ~= NULL then obj[key] = val end
 				local sep = skip_ws()
 				if recording then
 					source_members[#source_members + 1] = {
@@ -219,10 +222,14 @@ local function decode(raw, lossless, source_members)
 			local arr = {}
 			if lossless then ARRAY_VALUES[arr] = true end
 			if skip_ws() == "]" then pos = pos + 1; return arr end
+			-- Positions are kept: a null element leaves a hole (lossless keeps its
+			-- token), so the elements after it keep their indexes.
+			local count = 0
 			while true do
 				local val = parse_value()
 				if val == nil then return nil end
-				table.insert(arr, val == NULL and nil or val)
+				count = count + 1
+				if lossless or val ~= NULL then arr[count] = val end
 				local sep = skip_ws()
 				if sep == "]" then pos = pos + 1; return arr end
 				if sep ~= "," then return nil end
@@ -258,12 +265,19 @@ local function decode(raw, lossless, source_members)
 	local ok, result = pcall(parse_value, true)
 	if not ok then return nil end
 	if result == nil or skip_ws() ~= nil then return nil end
-	return result == NULL and nil or result
+	-- A null root decodes to nil, as a failure does; lossless keeps its token.
+	if result == NULL and not lossless then return nil end
+	return result
 end
 
---- Decodes JSON with the established untagged-table behavior.
+--- Decodes JSON into plain tables. A null object member is absent, a null
+--- array element leaves a hole at its position (# is then unreliable: read such
+--- arrays by index or with decode_lossless), and a null root gives nil, as a
+--- failure does. A rule that depends on a null being present (an explicit
+--- "error": null) reads decode_lossless instead; AutoHotkey's JsonParse keeps
+--- its JSON_NULL sentinel there, so the three readers agree on presence.
 --- @param raw string
---- @return any|nil Decoded legacy value, or nil on failure.
+--- @return any|nil Decoded value, or nil on failure.
 function M.decode(raw) return decode(raw, false) end
 
 --- Decodes explicit JSON identities without altering the default decoder.

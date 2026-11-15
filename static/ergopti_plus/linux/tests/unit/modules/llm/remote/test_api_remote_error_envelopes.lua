@@ -91,40 +91,53 @@ helpers.describe("remote multi-step error envelopes", function()
 		helpers.assert_nil(log:find("private_key_729", 1, true))
 		helpers.assert_true(log:find("no assistant_id", 1, true) ~= nil)
 	end)
+	-- A null member is absent (the shared decoder, like macOS's hs.json): null
+	-- answers are no answers and are refused, as macOS and Windows refuse them;
+	-- a null answer inside them is absent.
 	for _, kind in ipairs({ "decisions", "backboard-decisions" }) do
-		for _, spec in ipairs({
-			{ body = '{"answers":null}', expected = '{}' },
-			{ body = '{"answers":{"answer":null}}', expected = '{"answer":{}}' },
-		}) do
-			helpers.it("preserves legacy " .. kind .. " null representation " .. spec.body, function()
-				isolated(function(remote, _, answer)
-					local observed = { chunks = 0 }
-					helpers.assert_true(start(remote, kind, observed))
-					if kind == "backboard-decisions" then answer('{"assistant_id":"owned-assistant"}') end
-					answer(spec.body)
-					helpers.assert_eq(#observed, 1)
-					helpers.assert_nil(observed[1].failure)
-					helpers.assert_eq(Json.encode(observed[1].value), spec.expected)
-				end)
-			end)
-		end
-	end
-	for _, spec in ipairs({
-		{ body = '{"system_one":{"answers":null}}', expected = '{}' },
-		{ body = '{"system_one":{"answers":{"answer":null}}}', expected = '{"answer":{}}' },
-	}) do
-		helpers.it("preserves legacy Backboard system_one null representation " .. spec.body, function()
+		helpers.it("refuses " .. kind .. " whose answers are null (json-null)", function()
 			isolated(function(remote, _, answer)
 				local observed = { chunks = 0 }
-				helpers.assert_true(start(remote, "backboard-decisions", observed))
-				answer('{"assistant_id":"owned-assistant"}')
-				answer(spec.body)
+				helpers.assert_true(start(remote, kind, observed))
+				if kind == "backboard-decisions" then answer('{"assistant_id":"owned-assistant"}') end
+				answer('{"answers":null}')
+				helpers.assert_eq(#observed, 1)
+				helpers.assert_true(type(observed[1].failure) == "string")
+			end)
+		end)
+		helpers.it("drops a null answer of " .. kind .. " (json-null)", function()
+			isolated(function(remote, _, answer)
+				local observed = { chunks = 0 }
+				helpers.assert_true(start(remote, kind, observed))
+				if kind == "backboard-decisions" then answer('{"assistant_id":"owned-assistant"}') end
+				answer('{"answers":{"answer":null}}')
 				helpers.assert_eq(#observed, 1)
 				helpers.assert_nil(observed[1].failure)
-				helpers.assert_eq(Json.encode(observed[1].value), spec.expected)
+				helpers.assert_eq(Json.encode(observed[1].value), '{}')
 			end)
 		end)
 	end
+	helpers.it("refuses Backboard system_one answers that are null (json-null)", function()
+		isolated(function(remote, _, answer)
+			local observed = { chunks = 0 }
+			helpers.assert_true(start(remote, "backboard-decisions", observed))
+			answer('{"assistant_id":"owned-assistant"}')
+			answer('{"system_one":{"answers":null}}')
+			helpers.assert_eq(#observed, 1)
+			helpers.assert_true(type(observed[1].failure) == "string")
+		end)
+	end)
+	helpers.it("drops a null Backboard system_one answer (json-null)", function()
+		isolated(function(remote, _, answer)
+			local observed = { chunks = 0 }
+			helpers.assert_true(start(remote, "backboard-decisions", observed))
+			answer('{"assistant_id":"owned-assistant"}')
+			answer('{"system_one":{"answers":{"answer":null}}}')
+			helpers.assert_eq(#observed, 1)
+			helpers.assert_nil(observed[1].failure)
+			helpers.assert_eq(Json.encode(observed[1].value), '{}')
+		end)
+	end)
 	for _, kind in ipairs({ "creation", "chat" }) do
 		helpers.it("continues refusing a null " .. kind .. " value", function()
 			isolated(function(remote, calls, answer)

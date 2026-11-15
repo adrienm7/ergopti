@@ -241,7 +241,9 @@ local function info_bar_corpus()
 	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("core.text.engine.json").decode(raw))
+	-- Lossless: the « unknown pause » vector's null must stay a value, as Windows'
+	-- JSON_NULL keeps it, not fall back to the base's paused = false.
+	return assert(require("core.text.engine.json").decode_lossless(raw))
 end
 
 helpers.describe("LLM shared Info Bar check", function()

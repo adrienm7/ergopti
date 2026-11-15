@@ -58,3 +58,4 @@ helpers.describe("llm bridge: a streamed line with an escaped accent", function(
 end)
 
 require("tests.lua.core_text.json_root_source_contract")(helpers, Json)
+require("tests.lua.core_text.json_null_contract")(helpers, Json)

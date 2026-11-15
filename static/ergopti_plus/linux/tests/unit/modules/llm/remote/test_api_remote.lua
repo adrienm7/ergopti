@@ -371,9 +371,13 @@ end)
 helpers.describe("Shared provider response error ownership", function()
 	helpers.it("checks only a decoded root's own field and preserves false and null", function()
 		local formats = require("ai.engine.api.remote_formats")
+		-- The envelope is read losslessly, as the callers read it: the default
+		-- decode drops a null member, decode_lossless keeps it present.
 		for _, body in ipairs({ '{"error":null}', '{"error":false}', '{"error":""}', '{"error":{}}' }) do
-			helpers.assert_true(formats.response_has_error(assert(Json.decode(body))), body)
+			helpers.assert_true(formats.response_has_error(assert(Json.decode_lossless(body))), body)
 		end
+		helpers.assert_eq(formats.response_has_error(assert(Json.decode('{"error":null}'))), false,
+			"the default decode drops the null member: an envelope check needs decode_lossless")
 		for _, value in ipairs({ false, 0, "error", {}, { metadata = { error = true } },
 			setmetatable({}, { __index = { error = true } }) }) do
 			helpers.assert_eq(formats.response_has_error(value), false)

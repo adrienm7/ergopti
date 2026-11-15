@@ -99,3 +99,4 @@ helpers.describe("JsonCodec.decode result contract", function()
 end)
 
 require("tests.lua.core_text.json_root_source_contract")(helpers, require("core.text.engine.json"))
+require("tests.lua.core_text.json_null_contract")(helpers, require("core.text.engine.json"))
