@@ -312,8 +312,22 @@ Shipped as of 2026-11-14:
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the
   sentence.
 
-`static/corpus/frequency/` holds the downloaded frequency lists, which the
-register covers like the texts.
+- Count tables (`format` `count_table`, « ergopti-count-table » version 1):
+  the French Wikipedia 2021 sentences of the Leipzig Corpora Collection
+  (1 million sentences, CC BY-SA, counted as text, so bigrams and trigrams
+  cross words) and Lexique 4.10's word forms weighted by their frequency per
+  million (CC BY-SA 4.0, counted by the word-list rule, so their n-grams stay
+  inside words). A table holds `chars`, `bigrams` and `trigrams` with their
+  counts and records in `pruned_below` the count each kept from; the reader
+  refuses another format, an n-gram of the wrong length or a count under its
+  floor. `tools/build/import-count-tables.cjs` rebuilds them from the archives
+  pinned by SHA-256 in `static/corpus/count_table_sources.json`, with the
+  engine's own counting rules. The English Leipzig table is held until its
+  licence is confirmed. Norvig's counts are not imported: their host is not
+  reachable from the build environment.
+
+`static/corpus/frequency/` holds the downloaded frequency lists and count
+tables, which the register covers like the texts.
 
 The study (`docs/audits/layout-analysers/report.md`, section 18) lists what
 is refused, and why.

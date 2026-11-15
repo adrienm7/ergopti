@@ -1,5 +1,5 @@
 {
-	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries; « tsv » counts the column « tsv_text_column » (0-based) of each tab-separated line, one sentence per line.",
+	"_description": "Built-in corpora of the layout analysis: each names a text of static/corpus whose entry in static/corpus/register.json has status « ship »; its licence, attribution and source are read from that register (one source). The codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) ships their n-gram tables, never the text, in _shared/ui/layout_analysis/_generated/corpus_<id>.js, with the licence in each file's header. « restore_dead_key_pairs » turns the two-character spellings the old KLA conversion wrote (^e, ¨i) back into the accented letter; it stays off for code, where ^ is an operator. « strip_sentence_numbers » removes the « number<TAB> » prefix of each line of a Leipzig sentence file. « format »: « text » (the default) counts the text; « word_frequencies » reads « word count » lines and counts each word with a space on either side, so its n-grams stay inside words and at word boundaries; « tsv » counts the column « tsv_text_column » (0-based) of each tab-separated line, one sentence per line. « count_table » reads a static/corpus/frequency count table (format ergopti-count-table, written by tools/build/import-count-tables.cjs from static/corpus/count_table_sources.json): a large corpus's character, bigram and trigram counts, without its text.",
 	"schema_version": 1,
 	"corpora": [
 		{
@@ -173,6 +173,20 @@
 			"language": "en",
 			"file": "static/corpus/original/en/wikipedia_en_20_articles.txt",
 			"restore_dead_key_pairs": false
+		},
+		{
+			"id": "fr_wikipedia_1m",
+			"title": "Wikipedia — 1,000,000 sentences (counts)",
+			"language": "fr",
+			"file": "static/corpus/frequency/leipzig/fr_wikipedia_2021_1M.json",
+			"format": "count_table"
+		},
+		{
+			"id": "fr_lexique_words",
+			"title": "Lexique 4.10 — word forms (counts)",
+			"language": "fr",
+			"file": "static/corpus/frequency/lexique/fr_lexique_4_10.json",
+			"format": "count_table"
 		}
 	]
 }
