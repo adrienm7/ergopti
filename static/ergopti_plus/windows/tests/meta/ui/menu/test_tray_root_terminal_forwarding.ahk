@@ -133,14 +133,20 @@ _TRF_LifecycleInvalidationAndRetainedServiceAreWired() {
 
 	Watchdog := _DriverFuncBody("_SuspendStateWatchdog")
 	Assert(Watchdog != "", "_SuspendStateWatchdog() must exist")
-	GuardPos := InStr(Watchdog, "if !A_IsSuspended {")
+	; Retained roots drain once the pause state is stable, paused or not: a root
+	; is rebuilt under the pause too (EDD-1, pause-root-rebuild).
+	GuardPos := InStr(Watchdog, "if (A_IsSuspended == _LastSuspendState) {")
 	ServicePos := InStr(Watchdog,
 		"RootService := _TrayRootServiceRetained", false, GuardPos)
 	BoundaryPos := InStr(Watchdog,
-		"_TrayRootServiceRetainedWork(", false, ServicePos)
-	Assert(GuardPos > 0 and ServicePos > GuardPos
-		and BoundaryPos > ServicePos,
-		"the active watchdog must drain retained generic roots only after resume")
+		"_TrayRootServiceRetainedWork(RootService)", false, ServicePos)
+	ReturnPos := InStr(Watchdog, "return", false, BoundaryPos)
+	TransitionPos := InStr(Watchdog, "_TransitionBusy := true", false, GuardPos)
+	Assert(GuardPos > 0 and ServicePos > GuardPos and BoundaryPos > ServicePos
+		and ReturnPos > BoundaryPos and TransitionPos > ReturnPos,
+		"the watchdog must drain retained generic roots whenever the pause state is stable")
+	Assert(!InStr(Watchdog, "if !A_IsSuspended {"),
+		"the retained root service must not wait for the resume any more")
 }
 Test("tray root: lifecycle invalidation and retained service are wired (tray-root-lifecycle-forwarding)",
 	_TRF_LifecycleInvalidationAndRetainedServiceAreWired)

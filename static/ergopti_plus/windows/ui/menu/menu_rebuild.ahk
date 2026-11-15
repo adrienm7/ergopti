@@ -135,8 +135,8 @@ TrayMenuStage_Disable(Label) {
 ; Stages one FEATURE head row (layout, hotstrings, IA, metrics, shortcuts,
 ; tap-holds, gestures). Paused means every feature submenu is greyed out while
 ; the global rows (actions, language, about, « Suspendre », reload, quit, debug)
-; stay live, and rebuilds are refused while paused — so the pause state has to
-; be applied to the LIVE root by label. Recording the feature rows here, at their
+; stay live; a pause transition applies that state to the LIVE root by label,
+; and every rebuilt root gets it again at publication. Recording the feature rows here, at their
 ; single construction point, is what lets UpdateTrayIcon find them.
 TrayMenuStage_AddFeature(Label, Target) {
 	global _TrayMenuStage, _TrayFeatureHeadLabels
@@ -413,13 +413,11 @@ _TrayRootClaimLatest(&TargetGeneration, &AuthorizeFn, &WorkerFn,
 _TrayRootPublishAuthorized(TargetGeneration, LifecycleEpoch,
 		UpstreamAuthorizeFn := 0) {
 	global _TrayRootRequestedGeneration, _TrayRootLifecycleEpoch
-	; A rebuild is refused under a pause so that the live root stays what the
-	; user sees. A driver with no root yet has nothing live to keep: a reload
-	; asked while paused restores the pause before or during the boot build, and
-	; refusing that first publication left the paused driver with the boot menu,
-	; without its pause row (first-root-under-pause).
-	if A_IsSuspended && !_TrayRootFirstPublicationPending()
-		return false
+	; A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12): a
+	; root is rebuilt under the pause too, so a change made while paused shows in
+	; the tray at once. The publication re-applies the pause state to the new
+	; root (TrayMenuStage_Publish), and the lifecycle epoch below still drops a
+	; candidate staged across a pause transition.
 	if TargetGeneration != _TrayRootRequestedGeneration
 		or LifecycleEpoch != _TrayRootLifecycleEpoch
 		return false

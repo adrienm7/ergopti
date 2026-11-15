@@ -142,8 +142,8 @@ Test("tray root: pause pulse retains and replays latest generation exactly once 
 ; deferred boot build of the tray root is staging. The publication was refused
 ; like any rebuild under a pause and replayed only once the driver was active
 ; again: the paused driver kept the boot menu, without its pause row, and
-; opened the error window. A paused driver that has no root yet has nothing
-; live to keep: its first root publishes under the pause, and only that one.
+; opened the error window. Its first root publishes under the pause; since
+; EDD-1 (a pause stops typing, not configuration) every later one does too.
 _TRLR_PauseDuringFirstBuild(State, PublishAuthorizeFn) {
 	State.BuildCalls += 1
 	if State.BuildCalls == 1 {
@@ -186,16 +186,19 @@ _TRLR_FirstRootPublishesUnderAPause() {
 		AssertFalse(_TrayRootFirstPublicationPending(),
 			"a published root ends the exception")
 
-		AssertFalse(RebuildTrayMenu(0, Worker, false),
-			"once a root is live, a rebuild under the pause stays refused")
-		AssertEqual(1, State.PublishCalls,
-			"the live root must not be replaced under the pause")
+		; (pause-root-rebuild) A pause stops typing, not configuration (EDD-1):
+		; once a root is live, a rebuild under the pause publishes too.
+		AssertTrue(RebuildTrayMenu(0, Worker, false),
+			"a rebuild under the pause publishes (pause-root-rebuild)")
+		AssertEqual(2, State.PublishCalls,
+			"the live root is replaced under the pause, so a change made while paused shows")
+		AssertTrue(A_IsSuspended, "the rebuild leaves the driver paused")
 	} finally {
 		Suspend(WasSuspended)
 		_TRLR_RestoreRootState(Saved)
 	}
 }
-Test("tray root: a paused driver publishes its first root, and only that one (first-root-under-pause)",
+Test("tray root: a paused driver publishes its first root and later ones (first-root-under-pause, pause-root-rebuild)",
 	_TRLR_FirstRootPublishesUnderAPause)
 
 _TRLR_PreTrayServiceIsSafeBeforeInitializer() {
@@ -256,8 +259,10 @@ _TRLR_ShellDoesNotRetireDetailedBoot() {
 		AssertTrue(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch),
 			"the detailed first root must publish under the restored pause")
 		_TrayRootBootDetailsPending := false
-		AssertFalse(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch),
-			"a completed detailed root restores the normal pause refusal")
+		AssertTrue(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch),
+			"a completed detailed root still publishes under the pause (pause-root-rebuild)")
+		AssertFalse(_TrayRootPublishAuthorized(1, _TrayRootLifecycleEpoch + 1),
+			"a candidate of another lifecycle epoch stays refused")
 	} finally {
 		Suspend(WasSuspended)
 		_TrayRootBootDetailsPending := SavedDetails

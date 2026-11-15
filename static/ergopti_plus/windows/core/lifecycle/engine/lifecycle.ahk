@@ -907,20 +907,14 @@ _SuspendStateWatchdog() {
 				_SuspendRestoreFromMarker()
 		}
 		if (A_IsSuspended == _LastSuspendState) {
-				if !A_IsSuspended {
-						RootService := 0
-						if IsSet(_TrayRootServiceRetained)
-								RootService := _TrayRootServiceRetained
-						_TrayRootServiceRetainedWork(RootService)
-				} else if IsSet(_TrayRootFirstPublicationPending)
-						&& _TrayRootFirstPublicationPending() {
-						; A pause restored after a reload can land while the boot
-						; build of the tray root is staging, which makes that root
-						; stale. It is the one retained root served under a pause:
-						; without it the paused driver keeps the boot menu, without
-						; the row that lifts the pause (first-root-under-pause).
-						_TrayRootServiceRetainedWork(_TrayRootServiceRetained)
-				}
+				; The retained tray root is served paused or not: a root is
+				; rebuilt under the pause too (EDD-1), and a pause restored after
+				; a reload while the boot root was staging must still leave the
+				; paused driver its row that lifts the pause (first-root-under-pause).
+				RootService := 0
+				if IsSet(_TrayRootServiceRetained)
+						RootService := _TrayRootServiceRetained
+				_TrayRootServiceRetainedWork(RootService)
 				return
 		}
 		if _TransitionBusy
@@ -1760,7 +1754,8 @@ BuildTrayMenuDeferred() {
 		BuildAccepted := RebuildTrayMenu(0, _TrayRootBuildBoot, false)
 		if !((BuildAccepted is Integer) and BuildAccepted == 1) {
 			; A pause restored while the root was staging is an expected refusal,
-			; not a failure: the watchdog publishes the first root under the pause.
+			; not a failure: the staged root is stale, and the watchdog publishes
+			; the retained one under the pause.
 			if A_IsSuspended {
 				try LoggerInfo("TrayMenu", "Deferred tray-menu build interrupted by the restored pause; the watchdog rebuilds it under the pause.")
 			} else {
@@ -1796,8 +1791,8 @@ UpdateTrayIcon() {
 				if FileExist(IconPath)
 						TraySetIcon(IconPath)
 		}
-		; Rebuilds are refused while paused, so the live root is what the user
-		; sees: grey every feature submenu on pause and restore them on resume.
+		; Grey every feature submenu of the live root on pause and restore them on
+		; resume; a root rebuilt meanwhile gets the same state at publication.
 		; The global rows, « Suspendre » included, are not feature rows.
 		TrayMenu_ApplyPauseGreying(A_IsSuspended)
 		MenuPopulation_Resume()

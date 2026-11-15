@@ -479,8 +479,9 @@ pause from the successor's first watchdog tick, which lands during the
 deferred boot build of the tray root; « no rebuild under a pause » then
 refused the first root and left the paused driver without its pause row. The
 first root publishes under a pause and the watchdog serves it there
-(`_TrayRootFirstPublicationPending`); every later rebuild still waits for the
-resume. That build then asks owners the pause has suspended: the AI hotkeys
+(`_TrayRootFirstPublicationPending`). Since 2026-11-15 every later rebuild
+runs under the pause too (EDD-1: a pause stops typing, not configuration), and
+the publication re-applies the pause state to the new root. That build then asks owners the pause has suspended: the AI hotkeys
 need the native navigation owner, which refuses every plan while paused, so
 the first build defers them and `LLM_Menu_OnResume` activates them.
 

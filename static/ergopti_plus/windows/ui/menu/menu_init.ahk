@@ -290,7 +290,7 @@ _LAY_GreyPausedRows(Target, Paused := A_IsSuspended) {
 }
 
 ; Builds the live Layout submenu again at a pause or a resume, so its rows show
-; what waits for the resume: the tray root is not rebuilt under a pause.
+; what waits for the resume without waiting for a root rebuild.
 ; @return {Boolean} True when the submenu will build at its next open.
 _MI_LayoutRearmForPause() {
 	global _MI_LayoutDeferred

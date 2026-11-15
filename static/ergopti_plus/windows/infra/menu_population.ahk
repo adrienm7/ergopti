@@ -50,9 +50,9 @@ MenuDeferred_Create(BuildFn, ListId) {
 
 /**
  * Publishes an attached submenu again: its rows are dropped and built at its
- * next open, from the state of that moment. A pause or a resume uses it, since
- * the tray root is not rebuilt under a pause and a live submenu must show which
- * of its rows wait for the resume (EDD-1).
+ * next open, from the state of that moment. A pause or a resume uses it, so a
+ * live submenu shows which of its rows wait for the resume without waiting for
+ * a root rebuild (EDD-1).
  * @param {Menu} MenuObj The attached native submenu, kept as it is.
  * @param {Func} BuildFn Fills the empty native Menu it receives.
  * @param {String} ListId Closed list id for the counters and logs.
