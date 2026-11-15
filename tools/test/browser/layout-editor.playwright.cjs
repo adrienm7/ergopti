@@ -587,13 +587,17 @@ async function exerciseShortcuts(browser, origin) {
 		for (const mod of from) await page.check(`#le-shortcut-from input[value="${mod}"]`);
 		await page.selectOption('#le-shortcut-send', sendKey);
 		for (const mod of to) await page.check(`#le-shortcut-to input[value="${mod}"]`);
+		// (layout-editor-shortcut-form-render) A render before « Add » keeps the
+		// choices: the locale's late i18n:applied once rebuilt the form empty, and
+		// « Add » refused the combination for want of a modifier (a dev CI flake).
+		await page.evaluate(() => document.dispatchEvent(new CustomEvent('i18n:applied')));
 		await page.click('#le-shortcut-add');
 	};
 	// Ctrl+é sends Ctrl+Shift+C; Ctrl+A sends Ctrl+B.
 	await define('KeyW', ['control'], 'KeyC', ['control', 'shift']);
 	await define('KeyQ', ['control'], 'KeyB', ['control']);
-	assert.ok((await key('KeyW')).overridden, 'an overridden key is marked');
-	assert.ok((await key('KeyQ')).overridden);
+	assert.ok((await key('KeyW')).overridden, 'Ctrl+é is overridden after a render before « Add »');
+	assert.ok((await key('KeyQ')).overridden, 'Ctrl+A is overridden after a render before « Add »');
 	assert.ok((await key('KeyE')).same);
 	// A combination needs a modifier: the refusal says so and nothing is added.
 	await page.click('#le-board [data-code="KeyE"]');
