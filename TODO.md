@@ -483,8 +483,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       are done (5d5f424542, 0c197c6ce8; test-layout-analysis-engine.cjs); index >= middle >= ring >= pinky is checked on
       the default only, not on a user-edited load. [LATER] the 19 other locales keep pending English.
       Order on an edited load done 2026-11-15 (worker X, e363f74b): idealLoad refuses it as `ideal_load_order`; proof:
-      test-layout-analysis-engine.cjs (pinky and ring swapped on each hand). Left: the Comparer's ideal-load box shows
-      only a red sum, not the refusal's text (Comparer UI, owned by worker T).
+      test-layout-analysis-engine.cjs (pinky and ring swapped on each hand); the ideal-load box says the refusal
+      (2e8148c0).
 - [x] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
       for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
       (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
@@ -573,6 +573,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): Studio labels go through i18n with English and French (145df235e1, b9117767e7;
       test-locale-catalogue-complete.cjs); the fingering refusal embeds the engine's raw English error
       (analysis_engine.js), and no label-improvement pass has been made.
+      Fingering refusal done 2026-11-15 (worker X, 7b3f9e7c, 2e8148c0): engine refusals carry codes and the fingering
+      editor and the ideal-load box say them as layout_analysis.error.<code> (en, fr; others pending); proof:
+      test-layout-comparer-page.cjs. Left: the label-improvement pass; the 19 other locales.
 
 - [ ] **Site keyboard display from a layout file, later (maintainer, 2026-11-14 night; not now).** The site's
       Ergopti keyboard display is hand-coded today. Make it render from a layout source instead (the Ergopti TOML
