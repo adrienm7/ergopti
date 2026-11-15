@@ -214,6 +214,25 @@ end)
 if accepted == true or get_state() == "installing" then
 	while not install_done do luv.run("once") end
 end
+-- A release published before the structure move lacks the shared sentinel
+-- this updater's receipt schema names, and the running updater owns that
+-- schema (installer.lua record_ownership_with): it refuses the release by
+-- design. The pre-move releases are recorded, with the helpers they shipped,
+-- under tools/test/fixtures/linux-pre-move-ownership, which leaves with the
+-- legacy update probes. Until a post-move release is published, the run proves
+-- that refusal and the kept installation instead of an install (exit 3).
+local tag = tostring(first.tag)
+local pre_move = tag:match("^v[%w.%-]+$") ~= nil and read(DRIVER
+	.. "/../../../tools/test/fixtures/linux-pre-move-ownership/" .. tag .. "/ownership_schema.sh.frozen") ~= nil
+if pre_move then
+	expect(accepted == true and install_done and not installed
+		and install_detail == "could not record the new installation's file ownership",
+		"the post-move updater refuses the pre-move release " .. tag .. " (" .. tostring(install_detail) .. ")")
+	local kept = read(HOME .. "/.local/lib/ergopti/_shared/build_stamp.txt") or ""
+	expect(kept:match("version=([^\n]+)") == "0.0.0-dev.1", "the installation it refused leaves the old build in place")
+	print("  (the install proof waits for the first release published after the structure move)")
+	finish(#failures == 0 and 3 or 1)
+end
 -- The installer's own refusal reason is the only CI evidence of why it failed.
 if not expect(accepted == true and install_done and installed,
 	"installed (" .. tostring(install_detail) .. ")") then finish(1) end

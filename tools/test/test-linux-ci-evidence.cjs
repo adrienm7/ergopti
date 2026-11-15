@@ -1171,6 +1171,8 @@ exit "$UPDATER_TEST_STATUS"
 	for (const fixture of [
 		{ phase: 'updater', status: 1, child: 7 },
 		{ phase: 'complete', status: 0, child: 0 },
+		// The newest release predates the structure move: its refusal proved.
+		{ phase: 'transition', status: 0, child: 3 },
 		{ phase: 'build', status: 1, child: 0, build: 19 },
 		{ phase: 'install', status: 1, child: 0, install: 20 },
 		{ phase: 'environment', status: 2, child: 0, environment: 8 },
