@@ -271,6 +271,40 @@ comparer is embedded were decided by the agent, to be reviewed by the maintainer
 - « My typing »: the keystats counts loaded with « Analyse my typing » become the comparer's default corpus
   (`studio-ngrams` event).
 
+## Ergopti Studio: several layouts, never lost
+
+« Éditer » holds several personal layouts, one tab each, above the toolbar (`editor_page.js` « Tabs » and
+« Autosave »; the stored text and the backup are `layout_editor/workspace.js`, `LayoutEditorWorkspace`). The tab
+bar's place and the backup format were decided by the agent on 2026-11-15, to review by the maintainer.
+
+- Tabs: each tab has its own document and undo history; « + » opens a blank layout in a new tab with « Start from »
+  open (a file, a blank layout, QWERTY, AZERTY or a catalogue layout); « × » closes one, asking first when it has
+  changes not saved to a file; closing the last one leaves a blank layout. « New » and « Open » still act on the tab
+  shown.
+- Autosave: 300 ms after the last change the page stores every tab as its Ergopti TOML source (the text « Save »
+  writes, an imported `.keylayout` included), whether it differs from its file, and the tab shown:
+  `{schema: 1, active, tabs: [{text, dirty}]}`. The next mount restores them, so a reload, F5 or a crash loses at
+  most the last 300 ms; a page hidden or closed saves at once. The status next to the tabs says « saving », « saved
+  on this device » or why a save failed.
+- Where: the website keeps the text in the browser's IndexedDB (database `ergopti-studio`, store `workspace`) and
+  asks `navigator.storage.persist()`; a browser that refuses it is said (« the browser may clear them when it runs out
+  of space: export a backup »), and one without IndexedDB (a private window) says the tabs are not kept. The app keeps
+  it in `layout_sources/studio_workspace.json` of the user's data folder through the host
+  (`studio_workspace_load`, `studio_workspace_save {text}` with the page's request number, answered by
+  `studioWorkspace {request, ok, workspace}` and `studioWorkspaceResult`; initData `studio_workspace`), on the three
+  OS: `studio_store.lua` (macOS and Linux) and `StudioStore_Workspace*` (Windows `source_store.ahk`), bounded by
+  `studio.max_workspace_bytes`. « Close » saves the last edit before the window closes. Nothing is sent to a server.
+- Fail fast, never lose: a stored workspace that does not read (damaged JSON, a tab whose source no longer reads) is
+  refused with the reason, the tabs open as they were before it, and nothing is saved over it until the user acts;
+  a host file that cannot be read answers `studio_unreadable` and is never replaced by a load.
+- Backup: « Export all » downloads `ergopti-studio-layouts.zip`, one `<layout id>.toml` per tab (a second tab of the
+  same id is `<id>-2.toml`), through the host's download (`source_export` in the app, into the Downloads folder).
+  « Import » opens, each in a new tab, every `.toml` and `.keylayout` of the chosen files and of the chosen ZIP
+  archives; a file that does not read is named and the others still open. The editor's own backups are stored
+  (uncompressed) and read everywhere; an archive deflated by another tool needs the webview's `DecompressionStream`
+  (Chromium, WebView2, Safari 16.4 and WebKitGTK 2.40 or later), and an older webview refuses it with
+  `backup_deflate_unsupported` instead of reading it wrong.
+
 ## Limits stated to the user
 
 - An imported `.keylayout` stays verbatim (exportable unchanged) until « Convert to an editable source »: the

@@ -11,6 +11,9 @@
  * ErgoptiPlus mounts the same editor in its layout editor window with a host
  * that saves through the driver and ships the same export assets
  * (layout_editor_window/script.js, _generated/export_assets.js).
+ * Every tab and its unsaved edits are kept in this browser's IndexedDB as the
+ * user types (LayoutEditorWorkspace.indexedDbStore, persistent storage asked
+ * for), so a reload, F5 or a crash restores them; nothing leaves the device.
  * Framed by the site (/studio, « Éditer »), it posts its height to the parent
  * ({type: 'ergopti-layout-editor:height', height}) on load and on every
  * resize (the analysis panel opening, a panel unfolding), so the frame fits.
@@ -114,13 +117,23 @@
 	const lang = new URLSearchParams(location.search).get('lang');
 	if (lang && /^[a-z]{2}$/.test(lang)) window._i18n_locale = lang;
 
+	// A browser that keeps no data for the page (IndexedDB refused) still edits:
+	// the page says the tabs are not kept, through the store's refusal.
+	let workspace;
+	try {
+		workspace = LayoutEditorWorkspace.indexedDbStore(window);
+	} catch (error) {
+		workspace = { load: () => Promise.reject(error), save: () => Promise.reject(error) };
+	}
+
 	window.layoutEditor = LayoutEditorPage.mount(document.getElementById('layout-editor'), {
 		saveFile: download,
 		saveBinary: download,
 		loadSources: registrySources,
 		exportAssets: loadExportAssets,
 		// The site's Studio opens on a copy of Ergopti, as the app's does (maintainer, 2026-11-15).
-		startFrom: 'ergopti'
+		startFrom: 'ergopti',
+		workspace
 	});
 
 	// The message the framing page (the site's /studio) listens for to size its frame.

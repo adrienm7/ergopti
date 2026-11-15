@@ -49,6 +49,8 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'studio_corpus',
 	'studio_profile_load',
 	'studio_profile_save',
+	'studio_workspace_load',
+	'studio_workspace_save',
 	'lua_export'
 ]);
 
@@ -127,6 +129,8 @@ let _hostEmulates = false;
 let _hostLuaExport = false;
 // Whether the host writes the editor's downloads to the Downloads folder (source_export), from initData.
 let _hostExports = false;
+// Whether the host keeps the editor's tabs in the user's data folder (studio_workspace_*), from initData.
+let _hostWorkspace = false;
 
 /**
  * Called by the host once the page is ready: strings, capabilities and state.
@@ -147,6 +151,7 @@ window.initData = function (data) {
 	_hostEmulates = data.emulate === true;
 	_hostExports = data.source_export === true;
 	_hostLuaExport = data.lua_export === true;
+	_hostWorkspace = data.studio_workspace === true;
 	showKeystatsSource(data.keystats === true);
 	// « My typing » is the app's default corpus (maintainer, 2026-11-14): the
 	// window reads the local store once when it opens, as the button does; the
@@ -436,6 +441,7 @@ window.sourceData = function (data) {
 		applyNav: _hostAppliesNav ? hostApplyNav : null,
 		saveBinary: _hostExports ? hostSaveBinary : null,
 		exportAssets: _hostExports ? hostExportAssets : null,
+		workspace: _hostWorkspace ? hostWorkspace : null,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
@@ -446,8 +452,10 @@ window.sourceData = function (data) {
 		// « Compare with other layouts »: the Comparer ranks the edited layout
 		// against the layouts ticked there, on its chosen corpus.
 		compare: compareEdited,
-		// The editor is the whole window: leaving it closes the window.
+		// The editor is the whole window: leaving it closes the window, after the
+		// tabs' last edits (the host answers the messages in order).
 		onClose: function () {
+			_editor.flushAutosave();
 			send('close');
 		}
 	});
@@ -623,6 +631,10 @@ window.studioLayoutResult = settleStudio;
 window.studioCorpus = settleStudio;
 /** Called by the host with one export step's result: { request, ok, output | code, detail }. */
 window.luaExportResult = settleStudio;
+/** Called by the host with the editor's tabs: { request, ok, workspace: json text | absent }. */
+window.studioWorkspace = settleStudio;
+/** Called by the host once the editor's tabs are saved: { request, ok, code, detail }. */
+window.studioWorkspaceResult = settleStudio;
 /** Called by the host with the fingering profile: { request, ok, profile: json text | absent }. */
 window.studioProfile = settleStudio;
 /** Called by the host once the fingering profile is saved or reset: { request, ok, code, detail }. */
@@ -697,6 +709,20 @@ Object.assign(window.LAYOUT_ANALYSIS_HOST, {
 			const corpora = window.LAYOUT_ANALYSIS_CORPORA;
 			if (!corpora || !corpora[id]) throw new Error('the host ran no tables for the corpus ' + id);
 		});
+	}
+});
+
+// The editor's tabs and their unsaved edits, kept in the user's data folder
+// (studio_store.lua, StudioStore_Workspace*) so a reload or a crash restores
+// them; LayoutEditorWorkspace owns the text.
+const hostWorkspace = Object.freeze({
+	load: function () {
+		return studioRequest('studio_workspace_load').then(function (result) {
+			return typeof result.workspace === 'string' ? result.workspace : null;
+		});
+	},
+	save: function (text) {
+		return studioRequest('studio_workspace_save', { text: text }).then(function () {});
 	}
 });
 

@@ -1087,10 +1087,14 @@ check(
 		const { context, window, messages } = loadEditorPage();
 		window.initData({ strings: {}, state: { platform: 'linux' }, nav_apply: true, emulate: true });
 		let host = null;
+		const order = [];
 		context.LayoutEditorPage = {
 			mount: (root, options) => {
 				host = options;
-				return { open: () => {} };
+				return {
+					open: () => {},
+					flushAutosave: () => order.push(`flush before ${messages.length} messages`)
+				};
 			}
 		};
 		window.sourceData({ text: 'a = 1', filename: 'mine.toml' });
@@ -1100,7 +1104,11 @@ check(
 		assert.equal(typeof host.applyNav, 'function');
 		assert.equal(typeof host.emulate, 'function');
 		assert.equal(host.pickFile, null, 'no native picker without source_pick');
+		assert.equal(host.workspace, null, 'no workspace store without studio_workspace');
+		const before = messages.length;
 		host.onClose();
+		// The tabs' last edits are saved before the window closes (layout-editor-workspace).
+		assert.deepEqual(order, [`flush before ${before} messages`]);
 		assert.equal(plain(messages[messages.length - 1]).action, 'close');
 		host.saveFile('mine.toml', 'b = 2');
 		assert.deepEqual(plain(messages[messages.length - 1]), {

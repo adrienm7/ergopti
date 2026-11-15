@@ -32,6 +32,7 @@ const PAGE_SCRIPTS = [
 	'layout_composer/source_emulation.js',
 	'layout_editor/_generated/key_tables.js',
 	'layout_editor/zip_writer.js',
+	'layout_editor/workspace.js',
 	'layout_editor/toml_prelude.js',
 	'vendor/smol-toml.js',
 	'layout_composer/target_compiler.js',
@@ -48,7 +49,13 @@ function loadEditor() {
 		.filter((file) => PAGE_SCRIPTS.includes(file));
 	assert.deepEqual(loaded, PAGE_SCRIPTS, 'index.html loads the model scripts in this order');
 	// The globals a page has that the scripts use.
-	const context = vm.createContext({ TextEncoder });
+	const context = vm.createContext({
+		TextEncoder,
+		TextDecoder,
+		Blob,
+		Response,
+		DecompressionStream
+	});
 	for (const file of PAGE_SCRIPTS) {
 		// A top-level const is not a property of the context; the page reads these as globals.
 		const source = fs
@@ -60,12 +67,12 @@ function loadEditor() {
 		vm.runInContext(source, context, { filename: file });
 	}
 	return vm.runInContext(
-		'({ IO: LayoutSourceIO, M: LayoutEditorModel, Zip: LayoutZipWriter, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA })',
+		'({ IO: LayoutSourceIO, M: LayoutEditorModel, Zip: LayoutZipWriter, W: LayoutEditorWorkspace, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA })',
 		context
 	);
 }
 
-const { IO, M, Zip, LayerModel, LayoutComposer, DATA, COMPOSER } = loadEditor();
+const { IO, M, Zip, W, LayerModel, LayoutComposer, DATA, COMPOSER } = loadEditor();
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const registry = (id) =>
 	fs.readFileSync(path.join(ROOT, 'static', 'layouts', 'registry', id, `${id}.keylayout`), 'utf8');
@@ -800,22 +807,119 @@ test('the page writes the Windows DLLs the repository tool writes, and the Windo
 	);
 });
 
+// (layout-editor-workspace) The tabs « Éditer » keeps, as the stored text and as a backup.
+test('a workspace stores each tab as its source and reads back the same tabs', () => {
+	const mine = IO.serialize(
+		M.setMapping(IO.create('mine', 'Mine'), 'base', 'KeyA', { text: 'é' }, null)
+	);
+	const imported = IO.serialize(IO.importKeylayout(registry('ergopti'), 'ergopti', 'iso'));
+	const text = W.serialize(
+		[
+			{ text: mine, dirty: true },
+			{ text: imported, dirty: false }
+		],
+		1
+	);
+	assert.deepEqual(plain(W.parse(text)), {
+		active: 1,
+		tabs: [
+			{ text: mine, dirty: true },
+			{ text: imported, dirty: false }
+		]
+	});
+	assert.equal(
+		IO.parse(W.parse(text).tabs[1].text).ok,
+		true,
+		'an imported .keylayout tab reads back'
+	);
+});
+
+test('a stored workspace that does not read is refused, naming what', () => {
+	const refusal = (text, path) =>
+		assert.throws(
+			() => W.parse(text),
+			(error) => error.code === 'workspace_invalid' && error.path === path,
+			path
+		);
+	refusal('{broken', 'json');
+	refusal('{"schema":2,"active":0,"tabs":[{"text":"a","dirty":false}]}', 'schema');
+	refusal('{"schema":1,"active":0,"tabs":[]}', 'tabs');
+	refusal('{"schema":1,"active":0,"tabs":[{"text":"","dirty":false}]}', 'tabs[0]');
+	refusal('{"schema":1,"active":0,"tabs":[{"text":"a","dirty":"yes"}]}', 'tabs[0]');
+	refusal('{"schema":1,"active":1,"tabs":[{"text":"a","dirty":false}]}', 'active');
+	refuses(() => W.serialize([], 0), 'workspace_invalid');
+	refuses(() => W.serialize([{ text: 'a', dirty: false }], 2), 'workspace_invalid');
+});
+
+/** A one-entry ZIP whose entry is deflated, as archivers other than the editor write it. */
+function deflatedZip(name, text) {
+	const data = Buffer.from(text, 'utf8');
+	const packed = require('node:zlib').deflateRawSync(data);
+	const stored = Buffer.from(Zip.pack([{ path: name, text, encoding: 'utf8' }]));
+	const local = Buffer.from(stored.subarray(0, 30 + name.length));
+	local.writeUInt16LE(8, 8);
+	local.writeUInt32LE(packed.length, 18);
+	const centralAt = stored.readUInt32LE(stored.length - 6);
+	const central = Buffer.from(stored.subarray(centralAt, stored.length - 22));
+	central.writeUInt16LE(8, 10);
+	central.writeUInt32LE(packed.length, 20);
+	const end = Buffer.from(stored.subarray(stored.length - 22));
+	end.writeUInt32LE(local.length + packed.length, 16);
+	return new Uint8Array(Buffer.concat([local, packed, central, end]));
+}
+
+test('the backup holds one source per tab and reads back, other archivers included', async () => {
+	const a = IO.serialize(IO.create('mine', 'Mine'));
+	const b = IO.serialize(IO.create('mine', 'Mine again'));
+	const archive = W.backup([
+		{ id: 'mine', text: a },
+		{ id: 'mine', text: b }
+	]);
+	assert.equal(archive.filename, 'ergopti-studio-layouts.zip');
+	assert.deepEqual(plain(await W.readArchive(archive.bytes)), [
+		{ name: 'mine.toml', text: a },
+		{ name: 'mine-2.toml', text: b }
+	]);
+	// Folders and files the editor does not open are skipped.
+	const mixed = Zip.pack([
+		{ path: 'notes.txt', text: 'x', encoding: 'utf8' },
+		{ path: 'layouts/mine.toml', text: a, encoding: 'utf8' }
+	]);
+	assert.deepEqual(plain(await W.readArchive(mixed)), [{ name: 'mine.toml', text: a }]);
+	assert.deepEqual(plain(await W.readArchive(deflatedZip('mine.toml', a))), [
+		{ name: 'mine.toml', text: a }
+	]);
+});
+
+test('an archive that does not read is refused, never half read', async () => {
+	const rejects = (bytes, label) =>
+		assert.rejects(W.readArchive(bytes), (error) => error.code === 'backup_invalid', label);
+	await rejects(new TextEncoder().encode('not a zip at all, long enough to scan'), 'not a ZIP');
+	const archive = W.backup([{ id: 'mine', text: IO.serialize(IO.create('mine', 'Mine')) }]).bytes;
+	const damaged = archive.slice();
+	damaged[60] ^= 0xff;
+	await rejects(damaged, 'a damaged entry fails its CRC');
+	await rejects(archive.subarray(0, archive.length - 30), 'a cut archive');
+});
+
 function LayoutSourceIO_preserved(doc) {
 	return IO.isPreserved(doc);
 }
 
-let failed = 0;
-for (const [name, fn] of tests) {
-	try {
-		fn();
-		console.log(`ok - ${name}`);
-	} catch (error) {
-		failed++;
-		console.error(`not ok - ${name}\n${error.stack}`);
+(async () => {
+	let failed = 0;
+	for (const [name, fn] of tests) {
+		try {
+			await fn();
+			console.log(`ok - ${name}`);
+		} catch (error) {
+			failed++;
+			console.error(`not ok - ${name}\n${error.stack}`);
+		}
 	}
-}
-if (failed) {
-	console.error(`${failed} of ${tests.length} layout editor model tests failed`);
-	process.exit(1);
-}
-console.log(`ok - ${tests.length} layout editor model tests`);
+	if (failed) {
+		console.error(`${failed} of ${tests.length} layout editor model tests failed`);
+		process.exit(1);
+	}
+	console.log(`ok - ${tests.length} layout editor model tests`);
+})();

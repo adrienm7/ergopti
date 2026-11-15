@@ -705,12 +705,12 @@ async function exerciseManager(browser, origin) {
 	);
 	assert.equal(await page.textContent('#le-message'), strings['layout_editor.status.emulated']);
 
-	// « New » starts blank or from a reference or a catalogue layout of the host.
+	// « New » starts from a file, blank, or from a reference or a catalogue layout of the host.
 	await page.click('#le-new');
 	const starts = await page.$$eval('#le-start [data-start]', (buttons) =>
 		buttons.map((button) => button.dataset.start)
 	);
-	assert.deepEqual(starts, ['blank', 'qwerty', 'azerty', 'ergopti']);
+	assert.deepEqual(starts, ['file', 'blank', 'qwerty', 'azerty', 'ergopti']);
 	await page.click('#le-start [data-start="ergopti"]');
 	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
 	await page.waitForSelector('#le-start', { state: 'detached' });
@@ -1085,6 +1085,353 @@ async function exerciseLongLabels(browser, origin) {
 }
 
 /** At phone width, in light and dark, the page never scrolls sideways and stacks its columns. */
+/**
+ * (layout-editor-workspace) Several personal layouts, never lost, on the
+ * website: each layout has its tab, « + » opens another, every tab and its
+ * unsaved edits come back after F5 and after a crash (a new page of the same
+ * browser profile, with no pagehide), persistent storage is asked for, a
+ * damaged store is never saved over, and « Export all » then « Import »
+ * restores every tab from the backup ZIP.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseWorkspace(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const context = await browser.newContext({
+		acceptDownloads: true,
+		viewport: { width: 1280, height: 900 }
+	});
+	await context.addInitScript(() => {
+		// Records the persistent storage request; the page must ask it once per mount.
+		window.__persistAsked = 0;
+		const storage = navigator.storage;
+		storage.persist = () => {
+			window.__persistAsked += 1;
+			return Promise.resolve(false);
+		};
+	});
+	const errors = [];
+	const watch = (page) => {
+		page.on('pageerror', (error) => errors.push(error.message));
+		page.on('dialog', (dialog) => errors.push(`native dialog: ${dialog.message()}`));
+		return page;
+	};
+	const url = `${origin}/ui/layout_editor/index.html?lang=en`;
+	const saved = strings['layout_editor.tabs.autosave.saved'];
+	const settled = (page) =>
+		page.waitForFunction((text) => {
+			const node = document.querySelector('#le-autosave');
+			return node && node.textContent.startsWith(text);
+		}, saved);
+	const tabNames = (page) =>
+		page.$$eval('#le-layout-tabs .le-layout-tab', (tabs) => tabs.map((tab) => tab.textContent));
+	const legendOf = (page, code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	const mapKey = async (page, code, text) => {
+		await page.click(`#le-board [data-code="${code}"]`);
+		await page.selectOption('#le-kind', 'text');
+		await page.fill('#le-text', text);
+		await page.click('#le-apply');
+	};
+
+	const page = watch(await context.newPage());
+	await page.goto(url);
+	await page.waitForSelector('#le-board');
+	await settled(page);
+	assert.equal(
+		await page.evaluate(() => window.__persistAsked),
+		1,
+		'persistent storage is asked for'
+	);
+	assert.match(
+		await page.textContent('#le-autosave'),
+		/export a backup/,
+		'a refused persistent storage is said'
+	);
+	await mapKey(page, 'KeyQ', 'ŵ');
+	// « + » opens a blank layout in a new tab with « Start from » open.
+	await page.click('#le-tab-add');
+	await page.waitForSelector('#le-start');
+	assert.equal(
+		await page.locator('#le-start [data-start="file"]').count(),
+		1,
+		'« Start from » opens a file'
+	);
+	await page.click('#le-start [data-start="qwerty"]');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	assert.equal(await legendOf(page, 'KeyQ'), 'q', 'the new tab starts from QWERTY');
+	await page.fill('#le-name', 'Second');
+	await page.press('#le-name', 'Tab');
+	await mapKey(page, 'KeyW', 'ŷ');
+	assert.deepEqual(await tabNames(page), ['My layout •', 'Second •']);
+	// Each tab keeps its own document and history.
+	await page.click('#le-layout-tabs [data-tab="0"]');
+	assert.equal(await legendOf(page, 'KeyQ'), 'ŵ');
+	assert.equal(await page.isDisabled('#le-undo'), false, 'the first tab keeps its own undo');
+	await page.click('#le-layout-tabs [data-tab="1"]');
+	assert.equal(await legendOf(page, 'KeyW'), 'ŷ');
+	await settled(page);
+
+	// F5: every tab and its unsaved edits come back, on the tab shown.
+	await page.reload();
+	await page.waitForSelector('#le-board');
+	await settled(page);
+	assert.deepEqual(await tabNames(page), ['My layout •', 'Second •']);
+	assert.equal(await page.getAttribute('#le-layout-tabs [data-tab="1"]', 'aria-selected'), 'true');
+	assert.equal(await legendOf(page, 'KeyW'), 'ŷ');
+	await page.click('#le-layout-tabs [data-tab="0"]');
+	assert.equal(await legendOf(page, 'KeyQ'), 'ŵ');
+	await mapKey(page, 'KeyE', 'ẽ');
+	await settled(page);
+
+	// A crash: the page is gone without its pagehide; a new page restores the last save.
+	const crashed = watch(await context.newPage());
+	await page.close({ runBeforeUnload: false });
+	await crashed.goto(url);
+	await crashed.waitForSelector('#le-board');
+	await settled(crashed);
+	assert.deepEqual(await tabNames(crashed), ['My layout •', 'Second •']);
+	assert.equal(await legendOf(crashed, 'KeyE'), 'ẽ', 'the edit made just before the crash is back');
+
+	// « Export all » writes one ZIP of every tab's source.
+	const [download] = await Promise.all([
+		crashed.waitForEvent('download'),
+		crashed.click('#le-tabs-export')
+	]);
+	assert.equal(download.suggestedFilename(), 'ergopti-studio-layouts.zip');
+	const archive = fs.readFileSync(await download.path());
+	assert.equal(archive.subarray(0, 2).toString('latin1'), 'PK');
+	assert.deepEqual(
+		await crashed.evaluate(
+			(bytes) =>
+				LayoutEditorWorkspace.readArchive(new Uint8Array(bytes)).then((files) =>
+					files.map((file) => [file.name, /name = "([^"]*)"/.exec(file.text)[1]])
+				),
+			[...archive]
+		),
+		[
+			['my_layout.toml', 'My layout'],
+			['qwerty_custom.toml', 'Second']
+		]
+	);
+
+	// Closing an unsaved tab asks first; closing every tab leaves one blank layout.
+	await crashed.click('#le-layout-tabs [data-close-tab="1"]');
+	await crashed.click('#le-confirm-yes');
+	await crashed.click('#le-layout-tabs [data-close-tab="0"]');
+	await crashed.click('#le-confirm-yes');
+	assert.deepEqual(await tabNames(crashed), ['My layout']);
+	// « Import » opens every layout of the backup in its own tab.
+	const backup = path.join(require('node:os').tmpdir(), `layout-editor-backup-${process.pid}.zip`);
+	fs.writeFileSync(backup, archive);
+	try {
+		// The page reads the chosen files after the pick: the file stays until it has.
+		await crashed.setInputFiles('#le-tabs-import-file', [backup, KEYLAYOUT]);
+		await crashed.waitForFunction(
+			() => document.querySelectorAll('#le-layout-tabs .le-layout-tab').length === 4
+		);
+	} finally {
+		fs.rmSync(backup);
+	}
+	assert.deepEqual((await tabNames(crashed)).slice(1, 3), ['My layout', 'Second']);
+	assert.equal(await legendOf(crashed, 'KeyE'), 'ẽ', 'the imported tab is shown with its edits');
+	assert.match(await crashed.textContent('#le-message'), /3 layouts imported/);
+	await settled(crashed);
+
+	// A damaged store is said and never saved over, even after an edit.
+	await crashed.evaluate(
+		() =>
+			new Promise((resolve, reject) => {
+				const open = indexedDB.open('ergopti-studio', 1);
+				open.onerror = () => reject(open.error);
+				open.onsuccess = () => {
+					const put = open.result
+						.transaction('workspace', 'readwrite')
+						.objectStore('workspace')
+						.put('{broken', 'editor');
+					put.onsuccess = () => resolve();
+					put.onerror = () => reject(put.error);
+				};
+			})
+	);
+	await crashed.reload();
+	await crashed.waitForSelector('#le-board');
+	await crashed.waitForSelector('#le-autosave.failed');
+	assert.match(await crashed.textContent('#le-message'), /could not be restored/);
+	await mapKey(crashed, 'KeyR', 'ŕ');
+	await crashed.waitForTimeout(800);
+	const kept = await crashed.evaluate(
+		() =>
+			new Promise((resolve) => {
+				const open = indexedDB.open('ergopti-studio', 1);
+				open.onsuccess = () => {
+					const get = open.result.transaction('workspace').objectStore('workspace').get('editor');
+					get.onsuccess = () => resolve(get.result);
+				};
+			})
+	);
+	assert.equal(kept, '{broken', 'the damaged workspace is left as it was');
+	assert.deepEqual(errors, [], 'workspace: page errors');
+	await context.close();
+}
+
+/**
+ * (layout-editor-workspace) The app window keeps the tabs in the user's data
+ * folder through the host: it reads them with studio_workspace_load when it
+ * mounts, restores them, saves every change with studio_workspace_save, and
+ * saves before « Close » closes the window.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseAppWorkspace(browser, origin) {
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	await page.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	}, strings);
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.evaluate(() =>
+		window.initData({
+			strings: {},
+			state: {
+				platform: 'linux',
+				index: { layouts: [] },
+				installed: {},
+				provided: {},
+				builtin: {}
+			},
+			source_editor: true,
+			source_export: true,
+			studio_store: true,
+			studio_workspace: true
+		})
+	);
+	await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
+	await page.waitForSelector('#layout-editor #le-board');
+	await page.waitForFunction(() =>
+		window.__posted.some((p) => p.action === 'studio_workspace_load')
+	);
+	const source = fs.readFileSync(SOURCE_FIXTURE, 'utf8');
+	await page.evaluate((source) => {
+		const asked = window.__posted.find((p) => p.action === 'studio_workspace_load');
+		window.studioWorkspace({
+			request: asked.request,
+			ok: true,
+			workspace: JSON.stringify({
+				schema: 1,
+				active: 1,
+				tabs: [
+					{ text: source, dirty: false },
+					{ text: source.replace('name = "Source Fixture"', 'name = "Edited"'), dirty: true }
+				]
+			})
+		});
+	}, source);
+	await page.waitForFunction(
+		() => document.querySelectorAll('#le-layout-tabs .le-layout-tab').length === 2
+	);
+	assert.deepEqual(
+		await page.$$eval('#le-layout-tabs .le-layout-tab', (tabs) =>
+			tabs.map((tab) => tab.textContent)
+		),
+		['Source Fixture', 'Edited •']
+	);
+	assert.equal(await page.inputValue('#le-name'), 'Edited', 'the stored active tab is shown');
+	// A restored workspace wins over the window's start copy of Ergopti: answering
+	// the catalogue, if the page asked for it, must not replace a restored tab.
+	await page.evaluate(
+		(keylayout) => {
+			if (window.__posted.some((p) => p.action === 'composer_open'))
+				window.composerData({
+					sources: [{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text: keylayout }]
+				});
+		},
+		fs.readFileSync(KEYLAYOUT, 'utf8')
+	);
+	await page.waitForTimeout(300);
+	assert.deepEqual(
+		await page.$$eval('#le-layout-tabs .le-layout-tab', (tabs) =>
+			tabs.map((tab) => tab.textContent)
+		),
+		['Source Fixture', 'Edited •'],
+		'the restored tabs stay'
+	);
+	assert.equal(await page.inputValue('#le-name'), 'Edited');
+	await page.fill('#le-name', 'Edited again');
+	await page.press('#le-name', 'Tab');
+	await page.waitForFunction(() =>
+		window.__posted.some((p) => p.action === 'studio_workspace_save')
+	);
+	const save = await page.evaluate(() =>
+		window.__posted.filter((p) => p.action === 'studio_workspace_save').pop()
+	);
+	const stored = JSON.parse(save.text);
+	assert.equal(stored.active, 1);
+	assert.match(stored.tabs[1].text, /name = "Edited again"/);
+	await page.evaluate(
+		(request) => window.studioWorkspaceResult({ request, ok: true }),
+		save.request
+	);
+	await page.waitForFunction(
+		(text) => document.querySelector('#le-autosave').textContent === text,
+		strings['layout_editor.tabs.autosave.saved']
+	);
+	// A refused save is said, not hidden.
+	await page.fill('#le-name', 'Third');
+	await page.press('#le-name', 'Tab');
+	await page.waitForFunction(
+		(count) => window.__posted.filter((p) => p.action === 'studio_workspace_save').length > count,
+		1
+	);
+	const refused = await page.evaluate(() =>
+		window.__posted.filter((p) => p.action === 'studio_workspace_save').pop()
+	);
+	await page.evaluate(
+		(request) =>
+			window.studioWorkspaceResult({
+				request,
+				ok: false,
+				code: 'studio_write_failed',
+				detail: 'disk full'
+			}),
+		refused.request
+	);
+	await page.waitForSelector('#le-autosave.failed');
+	assert.match(await page.textContent('#le-autosave'), /could not write to your data folder/);
+	// « Close » saves the last edit before the window closes.
+	await page.fill('#le-name', 'Last');
+	await page.press('#le-name', 'Tab');
+	await page.click('#le-close');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'close'));
+	const order = await page.evaluate(() =>
+		window.__posted
+			.filter((p) => p.action === 'studio_workspace_save' || p.action === 'close')
+			.map((p) =>
+				p.action === 'close'
+					? 'close'
+					: JSON.parse(p.text).tabs[1].text.match(/name = "([^"]*)"/)[1]
+			)
+	);
+	assert.deepEqual(
+		order.slice(-2),
+		['Last', 'close'],
+		'the last edit is saved before the window closes'
+	);
+	assert.deepEqual(errors, [], 'app workspace: page errors');
+	await page.close();
+}
+
 async function exercisePhoneWidth(browser, origin) {
 	const backgrounds = [];
 	for (const colorScheme of ['light', 'dark']) {
@@ -1109,6 +1456,7 @@ async function exercisePhoneWidth(browser, origin) {
 				pageWidth: document.documentElement.scrollWidth,
 				viewport: window.innerWidth,
 				toolbarInside: inside('.le-toolbar button'),
+				tabsInside: inside('#le-layout-tabs button'),
 				levelsInside: inside('#le-layerbar [data-level]'),
 				toolTabsInside: inside('#le-tools [data-tool]'),
 				boardScrolls: (() => {
@@ -1127,6 +1475,7 @@ async function exercisePhoneWidth(browser, origin) {
 		});
 		assert.equal(layout.pageWidth, layout.viewport, `${colorScheme}: no sideways page scroll`);
 		assert.ok(layout.toolbarInside, `${colorScheme}: the primary toolbar fits the screen`);
+		assert.ok(layout.tabsInside, `${colorScheme}: the layout tabs fit the screen`);
 		assert.ok(layout.levelsInside, `${colorScheme}: the four levels fit the screen`);
 		assert.ok(layout.inspectorBelowBoard, `${colorScheme}: the inspector stacks under the board`);
 		assert.ok(layout.toolsBelowInspector, `${colorScheme}: the tools come last`);
@@ -1541,6 +1890,8 @@ async function exercisePhoneWidth(browser, origin) {
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
 		await exerciseShortcuts(browser, origin);
+		await exerciseWorkspace(browser, origin);
+		await exerciseAppWorkspace(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

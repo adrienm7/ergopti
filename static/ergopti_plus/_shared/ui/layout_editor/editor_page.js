@@ -28,6 +28,13 @@
  *    then the secondary tools in tabs. A host's side panel (the Studio's
  *    analysis) goes in the persistent slot the mount returns as sideSlot; the
  *    root fires layout-editor:rendered after each render.
+ * 6. Several personal layouts, never lost: each layout has its own tab (« + »
+ *    opens a blank one, a copy of another layout or a file), with its own undo
+ *    history. A host that gives a workspace store (host.workspace: the
+ *    website's IndexedDB, the app's user data folder) gets every tab and its
+ *    unsaved edits saved as the user types and restored on the next mount
+ *    (LayoutEditorWorkspace); « Export all » and « Import » back them up as one
+ *    ZIP of Ergopti sources.
  * ==============================================================================
  */
 
@@ -268,9 +275,11 @@ var LayoutEditorPage = (function () {
 	 *   savedStatus names the message shown after a save; onClose leaves the editor;
 	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
 	 *   on a host that can fetch them; startFrom names the start source (a
-	 *   loadSources or built-in id) the editor copies when it has no initial text;
-	 *   compare(layout) receives the edited layout from the analysis panel's
-	 *   « Compare with other layouts » (the app's Studio).
+	 *   loadSources or built-in id) the editor copies when it has no initial text
+	 *   and no restored workspace; compare(layout) receives the edited layout from
+	 *   the analysis panel's « Compare with other layouts » (the app's Studio);
+	 *   workspace {load(): Promise<string|null>, save(text): Promise,
+	 *   persist?(): Promise<boolean>} keeps the tabs (LayoutEditorWorkspace).
 	 * @returns {{open: function(string, string): void, current: function(): object}}
 	 */
 	function mount(root, host) {
@@ -345,8 +354,19 @@ var LayoutEditorPage = (function () {
 			importConvention: 'iso',
 			navHold: '',
 			lost: null,
-			dirty: false
+			dirty: false,
+			// The open layouts: each tab's own history and whether it differs from the
+			// file last saved. state.history and state.dirty are the shown tab's.
+			tabs: [],
+			active: 0,
+			// The workspace store's state: 'none' (the host keeps no tabs), 'loading'
+			// (the stored tabs are being read), 'saving', 'saved' or 'failed'; blocked
+			// when the stored workspace did not read, so nothing is saved over it.
+			// error is the refusal itself, translated when shown (the locale can arrive later).
+			workspace: { status: host.workspace ? 'loading' : 'none', blocked: false, error: null },
+			persisted: null
 		};
+		state.tabs.push({ history: state.history, dirty: false });
 		const doc = () => state.history.current();
 		// The live analysis beside the board, on the pages that load its scripts.
 		const analysisPanel =
@@ -400,6 +420,21 @@ var LayoutEditorPage = (function () {
 				focused.blur();
 		}
 
+		/** Shows another document: what was selected or typed belongs to the one left. */
+		function resetView(next, lost) {
+			state.layer = (next.layers || []).some((l) => l.id === 'base') ? 'base' : null;
+			state.selected = null;
+			state.presses = [];
+			state.lost = lost || null;
+			state.deadKey = null;
+			state.approximate = false;
+			// A shortcut being edited or chosen belongs to the document replaced: an
+			// « Edit » kept across an open once applied to the new file's override.
+			state.shortcutDraft = null;
+			state.shortcutForm = null;
+			state.pickingShortcutKey = null;
+		}
+
 		// How many documents replace() opened: the opening start keeps one the user opened.
 		let replacements = 0;
 
@@ -408,18 +443,408 @@ var LayoutEditorPage = (function () {
 			commitFocused();
 			replacements += 1;
 			state.history.reset(next);
-			state.layer = (next.layers || []).some((l) => l.id === 'base') ? 'base' : null;
-			state.selected = null;
-			state.presses = [];
-			state.lost = lost || null;
+			resetView(next, lost);
 			state.dirty = false;
-			state.deadKey = null;
-			state.approximate = false;
-			// A shortcut being edited or chosen belongs to the document replaced: an
-			// « Edit » kept across an open once applied to the new file's override.
-			state.shortcutDraft = null;
-			state.shortcutForm = null;
-			state.pickingShortcutKey = null;
+		}
+
+		// ============================
+		// ======= 4b/ Tabs ===========
+		// ============================
+
+		// Each document's TOML source, written once per document (documents are immutable).
+		const sourceTexts = new WeakMap();
+		function sourceText(document) {
+			if (!sourceTexts.has(document)) sourceTexts.set(document, LayoutSourceIO.serialize(document));
+			return sourceTexts.get(document);
+		}
+
+		/** The tab at an index, the shown one read from the live state. */
+		function tabAt(index) {
+			return index === state.active
+				? { history: state.history, dirty: state.dirty }
+				: state.tabs[index];
+		}
+
+		/** Writes the shown tab's history and state back into its tab. */
+		function keepActive() {
+			state.tabs[state.active] = tabAt(state.active);
+		}
+
+		/** Shows one tab (the caller kept the current one first). */
+		function showTab(index) {
+			const tab = state.tabs[index];
+			state.active = index;
+			state.history = tab.history;
+			state.dirty = tab.dirty;
+			state.starting = false;
+			state.confirm = null;
+			resetView(doc(), null);
+		}
+
+		function switchTab(index) {
+			if (index === state.active) return;
+			commitFocused();
+			keepActive();
+			showTab(index);
+			state.message = null;
+			render();
+		}
+
+		/** A tab for a document, with a history of its own. */
+		function newTab(document, dirty) {
+			return { history: LayoutEditorModel.createHistory(document), dirty };
+		}
+
+		/** A blank layout, as « New » makes it. */
+		function blankDoc() {
+			return LayoutSourceIO.create('my_layout', tl('default_name'));
+		}
+
+		/** « + »: a blank layout in a new tab, with « Start from » open to pick another. */
+		function addTab() {
+			commitFocused();
+			keepActive();
+			state.tabs.push(newTab(blankDoc(), false));
+			showTab(state.tabs.length - 1);
+			state.message = null;
+			state.starting = true;
+			if (state.fillSources === null) loadFillSources();
+			render();
+		}
+
+		function closeTab(index) {
+			const run = () => {
+				commitFocused();
+				keepActive();
+				state.tabs.splice(index, 1);
+				if (state.tabs.length === 0) state.tabs.push(newTab(blankDoc(), false));
+				const shown = index < state.active ? state.active - 1 : state.active;
+				showTab(Math.min(shown, state.tabs.length - 1));
+				render();
+			};
+			const tab = tabAt(index);
+			if (tab.dirty)
+				ask(tl('tabs.close_confirm', { name: tab.history.current().layout.name }), run);
+			else run();
+		}
+
+		/** « Export all »: one ZIP of every tab's source, for a backup or another machine. */
+		function exportTabs() {
+			keepActive();
+			let archive;
+			try {
+				archive = LayoutEditorWorkspace.backup(
+					state.tabs.map((tab) => ({
+						id: tab.history.current().layout.id,
+						text: sourceText(tab.history.current())
+					}))
+				);
+			} catch (error) {
+				notify('error', problemText(error));
+				return;
+			}
+			fromHost(() => host.saveBinary(archive.filename, archive.bytes, 'application/zip')).then(
+				() =>
+					notify('ok', tl('tabs.exported', { count: state.tabs.length, name: archive.filename })),
+				(error) => notify('error', problemText(error))
+			);
+		}
+
+		/** The document of one imported file: an Ergopti source or a .keylayout. */
+		function importedDoc(name, text) {
+			if (/\.keylayout$/i.test(name)) {
+				const id = LayoutSourceIO.identifierFrom(name.replace(/\.keylayout$/i, ''), 'layout');
+				return LayoutSourceIO.importKeylayout(text, id, state.importConvention);
+			}
+			const parsed = LayoutSourceIO.parse(text);
+			if (!parsed.ok) throw parsed.error;
+			return parsed.doc;
+		}
+
+		/**
+		 * « Import »: every layout of the chosen files (sources, .keylayout files and
+		 * backups) in new tabs; a file that does not read is named, the others open.
+		 */
+		async function importTabs(input) {
+			const files = [...(input.files || [])];
+			input.value = '';
+			if (files.length === 0) return;
+			const entries = [];
+			const refused = [];
+			for (const file of files) {
+				try {
+					if (/\.zip$/i.test(file.name))
+						entries.push(
+							...(await LayoutEditorWorkspace.readArchive(new Uint8Array(await file.arrayBuffer())))
+						);
+					else if (LayoutEditorWorkspace.IMPORTED.test(file.name))
+						entries.push({ name: file.name, text: await file.text() });
+					else throw { code: 'import_unsupported', path: file.name };
+				} catch (error) {
+					refused.push(`${file.name}: ${problemText(error)}`);
+				}
+			}
+			commitFocused();
+			keepActive();
+			const first = state.tabs.length;
+			for (const entry of entries) {
+				try {
+					state.tabs.push(newTab(importedDoc(entry.name, entry.text), false));
+				} catch (error) {
+					refused.push(`${entry.name}: ${problemText(error)}`);
+				}
+			}
+			if (state.tabs.length > first) showTab(first);
+			const imported = tl('tabs.imported', { count: state.tabs.length - first });
+			if (refused.length)
+				notify('error', `${imported} ${tl('tabs.import_refused', { files: refused.join(' · ') })}`);
+			else notify('ok', imported);
+		}
+
+		// ============================
+		// ======= 4c/ Autosave =======
+		// ============================
+
+		let autosaveTimer = null;
+		// The text last stored, and whether a save is running or another is due after it.
+		let storedText = null;
+		// What that text was made from: each tab's document and state, and the tab shown.
+		let storedShape = null;
+		let saving = false;
+		let saveAgain = false;
+
+		function autosaveText() {
+			const workspace = state.workspace;
+			if (workspace.status === 'none') return '';
+			if (workspace.status === 'failed')
+				return tl('tabs.autosave.failed', { reason: problemText(workspace.error) });
+			if (workspace.status === 'loading') return tl('tabs.autosave.loading');
+			const text = tl(
+				workspace.status === 'saving' ? 'tabs.autosave.saving' : 'tabs.autosave.saved'
+			);
+			return state.persisted === false ? `${text} ${tl('tabs.autosave.not_persistent')}` : text;
+		}
+
+		/** Shows the store's state without a render (a render would schedule another save). */
+		function showAutosave() {
+			const node = root.querySelector('#le-autosave');
+			if (!node) return;
+			node.textContent = autosaveText();
+			node.className = `le-autosave ${state.workspace.status}`;
+		}
+
+		/** Whether the tabs can be saved now: the host keeps them and they were read. */
+		function autosaves() {
+			return (
+				Boolean(host.workspace) && state.workspace.status !== 'loading' && !state.workspace.blocked
+			);
+		}
+
+		/** What the stored text depends on; documents are immutable, so identity is enough. */
+		function workspaceShape() {
+			return [state.active].concat(
+				...state.tabs.map((stored, index) => {
+					const tab = tabAt(index);
+					return [tab.history.current(), tab.dirty];
+				})
+			);
+		}
+
+		function sameShape(a, b) {
+			return (
+				a !== null && b !== null && a.length === b.length && a.every((part, i) => part === b[i])
+			);
+		}
+
+		/** Saves after the delay when a tab changed; the status says a save is due at once. */
+		function scheduleAutosave() {
+			if (!autosaves() || sameShape(workspaceShape(), storedShape)) return;
+			clearTimeout(autosaveTimer);
+			autosaveTimer = setTimeout(flushAutosave, LayoutEditorWorkspace.AUTOSAVE_DELAY_MS);
+			if (state.workspace.status !== 'failed') {
+				state.workspace.status = 'saving';
+				showAutosave();
+			}
+		}
+
+		/** Saves every tab now when they changed since the last save; one save at a time. */
+		function flushAutosave() {
+			clearTimeout(autosaveTimer);
+			autosaveTimer = null;
+			if (!autosaves()) return;
+			if (saving) {
+				saveAgain = true;
+				return;
+			}
+			const shape = workspaceShape();
+			let text;
+			try {
+				text = LayoutEditorWorkspace.serialize(
+					state.tabs.map((stored, index) => {
+						const tab = tabAt(index);
+						return { text: sourceText(tab.history.current()), dirty: tab.dirty };
+					}),
+					state.active
+				);
+			} catch (error) {
+				state.workspace.status = 'failed';
+				state.workspace.error = error;
+				showAutosave();
+				return;
+			}
+			if (text === storedText) {
+				storedShape = shape;
+				state.workspace.status = 'saved';
+				showAutosave();
+				return;
+			}
+			saving = true;
+			state.workspace.status = 'saving';
+			showAutosave();
+			fromHost(() => host.workspace.save(text))
+				.then(
+					() => {
+						storedText = text;
+						storedShape = shape;
+						// Saved, unless a change came while the save ran.
+						state.workspace.status = saveAgain ? 'saving' : 'saved';
+					},
+					(error) => {
+						state.workspace.status = 'failed';
+						state.workspace.error = error;
+					}
+				)
+				.then(() => {
+					saving = false;
+					showAutosave();
+					if (saveAgain) {
+						saveAgain = false;
+						flushAutosave();
+					}
+				});
+		}
+
+		/** A stored workspace that does not read: say why and never save over it. */
+		function refuseWorkspace(error) {
+			state.workspace = { status: 'failed', blocked: true, error };
+			state.message = {
+				kind: 'error',
+				text: tl('tabs.restore_failed', { reason: problemText(error) }),
+				// Translated again when the locale arrives after the refusal.
+				translate: () => tl('tabs.restore_failed', { reason: problemText(error) })
+			};
+		}
+
+		/**
+		 * Restores the stored tabs; a tab edited before they arrived stays after them.
+		 * @param {string|null} text - The stored workspace, null before the first save.
+		 * @returns {boolean} Whether tabs were restored (the caller renders).
+		 */
+		function restoreWorkspace(text) {
+			if (text === null) {
+				state.workspace.status = 'saved';
+				return false;
+			}
+			let stored;
+			let restored;
+			try {
+				stored = LayoutEditorWorkspace.parse(text);
+				restored = stored.tabs.map((tab, index) => {
+					const parsed = LayoutSourceIO.parse(tab.text);
+					if (!parsed.ok)
+						throw { code: parsed.error.code, path: `${index + 1}: ${parsed.error.path}` };
+					return newTab(parsed.doc, tab.dirty);
+				});
+			} catch (error) {
+				refuseWorkspace(error);
+				return false;
+			}
+			commitFocused();
+			keepActive();
+			const edited = state.tabs.filter((tab) => tab.dirty);
+			state.tabs = restored.concat(edited);
+			storedText = text;
+			state.workspace.status = 'saved';
+			showTab(edited.length ? state.tabs.length - 1 : stored.active);
+			storedShape = edited.length ? null : workspaceShape();
+			return true;
+		}
+
+		/** The open tabs, « + », the workspace's state and the backup of every tab. */
+		function tabBar() {
+			const tabs = state.tabs.map((stored, index) => {
+				const tab = tabAt(index);
+				const name = tab.history.current().layout.name;
+				const active = index === state.active;
+				return el('span', { class: `le-layout-tab-item${active ? ' active' : ''}` }, [
+					el('button', {
+						type: 'button',
+						class: 'le-layout-tab',
+						role: 'tab',
+						'data-tab': String(index),
+						'aria-selected': String(active),
+						title: tl(tab.dirty ? 'toolbar.unsaved' : 'toolbar.saved'),
+						text: `${name}${tab.dirty ? ' •' : ''}`,
+						onclick: () => switchTab(index)
+					}),
+					el('button', {
+						type: 'button',
+						class: 'le-layout-tab-close',
+						'data-close-tab': String(index),
+						'aria-label': tl('tabs.close', { name }),
+						title: tl('tabs.close', { name }),
+						text: '×',
+						onclick: () => closeTab(index)
+					})
+				]);
+			});
+			const importInput = el('input', {
+				type: 'file',
+				id: 'le-tabs-import-file',
+				accept: '.toml,.keylayout,.zip',
+				multiple: true,
+				hidden: true,
+				onchange: (event) => importTabs(event.target)
+			});
+			return el('div', { class: 'le-layout-tabs', id: 'le-layout-tabs' }, [
+				el(
+					'div',
+					{ class: 'le-layout-tab-list', role: 'tablist', 'aria-label': tl('tabs.label') },
+					[
+						...tabs,
+						el('button', {
+							type: 'button',
+							id: 'le-tab-add',
+							class: 'le-layout-tab-add',
+							'aria-label': tl('tabs.add'),
+							title: tl('tabs.add'),
+							text: '+',
+							onclick: addTab
+						})
+					]
+				),
+				el('span', {
+					class: `le-autosave ${state.workspace.status}`,
+					id: 'le-autosave',
+					role: 'status',
+					text: autosaveText()
+				}),
+				host.saveBinary
+					? el('button', {
+							type: 'button',
+							id: 'le-tabs-export',
+							text: tl('tabs.export_all'),
+							onclick: exportTabs
+						})
+					: null,
+				el('button', {
+					type: 'button',
+					id: 'le-tabs-import',
+					text: tl('tabs.import'),
+					onclick: () => importInput.click()
+				}),
+				importInput
+			]);
 		}
 
 		// ============================
@@ -2200,6 +2625,17 @@ var LayoutEditorPage = (function () {
 			const choices = [
 				el('button', {
 					type: 'button',
+					'data-start': 'file',
+					text: tl('start.file'),
+					onclick: () => {
+						state.starting = false;
+						render();
+						if (host.pickFile) pickWithHost();
+						else root.querySelector('#le-open-file').click();
+					}
+				}),
+				el('button', {
+					type: 'button',
 					'data-start': 'blank',
 					text: tl('start.blank'),
 					onclick: () =>
@@ -3135,6 +3571,7 @@ var LayoutEditorPage = (function () {
 			if (state.layer && !ids.includes(state.layer))
 				state.layer = ids.includes('base') ? 'base' : null;
 			const parts = [
+				tabBar(),
 				toolbar(),
 				startPanel(),
 				messageBar(),
@@ -3152,6 +3589,7 @@ var LayoutEditorPage = (function () {
 			fitLegends();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc());
+			scheduleAutosave();
 		}
 
 		/**
@@ -3204,7 +3642,31 @@ var LayoutEditorPage = (function () {
 		// The start the page opened on, renamed when the locale arrives after it.
 		let openedStart = null;
 
+		/**
+		 * The first document: the host's workspace restored when it holds tabs, else
+		 * the host's initial text, else a copy of its start source.
+		 */
 		function openInitial() {
+			if (!host.workspace) {
+				openStart();
+				return;
+			}
+			fromHost(() => host.workspace.load()).then(
+				(text) => {
+					if (!restoreWorkspace(text)) openStart();
+					render();
+				},
+				(error) => {
+					// The tabs could not be read: the page says so, saves nothing over them,
+					// and still opens the start document.
+					refuseWorkspace(error);
+					openStart();
+					render();
+				}
+			);
+		}
+
+		function openStart() {
 			if (typeof host.initial === 'string') {
 				const parsed = LayoutSourceIO.parse(host.initial);
 				if (parsed.ok) replace(parsed.doc);
@@ -3238,6 +3700,23 @@ var LayoutEditorPage = (function () {
 
 		openInitial();
 		render();
+		if (host.workspace) {
+			if (typeof host.workspace.persist === 'function')
+				fromHost(() => host.workspace.persist()).then(
+					(granted) => {
+						state.persisted = granted === true;
+						showAutosave();
+					},
+					() => {
+						state.persisted = false;
+						showAutosave();
+					}
+				);
+			// A reload or a closed tab saves the last edits at once instead of after the delay.
+			window.addEventListener('pagehide', () => {
+				if (autosaveTimer !== null) flushAutosave();
+			});
+		}
 		document.addEventListener('i18n:applied', () => {
 			// The first document is made before the locale arrives: give an untouched one its translated name.
 			const untouched =
@@ -3250,11 +3729,14 @@ var LayoutEditorPage = (function () {
 				state.history.reset(LayoutEditorModel.setLayout(doc(), { name }));
 				openedStart.doc = doc();
 			}
+			if (state.message && state.message.translate) state.message.text = state.message.translate();
 			render();
 		});
 		return {
 			open: (name, text) => openText(name, text),
 			current: () => doc(),
+			// Saves the tabs now instead of after the delay.
+			flushAutosave,
 			sideSlot,
 			render
 		};

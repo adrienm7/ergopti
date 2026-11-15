@@ -177,6 +177,60 @@ body {
 	color: var(--le-text);
 }
 
+/* The open layouts, one tab each, above the toolbar; long names are cut, the row wraps. */
+.le-layout-tabs {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-bottom: 8px;
+}
+
+.le-layout-tab-list {
+	display: flex;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	gap: 4px;
+	min-width: 0;
+}
+
+.le-layout-tab-item {
+	border: 1px solid var(--le-border);
+	border-radius: var(--le-radius);
+	display: inline-flex;
+	max-width: 100%;
+	min-width: 0;
+}
+
+.le-layout-tab-item.active {
+	border-color: var(--le-accent);
+	box-shadow: inset 0 -2px 0 var(--le-accent);
+}
+
+.le-layout-tab-item button {
+	border: 0;
+}
+
+.le-layout-tab {
+	max-width: 24ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.le-layout-tab-item.active .le-layout-tab {
+	font-weight: 600;
+}
+
+.le-autosave {
+	color: var(--le-sub);
+	font-size: 0.9em;
+}
+
+.le-autosave.failed {
+	color: var(--le-danger);
+}
+
 /* =============================== */
 /* =============================== */
 /* ======= 3/ Forms & Messages === */
