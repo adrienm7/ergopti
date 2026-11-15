@@ -182,10 +182,24 @@
 			"format": "count_table"
 		},
 		{
+			"id": "fr_news_1m",
+			"title": "News — 1,000,000 sentences (counts)",
+			"language": "fr",
+			"file": "static/corpus/frequency/leipzig/fr_news_2024_1M.json",
+			"format": "count_table"
+		},
+		{
 			"id": "fr_lexique_words",
 			"title": "Lexique 4.10 — word forms (counts)",
 			"language": "fr",
 			"file": "static/corpus/frequency/lexique/fr_lexique_4_10.json",
+			"format": "count_table"
+		},
+		{
+			"id": "en_wikipedia_1m",
+			"title": "Wikipedia — 1,000,000 sentences (counts)",
+			"language": "en",
+			"file": "static/corpus/frequency/leipzig/en_wikipedia_2016_1M.json",
 			"format": "count_table"
 		}
 	]

@@ -18,8 +18,12 @@
  *    it is read; --archive-dir takes archives already downloaded (by their
  *    URL's file name), otherwise curl downloads them (the maintainer's tool,
  *    never run by CI, which has no network).
- * 3. Bounded tables: n-grams rarer than prune_ratio of their table's total are
- *    dropped, and the table states the counts it kept from (pruned_below).
+ * 3. Bounded tables: n-grams rarer than the register's prune_ratio of their
+ *    table's total are dropped, and the table states the counts it kept from
+ *    (pruned_below). Pruning must not change the analysis: every metric of
+ *    PRUNE_CHECK_LAYOUTS, measured on the full and on the pruned counts,
+ *    differs by at most PRUNE_TOLERANCE, or the table is refused; the table
+ *    records the largest difference (prune_check).
  * 4. Deterministic output: entries sorted by count, then by n-gram.
  * 5. The register (static/corpus/register.json) owns licences: a table is
  *    written only for a source the register already lists by its URL.
@@ -32,19 +36,29 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 const zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
-const { REPO_ROOT } = require('../lib/paths.cjs');
+const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 const Analysis = require('../codegen/codegen-layout-analysis-data-js.cjs');
 
 const CORPUS_DIR = path.join(REPO_ROOT, 'static', 'corpus');
 const SOURCES_PATH = path.join(CORPUS_DIR, 'count_table_sources.json');
+const ANALYSIS_DATA_PATH = shared('ui', 'layout_analysis', '_generated', 'analysis_data.js');
 const REGISTER_PATH = path.join(CORPUS_DIR, 'register.json');
 const KINDS = ['leipzig_sentences', 'lexique_words'];
 const TABLES = ['chars', 'bigrams', 'trigrams'];
 // Lines counted per call of the engine: its segments end at a newline, so
 // counting chunk by chunk gives exactly the counts of the whole text.
 const LINES_PER_CHUNK = 20000;
+// The layouts the pruning check measures: Latin layouts of the languages the
+// tables count. A layout that types few of a table's characters (a Cyrillic
+// one on French) has metrics over a handful of n-grams, which no table needs.
+const PRUNE_CHECK_LAYOUTS = ['qwerty', 'azerty', 'bepo', 'ergopti', 'dvorak', 'colemak', 'ergol'];
+// The largest change pruning may make to any metric of those layouts, in the
+// metric's own unit (percentage points for the shares). A metric is shown
+// with one decimal; 0.05 never moves it by more than one rounding step.
+const PRUNE_TOLERANCE = 0.05;
 
 /** Exits with a reason. */
 function fail(message) {
@@ -215,15 +229,63 @@ function prune(counts, ratio) {
 	return { tables, prunedBelow };
 }
 
+/**
+ * The analysis engine with its layout library, from the generated data.
+ * @returns {object} LAYOUT_ANALYSIS.
+ */
+function engineWithLibrary() {
+	const sandbox = {};
+	vm.createContext(sandbox);
+	for (const file of [ANALYSIS_DATA_PATH, Analysis.ENGINE_PATH])
+		vm.runInContext(fs.readFileSync(file, 'utf8'), sandbox, { filename: file });
+	return vm.runInContext('LAYOUT_ANALYSIS', sandbox);
+}
+
+/**
+ * The largest change pruning makes to a metric of the check layouts.
+ * @param {object} engine - LAYOUT_ANALYSIS with its library.
+ * @param {object} counts - The full counts.
+ * @param {object} tables - The kept [n-gram, count] pairs (prune).
+ * @returns {{max_metric_change: number, at: string}} The change and where.
+ * @throws {Error} When a check layout is missing or a metric is not finite.
+ */
+function pruneDeviation(engine, counts, tables) {
+	const library = new Map(engine.libraryLayouts().map((layout) => [layout.id, layout]));
+	const full = engine.prepareNgrams(counts);
+	const kept = engine.prepareNgrams(
+		Object.fromEntries(TABLES.map((name) => [name, Object.fromEntries(tables[name])]))
+	);
+	let worst = { max_metric_change: 0, at: '' };
+	for (const id of PRUNE_CHECK_LAYOUTS) {
+		const layout = library.get(id);
+		if (!layout) throw new Error(`the layout library has no ${id}`);
+		const before = engine.analyse(layout, full, {}).metrics;
+		const after = engine.analyse(layout, kept, {}).metrics;
+		for (const [metric, value] of Object.entries(before)) {
+			const change = Math.abs(value - after[metric]);
+			if (!Number.isFinite(change)) throw new Error(`${id} ${metric} is not finite`);
+			if (change > worst.max_metric_change)
+				worst = { max_metric_change: change, at: `${id} ${metric}` };
+		}
+	}
+	return { max_metric_change: Number(worst.max_metric_change.toPrecision(3)), at: worst.at };
+}
+
 /** The count-table file of a source's tables, one entry per line. */
-function tableText(tables, prunedBelow) {
+function tableText(countedAs, tables, prunedBelow, pruneCheck) {
 	const block = (entries) =>
 		`{\n${entries.map(([gram, n]) => `\t\t${JSON.stringify(gram)}: ${n}`).join(',\n')}\n\t}`;
 	return [
 		'{',
 		`\t"format": ${JSON.stringify(Analysis.COUNT_TABLE_FORMAT)},`,
 		`\t"version": ${Analysis.COUNT_TABLE_VERSION},`,
+		`\t"counted_as": ${JSON.stringify(countedAs)},`,
 		`\t"pruned_below": { ${['chars', 'bigrams', 'trigrams'].map((name) => `"${name}": ${prunedBelow[name]}`).join(', ')} },`,
+		'\t"prune_check": {',
+		`\t\t"layouts": ${JSON.stringify(PRUNE_CHECK_LAYOUTS).replace(/,/g, ', ')},`,
+		`\t\t"max_metric_change": ${pruneCheck.max_metric_change},`,
+		`\t\t"at": ${JSON.stringify(pruneCheck.at)}`,
+		'\t},',
 		`\t"chars": ${block(tables.chars)},`,
 		`\t"bigrams": ${block(tables.bigrams)},`,
 		`\t"trigrams": ${block(tables.trigrams)}`,
@@ -249,17 +311,32 @@ function archiveOf(source, archiveDir, scratch) {
 /**
  * Builds one table from its source.
  * @param {object} source - A count_table_sources.json entry.
+ * @param {number} ratio - Its register entry's prune_ratio.
  * @param {string} archivePath - Its checked archive.
- * @param {object} engine - LAYOUT_ANALYSIS.
+ * @param {object} engine - LAYOUT_ANALYSIS with its library.
  * @returns {string} The table file's text.
+ * @throws {Error} When pruning changes a metric by more than PRUNE_TOLERANCE.
  */
-function buildTable(source, archivePath, engine) {
+function buildTable(source, ratio, archivePath, engine) {
 	if (!KINDS.includes(source.kind)) throw new Error(`${source.output}: kind ${source.kind}`);
 	const text = memberText(source, archivePath);
 	const counts =
 		source.kind === 'leipzig_sentences' ? leipzigCounts(text, engine) : lexiqueCounts(text, source);
-	const { tables, prunedBelow } = prune(counts, source.prune_ratio);
-	return tableText(tables, prunedBelow);
+	const { tables, prunedBelow } = prune(counts, ratio);
+	const check = pruneDeviation(engine, counts, tables);
+	console.log(
+		`import-count-tables: ${source.output}: pruning changes a metric by at most ${check.max_metric_change} (${check.at})`
+	);
+	if (check.max_metric_change > PRUNE_TOLERANCE)
+		throw new Error(
+			`${source.output}: pruning at ${ratio} changes ${check.at} by ${check.max_metric_change}, over ${PRUNE_TOLERANCE}`
+		);
+	return tableText(
+		source.kind === 'lexique_words' ? 'word_list' : 'text',
+		tables,
+		prunedBelow,
+		check
+	);
 }
 
 function main() {
@@ -269,7 +346,7 @@ function main() {
 	const register = JSON.parse(fs.readFileSync(REGISTER_PATH, 'utf8')).files;
 	const only = option('only');
 	const archiveDir = option('archive-dir');
-	const engine = Analysis.loadEngine();
+	const engine = engineWithLibrary();
 	const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-count-sources-'));
 	try {
 		for (const source of sources.tables) {
@@ -277,7 +354,12 @@ function main() {
 			const entry = register[source.output];
 			if (!entry || entry.url !== source.url)
 				fail(`${source.output}: static/corpus/register.json must list it with url ${source.url}`);
-			const text = buildTable(source, archiveOf(source, archiveDir, scratch), engine);
+			const text = buildTable(
+				source,
+				entry.prune_ratio,
+				archiveOf(source, archiveDir, scratch),
+				engine
+			);
 			const target = path.join(CORPUS_DIR, source.output);
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.writeFileSync(target, text);
@@ -291,4 +373,16 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { zipMember, leipzigCounts, lexiqueCounts, prune, tableText, buildTable };
+module.exports = {
+	memberText,
+	PRUNE_CHECK_LAYOUTS,
+	PRUNE_TOLERANCE,
+	zipMember,
+	leipzigCounts,
+	lexiqueCounts,
+	prune,
+	pruneDeviation,
+	engineWithLibrary,
+	tableText,
+	buildTable
+};

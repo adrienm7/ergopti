@@ -50,6 +50,8 @@ const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 // The folders of static/corpus the register covers: texts, and word frequency lists.
 const CORPUS_FOLDERS = ['original', 'frequency'];
 const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv', 'count_table'];
+// How a count table was counted: as running text, or by the word-list rule.
+const COUNTED_AS = ['text', 'word_list'];
 // The count-table file (static/corpus/frequency/<source>/<id>.json) a large corpus
 // ships instead of its text: tools/corpus/import-count-tables.cjs writes it.
 const COUNT_TABLE_FORMAT = 'ergopti-count-table';
@@ -464,8 +466,20 @@ function countTableCounts(text, id) {
 		throw new Error(`corpora.json: ${id} is not a ${COUNT_TABLE_FORMAT} v${COUNT_TABLE_VERSION}`);
 	const lengths = { chars: 1, bigrams: 2, trigrams: 3 };
 	for (const key of Object.keys(table))
-		if (!['format', 'version', 'pruned_below', ...Object.keys(lengths)].includes(key))
+		if (
+			![
+				'format',
+				'version',
+				'counted_as',
+				'pruned_below',
+				'prune_check',
+				...Object.keys(lengths)
+			].includes(key)
+		)
 			throw new Error(`corpora.json: ${id} count table has an unknown field ${key}`);
+	// A word list's n-grams stay inside words: the page says so (word_list).
+	if (!COUNTED_AS.includes(table.counted_as))
+		throw new Error(`corpora.json: ${id} count table has no valid counted_as`);
 	// The counts each table was kept from (tools/build/import-count-tables.cjs prune).
 	const pruned = table.pruned_below;
 	if (
@@ -474,6 +488,18 @@ function countTableCounts(text, id) {
 		!Object.values(pruned).every((n) => Number.isSafeInteger(n) && n >= 1)
 	)
 		throw new Error(`corpora.json: ${id} count table has no valid pruned_below`);
+	// What pruning changed in the analysis (import-count-tables.cjs pruneDeviation).
+	const check = table.prune_check;
+	if (
+		!check ||
+		Object.keys(check).join() !== 'layouts,max_metric_change,at' ||
+		!Array.isArray(check.layouts) ||
+		check.layouts.length === 0 ||
+		!check.layouts.every((layout) => typeof layout === 'string') ||
+		!(Number.isFinite(check.max_metric_change) && check.max_metric_change >= 0) ||
+		typeof check.at !== 'string'
+	)
+		throw new Error(`corpora.json: ${id} count table has no valid prune_check`);
 	for (const [name, length] of Object.entries(lengths)) {
 		const counts = table[name];
 		if (!counts || typeof counts !== 'object' || Array.isArray(counts))
@@ -482,7 +508,12 @@ function countTableCounts(text, id) {
 			if (Array.from(gram).length !== length || !Number.isSafeInteger(n) || n < pruned[name])
 				throw new Error(`corpora.json: ${id} ${name} entry ${JSON.stringify(gram)} is invalid`);
 	}
-	return { chars: table.chars, bigrams: table.bigrams, trigrams: table.trigrams };
+	return {
+		chars: table.chars,
+		bigrams: table.bigrams,
+		trigrams: table.trigrams,
+		countedAs: table.counted_as
+	};
 }
 
 /**
@@ -544,6 +575,10 @@ function buildCorpora(engine) {
 			title: corpus.title,
 			language: corpus.language,
 			format,
+			// Its n-grams stay inside words (layout_analysis.corpus.word_list).
+			word_list:
+				format === 'word_frequencies' ||
+				(format === 'count_table' && counts.countedAs === 'word_list'),
 			licence: entry.licence,
 			attribution: entry.attribution,
 			source: entry.source,
@@ -919,6 +954,8 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	ENGINE_PATH,
+	COUNTED_AS,
 	countTableCounts,
 	loadEngine,
 	COUNT_TABLE_FORMAT,

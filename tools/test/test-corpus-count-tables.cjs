@@ -10,8 +10,11 @@
  * entry with the same URL; the importer's rules give hand-written counts on
  * small inputs (a Leipzig sentence file counts as text, across words; a
  * Lexique table sums a form's rows and leaves multi-word entries out; pruning
- * keeps the counts at its floor, sorted by count); and the reader refuses a
- * malformed table.
+ * keeps the counts at its floor, sorted by count); pruning leaves every
+ * metric of the check layouts within the importer's tolerance (each table
+ * records its largest change, and a harsher pruning of a real text is caught
+ * by the same check); a word-list table shows the word-list caveat; and the
+ * reader refuses a malformed table.
  * ==============================================================================
  */
 
@@ -56,11 +59,28 @@ let checks = 0;
 			source.url,
 			`${file}: the register names its URL`
 		);
-		const counts = Analysis.countTableCounts(
-			fs.readFileSync(path.join(CORPUS, file), 'utf8'),
-			file
-		);
+		const text = fs.readFileSync(path.join(CORPUS, file), 'utf8');
+		const counts = Analysis.countTableCounts(text, file);
 		assert(Object.keys(counts.trigrams).length > 0, `${file} has trigrams`);
+		// The threshold is the register's, and pruning at it kept the analysis.
+		const ratio = register[file].prune_ratio;
+		assert(typeof ratio === 'number' && ratio > 0 && ratio < 1e-4, `${file}: prune_ratio ${ratio}`);
+		assert(!('prune_ratio' in source), `${file}: the register is the one source of prune_ratio`);
+		const check = JSON.parse(text).prune_check;
+		assert.deepEqual(
+			check.layouts,
+			Import.PRUNE_CHECK_LAYOUTS,
+			`${file}: checked on the check layouts`
+		);
+		assert(
+			check.max_metric_change <= Import.PRUNE_TOLERANCE,
+			`${file}: pruning changed ${check.at} by ${check.max_metric_change}`
+		);
+		assert.equal(
+			counts.countedAs,
+			source.kind === 'lexique_words' ? 'word_list' : 'text',
+			`${file}: counted as its kind counts`
+		);
 	}
 	checks++;
 }
@@ -133,7 +153,7 @@ let checks = 0;
 		[['ab', 9]],
 		'an integer-like n-gram below the floor is dropped'
 	);
-	const text = Import.tableText(tables, prunedBelow);
+	const text = Import.tableText('text', tables, prunedBelow, { max_metric_change: 0, at: '' });
 	assert.deepEqual(plain(Analysis.countTableCounts(text, 'test').chars), { a: 50, b: 30 });
 	const kept = Import.prune({ chars: { 10: 5, a: 7 }, bigrams: {}, trigrams: {} }, 0).tables.chars;
 	assert.deepEqual(
@@ -152,7 +172,9 @@ let checks = 0;
 	const good = {
 		format: Analysis.COUNT_TABLE_FORMAT,
 		version: Analysis.COUNT_TABLE_VERSION,
+		counted_as: 'text',
 		pruned_below: { chars: 2, bigrams: 1, trigrams: 1 },
+		prune_check: { layouts: ['qwerty'], max_metric_change: 0, at: '' },
 		chars: { a: 3 },
 		bigrams: { ab: 1 },
 		trigrams: { abc: 1 }
@@ -163,13 +185,81 @@ let checks = 0;
 		['field', { extra: 1 }],
 		['length', { bigrams: { abc: 1 } }],
 		['floor', { chars: { a: 1 } }],
-		['pruned_below', { pruned_below: { chars: 1 } }]
+		['pruned_below', { pruned_below: { chars: 1 } }],
+		['counted_as', { counted_as: 'words' }],
+		['prune_check', { prune_check: { layouts: [], max_metric_change: 0, at: '' } }],
+		['prune_check change', { prune_check: { layouts: ['qwerty'], max_metric_change: -1, at: '' } }]
 	])
 		assert.throws(
 			() => Analysis.countTableCounts(JSON.stringify({ ...good, ...change }), label),
 			/corpora\.json/,
 			label
 		);
+	checks++;
+}
+
+// Pruning a real text: a light floor keeps every check-layout metric within
+// the tolerance although it drops n-grams; a harsh one is caught.
+{
+	const engine = Import.engineWithLibrary();
+	const text = fs.readFileSync(
+		path.join(CORPUS, 'original', 'fr', 'corpus_nemolivier.txt'),
+		'utf8'
+	);
+	const counts = plain(engine.ngramsFromText(text));
+	const light = Import.prune(counts, 1e-6).tables;
+	assert(
+		light.trigrams.length < Object.keys(counts.trigrams).length,
+		'the light floor drops trigrams'
+	);
+	const kept = Import.pruneDeviation(engine, counts, light);
+	assert(kept.max_metric_change <= Import.PRUNE_TOLERANCE, `light pruning changed ${kept.at}`);
+	const harsh = Import.pruneDeviation(engine, counts, Import.prune(counts, 1e-4).tables);
+	assert(harsh.max_metric_change > Import.PRUNE_TOLERANCE, 'a harsh floor is caught');
+	checks++;
+}
+
+// The page shows the word-list caveat for every corpus counted from a word list.
+{
+	const sandbox = {};
+	require('node:vm').createContext(sandbox);
+	require('node:vm').runInContext(
+		fs.readFileSync(
+			path.join(
+				REPO_ROOT,
+				'static',
+				'ergopti_plus',
+				'_shared',
+				'ui',
+				'layout_analysis',
+				'_generated',
+				'analysis_data.js'
+			),
+			'utf8'
+		),
+		sandbox
+	);
+	const corpora = require('node:vm').runInContext('LAYOUT_ANALYSIS_DATA', sandbox).corpora;
+	const byId = new Map(corpora.map((corpus) => [corpus.id, corpus]));
+	assert.equal(byId.get('fr_lexique_words').word_list, true, 'the Lexique table is a word list');
+	assert.equal(byId.get('fr_wikipedia_1m').word_list, false, 'the Wikipedia table is text');
+	assert(
+		corpora.filter((corpus) => corpus.format === 'word_frequencies').every((c) => c.word_list),
+		'every word frequency list is a word list'
+	);
+	const page = fs.readFileSync(
+		path.join(
+			REPO_ROOT,
+			'static',
+			'ergopti_plus',
+			'_shared',
+			'ui',
+			'layout_analysis',
+			'comparer_page.js'
+		),
+		'utf8'
+	);
+	assert(page.includes('corpus.builtin.word_list'), 'the page reads word_list, not the format');
 	checks++;
 }
 

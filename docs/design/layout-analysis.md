@@ -312,19 +312,27 @@ Shipped as of 2026-11-14:
   licence asks. Their `format` is `tsv`, and `tsv_text_column` picks the
   sentence.
 
-- Count tables (`format` `count_table`, « ergopti-count-table » version 1):
-  the French Wikipedia 2021 sentences of the Leipzig Corpora Collection
-  (1 million sentences, CC BY-SA, counted as text, so bigrams and trigrams
-  cross words) and Lexique 4.10's word forms weighted by their frequency per
-  million (CC BY-SA 4.0, counted by the word-list rule, so their n-grams stay
-  inside words). A table holds `chars`, `bigrams` and `trigrams` with their
-  counts and records in `pruned_below` the count each kept from; the reader
-  refuses another format, an n-gram of the wrong length or a count under its
-  floor. `tools/build/import-count-tables.cjs` rebuilds them from the archives
-  pinned by SHA-256 in `static/corpus/count_table_sources.json`, with the
-  engine's own counting rules. The English Leipzig table is held until its
-  licence is confirmed. Norvig's counts are not imported: their host is not
-  reachable from the build environment.
+- Count tables (`format` `count_table`, « ergopti-count-table » version 1),
+  from the Leipzig Corpora Collection (shipped under CC BY 4.0 by the
+  maintainer's choice, Ergopti being non-commercial): a million sentences each
+  of French Wikipedia 2021, French news 2024 and English Wikipedia 2016,
+  counted as text, so bigrams and trigrams cross words; and Lexique 4.10's
+  word forms weighted by their frequency per million (CC BY-SA 4.0), counted
+  by the word-list rule, so their n-grams stay inside words and the page
+  shows the word-list caveat. A table holds `chars`, `bigrams` and `trigrams`
+  with their counts, how it was counted (`counted_as`: `text` or
+  `word_list`), the count each table kept from (`pruned_below`) and what that
+  pruning changed (`prune_check`); the reader refuses another format, an
+  n-gram of the wrong length or a count under its floor.
+  `tools/build/import-count-tables.cjs` rebuilds them from the archives pinned
+  by SHA-256 in `static/corpus/count_table_sources.json`, with the engine's
+  own counting rules. It drops the n-grams rarer than the register's
+  `prune_ratio` of their table (5e-8) and refuses a table when any metric of
+  QWERTY, AZERTY, BÉPO, Ergopti, Dvorak, Colemak or Ergo-L measured on the
+  pruned counts differs from the full counts by more than 0.05 (percentage
+  points for shares); the largest change, recorded in `prune_check`, is
+  0.037. Norvig's counts are not imported: their host is not reachable from
+  the build environment.
 
 `static/corpus/frequency/` holds the downloaded frequency lists and count
 tables, which the register covers like the texts.
