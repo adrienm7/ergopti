@@ -41,9 +41,11 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	const LOCAL_SIGNATURE = 0x04034b50;
 	const STORED = 0;
 	const DEFLATED = 8;
-	// This folder's URL, read while the script runs (a Node context has none).
+	// This folder's URL, read while the script runs. A Node context has none,
+	// and neither has a script the macOS and Linux hosts inline (its src is
+	// empty): there the host loads the corpora (LAYOUT_ANALYSIS_HOST.loadCorpus).
 	const BASE =
-		typeof document !== 'undefined' && document.currentScript
+		typeof document !== 'undefined' && document.currentScript && document.currentScript.src
 			? new URL('.', document.currentScript.src).href
 			: null;
 	const loadedScripts = new Map();
@@ -137,7 +139,10 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 
 	/** Loads a script of this folder once. */
 	function loadScript(path) {
-		if (!BASE) throw new Error('layout_analysis: corpus_files.js was not loaded by a page');
+		if (!BASE)
+			throw new Error(
+				'layout_analysis: corpus_files.js has no script URL (an inlined page needs LAYOUT_ANALYSIS_HOST.loadCorpus)'
+			);
 		const src = new URL(path, BASE).href;
 		if (!loadedScripts.has(src))
 			loadedScripts.set(

@@ -23,7 +23,8 @@
  *    and got undefined).
  * 6. Editor panel: the site's editor page and the app's editor window load
  *    the panel's scripts in the same order, before editor_page.js; the app
- *    window loads built-in corpora through its host, not as static tags.
+ *    window loads built-in corpora through its host, not as static tags; an
+ *    inlined corpus loader (no script URL) still loads.
  * ==============================================================================
  */
 
@@ -270,6 +271,27 @@ check(
 	standalone.includes("'ergopti-layout-editor:height'") && standalone.includes('postMessage'),
 	'the editor page no longer posts its height to the framing site'
 );
+
+// Inlined by the app (studio-inlined-corpus-files): the macOS and Linux hosts
+// inline every script, so document.currentScript has an empty src. The corpus
+// loader must still load (it once threw there, building its own URL, and the
+// Studio window lost the analysis panel and the Comparer), and load the corpora
+// through the host.
+{
+	const inlined = {
+		document: { currentScript: { src: '' } },
+		URL,
+		Map,
+		window: {}
+	};
+	vm.createContext(inlined);
+	vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, 'corpus_files.js'), 'utf8'), inlined);
+	const files = vm.runInContext('typeof LAYOUT_ANALYSIS_FILES', inlined);
+	check(
+		files === 'object',
+		`an inlined corpus_files.js defines no LAYOUT_ANALYSIS_FILES (${files})`
+	);
+}
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
