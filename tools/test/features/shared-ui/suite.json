@@ -488,7 +488,7 @@
 		},
 		{
 			"id": "corpus-text-sources",
-			"ordinal": 675,
+			"ordinal": 676,
 			"name": "every Project Gutenberg text under static/corpus/original traces to its pinned ebook, register entry and shipped corpus, keeps no Project Gutenberg header or footer, and the importer strips an ebook as hand-computed",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-text-sources.cjs"],

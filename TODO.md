@@ -618,6 +618,11 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): French and English books, Tatoeba, Wikipedia and MIT code are in (07b19db438,
       bd5f162320, 720aa72212, be84e5ba93); no text corpus in another language, nothing from Wikisource, no e-mail or
       chat register.
+      [CODE] Done (2026-11-15): German, Spanish and Italian books from pinned Project Gutenberg ebooks, two per
+      language, through tools/build/import-corpus-texts.cjs, which also reproduces and pins the four French and
+      English books (4beeed6b; test-corpus-text-sources.cjs). Left: nothing from Wikisource; no e-mail or chat register,
+      its candidates not cleared (Enron mails hold personal data, the Ubuntu IRC logs' licence is unchecked, Wikipedia
+      talk pages sign each message with a user name): the maintainer's choice.
 - [ ] **Large published frequency tables (maintainer, 2026-11-14 evening).** Use existing large-scale language
       analyses as built-in corpora: char, bigram and trigram counts from huge corpora (Google Books Ngram and Peter
       Norvig's counts, Wikipedia-derived frequency data per language, the Leipzig frequency lists, Lexique for French,
