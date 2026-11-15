@@ -2,7 +2,7 @@
 
 --- Owns directly declared script rows under the existing ordinary-save fence.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Runtime = require("settings.engine.scope.script_scope_runtime")
 local Transaction = require("settings.engine.scope.transaction")
 local Fenced = require("settings.engine.scope.fenced_transaction")

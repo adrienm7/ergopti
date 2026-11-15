@@ -207,9 +207,9 @@ helpers.describe("Linux metrics scope rendered commands", function()
 			}
 			with_scope(function(_, collector)
 				local i18n = require("core.i18n.engine.i18n")
-				package.loaded["ui.menu.builder"] = nil
+				package.loaded["menu.ui.builder.builder"] = nil
 				local passed, detail = pcall(function()
-					local rows = require("ui.menu.builder").build({ keystats = collector,
+					local rows = require("menu.ui.builder.builder").build({ keystats = collector,
 						paused = false, is_paused = function() return false end })
 					local submenu
 					for _, row in ipairs(rows) do
@@ -240,7 +240,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 					set = function() error("metrics scope must not write legacy storage") end,
 				}
 				with_scope(function(_, collector, widget, readout, controls, path)
-					local renderer = require("infra.manifest_menu")
+					local renderer = require("menu.engine.manifest_menu")
 					local root = renderer.get_root()
 					local old_rows, old_top = root.metrics_menu, root.top_level
 					local execute = os.execute
@@ -268,8 +268,8 @@ helpers.describe("Linux metrics scope rendered commands", function()
 							end
 							return execute(command)
 						end
-						package.loaded["ui.menu.builder"] = nil
-						local rows = require("ui.menu.builder").build({ keystats = collector,
+						package.loaded["menu.ui.builder.builder"] = nil
+						local rows = require("menu.ui.builder.builder").build({ keystats = collector,
 							paused = false, is_paused = function() return paused end,
 							on_menu_changed = function() changed = changed + 1 end })
 						local action
@@ -370,7 +370,7 @@ helpers.describe("metrics private native claim", function()
 			local runtime = "original"
 			claim.pending = function() return primary.pending() end
 			primary = require("settings.engine.scope.transaction").new({ path = path, backup_path = backup,
-				files = controls.files, manifest = require("infra.manifest_reader"),
+				files = controls.files, manifest = require("menu.engine.manifest_reader"),
 				capture = function() return { marker = runtime } end,
 				apply = function() runtime = "candidate"; return true end,
 				restore = function(snapshot) runtime = snapshot.marker; return true end })
@@ -506,7 +506,7 @@ helpers.describe("metrics retained native release debt", function()
 				pending = function() return false end, retry_restore = function(done) done(true) end }
 			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("menu.engine.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { tap_holds = before, metrics = { actual, after } } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)

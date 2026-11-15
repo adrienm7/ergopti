@@ -31,7 +31,7 @@
 
 local helpers = require("tests.helpers")
 
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local previous_preferences = package.loaded["infra.hotstring_preferences"]
 
 --- Installs an in-memory canonical preference owner and returns it.
@@ -289,7 +289,7 @@ end
 --- @param dh table The manager to hand the builder.
 --- @return table|nil
 local function dynamic_submenu(dh)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local first = dh.rule_families()[1].label
 	local found = nil
 
@@ -411,7 +411,7 @@ helpers.describe("dynamic menu shared family order", function()
 	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	helpers.it("keeps the independent published family metadata and returns detached records", function()
-		local menu = require("infra.manifest_menu")
+		local menu = require("menu.engine.manifest_menu")
 		local root = assert(menu.get_root())
 		helpers.assert_eq(root.dynamic_hotstring_families.rows, corpus.rows,
 			"the pre-centralization metadata snapshot must remain exact")
@@ -434,7 +434,7 @@ helpers.describe("dynamic menu shared family order", function()
 	end)
 	for _, vector in ipairs(corpus.vectors) do
 		helpers.it("consumes the actual published family order: " .. vector.id, function()
-			local menu = require("infra.manifest_menu")
+			local menu = require("menu.engine.manifest_menu")
 			local root = assert(menu.get_root())
 			local previous = root.dynamic_hotstring_families
 			local rows = {}

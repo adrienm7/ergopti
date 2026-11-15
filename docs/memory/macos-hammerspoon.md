@@ -906,7 +906,7 @@ that takes a config candidate.
 
 `MenuState.sync_state_to_modules` never persists and isolates failures per
 feature: a refused lifecycle whose posture can be read back demotes only that
-state flag, in memory (`report.demotions`), and `ui/menu/session_demotions.lua`
+state flag, in memory (`report.demotions`), and `menu/ui/transactions/session_demotions.lua`
 makes every save keep the config.toml value until a committed save carries a
 user change of that key (`settle` runs on commit, never while building the
 view, because a refused write rolls the key back to its demoted posture) or

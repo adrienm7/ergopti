@@ -329,7 +329,7 @@ try:
                             "package.loaded['ui.menu.start_at_login']={enabled=function() return false end,command_available=function() return false end}\n"
                             "package.loaded['core.fs.adapters.storage']={get=function(key,default) if key=='locale' then return 'en' end;return default end,set=function() return false end}\n"
                             "require('core.i18n.engine.locale').set_locale('en')\n"
-                            "require('ui.menu.builder').build({llm={is_enabled=function() return false end},_version='native-profile',on_quit=function() end})\n"
+                            "require('menu.ui.builder.builder').build({llm={is_enabled=function() return false end},_version='native-profile',on_quit=function() end})\n"
                             "assert(type(dialogs)=='table','real menu provider must publish native dialog ports')\n"
                             "local before=errors;dialogs.error('Preserved native error body'"
                             + (",''" if mode == "empty_error" else "")

@@ -18,7 +18,7 @@ local Fixture = require("tests.support.ui.owned_window_close_fixture")
 local function with_selection(mode, scenario)
 	helpers.with_stub_scope({
 		"ui.menu.menu_llm.backend_labels",
-		"infra.manifest_menu", "menu.engine.renderer", "core.logger.engine.shim", "core.fs.engine.paths",
+		"menu.engine.manifest_menu", "menu.engine.renderer", "core.logger.engine.shim", "core.fs.engine.paths",
 		"core.ui.adapters.own_window", "platform.focus.running_application", "diagnostics.engine.reports.error_description",
 		"core.fs.engine.native_path", "core.text.engine.number_policy",
 	}, function()

@@ -57,7 +57,7 @@ const SP = 'static/ergopti_plus';
 // user data there. Each entry must still match its exact line.
 const ALLOWED = [
 	{
-		file: 'macos/ui/menu/init.lua',
+		file: 'macos/menu/ui/init.lua',
 		line: '{ (hs.configdir or ".") .. "/cache" },',
 		why:
 			'a watcher exclusion: a source checkout may still hold the cache older builds wrote ' +

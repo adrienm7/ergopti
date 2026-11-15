@@ -25,7 +25,7 @@ local Logger = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local Paths  = require("core.fs.engine.paths")
 local i18n   = require("core.i18n.engine.i18n")
-local ManifestMenu = require("infra.manifest_menu")
+local ManifestMenu = require("menu.engine.manifest_menu")
 local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 local FsDir = require("core.fs.engine.dir")
 

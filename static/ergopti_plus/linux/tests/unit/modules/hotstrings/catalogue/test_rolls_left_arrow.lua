@@ -33,7 +33,7 @@ helpers.describe("rolls left_arrow section through the Linux loader (linux-rolls
 	end)
 
 	helpers.it("ships the section opt-in, like every bundled section", function()
-		local default = require("infra.manifest_reader").default_for("hotstrings.rolls.left_arrow")
+		local default = require("menu.engine.manifest_reader").default_for("hotstrings.rolls.left_arrow")
 		helpers.assert_eq(default, { enabled = false })
 	end)
 end)

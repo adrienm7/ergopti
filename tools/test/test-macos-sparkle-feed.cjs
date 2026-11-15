@@ -39,7 +39,7 @@ const launcherSource = fs.readFileSync(
 	'utf8'
 );
 const menuSource = fs.readFileSync(
-	path.join(root, 'static', 'ergopti_plus', 'macos', 'ui', 'menu', 'init.lua'),
+	path.join(root, 'static', 'ergopti_plus', 'macos', 'menu', 'ui', 'init.lua'),
 	'utf8'
 );
 const aboutSource = fs.readFileSync(

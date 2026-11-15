@@ -45,13 +45,13 @@ function withSharedSource(text, fn) {
 
 const SHARED_BODY = `
 	local modules = rawget(package, "loaded")
-	if type(modules) ~= "table" or rawget(modules, "infra.manifest_menu") ~= renderer
+	if type(modules) ~= "table" or rawget(modules, "menu.engine.manifest_menu") ~= renderer
 		or type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
 	local template, root_owner, array_owner = rawget(renderer, "template_rows"),
 		rawget(renderer, "get_root"), rawget(renderer, "get_array")
 	if type(template) ~= "function" or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
 	local function facade_current()
-		return rawget(package, "loaded") == modules and rawget(modules, "infra.manifest_menu") == renderer
+		return rawget(package, "loaded") == modules and rawget(modules, "menu.engine.manifest_menu") == renderer
 			and getmetatable(renderer) == nil and rawget(renderer, "template_rows") == template
 			and rawget(renderer, "get_root") == root_owner and rawget(renderer, "get_array") == array_owner
 	end
@@ -712,8 +712,8 @@ function personalInfoEvidence(source) {
 	}
 	const importStatement =
 		platform === 'hs'
-			? 'local ManifestMenu = require("infra.manifest_menu")'
-			: 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")';
+			? 'local ManifestMenu = require("menu.engine.manifest_menu")'
+			: 'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")';
 	const imports = positions(whole, importStatement, true);
 	if (imports.length !== 1 || whole.tokens[imports[0]].start >= port.base) return null;
 	const sharedImports = positions(whole, SHARED_IMPORT, true);

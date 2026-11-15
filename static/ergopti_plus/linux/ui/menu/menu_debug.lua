@@ -13,7 +13,7 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local ParentSource = require("menu.engine.frames.parent_source")
 local COMMAND = require("settings.engine.keys").COMMAND
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 local LOG = "ui.menu.menu_debug"
@@ -51,7 +51,7 @@ end
 --- does not read a manifest section cannot notice a row it does not build.
 ---
 --- Windows and macOS each have their OWN reader for this same section
---- (`infra/menu_manifest.ahk`, `ui/menu/builder.lua`) and key on `id` alone, so
+--- (`infra/menu_manifest.ahk`, `menu/ui/builder/builder.lua`) and key on `id` alone, so
 --- typing the rows costs them nothing and buys this driver the shared renderer.
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.

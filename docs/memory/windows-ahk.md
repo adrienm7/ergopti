@@ -211,7 +211,7 @@ logged `Deferred submenu 'hotstrings_menu'` build and fails if none was logged.
 
 Layout, Hotstrings, each hotstring category, Shortcuts, Tap-holds and AI are published
 with one disabled placeholder row and built in `WM_INITMENUPOPUP`, before paint,
-from the state of that moment (`MenuDeferred_*`, infra/menu_population.ahk). The
+from the state of that moment (`MenuDeferred_*`, menu/engine/population.ahk). The
 placeholder keeps the row a parent: a declared group with an empty child is not
 drawn. Boots and full rebuilds share this path, so a toggle redraws only the
 submenu opened next. Deferred children live in one global map because `SubMenus`

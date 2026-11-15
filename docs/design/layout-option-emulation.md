@@ -255,7 +255,7 @@ Implemented (30 October), macOS:
 - The menu rows (`number_row_live.lua`) apply to the selected installed registry or composed
   layout, or to the build typing for one; an Ergopti bundle types digits on both levels, so
   its rows stay refused (`digits_on_both`).
-- The global scope's layout participant (`ui/menu/global_scope.lua`) settles only on the
+- The global scope's layout participant (`menu/ui/transactions/global_scope.lua`) settles only on the
   read-back and reverts the rows when the system did not take the build.
 - The field run's `field_layout_rows` answers M4 to M6 on the maintainer's Mac with no
   person: two builds from the shipped Ergo-L replace each other live, then the selected

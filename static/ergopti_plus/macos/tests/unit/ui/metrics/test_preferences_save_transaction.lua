@@ -269,7 +269,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		local MenuState = helpers.load_with_stubs("menu.ui.builder.state")
 
 		local function sync_with(setter)
 			return MenuState.sync_state_to_modules({
@@ -293,7 +293,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		local nil_result = sync_with(function() end)
 		local throw_result = sync_with(function() error("runtime setter failure", 0) end)
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["ui.menu.menu_state"] = nil
+		package.loaded["menu.ui.builder.state"] = nil
 
 		helpers.assert_eq(nil_result, true,
 			"a successful setter's nil return must not be confused with failure")
@@ -312,7 +312,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 			errors[#errors + 1] = string.format(fmt, ...)
 		end
 		package.loaded["core.logger.engine.logger"] = logger
-		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
+		local MenuState = helpers.load_with_stubs("menu.ui.builder.state")
 		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = {
 			hotstrings = {},
@@ -349,7 +349,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		state.preview_star_enabled = true
 		local committed = save()
 		package.loaded["core.logger.engine.logger"] = nil
-		package.loaded["ui.menu.menu_state"] = nil
+		package.loaded["menu.ui.builder.state"] = nil
 		package.loaded["settings.ui.menu.preferences_transaction"] = nil
 
 		helpers.assert_eq(committed, false)
@@ -384,8 +384,8 @@ helpers.describe("menu preferences: first-click rollback", function()
 		package.loaded["modules.keystats.text_cipher"] = {
 			set_enabled = function(value) cipher_values[#cipher_values + 1] = value end,
 		}
-		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = require("ui.menu.menu_state")
+		package.loaded["menu.ui.builder.state"] = nil
+		local MenuState = require("menu.ui.builder.state")
 		local result = MenuState.sync_state_to_modules({
 			hotstrings = {},
 			keystats_encrypt = false,
@@ -405,8 +405,8 @@ helpers.describe("menu preferences: first-click rollback", function()
 
 	helpers.it("restores gesture registries owned outside the flat state", function()
 		helpers.load_with_stubs("core.logger.engine.logger")
-		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = require("ui.menu.menu_state")
+		package.loaded["menu.ui.builder.state"] = nil
+		local MenuState = require("menu.ui.builder.state")
 		local observed = {}
 		local result = MenuState.sync_state_to_modules({ hotstrings = {}, gestures = true }, {
 			gesture_modes = { swipe_left = "continuous" },
@@ -608,7 +608,7 @@ helpers.describe("Number-row native-only preferences", function()
 		local saved, status = preferences.load(path)
 		helpers.assert_eq(status, "absent")
 		helpers.assert_eq(preferences.flat_key_for("layout.direct_access_digits"), "layout_number_row_mode")
-		helpers.assert_eq(require("infra.manifest_reader").default_for("layout.direct_access_digits"), "native")
+		helpers.assert_eq(require("menu.engine.manifest_reader").default_for("layout.direct_access_digits"), "native")
 		helpers.assert_eq(saved.layout_number_row_mode, nil)
 		helpers.assert_eq(preferences.save(path, { layout_number_row_mode = "native" }, {}, {}), true)
 		helpers.assert_eq(written, 1)

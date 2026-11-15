@@ -1040,7 +1040,7 @@ function checkWordExpanderControls() {
 			'local delay_menu'
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'["word_expanders"] = function()',
 			'["magic_key_config"] = function()'
 		]
@@ -1092,7 +1092,7 @@ function checkInfoBarControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1161,7 +1161,7 @@ function checkAutoTemperatureControl() {
 		],
 		['macos/ui/menu/menu_llm/temperature_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'providers["llm_generation"] = function',
 			"-- The category switch, the submenu's first row"
 		]
@@ -1227,7 +1227,7 @@ function checkTokenStreamingControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1286,7 +1286,7 @@ function checkShowAllControl() {
 		],
 		['macos/ui/menu/menu_llm/streaming_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_display"] = function',
 			'group_builders["llm_navigation"] = function'
 		]
@@ -1393,7 +1393,7 @@ function checkAutomaticTriggerControls() {
 		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_trigger"] = function',
 			'providers["llm_profile"] = function'
 		]
@@ -1439,7 +1439,12 @@ checkAutomaticTriggerControls();
 function checkUpdateFrequencyControl() {
 	const assert = require('node:assert/strict');
 	for (const [file, declaration, endMarker, renderer] of [
-		['windows/ui/menu/menu_init.ahk', '_MI_FrequencyPickerRow(', '\n}', 'MenuRenderer_ChoiceRow'],
+		[
+			'windows/menu/ui/builder/menu_init.ahk',
+			'_MI_FrequencyPickerRow(',
+			'\n}',
+			'MenuRenderer_ChoiceRow'
+		],
 		[
 			'macos/ui/menu/menu_about.lua',
 			'local function frequency_picker(',
@@ -1447,7 +1452,7 @@ function checkUpdateFrequencyControl() {
 			'ManifestMenu.choice_row'
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'local function _frequency_picker(',
 			'\nend',
 			'ManifestMenu.choice_row'
@@ -1522,7 +1527,7 @@ function checkIndentationControl() {
 			'DisplayPolicy.indentation_intent',
 			'SettingsManager.publication_guard'
 		],
-		['linux/ui/menu/builder.lua', 'DisplayPolicy.indentation_intent', 'current.source']
+		['linux/menu/ui/builder/builder.lua', 'DisplayPolicy.indentation_intent', 'current.source']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
 		assert(
@@ -1627,7 +1632,7 @@ function checkPrivacyTriggerControls() {
 		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'group_builders["llm_trigger"] = function',
 			'providers["llm_profile"] = function'
 		]
@@ -1843,7 +1848,7 @@ checkPrivacyTriggerControls();
 			'macos/ui/menu/menu_hotstrings_custom.lua',
 			'ManifestMenu.command_row("personal_hotstring_commands"'
 		],
-		['linux/ui/menu/builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
+		['linux/menu/ui/builder/builder.lua', 'ManifestMenu.command_row("personal_hotstring_commands"']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -1970,7 +1975,7 @@ checkPrivacyTriggerControls();
 				).test(source)
 		);
 	const linuxMenu = require('../lib/linux-menu-parts.cjs');
-	for (const file of ['macos/ui/menu/builder.lua', 'linux/ui/menu/builder.lua']) {
+	for (const file of ['macos/menu/ui/builder/builder.lua', 'linux/menu/ui/builder/builder.lua']) {
 		const source =
 			file === linuxMenu.LINUX_MENU_ROOT
 				? linuxMenu.linuxMenuRootSource(resolve(REPO_ROOT, 'static/ergopti_plus'))
@@ -2006,14 +2011,14 @@ checkPrivacyTriggerControls();
 		'lifecycle provider'
 	);
 	const windows = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/windows/ui/menu/menu_init.ahk')
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/menu/ui/builder/menu_init.ahk')
 	);
 	// Reload's wrapper is the startup-safe subclass the dispatcher recognises, so a
 	// click during a reload joins it instead of starting a second one.
 	assert(
 		/^class MenuStartupReloadCommand extends MenuStartupSafeCommand \{$/m.test(
 			readSourceFile(
-				resolve(REPO_ROOT, 'static/ergopti_plus/windows/infra/menu_startup_commands.ahk')
+				resolve(REPO_ROOT, 'static/ergopti_plus/windows/menu/engine/startup_commands.ahk')
 			)
 		),
 		'the Reload wrapper must keep the startup-safe admission it inherits'
@@ -2154,7 +2159,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		'macos/ui/menu/menu_llm/profiles_manager.lua',
-		'linux/ui/menu/builder.lua'
+		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2212,7 +2217,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		'macos/ui/menu/menu_llm/profiles_manager.lua',
-		'linux/ui/menu/builder.lua'
+		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2272,7 +2277,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const file of [
 		'windows/ui/menu/menu_hotstring_switches.ahk',
 		'macos/ui/menu/menu_hotstrings.lua',
-		'linux/ui/menu/builder.lua'
+		'linux/menu/ui/builder/builder.lua'
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		assert(
@@ -2308,7 +2313,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the canonical declaration owns identity, label, live readiness and platform policy'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const start = source.indexOf('local function _build_shortcuts(ctx)');
 	const end = source.indexOf('local function _tap_hold_key_label', start);
@@ -2354,7 +2359,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the independent trio owns order, labels, native readiness and placement'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const start = source.indexOf('local case_methods = {');
 	const end = source.indexOf('local helper_methods = {', start);
@@ -2408,7 +2413,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		'the independent helper trio owns captions, order, readiness and placement'
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const start = source.indexOf('local helper_methods = {');
 	const end = source.indexOf('local handlers = {}', start);
@@ -2450,7 +2455,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [driver, relative, call] of [
 		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_CheckRow'],
 		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.check_row'],
-		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").check_row']
+		['linux', 'ui/menu/agent_rows.lua', 'require("menu.engine.manifest_menu").check_row']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative));
 		assert(
@@ -2471,7 +2476,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const providers = [
 		['windows/ui/menu/menu_llm/menu_settings.ahk', '_MR_GetMenuDef("llm_navigation_rows")'],
 		['macos/ui/menu/menu_llm/init.lua', 'ManifestMenu.get_array("llm_navigation_rows")'],
-		['linux/ui/menu/builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
+		['linux/menu/ui/builder/builder.lua', 'ManifestMenu.get_array("llm_navigation_rows")']
 	];
 	for (const [native, read] of providers) {
 		const source = readSourceFile(resolve(SHARED, '..', native));
@@ -2536,7 +2541,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 	for (const [driver, relative, call] of [
-		['windows', 'ui/menu/menu_init.ahk', '_LAY_NumberRowRows()'],
+		['windows', 'menu/ui/builder/menu_init.ahk', '_LAY_NumberRowRows()'],
 		[
 			'macos',
 			'ui/menu/menu_keyboard_layout.lua',
@@ -2544,7 +2549,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		],
 		[
 			'linux',
-			'ui/menu/builder.lua',
+			'menu/ui/builder/builder.lua',
 			// Linux passes its live owner: the rows apply where the session can.
 			'NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands, {'
 		]
@@ -2643,7 +2648,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'--- Builds the tap / hold rows of one hand'
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'ManifestMenu.template_rows',
 			'tap_hold_key_native',
 			'tap_hold_key_tap',
@@ -2770,7 +2775,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'handwritten inert-status declaration'
 		);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const begin = source.indexOf('local function _migration_row(k)');
 	const end = source.indexOf('--- Renders the rows of the metrics submenu', begin);
@@ -2992,7 +2997,10 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			corpus.captions[code]
 		);
 	}
-	for (const relative of ['_shared/menu/engine/renderer.lua', 'windows/infra/manifest_menu.ahk']) {
+	for (const relative of [
+		'_shared/menu/engine/renderer.lua',
+		'windows/menu/engine/manifest_menu.ahk'
+	]) {
 		const renderer = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', relative));
 		assert.match(
 			renderer,
@@ -3059,7 +3067,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			]
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'local function hand_rows(hand)',
 			'local providers = {',
 			['tap_hold_key_delay', 'tap_hold_key_delay_caption']
@@ -3655,7 +3663,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			);
 		};
 		return (
-			has('local ManifestMenu = require("infra.manifest_menu")') &&
+			has('local ManifestMenu = require("menu.engine.manifest_menu")') &&
 			has(
 				'if #rows == 0 then rows = ManifestMenu.template_rows("apps_empty_rows") if not rows then return nil end end'
 			) &&
@@ -4165,9 +4173,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert(sequence(tokens, append), 'actual provider materialization: ' + driver);
 	}
 	for (const [driver, file] of [
-		['ahk', 'windows/ui/menu/menu_init.ahk'],
+		['ahk', 'windows/menu/ui/builder/menu_init.ahk'],
 		['hs', 'macos/ui/menu/menu_about.lua'],
-		['linux', 'linux/ui/menu/builder.lua']
+		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const text = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		wiring(text, driver);
@@ -4210,9 +4218,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		assert.equal(row.kind, 'compose');
 		for (const platform of ['ahk', 'hs', 'linux']) assert(row.platforms.includes(platform));
 		for (const [platform, path] of [
-			['ahk', 'windows/ui/menu/menu_init.ahk'],
+			['ahk', 'windows/menu/ui/builder/menu_init.ahk'],
 			['hs', 'macos/ui/menu/menu_about.lua'],
-			['linux', 'linux/ui/menu/builder.lua']
+			['linux', 'linux/menu/ui/builder/builder.lua']
 		])
 			assert.equal(row.native_sources[platform], path);
 	}
@@ -4287,7 +4295,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, file] of [
 		['hs', 'macos/ui/menu/menu_llm/profiles_manager.lua'],
-		['linux', 'linux/ui/menu/builder.lua']
+		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', file));
 		wiring(source, platform);
@@ -4455,7 +4463,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		}
 	}
 	const native = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	wiring(native);
 	for (const mutate of [
@@ -4486,7 +4494,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert(edge);
 			assert.equal(edge.kind, 'compose');
 			assert.deepEqual([...edge.platforms], ['linux']);
-			assert.equal(edge.native_sources.linux, 'linux/ui/menu/builder.lua');
+			assert.equal(edge.native_sources.linux, 'linux/menu/ui/builder/builder.lua');
 		}
 	}
 	edges(graph);
@@ -4550,7 +4558,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	const owners = {
 		ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk',
 		hs: 'macos/ui/menu/menu_llm/profiles_manager.lua',
-		linux: 'linux/ui/menu/builder.lua'
+		linux: 'linux/menu/ui/builder/builder.lua'
 	};
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	function sequence(tokens, values) {
@@ -5111,7 +5119,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		readSourceFile(resolve(SHARED, 'tests/corpus/menus/linux_absent_modules.json'))
 	);
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	assert.equal(expected.owners.length, 5);
 	assert.equal(
@@ -5176,7 +5184,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'MenuRenderer_TemplateRows',
 			['trigger', 'display']
 		],
-		['linux', 'ui/menu/builder.lua', 'ManifestMenu.template_rows', ['trigger']]
+		['linux', 'menu/ui/builder/builder.lua', 'ManifestMenu.template_rows', ['trigger']]
 	]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative));
 		for (const key of keys)
@@ -5199,7 +5207,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 	for (const [driver, relative, extension, section] of [
 		['macos', 'ui/menu/menu_llm/profiles_manager.lua', '.lua', 'llm_profile_lua_frame'],
-		['linux', 'ui/menu/builder.lua', '.lua', 'llm_profile_lua_frame'],
+		['linux', 'menu/ui/builder/builder.lua', '.lua', 'llm_profile_lua_frame'],
 		['windows', 'ui/menu/menu_llm/menu_profiles.ahk', '.ahk', 'llm_profile_windows_frame']
 	]) {
 		assert.ok(Array.isArray(profile.sections[section]) && profile.sections[section].length > 0);
@@ -5238,7 +5246,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const tokens = scriptTokens(source, '.lua');
 	const sections = ['selection_case_boundary', 'selection_helper_boundary'];
@@ -5580,7 +5588,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, relative] of [
 		['hs', 'macos/ui/menu/menu_llm/init.lua'],
-		['linux', 'linux/ui/menu/builder.lua'],
+		['linux', 'linux/menu/ui/builder/builder.lua'],
 		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
@@ -5626,7 +5634,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 	for (const [platform, relative, root] of [
 		['hs', 'macos/ui/menu/menu_llm/init.lua', 'child_group_for("llm_'],
-		['linux', 'linux/ui/menu/builder.lua', 'group_builders["llm_'],
+		['linux', 'linux/menu/ui/builder/builder.lua', 'group_builders["llm_'],
 		['ahk', 'windows/ui/menu/menu_llm/menu_main.ahk', 'MenuRenderer_Build("llm_menu"']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', relative));
@@ -5730,8 +5738,8 @@ console.log(
 	assert.equal(expected.populated_frame_count, 2);
 	const personalFiles = [
 		'ui/menu/menu_shortcuts.ahk',
-		'ui/menu/menu_init.ahk',
-		'infra/manifest_menu.ahk',
+		'menu/ui/builder/menu_init.ahk',
+		'menu/engine/manifest_menu.ahk',
 		'adapters/tray_menu.ahk'
 	];
 	const physicalPersonalSources = Object.fromEntries(
@@ -5941,7 +5949,7 @@ console.log(
 	}
 	// The genuine constructor guard cannot overwrite its observed intrinsic name.
 	{
-		const nativeFile = 'windows/infra/manifest_menu.ahk';
+		const nativeFile = 'windows/menu/engine/manifest_menu.ahk';
 		const original = physicalPersonalSources[nativeFile];
 		const before = '\tSourceLive() {\n\t\tif Constructor != NativeClass';
 		const after =
@@ -6218,8 +6226,8 @@ console.log(
 			'a nested exception-swallowing bootstrap cannot own module initialization'
 		],
 		[
-			'#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
-			'return\n\ufeff; infra/manifest_menu.ahk\n#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'#Include population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'return\n\ufeff; menu/engine/manifest_menu.ahk\n#Include population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
 			'a moved documentary heading cannot hide a real pre-bootstrap module return'
 		],
 		...actualBooleanCalls.flatMap((call) =>
@@ -6568,7 +6576,7 @@ console.log(
 	}
 	const sharedRoot = resolve(SHARED, '.');
 	const mac = 'macos/ui/menu/magic_key_source_menu.lua',
-		linux = 'linux/ui/menu/builder.lua';
+		linux = 'linux/menu/ui/builder/builder.lua';
 	for (const rel of [mac, linux]) {
 		const source = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', rel));
 		const reached = delegatedMenuSources([{ rel, src: source }], sharedRoot).find(
@@ -6843,7 +6851,7 @@ console.log(
 			'.lua',
 			['word_expander', 'preview', 'delays']
 		],
-		['../linux/ui/menu/builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
+		['../linux/menu/ui/builder/builder.lua', '.lua', ['word_expander', 'preview', 'delays']]
 	];
 	for (const [file, extension, names] of owners) {
 		const source = readSourceFile(resolve(SHARED, file));
@@ -7044,8 +7052,8 @@ console.log(
 	const owners = [
 		['../windows/ui/menu/menu_hotstrings.ahk', '.ahk', ['content_frame', 'empty_file']],
 		['../macos/ui/menu/menu_hotstrings.lua', '.lua', ['bulk_controls']],
-		['../macos/ui/menu/builder.lua', '.lua', ['content_frame']],
-		['../linux/ui/menu/builder.lua', '.lua', ['content_frame', 'bulk_controls']]
+		['../macos/menu/ui/builder/builder.lua', '.lua', ['content_frame']],
+		['../linux/menu/ui/builder/builder.lua', '.lua', ['content_frame', 'bulk_controls']]
 	];
 	for (const [file, extension, names] of owners) {
 		const source = readSourceFile(resolve(SHARED, file));
@@ -7271,7 +7279,7 @@ console.log(
 	const files = {
 		ahk: resolve(SHARED, '../windows/ui/menu/menu_shortcuts.ahk'),
 		hs: resolve(SHARED, '../macos/ui/menu/menu_shortcuts.lua'),
-		linux: resolve(SHARED, '../linux/ui/menu/builder.lua')
+		linux: resolve(SHARED, '../linux/menu/ui/builder/builder.lua')
 	};
 	const frames = {
 		shortcut_wrap_frame: [
@@ -7548,7 +7556,9 @@ console.log(
 		}
 	}
 	const windows = readSourceFile(files.ahk);
-	const nativeRenderer = readSourceFile(resolve(SHARED, '../windows/infra/manifest_menu.ahk'));
+	const nativeRenderer = readSourceFile(
+		resolve(SHARED, '../windows/menu/engine/manifest_menu.ahk')
+	);
 	// The complete original owner is the independent physical witness. One exact
 	// edited span restores it; an unconditioned call, not an unused loan, must own execution.
 	const originalOwner =
@@ -7766,7 +7776,7 @@ console.log(
 	);
 	for (const driver of ['hs', 'linux']) {
 		const utility =
-			driver === 'hs' ? resolve(SHARED, '../macos/ui/menu/menu_utils.lua') : files.linux;
+			driver === 'hs' ? resolve(SHARED, '../macos/menu/ui/builder/utils.lua') : files.linux;
 		const source = readSourceFile(utility);
 		const statement =
 			driver === 'hs' ? 'return RowDialect.rows(menu)' : 'return RowDialect.rows(list)';
@@ -8451,7 +8461,7 @@ console.log(
 	}
 	const native = [
 		[
-			'macos/ui/menu/builder.lua',
+			'macos/menu/ui/builder/builder.lua',
 			'["language"] = function()',
 			[
 				'if type(i18n.build_language_menu_items) ~= "function" then return {} end',
@@ -8466,7 +8476,7 @@ console.log(
 			]
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'local function _build_language(ctx)',
 			[
 				'local locales = i18n.list_locales()',
@@ -8684,14 +8694,14 @@ console.log(
 	for (const [driver, file, signature, child, finish] of [
 		[
 			'hs',
-			'macos/ui/menu/builder.lua',
+			'macos/menu/ui/builder/builder.lua',
 			'["debug"] = function()',
 			'debug_items',
 			'local row = ManifestMenu.group_row("top_level", "debug", debug_items, dbg_ctx.state_getters)'
 		],
 		[
 			'linux',
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'local function _build_debug(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)'
@@ -8943,14 +8953,14 @@ console.log(
 	for (const [driver, file, signature, child, finish] of [
 		[
 			'hs',
-			'macos/ui/menu/builder.lua',
+			'macos/menu/ui/builder/builder.lua',
 			'["configuration"] = function()',
 			'rows',
 			'local row = ManifestMenu.group_row("top_level", "configuration", rows, cfg_ctx.state_getters)'
 		],
 		[
 			'linux',
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'local function _build_configuration(ctx)',
 			'rows',
 			'return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)'
@@ -9417,7 +9427,7 @@ console.log(
 	}
 	for (const [driver, file, signature] of [
 		['hs', 'macos/ui/menu/menu_metrics.lua', 'function M.build(ctx)'],
-		['linux', 'linux/ui/menu/builder.lua', 'local function _build_metrics(ctx)']
+		['linux', 'linux/menu/ui/builder/builder.lua', 'local function _build_metrics(ctx)']
 	]) {
 		const source = readSourceFile(path.join(base, file));
 		const native = ownerBody(source, signature);
@@ -9833,7 +9843,7 @@ console.log(
 			]
 		],
 		[
-			'linux/ui/menu/builder.lua',
+			'linux/menu/ui/builder/builder.lua',
 			'.lua',
 			'local function _manifest_hotstring_rows(ctx, config)',
 			[
@@ -10165,7 +10175,7 @@ console.log(
 		assert.equal(strings['menu.builder.title_paused'], captions.paused);
 	}
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/canvas_badge.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/menu/ui/builder/canvas_badge.lua')
 	);
 	for (const [key, expression] of [
 		['macos_badge_is_paused', 'not not paused'],
@@ -10209,12 +10219,21 @@ console.log(
 		);
 	}
 	const chain = [
-		['macos/ui/menu/init.lua', 'local Builder = require("ui.menu.builder")'],
-		['macos/ui/menu/init.lua', 'pcall(Builder.generate, ctx, menu_mods, actions)'],
-		['macos/ui/menu/builder.lua', 'local CanvasBadge = require("ui.menu.canvas_badge")'],
-		['macos/ui/menu/builder.lua', 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()'],
-		['macos/ui/menu/canvas_badge.lua', 'function M.prepend_to(items, ctx, on_click)'],
-		['macos/ui/menu/canvas_badge.lua', 'local ManifestMenu = require("infra.manifest_menu")']
+		['macos/menu/ui/init.lua', 'local Builder = require("menu.ui.builder.builder")'],
+		['macos/menu/ui/init.lua', 'pcall(Builder.generate, ctx, menu_mods, actions)'],
+		[
+			'macos/menu/ui/builder/builder.lua',
+			'local CanvasBadge = require("menu.ui.builder.canvas_badge")'
+		],
+		[
+			'macos/menu/ui/builder/builder.lua',
+			'pcall(CanvasBadge.prepend_to, rendered, ctx, function()'
+		],
+		['macos/menu/ui/builder/canvas_badge.lua', 'function M.prepend_to(items, ctx, on_click)'],
+		[
+			'macos/menu/ui/builder/canvas_badge.lua',
+			'local ManifestMenu = require("menu.engine.manifest_menu")'
+		]
 	];
 	for (const [path, call] of chain) {
 		const actual = readSourceFile(resolve(REPO_ROOT, 'static/ergopti_plus', path));
@@ -10284,7 +10303,7 @@ console.log(
 		}
 	}
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/menu/ui/builder/builder.lua')
 	);
 	const first = source.indexOf('["reload"]          = function()');
 	const last = source.indexOf('["debug"]           = function()', first);
@@ -10821,7 +10840,7 @@ console.log(
 		[
 			'foreign guarded native receiver',
 			source.replace(
-				'pcall(require, "infra.manifest_menu")',
+				'pcall(require, "menu.engine.manifest_menu")',
 				'pcall(require, "infra.foreign_menu")'
 			)
 		],
@@ -11449,7 +11468,8 @@ console.log(
 			'local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")',
 			'local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")'
 		];
-		const importStatement = 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")';
+		const importStatement =
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")';
 		const failureStatement =
 			'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end';
 		const imports = rootPositions(source, importStatement),
@@ -11507,7 +11527,7 @@ console.log(
 		const guard = ownerBody(source, 'local function separator_facade_current()');
 		const expected = `return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
 			and rawget(package, "loaded") == separator_modules
-			and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+			and rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu
 			and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
 			and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
 			and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
@@ -11618,7 +11638,7 @@ console.log(
 			return false;
 		}
 	}
-	const source = readSourceFile(path.join(base, 'linux/ui/menu/builder.lua'));
+	const source = readSourceFile(path.join(base, 'linux/menu/ui/builder/builder.lua'));
 	assert.equal(
 		admits(source),
 		true,
@@ -11676,7 +11696,7 @@ console.log(
 			'foreign captured render owner'
 		],
 		[
-			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand rawget(separator_modules, "menu.engine.manifest_menu") == ManifestMenu',
 			'local function separator_facade_current()\n\treturn type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil\n\t\tand rawget(package, "loaded") == separator_modules\n\t\tand true',
 			'missing imported facade custody'
 		],
@@ -11803,18 +11823,18 @@ console.log(
 			'captured owner iterator binding'
 		],
 		[
-			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
-			'local require = Foreign.require\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
+			'local require = Foreign.require\nlocal ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 			'shadowed canonical require'
 		],
 		[
-			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
-			'local function pcall(...) return true, Foreign end\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
+			'local function pcall(...) return true, Foreign end\nlocal ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 			'shadowed canonical protected import'
 		],
 		[
-			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
-			'local _ENV = Foreign\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
+			'local _ENV = Foreign\nlocal ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 			'shadowed canonical import environment'
 		],
 		[
@@ -11964,7 +11984,7 @@ console.log(
 	const assert = require('node:assert/strict');
 	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 	const source = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/linux/ui/menu/builder.lua')
+		resolve(REPO_ROOT, 'static/ergopti_plus/linux/menu/ui/builder/builder.lua')
 	);
 	const menu = JSON.parse(readSourceFile(MENU_PATH));
 	const native = [{ src: source }];
@@ -12160,7 +12180,10 @@ console.log(
 	);
 	assert.equal(publishesMenuTemplate(owner, '.lua', 'removed_complete_frame'), false);
 	for (const [from, to] of [
-		['rawget(package.loaded, "infra.manifest_menu")', 'rawget(package.loaded, "foreign.renderer")'],
+		[
+			'rawget(package.loaded, "menu.engine.manifest_menu")',
+			'rawget(package.loaded, "foreign.renderer")'
+		],
 		['rawget(renderer, "template_rows")', 'rawget(Foreign, "template_rows")'],
 		['rawget(renderer, "render_rows")', 'rawget(Foreign, "render_rows")'],
 		['local rows = template_owner(', 'template_owner = nil\nlocal rows = template_owner('],
@@ -12204,8 +12227,8 @@ console.log(
 			'field ~= "title" and field ~= "fn" and field ~= "disabled" and field ~= "checked"'
 		],
 		[
-			'return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)',
-			'return true or rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)'
+			'return rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer)',
+			'return true or rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer)'
 		],
 		[
 			'for field in next, declaration do if rawget(fields, field) == nil then return false end end',
@@ -12217,7 +12240,7 @@ console.log(
 		],
 		[
 			'local root = root_owner()',
-			'package.loaded["infra.manifest_menu"] = Foreign\nlocal root = root_owner()'
+			'package.loaded["menu.engine.manifest_menu"] = Foreign\nlocal root = root_owner()'
 		],
 		['["llm_download_shortcut"] = function()', '["foreign_download_command"] = function()']
 	]) {
@@ -12274,7 +12297,7 @@ console.log(
 	);
 	for (const [platform, file] of [
 		['hs', 'macos/ui/menu/menu_hotstrings.lua'],
-		['linux', 'linux/ui/menu/builder.lua']
+		['linux', 'linux/menu/ui/builder/builder.lua']
 	]) {
 		const source = readSourceFile(resolve(SHARED, '..', file));
 		const admits = (candidate) => publishesMenuTemplate(candidate, '.lua', section);
@@ -12354,7 +12377,7 @@ console.log(
 				'foreign helper renderer'
 			],
 			[
-				'rawget(modules, "infra.manifest_menu") ~= renderer',
+				'rawget(modules, "menu.engine.manifest_menu") ~= renderer',
 				'false',
 				'canonical module custody withdrawn'
 			],
@@ -12932,7 +12955,7 @@ console.log(
 		'Windows receives one final command at the original apps position'
 	);
 	const renderer = readSourceFile(
-		resolve(REPO_ROOT, 'static/ergopti_plus/windows/infra/manifest_menu.ahk')
+		resolve(REPO_ROOT, 'static/ergopti_plus/windows/menu/engine/manifest_menu.ahk')
 	);
 	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
 	const commands =
@@ -13120,7 +13143,7 @@ console.log(
 	const assert = require('node:assert/strict');
 	const manifest = JSON.parse(readSourceFile(MENU_PATH));
 	const source = readSourceFile(resolve(SHARED, '../windows/ui/menu/menu_llm/menu_agent.ahk'));
-	const renderer = readSourceFile(resolve(SHARED, '../windows/infra/manifest_menu.ahk'));
+	const renderer = readSourceFile(resolve(SHARED, '../windows/menu/engine/manifest_menu.ahk'));
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	const executable = scriptTokens(source, '.ahk');
 	assert.equal(

@@ -119,17 +119,17 @@ if (modifiers && modifiers.length > 0) {
 	}
 
 	// The Linux menu must actually offer the picker — the point of the exercise.
-	const linuxMenu = readSourceFile(path.join(SP, 'linux', 'ui', 'menu', 'builder.lua'));
+	const linuxMenu = readSourceFile(path.join(SP, 'linux', 'menu', 'ui', 'builder', 'builder.lua'));
 	if (!/tap_hold\.engine\.hold_options/.test(linuxMenu)) {
 		errors.push(
-			'linux/ui/menu/builder.lua no longer builds its hold picker from the shared catalogue. ' +
+			'linux/menu/ui/builder/builder.lua no longer builds its hold picker from the shared catalogue. ' +
 				'Its tap-hold submenu was greyed read-outs until 2026-08-08 and this is what stops it ' +
 				'quietly going back.'
 		);
 	}
 	if (!/tap_hold_writer/.test(linuxMenu)) {
 		errors.push(
-			'linux/ui/menu/builder.lua no longer reaches the tap-hold writer — the rows would be ' +
+			'linux/menu/ui/builder/builder.lua no longer reaches the tap-hold writer — the rows would be ' +
 				'read-outs again, which is the state this gate exists to end.'
 		);
 	}

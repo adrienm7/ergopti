@@ -64,7 +64,7 @@ end
 local Logger    = require("core.logger.engine.logger")
 local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local LEAF = require("settings.engine.keys").LEAF
 local HotstringLanguages = require("hotstrings.engine.languages")
 local ConfigOutdated = require("settings.engine.migration.outdated")
@@ -691,7 +691,7 @@ end
 -- The LLM values a hand edit or another driver can store: their shared value
 -- schema declarations, the rule the three drivers apply at load. The context
 -- length keeps its own owner, which demotes a stored value past the buffer's
--- limit with an explicit confirmation (ui/menu/menu_state.lua).
+-- limit with an explicit confirmation (menu/ui/builder/state.lua).
 for state_key, schema_key in pairs({
 	llm_temperature = ConfigKeys.KEY.LLM_GENERATION_TEMPERATURE,
 	llm_min_words = ConfigKeys.KEY.LLM_GENERATION_MIN_WORDS,

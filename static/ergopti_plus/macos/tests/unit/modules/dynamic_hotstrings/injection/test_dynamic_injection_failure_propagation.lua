@@ -109,7 +109,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
 		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
-		package.loaded["infra.manifest_reader"] = {
+		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function(key)
 				if key == "hotstrings.trigger_char" then return "\u{2605}" end
 				if key == "hotstrings.expansion_delay" then return 0 end
@@ -180,7 +180,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
 		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
-		package.loaded["infra.manifest_reader"] = {
+		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function(key)
 				if key == "hotstrings.trigger_char" then return "\u{2605}" end
 				if key == "hotstrings.expansion_delay" then return 0 end

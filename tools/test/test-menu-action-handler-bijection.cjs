@@ -21,7 +21,7 @@
  * Linux renders **none** of it: the manifest carries no `linux` platform value
  * anywhere (27 rows are `[ahk]`, 19 `[hs]`, 2 both), so its 27 rows are visible
  * to Linux only because an unrestricted row defaults to every platform — while
- * `ui/menu/builder.lua` builds its 97 rows by hand.
+ * `menu/ui/builder/builder.lua` builds its 97 rows by hand.
  *
  * That gap is the I2/I3 migration, not a defect to fix here. Freezing it is what
  * this guard is for: Windows cannot regress from zero, and the other two cannot
@@ -122,7 +122,7 @@ const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
 //     Two rows declared for every platform, answered by one driver.
 //   hs — the same llm_models, layout_menu.active_layouts, and the five
 //     hotstrings rows, because macOS assembles its hotstrings menu by hand in
-//     ui/menu/builder.lua and reads the manifest for none of it.
+//     menu/ui/builder/builder.lua and reads the manifest for none of it.
 //
 // So the honest number rose while the code improved, exactly as the row-bypass
 // ratchet's own linux 2 → 124 did when ITS definition was corrected. Lower these
@@ -553,7 +553,7 @@ function nativeFunctionReferenceKeys(source) {
 		),
 		false
 	);
-	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/builder.lua'));
+	const linux = readSourceFile(path.join(SP, 'linux/menu/ui/builder/builder.lua'));
 	assert.equal(
 		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true

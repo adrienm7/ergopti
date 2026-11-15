@@ -182,11 +182,11 @@ end
 helpers.describe("native callback owners survive Hammerspoon GC", function()
 	helpers.it("allows raw UI timers only at exact strongly-owned lifecycle sites", function()
 		local expected = {
-			[module_source("ui.menu.init")] = {
+			[module_source("menu.ui.init")] = {
 				count = 1,
 				patterns = { "_menu_refresh_timer%s*=%s*hs%.timer%.doAfter" },
 			},
-			[module_source("ui.menu.menu_watchers")] = {
+			[module_source("menu.ui.builder.watchers")] = {
 				count = 1,
 				patterns = { "_debounce_timer%s*=%s*timer" },
 			},

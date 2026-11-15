@@ -37,7 +37,7 @@ local Json = require("core.text.engine.json")
 local Vision = require("ai.engine.prediction.vision")
 local Agent = require("ai.engine.agent.agent")
 local AppIdentity = require("ai.engine.policy.app_identity")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.agent_settings"

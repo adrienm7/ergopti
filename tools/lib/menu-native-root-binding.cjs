@@ -102,9 +102,9 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		return false;
 	if (!Object.entries(declaration).every(([key, rows]) => isDeepStrictEqual(manifest[key], rows)))
 		return false;
-	const init = sources?.['macos/ui/menu/init.lua'];
-	const builder = sources?.['macos/ui/menu/builder.lua'];
-	const badge = sources?.['macos/ui/menu/canvas_badge.lua'];
+	const init = sources?.['macos/menu/ui/init.lua'];
+	const builder = sources?.['macos/menu/ui/builder/builder.lua'];
+	const badge = sources?.['macos/menu/ui/builder/canvas_badge.lua'];
 	const llm = sources?.['macos/ui/menu/menu_llm/init.lua'];
 	if (
 		![init, builder, badge, llm].every((source) => typeof source === 'string' && source.length > 0)
@@ -381,13 +381,13 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	)
 		return false;
 	if (
-		!imported(init, 'Builder', 'ui.menu.builder', start) ||
+		!imported(init, 'Builder', 'menu.ui.builder.builder', start) ||
 		!imported(init, 'TrayMenu', 'adapters.tray_menu', publish) ||
 		!imported(init, 'TrayMenu', 'adapters.tray_menu', start) ||
-		!imported(builder, 'CanvasBadge', 'ui.menu.canvas_badge', generate) ||
-		!imported(builder, 'ManifestMenu', 'infra.manifest_menu', generate) ||
-		!imported(badge, 'ManifestMenu', 'infra.manifest_menu', prepend) ||
-		!imported(builder, 'ManifestMenu', 'infra.manifest_menu', loadRoot)
+		!imported(builder, 'CanvasBadge', 'menu.ui.builder.canvas_badge', generate) ||
+		!imported(builder, 'ManifestMenu', 'menu.engine.manifest_menu', generate) ||
+		!imported(badge, 'ManifestMenu', 'menu.engine.manifest_menu', prepend) ||
+		!imported(builder, 'ManifestMenu', 'menu.engine.manifest_menu', loadRoot)
 	)
 		return false;
 	const declaredTop = declaredMacTopLevelPublication(builder);
@@ -564,7 +564,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!unique(create, 'return type(result) == "table" and result or {}') ||
 		!soleLocal(lex(llm), 'create_menu', 'local function create_menu(deps)') ||
 		!unique(createMenu, 'build_download_item = build_download_item,') ||
-		!imported(llm, 'ManifestMenu', 'infra.manifest_menu', download) ||
+		!imported(llm, 'ManifestMenu', 'menu.engine.manifest_menu', download) ||
 		!require('./menu-native-download-binding.cjs').retainedNativeDownloadProjection(
 			download.source,
 			true

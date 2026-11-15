@@ -10,7 +10,7 @@
 ; produce identical Menu labels; AHK's name-based Menu.Check/Uncheck always
 ; resolves to the FIRST item carrying that label, so toggling/selecting the
 ; SECOND section silently painted the checkmark on the FIRST. The fix builds a
-; per-section disambiguated label (infra/menu_helpers.ahk's
+; per-section disambiguated label (menu/engine/helpers.ahk's
 ; _HS_BuildDisambiguatedSectionLabels) and threads it through every
 ; Check/Uncheck-relevant call site in the personal-section submenus instead of
 ; the raw TomlData[...]["description"].
@@ -18,7 +18,7 @@
 ; Source-scan rather than behavioral: driving a real duplicate-description
 ; scenario end-to-end needs a live Menu() + i18n + ScriptInformation harness;
 ; the disambiguation LOGIC itself is covered behaviorally by
-; tests/unit/ui/menu/test_menu_helpers.ahk. This test only pins that the render/toggle
+; tests/unit/menu/test_helpers.ahk. This test only pins that the render/toggle
 ; call sites actually consume the disambiguated map.
 ; ==============================================================================
 

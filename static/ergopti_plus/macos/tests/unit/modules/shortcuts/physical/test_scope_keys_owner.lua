@@ -3,7 +3,7 @@
 --- Keeps generated scope recommendations within the real static binding registry.
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.shortcut_bindings_fixture")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 helpers.describe("shortcut scope declared native owners", function()
 	helpers.it("selects only real bindings and leaves the tap-key dispatcher derived", function()

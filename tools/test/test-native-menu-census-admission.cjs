@@ -45,7 +45,7 @@ const legacy = JSON.parse(corpusBytes);
 const currentName = (rel) =>
 	rel
 		.replace(/keylogger/g, 'keystats')
-		.replace(/^linux\/ui\/menu\/menu_builder\.lua$/, 'linux/ui/menu/builder.lua');
+		.replace(/^linux\/ui\/menu\/menu_builder\.lua$/, 'linux/menu/ui/builder/builder.lua');
 const currentTree = JSON.parse(JSON.stringify(legacy).replace(/keylogger/g, 'keystats'));
 for (const driver of DRIVERS)
 	currentTree.drivers[driver].sourceFiles =

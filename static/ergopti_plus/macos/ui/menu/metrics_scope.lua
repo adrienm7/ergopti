@@ -2,7 +2,7 @@
 
 --- Owns Metrics configuration without deleting history or converting stored text.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("settings.engine.preferences.preferences")
 local TableUtil = require("core.text.engine.table_util")
 

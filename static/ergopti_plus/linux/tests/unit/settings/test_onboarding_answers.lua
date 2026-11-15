@@ -24,7 +24,7 @@ helpers.describe("Linux wizard retained native publication phases", function()
 		local locale, directory, path_rollbacks, locale_rollbacks = "en", "/before", 0, 0
 		local refuse_locale_inverse = true
 		local state = {
-			manifest = require("infra.manifest_reader"),
+			manifest = require("menu.engine.manifest_reader"),
 			file_system = { read_with_status = function() return nil, "absent" end },
 			i18n = {
 				get_locale = function() return locale end,
@@ -94,7 +94,7 @@ local function with_receiving_boundary(scenario)
 	local answers = { locale = "fr", config_dir = "/after",
 		operations = { { path = "gestures.enabled", value = true } } }
 	local state = {
-		manifest = require("infra.manifest_reader"), layout = "qwerty",
+		manifest = require("menu.engine.manifest_reader"), layout = "qwerty",
 		file_system = { read_with_status = function() return nil, "absent" end },
 		i18n = {
 			get_locale = function() if f.getter_failure then error("locale observer refused") end; return f.locale end,

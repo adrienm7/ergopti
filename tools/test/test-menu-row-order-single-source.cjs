@@ -50,8 +50,9 @@ const WINDOWS_READER = path.join(
 	'static',
 	'ergopti_plus',
 	'windows',
-	'infra',
-	'menu_row_order.ahk'
+	'menu',
+	'engine',
+	'row_order.ahk'
 );
 
 const data = JSON.parse(
@@ -160,8 +161,8 @@ assert.deepEqual(
 	'windows/_generated/menu_row_order.ahk must project row_order.json: run the codegen'
 );
 assert(
-	fs.readFileSync(WINDOWS_READER, 'utf8').includes('#Include ../_generated/menu_row_order.ahk'),
-	'infra/menu_row_order.ahk must load the generated table'
+	fs.readFileSync(WINDOWS_READER, 'utf8').includes('#Include ../../_generated/menu_row_order.ahk'),
+	'menu/engine/row_order.ahk must load the generated table'
 );
 
 console.log(

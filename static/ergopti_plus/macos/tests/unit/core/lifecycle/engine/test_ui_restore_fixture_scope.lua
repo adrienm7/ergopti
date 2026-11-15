@@ -10,7 +10,7 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.ui_restore_fixture")
 local OWNERS = {
 	"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger", "core.timing.engine.timings",
-	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
+	"menu.engine.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
 
@@ -29,7 +29,7 @@ helpers.describe("UI restore fixture lifetime (ui-restore-fixture-scope)", funct
 					if outcome == "construction failure" then
 						_G.require = function(name)
 							local module = original_require(name)
-							if name == "infra.ui_restore" then
+							if name == "menu.engine.ui_restore" then
 								constructed = true
 								error("UI restore construction marker")
 							end

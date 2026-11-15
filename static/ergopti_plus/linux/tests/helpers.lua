@@ -188,7 +188,7 @@ function M.driver_module_path(name)
 end
 
 --- Returns the tray root's source followed by every section module it binds.
---- ui/menu/builder.lua binds each section builder from its own
+--- menu/ui/builder/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.
@@ -204,7 +204,7 @@ function M.read_menu_source()
 	-- A part may bind another part (the dialogs), which the root no longer names.
 	-- The sections live in their features' folders: each is found by its module
 	-- name; a menu module outside the driver (a shared one) is not a section.
-	local texts, seen, index = { read(assert(package.searchpath("ui.menu.builder", search))) }, {}, 1
+	local texts, seen, index = { read(assert(package.searchpath("menu.ui.builder.builder", search))) }, {}, 1
 	while texts[index] do
 		for name in texts[index]:gmatch('require%("([%w_%.]*menu[%w_%.]*)"%)') do
 			local path = not seen[name] and package.searchpath(name, search)

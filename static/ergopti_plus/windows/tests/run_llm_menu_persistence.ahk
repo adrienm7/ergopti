@@ -33,7 +33,7 @@ global _LogsDir := _ConfigDir . "logs\"
 #Include ../core/text/engine/toml/helpers.ahk
 #Include ../core/text/engine/toml/loader.ahk
 #Include ../core/text/engine/toml/config_loader.ahk
-#Include ../infra/manifest_reader.ahk
+#Include ../menu/engine/manifest_reader.ahk
 #Include ../core/lifecycle/engine/master_gates.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../settings/engine/migration/transition.ahk
@@ -72,7 +72,7 @@ global _LLM_Menu_Loaded := false
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 ; The native AI tray owner catches the real staged-root exception classes.
-#Include ../ui/menu/menu_rebuild.ahk
+#Include ../menu/ui/builder/rebuild.ahk
 #Include ../ui/menu/menu_llm/init.ahk
 #Include unit/modules/llm/menu/test_llm_menu_persistence.ahk
 #Include unit/modules/llm/menu/test_llm_menu_regressions.ahk

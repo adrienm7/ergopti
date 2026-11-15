@@ -290,7 +290,7 @@ helpers.describe("live mode: the sentence translated as it is typed", function()
 		local config = live_json()
 		helpers.assert_eq(require("modules.llm.prediction_engine").parse_live_config(Json.encode(config)).debounce_ms,
 			config.debounce_ms, "the engine reads the shipped file")
-		helpers.assert_eq(require("infra.manifest_reader").default_for("llm.trigger.debounce_ms") > config.debounce_ms,
+		helpers.assert_eq(require("menu.engine.manifest_reader").default_for("llm.trigger.debounce_ms") > config.debounce_ms,
 			true, "otherwise the tests below could not tell the two debounces apart")
 		helpers.assert_eq(config.min_words, 0)
 		helpers.assert_eq(require("modules.llm.prediction_engine").parse_live_config('{"debounce_ms": -1, "min_words": 0}'),
@@ -688,7 +688,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
 		} }, function(world)
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local rebuilt = 0
 			local ctx = { llm = world.engine, on_menu_changed = function() rebuilt = rebuilt + 1 end }
 			local i18n = require("core.i18n.engine.i18n")
@@ -771,7 +771,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local i18n = require("core.i18n.engine.i18n")
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
 			local spec = Json.decode(file:read("*a")); file:close()
@@ -818,7 +818,7 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("retains the real shortcut stop notice in all locales while the second chooser stays absent", function()
 		scenario({}, function(world)
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local i18n = require("core.i18n.engine.i18n")
 			local saved_get = i18n.get
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))

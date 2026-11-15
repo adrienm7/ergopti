@@ -19,7 +19,7 @@ helpers.describe("API panel runtime identity transaction", function()
 	helpers.it("(api-panel-runtime-identity) (no-model-runtime) (remote-identity-generation) resets visible predictions before changing entry identity", function()
 		local module_names = {
 			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
 		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
@@ -74,7 +74,7 @@ helpers.describe("API panel runtime identity transaction", function()
 		},
 			logger = helpers.make_logger_stub(),
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			command_row = command_renderer.command_row,
 			template_rows = command_renderer.template_rows,
 			get_array = command_renderer.get_array,
@@ -147,7 +147,7 @@ helpers.describe("API panel runtime identity transaction", function()
 	helpers.it("lists entries by their automatic name only", function()
 		local module_names = {
 			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved_modules = {}
 		for _, name in ipairs(module_names) do saved_modules[name] = package.loaded[name] end
@@ -179,7 +179,7 @@ helpers.describe("API panel runtime identity transaction", function()
 				section = package.loaded["core.i18n.engine.i18n"].get },
 			logger = helpers.make_logger_stub(),
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			template_rows = command_renderer.template_rows,
 			command_row = command_renderer.command_row,
 			get_array = command_renderer.get_array,

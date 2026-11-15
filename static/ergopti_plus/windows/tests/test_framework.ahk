@@ -808,7 +808,7 @@ global TEST_MODULE_GROUPS := [
 	; User interface: menus, windows, onboarding, tooltips, healthcheck.
 	["ui", "^unit/ui/"],
 	; Adapters, platform services, shared infrastructure and the test runner.
-	["core", "^unit/(adapters|platform|infra|suite|core|settings)/"]
+	["core", "^unit/(adapters|platform|infra|suite|core|settings|menu)/"]
 ]
 
 ; The test category of a registering test file; a file no category declares is refused.

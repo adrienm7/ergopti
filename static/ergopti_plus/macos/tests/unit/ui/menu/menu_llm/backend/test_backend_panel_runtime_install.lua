@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "menu.engine.manifest_menu",
 	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
@@ -113,7 +113,7 @@ local function with_rows(opts, scenario)
 			format = function(key) return key end,
 		}
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+		package.loaded["menu.engine.manifest_menu"] = { render_rows = function(rows) return rows end }
 		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body)
 				record.notices[#record.notices + 1] = { title = title, body = body }
@@ -392,7 +392,7 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
 			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
-			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+			package.loaded["menu.engine.manifest_menu"] = { render_rows = function(rows) return rows end }
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = { llm_num_predictions = 1, llm_model_mlx = "candidate", llm_model_ollama = "candidate" },
 				get_backend = function() return observed.backend end,

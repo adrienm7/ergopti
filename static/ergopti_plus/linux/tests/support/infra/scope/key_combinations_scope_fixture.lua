@@ -103,7 +103,7 @@ local function with_owner(body, managed, public_chords)
 		helpers.assert_true(gestures.release_parameter_configuration(initial))
 		state.gestures, state.files = gestures, files
 		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
-			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
+			manifest=public_chords==true and require("menu.engine.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
 			end}})
 		body(state)
@@ -118,7 +118,7 @@ local function failed(value) helpers.assert_eq(value,false) end
 local function next_scope(s,expected,manifest,tag)
 	return Scope.new({path=path,backup_path=backup..(tag or ".next"),
 		files=s.files,combinations=s.pairs,parameters=s.gestures,
-		manifest=manifest or require("infra.manifest_reader"),expected_source=expected})
+		manifest=manifest or require("menu.engine.manifest_reader"),expected_source=expected})
 end
 
 local function with_menu(body, public_chords)
@@ -127,7 +127,7 @@ local function with_menu(body, public_chords)
 		package.loaded["settings.engine.paths"]={config=function() return path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
-		local renderer=require("infra.manifest_menu")
+		local renderer=require("menu.engine.manifest_menu")
 		local i18n=require("core.i18n.engine.i18n")
 		local Holds=require("tap_hold.engine.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}

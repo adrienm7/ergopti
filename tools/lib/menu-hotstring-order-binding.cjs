@@ -78,10 +78,10 @@ function hotstringOrderMenuSource(nativeSource, sharedSource) {
 	const native = tokens(nativeSource);
 	const binding = starts(native, 'local SectionOrder = require("hotstrings.engine.section_order")');
 	if (binding.length !== 1) return '';
-	const direct = starts(native, 'local ManifestMenu = require("infra.manifest_menu")');
+	const direct = starts(native, 'local ManifestMenu = require("menu.engine.manifest_menu")');
 	const protectedBinding = starts(
 		native,
-		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")'
+		'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")'
 	);
 	if (direct.length + protectedBinding.length !== 1) return '';
 	const lastImport = Math.max(binding[0], direct[0] ?? protectedBinding[0]);

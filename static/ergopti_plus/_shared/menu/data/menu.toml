@@ -1256,7 +1256,7 @@ path = "shortcuts.wrap_text_if_selected"
 
 # The wrap-symbol picker. Declared platforms = ["ahk"] until 2026-08-06, and all
 # three drivers had been building it the whole time: macOS in
-# build_wrap_symbols_submenu, Linux in ui/menu/builder.lua's wrap_items. The restriction
+# build_wrap_symbols_submenu, Linux in menu/ui/builder/builder.lua's wrap_items. The restriction
 # recorded who wrote it first rather than what the platforms can do — the third
 # time this exact shape has been found in this manifest.
 #
@@ -1271,7 +1271,7 @@ id = "wrap_symbols_menu"
 # The selection operations this driver performs on the current X11 selection —
 # CapsWord, the three case transforms, select word, select line, paste without
 # formatting. Declared 2026-08-07; they were built by hand in
-# linux/ui/menu/builder.lua and described nowhere, so no gate could see
+# linux/menu/ui/builder/builder.lua and described nowhere, so no gate could see
 # seven rows of a shared menu.
 #
 # A `list` rather than seven `command` rows because the set is one block with one
@@ -1428,7 +1428,7 @@ id = "extensions_shortcuts"
 # This carried platforms = ["ahk"] with the reason "neither Lua driver has that
 # concept", which was false for both: macOS has done it since
 # ui/menu/menu_shortcuts.lua:543 was written, and Linux since 2026-08-05
-# (ui/menu/builder.lua, _extension_shortcut_rows). The restriction survived
+# (menu/ui/builder/builder.lua, _extension_shortcut_rows). The restriction survived
 # a correction attempt because Linux's shortcuts menu was hand-rolled and could
 # not render any row BY ID, so widening it would have made the manifest promise
 # something the handler-bijection ratchet would flag. That menu now dispatches
@@ -2049,7 +2049,7 @@ disabled_when = ["keystats_enabled"]
 
 # The readouts this driver answers in its log rather than in a window. They are
 # Linux's own — macOS and Windows open a metrics WINDOW for the same figures —
-# and until 2026-08-06 they were built in ui/menu/builder.lua with nothing
+# and until 2026-08-06 they were built in menu/ui/builder/builder.lua with nothing
 # describing them. A driver-specific row is fine; a driver-specific row nobody
 # declared is a row no gate can compare, reason about or find.
 
@@ -2157,7 +2157,7 @@ id = "custom_layouts"
 status_rows.none_installed = [{ type = "label", i18n = "menu.layout.none_installed" }]
 
 # How far GTK 3 applications compose the installed layouts' Compose sequences
-# (ui/menu/compose_input_method_row.lua): GTK 3's built-in input method takes
+# (menu/ui/compose_input_method_row.lua): GTK 3's built-in input method takes
 # only the single-character rules, IBus takes them all. Linux only: macOS and
 # Windows type every character through their own layouts, with no Compose file.
 [[menu.layout_menu]]
@@ -2326,7 +2326,7 @@ type = "section_header"
 i18n = "menu.layout.header_any"
 
 # The base layout the Linux keyboard hook decodes keycodes with. Declared
-# 2026-08-07; the rows were two names written into ui/menu/builder.lua while the
+# 2026-08-07; the rows were two names written into menu/ui/builder/builder.lua while the
 # driver already owned the list — input_reader.get_layouts() is the table the
 # decoder itself uses, and a menu that enumerates it by hand goes stale the day a
 # third table is added.
@@ -2750,7 +2750,7 @@ current_choice_label_value = true
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while
-# _build_gestures in ui/menu/builder.lua has always built a master toggle, both bulk
+# _build_gestures in menu/ui/builder/builder.lua has always built a master toggle, both bulk
 # actions and every configurable slot. Same failure as kanata/updates/apps: the
 # manifest simply had no opinion about Linux, and an absent opinion reads as
 # "restricted elsewhere" rather than as the omission it was.
@@ -2930,7 +2930,7 @@ status_rows.fingers_4 = [{ type = "section_header", i18n = "menu.gestures.header
 # One list whose provider groups the slots by the finger count in their names
 # and frames each group with these status rows, as Windows does.
 # A `list`, not a `dynamic`, since 2026-08-05: a dynamic handler appends its rows
-# inside the driver, so the manifest would name the slot while ui/menu/builder.lua
+# inside the driver, so the manifest would name the slot while menu/ui/builder/builder.lua
 # still built all thirty-odd rows and their nested action pickers. A list provider
 # returns row DATA and the shared renderer materialises it.
 [[menu.gestures_menu]]

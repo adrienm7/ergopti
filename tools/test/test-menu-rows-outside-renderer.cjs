@@ -15,7 +15,7 @@
  *
  * WHY A RATCHET AND NOT A BAN:
  * Measured on 2026-08-01, the three drivers are in completely different places.
- * Linux already builds 97 of its 100 rows inside ui/menu/builder.lua. Windows
+ * Linux already builds 97 of its 100 rows inside menu/ui/builder/builder.lua. Windows
  * builds 8 of 230 inside the renderer, macOS 29 of 330. Banning the bypass today
  * would mean rewriting two menu layers in one change, so the count is frozen
  * instead: the migration can proceed row by row, and nothing new accumulates
@@ -81,17 +81,17 @@ const MEASURE = process.argv.includes('--measure');
 // ── linux 2 → 124 on 2026-08-05, and that is NOT a regression ──
 //
 // Read the number before reading the jump. Until today this file listed
-// `ui/menu/builder.lua` as "the Linux renderer", so every one of that file's
+// `menu/ui/builder/builder.lua` as "the Linux renderer", so every one of that file's
 // row sites counted as INSIDE and Linux read 2/2 — a number that could not move
 // no matter how much of the menu was hand-built, because the hand-building WAS
 // the renderer by definition. Linux is the only driver whose renderer is entirely
-// shared (_shared/menu/engine/renderer.lua, bound by infra/manifest_menu.lua), and
-// ui/menu/builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
+// shared (_shared/menu/engine/renderer.lua, bound by menu/engine/manifest_menu.lua), and
+// menu/ui/builder/builder.lua is a CALLER of it, exactly as menu_shortcuts.lua is on macOS —
 // which this file has always counted as outside.
 //
 // So the definition was wrong and the measurement was vacuous. Nothing got worse
 // today; the dial started working. The debt was 136 when the definition changed
-// (134 sites in ui/menu/builder.lua plus the 2 in ergopti_hotstrings.lua the old
+// (134 sites in menu/ui/builder/builder.lua plus the 2 in ergopti_hotstrings.lua the old
 // baseline named) and is frozen here at the 124 measured after the kanata and
 // updates submenus moved onto `list` providers — freezing at the pre-migration
 // figure would have quietly given back the twelve rows those two blocks cost.
@@ -120,7 +120,7 @@ const MEASURE = process.argv.includes('--measure');
 // renderer materialises it: `type = "check"` carries the label key, the
 // checked_when predicate and the disabled_when predicate, and the driver
 // registers only a named command. Both renderers gained the type in the same
-// change — _shared/menu/engine/renderer.lua and windows/infra/manifest_menu.ahk —
+// change — _shared/menu/engine/renderer.lua and windows/menu/engine/manifest_menu.ahk —
 // because a shared declaration that only one renderer understands is a row that
 // disappears on the other two.
 //
@@ -457,7 +457,7 @@ const DRIVER_SPEC = {
 			/\bMenuAdd[A-Za-z]*\s*\(/,
 			/\b(?:[A-Za-z_]*Menu|Sub[A-Za-z_]*|M)\.Add\s*\(/
 		],
-		// ui/menu/menu_engine.ahk joined the set on 2026-08-07, and this is a
+		// menu/ui/builder/engine.ahk joined the set on 2026-08-07, and this is a
 		// correction of DOUBLE COUNTING rather than a migration. Its three
 		// MenuAdd* helpers are this driver's row materialisation — the manifest
 		// renderer calls them at four places — and the predicate above already
@@ -468,9 +468,9 @@ const DRIVER_SPEC = {
 		// menu_engine's above — the predicate charging a row where it is DRAWN as
 		// well as where it was decided:
 		//
-		//   infra/menu_dispatcher.ahk defines RegisterMenuItem. Counting the
+		//   menu/engine/dispatcher.ahk defines RegisterMenuItem. Counting the
 		//     definition of the row API as a row is counting the ruler as a length.
-		//   ui/menu/menu_rebuild.ahk is the tray TRANSPORT: TrayMenuStage_* records
+		//   menu/ui/builder/rebuild.ahk is the tray TRANSPORT: TrayMenuStage_* records
 		//     what a caller decided and replays it into A_TrayMenu at publish. Every
 		//     Menu.Add in it is a replay of a decision made elsewhere — and the
 		//     equivalent layer on the other two drivers (tray_menu.setMenu,
@@ -483,10 +483,10 @@ const DRIVER_SPEC = {
 		// counted. Windows falls 28 → 18 with nothing rewritten, and the number
 		// finally means the same thing on all three drivers.
 		renderers: new Set([
-			'infra/manifest_menu.ahk',
-			'ui/menu/menu_engine.ahk',
-			'infra/menu_dispatcher.ahk',
-			'ui/menu/menu_rebuild.ahk',
+			'menu/engine/manifest_menu.ahk',
+			'menu/ui/builder/engine.ahk',
+			'menu/engine/dispatcher.ahk',
+			'menu/ui/builder/rebuild.ahk',
 			'adapters/tray_menu.ahk'
 		])
 	},
@@ -501,7 +501,7 @@ const DRIVER_SPEC = {
 		// packs' read-only counts — and that tree is provider rows since the packs
 		// became real, switchable groups, so the files below draw no row of their
 		// own and the empty count is the definition, not a stale path.
-		renderers: new Set(['infra/manifest_menu.lua', 'ui/menu/builder.lua']),
+		renderers: new Set(['menu/engine/manifest_menu.lua', 'menu/ui/builder/builder.lua']),
 		sharedRenderer: true
 	},
 	linux: {
@@ -510,7 +510,7 @@ const DRIVER_SPEC = {
 		patterns: [/\btitle\s*=(?!=)\s*\S/],
 		context: /\b(?:fn|checked|disabled|menu)\s*=/,
 		// This driver's renderer lives entirely in _shared/menu/engine/renderer.lua;
-		// infra/manifest_menu.lua is the binding that hands it this platform's
+		// menu/engine/manifest_menu.lua is the binding that hands it this platform's
 		// token, its manifest path and its JSON decoder, and builds no row itself.
 		// So the set is empty ON PURPOSE, and `sharedRenderer` says so — without it
 		// the "a renderer that draws no rows is not a renderer" guard below reads
@@ -725,7 +725,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 // ==================================================
 
 // The count above cannot see the Linux migration at all. It treats
-// ui/menu/builder.lua as "the Linux renderer", so all 134 of that file's row sites
+// menu/ui/builder/builder.lua as "the Linux renderer", so all 134 of that file's row sites
 // count as INSIDE and Linux reads 2/2 no matter what moves. Repointing it would
 // take Linux from 2 to 134 — a change of DEFINITION that reads as a regression,
 // and a judgment about what the number means rather than a fact to be measured.
@@ -741,7 +741,7 @@ for (const [driver, spec] of Object.entries(DRIVER_SPEC)) {
 const LIST_PROVIDERS_FLOOR = { linux: 7 };
 
 const MENU_MANIFEST = path.join(DRIVERS, '_shared', 'menu', 'data', 'menu_manifest.json');
-const LINUX_SRC = path.join(DRIVERS, 'linux', 'ui', 'menu', 'builder.lua');
+const LINUX_SRC = path.join(DRIVERS, 'linux', 'menu', 'ui', 'builder', 'builder.lua');
 if (fs.existsSync(LINUX_SRC) && fs.existsSync(MENU_MANIFEST)) {
 	const menuManifest = JSON.parse(fs.readFileSync(MENU_MANIFEST, 'utf8'));
 	const src = readSourceFile(LINUX_SRC);

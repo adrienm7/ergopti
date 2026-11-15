@@ -200,7 +200,7 @@ end)
 helpers.describe("Count fixture authentic whole-frame admission", function()
 	helpers.it("refuses missing non-count commands without delivering the observed transaction", function()
 		with_count_menu(function(menu, _, calls)
-			local native = package.loaded["infra.manifest_menu"]
+			local native = package.loaded["menu.engine.manifest_menu"]
 			local declaration = native.get_array("llm_generation_context_control")
 			local original = declaration[1]
 			helpers.assert_true(#generation_rows(menu) >= 6)
@@ -238,7 +238,7 @@ helpers.describe("The AI menu builds no model list (model-selector-page)", funct
 				helpers.assert_eq(state.llm_backend, backend)
 				button.fn()
 				helpers.assert_eq(calls.page_opens, 1, "the button opens the selector page")
-				local renderer = require("infra.manifest_menu")
+				local renderer = require("menu.engine.manifest_menu")
 				local compose = renderer.native_composition("macos_download_root")
 				helpers.assert_eq(compose({ download = {}, body = item.submenu }), true,
 					"the menu without the model list passes strict native ABI publication")

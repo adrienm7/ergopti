@@ -63,7 +63,7 @@ end
 --- @return string current The current backend's label.
 --- @return table rows
 local function system_rows(system, dialogs, changed)
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	local spec = AgentSettings.get_spec(system)
 	local parsed = spec ~= "" and require("ai.engine.prediction.vision").parse(spec) or nil
 	local choices = AgentSettings.backend_choices(system)
@@ -79,7 +79,7 @@ local function system_rows(system, dialogs, changed)
 	local function store(value)
 		if AgentSettings.set_spec(system, value) then changed() end
 	end
-	local off = require("infra.manifest_menu").check_row("agent_system_controls", require("settings.engine.keys").COMMAND.AGENT_SYSTEM_OFF, {
+	local off = require("menu.engine.manifest_menu").check_row("agent_system_controls", require("settings.engine.keys").COMMAND.AGENT_SYSTEM_OFF, {
 		agent_system_off = function()
 			if AgentSettings.set_spec(system, "") ~= true then return false end
 			changed()
@@ -170,7 +170,7 @@ end
 --- @param changed function Redraws the menu.
 --- @return integer count, table rows
 local function disabled_app_rows(llm, dialogs, changed)
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	local apps = AgentSettings.get_disabled_apps()
 	local excluded = {}
 	for _, app in ipairs(apps) do
@@ -241,7 +241,7 @@ end
 --- @param dialogs table { prompt(title, text, initial, hidden, choices), error(text) }
 --- @return table Row data { label, submenu }.
 function M.build(ctx, dialogs)
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	local NativeParent = require("ui.menu.ai_parent")
 	local parent = NativeParent.begin(ManifestMenu, "agent", ctx, AgentSettings)
 	if not parent then return nil end

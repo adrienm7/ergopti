@@ -92,7 +92,7 @@ function M.run(receipt_path, destination, nonce)
 	local okay, failure = xpcall(function()
 		Scope = require("settings.engine.scope.script_scope")
 		Runtime = require("settings.engine.scope.script_scope_runtime")
-		Manifest = require("infra.manifest_reader")
+		Manifest = require("menu.engine.manifest_reader")
 		I18n = require("core.i18n.engine.i18n")
 		Locale = require("core.i18n.engine.locale")
 		Logger = require("core.logger.engine.logger")
@@ -104,7 +104,7 @@ function M.run(receipt_path, destination, nonce)
 		local _, source_status = FileSystem.read_with_status(destination)
 		assert(source_status == "absent", "Private Script source must initially be absent")
 		-- Only the standalone bootstrap initializes these native locale owners.
-		assert(package.loaded["modules.keymap"] == nil and package.loaded["ui.menu"] == nil,
+		assert(package.loaded["modules.keymap"] == nil and package.loaded["menu.ui"] == nil,
 			"The managed driver must not own this standalone native probe")
 		I18n.set_locale_injector(function(code) Locale.set_locale(code) end)
 		I18n.init()

@@ -36,7 +36,7 @@ local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
 local Paths  = require("core.fs.engine.paths")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local TextCase = require("core.text.engine.unicode_case")
 local WrapPair = require("keyboard.engine.wrap_pair")
 local WrapSettings = require("modules.shortcuts.wrap_symbol_settings")

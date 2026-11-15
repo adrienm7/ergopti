@@ -605,7 +605,7 @@ local function build_sections()
 
 	local descriptions = { date_long_fr = desc_datelongfr, date_fr = desc_datefr, date = desc_date }
 	local out = {}
-	for _, family in ipairs(require("infra.manifest_menu").get_dynamic_hotstring_families()) do
+	for _, family in ipairs(require("menu.engine.manifest_menu").get_dynamic_hotstring_families()) do
 		if family.separator then
 			out[#out + 1] = { name = "-" }
 		else

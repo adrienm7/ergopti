@@ -94,8 +94,8 @@ end
 local function tray_keys()
 	local seen = {}
 	-- Keys the tray's modules resolve themselves (rows, headers, dialogs): every
-	-- file whose header names it as a ui/menu module.
-	local src = helpers.read_driver_source("--- ui/menu/")
+	-- file whose header names it as a menu module, in whichever feature folder.
+	local src = helpers.read_menu_source()
 	helpers.assert_true(type(src) == "string" and src:find("function M.generate", 1, true) ~= nil,
 		"the tray's menu modules must be readable")
 	for key in src:gmatch('i18n%.get%(%s*"([^"]+)"') do seen[key] = true end

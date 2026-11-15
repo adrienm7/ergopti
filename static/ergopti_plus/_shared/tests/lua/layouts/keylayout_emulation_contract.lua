@@ -182,7 +182,7 @@ function M.register(helpers, shared)
 
 		helpers.it("reads the [layout] settings the way Windows selects the layout", function()
 			local Settings = require("layouts.engine.emulation.settings")
-			local default_for = require("infra.manifest_reader").default_for
+			local default_for = require("menu.engine.manifest_reader").default_for
 			local reported = {}
 			local function report(segments) reported[#reported + 1] = table.concat(segments, ".") end
 			local empty = Settings.resolve({}, default_for, report)
@@ -212,7 +212,7 @@ function M.register(helpers, shared)
 		helpers.it("lists the emulation choices with the current one ticked", function()
 			local Settings = require("layouts.engine.emulation.settings")
 			local Menu = require("layouts.engine.emulation.menu")
-			local default_for = require("infra.manifest_reader").default_for
+			local default_for = require("menu.engine.manifest_reader").default_for
 			local chosen
 			local function rows_for(layout, status)
 				return Menu.choice_rows({ t = function(key) return key end,

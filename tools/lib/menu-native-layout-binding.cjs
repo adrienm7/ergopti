@@ -118,7 +118,7 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	)
 		return false;
 	const helper = body('local function layout_declared_row(section, commands, getters, children)');
-	const expected = lex(`local renderer = require("infra.manifest_menu")
+	const expected = lex(`local renderer = require("menu.engine.manifest_menu")
 		local rows = type(renderer.template_rows) == "function"
 			and renderer.template_rows(section, commands or {}, getters or {}, children or {}) or nil
 		if type(rows) ~= "table" or #rows ~= 1 then return nil end
@@ -149,9 +149,10 @@ function nativeLayoutTemplatePublication(source, section, definition, ownership)
 	const build = body('function M.build(ctx)');
 	if (
 		!build ||
-		positions(build, 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")').filter(
-			(at) => build.scopes[at] === 0
-		).length !== 1 ||
+		positions(
+			build,
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")'
+		).filter((at) => build.scopes[at] === 0).length !== 1 ||
 		positions(build, 'ManifestMenu =').filter((at) => build.scopes[at] === 0).length !== 1 ||
 		!one(
 			build,

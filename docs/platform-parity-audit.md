@@ -322,7 +322,7 @@ and context length even though the native Windows/macOS presentation rows are
 absent. See `linux/ui/menu/menu_llm.lua` and `modules/llm/settings.lua`.
 
 Windows programmable hotstrings are an equivalent presentation rather than an
-absence: `ui/menu/menu_submenus.ahk` calls `_HS_ProgrammableHotstringRows`, whose
+absence: `menu/ui/builder/submenus.ahk` calls `_HS_ProgrammableHotstringRows`, whose
 commands open, reload or repair the user's source. Likewise Linux prompt actions
 reach `prediction_engine.trigger_prompt` through `llm_prompt_prediction`; the
 absence of macOS's per-profile shortcut dialog does not remove prompt actions.

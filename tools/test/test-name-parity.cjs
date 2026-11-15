@@ -11,8 +11,8 @@
  *    (old name string_utils.ahk must be absent).
  * 2. action_picker — both drivers use a ui/action_picker/init.{ahk,lua} folder
  *    layout (old flat ui/action_picker.ahk must be absent).
- * 3. manifest_menu — windows/infra/manifest_menu.ahk mirrors
- *    macos/infra/manifest_menu.lua (the renderer file; already symmetric, guard
+ * 3. manifest_menu — windows/menu/engine/manifest_menu.ahk mirrors
+ *    macos/menu/engine/manifest_menu.lua (the renderer file; already symmetric, guard
  *    ensures it is never accidentally reverted or renamed).
  *
  * ROOT CAUSE ENCODED:
@@ -103,15 +103,15 @@ check(
 // =====================================================================
 
 check(
-	'windows/infra/manifest_menu.ahk exists (renderer, peer of manifest_menu.lua)',
-	exists('windows/infra/manifest_menu.ahk'),
-	'windows/infra/manifest_menu.ahk (the menu renderer) must not be renamed or removed.'
+	'windows/menu/engine/manifest_menu.ahk exists (renderer, peer of manifest_menu.lua)',
+	exists('windows/menu/engine/manifest_menu.ahk'),
+	'windows/menu/engine/manifest_menu.ahk (the menu renderer) must not be renamed or removed.'
 );
 
 check(
-	'macos/infra/manifest_menu.lua exists',
-	exists('macos/infra/manifest_menu.lua'),
-	'macos/infra/manifest_menu.lua is the macOS renderer peer — must not be renamed or removed.'
+	'macos/menu/engine/manifest_menu.lua exists',
+	exists('macos/menu/engine/manifest_menu.lua'),
+	'macos/menu/engine/manifest_menu.lua is the macOS renderer peer — must not be renamed or removed.'
 );
 
 // =====================================================================

@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local function quit_action_body()
 	local source, err = helpers.read_driver_unit("local function safe_require")
-	helpers.assert_true(source ~= nil, "ui.menu.init source must be unique: " .. tostring(err))
+	helpers.assert_true(source ~= nil, "menu.ui.init source must be unique: " .. tostring(err))
 	local start_at = source:find("quit%s*=%s*function%(%)")
 	local end_at = source:find("open_logs%s*=", start_at or 1)
 	helpers.assert_true(start_at ~= nil and end_at ~= nil, "quit action must be locatable")
@@ -55,7 +55,7 @@ local function load_menu_quit_action()
 	-- Menu startup loads optional user code; the quit contract must never acquire
 	-- a real personal configuration file or its persistent cooperative lock.
 	package.loaded["infra.personal_shortcuts"] = { load = function() return true end }
-	package.loaded["ui.menu.global_actions_transaction"] = {
+	package.loaded["menu.ui.transactions.global_actions_transaction"] = {
 		create = function(deps)
 			return {
 				is_exclusive_blocked = function() return stock_calls.writer_blocked == true end,
@@ -74,7 +74,7 @@ local function load_menu_quit_action()
 		escape_gsub_replacement = function(value) return tostring(value) end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.ui_restore"] = {}
+	package.loaded["menu.engine.ui_restore"] = {}
 	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function()
 			return {
@@ -89,7 +89,7 @@ local function load_menu_quit_action()
 		get_group_name = function() return "group" end,
 		save = function() return true end,
 	}
-	package.loaded["ui.menu.builder"] = { generate = function() return {} end }
+	package.loaded["menu.ui.builder.builder"] = { generate = function() return {} end }
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
 	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
@@ -113,10 +113,10 @@ local function load_menu_quit_action()
 			}
 		end,
 	}
-	package.loaded["ui.menu.menu_state"] = {
+	package.loaded["menu.ui.builder.state"] = {
 		sync_state_to_modules = function() return true end,
 	}
-	package.loaded["ui.menu.menu_watchers"] = {
+	package.loaded["menu.ui.builder.watchers"] = {
 		start_config_watcher = function() return {} end,
 		start_theme_watcher = function() return {} end,
 	}
@@ -158,8 +158,8 @@ local function load_menu_quit_action()
 		set_extras = function(actions) captured_actions = actions end,
 	}
 
-	package.loaded["ui.menu.init"] = nil
-	local menu = require("ui.menu.init")
+	package.loaded["menu.ui.init"] = nil
+	local menu = require("menu.ui.init")
 	local program_admission
 	local gestures = { configure_program_admission = function(callback)
 		helpers.assert_type(callback, "function")
@@ -167,7 +167,7 @@ local function load_menu_quit_action()
 		return true
 	end }
 	local started, start_err = pcall(menu.start, ".", {}, gestures, nil, nil, {}, nil, {})
-	helpers.assert_true(started, "ui.menu.init must start over the quit harness: " .. tostring(start_err))
+	helpers.assert_true(started, "menu.ui.init must start over the quit harness: " .. tostring(start_err))
 	helpers.assert_type(program_admission, "function", "quit startup retains its required program admission callback")
 	helpers.assert_true(type(captured_actions) == "table" and type(captured_actions.quit) == "function",
 		"the real menu start must publish its quit action")

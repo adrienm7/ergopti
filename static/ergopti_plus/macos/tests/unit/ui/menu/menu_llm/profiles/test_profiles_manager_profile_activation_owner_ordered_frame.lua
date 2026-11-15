@@ -48,7 +48,7 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 			local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
 				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 				json_decode = function() return document end, i18n = i18n, logger = package.loaded["core.logger.engine.logger"] }))
-			local binding = package.loaded["infra.manifest_menu"]
+			local binding = package.loaded["menu.engine.manifest_menu"]
 			binding.template_rows, binding.render_rows = Menu.template_rows, Menu.render_rows
 			if options.paused then fixture.native_dependencies.script_control.is_paused = function() return true end end
 			local function rows() return fixture.manager.get_menu_item().menu end

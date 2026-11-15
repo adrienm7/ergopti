@@ -1045,9 +1045,9 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       about 78 ms, is unchanged); macOS `menu_keyboard_layout.sources`
       re-reads the bundle variants from disk per rebuild (57-415 ms spikes) and needs a proven cache contract;
       hs.menubar has no per-row update, so a macOS toggle still re-pushes the root, but since 11 November its Lua
-      build is bounded: a refresh asked only by clicks in one branch (`ui/menu/refresh_scope.lua`, through the click
+      build is bounded: a refresh asked only by clicks in one branch (`menu/ui/transactions/refresh_scope.lua`, through the click
       gate's `around_click`) rebuilds that branch's module and reuses the rows the other menu modules built last
-      (`ui/menu/branch_rows.lua`, a decorator over the menu modules, `builder.lua` unchanged). A pause flip, a request
+      (`menu/ui/builder/branch_rows.lua`, a decorator over the menu modules, `builder.lua` unchanged). A pause flip, a request
       from outside a click, two branches, or a click in the layout, AI, agent, configuration, language, About,
       Hotstrings or Debug rows still rebuilds everything; Metrics, Shortcuts, Tap-Holds, Gestures and Apps may
       rebuild alone. Real-module tray harness (median of 15 builds, 1,531 rows): full tree 20.1 ms and 2.76 MB

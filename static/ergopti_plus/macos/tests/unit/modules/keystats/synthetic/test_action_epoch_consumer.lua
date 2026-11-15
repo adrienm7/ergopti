@@ -23,7 +23,7 @@ local RESET_MODULES = {
 	"platform.input.keyboard_hook", "adapters.event_provenance",
 	"platform.input.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
-	"infra.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+	"menu.engine.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
 }
 
@@ -273,7 +273,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		metrics_dir = function() return "/tmp/ergopti_timer_failure/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_timer_failure/cache" end,
 	}
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 
@@ -441,7 +441,7 @@ local function load_fixture()
 		end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return false end }
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 	package.loaded["metrics.engine.metrics"] = {

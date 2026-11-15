@@ -119,7 +119,7 @@ end
 function M.is_enabled()
 	if _enabled ~= nil then return _enabled end
 	return DialogCore.stored_enabled(Storage,
-		function(path) return require("infra.manifest_reader").default_for(path) end, SETTING)
+		function(path) return require("menu.engine.manifest_reader").default_for(path) end, SETTING)
 end
 
 --- Ticks or unticks "Show a window for every error", durably.

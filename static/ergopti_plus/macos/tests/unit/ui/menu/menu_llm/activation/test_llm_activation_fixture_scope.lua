@@ -30,7 +30,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
 	"ui.menu.menu_llm.menu_layout",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"core.events.timer_scheduler",

@@ -240,7 +240,7 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const binding =
-		'local Shared = require("layouts.engine.layers.magic_key_source")\nlocal ManifestMenu = require("infra.manifest_menu")';
+		'local Shared = require("layouts.engine.layers.magic_key_source")\nlocal ManifestMenu = require("menu.engine.manifest_menu")';
 	const call = 'Shared.menu_rows(resolver, {manifest=ManifestMenu})';
 	assert.deepStrictEqual(names(resolve([binding + '\n' + call], shared)), [
 		'layouts.engine.layers.magic_key_source.menu_rows'
@@ -248,15 +248,15 @@ return M`;
 	assert(handlers(resolve([binding + '\n' + call], shared)).has('magic_key_source_capture'));
 	assert(handlers(resolve([binding + '\n' + call], shared)).has('magic_key_source_automatic'));
 	const protectedBinding = binding.replace(
-		'local ManifestMenu = require("infra.manifest_menu")',
-		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")'
+		'local ManifestMenu = require("menu.engine.manifest_menu")',
+		'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")'
 	);
 	assert.deepStrictEqual(names(resolve([protectedBinding + '\n' + call], shared)), [
 		'layouts.engine.layers.magic_key_source.menu_rows'
 	]);
 	assert.deepStrictEqual(
 		resolve(
-			[protectedBinding.replace('infra.manifest_menu', 'foreign.renderer') + '\n' + call],
+			[protectedBinding.replace('menu.engine.manifest_menu', 'foreign.renderer') + '\n' + call],
 			shared
 		),
 		[]
@@ -307,7 +307,7 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const prefix =
-		'local ManifestMenu = require("infra.manifest_menu")\nlocal Shared = require("layouts.engine.layers.magic_key_source")\n';
+		'local ManifestMenu = require("menu.engine.manifest_menu")\nlocal Shared = require("layouts.engine.layers.magic_key_source")\n';
 	const reached = (options) =>
 		resolve([prefix + 'Shared.menu_rows(resolver, {' + options + '})'], shared);
 	for (const options of [
@@ -348,7 +348,7 @@ function M.menu_rows(resolver, opts)
 end
 return M`;
 	const native =
-		'local ManifestMenu=require("infra.manifest_menu")\nlocal Shared=require("layouts.engine.layers.magic_key_source")\n';
+		'local ManifestMenu=require("menu.engine.manifest_menu")\nlocal Shared=require("layouts.engine.layers.magic_key_source")\n';
 	for (const alias of [
 		String.raw`"\109anifest"`,
 		String.raw`"\x6danifest"`,

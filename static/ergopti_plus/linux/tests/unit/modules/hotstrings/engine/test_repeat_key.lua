@@ -221,7 +221,7 @@ helpers.describe("repeat key menu persistence", function()
 				local writer = require("core.text.engine.toml_codec.writer")
 				local reports, notices, execute = 0, 0, os.execute
 				writer.set_case_twin_reporter(function() reports = reports + 1 end)
-				local rows = helpers.load_module("ui.menu.builder").build({ config = {
+				local rows = helpers.load_module("menu.ui.builder.builder").build({ config = {
 					any_enabled = function() return true end, get_groups = function() return {} end,
 					is_group_enabled = function() return true end, is_section_enabled = function() return true end } })
 				local function find(items)
@@ -336,7 +336,7 @@ helpers.describe("repeat key menu persistence", function()
 	end)
 	helpers.it("a held scope reports its refusal without consuming an older TOML notice", function()
 		with_repeat(SOURCE, function()
-			local builder = helpers.load_module("ui.menu.builder")
+			local builder = helpers.load_module("menu.ui.builder.builder")
 			local rows = builder.build({ config = { any_enabled = function() return true end,
 				get_groups = function() return {} end, is_group_enabled = function() return true end,
 				is_section_enabled = function() return true end } })
@@ -377,7 +377,7 @@ helpers.describe("repeat key menu persistence", function()
 				return old(command)
 			end
 			local ok, err = pcall(function()
-				local builder = helpers.load_module("ui.menu.builder")
+				local builder = helpers.load_module("menu.ui.builder.builder")
 				local rows = builder.build({ config = { any_enabled = function() return true end,
 					get_groups = function() return {} end, is_group_enabled = function() return true end,
 					is_section_enabled = function() return true end },
@@ -522,7 +522,7 @@ helpers.describe("magic-key repeat: canonical sparse preferences", function()
 	helpers.it("refreshes the leaf after an actual canonical clear candidate was published", function()
 		with_repeat(SOURCE, function(subject, _, path)
 			helpers.assert_true(subject.is_enabled())
-			local operations = require("infra.manifest_reader").scope_operations("hotstrings", "clear")
+			local operations = require("menu.engine.manifest_reader").scope_operations("hotstrings", "clear")
 			helpers.assert_true(require("core.text.engine.toml_codec.writer").batch_write(path, operations))
 			helpers.assert_true(subject.refresh())
 			helpers.assert_eq(subject.is_enabled(), false)

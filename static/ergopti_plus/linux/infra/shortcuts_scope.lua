@@ -3,7 +3,7 @@
 --- Publishes one shortcut scope through existing preference and dispatch owners.
 local M = {}
 local PhysicalAvailability = require("shortcuts.engine.physical_availability")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")

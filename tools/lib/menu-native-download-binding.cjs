@@ -165,7 +165,7 @@ function retainedNativeDownloadProjection(source, constructorBody = false) {
 	)
 		return false;
 	const statements = [
-		'local renderer = rawget(package.loaded, "infra.manifest_menu")',
+		'local renderer = rawget(package.loaded, "menu.engine.manifest_menu")',
 		'if type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end',
 		'local template_owner, render_owner = rawget(renderer, "template_rows"), rawget(renderer, "render_rows")',
 		'local root_owner, array_owner = rawget(renderer, "get_root"), rawget(renderer, "get_array")',
@@ -193,7 +193,7 @@ function retainedNativeDownloadProjection(source, constructorBody = false) {
 	];
 	for (const statement of statements) if (!one(statement)) return false;
 	const rendererBody =
-		'return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer) and getmetatable(renderer) == nil and rawequal(rawget(renderer, "template_rows"), template_owner) and rawequal(rawget(renderer, "render_rows"), render_owner) and rawequal(rawget(renderer, "get_root"), root_owner) and rawequal(rawget(renderer, "get_array"), array_owner)';
+		'return rawequal(rawget(package.loaded, "menu.engine.manifest_menu"), renderer) and getmetatable(renderer) == nil and rawequal(rawget(renderer, "template_rows"), template_owner) and rawequal(rawget(renderer, "render_rows"), render_owner) and rawequal(rawget(renderer, "get_root"), root_owner) and rawequal(rawget(renderer, "get_array"), array_owner)';
 	if (
 		JSON.stringify(renderer.tokens.map((t) => [t.kind, t.value])) !==
 		JSON.stringify(scriptTokens(rendererBody, '.lua').map((t) => [t.kind, t.value]))

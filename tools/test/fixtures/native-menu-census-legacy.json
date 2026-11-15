@@ -12,8 +12,8 @@
 				"windows/ui/menu/menu_hotstrings.ahk:1074 append",
 				"windows/ui/menu/menu_hotstrings.ahk:1251 append",
 				"windows/ui/menu/menu_hotstrings.ahk:1265 append",
-				"windows/ui/menu/menu_init.ahk:48 append",
-				"windows/ui/menu/menu_init.ahk:67 add",
+				"windows/menu/ui/builder/menu_init.ahk:48 append",
+				"windows/menu/ui/builder/menu_init.ahk:67 add",
 				"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
 				"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
 				"windows/ui/menu/menu_llm/menu_main.ahk:177 append",
@@ -31,16 +31,16 @@
 				"windows/ui/menu/menu_llm/menu_models.ahk:336 append",
 				"windows/ui/menu/menu_shortcuts.ahk:195 append",
 				"windows/ui/menu/menu_shortcuts.ahk:200 append",
-				"windows/ui/menu/menu_submenus.ahk:62 separator",
-				"windows/ui/menu/menu_submenus.ahk:170 separator",
-				"windows/ui/menu/menu_submenus.ahk:209 separator"
+				"windows/menu/ui/builder/submenus.ahk:62 separator",
+				"windows/menu/ui/builder/submenus.ahk:170 separator",
+				"windows/menu/ui/builder/submenus.ahk:209 separator"
 			]
 		},
 		"macos": {
 			"count": 22,
 			"sites": [
-				"macos/ui/menu/builder.lua:452 separator",
-				"macos/ui/menu/builder.lua:876 separator",
+				"macos/menu/ui/builder/builder.lua:452 separator",
+				"macos/menu/ui/builder/builder.lua:876 separator",
 				"macos/ui/menu/menu_gestures.lua:205 static",
 				"macos/ui/menu/menu_gestures.lua:257 static",
 				"macos/ui/menu/menu_hotstrings.lua:297 static",
@@ -201,14 +201,14 @@
 				"windows/core/i18n/engine/locale.ahk",
 				"windows/core/logger/engine/logger.ahk",
 				"windows/infra/magic_editor.ahk",
-				"windows/infra/manifest_descriptions.ahk",
-				"windows/infra/manifest_reader.ahk",
+				"windows/menu/engine/manifest_descriptions.ahk",
+				"windows/menu/engine/manifest_reader.ahk",
 				"windows/core/lifecycle/engine/master_gates.ahk",
-				"windows/infra/menu_command_origin.ahk",
-				"windows/infra/menu_helpers.ahk",
-				"windows/infra/menu_manifest.ahk",
-				"windows/infra/menu_population.ahk",
-				"windows/infra/menu_startup_commands.ahk",
+				"windows/menu/engine/command_origin.ahk",
+				"windows/menu/engine/helpers.ahk",
+				"windows/menu/engine/manifest.ahk",
+				"windows/menu/engine/population.ahk",
+				"windows/menu/engine/startup_commands.ahk",
 				"windows/infra/metrics/metrics_filters.ahk",
 				"windows/infra/metrics/metrics_shortcuts.ahk",
 				"windows/core/ui/engine/native_dialogs.ahk",
@@ -440,11 +440,11 @@
 				"windows/ui/layer_editor/init.ahk",
 				"windows/ui/layout_manager/init.ahk",
 				"windows/ui/log_openers.ahk",
-				"windows/ui/menu/menu_actions.ahk",
+				"windows/menu/ui/builder/actions.ahk",
 				"windows/ui/menu/menu_gestures.ahk",
 				"windows/ui/menu/menu_hotstring_switches.ahk",
 				"windows/ui/menu/menu_hotstrings.ahk",
-				"windows/ui/menu/menu_init.ahk",
+				"windows/menu/ui/builder/menu_init.ahk",
 				"windows/ui/menu/menu_layout.ahk",
 				"windows/ui/menu/menu_llm/_index.ahk",
 				"windows/ui/menu/menu_llm/actions.ahk",
@@ -467,7 +467,7 @@
 				"windows/ui/menu/menu_metrics.ahk",
 				"windows/ui/menu/menu_metrics_actions.ahk",
 				"windows/ui/menu/menu_shortcuts.ahk",
-				"windows/ui/menu/menu_submenus.ahk",
+				"windows/menu/ui/builder/submenus.ahk",
 				"windows/ui/menu/menu_taphold.ahk",
 				"windows/ui/model_browser/init.ahk",
 				"windows/ui/onboarding/answers.ahk",
@@ -492,7 +492,7 @@
 				"windows/core/ui/ui/tooltip/position_receipt.ahk",
 				"windows/core/ui/ui/tooltip/position_refinement.ahk",
 				"windows/core/ui/ui/tooltip/tooltip_llm.ahk",
-				"windows/ui/tray_menu.ahk",
+				"windows/menu/ui/tray_menu.ahk",
 				"windows/ui/update_check/init.ahk",
 				"windows/ui/wpm/init.ahk",
 				"windows/ui/wpm/wpm_config.ahk",
@@ -539,18 +539,18 @@
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_init.ahk",
+					"path": "windows/menu/ui/builder/menu_init.ahk",
 					"sourceSha256": "4abbdb94abdbed56d64b53d0a4609381d046158bcf33a1504e9f43009ff26f6d",
 					"lines": [
 						{
 							"line": 48,
 							"source": "\tMenuRenderer_AppendTemplate(ShortcutsMenu, \"personal_shortcuts_frame\", Map(), Map(),",
-							"expectedSite": "windows/ui/menu/menu_init.ahk:48 append"
+							"expectedSite": "windows/menu/ui/builder/menu_init.ahk:48 append"
 						},
 						{
 							"line": 67,
 							"source": "\t\t\tA_TrayMenu.Add(t(\"menu.global.language\"), StagedMenu)",
-							"expectedSite": "windows/ui/menu/menu_init.ahk:67 add"
+							"expectedSite": "windows/menu/ui/builder/menu_init.ahk:67 add"
 						}
 					]
 				},
@@ -664,23 +664,23 @@
 					]
 				},
 				{
-					"path": "windows/ui/menu/menu_submenus.ahk",
+					"path": "windows/menu/ui/builder/submenus.ahk",
 					"sourceSha256": "b0dee4a66d91987b20da3a71ef3ff8ca7d601c2a4fc40dc2aaeea9018b70bd36",
 					"lines": [
 						{
 							"line": 62,
 							"source": "\t\t\t\t\t\t\tRows.Push(Map(\"separator\", true))",
-							"expectedSite": "windows/ui/menu/menu_submenus.ahk:62 separator"
+							"expectedSite": "windows/menu/ui/builder/submenus.ahk:62 separator"
 						},
 						{
 							"line": 170,
 							"source": "\t\tItems.Push(Map(\"separator\", true))",
-							"expectedSite": "windows/ui/menu/menu_submenus.ahk:170 separator"
+							"expectedSite": "windows/menu/ui/builder/submenus.ahk:170 separator"
 						},
 						{
 							"line": 209,
 							"source": "\t\t\tRows.Push(Map(\"separator\", true))",
-							"expectedSite": "windows/ui/menu/menu_submenus.ahk:209 separator"
+							"expectedSite": "windows/menu/ui/builder/submenus.ahk:209 separator"
 						}
 					]
 				}
@@ -688,16 +688,16 @@
 		},
 		"macos": {
 			"sourceFiles": [
-				"macos/ui/menu/base_delay_transaction.lua",
-				"macos/ui/menu/builder.lua",
-				"macos/ui/menu/canvas_badge.lua",
+				"macos/menu/ui/keyboard/base_delay_transaction.lua",
+				"macos/menu/ui/builder/builder.lua",
+				"macos/menu/ui/builder/canvas_badge.lua",
 				"macos/ui/menu/gesture_scope.lua",
-				"macos/ui/menu/global_actions_transaction.lua",
-				"macos/ui/menu/global_scope.lua",
+				"macos/menu/ui/transactions/global_actions_transaction.lua",
+				"macos/menu/ui/transactions/global_scope.lua",
 				"macos/ui/menu/hotstring_counter.lua",
 				"macos/ui/menu/hotstrings_scope.lua",
-				"macos/ui/menu/init.lua",
-				"macos/ui/menu/keymap_lifecycle.lua",
+				"macos/menu/ui/init.lua",
+				"macos/menu/ui/keyboard/keymap_lifecycle.lua",
 				"macos/ui/menu/llm_scope.lua",
 				"macos/ui/menu/magic_key_source_menu.lua",
 				"macos/ui/menu/menu_about.lua",
@@ -745,42 +745,42 @@
 				"macos/ui/menu/menu_metrics.lua",
 				"macos/settings/ui/menu/paths.lua",
 				"macos/ui/menu/menu_shortcuts.lua",
-				"macos/ui/menu/menu_state.lua",
+				"macos/menu/ui/builder/state.lua",
 				"macos/ui/menu/menu_tap_holds.lua",
 				"macos/ui/menu/menu_tap_keys.lua",
-				"macos/ui/menu/menu_utils.lua",
-				"macos/ui/menu/menu_watchers.lua",
+				"macos/menu/ui/builder/utils.lua",
+				"macos/menu/ui/builder/watchers.lua",
 				"macos/ui/menu/metrics_scope.lua",
 				"macos/settings/ui/menu/preferences_transaction.lua",
-				"macos/ui/menu/preview_transaction.lua",
-				"macos/ui/menu/program_parameter_transaction.lua",
+				"macos/menu/ui/transactions/preview_transaction.lua",
+				"macos/menu/ui/transactions/program_parameter_transaction.lua",
 				"macos/ui/menu/programmatic_hotstrings.lua",
 				"macos/ui/menu/quit_layout.lua",
-				"macos/ui/menu/recoverable_file_moves.lua",
+				"macos/menu/ui/transactions/recoverable_file_moves.lua",
 				"macos/ui/menu/remap_switch.lua",
 				"macos/settings/ui/menu/scoped_preferences.lua",
-				"macos/ui/menu/script_chords_transaction.lua",
-				"macos/ui/menu/session_demotions.lua",
+				"macos/menu/ui/transactions/script_chords_transaction.lua",
+				"macos/menu/ui/transactions/session_demotions.lua",
 				"macos/ui/menu/shortcut_utils.lua",
 				"macos/ui/menu/shortcuts_scope.lua",
 				"macos/ui/menu/start_at_login.lua",
-				"macos/ui/menu/uninstall.lua",
+				"macos/menu/ui/transactions/uninstall.lua",
 				"macos/settings/ui/menu/unused_keys_cleanup.lua"
 			],
 			"excerpts": [
 				{
-					"path": "macos/ui/menu/builder.lua",
+					"path": "macos/menu/ui/builder/builder.lua",
 					"sourceSha256": "3a108269abab0aa297a5783035812bb1a10f4b4c71f8a21c6200b13a47abb878",
 					"lines": [
 						{
 							"line": 452,
 							"source": "\t\titems[#items + 1] = { separator = true }",
-							"expectedSite": "macos/ui/menu/builder.lua:452 separator"
+							"expectedSite": "macos/menu/ui/builder/builder.lua:452 separator"
 						},
 						{
 							"line": 876,
 							"source": "\t\t\ttable.insert(items, { separator = true })",
-							"expectedSite": "macos/ui/menu/builder.lua:876 separator"
+							"expectedSite": "macos/menu/ui/builder/builder.lua:876 separator"
 						}
 					]
 				},
@@ -967,7 +967,7 @@
 				"linux/ui/menu/menu_builder.lua",
 				"linux/ui/menu/programmatic_hotstrings.lua",
 				"linux/ui/menu/start_at_login.lua",
-				"linux/ui/menu/uninstall.lua",
+				"linux/menu/ui/transactions/uninstall.lua",
 				"linux/settings/ui/menu/unused_keys_cleanup.lua"
 			],
 			"excerpts": [

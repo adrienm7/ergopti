@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Reloads the tray root's section modules whenever the root itself reloads.
 ---
---- ui/menu/builder.lua binds each section builder from its own module
+--- menu/ui/builder/builder.lua binds each section builder from its own module
 --- (ui/menu/menu_<section>.lua) when it loads, and each module captures its
 --- dependencies at its own load. Tests swap a dependency, reload the root and
 --- expect it to render with the swap; a section module still cached from an
@@ -24,9 +24,9 @@
 
 local M = {}
 
-local ROOT = "ui.menu.builder"
+local ROOT = "menu.ui.builder.builder"
 -- Modules every section imports that the root does not bind as a section.
-local SHARED_PARTS = { "ui.menu.menu_dialogs" }
+local SHARED_PARTS = { "menu.ui.builder.dialogs" }
 
 local _installed = false
 

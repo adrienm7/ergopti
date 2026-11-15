@@ -76,7 +76,7 @@ helpers.describe("Linux keyboard group scope", function()
 
 	helpers.it("each bindable group of the tray opens with its restore and clear, which ask nothing", function()
 		with_scope(function(_, _, controls, path)
-			local renderer = require("infra.manifest_menu")
+			local renderer = require("menu.engine.manifest_menu")
 			local root = renderer.get_root()
 			local top, execute = root.top_level, os.execute
 			local questions, changed = 0, 0
@@ -98,7 +98,7 @@ helpers.describe("Linux keyboard group scope", function()
 				end
 				local i18n = require("core.i18n.engine.i18n")
 				local function groups()
-					local menu = require("ui.menu.builder").build({ shortcuts = require("modules.shortcuts.manager"),
+					local menu = require("menu.ui.builder.builder").build({ shortcuts = require("modules.shortcuts.manager"),
 						paused = false, is_paused = function() return controls.paused end,
 						on_menu_changed = function() changed = changed + 1 end })
 					local found = {}

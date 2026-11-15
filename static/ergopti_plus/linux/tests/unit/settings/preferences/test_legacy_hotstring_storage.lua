@@ -80,7 +80,7 @@ end
 
 -- A legacy preview choice the import must carry: the opposite of the neutral
 -- manifest default, since a neutral value is stored as absence.
-local AI_PREVIEW_CHOICE = not require("infra.manifest_reader").default_for("hotstrings.preview_ai_enabled")
+local AI_PREVIEW_CHOICE = not require("menu.engine.manifest_reader").default_for("hotstrings.preview_ai_enabled")
 
 local MAINTAINER = {
 	["hotstrings.disabled_categories"] = "+autocorrection.caps,+rolls.hc,rolls,+french_autocorrection.accents,"

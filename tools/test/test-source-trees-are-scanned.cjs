@@ -5,14 +5,14 @@
  * MODULE: Source-Tree Scan Coverage Gate
  * DESCRIPTION:
  * Twenty meta-tests and tools enumerate a driver's source by a HARDCODED list of
- * top-level folders — `{ "adapters", "infra", "modules", "ui", "core", "platform", "settings" }` and its
+ * top-level folders — `{ "adapters", "infra", "modules", "ui", "core", "platform", "settings", "menu" }` and its
  * variants. Adding a new top-level tree makes every one of them quietly stop
  * covering it.
  *
  * This is not hypothetical. Extracting platform/ on 2026-08-02 moved 19 Windows
  * files out of modules/ and infra/, and the AHK suite went from 3626 tests to
  * 3607 with ZERO failures: test_ahk_brace_balance registers one case per file
- * under ["infra", "modules", "ui", "core", "platform", "settings"], so nineteen cases simply stopped existing.
+ * under ["infra", "modules", "ui", "core", "platform", "settings", "menu"], so nineteen cases simply stopped existing.
  * Nothing reported it. The suite's own floor ("at least one file checked") could
  * not fire, because the other three trees still had files.
  *
@@ -46,7 +46,16 @@ const REQUIRED_DRIVERS = ['linux', 'macos', 'windows'];
 // `data`, `_generated`, `tests`, `vendor`, `build`, `docs` and install helpers are deliberately
 // NOT here: they are not hand-written driver source and the scanners that care
 // about them say so. Per-driver native/toolchain trees have their own gates.
-const CANONICAL_TREES = ['adapters', 'infra', 'modules', 'platform', 'ui', 'core', 'settings'];
+const CANONICAL_TREES = [
+	'adapters',
+	'infra',
+	'modules',
+	'platform',
+	'ui',
+	'core',
+	'settings',
+	'menu'
+];
 
 // Folders that legitimately sit beside the canonical trees. `apps`, `launcher`,
 // `bin` and `native` hold code in another language/toolchain entirely
@@ -108,7 +117,7 @@ const tracked = trackedPaths
 // is carved out of modules/ and infra/, so a list naming either of those and
 // not platform/ has a hole created by that migration, whatever it meant to
 // cover. That is the exact shape that silently dropped 19 tests.
-const REQUIRES_PLATFORM = ['modules', 'infra', 'core', 'platform', 'settings'];
+const REQUIRES_PLATFORM = ['modules', 'infra', 'core', 'platform', 'settings', 'menu'];
 
 const incomplete = [];
 for (const rel of tracked) {

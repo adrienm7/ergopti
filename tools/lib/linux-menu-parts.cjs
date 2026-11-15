@@ -3,10 +3,10 @@
 /**
  * Follows the Linux tray root across its per-section modules.
  *
- * `linux/ui/menu/builder.lua` keeps the tray root and binds each section
+ * `linux/menu/ui/builder/builder.lua` keeps the tray root and binds each section
  * builder from its own module:
  *
- *     local _build_quit = require("ui.menu.menu_quit").build
+ *     local _build_quit = require("menu.ui.builder.quit").build
  *
  * The menu gates are single-source analysers: they prove a builder's wiring
  * by reading its body next to the root's imports and facade checks. This
@@ -26,10 +26,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { scriptTokens } = require('./script-source.cjs');
 
-const LINUX_MENU_ROOT = 'linux/ui/menu/builder.lua';
+const LINUX_MENU_ROOT = 'linux/menu/ui/builder/builder.lua';
 // The closed set of part modules, by module name. Each section's builder
 // binding is named after its module's last segment without menu_
-// (`_build_quit` for ui.menu.menu_quit). The parts once shared the prefix
+// (`_build_quit` for menu.ui.builder.quit). The parts once shared the prefix
 // ui.menu.menu_; the feature-first tree puts each in its feature's folder
 // (settings.ui.menu.configuration, menu.ui.builder.quit), so a name pattern
 // would silently drop every section a structure step moves. The names are Lua
@@ -41,21 +41,21 @@ const PART_MODULES = new Set([
 	'ui.menu.menu_apps',
 	'settings.ui.menu.configuration',
 	'ui.menu.menu_debug',
-	'ui.menu.menu_dialogs',
-	'ui.menu.menu_ergopti_studio',
+	'menu.ui.builder.dialogs',
+	'menu.ui.ergopti_studio',
 	'ui.menu.menu_gestures',
 	'ui.menu.menu_hotstrings',
 	'settings.ui.menu.language',
 	'ui.menu.menu_layouts',
 	'ui.menu.menu_llm',
 	'ui.menu.menu_metrics',
-	'ui.menu.menu_quit',
-	'ui.menu.menu_reload',
+	'menu.ui.builder.quit',
+	'menu.ui.builder.reload',
 	'ui.menu.menu_shortcuts',
 	'ui.menu.menu_tap_holds'
 ]);
 // The root's own module name, which it spells only in its LOG source.
-const ROOT_LOG = 'ui.menu.builder';
+const ROOT_LOG = 'menu.ui.builder.builder';
 
 /** Whether a module name is one of the part modules. */
 function isPartModule(moduleName) {

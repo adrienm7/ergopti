@@ -29,7 +29,7 @@
 local M = {}
 
 local Logger = require("core.logger.engine.shim")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local EvdevCodes = require("platform.input.evdev_codes")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")

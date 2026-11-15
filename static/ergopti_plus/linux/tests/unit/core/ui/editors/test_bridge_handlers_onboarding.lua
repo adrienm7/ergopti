@@ -79,7 +79,7 @@ helpers.describe("ui.bridge_handlers", function()
 				restarts = {}, notices = 0, errors = {} }
 			local state = {
 				layout = "qwerty",
-				manifest = helpers.load_module("infra.manifest_reader"),
+				manifest = helpers.load_module("menu.engine.manifest_reader"),
 				i18n = {
 					get_locale = function() return values.locale end,
 					list_locales = function() return { "en", "fr" } end,

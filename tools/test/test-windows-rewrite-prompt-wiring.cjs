@@ -665,7 +665,7 @@ check(
 	'a mail must only ever be displayed as a draft, never sent'
 );
 check(
-	read('ui/menu/menu_init.ahk').includes('"agent",           _MI_StageAgent') &&
+	read('menu/ui/builder/menu_init.ahk').includes('"agent",           _MI_StageAgent') &&
 		bodyOf(agentMenu, 'LLM_Agent_MenuBuild').includes('MenuRenderer_Build("agent_menu"'),
 	'the tray must build the top-level agent row from the manifest agent_menu'
 );

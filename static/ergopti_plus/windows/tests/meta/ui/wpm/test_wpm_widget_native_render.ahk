@@ -17,7 +17,7 @@
 ;   the widget, that whole-keyboard-freeze regression returns — this test makes
 ;   that loud.
 ;
-; SCOPE: source introspection of ui/wpm/ (init.ahk + wpm_widget.ahk) + ui/tray_menu.ahk
+; SCOPE: source introspection of ui/wpm/ (init.ahk + wpm_widget.ahk) + menu/ui/tray_menu.ahk
 ;   (neither is loaded by the headless run_all, so a code-level guard is the only
 ;   automated net available for them). ASCII-only per the suite convention.
 ; ==============================================================================
@@ -61,7 +61,7 @@ _MetaCheckWpmWidgetNativeRender() {
 		"wpm_widget.ahk must define the native GDI+ WPMWidget_DrawGraph renderer")
 
 	; The tray-menu graph toggle must not touch the removed WebView2 widget state.
-	TrayFile := WindowsDir . "\ui\tray_menu.ahk"
+	TrayFile := WindowsDir . "\menu\ui\tray_menu.ahk"
 	TrayBody := ""
 	try TrayBody := FileRead(TrayFile)
 	Assert(TrayBody != "", "tray_menu.ahk must be readable for the native-render guard")
@@ -114,7 +114,7 @@ Test("meta wpm widget: every frame retains complete GDI+ ownership",
 ; wpm-webview-temp-dir-leak: the WPM widget has no live WebView2 (GDI+ migration).
 _ATG_WpmWidgetHasNoLiveWebView2() {
 	; Scope the scan to ui/wpm (both init.ahk and the wpm_widget.ahk render layer
-	; after the F3 split) — NOT _DriverDirsConcat("ui", "settings/ui", "core/ui/ui", "core/network"): other ui/ files (changelog,
+	; after the F3 split) — NOT _DriverDirsConcat("ui", "menu/ui", "settings/ui", "core/ui/ui", "core/network"): other ui/ files (changelog,
 	; model browser, healthcheck) reference WebView2 in live code, so a whole-tree
 	; scan would false-trip this module-scoped "wpm widget has none" invariant.
 	Src := _StripFullLineComments(_DriverDirConcat("ui/wpm"))

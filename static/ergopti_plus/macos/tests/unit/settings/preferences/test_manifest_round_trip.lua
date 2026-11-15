@@ -92,7 +92,7 @@ end
 helpers.describe("every manifest setting survives config.toml load and save (preferences-manifest-round-trip)", function()
 	helpers.it("loads each value at its owner and saves it back unchanged", function()
 		helpers.with_fresh_modules({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system" }, function()
-			local manifest = require("infra.manifest_reader")
+			local manifest = require("menu.engine.manifest_reader")
 			local prefs_probe = helpers.load_with_stubs("settings.engine.preferences.preferences")
 
 			-- Every macOS setting with a scalar owner or inside an owned nested map

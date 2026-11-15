@@ -189,7 +189,7 @@ expect(
 );
 expect(
 	/"installed_build",\s*\(\)\s*=>\s*!Updater_IsLocalSource\(\)/.test(
-		ahkBody('ui/menu/menu_init.ahk', '_MI_BuildAboutMenu')
+		ahkBody('menu/ui/builder/menu_init.ahk', '_MI_BuildAboutMenu')
 	),
 	'the Windows About menu must answer installed_build from Updater_IsLocalSource'
 );
@@ -219,7 +219,7 @@ expect(
 	),
 	'the macOS About menu must answer installed_build from Updater.is_local_source'
 );
-const macUninstall = code('macos', 'ui/menu/uninstall.lua', luaComment);
+const macUninstall = code('macos', 'menu/ui/transactions/uninstall.lua', luaComment);
 expect(
 	macUninstall.indexOf('is_local_source()') >= 0 &&
 		macUninstall.indexOf('is_local_source()') < macUninstall.indexOf('block_alert'),
@@ -249,7 +249,7 @@ for (const file of sources('linux', '.lua')) {
 	);
 }
 for (const file of [
-	'ui/menu/uninstall.lua',
+	'menu/ui/transactions/uninstall.lua',
 	'ui/menu/menu_about.lua',
 	'ui/changelog/bridge.lua',
 	'ui/update_check/bridge.lua',

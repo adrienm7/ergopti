@@ -2,7 +2,7 @@
 
 --- Proves the scope is backed by existing macOS preference owners.
 local helpers = require("tests.helpers")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("settings.engine.preferences.preferences")
 
 helpers.describe("llm-scope-contract", function()

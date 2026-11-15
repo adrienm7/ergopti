@@ -28,7 +28,7 @@ local M = {}
 local TableUtil = require("core.text.engine.table_util")
 
 local Logger = require("core.logger.engine.shim")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Paths = require("settings.engine.paths")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")

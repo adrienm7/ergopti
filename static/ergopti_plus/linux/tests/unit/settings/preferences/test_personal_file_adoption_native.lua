@@ -76,8 +76,8 @@ local function with_native_menu(fixture_state, body)
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local changed, opened = 0, {}
 	local ok, detail = pcall(function()
-		package.loaded["ui.menu.builder"] = nil
-		local Builder = require("ui.menu.builder")
+		package.loaded["menu.ui.builder.builder"] = nil
+		local Builder = require("menu.ui.builder.builder")
 		local context = { config = fixture_state.config, _version = "9.9.9",
 			on_menu_changed = function() changed = changed + 1 end,
 			webview = { show = function(app) opened[#opened + 1] = app; return true end } }

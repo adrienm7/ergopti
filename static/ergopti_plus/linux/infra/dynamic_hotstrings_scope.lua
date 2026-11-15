@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local BulkScope = require("hotstrings.engine.bulk_scope")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")

@@ -9,8 +9,8 @@ const keys = Object.freeze({
 	entry: 'windows/ErgoptiPlus.ahk',
 	bootstrap: 'windows/infra/tray_bootstrap.ahk',
 	adapter: 'windows/adapters/tray_menu.ahk',
-	dispatcher: 'windows/infra/menu_dispatcher.ahk',
-	safe: 'windows/infra/menu_startup_commands.ahk'
+	dispatcher: 'windows/menu/engine/dispatcher.ahk',
+	safe: 'windows/menu/engine/startup_commands.ahk'
 });
 function tokensOf(source) {
 	const tokens = scriptTokens(source, '.ahk');
@@ -424,8 +424,8 @@ function nativeStartupRows(inputs, platform) {
 		!entry ||
 		!sourceInclude(bootstrap, '../../_shared/menu/data/startup_tray_projection.ahk') ||
 		!sourceInclude(sources[keys.entry], 'adapters/tray_menu.ahk') ||
-		!sourceInclude(sources[keys.entry], 'infra/menu_dispatcher.ahk') ||
-		!sourceInclude(dispatcher, 'menu_startup_commands.ahk') ||
+		!sourceInclude(sources[keys.entry], 'menu/engine/dispatcher.ahk') ||
+		!sourceInclude(dispatcher, 'startup_commands.ahk') ||
 		matches(entry, coldEntry, 0).length !== 1 ||
 		matches(entry, '_InstallSafeBootstrapTray()', 0).length !== 1 ||
 		matches(entry, '_InstallNativeStartupTray(ObjBindMethod(_TrayStartupCommands, "Request"))', 0)

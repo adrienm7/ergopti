@@ -15,7 +15,7 @@ local OWNERS = {
 	"core.text.engine.number_policy",
 	"core.text.engine.toml_codec.source_open",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"settings.engine.paths",
 	"core.ui.engine.dialog_util",
 	"core.lifecycle.engine.shutdown.teardown_transaction",

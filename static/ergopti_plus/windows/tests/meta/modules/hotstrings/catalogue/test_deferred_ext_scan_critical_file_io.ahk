@@ -19,7 +19,7 @@
 ; _HS_Extensions no longer does Loop Files / FileRead(ManifestPath), so a
 ; regression that moves the I/O back under Critical fails CI.
 ;
-; SCOPE: source introspection of ErgoptiPlus.ahk and ui/tray_menu.ahk.
+; SCOPE: source introspection of ErgoptiPlus.ahk and menu/ui/tray_menu.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

@@ -8,7 +8,7 @@ Windows** under plain Lua 5.4 — no external dependencies required.
 
 The tree mirrors the driver source: a test of `modules/keymap/…` lives in
 `tests/unit/modules/keymap/<stage>/`, a test of `ui/menu/…` in
-`tests/unit/ui/menu/<submenu>/`.
+`tests/unit/<submenu>/`.
 
 ```
 tests/

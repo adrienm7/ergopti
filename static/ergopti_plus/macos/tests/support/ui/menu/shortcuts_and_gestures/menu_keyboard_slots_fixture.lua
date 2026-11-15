@@ -15,8 +15,8 @@ local MODULES = {
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
-	"tests.support.keyboard_config_fixture", "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
-	"settings.ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction",
+	"tests.support.keyboard_config_fixture", "menu.engine.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
+	"settings.ui.menu.preferences_transaction", "menu.ui.transactions.program_parameter_transaction", "menu.ui.transactions.global_actions_transaction",
 }
 
 --- Owns the real facade and its canonical persistence boundary for one UI case.

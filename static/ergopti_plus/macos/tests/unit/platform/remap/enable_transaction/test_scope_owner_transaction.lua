@@ -38,7 +38,7 @@ helpers.describe("remap scope transaction", function()
 			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save may only replace the backed-up bytes")
 			local saved = calls.saved_payloads[1]
-			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))
+			helpers.assert_eq(saved.tap_holds_enabled, require("menu.engine.manifest_reader").recommended_for("tap_holds.enabled"))
 			helpers.assert_eq(saved.tap_hold_config[KEY], { tap = "copy", hold = "shift" })
 			helpers.assert_eq(saved.mod_combos_config[COMBO].tap, "escape", "the chords belong to the shortcuts scope")
 			helpers.assert_eq(#settled, 0, "no success before the Karabiner terminal")

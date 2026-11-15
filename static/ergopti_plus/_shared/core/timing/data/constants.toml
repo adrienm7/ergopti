@@ -951,7 +951,7 @@ field_run_poll_ms = 1000
 
 # Hammerspoon reload debounce after a config file change, and the settle poll
 # while Git holds the tree.
-# HS: ui/menu/menu_watchers.lua DEBOUNCE_SEC.
+# HS: menu/ui/builder/watchers.lua DEBOUNCE_SEC.
 hs_reload_debounce_ms = 500
 
 # Onboarding / first-run wizard startup delay.
@@ -1006,7 +1006,7 @@ reload_deadline_ms = 12000
 editor_open_after_click_ms = 100
 
 # macOS: delay before Hammerspoon reloads after the paths editor changed a path.
-# HS: ui/menu/init.lua.
+# HS: menu/ui/init.lua.
 config_editor_reload_delay_ms = 250
 
 # macOS: delay after a webview finished navigating before queued JavaScript is
@@ -1209,7 +1209,7 @@ driver_reload_ms = 4000
 # events reach the taps late ([logger]'s main-thread hold count threshold,
 # core/logger/engine/logger.lua SLOW_TIMER_CALLBACK_COUNT_MS); measured p50 283 ms, so the
 # budget names a defect the log already shows.
-# HS: ui/menu/init.lua.
+# HS: menu/ui/init.lua.
 menu_rebuild_ms = 250
 
 # One request to a local AI server (Ollama, MLX, a local OpenAI-compatible

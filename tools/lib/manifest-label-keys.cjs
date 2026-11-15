@@ -5,7 +5,7 @@
  * MODULE: Manifest Label Candidate Keys
  * DESCRIPTION:
  * JavaScript port of `_MenuLabelCandidateKeys` in
- * `static/ergopti_plus/windows/infra/manifest_descriptions.ahk`: the ordered
+ * `static/ergopti_plus/windows/menu/engine/manifest_descriptions.ahk`: the ordered
  * locale keys a manifest entry's label is looked up under. The locale files
  * store many feature labels in a folded form (`layout.ergopti_base` ->
  * `layout.ergoptibase`), so a manifest `description_key` alone does not name

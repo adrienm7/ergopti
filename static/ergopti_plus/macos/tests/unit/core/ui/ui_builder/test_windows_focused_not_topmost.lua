@@ -310,7 +310,7 @@ end)
 local function load_error_dialog(view, app)
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
-		"core.i18n.engine.locale", "core.ui.ui.builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
+		"core.i18n.engine.locale", "core.ui.ui.builder", "core.events.timer_scheduler", "core.fs.adapters.storage", "menu.engine.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -347,7 +347,7 @@ local function load_error_dialog(view, app)
 		get = function(_, default) return default end,
 		set = function() return true end,
 	}
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 	}
 	package.loaded["ui.healthcheck.core"] = {

@@ -221,7 +221,7 @@ helpers.describe("healthcheck (linux): the features this driver lacks", function
 		local unavailable = helpers.load_module("ui.healthcheck.bridge").build_snapshot({
 			engine = {}, keystats = {}, config = {}, llm = {},
 		}, false).sections.unavailable
-		local explained, silent = require("infra.manifest_reader").coverage_gaps()
+		local explained, silent = require("menu.engine.manifest_reader").coverage_gaps()
 		helpers.assert_true(type(unavailable) == "table" and type(unavailable.items) == "table",
 			"the snapshot carries the section")
 		helpers.assert_eq(#unavailable.items, #explained + #silent, "every absence, explained or not")

@@ -19,7 +19,7 @@ local MODULES = {
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -89,7 +89,7 @@ local function with_subject(initial_action, scenario)
 	}
 	package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
 	-- Neutral manifest defaults acquire no extra native handles in this fixture.
-	package.loaded["infra.manifest_reader"] = nil
+	package.loaded["menu.engine.manifest_reader"] = nil
 	local logger = helpers.make_logger_stub()
 	logger.callback = function(_, _, fn, ...)
 		local ok, result = xpcall(fn, debug.traceback, ...)

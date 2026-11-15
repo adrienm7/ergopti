@@ -312,14 +312,10 @@ check(
 	'the Shortcuts submenu must open the group on the three drivers, its title ticked from the switch'
 );
 for (const [driver, file, builder] of [
-	[
-		'macOS',
-		['macos', 'ui', 'menu', 'menu_shortcuts.lua'],
-		/\["script_control"\] = script_control_group/
-	],
-	['Linux', ['linux', 'ui', 'menu', 'builder.lua'], /group_builders\["script_control"\] = function/]
+	['macOS', 'macos/ui/menu/menu_shortcuts.lua', /\["script_control"\] = script_control_group/],
+	['Linux', 'linux/menu/ui/builder/builder.lua', /group_builders\["script_control"\] = function/]
 ]) {
-	const source = read(...file);
+	const source = read(file);
 	check(builder.test(source), `${driver} must build the script_control group`);
 	for (const command of ['script_control_toggle', 'scope_restore', 'scope_clear']) {
 		check(
@@ -337,10 +333,10 @@ for (const [driver, file, builder] of [
 	);
 }
 check(
-	!/dyn_script_control/.test(read('macos', 'ui', 'menu', 'menu_shortcuts.lua')),
+	!/dyn_script_control/.test(read('macos/ui/menu/menu_shortcuts.lua')),
 	"macOS's dead script-control provider must be gone"
 );
-const menuShortcuts = read('windows', 'ui', 'menu', 'menu_shortcuts.ahk');
+const menuShortcuts = read('windows/ui/menu/menu_shortcuts.ahk');
 check(
 	/"script_control",\s*\(\) => _SC_ScriptControlSubmenu\(\)/.test(menuShortcuts) &&
 		/MenuRenderer_Build\("script_control_group"/.test(menuShortcuts),

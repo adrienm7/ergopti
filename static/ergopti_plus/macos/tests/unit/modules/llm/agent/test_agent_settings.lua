@@ -64,7 +64,7 @@ helpers.describe("AI agent settings (macOS)", function()
 	end)
 
 	helpers.it("pushes the loaded settings into the keymap bridge at boot", function()
-		local menu_state = helpers.load_with_stubs("ui.menu.menu_state")
+		local menu_state = helpers.load_with_stubs("menu.ui.builder.state")
 		local pushed = {}
 		local keymap = setmetatable({
 			set_llm_model = function() return true end,

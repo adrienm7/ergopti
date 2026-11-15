@@ -293,7 +293,7 @@ Test("HSE star prefix retains candidate eligibility across group toggles (star-p
 ; Each hotstring loaded for a TOML section must land in its own
 ; "<category>.<section>" HSE group so HSE_EnableGroup / HSE_DisableGroup can
 ; toggle the section live (no Reload). These tests pin that contract — the
-; reload-free tray toggles in ui/tray_menu.ahk depend on it.
+; reload-free tray toggles in menu/ui/tray_menu.ahk depend on it.
 
 TestHSE_GroupDerivedFromObjectMeta() {
     HSE_TestReset()

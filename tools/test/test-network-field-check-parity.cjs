@@ -113,11 +113,11 @@ check('each driver routes the row to its check', () => {
 		/field_check_network = \{ check = "network"/
 	);
 	assert.match(
-		read('windows', 'ui', 'menu', 'menu_init.ahk'),
+		read('windows', 'menu', 'ui', 'builder', 'menu_init.ahk'),
 		/MenuCommand\.FIELD_CHECK_NETWORK, NetworkCheck_Command/
 	);
 	assert.match(
-		read('linux', 'ui', 'menu', 'builder.lua'),
+		read('linux', 'menu', 'ui', 'builder', 'builder.lua'),
 		/\[COMMAND\.FIELD_CHECK_NETWORK\] = function\(\) require\("ui\.field_check\.network_check"\)\.run\(\) end/
 	);
 });

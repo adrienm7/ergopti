@@ -116,7 +116,7 @@ for (const file of fs.readdirSync(localesDir).filter((name) => name.endsWith('.j
 const lua = fs.readFileSync(shared('menu/engine/renderer.lua'), 'utf8');
 assert.match(lua, /apply_category_off\(finished, roles, off_reason_key\)/);
 const windows = 'static/ergopti_plus/windows/';
-const ahk = fs.readFileSync(path.join(ROOT, windows, 'infra/manifest_menu.ahk'), 'utf8');
+const ahk = fs.readFileSync(path.join(ROOT, windows, 'menu/engine/manifest_menu.ahk'), 'utf8');
 assert.match(ahk, /_MR_ApplyCategoryOff\(Result, OffRule\)/);
 const keystats = fs.readFileSync(
 	path.join(ROOT, windows, 'modules/keystats/keystats_ui.ahk'),

@@ -30,7 +30,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("core.logger.engine.logger")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "layout"

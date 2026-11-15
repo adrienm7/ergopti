@@ -48,9 +48,9 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		return false;
 	if (!Object.entries(declaration).every(([key, rows]) => isDeepStrictEqual(manifest[key], rows)))
 		return false;
-	const init = sources?.['macos/ui/menu/init.lua'];
-	const builder = sources?.['macos/ui/menu/builder.lua'];
-	const badge = sources?.['macos/ui/menu/canvas_badge.lua'];
+	const init = sources?.['macos/menu/ui/init.lua'];
+	const builder = sources?.['macos/menu/ui/builder/builder.lua'];
+	const badge = sources?.['macos/menu/ui/builder/canvas_badge.lua'];
 	if (![init, builder, badge].every((source) => typeof source === 'string' && source.length > 0))
 		return false;
 
@@ -317,13 +317,13 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 	)
 		return false;
 	if (
-		!imported(init, 'Builder', 'ui.menu.builder', start) ||
+		!imported(init, 'Builder', 'menu.ui.builder.builder', start) ||
 		!imported(init, 'TrayMenu', 'adapters.tray_menu', publish) ||
 		!imported(init, 'TrayMenu', 'adapters.tray_menu', start) ||
-		!imported(builder, 'CanvasBadge', 'ui.menu.canvas_badge', generate) ||
-		!imported(builder, 'ManifestMenu', 'infra.manifest_menu', generate) ||
-		!imported(badge, 'ManifestMenu', 'infra.manifest_menu', prepend) ||
-		!imported(builder, 'ManifestMenu', 'infra.manifest_menu', loadRoot)
+		!imported(builder, 'CanvasBadge', 'menu.ui.builder.canvas_badge', generate) ||
+		!imported(builder, 'ManifestMenu', 'menu.engine.manifest_menu', generate) ||
+		!imported(badge, 'ManifestMenu', 'menu.engine.manifest_menu', prepend) ||
+		!imported(builder, 'ManifestMenu', 'menu.engine.manifest_menu', loadRoot)
 	)
 		return false;
 	if (

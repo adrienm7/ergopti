@@ -40,8 +40,8 @@ local function fixture(body, options)
 		"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.utils",
 		"modules.llm.prediction_engine", "modules.llm.warmup_controller", "modules.llm.streaming_handler",
 		"modules.keymap.terminators", "modules.keymap.terminator_replay", "ui.hotstring_editor",
-		"settings.engine.preferences.preferences", "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom", "ui.menu.keymap_lifecycle",
-		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.hotstrings_config_window",
+		"settings.engine.preferences.preferences", "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom", "menu.ui.keyboard.keymap_lifecycle",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.manifest_menu", "ui.hotstrings_config_window",
 	}, function()
 		local root = os.tmpname(); os.remove(root); assert(lfs.mkdir(root))
 		local primary, alpha, beta = root .. "/personal_hotstrings.toml", root .. "/alpha.toml", root .. "/beta.toml"
@@ -235,7 +235,7 @@ end
 --- mutations still traverse the real controller, registry and conditional writer.
 local function personal_menu(f)
 	package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = nil, nil, nil
-	package.loaded["infra.manifest_menu"], package.loaded["ui.menu.menu_hotstrings_custom"] = nil, nil
+	package.loaded["menu.engine.manifest_menu"], package.loaded["ui.menu.menu_hotstrings_custom"] = nil, nil
 	local i18n = require("core.i18n.engine.i18n"); i18n.init()
 	local locale = require("core.i18n.engine.locale"); locale.set_locale("en")
 	local projected = f.Preferences.project_hotstring_preferences(f.saved, f.Registry.list_groups(), f.Registry.get_sections)
@@ -255,7 +255,7 @@ local function personal_menu(f)
 		observations.edits = observations.edits + 1; return true
 	end }
 	local Custom = require("ui.menu.menu_hotstrings_custom")
-	local Manifest = require("infra.manifest_menu")
+	local Manifest = require("menu.engine.manifest_menu")
 	local function find(rows, predicate)
 		for _, row in ipairs(rows or {}) do
 			if predicate(row) then return row end

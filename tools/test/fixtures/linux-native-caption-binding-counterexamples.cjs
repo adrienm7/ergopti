@@ -13,7 +13,7 @@ const { verifyQuitSplit } = require('../lib/linux-menu-split.cjs');
  * @param menuSources the tray root and its split modules as they are on disk
  */
 module.exports = function (sources, manifest, menuSources) {
-	const file = 'linux/ui/menu/builder.lua',
+	const file = 'linux/menu/ui/builder/builder.lua',
 		source = sources[file];
 	const composed = composeLinuxMenuRoot(menuSources);
 	assert.equal(composed.ok, true, 'the tray root composes: ' + composed.reason);
@@ -50,7 +50,7 @@ module.exports = function (sources, manifest, menuSources) {
 			name + ': restoring the real app identity owner restores the route'
 		);
 	}
-	const imported = 'local NativePresentation = require("infra.native_presentation")';
+	const imported = 'local NativePresentation = require("menu.engine.native_presentation")';
 	const captured =
 		'local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title';
 	const cases = [
@@ -279,7 +279,7 @@ module.exports = function (sources, manifest, menuSources) {
 			'removal capture cannot precede the genuine package-table local'
 		),
 		movedAfterCaptures(
-			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\nif not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end\n',
+			'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")\nif not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end\n',
 			'removal capture cannot precede the genuine facade import and boot guard'
 		)
 	);

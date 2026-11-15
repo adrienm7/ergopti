@@ -206,7 +206,7 @@ helpers.describe("hotstrings config: sections are opt-in", function()
 		for _, operation in ipairs(operations) do
 			helpers.assert_not_nil(index.entries[operation.path], "the Linux wizard asks for " .. operation.path)
 		end
-		local rows = assert(Answers.rows(index, operations, require("infra.manifest_reader")))
+		local rows = assert(Answers.rows(index, operations, require("menu.engine.manifest_reader")))
 		local lines = {}
 		for _, row in ipairs(rows) do
 			helpers.assert_nil(row.delete, "an opt-in answer is an explicit value")

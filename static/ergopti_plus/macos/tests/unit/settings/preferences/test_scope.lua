@@ -115,7 +115,7 @@ helpers.describe("macOS scoped preference table owner", function()
 	helpers.it("the shared preparation port requires a terminal result and an exact valid candidate", function()
 		for _, result in ipairs({ "accepted", true }) do
 			local _, files, writes, runtime, _, original, _, _, options = fixture()
-			options.manifest = require("infra.manifest_reader")
+			options.manifest = require("menu.engine.manifest_reader")
 			local candidate = result == true and "[invalid" or '[gestures]\nfuture = "preserve"\n'
 			options.prepare_batch = function() return result, nil, candidate, { status = "ok", content = original } end
 			local owner = require("settings.engine.scope.transaction").new(options)

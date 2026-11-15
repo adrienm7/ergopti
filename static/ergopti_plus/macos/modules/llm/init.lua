@@ -143,7 +143,7 @@ local function load_shared_defaults()
 
 	-- Whether the prompt profile follows the selected model: the manifest's
 	-- default, as on Windows and Linux (llm.profiles.auto_profile_for_model).
-	merged.llm_auto_profile_for_model = require("infra.manifest_reader").default_for(
+	merged.llm_auto_profile_for_model = require("menu.engine.manifest_reader").default_for(
 		ConfigKeys.KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL)
 	if type(merged.llm_auto_profile_for_model) ~= "boolean" then
 		error("ergopti_plus: the manifest declares no boolean default for llm.profiles.auto_profile_for_model")
@@ -151,7 +151,7 @@ local function load_shared_defaults()
 
 	-- Whether a finished prediction is typed instead of offered: the manifest's
 	-- default, as on Windows and Linux (llm.trigger.inline_autotype).
-	merged.llm_inline_autotype = require("infra.manifest_reader").default_for(
+	merged.llm_inline_autotype = require("menu.engine.manifest_reader").default_for(
 		ConfigKeys.KEY.LLM_TRIGGER_INLINE_AUTOTYPE)
 	if type(merged.llm_inline_autotype) ~= "boolean" then
 		error("ergopti_plus: the manifest declares no boolean default for llm.trigger.inline_autotype")

@@ -38,7 +38,7 @@ local function registry()
 	return decoded
 end
 
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
 	entry = Manifest.find_entry_by_path(PATH),
 	registry = registry(),

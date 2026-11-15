@@ -92,7 +92,7 @@ helpers.describe("number row preferences", function()
 		local Settings = require("layouts.engine.emulation.settings")
 		local reported = {}
 		local settings = Settings.resolve({ layout = { ergopti_variant = "Ergopti_Plus", direct_access_digits = "DIGITS" } },
-			require("infra.manifest_reader").default_for, function(segments) reported[#reported + 1] = table.concat(segments, ".") end)
+			require("menu.engine.manifest_reader").default_for, function(segments) reported[#reported + 1] = table.concat(segments, ".") end)
 		helpers.assert_eq(reported, {}, "a case variant is not outdated")
 		helpers.assert_eq(settings.id, "ergopti_plus")
 		helpers.assert_eq(settings.number_row, "digits")

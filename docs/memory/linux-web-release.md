@@ -360,16 +360,16 @@ grouping, in `--no-grab` mode) needs a real-machine check.
 ### project-linux-the-menu-builder-is-pinned-token-by-token
 
 `tools/lib/menu-native-llm-parent-binding.cjs` and the language-owner binding
-read `ui/menu/builder.lua` token by token. A new top-level `local` (an
+read `menu/ui/builder/builder.lua` token by token. A new top-level `local` (an
 import, a helper table, a function) in that file turns `test-menu-parity` and
 `test-hotstring-category-submenu-order` red. Put helpers in their own module and
 call them with an inline `require(...)` at the call site, as
-`ui/menu/feature_notice.lua` is. Check fast with
+`menu/ui/builder/feature_notice.lua` is. Check fast with
 `declaredLinuxTopLevelPublication(source)` instead of the four-minute suite.
 
 ### project-linux-e2e-tray-clicks-need-the-idle-pump
 
-A committed menu row asks `ui/menu/rebuild_owner.lua` for a redraw; the tray
+A committed menu row asks `menu/ui/builder/rebuild_owner.lua` for a redraw; the tray
 publishes the new tree only on the event loop's idle tick, and a click on a
 stale tree is held, not run. An E2E that clicks rows must click the tree the
 tray was handed (the appindicator stub's `set_menu`), then run `loop.onIdle()`

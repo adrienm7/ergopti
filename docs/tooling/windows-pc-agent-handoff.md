@@ -269,8 +269,8 @@ downloaded again`). Ollama deletes that layer before it reports the
 - Menu rebuild budget on Windows: macOS and Linux now write
   `Menu tree rebuilt in N ms (M top-level item(s)).` on each tray rebuild and
   judge it against `[budgets] menu_rebuild_ms` through `perf_budget` (Linux
-  `ui/menu/timed_build.lua`, `fix/linux-todo-final`). The Windows rebuild
-  (`ui/menu/menu_rebuild.ahk`) writes neither, so `field-log-analyse.py` judges
+  `menu/ui/builder/timed_build.lua`, `fix/linux-todo-final`). The Windows rebuild
+  (`menu/ui/builder/rebuild.ahk`) writes neither, so `field-log-analyse.py` judges
   no Windows menu rebuild: time it, write the same line and call
   `core/logger/engine/perf_budget.ahk` with `menu.rebuild`, with an AHK test that fails
   without the line.
@@ -479,29 +479,29 @@ ready (3 step(s)).` and `build/field-run/ready.json` names the driver's pid.
     System row has no `platforms` to save and restore);
   - unchanged but covering the edited code:
     `tests/unit/modules/llm/menu/test_llm_menu_build_submenu.ahk`,
-    `tests/unit/ui/menu/test_manifest_menu_parent_groups.ahk`,
+    `tests/unit/menu/test_manifest_menu_parent_groups.ahk`,
     `tests/unit/modules/llm/actions/test_llm_agent_system_menu.ahk`,
     `tests/unit/modules/llm/menu/test_llm_menu_test_prediction.ahk`,
     `tests/meta/modules/llm/menu/test_llm_menu_build_critical.ahk`,
     `tests/meta/modules/llm/menu/test_llm_menu_build_coordinator.ahk`,
     `tests/meta/modules/llm/menu/test_llm_menu_caller_child_full_root.ahk`,
-    `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk`;
+    `tests/unit/menu/test_manifest_menu_no_double_separator.ahk`;
   - then the full `run_all.ahk` and `e2e/run_e2e.ahk`, and open the AI submenu
     once: the model button, the profile submenu and both agent Systems must
     sit where they did, with the same labels.
-- Same branch, follow-ups also written without AutoHotkey: `infra/manifest_menu.ahk`
+- Same branch, follow-ups also written without AutoHotkey: `menu/engine/manifest_menu.ahk`
   lost its `dynamic` branch (a stale `dynamic` row is now an unknown type), and
   the tray menu moved to `_shared/menu/data/menu.toml`. Run:
-  - `tests/unit/ui/menu/test_manifest_menu_declarations_are_read.ahk` (edited:
+  - `tests/unit/menu/test_manifest_menu_declarations_are_read.ahk` (edited:
     a retired `dynamic` row is drawn as nothing and not dispatched);
-  - `tests/unit/ui/menu/test_manifest_menu_no_double_separator.ahk` (edited:
+  - `tests/unit/menu/test_manifest_menu_no_double_separator.ahk` (edited:
     action handlers only);
   - `tests/meta/modules/keystats/metrics/test_menu_metrics_disabled_when.ahk`
     (edited: reads `[[menu.metrics_menu]]` from `menu.toml`; `dynamic` is no
     longer a rendered type);
-  - `tests/meta/ui/menu/test_list_providers_touch_no_menu.ahk` (unchanged,
+  - `tests/meta/menu/test_list_providers_touch_no_menu.ahk` (unchanged,
     covers the renderer);
-  - `tests/unit/ui/menu/test_menu_row_order.ahk` (edited: the corpus keeps one
+  - `tests/unit/menu/test_row_order.ahk` (edited: the corpus keeps one
     list vector since the `llm_menu_rows` rule was retired);
   - then `run_all.ahk` again: every menu goes through the edited renderer.
 

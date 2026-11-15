@@ -107,7 +107,7 @@ return function(callback, options)
 		end }
 		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = accept }
 		package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = accept }
-		package.loaded["infra.manifest_menu"] = nil
+		package.loaded["menu.engine.manifest_menu"] = nil
 		local core = package.loaded["modules.llm"]
 		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
 		calls.profile_constructor_sync = {}

@@ -12,7 +12,7 @@ local modules = {
 	'modules.dynamic_hotstrings.personal_info', 'core.fs.adapters.file_system',
 	'core.logger.engine.logger', 'platform.input.synthetic_input', 'ui.personal_info_editor',
 	'modules.keystats',
-	'infra.manifest_reader', 'infra.personal_info_fields',
+	'menu.engine.manifest_reader', 'infra.personal_info_fields',
 }
 local function with_subject(content, run)
 	helpers.with_fresh_modules(modules, function()

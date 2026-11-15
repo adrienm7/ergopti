@@ -10,7 +10,7 @@
 
 local M = {}
 local Policy = require("menu.engine.programmable_hotstrings")
-local Manifest = require("infra.manifest_menu")
+local Manifest = require("menu.engine.manifest_menu")
 local Preferences = require("infra.hotstring_preferences")
 local Shell = require("core.process.adapters.shell_runner")
 local Prompt = require("core.ui.ui.text_prompt")
@@ -53,7 +53,7 @@ function M.build(ctx)
 		end,
 		refusal = function(message)
 			Logger.warn("programmable_hotstrings", "Typed activation delay refused.")
-			require("ui.menu.menu_dialogs").show_error(message, I18n.get("dialog.value_check.title"))
+			require("menu.ui.builder.dialogs").show_error(message, I18n.get("dialog.value_check.title"))
 		end,
 	})
 end

@@ -33,7 +33,7 @@ end
 local function tray_row(ctx)
 	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 	install_legacy_layout_formats()
-	local ManifestMenu = require("infra.manifest_menu")
+	local ManifestMenu = require("menu.engine.manifest_menu")
 	local item = layout.build(ctx)
 	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
 	return ManifestMenu.render_rows({ item }, "top_level")[1]
@@ -72,7 +72,7 @@ end
 
 
 local function with_switch_frame(callback, labels, configure)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
+	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "menu.engine.manifest_menu", "core.i18n.engine.i18n",
 		"core.ui.engine.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
@@ -100,8 +100,8 @@ local function with_switch_frame(callback, labels, configure)
 			if key == "menu.layout.resume_picker_caption" then return "  ↳ " .. original_get("menu.layout.layout_on_resume") .. " : %s" end
 			return original_get(key)
 		end
-		package.loaded["infra.manifest_menu"] = nil
-		local binding = require("infra.manifest_menu")
+		package.loaded["menu.engine.manifest_menu"] = nil
+		local binding = require("menu.engine.manifest_menu")
 		package.loaded["ui.menu.menu_keyboard_layout"] = nil
 		local module = require("ui.menu.menu_keyboard_layout")
 		local ctx = make_ctx()

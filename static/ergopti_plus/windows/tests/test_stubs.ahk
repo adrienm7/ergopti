@@ -228,7 +228,7 @@ global Features := Map(
             "code",           Map("enabled", true, "time_activation_seconds", 0.75),
         ),
     ),
-    ; ui/tray_menu.ahk's LLM tray populator now reads from this
+    ; menu/ui/tray_menu.ahk's LLM tray populator now reads from this
     ; nested map (instead of IniCacheGet) and flattens it back into the
     ; legacy _LlmSavedOpts shape that LLM_Menu_Init expects. Manifest
     ; defaults match production; tests don't fire the LLM menu but the

@@ -115,7 +115,7 @@ helpers.describe("canonical metrics preferences", function()
 			helpers.assert_eq(preferences.get("metrics.enabled"), true)
 			helpers.assert_eq(preferences.get("metrics.private_filter_enabled"), false)
 			helpers.assert_eq(preferences.get("metrics.wpm_widget_visible"),
-				require("infra.manifest_reader").default_for("metrics.wpm_widget_visible"))
+				require("menu.engine.manifest_reader").default_for("metrics.wpm_widget_visible"))
 			helpers.assert_eq(Sandbox.read_bytes(path), source)
 		end)
 	end)

@@ -681,7 +681,7 @@ helpers.describe("API menu metadata path", function()
 	helpers.it("builds before token resolution without starting any shell work", function()
 		local names = {
 			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel",
 			"menu.engine.renderer", "core.fs.adapters.json_codec",
 		}
 		local saved = {}
@@ -716,7 +716,7 @@ helpers.describe("API menu metadata path", function()
 			package.loaded["core.logger.engine.logger"] = { error = function() end }
 			package.loaded["core.ui.engine.dialog_util"] = {}
 			package.loaded["core.ui.engine.notifications"] = {}
-			package.loaded["infra.manifest_menu"] = {
+			package.loaded["menu.engine.manifest_menu"] = {
 				command_row = command_renderer.command_row,
 				template_rows = command_renderer.template_rows,
 				get_array = command_renderer.get_array,

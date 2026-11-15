@@ -13,11 +13,11 @@ local M = {}
 local Logger = require("core.logger.engine.shim")
 local ParentSource = require("menu.engine.frames.parent_source")
 local TextPrompt = require("core.ui.ui.text_prompt")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local show_error = require("ui.menu.menu_dialogs").show_error
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_metrics"
 

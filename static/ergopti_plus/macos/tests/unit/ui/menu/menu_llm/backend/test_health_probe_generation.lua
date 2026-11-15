@@ -38,14 +38,14 @@ local MODULES = {
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
 	"ui.menu.menu_llm.menu_layout",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 }
 
 local function build_fixture(callback, options)
 	return helpers.with_fresh_modules(MODULES, function()
-		local native_renderer = require("infra.manifest_menu")
+		local native_renderer = require("menu.engine.manifest_menu")
 		local noop = function() end
 		local accept = function() return true end
 		local updates = 0
@@ -247,7 +247,7 @@ local function build_fixture(callback, options)
 			i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
 			logger = package.loaded["core.logger.engine.logger"],
 		}))
-		package.loaded["infra.manifest_menu"] = {
+		package.loaded["menu.engine.manifest_menu"] = {
 			command_row = native_renderer.command_row,
 			group_row = presentation_renderer.group_row,
 			template_rows = presentation_renderer.template_rows,

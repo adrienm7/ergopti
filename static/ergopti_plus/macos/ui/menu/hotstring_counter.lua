@@ -7,7 +7,7 @@
 --- by scanning TOML section metadata from the keymap module.
 ---
 --- FEATURES & RATIONALE:
---- 1. Extracted from builder.lua to make the counting logic unit-testable.
+--- 1. Extracted from ../../menu/ui/builder/builder.lua to make the counting logic unit-testable.
 --- 2. Returns a single structured result consumed by the menu builder.
 --- 3. One source for every count: the sections the keymap registered. The
 ---    extension packs used to be counted from a second walk of the bundled
@@ -25,7 +25,7 @@ local Labels = require("menu.engine.labels")
 local Extensions = require("hotstrings.engine.extensions")
 
 --- Invalidates the hotstring count cache.
---- Preserved for API compatibility (called by save_prefs in init.lua). Every
+--- Preserved for API compatibility (called by save_prefs in ../../menu/ui/init.lua). Every
 --- count is read from the live keymap sections, so there is nothing to drop.
 function M.invalidate_cache()
 	-- Intentionally left empty: counts are recomputed from live sections.

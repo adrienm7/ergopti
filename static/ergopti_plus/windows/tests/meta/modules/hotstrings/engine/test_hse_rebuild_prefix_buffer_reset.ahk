@@ -24,7 +24,7 @@
 
 _HRPBR_RebuildResetsPrefixBuffer() {
 	Body := _DriverFuncBody("_RebuildHotstringsLiveOnce")
-	Assert(Body != "", "the serialized live-rebuild pass must exist in ui/menu/menu_rebuild.ahk")
+	Assert(Body != "", "the serialized live-rebuild pass must exist in menu/ui/builder/rebuild.ahk")
 	Assert(InStr(Body, "_PrefixInvalidateInputContext(0, false)") > 0,
 		"the yielded rebuild must atomically reset engine + preview with unknown left context")
 	Assert(InStr(Body, "HSE_HardReset") == 0 and InStr(Body, "_ResetPrefixBuffer") == 0,

@@ -14,7 +14,7 @@ local function with_frames(body, paused, mutate)
 		}))
 		local root = renderer.get_root()
 		if mutate then mutate(root) end
-		package.loaded["infra.manifest_menu"] = renderer
+		package.loaded["menu.engine.manifest_menu"] = renderer
 		local context = { paused = paused == true, config = {
 			-- Hotstrings on: an off category greys its submenu (category-off rule).
 			any_enabled = function() return true end,
@@ -25,7 +25,7 @@ local function with_frames(body, paused, mutate)
 			has_base_delay_override = function() return false end,
 		}, on_toggle_pause = function() end, on_quit = function() end }
 		context.is_paused = function() return context.paused end
-		local rows = helpers.load_module("ui.menu.builder").build(context)
+		local rows = helpers.load_module("menu.ui.builder.builder").build(context)
 		body(rows, i18n, context)
 	end)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end

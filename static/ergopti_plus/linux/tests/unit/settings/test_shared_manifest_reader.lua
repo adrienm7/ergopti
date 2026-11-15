@@ -4,7 +4,7 @@
 --- MODULE: Shared Manifest Reader Tests (Linux)
 --- DESCRIPTION:
 --- Pins the shared manifest reader (_shared/menu/engine/manifest_reader_core.lua) that
---- infra/manifest_reader.lua binds: a missing or malformed generated manifest
+--- menu/engine/manifest_reader.lua binds: a missing or malformed generated manifest
 --- raises, the platform hooks run before a value that includes their default
 --- and never for declaration metadata, the absences split by whether they say
 --- why, and the driver binding answers from the generated manifest.
@@ -82,7 +82,7 @@ helpers.describe("shared manifest reader (Linux)", function()
 	end)
 
 	helpers.it("binds the driver to the generated manifest", function()
-		local driver = require("infra.manifest_reader")
+		local driver = require("menu.engine.manifest_reader")
 		helpers.assert_true(#driver.features() > 0)
 		local entry = driver.features()[1]
 		helpers.assert_eq(driver.find_entry_by_path(entry.path), entry)

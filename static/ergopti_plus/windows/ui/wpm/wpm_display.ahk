@@ -14,7 +14,7 @@
 #Requires Autohotkey v2.0+
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
 
-#Include ../../infra/menu_row_order.ahk
+#Include ../../menu/engine/row_order.ahk
 
 
 

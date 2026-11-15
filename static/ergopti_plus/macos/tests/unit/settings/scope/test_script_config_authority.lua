@@ -10,6 +10,6 @@
 local helpers = require("tests.helpers")
 
 require("tests.lua.settings.script_config_authority_contract").run(helpers, {
-	platform = "hs", manifest = require("infra.manifest_reader"),
+	platform = "hs", manifest = require("menu.engine.manifest_reader"),
 	aliases = require("settings.engine.scope.script_scope").alias_names(), file_adapter = require("core.fs.adapters.file_system"),
 })

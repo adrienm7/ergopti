@@ -118,7 +118,7 @@ local function load_bridge(controls)
 				return applied
 			end,
 		},
-		["infra.manifest_reader"] = {
+		["menu.engine.manifest_reader"] = {
 			default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 		},
 		["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end },

@@ -118,7 +118,7 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 #Include ../../core/fs/adapters/file_system.ahk
 #Include ../../core/lifecycle/engine/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
-#Include ../../infra/manifest_reader.ahk
+#Include ../../menu/engine/manifest_reader.ahk
 #Include ../../modules/keymap/layout/layout_ergopti.ahk
 #Include ../../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../../_shared/settings/data/features/number_row_policy.ahk

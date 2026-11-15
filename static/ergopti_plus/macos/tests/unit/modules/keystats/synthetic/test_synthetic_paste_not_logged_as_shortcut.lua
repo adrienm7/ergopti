@@ -79,7 +79,7 @@ local function load_fixture()
 		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return nil end }
-	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
+	package.loaded["menu.engine.manifest_reader"] = { default_for = function() return true end }
 	package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end,
 		metrics_cache_dir = function() return "/tmp/metrics_cache" end }
 
@@ -156,7 +156,7 @@ local function load_fixture()
 				"adapters.event_provenance",
 				"platform.input.synthetic_input",
 				"modules.keymap",
-				"infra.manifest_reader",
+				"menu.engine.manifest_reader",
 				"settings.engine.paths",
 			}) do
 				package.loaded[name] = nil

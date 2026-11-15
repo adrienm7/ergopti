@@ -228,7 +228,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 		-- the whole point: before this, the manifest could not promise Linux this
 		-- row, and the restriction said no Lua driver had the concept while both
 		-- did.
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		helpers.assert_true(mb ~= nil)
 
 		local source = helpers.read_menu_source()
@@ -243,7 +243,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 	end)
 
 	helpers.it("keeps the rest of the tray when the shortcuts module is absent", function()
-		local mb = helpers.load_module("ui.menu.builder")
+		local mb = helpers.load_module("menu.ui.builder.builder")
 		local tree = mb.build({ _version = "9.9.9" })
 
 		-- Not "it did not throw": that would pass just as well if build returned an
@@ -345,7 +345,7 @@ helpers.describe("shortcuts menu: master publication receipt", function()
 	--- @return table row
 	local function master_row(sc, changed)
 		local key, declarations = nil, 0
-		for _, declaration in ipairs(require("infra.manifest_menu").get_array("shortcuts_menu")) do
+		for _, declaration in ipairs(require("menu.engine.manifest_menu").get_array("shortcuts_menu")) do
 			if declaration.id == "shortcuts_toggle" then key = declaration.i18n; declarations = declarations + 1 end
 		end
 		helpers.assert_eq(declarations, 1)
@@ -453,7 +453,7 @@ helpers.describe("shortcuts menu: current script chord publication", function()
 	--- @return function action
 	local function command(chords, changed)
 		local key, declared = nil, 0
-		for _, row in ipairs(require("infra.manifest_menu").get_array("script_control_group")) do
+		for _, row in ipairs(require("menu.engine.manifest_menu").get_array("script_control_group")) do
 			if row.id == "script_control_toggle" then key = row.i18n; declared = declared + 1 end
 		end
 		helpers.assert_eq(declared, 1)
@@ -665,7 +665,7 @@ end)
 
 helpers.describe("declared Shortcut wrap presentation source", function()
 	helpers.it("withdraws and repairs the actual wrap-parent source without a fixed fallback", function()
-		local renderer = require("infra.manifest_menu")
+		local renderer = require("menu.engine.manifest_menu")
 		local root = renderer.get_root()
 		local original = root.shortcut_wrap_frame
 		local label = require("core.i18n.engine.i18n").get("menu.shortcuts.wrap_symbols")
@@ -686,7 +686,7 @@ helpers.describe("declared Shortcut wrap presentation source", function()
 	end)
 
 	helpers.it("uses the declared live-wrap label and late source readiness before its unchanged native setter", function()
-		local renderer = require("infra.manifest_menu")
+		local renderer = require("menu.engine.manifest_menu")
 		local root = renderer.get_root()
 		local original = root.shortcut_wrap_live_control
 		local i18n = require("core.i18n.engine.i18n")

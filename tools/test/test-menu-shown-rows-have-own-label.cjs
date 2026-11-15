@@ -83,10 +83,10 @@ const LISTED_WITHOUT_A_LABEL = new Map([
 // A variable section argument: each site is read by hand and named here, so a
 // new one fails until someone says what it lists.
 const VARIABLE_LISTING_SITES = new Map([
-	['windows/ui/menu/menu_submenus.ahk', 'V2Section: the hotstring categories listed above'],
+	['windows/menu/ui/builder/submenus.ahk', 'V2Section: the hotstring categories listed above'],
 	['windows/ui/menu/menu_hotstrings.ahk', 'the hotstring categories listed above'],
 	['windows/ui/menu/menu_hotstring_switches.ahk', 'paths only: the « all sections » writers'],
-	['windows/infra/manifest_menu.ahk', 'a `group_label` row, of which the manifest has none']
+	['windows/menu/engine/manifest_menu.ahk', 'a `group_label` row, of which the manifest has none']
 ]);
 
 // Features allowed to carry a section's key. Each entry is a setting no menu

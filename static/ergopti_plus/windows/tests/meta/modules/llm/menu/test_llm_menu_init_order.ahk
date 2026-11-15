@@ -37,7 +37,7 @@
 
 _MetaCheckLlmTrayInitOrder() {
 	; Scope the check to the IA row's tray-root builder, the one initMenu
-	; dispatches the `llm` id to (ui/menu/menu_init.ahk), via the
+	; dispatches the `llm` id to (menu/ui/builder/menu_init.ahk), via the
 	; location-independent driver-source helper. The reset must come before the
 	; LLM_Menu_Init() call.
 	Body := _DriverFuncBody("_MI_StageLlm")

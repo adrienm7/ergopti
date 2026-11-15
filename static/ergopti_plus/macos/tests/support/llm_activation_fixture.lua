@@ -13,7 +13,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.ollama_enable_probe",
 	"ai.engine.settings.enable_admission_core",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
@@ -34,7 +34,7 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.startup_controller",
 	"ui.menu.menu_llm.trigger_orchestrator",
 	"ui.menu.menu_llm.menu_layout",
-	"infra.manifest_menu",
+	"menu.engine.manifest_menu",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer",
@@ -80,7 +80,7 @@ local LOCAL_SERVERS = {
 
 local function build_fixture(backend, save_results, options)
 	-- Bind the real shared row policy before the fixture installs its menu port.
-	local native_renderer = require("infra.manifest_menu")
+	local native_renderer = require("menu.engine.manifest_menu")
 	options = options or {}
 	local noop = function() end
 	local calls = {
@@ -437,7 +437,7 @@ local function build_fixture(backend, save_results, options)
 		i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
 		logger = package.loaded["core.logger.engine.logger"],
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		check_row = native_renderer.check_row,
 		group_row = presentation_renderer.group_row,
 		native_child_rows = native_renderer.native_child_rows,

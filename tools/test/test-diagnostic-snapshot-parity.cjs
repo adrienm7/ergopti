@@ -152,7 +152,7 @@ const linuxReady = daemon.indexOf('"Daemon ready (');
 const linuxEmit = daemon.indexOf('\temit_diagnostic_snapshot(boot_ms, opts,');
 if (linuxReady < 0 || linuxEmit < 0 || linuxEmit < linuxReady)
 	errors.push('Linux must emit the snapshot after its ready line');
-const menu = read('macos/ui/menu/init.lua');
+const menu = read('macos/menu/ui/init.lua');
 if (!menu.includes('DiagnosticSnapshot.emit_once('))
 	errors.push('macOS must emit the snapshot from the post-boot menu prime');
 

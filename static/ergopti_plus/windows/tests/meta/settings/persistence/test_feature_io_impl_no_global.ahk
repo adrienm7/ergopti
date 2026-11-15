@@ -83,7 +83,7 @@ _FIONG_NoBareCallShapesRemain() {
 	for _, FuncName in ["MenuRowFromManifest", "MenuRowWithLabel", "MenuAddLetterPicker",
 		"SetFeatureLetter", "SetFeatureLetterOff", "ToggleFeatureV2", "_HS_TryLiveToggleV2"] {
 		Body := _DriverFuncBody(FuncName)
-		Assert(Body != "", FuncName . " must exist in ui/menu/menu_engine.ahk")
+		Assert(Body != "", FuncName . " must exist in menu/ui/builder/engine.ahk")
 		Assert(InStr(Body, "global Features") > 0,
 			FuncName . " must declare 'global Features' itself so it can pass it explicitly to FeatureLocateV2/WriteFeatureV2/WriteFeatureBatchV2 (F43)")
 	}

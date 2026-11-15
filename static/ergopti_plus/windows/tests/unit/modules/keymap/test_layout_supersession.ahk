@@ -135,7 +135,7 @@ Test("layout supersession: MenuRowFromManifest greys and labels a superseded row
 
 _LSD_MenuWiringCase() {
 	Body := _DriverFuncBody("MenuRowFromManifest")
-	Assert(Body != "", "MenuRowFromManifest must exist in ui/menu/menu_engine.ahk")
+	Assert(Body != "", "MenuRowFromManifest must exist in menu/ui/builder/engine.ahk")
 	ReasonPos := InStr(Body, "LayoutSupersededReason(ManifestEntry)")
 	Assert(ReasonPos > 0, "MenuRowFromManifest must ask LayoutSupersededReason about its entry")
 	Assert(RegExMatch(Body, 's)LayoutSupersededReason\(ManifestEntry\).*Row\["disabled"\] := true'),

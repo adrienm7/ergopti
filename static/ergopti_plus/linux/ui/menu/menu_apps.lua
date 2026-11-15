@@ -11,7 +11,7 @@
 
 local M = {}
 
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
 --- Builds the Applications submenu.

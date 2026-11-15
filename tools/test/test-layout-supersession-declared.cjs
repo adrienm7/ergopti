@@ -44,7 +44,7 @@ const CONSUMERS = [
 		token: 'superseded_reason_key'
 	},
 	{
-		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_engine.ahk'),
+		file: path.join(SP, 'windows', 'menu', 'ui', 'builder', 'engine.ahk'),
 		token: 'LayoutSupersededReason('
 	}
 ];

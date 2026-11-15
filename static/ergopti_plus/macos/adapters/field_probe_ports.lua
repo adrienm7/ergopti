@@ -610,7 +610,7 @@ end
 --- The menu's timed rebuild, or nil before the menu exists.
 --- @return table|nil outcome
 local function menu_rebuild()
-	local menu = package.loaded["ui.menu"]
+	local menu = package.loaded["menu.ui"]
 	if type(menu) ~= "table" or type(menu.timed_rebuild) ~= "function" then return nil end
 	-- The rebuild is synchronous, so each layout phase's total grows by what
 	-- this rebuild spent in it: the slowest names the stage to fix.
@@ -996,7 +996,7 @@ function M.new()
 		menu_rebuild = menu_rebuild,
 		scratch_typing = scratch_typing,
 		keystats_start_ms = function()
-			local MenuState = package.loaded["ui.menu.menu_state"]
+			local MenuState = package.loaded["menu.ui.builder.state"]
 			return type(MenuState) == "table" and MenuState.keystats_start_ms() or nil
 		end,
 		gesture_frame_counts = function() return require("infra.gesture_frame_evidence").counts() end,

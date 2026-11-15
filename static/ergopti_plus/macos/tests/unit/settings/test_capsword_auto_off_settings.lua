@@ -38,7 +38,7 @@ helpers.describe("CapsWord auto-off settings owner", function()
 	helpers.it("takes the pointer kinds and defaults from the manifest", function()
 		helpers.with_stub_scope({ "infra.capsword_auto_off", "core.logger.engine.logger" }, function()
 			local Owner = fresh_owner()
-			local Manifest = require("infra.manifest_reader")
+			local Manifest = require("menu.engine.manifest_reader")
 			local declared = {}
 			for _, entry in ipairs(Manifest.declared_section_entries("shortcuts.caps_word.pointer")) do
 				declared[#declared + 1] = entry.id

@@ -4,8 +4,8 @@
  * The Linux tray root is read through one resolver.
  *
  * tools/lib/linux-menu-parts.cjs binds each
- * `local _build_x = require("ui.menu.menu_x").build` of
- * linux/ui/menu/builder.lua to that module's builder and recomposes the
+ * `local _build_x = require("<part module>").build` of
+ * linux/menu/ui/builder/builder.lua to that module's builder and recomposes the
  * root the menu gates analyse. This gate proves the two halves of that
  * contract: a faithful split recomposes token for token into the root it came
  * from, and every other wiring is refused rather than composed.
@@ -83,7 +83,7 @@ assert.ok(rootImports.includes('Version'), 'the root keeps the imports it reads'
 for (const name of rootImports)
 	assert.ok(rootReads(name) > 1, 'the root holds ' + name + ' only for a part: move it there');
 assert.ok(
-	!/require\("ui\.menu\.menu_dialogs"\)/.test(sources[LINUX_MENU_ROOT]),
+	!/require\("menu\.ui\.builder\.dialogs"\)/.test(sources[LINUX_MENU_ROOT]),
 	'the parts bind the dialogs they use, not the root'
 );
 for (const statement of [
@@ -133,17 +133,17 @@ const partOnlyCases = [
 	[
 		'a part binds a dialog the dialogs module does not export',
 		partOnly(
-			'linux/ui/menu/menu_quit.lua',
-			'local LOG = "ui.menu.menu_quit"',
-			'local foreign_dialog = require("ui.menu.menu_dialogs").foreign_dialog\nlocal LOG = "ui.menu.menu_quit"'
+			'linux/menu/ui/builder/quit.lua',
+			'local LOG = "menu.ui.builder.quit"',
+			'local foreign_dialog = require("menu.ui.builder.dialogs").foreign_dialog\nlocal LOG = "menu.ui.builder.quit"'
 		)
 	],
 	[
 		'part modules bind each other in a cycle',
 		partOnly(
-			'linux/ui/menu/menu_dialogs.lua',
-			'local LOG = "ui.menu.menu_dialogs"',
-			'local layouts_probe = require("ui.menu.menu_layouts").layouts_probe\nlocal LOG = "ui.menu.menu_dialogs"'
+			'linux/menu/ui/builder/dialogs.lua',
+			'local LOG = "menu.ui.builder.dialogs"',
+			'local layouts_probe = require("ui.menu.menu_layouts").layouts_probe\nlocal LOG = "menu.ui.builder.dialogs"'
 		)
 	]
 ];
@@ -157,14 +157,14 @@ for (const [cause, changed] of partOnlyCases) {
 
 // M3.3: once every section moved to its own menu_*.lua, the root took the macOS
 // root's name, so the `menu_` prefix names parts only and both drivers read
-// `ui/menu/builder.lua` as the tray root. Nothing may still load the old name.
+// `menu/ui/builder/builder.lua` as the tray root. Nothing may still load the old name.
 assert.equal(
 	LINUX_MENU_ROOT,
-	'linux/ui/menu/builder.lua',
+	'linux/menu/ui/builder/builder.lua',
 	'the Linux root has the macOS root name'
 );
 assert.ok(
-	fs.existsSync(path.join(SP, 'macos/ui/menu/builder.lua')),
+	fs.existsSync(path.join(SP, 'macos/menu/ui/builder/builder.lua')),
 	'the macOS root it mirrors exists'
 );
 assert.ok(

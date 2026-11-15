@@ -21,7 +21,7 @@ local RESET_MODULES = {
 	"platform.input.synthetic_input", "adapters.event_provenance",
 	"core.events.timer_scheduler",
 	"core.logger.engine.logger", "core.logger.engine.perf", "infra.hotpath_profiler",
-	"infra.manifest_reader", "platform.input.keycodes", "layouts.engine.layers.terminators",
+	"menu.engine.manifest_reader", "platform.input.keycodes", "layouts.engine.layers.terminators",
 }
 
 local function noop() end
@@ -256,7 +256,7 @@ local function load_fixture(prepare_input)
 	})
 	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.expansion_delay" then return 0 end
 			if key == "hotstrings.trigger_char" then return "★" end

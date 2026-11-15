@@ -194,7 +194,7 @@ helpers.describe("shortcuts.bindings: public API", function()
 		-- Drift guard: the macOS default MUST equal the
 		-- cross-driver manifest default so a change to shortcuts.chatgpt_url cannot
 		-- silently diverge from the AHK driver, which reads the same default.
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		helpers.assert_eq(Bindings.DEFAULT_CHATGPT_URL, Manifest.default_for("shortcuts.chatgpt_url"))
 	end)
 end)

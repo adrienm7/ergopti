@@ -84,9 +84,9 @@ end
 --- Checks that the driver's receiving owner is the shared receiver.
 --- @param helpers table Driver test API.
 function M.register_driver(helpers)
-	helpers.describe("infra.native_presentation is the shared receiver (native-presentation-receiver)", function()
+	helpers.describe("menu.engine.native_presentation is the shared receiver (native-presentation-receiver)", function()
 		helpers.it("prepare and title come from menu/engine/native_presentation_core.lua", function()
-			local receiver = require("infra.native_presentation")
+			local receiver = require("menu.engine.native_presentation")
 			for _, method in ipairs({ "prepare", "title" }) do
 				local source = debug.getinfo(receiver[method], "S").source
 				helpers.assert_true(source:find("_shared/menu/engine/native_presentation_core.lua", 1, true) ~= nil,

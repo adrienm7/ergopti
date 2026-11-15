@@ -583,7 +583,7 @@ function reachedInertTemplateRows(nativeSources, extension, definitions, platfor
 						(native) => native.rel === path.join(SP, 'windows/ui/menu/menu_shortcuts.ahk')
 					)?.src,
 					nativeSources.find(
-						(native) => native.rel === path.join(SP, 'windows/infra/manifest_menu.ahk')
+						(native) => native.rel === path.join(SP, 'windows/menu/engine/manifest_menu.ahk')
 					)?.src
 				)
 			: null;
@@ -989,7 +989,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 		),
 		false
 	);
-	const linux = readSourceFile(path.join(SP, 'linux/ui/menu/builder.lua'));
+	const linux = readSourceFile(path.join(SP, 'linux/menu/ui/builder/builder.lua'));
 	assert.equal(
 		nativeTemplateBinding(linux, '.lua', 'hotstrings_magic_trigger_frame', 'magic_key_change', 1),
 		true
@@ -1513,7 +1513,7 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 	const helper = 'windows/infra/tray_bootstrap.ahk';
 	const adapter = 'windows/adapters/tray_menu.ahk';
 	const entry = 'windows/ErgoptiPlus.ahk';
-	const dispatcher = 'windows/infra/menu_dispatcher.ahk';
+	const dispatcher = 'windows/menu/engine/dispatcher.ahk';
 	const controls = [
 		[
 			'withdraw native adapter include',
@@ -1759,7 +1759,10 @@ for (const mutate of [
 		'missing, foreign-caption or behavior-bearing rows cannot borrow inert publication'
 	);
 }
-for (const ownerPath of ['windows/ui/menu/menu_shortcuts.ahk', 'windows/infra/manifest_menu.ahk']) {
+for (const ownerPath of [
+	'windows/ui/menu/menu_shortcuts.ahk',
+	'windows/menu/engine/manifest_menu.ahk'
+]) {
 	const target = path.join(SP, ownerPath);
 	const original = src.ahk.nativeSources.find((native) => native.rel === target);
 	assert(original && original.src !== '', 'the actual production Source owner exists');

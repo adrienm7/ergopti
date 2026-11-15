@@ -17,7 +17,7 @@ local RESET_MODULES = {
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"platform.input.synthetic_input", "adapters.event_provenance",
 	"core.logger.engine.logger", "core.logger.engine.perf",
-	"infra.hotpath_profiler", "infra.manifest_reader", "platform.input.keycodes",
+	"infra.hotpath_profiler", "menu.engine.manifest_reader", "platform.input.keycodes",
 }
 
 
@@ -215,7 +215,7 @@ local function load_fixture()
 	})
 	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function(key)
 			if key == "hotstrings.expansion_delay" then return 0 end
 			if key == "hotstrings.trigger_char" then return "★" end

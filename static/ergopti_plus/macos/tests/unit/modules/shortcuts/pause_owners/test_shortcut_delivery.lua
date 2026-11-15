@@ -208,7 +208,7 @@ local function load_real_shortcut_delivery_owner()
 	-- which made the combined run fail in `i18n.format` while this file passed alone.
 	package.loaded["core.i18n.engine.i18n"] = nil
 	package.loaded["modules.gestures.actions"] = nil
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,
 	}
 	package.loaded["modules.keystats"] = { log_shortcut = function() return true end }

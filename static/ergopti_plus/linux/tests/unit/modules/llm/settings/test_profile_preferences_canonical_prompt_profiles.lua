@@ -307,7 +307,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
 			with_idle_live_owner(settings, function(live_owner)
-				local names = { "infra.manifest_menu", "ui.menu.builder", "ui.prompt_editor.bridge" }
+				local names = { "menu.engine.manifest_menu", "menu.ui.builder.builder", "ui.prompt_editor.bridge" }
 				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 				local ok, err = pcall(function()
 					local document = read_json("menu/data/menu_manifest.json")
@@ -325,7 +325,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 						manifest_path = function() return shared("menu/data/menu_manifest.json") end,
 						json_decode = function() return document end, i18n = translator, logger = require("core.logger.engine.shim"),
 					}))
-					package.loaded["infra.manifest_menu"] = renderer
+					package.loaded["menu.engine.manifest_menu"] = renderer
 					local opened, editor_calls, rebuilds, confirmations = nil, 0, 0, 0
 					local accepted, confirmed = true, true
 					package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
@@ -340,7 +340,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 						confirmations = confirmations + 1
 						helpers.assert_eq({id,label}, {"user_canonical","Canonical"}); return confirmed
 					end }
-					local builder = helpers.load_module("ui.menu.builder")
+					local builder = helpers.load_module("menu.ui.builder.builder")
 					local function find(rows)
 						for _, row in ipairs(rows or {}) do
 							if row.title == "Canonical" then return row.menu or {} end
@@ -493,7 +493,7 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 					local nested = find(row.menu, title); if nested then return nested end
 				end
 			end
-			local builder = require("ui.menu.builder")
+			local builder = require("menu.ui.builder.builder")
 			local create = assert(find(builder.build(f.ctx), "menu.profiles.create_profile"), "create row missing")
 			helpers.assert_eq(create.fn(), true)
 			f.ctx.paused = true; f.ctx.is_paused = function() return true end
@@ -537,7 +537,7 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 		local initial='[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(custom and {profile()} or Json.array({})))
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial,function(settings,path)
-			local names={"infra.manifest_menu","core.i18n.engine.i18n","ui.menu.builder"}
+			local names={"menu.engine.manifest_menu","core.i18n.engine.i18n","menu.ui.builder.builder"}
 			local saved={};for _,name in ipairs(names) do saved[name]=package.loaded[name] end
 			local ok,err=xpcall(function()
 				local document=read_json("menu/data/menu_manifest.json")
@@ -557,12 +557,12 @@ helpers.describe("shared profile section headings: actual canonical Linux provid
 				local renderer=assert(require("menu.engine.renderer").new({platform="linux",
 					manifest_path=function() return shared("menu/data/menu_manifest.json") end,
 					json_decode=function() return document end,i18n=i18n,logger=require("core.logger.engine.shim")}))
-				package.loaded["infra.manifest_menu"]=renderer
+				package.loaded["menu.engine.manifest_menu"]=renderer
 				local redraws=0
 				local ctx={is_paused=function() return false end,llm={is_enabled=function() return true end,
 					get_models=function() return {} end,get_current_model=function() return "small" end,
 					get_prediction_model=function() return "small" end},on_menu_changed=function() redraws=redraws+1 end}
-				local builder=helpers.load_module("ui.menu.builder")
+				local builder=helpers.load_module("menu.ui.builder.builder")
 				local function find(rows)
 					for _,row in ipairs(rows or {}) do
 						if row.menu then

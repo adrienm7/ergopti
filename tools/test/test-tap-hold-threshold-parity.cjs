@@ -206,22 +206,13 @@ if (/"platforms"/.test(useGlobal)) {
 	);
 }
 for (const [file, needles] of [
-	[
-		['windows', 'ui', 'menu', 'menu_taphold.ahk'],
-		['WriteTapHoldGlobalDuration', 'WriteTapHoldDurationReset']
-	],
-	[
-		['linux', 'ui', 'menu', 'builder.lua'],
-		['set_global_threshold', 'tap_hold_key_delay_use_global']
-	],
-	[
-		['macos', 'ui', 'menu', 'menu_tap_holds.lua'],
-		['set_tap_hold_timeout', 'tap_hold_key_delay_use_global']
-	]
+	['windows/ui/menu/menu_taphold.ahk', ['WriteTapHoldGlobalDuration', 'WriteTapHoldDurationReset']],
+	['linux/menu/ui/builder/builder.lua', ['set_global_threshold', 'tap_hold_key_delay_use_global']],
+	['macos/ui/menu/menu_tap_holds.lua', ['set_tap_hold_timeout', 'tap_hold_key_delay_use_global']]
 ]) {
-	const text = read(...file);
+	const text = read(file);
 	for (const needle of needles) {
-		if (!text.includes(needle)) errors.push(`${file.join('/')} does not wire ${needle}.`);
+		if (!text.includes(needle)) errors.push(`${file} does not wire ${needle}.`);
 	}
 }
 

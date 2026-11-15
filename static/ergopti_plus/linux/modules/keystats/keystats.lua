@@ -38,7 +38,7 @@ local Timings   = require("core.timing.engine.timings")
 local EvdevCodes = require("platform.input.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
-local Manifest      = require("infra.manifest_reader")
+local Manifest      = require("menu.engine.manifest_reader")
 local PrivateWindow = require("metrics.engine.view.private_window")
 -- WPM ring cap single-sourced from the shared keystats metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.

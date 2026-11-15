@@ -16,11 +16,11 @@ local M = {}
 
 local gestures_mod  = require("modules.gestures")
 local Sensitivity = require("gestures.engine.sensitivity")
-local MenuUtils = require("ui.menu.menu_utils")
+local MenuUtils = require("menu.ui.builder.utils")
 local dialog        = require("core.ui.engine.dialog_util")
 local i18n          = require("core.i18n.engine.i18n")
 local LabelValue = require("core.i18n.engine.label_value")
-local ManifestMenu  = require("infra.manifest_menu")
+local ManifestMenu  = require("menu.engine.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
 local Logger         = require("core.logger.engine.logger")

@@ -7,7 +7,7 @@
  * A gate that follows the module boundary must still fail when the code it
  * guards is broken INSIDE a split module, or wired to the root any other way.
  * The Quit builder is the probe: it needs no root helper, so it can always be
- * split off. When `ui/menu/menu_quit.lua` exists the real module is used;
+ * split off. When `menu/ui/builder/quit.lua` exists the real module is used;
  * before that, the same module is synthesized from the root, so every case
  * runs on dev before any split lands.
  */
@@ -17,8 +17,8 @@
 const assert = require('node:assert/strict');
 const { LINUX_MENU_ROOT, composeLinuxMenuRoot } = require('../../lib/linux-menu-parts.cjs');
 
-const QUIT_FILE = 'linux/ui/menu/menu_quit.lua';
-const QUIT_BINDING = 'local _build_quit = require("ui.menu.menu_quit").build';
+const QUIT_FILE = 'linux/menu/ui/builder/quit.lua';
+const QUIT_BINDING = 'local _build_quit = require("menu.ui.builder.quit").build';
 
 /** Replaces the one occurrence of `before` in `text`; throws when it is not unique. */
 function replaceOnce(text, before, after, label) {
@@ -45,12 +45,12 @@ function splitQuit(sources) {
 	const root = sources[LINUX_MENU_ROOT];
 	const body = quitFunction(root);
 	const part = [
-		'--- ui/menu/menu_quit.lua',
+		'--- menu/ui/builder/quit.lua',
 		'local M = {}',
 		'local Logger = require("core.logger.engine.shim")',
-		'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+		'local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")',
 		'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end',
-		'local LOG = "ui.menu.menu_quit"',
+		'local LOG = "menu.ui.builder.quit"',
 		body,
 		'M.build = _build_quit',
 		'return M',
@@ -82,13 +82,13 @@ function quitWiringCases(split) {
 		],
 		[
 			'binding a foreign export',
-			inRoot(QUIT_BINDING, 'local _build_quit = require("ui.menu.menu_quit").quit')
+			inRoot(QUIT_BINDING, 'local _build_quit = require("menu.ui.builder.quit").quit')
 		],
 		[
 			'binding through an alias',
 			inRoot(
 				QUIT_BINDING,
-				'local QuitPart = require("ui.menu.menu_quit")\nlocal _build_quit = QuitPart.build'
+				'local QuitPart = require("menu.ui.builder.quit")\nlocal _build_quit = QuitPart.build'
 			)
 		],
 		[
@@ -104,7 +104,10 @@ function quitWiringCases(split) {
 		],
 		[
 			'foreign facade import in the split module',
-			inPart('pcall(require, "infra.manifest_menu")', 'pcall(require, "foreign.manifest_menu")')
+			inPart(
+				'pcall(require, "menu.engine.manifest_menu")',
+				'pcall(require, "foreign.manifest_menu")'
+			)
 		],
 		[
 			'extra top-level statement in the split module',
@@ -114,10 +117,10 @@ function quitWiringCases(split) {
 			'definition reaching the module table',
 			inPart('local function _build_quit(ctx)', 'local function _build_quit(ctx)\n\tM.build = nil')
 		],
-		['foreign log source', inPart('"ui.menu.menu_quit"', '"ui.menu.menu_foreign"')],
+		['foreign log source', inPart('"menu.ui.builder.quit"', '"ui.menu.menu_foreign"')],
 		[
 			'header reading a facade the module never declared',
-			inPart('local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")\n', '')
+			inPart('local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")\n', '')
 		]
 	];
 }

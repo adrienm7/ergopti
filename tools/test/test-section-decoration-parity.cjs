@@ -133,8 +133,8 @@ check(
 
 // 2. AHK kernel reads the same generated format.
 check(
-	'AHK: infra/menu_helpers.ahk MenuSectionTitle frames with the generated format',
-	'static/ergopti_plus/windows/infra/menu_helpers.ahk',
+	'AHK: menu/engine/helpers.ahk MenuSectionTitle frames with the generated format',
+	'static/ergopti_plus/windows/menu/engine/helpers.ahk',
 	/MenuSectionTitle\(Text\)\s*\{\s*return MENU_SECTION_HEADER_PREFIX \. Text \. MENU_SECTION_HEADER_SUFFIX/
 );
 

@@ -8,8 +8,8 @@
  * parsed it THREE times, from three files, with two independent session caches
  * and two byte-identical error messages:
  *
- *   infra/manifest_menu.lua      get_manifest_root()   — the owner
- *   ui/menu/builder.lua          load_manifest()       — a second copy
+ *   menu/engine/manifest_menu.lua      get_manifest_root()   — the owner
+ *   menu/ui/builder/builder.lua          load_manifest()       — a second copy
  *   ui/menu/menu_remap.lua       inline, as a fallback "in case manifest_menu is
  *                                not loaded yet" — which require makes
  *                                impossible, so it was a reader on a path
@@ -53,7 +53,7 @@ const NEAR_LINES = 6;
 /**
  * Blanks out comment text so prose cannot be mistaken for a call.
  *
- * Not fastidiousness: the first run of this gate flagged ui/menu/builder.lua,
+ * Not fastidiousness: the first run of this gate flagged menu/ui/builder/builder.lua,
  * whose only remaining mention of the manifest is the comment explaining that it
  * no longer reads the file — a comment that necessarily names hs.json.decode to
  * say so. A detector that reads documentation as evidence reports the fix as the
@@ -87,7 +87,7 @@ const DRIVERS = {
 //
 // linux 0 → 1 later the same day, and the zero did the job it was pinned for: it
 // made the renderer binding show up as a deliberate change rather than as noise.
-// Linux now has infra/manifest_menu.lua, the one place on that driver that knows
+// Linux now has menu/engine/manifest_menu.lua, the one place on that driver that knows
 // where the manifest is and how to decode it.
 //
 // WHAT THIS COUNTS, AFTER THE EXTRACTION. The io.open now lives in

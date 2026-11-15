@@ -156,7 +156,7 @@ helpers.describe("Linux tap-hold scope: restore recommended", function()
 			helpers.assert_nil(stored.tap_hold.inherit_defaults, "no inheritance stands in for the preset")
 			helpers.assert_nil(stored.tap_hold.enabled, "the switch is a config.toml row")
 			helpers.assert_eq(stored_switch(s),
-				require("infra.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED))
+				require("menu.engine.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED))
 			local preset = require("platform.remap.tap_hold_loader").preset_keys(DEFAULTS)
 			helpers.assert_true(next(preset) ~= nil, "the shipped preset has keys")
 			helpers.assert_eq(stored.tap_hold.keys, preset)
@@ -199,7 +199,7 @@ helpers.describe("Linux tap-hold scope: the one-shot timeout", function()
 			local ok, detail = s.owner().apply("recommended")
 			helpers.assert_eq(ok, true, detail)
 			local stored = Codec.decode(read(s.config_path))
-			local recommended = require("infra.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+			local recommended = require("menu.engine.manifest_reader").recommended_for(require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 			local timeout = stored.tap_holds and stored.tap_holds.sticky_timeout_ms
 			helpers.assert_true(timeout == nil or timeout == recommended, "the stored timeout is reset: " .. tostring(timeout))
 			helpers.assert_true(timeout ~= 4000)
@@ -523,7 +523,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 					retry_restore = function(done) return done(true) end,
 				}
 				local composition = require("settings.engine.scope.composition").new({
-					manifest = require("infra.manifest_reader"), scope = "global",
+					manifest = require("menu.engine.manifest_reader"), scope = "global",
 					logger = helpers.make_logger_stub(),
 					participants = function() return { tap_holds = participant, llm = failed } end,
 				})
@@ -719,7 +719,7 @@ helpers.describe("Linux tap-hold scope: retained navigation-layer compensation",
 				retry_restore = function(done) return done(true) end,
 			}
 			local composition = require("settings.engine.scope.composition").new({
-				manifest = require("infra.manifest_reader"), scope = "global",
+				manifest = require("menu.engine.manifest_reader"), scope = "global",
 				logger = helpers.make_logger_stub(),
 				participants = function() return { tap_holds = participant, llm = next_category } end,
 			})

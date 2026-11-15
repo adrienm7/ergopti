@@ -116,7 +116,7 @@ end
 --- @param opts table `{ driver = "macos" | "linux" }`.
 function M.register(helpers, opts)
 	local driver = assert(opts and opts.driver, "the contract needs the driver name")
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local index = Answers.load(catalogue_text(), driver)
 	-- The catalogue offers the trigger choice only where config.toml owns it.
 	local trigger = index.entries["hotstrings.trigger_char"] and "hotstrings.trigger_char" or nil

@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local Logger = require("core.logger.engine.shim")
 local LOG = "infra.keyboard_layout_scope"

@@ -12,7 +12,7 @@ function M.with_session(options, body)
 	options = options or {}
 	local names = { "ffi", "core.logger.engine.monotonic", "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook",
 		"adapters.xkb_capture", "modules.hotstrings.device_finder", "platform.remap.tap_hold_engine",
-		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "infra.manifest_reader" }
+		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "menu.engine.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 	local previous_preload = package.preload.ffi

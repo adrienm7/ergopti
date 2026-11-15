@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 local Codec = require("core.text.engine.toml_codec")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local FS = require("core.fs.adapters.file_system")
 local function clone(value)
 	if type(value) ~= "table" then return value end
@@ -72,7 +72,7 @@ local function fixture(demoted)
 		reset_health = function() return true end, model_power = function() return 1 end,
 		display_model = function(model) return model end, backend_label = function(backend) return backend end,
 	})
-	local demotions = require("ui.menu.session_demotions").new()
+	local demotions = require("menu.ui.transactions.session_demotions").new()
 	if demoted then demotions.record({ feature = "ai", key = "llm_enabled", persisted = true, demoted = false }) end
 	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(Preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = {}, initial_state = state,

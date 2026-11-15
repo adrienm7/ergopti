@@ -69,7 +69,7 @@ global _DefaultLogsDir := _LogsDir
 ; the manifest by its generated key: without both owners the AltGr pair cases
 ; died on an unset ConfigKey in constants.ahk.
 #Include ../_generated/config_keys.ahk
-#Include ../infra/manifest_reader.ahk
+#Include ../menu/engine/manifest_reader.ahk
 #Include ../platform/remap/constants.ahk
 #Include ../platform/remap/altgr_criteria.ahk
 

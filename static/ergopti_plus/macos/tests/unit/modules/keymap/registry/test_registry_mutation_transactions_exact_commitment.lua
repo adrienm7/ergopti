@@ -566,8 +566,8 @@ helpers.describe("canonical hotstring cache projection", function()
 	helpers.it("the real menu synchronizer replaces absent canonical section choices", function()
 		local _, registry, preferences = fixture(nil)
 		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
-		package.loaded["ui.menu.menu_state"] = nil
-		local MenuState = require("ui.menu.menu_state")
+		package.loaded["menu.ui.builder.state"] = nil
+		local MenuState = require("menu.ui.builder.state")
 		local state = { hotstrings = {}, keymap = false, delays = {}, repeat_key_enabled = false }
 		local keymap = setmetatable({ set_llm_model = function() return true end }, { __index = registry })
 		local result, report = MenuState.sync_state_to_modules(state, preferences.load("config"), false, {

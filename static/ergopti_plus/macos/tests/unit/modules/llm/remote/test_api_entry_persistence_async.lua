@@ -254,7 +254,7 @@ helpers.describe("LLM API persistence transaction", function()
 				end
 				remote.check_availability = function(_, callback) callback(); return true end
 				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "core.ui.engine.dialog_util",
-					"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications" }, function()
+					"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.ui.engine.notifications" }, function()
 					local prompts, updates, warmups = 0, 0, 0
 					local notices = {}
 					package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
@@ -276,7 +276,7 @@ helpers.describe("LLM API persistence transaction", function()
 						i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = function() return {} end },
 						logger = helpers.make_logger_stub(),
 					}))
-					package.loaded["infra.manifest_menu"] = {
+					package.loaded["menu.engine.manifest_menu"] = {
 						command_row = renderer.command_row, template_rows = renderer.template_rows,
 						get_array = renderer.get_array, render_rows = function(rows) return rows end,
 					}

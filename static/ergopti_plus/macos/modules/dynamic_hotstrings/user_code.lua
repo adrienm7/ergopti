@@ -25,7 +25,7 @@ local ConfigPaths = require("settings.engine.paths")
 local Logger = require("core.logger.engine.logger")
 local Notifier = require("platform.focus.application_notifier")
 local I18n = require("core.i18n.engine.i18n")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 --- Notification kind per severity on this driver's notifier.
 local NOTIFY_KIND = { error = "error", warning = "warn" }

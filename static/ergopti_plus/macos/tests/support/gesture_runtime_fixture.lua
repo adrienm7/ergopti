@@ -28,7 +28,7 @@ local MODULE_NAMES = {
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
 	"core.logger.engine.logger",
-	"infra.manifest_reader",
+	"menu.engine.manifest_reader",
 	"core.ui.engine.notifications",
 	"core.timing.engine.timings",
 	"modules.gestures",
@@ -97,7 +97,7 @@ function M.with_fixture(options, scenario)
 		end,
 	}, { __index = function() return noop end })
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.manifest_reader"] = {
+	package.loaded["menu.engine.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}

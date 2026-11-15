@@ -61,7 +61,7 @@ _RSH_GroupRules() {
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
 	AssertEqual("keymap-gestures", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\gestures\test_gestures.ahk"))
 	AssertEqual("keystats", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\keystats\test_keystats_event_id.ahk"))
-	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\ui\menu\test_script_control_submenu.ahk"))
+	AssertEqual("ui", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\menu\test_script_control_submenu.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\process\shell_runner\test_tree_owned.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\network\adapters\test_managed_remote_transport.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\core\text\test_utils.ahk"))

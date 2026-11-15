@@ -181,7 +181,7 @@ local function global_cohort(remap, refuse)
 	local observed = { deferred = {}, refreshes = {} }
 	local late = { apply = function() return not refuse end, revert = function() return true end,
 		release = function() end, pending = function() return false end, retry_restore = function() return true end }
-	local global = require("ui.menu.global_scope").new({
+	local global = require("menu.ui.transactions.global_scope").new({
 		owners = { llm = function() return late end }, remap = remap,
 		backup_path = function(scope) return "/remap/global-cohort-" .. scope end,
 		defer = function(fn) observed.deferred[#observed.deferred + 1] = fn; return true end,

@@ -24,7 +24,7 @@
 local M = {}
 
 local Logger     = require("core.logger.engine.logger")
-local Manifest   = require("infra.manifest_reader")
+local Manifest   = require("menu.engine.manifest_reader")
 local Paths      = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local Json       = require("core.text.engine.json")

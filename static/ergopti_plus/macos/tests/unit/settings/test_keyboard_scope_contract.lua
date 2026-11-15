@@ -2,7 +2,7 @@
 
 --- Dynamic keyboard leaves have typed neutral values without inventing assignments.
 local helpers = require("tests.helpers")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 helpers.describe("dynamic keyboard scope contract", function()
 	helpers.it("makes an explicitly inventoried non-static keyboard assignment sparse", function()

@@ -12,7 +12,7 @@ local M = {}
 
 local Logger = require("core.logger.engine.shim")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local DisplayPolicy = require("ai.engine.settings.display_policy")
 local ConfigKeys = require("settings.engine.keys")
 

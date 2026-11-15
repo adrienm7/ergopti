@@ -348,7 +348,7 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 	; purely in the menu's "IA" submenu; no opt-in nag at startup.
 
 	; Publish the IA submenu with its rows built at its first open, like the
-	; layout, hotstring and shortcut submenus (infra/menu_population.ahk): every
+	; layout, hotstring and shortcut submenus (menu/engine/population.ahk): every
 	; root build, the boot's and each full rebuild a toggle asks for, otherwise
 	; paid the whole IA row construction (90-190 ms on a maintainer-sized
 	; setup) for a submenu most rebuilds never show. The rows then read the IA

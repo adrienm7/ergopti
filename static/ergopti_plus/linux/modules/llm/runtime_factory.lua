@@ -38,7 +38,7 @@ function M.new(engine, profiles)
 	if not relay_policy then return nil, relay_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
-		writer = require("core.text.engine.toml_codec.writer"), manifest = require("infra.manifest_reader"),
+		writer = require("core.text.engine.toml_codec.writer"), manifest = require("menu.engine.manifest_reader"),
 		engine = engine, backend_key = engine.backend_key,
 		path = require("settings.engine.paths").config("config.toml"),
 	})

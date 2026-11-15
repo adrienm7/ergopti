@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local HotstringCore = require("infra.hotstring_engine")
 
 --- Loads the real keymap with its taps captured and its LLM bridge inert.

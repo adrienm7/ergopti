@@ -19,7 +19,7 @@
  *    word "personal" in every language.
  *
  * 2. A RATCHET on how many entries still fall all the way through. The chain
- *    (infra/manifest_descriptions.ahk) ends by returning the path's last
+ *    (menu/engine/manifest_descriptions.ahk) ends by returning the path's last
  *    segment, so a missing translation is never an error at runtime — it is a
  *    lowercase English identifier in the middle of a translated menu. Nothing
  *    counted them. 110 of 243 entries do. Most are settings the hand-written

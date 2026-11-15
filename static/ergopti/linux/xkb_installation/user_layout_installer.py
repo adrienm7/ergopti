@@ -97,7 +97,7 @@ LAYOUT_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 MANIFEST_NAME = ".ergopti_plus_layouts.json"
 # The Compose input method state the daemon's layout menu reads
-# (linux/ui/menu/compose_input_method_row.lua pins this name).
+# (linux/menu/ui/compose_input_method_row.lua pins this name).
 COMPOSE_STATE_NAME = ".ergopti_plus_compose_input_method"
 MANIFEST_SCHEMA = 1
 RULES_MARKER = "// ErgoptiPlus managed rules: registry layouts"

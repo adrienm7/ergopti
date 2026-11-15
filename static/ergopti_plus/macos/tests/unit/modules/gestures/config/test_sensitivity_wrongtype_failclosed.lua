@@ -60,7 +60,7 @@ helpers.describe("gesture sensitivity fails closed to DEFAULT_SENSITIVITY on a w
 	end)
 
 	helpers.it("restores the slot-specific default for an invalid tab sensitivity", function()
-		local Manifest = require("infra.manifest_reader")
+		local Manifest = require("menu.engine.manifest_reader")
 		for _, slot in ipairs({ "swipe_3_up", "swipe_3_down" }) do
 			local expected = Manifest.default_for("gestures.sensitivities." .. slot)
 			helpers.assert_eq(expected, 25, "the slower tab default must remain distinct")

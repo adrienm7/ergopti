@@ -152,7 +152,7 @@ helpers.describe("menu.builder manifest resolution", function()
 		-- should log ERROR (not WARN) when the manifest is missing.
 		-- We can't directly call these private functions, but we can verify
 		-- the module loads and the logging is configured correctly.
-		local builder = require("ui.menu.builder")
+		local builder = require("menu.ui.builder.builder")
 		helpers.assert_eq(type(builder), "table",
 			"the menu builder must load even when the manifest cannot be found — a missing "
 				.. "manifest degrades the menu, it does not take the boot down")

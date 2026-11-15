@@ -128,7 +128,7 @@ local DUPLICATE_RECORDS = {
 local function menu_controls(Settings, paused, reordered)
 	local paths = require("core.fs.engine.paths")
 	local i18n = require("core.i18n.engine.i18n")
-	local original = package.loaded["infra.manifest_menu"]
+	local original = package.loaded["menu.engine.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
 	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
@@ -156,7 +156,7 @@ local function menu_controls(Settings, paused, reordered)
 		if section == "word_expanders_menu" then observations.controls = rows end
 		return rows
 	end
-	package.loaded["infra.manifest_menu"] = facade
+	package.loaded["menu.engine.manifest_menu"] = facade
 	local ctx = {
 		paused = paused,
 		config = {
@@ -178,8 +178,8 @@ local function menu_controls(Settings, paused, reordered)
 		on_quit = function() end,
 	}
 	ctx.is_paused = function() return ctx.paused end
-	local passed, rows = pcall(function() return helpers.load_module("ui.menu.builder").build(ctx) end)
-	package.loaded["infra.manifest_menu"] = original
+	local passed, rows = pcall(function() return helpers.load_module("menu.ui.builder.builder").build(ctx) end)
+	package.loaded["menu.engine.manifest_menu"] = original
 	if not passed then error(rows, 0) end
 	local function find(items)
 		for _, row in ipairs(items or {}) do

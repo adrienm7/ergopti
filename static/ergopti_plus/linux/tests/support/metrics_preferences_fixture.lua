@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 
 --- Builds a sparse, in-memory canonical preference port.
 --- @param options table|nil Initial values and refused-write switch.

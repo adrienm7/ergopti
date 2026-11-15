@@ -81,7 +81,7 @@ M.COUNT_SIGNALS = {
 	{ step = "log_api_key_reentered", name = "api_key_reentered" },
 	-- modules/gestures/engine.lua: a three-finger swipe slot that dispatched its action.
 	{ step = "log_gesture_swipe_dispatches", name = "swipe_dispatch" },
-	-- ui/menu/init.lua and the shared global composition: a committed restore or clear.
+	-- menu/ui/init.lua and the shared global composition: a committed restore or clear.
 	{ step = "log_scope_commits", name = "scope_commit" },
 	-- modules/keymap/init.lua: Karabiner's tap-hold command marker that reset the word.
 	{ step = "log_tap_hold_word_resets", name = "tap_hold_reset" },

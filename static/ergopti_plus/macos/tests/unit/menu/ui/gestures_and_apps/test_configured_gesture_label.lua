@@ -1,0 +1,59 @@
+--- tests/unit/menu/ui/gestures_and_apps/test_configured_gesture_label.lua
+
+--- ==============================================================================
+--- MODULE: Configured Gesture Menu Label Tests
+--- DESCRIPTION:
+--- Drives the real four-finger menu provider with the shipped translation and
+--- a saved URL. A formatter-only test cannot detect a stale host call site.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local json = require("core.text.engine.json")
+
+helpers.describe("configured gesture menu label", function()
+	helpers.it("replaces the marker on the four-finger menu row", function()
+		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "menu.ui.builder.utils",
+			"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "menu.engine.manifest_menu", "ui.action_picker",
+			"menu.engine.renderer",
+			"ui.menu.shortcut_utils", "core.logger.engine.logger", "core.timing.engine.deferred_work" }, function()
+			local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
+			local strings = json.decode(file:read("*a"))
+			file:close()
+			local url = "https://apple.com/?q=[x]&part=50%"
+			local gestures = {
+				get_action = function() return "open_url" end,
+				get_action_label = function() return strings["sg_actions.open_url"] end,
+				get_action_parameter = function(slot, action)
+					helpers.assert_eq(slot, "tap_4")
+					helpers.assert_eq(action, "open_url")
+					return url
+				end,
+				get_sg_names = function() return {} end,
+			}
+			package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true }, DEFAULT_GESTURES = {}, SINGLE_SLOTS = { "tap_4" } }
+			package.loaded["menu.ui.builder.utils"] = {}
+			package.loaded["core.ui.engine.dialog_util"] = {}
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
+			local renderer = assert(require("menu.engine.renderer").new({
+				platform = "hs",
+				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+				json_decode = json.decode,
+				i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
+			}))
+			package.loaded["menu.engine.manifest_menu"] = {
+				group_receiver = renderer.group_receiver,
+				template_rows = renderer.template_rows,
+				get_root = function() return { gesture_slots = { ["4"] = { "tap_4" } } } end,
+				build = function(_, _, _, _, _, providers) return providers.gesture_slots_4() end,
+			}
+			package.loaded["ui.action_picker"] = {}
+			package.loaded["ui.menu.shortcut_utils"] = {}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.timing.engine.deferred_work"] = {}
+			local menu = require("ui.menu.menu_gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })
+			local prefix = assert(strings["sg_actions.open_url"]:match("^(.-)%[[^%[%]]*%]$"))
+			helpers.assert_true(menu.submenu[1].label:find(prefix .. "[" .. url .. "]", 1, true) ~= nil)
+			helpers.assert_true(menu.submenu[1].label:find("[configurable]", 1, true) == nil)
+		end)
+	end)
+end)

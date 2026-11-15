@@ -68,7 +68,7 @@ end
 --- @param ctx_extra table|nil
 --- @return table|nil rows, table|nil parent
 local function hotstrings_rows(config, ctx_extra)
-	local mb = helpers.load_module("ui.menu.builder")
+	local mb = helpers.load_module("menu.ui.builder.builder")
 	local ctx = { config = config, _version = "9.9.9" }
 	for k, v in pairs(ctx_extra or {}) do ctx[k] = v end
 
@@ -202,7 +202,7 @@ end)
 
 helpers.describe("shared personal editor command", function()
 	helpers.it("shared-personal-editor: the actual personal provider follows a changed shared label", function()
-		local Menu = require("infra.manifest_menu")
+		local Menu = require("menu.engine.manifest_menu")
 		local declaration = Menu.get_array("personal_hotstring_commands")
 		helpers.assert_eq(#declaration, 1)
 		local before = declaration[1].i18n

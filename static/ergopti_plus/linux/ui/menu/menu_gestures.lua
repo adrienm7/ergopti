@@ -9,13 +9,13 @@
 
 local M = {}
 
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local show_info = require("ui.menu.menu_dialogs").show_info
-local plain_markup = require("ui.menu.menu_dialogs").plain_markup
-local assign_parameterized_action = require("ui.menu.menu_dialogs").assign_parameterized_action
-local slot_binding_rows = require("ui.menu.menu_dialogs").slot_binding_rows
+local show_info = require("menu.ui.builder.dialogs").show_info
+local plain_markup = require("menu.ui.builder.dialogs").plain_markup
+local assign_parameterized_action = require("menu.ui.builder.dialogs").assign_parameterized_action
+local slot_binding_rows = require("menu.ui.builder.dialogs").slot_binding_rows
 
 --- Builds the gestures submenu.
 local function _build_gestures(ctx)
@@ -59,7 +59,7 @@ local function _build_gestures(ctx)
 	local function master_toggle_action()
 		local before = ge.is_enabled()
 		local after = ge.toggle()
-		if after ~= before then require("ui.menu.feature_notice").feature(i18n_safe("menu.gestures.notify_title"), after == true) end
+		if after ~= before then require("menu.ui.builder.feature_notice").feature(i18n_safe("menu.gestures.notify_title"), after == true) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 

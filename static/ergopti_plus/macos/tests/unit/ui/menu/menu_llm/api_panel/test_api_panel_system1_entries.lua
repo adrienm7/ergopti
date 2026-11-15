@@ -30,7 +30,7 @@ end)()
 
 local FRESH = {
 	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
-	"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+	"core.ui.engine.notifications", "menu.engine.manifest_menu", "ui.menu.menu_llm.api_panel",
 }
 
 --- Installs the panel's doubles around the real catalogue.
@@ -109,7 +109,7 @@ local function install(args)
 		},
 		logger = helpers.make_logger_stub(),
 	}))
-	package.loaded["infra.manifest_menu"] = {
+	package.loaded["menu.engine.manifest_menu"] = {
 		command_row = command_renderer.command_row,
 		template_rows = command_renderer.template_rows,
 		get_array = command_renderer.get_array, render_rows = function(rows) return rows end }
@@ -247,7 +247,7 @@ helpers.describe("complete API presentation frames", function()
 		helpers.it("refuses an unowned declared API frame and repairs the same genuine entries: " .. section, function()
 			helpers.with_fresh_modules(FRESH, function()
 				local world = install({ entries = { OPENAI, JEV }, active_id = "chat" })
-				local owner = package.loaded["infra.manifest_menu"]
+				local owner = package.loaded["menu.engine.manifest_menu"]
 				local frame = assert(owner.get_array(section))
 				local original = frame[1]
 				local function build()
@@ -266,7 +266,7 @@ helpers.describe("complete API presentation frames", function()
 					helpers.assert_eq(world.warmups, 0)
 				end, debug.traceback)
 				frame[1] = original
-				helpers.assert_true(rawequal(package.loaded["infra.manifest_menu"], owner))
+				helpers.assert_true(rawequal(package.loaded["menu.engine.manifest_menu"], owner))
 				helpers.assert_true(rawequal(frame[1], original))
 				if not ok then error(err, 0) end
 				helpers.assert_true(#build() > 0, "exact original declaration repair uses the retained entry owner")

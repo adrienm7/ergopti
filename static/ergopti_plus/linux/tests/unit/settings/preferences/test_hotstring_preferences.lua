@@ -15,7 +15,7 @@ local Writer = require("core.text.engine.toml_codec.writer")
 
 -- The leaf these cases toggle. Its neutral value is the manifest default, read
 -- from the one declaration; the explicit choice is the other boolean.
-local STAR_NEUTRAL = require("infra.manifest_reader").default_for("hotstrings.preview_star_enabled")
+local STAR_NEUTRAL = require("menu.engine.manifest_reader").default_for("hotstrings.preview_star_enabled")
 local STAR_CHOICE = not STAR_NEUTRAL
 
 local SOURCE = '[hotstrings]\npreview_star_enabled = ' .. tostring(STAR_CHOICE) .. '\nunknown = "kept"\n[other]\nvalue = 1\n'
@@ -58,7 +58,7 @@ helpers.describe("hotstring preferences: canonical leaves", function()
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.enabled"), false)
 			helpers.assert_eq(Preferences.get("hotstrings.dynamic.date.enabled"), false)
 			helpers.assert_eq(Preferences.get("hotstrings.trigger_char"),
-				require("infra.manifest_reader").default_for("hotstrings.trigger_char"))
+				require("menu.engine.manifest_reader").default_for("hotstrings.trigger_char"))
 			helpers.assert_eq(Preferences.is_explicit("hotstrings.trigger_char"), false)
 			helpers.assert_nil(read(path), "reading never writes")
 		end)

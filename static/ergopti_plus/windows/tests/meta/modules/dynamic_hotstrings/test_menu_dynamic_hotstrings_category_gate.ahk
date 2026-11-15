@@ -17,7 +17,7 @@
 ; spurious "unknown category" WARNING on every single menu build, for a
 ; category name that structurally can never appear in CategoryEnabled.
 ;
-; SCOPE: source introspection of ui/menu/menu_engine.ahk.
+; SCOPE: source introspection of menu/ui/builder/engine.ahk.
 ;
 ; The subject was MenuRowFromManifest until 2026-08-07, when the row and the
 ; drawing were split: MenuRowFromManifest decides the label, the tick and the
@@ -38,7 +38,7 @@
 
 _MDHCG_CheckDynamicHotstringsExcluded() {
 	Body := _DriverFuncBody("MenuRowFromManifest")
-	Assert(Body != "", "MenuRowFromManifest must exist in ui/menu/menu_engine.ahk")
+	Assert(Body != "", "MenuRowFromManifest must exist in menu/ui/builder/engine.ahk")
 
 	Assert(InStr(Body, "IsCategoryGated(") == 0,
 		"editable children must not query independent gates, including categories without their own master")
@@ -70,7 +70,7 @@ Test("menu: real hotstring subcategories gate runtime independently of editable 
 
 _MDHCG_LongDateUsesSharedFormatter() {
 	Body := _DriverFuncBody("_ApplyMenuLabelDynamicSubstitutions")
-	Assert(Body != "", "_ApplyMenuLabelDynamicSubstitutions must exist in ui/menu/menu_engine.ahk")
+	Assert(Body != "", "_ApplyMenuLabelDynamicSubstitutions must exist in menu/ui/builder/engine.ahk")
 
 	CasePos := InStr(Body, 'case "hotstrings.dynamic.date_long_fr":')
 	NextCasePos := InStr(Body, 'case "hotstrings.dynamic.date":', , CasePos + 1)

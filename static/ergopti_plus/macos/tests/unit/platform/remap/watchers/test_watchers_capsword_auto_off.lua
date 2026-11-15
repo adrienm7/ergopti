@@ -501,7 +501,7 @@ helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed p
 		local h = fresh_harness({ shipped = true })
 		activate(h)
 		local delay = require("keyboard.engine.caps_word_auto_off").idle_delay_ms(h.settings.policy()) / 1000
-		helpers.assert_eq(delay, require("infra.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
+		helpers.assert_eq(delay, require("menu.engine.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
 			"the shipped delay is the manifest default")
 		helpers.assert_eq(delay, 10, "10 s (maintainer decision of 2026-10-20)")
 		helpers.assert_true(timers_at(h, delay)[1] ~= nil, "the delay counts from the activation")

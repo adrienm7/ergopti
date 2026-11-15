@@ -43,7 +43,7 @@ local KNOWN_VIOLATIONS = {
 	-- Encore plus: more modules for full pause coverage
 	["modules.llm.prediction_engine"] = true,
 	["modules.metrics.aggregator"] = true,
-	["ui.menu.builder"] = true,
+	["menu.ui.builder.builder"] = true,
 }
 
 local function list_lua_files(dir)

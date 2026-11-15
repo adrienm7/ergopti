@@ -25,11 +25,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("boot: core backend is synced before the model is pushed to the engine", function()
 	local function read_menu_init()
-		-- Selected by a declaration unique to ui/menu/init.lua rather than by
+		-- Selected by a declaration unique to menu/ui/init.lua rather than by
 		-- path, so moving or splitting the module cannot turn this invariant
 		-- into a path error.
 		local src = helpers.read_driver_source("local function safe_require")
-		helpers.assert_true(src ~= nil, "ui/menu/init.lua source must be locatable")
+		helpers.assert_true(src ~= nil, "menu/ui/init.lua source must be locatable")
 		return src
 	end
 

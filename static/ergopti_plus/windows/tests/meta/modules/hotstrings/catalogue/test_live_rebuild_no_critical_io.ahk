@@ -21,7 +21,7 @@
 
 _LRNC_NoCriticalAcrossRegistration() {
 	Body := _DriverFuncBody("_RebuildHotstringsLiveOnce")
-	Assert(Body != "", "the serialized live-rebuild pass must exist in ui/menu/menu_rebuild.ahk")
+	Assert(Body != "", "the serialized live-rebuild pass must exist in menu/ui/builder/rebuild.ahk")
 	DrainBody := _DriverFuncBody("_HSLR_DrainOwner")
 	Assert(DrainBody != "", "the live-rebuild owner drain must exist")
 	AcquireBody := _DriverFuncBody("_HSLR_RequestAndTryAcquire")

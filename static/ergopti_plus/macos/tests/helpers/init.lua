@@ -543,10 +543,13 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
 	-- The menu modules sit under ui.menu before the structure moves and under each
 	-- feature's ui/menu (settings.ui.menu.paths, updater.ui.menu_about) and the menu
-	-- feature itself after them, so the sweep names both trees rather than one prefix.
+	-- feature itself after them, so the sweep reads a name's first two segments
+	-- rather than one prefix a structure step would respell.
 	for name in pairs(loaded) do
-		if type(name) == "string" and (name:find("^ui%.menu%f[^%w_]")
-			or name:find("^[%w_]+%.ui%.menu") or name:find("^menu%.ui%f[^%w_]")) then
+		local first, second
+		if type(name) == "string" then first, second = name:match("^([%w_]+)%.?([%w_]*)") end
+		if first and ((first == "ui" and second == "menu") or (first == "menu" and second == "ui")
+			or name:find("^[%w_]+%.ui%.menu")) then
 			loaded[name] = nil
 		end
 	end
@@ -748,6 +751,35 @@ function M.read_driver_source(symbol)
 		if not symbol or body:find(symbol, 1, true) then
 			parts[#parts + 1] = body
 		end
+	end
+	if #parts == 0 then return nil end
+	return table.concat(parts, "\n")
+end
+
+--- Whether a driver-relative path is a menu source: under ui/menu before the
+--- structure moves, then a feature's ui/menu/ or ui/menu_<x> and the menu
+--- feature's ui/ tree. Read by segments, which no structure step respells.
+--- @param path string Driver-relative path, forward slashes.
+--- @return boolean
+local function is_menu_source_path(path)
+	local segments = {}
+	for segment in path:gmatch("[^/]+") do segments[#segments + 1] = segment end
+	if segments[1] == "menu" and segments[2] == "ui" then return true end
+	for index = 1, #segments - 1 do
+		local following = segments[index + 1]
+		if segments[index] == "ui" and (following == "menu" or following:find("^menu_")) then return true end
+	end
+	return false
+end
+
+--- Returns the concatenated source of every production menu module, found by
+--- the path its header names, wherever its feature folder keeps it.
+--- @return string|nil source nil when no menu module is found.
+function M.read_menu_source()
+	local parts = {}
+	for _, body in ipairs(production_sources()) do
+		local header = body:match("^%-%-%- (%S+)")
+		if header and is_menu_source_path(header) then parts[#parts + 1] = body end
 	end
 	if #parts == 0 then return nil end
 	return table.concat(parts, "\n")

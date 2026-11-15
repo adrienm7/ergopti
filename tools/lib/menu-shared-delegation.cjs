@@ -52,7 +52,7 @@ function magicRendererPort(source, owner) {
 			tokens[i + 3]?.value === 'require' &&
 			tokens[i + 4]?.value === '(' &&
 			tokens[i + 5]?.kind === 'string' &&
-			tokens[i + 5]?.value === 'infra.manifest_menu' &&
+			tokens[i + 5]?.value === 'menu.engine.manifest_menu' &&
 			tokens[i + 6]?.value === ')'
 	);
 	const protectedImport = tokens.some(
@@ -70,7 +70,7 @@ function magicRendererPort(source, owner) {
 			tokens[i + 7]?.value === 'require' &&
 			tokens[i + 8]?.value === ',' &&
 			tokens[i + 9]?.kind === 'string' &&
-			tokens[i + 9]?.value === 'infra.manifest_menu' &&
+			tokens[i + 9]?.value === 'menu.engine.manifest_menu' &&
 			tokens[i + 10]?.value === ')'
 	);
 	if (!direct && !protectedImport) return false;

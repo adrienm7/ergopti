@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Scope = require("settings.engine.scope.preferences_scope")
 
 --- Creates the session owner for the two existing whole-gesture menu commands.

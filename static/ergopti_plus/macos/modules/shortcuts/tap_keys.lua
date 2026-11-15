@@ -34,7 +34,7 @@ local BindingPublication = require("settings.engine.publication.binding_publicat
 
 local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
-local Manifest   = require("infra.manifest_reader")
+local Manifest   = require("menu.engine.manifest_reader")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local Keycodes   = require("platform.input.keycodes")
 local FileSystem = require("core.fs.adapters.file_system")

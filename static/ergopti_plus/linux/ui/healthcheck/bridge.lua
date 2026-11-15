@@ -453,7 +453,7 @@ function M.configuration_context(schema, overrides)
 	return {
 		schema   = schema,
 		driver   = M.DRIVER,
-		features = overrides.features or function() return require("infra.manifest_reader").features() end,
+		features = overrides.features or function() return require("menu.engine.manifest_reader").features() end,
 		path_of  = overrides.path_of or function(id) return require("settings.engine.paths").config(names[id]) end,
 		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
@@ -594,7 +594,7 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 		configuration_files = { items = {} },
 		configuration = { items = {} },
 		unavailable = collect_timed("platform_coverage", function()
-			return require("diagnostics.engine.healthcheck.unavailable").collect(require("infra.manifest_reader"))
+			return require("diagnostics.engine.healthcheck.unavailable").collect(require("menu.engine.manifest_reader"))
 		end),
 		ai          = collect_timed("ai", function() return collect_ai(state) end),
 		network     = {},

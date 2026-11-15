@@ -11,15 +11,15 @@
 
 local M = {}
 
-local NativePresentation = require("infra.native_presentation")
+local NativePresentation = require("menu.engine.native_presentation")
 local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local Logger = require("core.logger.engine.shim")
 local MagicKeySourceRows = require("layouts.engine.layers.magic_key_source")
-local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+local ok_mm, ManifestMenu = pcall(require, "menu.engine.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
-local show_error = require("ui.menu.menu_dialogs").show_error
+local show_error = require("menu.ui.builder.dialogs").show_error
 
 local LOG = "ui.menu.menu_layouts"
 
@@ -297,7 +297,7 @@ local function _build_layouts(ctx)
 	end
 	-- How far GTK 3 applications compose the installed layouts' sequences.
 	providers["compose_input_method"] = function()
-		return require("ui.menu.compose_input_method_row").rows({ t = i18n_safe })
+		return require("menu.ui.compose_input_method_row").rows({ t = i18n_safe })
 	end
 	-- Input sources: the desktop's layouts, the active one ticked; choosing one
 	-- switches the desktop (ui/menu/active_layout_rows.lua), as macOS does.

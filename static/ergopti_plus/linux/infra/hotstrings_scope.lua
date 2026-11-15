@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Transaction = require("settings.engine.scope.transaction")
 local FencedTransaction = require("settings.engine.scope.fenced_transaction")
 local Writer = require("core.text.engine.toml_codec.writer")

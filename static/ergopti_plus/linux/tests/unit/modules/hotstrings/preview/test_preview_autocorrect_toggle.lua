@@ -29,7 +29,7 @@ local stored = {}
 package.loaded["infra.hotstring_preferences"] = {
 	get = function(path)
 		if stored[path] ~= nil then return stored[path] end
-		return require("infra.manifest_reader").default_for(path)
+		return require("menu.engine.manifest_reader").default_for(path)
 	end,
 	set = function(path, value) stored[path] = value; return true end,
 	is_explicit = function(path) return stored[path] ~= nil end,

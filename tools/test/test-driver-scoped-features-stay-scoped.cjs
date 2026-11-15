@@ -165,17 +165,18 @@ assert.match(policy, /return platform == "ahk" and/);
 for (const [driver, file, pattern, role] of [
 	[
 		'macos',
-		'menu_keyboard_layout.lua',
+		'macos/ui/menu/menu_keyboard_layout.lua',
 		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands\)/,
 		'read-only'
 	],
 	[
 		'linux',
-		'builder.lua',
+		'linux/menu/ui/builder/builder.lua',
 		/NumberRowPolicy\.native_rows\(ManifestMenu, render_ctx\.commands, \{/,
 		'live'
 	]
 ]) {
-	const native = readSourceFile(path.join(ROOT, 'static/ergopti_plus', driver, 'ui/menu', file));
+	// One driver-relative path per provider, so a structure step's rewrite follows it.
+	const native = readSourceFile(path.join(ROOT, 'static/ergopti_plus', file));
 	assert.match(native, pattern, `${driver}: actual ${role} native provider`);
 }

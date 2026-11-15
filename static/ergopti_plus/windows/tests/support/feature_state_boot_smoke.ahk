@@ -47,7 +47,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\core\fs\adapters\file_system.ahk
 #Include ..\..\platform\input\key_state.ahk
 #Include ..\..\core\text\engine\toml\helpers.ahk
-#Include ..\..\infra\manifest_reader.ahk
+#Include ..\..\menu\engine\manifest_reader.ahk
 ; The getter consumes the actual configuration-owner binding policy.
 #Include ..\..\core\text\engine\toml\config_loader.ahk
 #Include ..\..\settings\engine\preferences\feature_state.ahk

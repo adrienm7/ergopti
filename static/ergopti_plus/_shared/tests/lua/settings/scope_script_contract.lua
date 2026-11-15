@@ -194,7 +194,7 @@ return function(helpers, driver)
 		helpers.it("refuses a same-valued declaration owner replacement before file or aliases are written", function()
 			fixture(function(ctx)
 				local owner = ctx.create()
-				local manifest = require("infra.manifest_reader")
+				local manifest = require("menu.engine.manifest_reader")
 				local original = manifest.direct_scope_plan
 				manifest.direct_scope_plan = function(...) return original(...) end
 				local called, failure = pcall(function()
@@ -210,7 +210,7 @@ return function(helpers, driver)
 		end)
 		helpers.it("refuses a same-valued declaration successor interposed by the real config read", function()
 			fixture(function(ctx)
-				local manifest = require("infra.manifest_reader")
+				local manifest = require("menu.engine.manifest_reader")
 				local planner, reader = manifest.direct_scope_plan, ctx.files.read_with_status
 				local armed = false
 				ctx.files.read_with_status = function(path)
@@ -238,7 +238,7 @@ return function(helpers, driver)
 		helpers.it("refuses changed declaration metadata before file or aliases are written", function()
 			fixture(function(ctx)
 				local owner = ctx.create()
-				local manifest = require("infra.manifest_reader")
+				local manifest = require("menu.engine.manifest_reader")
 				local entry = (manifest.find_declared_entry_by_path or manifest.find_entry_by_path)("script.locale")
 				local original = entry.platforms
 				entry.platforms = { "ahk" }
@@ -278,7 +278,7 @@ return function(helpers, driver)
 				local owner = ctx.create()
 				local participant = require("settings.engine.scope.participant").synchronous({
 					apply = function(mode) return owner.apply(mode) end, owner = function() return owner end })
-				local composition = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"),
+				local composition = require("settings.engine.scope.composition").new({ manifest = require("menu.engine.manifest_reader"),
 					scope = "global", logger = require(driver == "linux" and "core.logger.engine.shim" or "core.logger.engine.logger"),
 					participants = function() return { global = participant } end })
 				local committed, report

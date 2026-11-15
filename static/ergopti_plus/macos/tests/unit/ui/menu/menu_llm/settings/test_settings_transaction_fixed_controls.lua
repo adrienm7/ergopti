@@ -43,7 +43,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 		file:close()
 		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
 		with_fixture({ translate = translate }, function(f)
-			local menu = package.loaded["infra.manifest_menu"]
+			local menu = package.loaded["menu.engine.manifest_menu"]
 			local root, frame = menu.get_root(), menu.get_array("llm_modifier_picker_frame")
 			local original = frame[1].i18n
 			local ok, detail = xpcall(function()
@@ -80,7 +80,7 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 		helpers.it("refuses the actual missing " .. section .. " before native action delivery and repairs it", function()
 			with_fixture({ parent_only = true }, function(f)
 				local rebuild = f.top_level_callbacks().rebuild
-				local menu = package.loaded["infra.manifest_menu"]
+				local menu = package.loaded["menu.engine.manifest_menu"]
 				local root, declaration = menu.get_root(), menu.get_array(section)
 				helpers.assert_true(#declaration > 0)
 				local before = rebuild()
@@ -215,7 +215,7 @@ helpers.describe("Complete LLM generation: independent native images", function(
 	for _, section in ipairs({ "llm_generation_count_control", "llm_generation_count_reset_control", "llm_generation_temperature_controls" }) do
 		helpers.it("refuses withdrawn " .. section .. " without effects and repairs its actual owner", function()
 			with_fixture({ parent_only = true }, function(f)
-				local rebuild, menu = f.top_level_callbacks().rebuild, package.loaded["infra.manifest_menu"]
+				local rebuild, menu = f.top_level_callbacks().rebuild, package.loaded["menu.engine.manifest_menu"]
 				local root, declaration = menu.get_root(), menu.get_array(section)
 				local before = rebuild()
 				helpers.assert_true(#declaration > 0 and #before > 0)

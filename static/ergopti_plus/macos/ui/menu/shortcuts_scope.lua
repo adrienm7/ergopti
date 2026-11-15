@@ -3,7 +3,7 @@
 --- Applies complete shortcut intent through the existing native and source owners.
 local M = {}
 local PhysicalAvailability = require("shortcuts.engine.physical_availability")
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Preferences = require("settings.engine.preferences.preferences")
 local Scope = require("settings.engine.scope.preferences_scope")
 local MOD_COMBOS = require("settings.engine.keys").KEY.MOD_COMBOS

@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "settings.engine.paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "menu.engine.manifest_reader", "settings.engine.paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()

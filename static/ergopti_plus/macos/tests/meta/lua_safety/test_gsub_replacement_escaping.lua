@@ -34,7 +34,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Subtrees that ship in the driver.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings", "menu" }
 
 -- Replacement expressions that are safe by construction and need no escaping:
 -- string literals, and calls that already escape.

@@ -2,7 +2,7 @@
 
 --- Isolates functional AI controls from the user's canonical configuration.
 local M = {}
-local Manifest = require("infra.manifest_reader")
+local Manifest = require("menu.engine.manifest_reader")
 local Fakes = require("tests.fakes")
 
 --- Builds a sparse preference port; physical persistence has separate file tests.

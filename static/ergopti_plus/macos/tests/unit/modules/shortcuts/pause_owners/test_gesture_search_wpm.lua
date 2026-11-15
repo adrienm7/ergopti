@@ -186,7 +186,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		package.loaded["modules.gestures.engine"] = gesture_engine
 		package.loaded["modules.gestures.conflicts"] = permissive()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-		package.loaded["infra.manifest_reader"] = {
+		package.loaded["menu.engine.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}

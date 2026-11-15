@@ -50,7 +50,7 @@
  * WHAT IT DELIBERATELY DOES NOT DO:
  * render the three menus and diff their translated labels. That needs Linux to
  * read the manifest at runtime, which is a 561-line renderer port
- * (macos/infra/manifest_menu.lua is the reference). This gate is the half that
+ * (macos/menu/engine/manifest_menu.lua is the reference). This gate is the half that
  * can be true today, and it is what makes that port checkable when someone does
  * it: the shape is pinned first, so the port cannot quietly change it.
  * ==============================================================================
@@ -67,7 +67,7 @@ const { readSourceFile } = require('../lib/linux-menu-parts.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 const MANIFEST = path.join(SP, '_shared', 'menu', 'data', 'menu_manifest.json');
-const LINUX_BUILDER = path.join(SP, 'linux', 'ui', 'menu', 'builder.lua');
+const LINUX_BUILDER = path.join(SP, 'linux', 'menu', 'ui', 'builder', 'builder.lua');
 
 // The separator id, which carries no identity and cannot be compared by name.
 const SEPARATOR = '---';
@@ -289,8 +289,8 @@ if (declaredOrder !== builtOrder && !KNOWN_ORDER_DIVERGENCES.linux) {
 
 const DRIVER_ROOTS = {
 	hs: {
-		file: path.join(SP, 'macos', 'ui', 'menu', 'builder.lua'),
-		label: 'macos/ui/menu/builder.lua',
+		file: path.join(SP, 'macos', 'menu', 'ui', 'builder', 'builder.lua'),
+		label: 'macos/menu/ui/builder/builder.lua',
 		// The dispatch loop, which must read the WHOLE array, not a tail of it.
 		loop: 'for _, entry in ipairs(load_top_level()) do',
 		// The builder table M.generate dispatches through. Its entries sit two
@@ -300,8 +300,8 @@ const DRIVER_ROOTS = {
 		key: /^\t\t\["(\w+)"\]\s*=/gm
 	},
 	ahk: {
-		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_init.ahk'),
-		label: 'windows/ui/menu/menu_init.ahk',
+		file: path.join(SP, 'windows', 'menu', 'ui', 'builder', 'menu_init.ahk'),
+		label: 'windows/menu/ui/builder/menu_init.ahk',
 		loop: '_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders)',
 		factory: 'Builders := _MI_TopLevelBuilders()',
 		// The Map _MI_TopLevelBuilders returns: one "id", builder pair per line.

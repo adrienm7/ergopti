@@ -96,7 +96,7 @@ end
 function M.defaults()
 	-- Required here, not at load: the gesture layer reads only the paused
 	-- actions, and must not pull the whole manifest reader in with them.
-	local Manifest = require("infra.manifest_reader")
+	local Manifest = require("menu.engine.manifest_reader")
 	local assignments = {}
 	for _, slot in ipairs(M.get().slots) do
 		assignments[slot.id] = Manifest.default_for(M.path(slot.id))
