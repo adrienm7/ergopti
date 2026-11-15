@@ -151,9 +151,17 @@ while paused on the three OS; the key is saved at once and stays inert until
 resume, since a paused driver remaps nothing; a pause or a resume during the
 capture cancels it. Before, all three refused it while paused (macOS dropped the
 row's action, Linux `can_capture` required `is_active`, Windows
-`MagicKeySourceCapture` returned on `A_IsSuspended`). The Windows tray still
-greys the Layout submenu while paused, so the row is reachable there once that
-greying is lifted (EDD-1 on AHK).
+`MagicKeySourceCapture` returned on `A_IsSuspended`).
+
+The Windows tray greyed the whole Layout submenu while paused, so the capture
+was unreachable there (decided by the coordinator on 2026-11-14 to lift it):
+the Layout head now stays live while paused, a pause or a resume builds its
+rows again at the next open (`MenuDeferred_Rearm`, the tray root being kept
+under a pause), and only the layout manager and the layout editor, whose pages
+refuse every command under Suspend, are greyed with « ErgoptiPlus est en
+pause ». The pause and resume layout pickers no longer grey while paused, as
+on macOS and Linux. Regressions: `test_tray_pause_greys_features.ahk`
+`(paused-layout-live)`.
 
 | OS      | Change                                                                                                    | Regression                                                        |
 | ------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -176,10 +184,13 @@ WPM, and counted every modifier chord, while paused (`handle_physical`,
 `handle_control`, `consume_bound_chord`); macOS and Windows drop them. Regression:
 `test_paused_driver_records_no_keys` `(paused-records-no-keys)`.
 
-Open, macOS: nothing explicitly ends CapsWord at pause, where Windows and Linux
-do. Karabiner's paused graph holds no CapsWord rule, so its auto-off cannot
-answer; whether the system CapsLock it raised stays on through the pause can
-only be seen on a Mac.
+Fixed on macOS: nothing ended CapsWord at pause, where Windows and Linux do.
+The paused Karabiner graph holds no CapsWord rule, so its auto-off could not
+answer and its CapsLock stayed on through the pause. The pause inventory now
+runs the one-way `watchers.end_capsword_for_pause`, which clears only a CapsWord
+known active. Regressions: `test_pause_ends_capsword`,
+`test_watchers_capsword_auto_off` `(paused-ends-capsword)`; field point
+`pause_ends_capsword`.
 
 ## Left (next pass, listed rather than guessed)
 
@@ -190,7 +201,6 @@ source proofs reworked first:
 - AI menus: turning the AI on (it starts model warmups and may offer an
   install), and on Windows the model and API entry rows, the whole-scope
   restore and clear, and the tray's greying of the AI submenu.
-- macOS CapsWord at pause, to see on a Mac (see the typing-inertness audit).
 - Windows: every `A_IsSuspended` gate is listed in
   [the Windows inventory](windows-inventory.md); the fourth pass removed the
   personal editor, word expander, terminator, extension scope and AI settings
