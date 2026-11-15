@@ -66,7 +66,9 @@ _HRG_RebuildIsGuarded() {
 		"HSE_FindMatchAtEnd must return no match for either rebuild fence before reading any registry index (hse-registry-torn-read-vs-onmessage)")
 	
 	; 3. Verify the serialized coordinator owns the fence across every pass.
-	MenuSrc := _HRG_ReadSource("menu_rebuild.ahk")
+	; The file that defines the live-rebuild coordinator, read by that symbol so
+	; the lookup follows it through a move or a rename.
+	MenuSrc := _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol("RebuildHotstringsLive"), "UTF-8"))
 	Coordinator := _DriverFuncBody("RebuildHotstringsLive")
 	AcquireBody := _DriverFuncBody("_HSLR_RequestAndTryAcquire")
 	ReleaseBody := _DriverFuncBody("_HSLR_TryReleaseIfDrained")
