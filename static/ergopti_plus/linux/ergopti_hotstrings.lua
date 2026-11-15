@@ -1346,8 +1346,6 @@ local function main()
 			-- application's time starts again with the resume.
 			keystats.set_script_paused(paused == true)
 			if not paused and _cached_app_id then keystats.on_app_focus(_cached_app_id) end
-			-- The spotlight ring is an overlay of its own timer: a pause ends it.
-			if paused then require("modules.gestures.pointer_spotlight").dismiss() end
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
@@ -1355,6 +1353,8 @@ local function main()
 			MagicKeySource.cancel_capture()
 			-- A dead key pending in the emulation must not compose after the resume.
 			if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end
+			-- The spotlight ring is an overlay of its own timer: a pause ends it.
+			if paused then require("modules.gestures.pointer_spotlight").dismiss() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end

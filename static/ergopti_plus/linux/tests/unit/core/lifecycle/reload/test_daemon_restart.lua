@@ -322,6 +322,9 @@ helpers.describe("Main early pause restoration", function()
 					keystats = {
 						cancel_hold_intervals = function() end,
 						discard_roi = function() pause_steps[#pause_steps + 1] = "roi" end,
+						-- Every metric follows the pause (paused-records-no-keys).
+						set_script_paused = function() end,
+						on_app_focus = function() end,
 					}, engine = { reset = function() end },
 					MagicKeySource = { cancel_capture = function() end }, perform_reload = function() end,
 					shutdown = { request = function() end },
