@@ -99,7 +99,7 @@ end)
 
 helpers.describe("config_paths metrics directory", function()
 	local function real_config_paths()
-		return helpers.load_with_stubs("infra.config_paths", {})
+		return helpers.load_with_stubs("settings.engine.paths", {})
 	end
 
 	helpers.it("(onboarding-metrics-path) the metrics store sits at the folder root", function()

@@ -92,7 +92,7 @@ end)
 helpers.describe('Mac physical reason transport under production Boolean admission contract',function()
  for _, mode in ipairs({'collision','private scalar path argv'})do
   helpers.it('retains only closed native reason through a Boolean-only admission: '..(mode=='collision' and 'known' or 'unknown'),function()
-   local Scoped=require('ui.menu.scoped_preferences')
+   local Scoped=require('settings.ui.menu.scoped_preferences')
    local baseline={status='ok',content='controlled original source'}
    local owner=Scoped.new({scope='shortcuts',path='controlled',state={},files={},paused=function()return false end,
     admission=function(_,callback)return callback()==true end,backup_path=function()return 'protected' end,

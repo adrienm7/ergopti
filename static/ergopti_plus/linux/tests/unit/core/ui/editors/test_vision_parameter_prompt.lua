@@ -87,12 +87,12 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 		local TextPrompt = require("core.ui.ui.text_prompt")
 		local held_ask = TextPrompt.ask
 		local held_prompt = package.loaded["ui.vision_parameter_prompt"]
-		local held_tx = package.loaded["infra.program_binding_transaction"]
+		local held_tx = package.loaded["settings.engine.preferences.program_binding_transaction"]
 		TextPrompt.ask = function() typed = typed + 1; return "openai" end
 		package.loaded["ui.vision_parameter_prompt"] = { ask = function(_, prior)
 			listed = listed + 1; helpers.assert_eq(prior, "local"); return "openai|gpt-4o"
 		end }
-		package.loaded["infra.program_binding_transaction"] = { pending = function() return false end,
+		package.loaded["settings.engine.preferences.program_binding_transaction"] = { pending = function() return false end,
 			apply = function(_, value) stored = value; return true end }
 		local ok, failure = pcall(function()
 			-- The tray root defines the i18n_safe global the dialog helpers read.
@@ -109,7 +109,7 @@ helpers.describe("screen action vision parameter (linux-vision-choice-list)", fu
 		end)
 		TextPrompt.ask = held_ask
 		package.loaded["ui.vision_parameter_prompt"] = held_prompt
-		package.loaded["infra.program_binding_transaction"] = held_tx
+		package.loaded["settings.engine.preferences.program_binding_transaction"] = held_tx
 		if not ok then error(failure, 0) end
 		helpers.assert_eq({ typed, listed, stored }, { 0, 1, "openai|gpt-4o" })
 	end)

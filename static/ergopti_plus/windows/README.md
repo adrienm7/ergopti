@@ -12,7 +12,7 @@ The Windows implementation of ErgoptiPlus.
 >
 > Two name collisions to know before navigating: `modules/keymap/` is the
 > **physical layout remap** here and the **hotstring expansion engine** on macOS;
-> `infra/registry.ahk` is a **Windows-registry** wrapper while
+> `settings/engine/registry.ahk` is a **Windows-registry** wrapper while
 > `macos/modules/keymap/registry.lua` is the **hotstring registry**.
 
 ## Entry point

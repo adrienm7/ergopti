@@ -5,12 +5,12 @@ local h = require("tests.helpers")
 local Fixture = require("tests.support.gesture_actions_fixture")
 local eq = h.assert_eq
 local function action_scope(fresh, body)
-	return h.with_stub_scope({ "infra.preferences", "modules.gestures.native_app_switcher_action" }, function()
+	return h.with_stub_scope({ "settings.engine.preferences.preferences", "modules.gestures.native_app_switcher_action" }, function()
 		local actions, calls = fresh()
 		local state = { ga = { tap_3 = "system_app_switcher" } }
 		actions.init(state)
 		local source_current, content, publication = true, "canonical source", nil
-		package.loaded["infra.preferences"] = {
+		package.loaded["settings.engine.preferences.preferences"] = {
 			source_snapshot = function() return { status = "ok", content = "canonical source" } end,
 			capture_source_delivery_guard = function() return function() return source_current end end,
 		}

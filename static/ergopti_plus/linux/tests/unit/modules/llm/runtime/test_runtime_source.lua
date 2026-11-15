@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "settings.engine.paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
@@ -91,7 +91,7 @@ local function world()
 			return {section='llm.models',key='ollama',value=value}
 		end}
 	package.loaded['infra.manifest_reader']=manifest
-	package.loaded['infra.config_paths']={config=function()return '/memory/config.toml'end}
+	package.loaded['settings.engine.paths']={config=function()return '/memory/config.toml'end}
 	package.loaded['settings.engine.migration.outdated']={manifest_value_fits=function()return true end,canonical_enum_value=function(_,value)return value end,report=function()end}
 	package.loaded['core.text.engine.toml_codec.writer']=routed
 	local prefs = helpers.load_module("infra.llm_preferences")

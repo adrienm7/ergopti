@@ -25,7 +25,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 	read_with_status = function() return nil, "absent" end,
 	write = function() return true end,
 }
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
 package.loaded["platform.input.keycodes"] = {

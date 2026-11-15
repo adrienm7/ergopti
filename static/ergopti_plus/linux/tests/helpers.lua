@@ -179,27 +179,37 @@ function M.read_module_source(module_name)
 	return body
 end
 
+--- Finds a driver module's file by its module name, as require would.
+--- @param name string Module name.
+--- @return string|nil path nil when the driver holds no such module.
+function M.driver_module_path(name)
+	local root = M.driver_root()
+	return package.searchpath(name, root .. "/?.lua;" .. root .. "/?/init.lua")
+end
+
 --- Returns the tray root's source followed by every section module it binds.
 --- ui/menu/builder.lua binds each section builder from its own
 --- ui/menu/menu_<section>.lua; a test that looks for a builder's code by text
 --- finds it in whichever of these files now holds it.
 --- @return string The root's text, then each module it or a part binds, in binding order.
 function M.read_menu_source()
-	local directory = M.driver_root() .. "/ui/menu/"
-	local function read(name)
-		local handle = assert(io.open(directory .. name .. ".lua", "rb"))
+	local root = M.driver_root()
+	local search = root .. "/?.lua;" .. root .. "/?/init.lua"
+	local function read(path)
+		local handle = assert(io.open(path, "rb"))
 		local text = assert(handle:read("*a"))
 		assert(handle:close())
 		return text
 	end
 	-- A part may bind another part (the dialogs), which the root no longer names.
-	local texts, seen, index = { read("builder") }, {}, 1
+	-- The sections live in their features' folders: each is found by its module
+	-- name; a menu module outside the driver (a shared one) is not a section.
+	local texts, seen, index = { read(assert(package.searchpath("ui.menu.builder", search))) }, {}, 1
 	while texts[index] do
-		for name in texts[index]:gmatch('require%("ui%.menu%.(menu_[a-z_]+)"%)') do
-			if not seen[name] then
-				seen[name] = true
-				texts[#texts + 1] = read(name)
-			end
+		for name in texts[index]:gmatch('require%("([%w_%.]*menu[%w_%.]*)"%)') do
+			local path = not seen[name] and package.searchpath(name, search)
+			seen[name] = true
+			if path then texts[#texts + 1] = read(path) end
 		end
 		index = index + 1
 	end

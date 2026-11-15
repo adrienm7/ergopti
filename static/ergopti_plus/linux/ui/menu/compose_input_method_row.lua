@@ -44,7 +44,7 @@ local LABELS = {
 function M.state_path(getenv)
 	getenv = getenv or os.getenv
 	local root = getenv(M.ROOT_ENV)
-	if root == nil or root == "" then root = require("infra.config_paths").config_home() .. "/xkb" end
+	if root == nil or root == "" then root = require("settings.engine.paths").config_home() .. "/xkb" end
 	return root .. "/" .. M.STATE_FILE
 end
 

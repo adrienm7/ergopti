@@ -9,7 +9,7 @@ local FencedTransaction = require("settings.engine.scope.fenced_transaction")
 local Logger = require("core.logger.engine.shim")
 local LOG = "infra.llm_scope"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("llm_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("llm_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 local OWNERS = { "settings", "trigger_settings", "display_settings", "navigation_settings",
 	"profile_settings", "agent_settings", "profiles" }
@@ -94,7 +94,7 @@ function M.apply(mode)
 	if mode ~= "clear" and mode ~= "recommended" then return false end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path, backup_path = path .. ".llm-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
 	Logger.start(LOG, "AI preference scope %s started.", mode)
 	local ok, detail = _owner.apply(mode)

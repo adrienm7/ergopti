@@ -27,13 +27,45 @@ const path = require('node:path');
 const { scriptTokens } = require('./script-source.cjs');
 
 const LINUX_MENU_ROOT = 'linux/ui/menu/builder.lua';
-const PART_MODULE = /^ui\.menu\.menu_([a-z][a-z_]*)$/;
+// The closed set of part modules, by module name. Each section's builder
+// binding is named after its module's last segment without menu_
+// (`_build_quit` for ui.menu.menu_quit). The parts once shared the prefix
+// ui.menu.menu_; the feature-first tree puts each in its feature's folder
+// (settings.ui.menu.configuration, menu.ui.builder.quit), so a name pattern
+// would silently drop every section a structure step moves. The names are Lua
+// module names the structure plan respells (edits.cjs MODULE_NAME_FILES), and
+// every listed module must exist.
+const PART_MODULES = new Set([
+	'ui.menu.menu_about',
+	'ui.menu.menu_agent',
+	'ui.menu.menu_apps',
+	'settings.ui.menu.configuration',
+	'ui.menu.menu_debug',
+	'ui.menu.menu_dialogs',
+	'ui.menu.menu_ergopti_studio',
+	'ui.menu.menu_gestures',
+	'ui.menu.menu_hotstrings',
+	'settings.ui.menu.language',
+	'ui.menu.menu_layouts',
+	'ui.menu.menu_llm',
+	'ui.menu.menu_metrics',
+	'ui.menu.menu_quit',
+	'ui.menu.menu_reload',
+	'ui.menu.menu_shortcuts',
+	'ui.menu.menu_tap_holds'
+]);
+// The root's own module name, which it spells only in its LOG source.
+const ROOT_LOG = 'ui.menu.builder';
+
+/** Whether a module name is one of the part modules. */
+function isPartModule(moduleName) {
+	return PART_MODULES.has(moduleName);
+}
 
 /** The repository-relative file of one part module, or null for a foreign name. */
 function partFile(moduleName) {
-	const match = PART_MODULE.exec(moduleName);
-	if (!match || match[1] === 'builder') return null;
-	return 'linux/ui/menu/menu_' + match[1] + '.lua';
+	if (!isPartModule(moduleName)) return null;
+	return 'linux/' + moduleName.split('.').join('/') + '.lua';
 }
 
 /** Lexes Lua with each token's block depth; null on unbalanced blocks. */
@@ -124,8 +156,12 @@ function partBinding(unit, at) {
 
 /** The export a binding of `name` must read: `build` for a section builder, else its own name. */
 function expectedField(name, moduleName) {
-	const match = PART_MODULE.exec(moduleName);
-	return match && name === '_build_' + match[1] ? 'build' : name;
+	if (!PART_MODULES.has(moduleName)) return name;
+	const section = moduleName
+		.split('.')
+		.pop()
+		.replace(/^menu_/, '');
+	return name === '_build_' + section ? 'build' : name;
 }
 
 /** Positions where `name` is declared or assigned outside table keys. */
@@ -245,7 +281,11 @@ function readPart(file, source) {
 	const unit = lex(source);
 	if (!unit) return { ok: false, reason: file + ': unbalanced Lua blocks' };
 	const t = unit.tokens;
-	const moduleName = 'ui.menu.' + path.basename(file, '.lua');
+	const moduleName = file
+		.replace(/^linux\//, '')
+		.replace(/\.lua$/, '')
+		.split('/')
+		.join('.');
 	const imports = [],
 		partBindings = [],
 		definitions = new Set(),
@@ -289,7 +329,7 @@ function readPart(file, source) {
 		}
 		if (phase === 'exports') return refuse('a statement follows the exports');
 		const binding = partBinding(unit, at);
-		if (binding && PART_MODULE.test(binding.module)) {
+		if (binding && isPartModule(binding.module)) {
 			if (phase !== 'header') return refuse('a part binding follows a definition');
 			if (expectedField(binding.name, binding.module) !== binding.field)
 				return refuse('binding ' + binding.name + ' reads a foreign field');
@@ -396,11 +436,26 @@ function composeLinuxMenuRoot(sources) {
 	const t = root.tokens;
 	const blocks = [];
 	for (let at = 0; at < t.length; at++) {
-		if (t[at].kind !== 'string' || !PART_MODULE.test(t[at].value)) continue;
-		if (t[at].value === 'ui.menu.builder') {
+		if (t[at].kind !== 'string') continue;
+		if (t[at].value === ROOT_LOG) {
 			// The root's own log source is the one other place its name appears.
-			if (spells(root, at - 3, 'local LOG = "ui.menu.builder"') === at + 1) continue;
+			if (spells(root, at - 3, 'local LOG = "' + ROOT_LOG + '"') === at + 1) continue;
 			return refuse(LINUX_MENU_ROOT + ': the root names itself outside its LOG');
+		}
+		if (!isPartModule(t[at].value)) {
+			// A section builder bound from any other module is a foreign wiring,
+			// never an import the composition may leave in place.
+			const foreign = partBinding(root, at - 5);
+			if (foreign && foreign.module === t[at].value && foreign.name.startsWith('_build_'))
+				return refuse(
+					LINUX_MENU_ROOT +
+						': ' +
+						foreign.name +
+						' is bound from ' +
+						foreign.module +
+						', which is no part module'
+				);
+			continue;
 		}
 		const binding = partBinding(root, at - 5);
 		if (!binding || root.depth[binding.at] !== 0 || root.braces[binding.at] !== undefined)
@@ -530,9 +585,19 @@ function composeLinuxMenuRoot(sources) {
 	return { ok: true, source: result, parts: [...composed].map(partFile) };
 }
 
-/** Root plus every part module it or a part binds, read from `<pluginRoot>/linux/ui/menu`. */
+/** Root plus every part module it or a part binds, read from under `<pluginRoot>/linux`. */
 function readLinuxMenuSources(pluginRoot) {
 	const read = (file) => fs.readFileSync(path.join(pluginRoot, file), 'utf8');
+	// A listed part that no longer exists is a stale table, not an absent section.
+	for (const moduleName of PART_MODULES.keys())
+		if (!fs.existsSync(path.join(pluginRoot, partFile(moduleName))))
+			throw new Error(
+				'Linux menu part ' +
+					moduleName +
+					' is listed but ' +
+					partFile(moduleName) +
+					' does not exist'
+			);
 	const sources = { [LINUX_MENU_ROOT]: read(LINUX_MENU_ROOT) };
 	const pending = [LINUX_MENU_ROOT];
 	while (pending.length) {

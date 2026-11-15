@@ -145,8 +145,8 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 
 	helpers.it("accented-shortcut: the settings are config.toml's, over the manifest defaults", function()
 		local path = os.tmpname()
-		local saved = package.loaded["infra.config_paths"]
-		package.loaded["infra.config_paths"] = { config = function() return path end }
+		local saved = package.loaded["settings.engine.paths"]
+		package.loaded["settings.engine.paths"] = { config = function() return path end }
 		local ok, err = pcall(function()
 			Sandbox.write_bytes(path, "")
 			local Accented = fresh()
@@ -162,7 +162,7 @@ helpers.describe("linux accented-letter shortcuts (linux-accented-shortcuts)", f
 				function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(marked, { "shortcuts.e_acute.enabled" }, "an outdated letter is left for the cleanup")
 		end)
-		package.loaded["infra.config_paths"] = saved
+		package.loaded["settings.engine.paths"] = saved
 		os.remove(path)
 		if not ok then error(err, 0) end
 	end)

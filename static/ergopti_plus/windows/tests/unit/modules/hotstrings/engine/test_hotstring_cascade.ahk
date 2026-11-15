@@ -410,7 +410,7 @@ _HCA_SetterPersistsAndPublishes() {
 	}
 }
 
-; The loader (infra/feature_state.ahk) is not part of the headless suite, so its
+; The loader (settings/engine/preferences/feature_state.ahk) is not part of the headless suite, so its
 ; reader _FeatureStateCascadeMaxArrows cannot be called here. Its rule is the
 ; engine's HSE_ValidCascadeMaxArrows, checked on the cases the reader must accept
 ; or fall back from, while the source pins that the loader restates the same rule
@@ -429,7 +429,7 @@ _HCA_LoaderReadsTheDepth() {
 		HSE_CascadeMaxArrows := ""
 		AssertEqual(3, HSE_CascadeMaxArrowsCurrent(), "before the loader ran the engine reads the manifest default")
 	} finally HSE_CascadeMaxArrows := Saved
-	Source := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
+	Source := FileRead(A_ScriptDir . "\..\settings\engine\preferences\feature_state.ahk", "UTF-8")
 	AssertTrue(InStr(Source, "_FeatureStateCascadeMaxArrows(") > 0
 		&& InStr(Source, "ConfigLeaf.CASCADE_MAX_ARROWS") > 0
 		&& InStr(Source, "(Raw is Integer) and Raw >= 1 and Raw <= 10") > 0,

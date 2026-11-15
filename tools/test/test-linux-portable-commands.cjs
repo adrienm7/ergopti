@@ -620,7 +620,7 @@ const PROGRAMS = {
 	}),
 	cmd: why('cmd.exe, in the Windows branch of a portable test', TEST, {
 		proof: {
-			file: `${LINUX_DIR}/tests/unit/infra/config/test_paths_shared_root_layouts.lua`,
+			file: `${LINUX_DIR}/tests/unit/settings/test_paths_shared_root_layouts.lua`,
 			token: 'package\\.config:sub\\(1, 1\\) == "\\\\\\\\"'
 		}
 	}),

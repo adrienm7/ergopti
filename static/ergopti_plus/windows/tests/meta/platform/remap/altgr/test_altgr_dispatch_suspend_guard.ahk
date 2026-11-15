@@ -94,7 +94,7 @@ _ADSG_SuspendExemptionIsScopedToManagement() {
 	; The pause check moved into ScriptShortcutSlotRunsAction, which every chord's
 	; #HotIf and RunScriptShortcutAction ask (script-chord-slot-2026-09-30).
 	Body := _DriverFuncBody("RunScriptShortcutAction")
-	Assert(Body != "", "RunScriptShortcutAction must exist in infra/config_io.ahk")
+	Assert(Body != "", "RunScriptShortcutAction must exist in settings/engine/io.ahk")
 	GatePos := InStr(Body, "ScriptShortcutSlotRunsAction(Slot)")
 	InvokePos := InStr(Body, "GestureInvokeAction(")
 	Assert(GatePos > 0 && InvokePos > GatePos,

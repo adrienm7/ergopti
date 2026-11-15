@@ -186,7 +186,7 @@ helpers.describe("private program retained compensation owner", function()
 			local options = { [mode] = true }
 			if mode == "durable_refusal" then
 				options.snapshot_view = function(snapshot)
-					snapshot = require("ui.menu.preferences_transaction").clone(snapshot)
+					snapshot = require("settings.ui.menu.preferences_transaction").clone(snapshot)
 					snapshot.gesture_action_parameters.keyboard__primary_1__run_program = SCALAR:gsub("secret%-tool", "other-tool")
 					return snapshot
 				end

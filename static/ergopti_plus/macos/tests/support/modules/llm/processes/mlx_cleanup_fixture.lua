@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.config_paths",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "settings.engine.paths",
 	"core.text.engine.utils", "core.timing.engine.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
 	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
 	"core.events.timer_scheduler", "core.process.adapters.task_lifecycle", "modules.llm.profiles",
@@ -50,7 +50,7 @@ function M.with_commands(callback)
 			}
 			package.loaded["core.ui.engine.notifications"] = { notify = noop }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
+			package.loaded["settings.engine.paths"] = { get = function() return "/fixture/model.txt" end }
 			package.loaded["core.text.engine.utils"] = { shell_quote = M.quote }
 			package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }

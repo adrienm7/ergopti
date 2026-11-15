@@ -162,7 +162,7 @@ local function load_remap(initially_enabled, options)
 	}
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function() return "missing-config.toml" end,
 		get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 	}

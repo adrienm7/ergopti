@@ -297,7 +297,7 @@ function read(folder, name) {
 		});
 
 		await check("the logs folder and file names are the driver's own", () => {
-			assert.match(collector, /require\("infra\.config_paths"\)\.get_logs_dir\(\)/);
+			assert.match(collector, /require\("settings\.engine\.paths"\)\.get_logs_dir\(\)/);
 			assert.match(collector, /require\("core.fs.engine.app_dirs"\)/);
 			assert.doesNotMatch(
 				collector.replace(/^\s*#.*$/gm, ''),

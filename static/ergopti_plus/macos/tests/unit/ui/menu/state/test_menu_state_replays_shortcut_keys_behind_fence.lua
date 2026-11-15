@@ -124,7 +124,7 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 	end)
 
 	helpers.it("warns once about a removed saved key and never refuses the boot (config-outdated-at-hash)", function()
-		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "settings.engine.preferences.preferences" }, function()
 		Fixture.with_bindings(function(bindings, ctx)
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
@@ -132,7 +132,7 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 			shim.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
 			package.loaded["core.logger.engine.shim"] = shim
 			helpers.load_with_stubs("settings.engine.migration.outdated")
-			local Preferences = helpers.load_with_stubs("infra.preferences")
+			local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			local decoded = require("core.text.engine.toml_codec").decode(OUTDATED_KEYS)
 
 			-- The loader is the gate: the removed id never reaches the replay.

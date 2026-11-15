@@ -188,8 +188,8 @@ local function with_write_receipts(channel, refusal, body)
 	function logger.disable_repeat_collapsing() end
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
-	local previous_paths = package.loaded["infra.config_paths"]
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return dir end,
+	local previous_paths = package.loaded["settings.engine.paths"]
+	package.loaded["settings.engine.paths"] = { get_logs_dir = function() return dir end,
 		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function() return 0 end
 	io.stdout = { write = function(_, line) state.console[#state.console + 1] = line; return true end,
@@ -231,7 +231,7 @@ local function with_write_receipts(channel, refusal, body)
 	Sink.uninstall(logger)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
-	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["settings.engine.paths"] = previous_paths
 	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
@@ -309,10 +309,10 @@ local function with_repoint_receipts(case, body)
 	local state = { phase = "initial", target = old, old = {}, candidates = {}, console = {}, diagnostics = {} }
 	local original_open, original_execute = io.open, os.execute
 	local original_stdout, original_stderr = io.stdout, io.stderr
-	local previous_paths = package.loaded["infra.config_paths"]
+	local previous_paths = package.loaded["settings.engine.paths"]
 	local logger = { set_sink = function(callback) state.emit = callback end,
 		enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
-	package.loaded["infra.config_paths"] = { get_logs_dir = function() return state.target end,
+	package.loaded["settings.engine.paths"] = { get_logs_dir = function() return state.target end,
 		get_config_dir = function() return "/home/fixture-user/.config/ergopti" end }
 	os.execute = function()
 		if state.phase ~= "initial" and case.mode == "mkdir" then return false end
@@ -365,7 +365,7 @@ local function with_repoint_receipts(case, body)
 	Sink.uninstall(logger)
 	io.open, os.execute = original_open, original_execute
 	io.stdout, io.stderr = original_stdout, original_stderr
-	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["settings.engine.paths"] = previous_paths
 	package.loaded["core.fs.engine.regular_file_writer"] = saved_writer
 	if not ok then error(err, 0) end
 end
@@ -716,7 +716,7 @@ local function with_private_log_sink(options, body)
 	local policy = assert(read_file(policy_path))
 	local saved_open, saved_execute, saved_getenv = io.open, os.execute, os.getenv
 	local saved_stdout, saved_stderr = io.stdout, io.stderr
-	local names = { "core.fs.engine.paths", "infra.config_paths", "core.timing.engine.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
+	local names = { "core.fs.engine.paths", "settings.engine.paths", "core.timing.engine.timings", "core.logger.engine.sink", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local state = { main = {}, errors = {}, console = {}, diagnostics = {}, commands = 0, policy_reads = 0,
@@ -724,7 +724,7 @@ local function with_private_log_sink(options, body)
 	local logger = { enable_repeat_collapsing = function() end, disable_repeat_collapsing = function() end }
 	function logger.set_sink(callback) state.emit = callback end
 	local Sink = helpers.load_module("core.logger.engine.sink")
-	local DirectoryResolver = helpers.load_module("infra.config_paths")
+	local DirectoryResolver = helpers.load_module("settings.engine.paths")
 	state.account_home, state.directory_home = DirectoryResolver.account_home, DirectoryResolver.home
 	state.home_resolutions = 0
 	package.loaded["core.fs.engine.paths"] = {
@@ -735,7 +735,7 @@ local function with_private_log_sink(options, body)
 			return "/owned-shared"
 		end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_logs_dir = function() return "/home/PrivateUser/logs" end,
 		get_config_dir = function() return "/home/PrivateUser/.config/ergopti" end,
 		account_home = function()

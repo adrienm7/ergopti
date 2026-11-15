@@ -341,7 +341,7 @@ end
 --- delays-and-colours window as "Error: app 'hotstrings_config' not found".
 ---
 local BRIDGE_MODULES = {
-	config_cleanup        = "ui.config_cleanup.bridge",
+	config_cleanup        = "settings.ui.cleanup",
 	action_picker         = "ui.action_picker.bridge",
 	physical_shortcuts     = "ui.physical_shortcuts.bridge",
 	changelog             = "ui.changelog.bridge",
@@ -363,7 +363,7 @@ local BRIDGE_MODULES = {
 	onboarding            = "ui.onboarding.bridge",
 	layout_manager        = "ui.layout_manager.bridge",
 	layout_editor_window  = "ui.layout_manager.editor_bridge",
-	paths_editor          = "ui.paths_editor.bridge",
+	paths_editor          = "settings.ui.paths_editor.bridge",
 	personal_info_editor  = "ui.personal_info_editor.bridge",
 	numeric_prompt        = "core.ui.ui.numeric_prompt",
 	prompt_editor         = "ui.prompt_editor.bridge",

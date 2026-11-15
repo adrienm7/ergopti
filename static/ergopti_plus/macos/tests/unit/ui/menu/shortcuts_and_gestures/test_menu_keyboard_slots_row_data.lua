@@ -376,14 +376,14 @@ local function parameter_ctx()
 
 	-- Keep the retained transaction on the same real keyboard publisher and
 	-- canonical conditional file port installed by fresh().
-	local preferences = require("infra.preferences")
+	local preferences = require("settings.engine.preferences.preferences")
 	local files = package.loaded["core.fs.adapters.file_system"]
-	local path = require("infra.config_paths").get("ConfigTomlPath")
+	local path = require("settings.engine.paths").get("ConfigTomlPath")
 	preferences.load(path)
 	local state, noop = {}, function() return true end
 	local core = { gestures = ctx.gestures }
 	local snapshot = function() return preferences.snapshot(state, {}, core) end
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(preferences, {
 		path = path, state = state, hotfiles = {}, core_modules = core,
 		initial_state = state, initial_preferences = snapshot(), restore_runtime = noop,
 	})
@@ -402,10 +402,10 @@ local function parameter_ctx()
 	local owner = require("ui.menu.program_parameter_transaction").new({
 		path = path, files = files, gestures = ctx.gestures, preferences = preferences, checkpoint = checkpoint,
 		paused = function() return false end, admission = global.run_exclusive,
-		current_path = function() return require("infra.config_paths").get("ConfigTomlPath") end,
+		current_path = function() return require("settings.engine.paths").get("ConfigTomlPath") end,
 		save_prefs = save,
 		capture_checkpoint_candidate = function()
-			return { state = require("ui.menu.preferences_transaction").clone(state), preferences = snapshot() }
+			return { state = require("settings.ui.menu.preferences_transaction").clone(state), preferences = snapshot() }
 		end,
 	})
 	ctx.commit_program_parameter = owner.apply

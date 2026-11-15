@@ -150,7 +150,7 @@ end
 
 --- Default side effects of the degraded menu; tests replace each one.
 local DEFAULT_ACTIONS = {
-	open_logs = function() open_on_desktop(require("infra.config_paths").get_logs_dir()) end,
+	open_logs = function() open_on_desktop(require("settings.engine.paths").get_logs_dir()) end,
 	report_bug = function() open_on_desktop(bug_form_url()) end,
 	-- The menu's actions start desktop helpers on the libuv loop, which the
 	-- daemon's own loop never runs in this state: drain it beside the tray.

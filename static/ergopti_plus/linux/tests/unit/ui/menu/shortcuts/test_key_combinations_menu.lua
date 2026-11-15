@@ -186,7 +186,7 @@ local function with_canonical_locale_menu(callback)
 		}
 		-- This fixture controls persistence only; publish through the actual locale
 		-- owner's receipt protocol so its runtime and translator remain in sync.
-		package.loaded["infra.script_scope"] = {
+		package.loaded["settings.engine.scope.script_scope"] = {
 			retry_locale = function() return true end,
 			edit_locale = function(value)
 				if package.loaded["core.fs.adapters.storage"].set("locale", value) ~= true then return false end

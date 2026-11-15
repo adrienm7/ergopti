@@ -252,7 +252,7 @@ function M.extension_roots()
 	-- The Ergopti extension the driver ships is installed by shipping
 	-- (layouts/extension.shipped_root), after the installed generations.
 	roots[#roots + 1] = LayoutRegistry.shipped_extension_root()
-	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "/extensions"
+	roots[#roots + 1] = require("settings.engine.paths").get_config_dir() .. "/extensions"
 	return roots
 end
 

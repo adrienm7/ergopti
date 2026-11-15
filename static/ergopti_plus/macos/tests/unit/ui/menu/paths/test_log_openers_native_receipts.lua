@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
 local shell_quote = require("core.text.engine.utils_core").shell_quote
-local OWNERS = { "ui.log_openers", "core.logger.engine.logger", "infra.config_paths",
+local OWNERS = { "ui.log_openers", "core.logger.engine.logger", "settings.engine.paths",
 	"core.ui.engine.notifications", "core.fs.adapters.file_system", "core.fs.engine.dir" }
 
 --- Uses real filesystem outcomes and always reopens its private fixture for cleanup.
@@ -51,7 +51,7 @@ local function with_entry(kind, check)
 				observed.errors[#observed.errors + 1] = string.format(message, ...)
 			end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["infra.config_paths"] = {}
+			package.loaded["settings.engine.paths"] = {}
 			package.loaded["core.ui.engine.notifications"] = { notify = function(message)
 				observed.notified[#observed.notified + 1] = message
 				return observed.notify_ok ~= false

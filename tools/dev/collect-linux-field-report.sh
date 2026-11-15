@@ -42,7 +42,7 @@
 # marks; no click is needed.
 #
 # The logs folder is the one the driver itself resolves
-# (infra/config_paths.lua get_logs_dir: the paths.logs_dir override, else
+# (settings/engine/paths.lua get_logs_dir: the paths.logs_dir override, else
 # ${XDG_STATE_HOME:-~/.local/state}/ergopti/logs), asked through luajit.
 #
 # NOT COVERED, AND WHY:
@@ -186,11 +186,11 @@ driver_log_layout() {
 	LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;" \
 		luajit -e '
 			local dirs, files = require("core.fs.engine.app_dirs"), require("core.fs.engine.app_dirs").files
-			print(require("infra.config_paths").get_logs_dir())
+			print(require("settings.engine.paths").get_logs_dir())
 			print(files.unified_prefix); print(files.errors_prefix); print(files.extension)
 			print(files.bootstrap_log); print(dirs.crash_reports_dir)
-			print(require("infra.config_paths").config("personal_hotstrings.toml"))
-			print(require("infra.config_paths").metrics_path())'
+			print(require("settings.engine.paths").config("personal_hotstrings.toml"))
+			print(require("settings.engine.paths").metrics_path())'
 }
 
 # Copies one log into the report without the user's typed text.
@@ -223,7 +223,7 @@ finalize() {
 		{ read -r log_dir; read -r main; read -r errors; read -r ext; read -r bootstrap; read -r crashes; read -r personal; } <<< "${layout}"
 	fi
 	if [ -z "${crashes:-}" ]; then
-		printf '%-28s unresolved (luajit could not run infra/config_paths.lua, see logs_dir.txt)\n' "logs" >> "${steps}"
+		printf '%-28s unresolved (luajit could not run settings/engine/paths.lua, see logs_dir.txt)\n' "logs" >> "${steps}"
 		mask_file "${out}/logs_dir.txt"
 	elif [ -d "${log_dir}" ]; then
 		: > "${out}/logs_dir.txt"

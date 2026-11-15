@@ -41,7 +41,7 @@
 ---    (the logs folder is one of the moved entries), so the result is a report
 ---    the driver logs once its logger is ready.
 ---
---- WINDOWS: infra/legacy_folder_migration.ahk applies the same rules, replayed
+--- WINDOWS: settings/engine/migration/legacy_folder_migration.ahk applies the same rules, replayed
 --- from the same vectors (_shared/tests/corpus/paths/legacy_folder_migration_vectors.json).
 --- ==============================================================================
 

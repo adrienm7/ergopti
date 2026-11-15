@@ -38,7 +38,7 @@ local TextUtils = require("core.text.engine.utils_core")
 
 local Logger = require("core.logger.engine.shim")
 local Json = require("core.text.engine.json")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local ConfigOutdated = require("settings.engine.migration.outdated")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
 local AuthPolicy = require("ai.engine.local_servers.auth")

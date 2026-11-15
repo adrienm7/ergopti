@@ -5,18 +5,18 @@ local helpers = require("tests.helpers")
 local roundtrip = require("tests.support.preferences_roundtrip_fixture")
 local boot = require("tests.support.menu_boot_fixture")
 local OWNED = {
-	"ui.menu.init", "ui.menu.menu_state", "ui.menu.preferences_transaction", "ui.menu.session_demotions",
+	"ui.menu.init", "ui.menu.menu_state", "settings.ui.menu.preferences_transaction", "ui.menu.session_demotions",
 	"ui.menu.keymap_lifecycle", "ui.menu.global_actions_transaction", "ui.menu.recoverable_file_moves",
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.ui_restore", "core.text.engine.utils",
-	"core.timing.engine.deferred_work", "infra.preferences", "ui.hotstring_editor", "ui.menu.builder", "ui.menu.hotstring_counter",
-	"ui.menu.menu_paths", "infra.factory_reset_journal", "ui.menu.menu_watchers", "modules.updater",
+	"core.timing.engine.deferred_work", "settings.engine.preferences.preferences", "ui.hotstring_editor", "ui.menu.builder", "ui.menu.hotstring_counter",
+	"settings.ui.menu.paths", "settings.engine.factory_reset_journal", "ui.menu.menu_watchers", "modules.updater",
 	"adapters.tray_menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "ui.menu.menu_gestures",
 	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about", "ui.menu.menu_llm", "infra.personal_shortcuts",
 	"modules.dynamic_hotstrings", "modules.gestures", "modules.keystats.text_cipher", "modules.llm",
 	"modules.keystats", "modules.shortcuts", "modules.shortcuts.actions.text", "menu.engine.wrap_mutation",
 	"ui.menu.global_scope", "ui.menu.metrics_scope", "ui.menu.gesture_scope", "ui.menu.hotstrings_scope",
-	"ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
+	"settings.ui.menu.scoped_preferences", "modules.hotstrings.hotstrings_config",
 }
 local function with_boot(saved, callback)
 	return helpers.with_stub_scope(OWNED, function()
@@ -40,7 +40,7 @@ helpers.describe("actual eager Wrap getter after physical reload", function()
 		helpers.it("retains eager input during actual boot transaction " .. receipt, function()
 			with_boot({ shortcuts = true, wrap_symbol_states = {}, custom_wrap_symbols = { { left = "a", right = "b" } } }, function(f)
 				local observed, calls = nil, 0
-				local preferences = package.loaded["infra.preferences"]
+				local preferences = package.loaded["settings.engine.preferences.preferences"]
 				local original_save = preferences.save
 				preferences.save = function(...)
 					calls = calls + 1

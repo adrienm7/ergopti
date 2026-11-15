@@ -27,7 +27,7 @@ local function run_publication(outcome)
 		end,
 	}
 	local lifecycle = helpers.load_with_stubs("ui.menu.keymap_lifecycle")
-	local transaction = require("ui.menu.preferences_transaction")
+	local transaction = require("settings.ui.menu.preferences_transaction")
 	local state = { hotstrings = { alpha = true, untouched = false } }
 	local runtime = { alpha = true }
 	local calls = { writes = 0, rollbacks = 0, cache_updates = 0 }

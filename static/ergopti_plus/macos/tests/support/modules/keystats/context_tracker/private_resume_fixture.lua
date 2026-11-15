@@ -16,7 +16,7 @@ local OWNERS = {
 	"core.text.engine.toml_codec.source_open",
 	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.ui.engine.dialog_util",
 	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"modules.keystats.init",

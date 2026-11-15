@@ -4,8 +4,8 @@
 local M = {}
 local PhysicalAvailability = require("shortcuts.engine.physical_availability")
 local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
-local Scope = require("infra.preferences_scope")
+local Preferences = require("settings.engine.preferences.preferences")
+local Scope = require("settings.engine.scope.preferences_scope")
 local MOD_COMBOS = require("settings.engine.keys").KEY.MOD_COMBOS
 
 local STATE_FIELDS = { "shortcuts", require("settings.engine.keys").LEAF.CHATGPT_URL, "shortcut_keys", "script_control_enabled", "script_control_shortcuts" }
@@ -250,10 +250,10 @@ function M.new(options)
 			return true
 		end,
 	}
-	local owner = require("ui.menu.scoped_preferences").new(ports)
+	local owner = require("settings.ui.menu.scoped_preferences").new(ports)
 	local source_owner = options.preferences or Preferences
 	local inventory = require("shortcuts.engine.physical_editor_inventory").new({
-		path = options.path, current_path = options.current_path or function() return require("infra.config_paths").get("config.toml") end,
+		path = options.path, current_path = options.current_path or function() return require("settings.engine.paths").get("config.toml") end,
 		read = options.files.read_with_status, keyboard = keyboard, parameters = require("modules.gestures.actions"),
 		recognizes = function(binding)
 			return type(binding) == "string" and (binding:match("^keyboard__") ~= nil

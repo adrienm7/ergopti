@@ -290,7 +290,7 @@ function flatpakModules(data) {
 			source: 'glib_networking'
 		},
 		// The programs and Lua modules the driver runs from its own prefix only
-		// (linux/infra/owned_programs.lua), the ones the other formats stage
+		// (linux/settings/engine/preferences/owned_programs.lua), the ones the other formats stage
 		// from the oldest supported LTS. The command-line programs link their
 		// library statically, so no second libcrypto or libsqlite3 shadows the
 		// runtime's own in /app/lib.

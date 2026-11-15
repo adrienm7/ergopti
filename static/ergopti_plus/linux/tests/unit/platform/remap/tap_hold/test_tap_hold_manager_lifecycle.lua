@@ -211,7 +211,7 @@ os.remove(user_path)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
 		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
-			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "infra.config_paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
+			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "settings.engine.paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local user_path, config_path = os.tmpname(), os.tmpname()
@@ -228,7 +228,7 @@ os.remove(user_path)
 				if not stream then return nil, "absent" end
 				local text = stream:read("*a"); stream:close(); return text, "ok"
 			end }
-			package.loaded["infra.config_paths"] = { config = function() return config_path end }
+			package.loaded["settings.engine.paths"] = { config = function() return config_path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
 			package.loaded["adapters.window_switch"] = { new = function(owner_capture)

@@ -30,7 +30,7 @@ local function load_over_config(initial, writes_fail, chatgpt)
 		_displaced.storage = package.loaded["core.fs.adapters.storage"]
 		_displaced.chatgpt = package.loaded["modules.shortcuts.chatgpt"]
 		_displaced.module = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-		_displaced.paths = package.loaded["infra.config_paths"]
+		_displaced.paths = package.loaded["settings.engine.paths"]
 		_displaced.held = true
 	end
 	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
@@ -42,7 +42,7 @@ local function load_over_config(initial, writes_fail, chatgpt)
 		lines[#lines + 1] = key:match("([^.]+)$") .. " = " .. string.format("%q", value)
 	end
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
-	package.loaded["infra.config_paths"] = { config = function() return path end }
+	package.loaded["settings.engine.paths"] = { config = function() return path end }
 	if writes_fail then require("core.text.engine.toml_codec.writer").refuse_writes(path, "injected persistence refusal") end
 	package.loaded["modules.shortcuts.chatgpt"] = chatgpt or { open = function() return true end }
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
@@ -69,7 +69,7 @@ local function drop_config()
 	package.loaded["core.fs.adapters.storage"] = _displaced.storage
 	package.loaded["modules.shortcuts.chatgpt"] = _displaced.chatgpt
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = _displaced.module
-	package.loaded["infra.config_paths"] = _displaced.paths
+	package.loaded["settings.engine.paths"] = _displaced.paths
 	_displaced.held = false
 	for _, path in ipairs(_files) do os.remove(path) os.remove(path .. ".tmp") end
 	_files = {}

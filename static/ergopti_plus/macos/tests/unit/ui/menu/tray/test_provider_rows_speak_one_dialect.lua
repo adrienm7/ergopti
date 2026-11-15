@@ -266,11 +266,11 @@ helpers.describe("provider rows speak the provider dialect (a driver-dialect row
 	end)
 
 	helpers.it("nested personal files retain their sorted native command subtrees", function()
-		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+		helpers.with_stub_scope({ "settings.engine.scope.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
 			-- This projection fixture owns a synthetic acknowledged group. Actual
 			-- provenance, native route and refusal behavior have their own owner test.
 			local bindings = 0
-			package.loaded["infra.personal_file_scope"] = { bind = function()
+			package.loaded["settings.engine.scope.personal_file_scope"] = { bind = function()
 				bindings = bindings + 1
 				return function() return true end
 			end }

@@ -121,7 +121,7 @@ helpers.describe("layout submenu: the icon choice is stored in config.toml, not 
 		local fh = assert(io.open(tmp, "w"))
 		fh:write("[ui]\nmenubar_icon = \"v2\"\n")
 		fh:close()
-		local Prefs = helpers.load_with_stubs("infra.preferences")
+		local Prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local flat = Prefs.load(tmp)
 		pcall(os.remove, tmp)
 		helpers.assert_eq(flat.menubar_icon, "v2", "[ui] menubar_icon must reach the menu state")

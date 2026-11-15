@@ -1112,7 +1112,7 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       shortcuts participant (fixed in 3e209162 by `Preferences.replace_source`). Check whether the AHK global restore
       cohort has the same handoff gap now that `[tap_holds]` and `[mod_combos]` live in `config.toml`.
       Checked 2026-11-13 by worker I: no such gap on Windows, so no code change. The AHK scopes keep no loaded
-      source to compare with: `ConfigScopeCommitOperations` (`infra/config_scope.ahk`, `Build()`) reads `config.toml`
+      source to compare with: `ConfigScopeCommitOperations` (`settings/engine/scope/scope.ahk`, `Build()`) reads `config.toml`
       fresh at commit time, checks drift against that image and publishes under its expected-old hash, and
       `ConfigGlobalScopeApply` puts the tap-hold owner in the same cohort, so no participant hands bytes to the next.
       Covered by `test_config_scope_manifest.ahk` (`scope-hash-precondition`, « inventory source drift refuses
@@ -1181,7 +1181,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       the physical Ctrl (SCD-3, a `ctrl_x` slot fires for Ctrl+AltGr+x). Tests beside each.
       ILD-2 and SCD-2 done 2026-11-12 (`claude/ergopti-todo-windows-ahk`, 7163ba50 and ee18e2d9: `_KLE_AltGrShortcutMods` with `_KLE_RealCtrlHeld`, the `<^<!` and `<^<!+` chords). Left: SCD-3. `AddShortcut` in `modules/shortcuts/utils.ahk` has no production caller, so the `<^>!^` registration belongs where the `ctrl_x` slots are really registered; find that registrar first, then add the hotkey guarded by `_KLE_RealCtrlHeld()` and test Ctrl+AltGr+x running the `ctrl_x` action.
       SCD-3 done 2026-11-13 by worker E: the Ctrl slots are bound by `KeyboardShortcutsBindAll`
-      (`infra/config_io.ahk`), and Ctrl+AltGr already reaches `_KLE_OnAltGr` with a real Ctrl (ILD-2), so the slot is
+      (`settings/engine/io.ahk`), and Ctrl+AltGr already reaches `_KLE_OnAltGr` with a real Ctrl (ILD-2), so the slot is
       run there: `_KLE_AltGrSlotFor` names the `primary_`/`primary_shift_` slot of the logical key, which runs
       through `RunKeyboardShortcutAction` (Shortcuts gate kept); without one the chord goes on as Ctrl and the key.
       Test `SCD-3` in `test_keylayout_emulation.ahk`; the press on a PC is in TODO-tests-windows.md.
@@ -1252,7 +1252,7 @@ between workers) green alone. All live checks pass, typed by the harness.
       [CODE] Left (2026-11-15): not started (c448c6d1ff); the Notepad and terminal owners keep no undo record. The PC
       run that qualifies the fix is in TODO-tests-windows.md (2026-11-15).
 
-- [x] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
+- [x] **LogsDirPath under the old folder name.** `settings/engine/migration/legacy_folder_migration.ahk` renames a custom logs folder named
       like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
       Done 2026-11-13 by worker E: `LegacyFolderCustomLegacyLogs`, `LegacyFolderCustomLogsStep` and the `renamed`
       rule of `LegacyFolderRebased`; the logger's entries move, the user's own files stay (tests
@@ -1445,7 +1445,7 @@ coordinator on 2026-11-11, to review by the maintainer.
 - [ ] macOS boot: `migrations.toml` (74 KB) is parsed and validated at every boot (about 30 ms of Lua 5.4); a
       generated, hash-checked Lua mirror would remove it (maintainer decision, numbers in the report).
       Other OS, measured or read 2026-11-14 (worker L): Windows already skips the parse with a typed cache keyed by
-      the registry's SHA-256 and the parser files' identity (`infra/config_registry_cache.ahk`, validation still runs
+      the registry's SHA-256 and the parser files' identity (`settings/engine/publication/registry_cache.ahk`, validation still runs
       on a hit; its parse cost about 0.5 s); Linux parses the same file under LuaJIT in about 7 ms cold and under 1 ms
       warm (`settings.engine.migration.migrate.load_registry`, 21 runs), not worth a cache. Decided by the agent on
       2026-11-14, to review by the maintainer: not built tonight. The parity path is a port of the Windows cache to

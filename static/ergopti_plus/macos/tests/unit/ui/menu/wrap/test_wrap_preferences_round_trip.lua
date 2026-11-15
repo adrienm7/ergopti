@@ -16,10 +16,10 @@ local function write(path, bytes)
 	assert(handle:close())
 end
 local function with_source(source, callback)
-	return helpers.with_stub_scope({ "infra.preferences", "core.logger.engine.logger", "core.fs.adapters.file_system", "core.fs.engine.dir",
+	return helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.logger.engine.logger", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"menu.engine.wrap_preferences", "menu.engine.wrap_mutation", "core.lifecycle.engine.compat.utf8" }, function()
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		local preferences = helpers.load_with_stubs("infra.preferences")
+		local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		return output.with_output(function(path)
 			write(path, source)
 			local flat, status = preferences.load(path)

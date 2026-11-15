@@ -7,10 +7,10 @@ return function(helpers, driver)
 		settings = settings or {}
 		local saved = {}
 		for name, value in pairs(package.loaded) do saved[name] = value end
-		local names = { "core.fs.adapters.storage", "infra.script_scope", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"infra.script_settings", "core.logger.engine.logger", "infra.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
-			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "ui.menu.scoped_preferences",
-			"ui.menu.preferences_transaction" }
+		local names = { "core.fs.adapters.storage", "settings.engine.scope.script_scope", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+			"settings.engine.scope.script_settings", "core.logger.engine.logger", "settings.engine.preferences.preferences", "ui.error_dialog", "ui.error_dialog.bridge",
+			"settings.engine.scope.script_scope_runtime", "core.text.engine.toml_codec.writer", "settings.engine.migration.migrate", "settings.engine.scope.transaction", "settings.ui.menu.scoped_preferences",
+			"settings.ui.menu.preferences_transaction" }
 		for _, name in ipairs(names) do package.loaded[name] = nil end
 		local prefix = assert(os.tmpname()); os.remove(prefix)
 		local quote = require("core.text.engine.utils_core").shell_quote
@@ -29,7 +29,7 @@ return function(helpers, driver)
 		local called, failure = xpcall(function()
 			local store, files, cells
 			if driver == "linux" then
-				paths = require("infra.config_paths"); previous_config_home = paths.config_home
+				paths = require("settings.engine.paths"); previous_config_home = paths.config_home
 				paths.config_home = function() return prefix end
 				write(prefix .. "/" .. linux_folder .. "/storage.json", settings.storage or
 					'{"locale":"en","script.log_level":"DEBUG","script.show_error_dialog":false,"foreign":[1,2]}')
@@ -56,17 +56,17 @@ return function(helpers, driver)
 			local i18n, backend = require("core.i18n.engine.i18n"), require("core.i18n.engine.locale")
 			if driver == "macos" then i18n.set_locale_injector(backend.set_locale) end
 			i18n.init()
-			local logger = require(driver == "linux" and "infra.script_settings" or "core.logger.engine.logger")
+			local logger = require(driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger")
 			if driver == "linux" then assert(logger.apply()) else logger.set_level("DEBUG") end
 			local dialog = require(driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog")
 			local function create(overrides)
 				local options = { path = path, files = files,
 					backup_path = path .. ".bak", storage_backup_path = path .. ".settings.bak" }
 				if driver == "macos" then
-					local preferences = require("infra.preferences")
+					local preferences = require("settings.engine.preferences.preferences")
 					local _, status = preferences.load(path); assert(status == "ok", status)
 					local state = {}
-					local _, checkpoint = require("ui.menu.preferences_transaction").bind(preferences,
+					local _, checkpoint = require("settings.ui.menu.preferences_transaction").bind(preferences,
 						{ state = state, initial_state = {}, initial_preferences = {} })
 					options = { path = path, files = files, state = state, preferences = preferences, checkpoint = checkpoint,
 						capture_preferences = function() return preferences.snapshot(state, {}, {}) end,
@@ -75,7 +75,7 @@ return function(helpers, driver)
 						storage_backup_path = function() return path .. ".settings.bak" end }
 				end
 				for key, value in pairs(overrides or {}) do options[key] = value end
-				return require("infra.script_scope").new(options)
+				return require("settings.engine.scope.script_scope").new(options)
 			end
 			callback({ create = create, path = path, source = source, store = store, files = files,
 				read = read, write = write, i18n = i18n, backend = backend, logger = logger, dialog = dialog, cells = cells })
@@ -127,7 +127,7 @@ return function(helpers, driver)
 				local owner = ctx.create()
 				helpers.assert_eq(owner.apply("clear"), true)
 				helpers.assert_eq(owner.release(), true)
-				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "infra.script_settings" or "core.logger.engine.logger"
+				local locale_name, log_name = "core.i18n.engine.i18n", driver == "linux" and "settings.engine.scope.script_settings" or "core.logger.engine.logger"
 				local dialog_name = driver == "linux" and "ui.error_dialog.bridge" or "ui.error_dialog"
 				package.loaded[locale_name], package.loaded[log_name], package.loaded[dialog_name] = nil, nil, nil
 				local locale, logger, dialog = require(locale_name), require(log_name), require(dialog_name)

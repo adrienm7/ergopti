@@ -23,7 +23,7 @@ function M.with_configuration(body)
 	local xdg_keys = { "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR", "XDG_STATE_HOME" }
 	local environment = {}
 	for _, key in ipairs(xdg_keys) do environment[key] = { value = uv.os_getenv(key) } end
-	local parent_paths = helpers.load_module("infra.config_paths")
+	local parent_paths = helpers.load_module("settings.engine.paths")
 	local parent_bootstrap = parent_paths.config_home() .. "/" .. FOLDER .. "/storage.json"
 	local function bootstrap_snapshot()
 		local info, detail, code = uv.fs_lstat(parent_bootstrap)
@@ -46,9 +46,9 @@ function M.with_configuration(body)
 			assert(uv.fs_mkdir(directory, 448)); assert(uv.os_setenv(key, directory))
 		end
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "infra.config_paths"
+			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") or name == "settings.engine.paths"
 				or name == "core.fs.adapters.storage" or name == "core.text.engine.toml_codec.writer" or name == "ui.menu.builder" or name == "core.ui.ui.numeric_prompt"
-				or name == "ui.paths_editor.bridge" then package.loaded[name] = nil end
+				or name == "settings.ui.paths_editor.bridge" then package.loaded[name] = nil end
 		end
 		local Json, Codec = require("core.text.engine.json"), require("core.text.engine.toml_codec")
 		local dirs = { a = root .. "/a", b = root .. "/b" }
@@ -60,7 +60,7 @@ function M.with_configuration(body)
 				.. "[llm.trigger]\ndebounce_ms = 300\n[independent]\nkeep = \"" .. id .. "\"\n"
 			write(dir .. "/config.toml", initial[id])
 		end
-		local Paths = require("infra.config_paths"); assert(Paths.set_config_dir(dirs.a))
+		local Paths = require("settings.engine.paths"); assert(Paths.set_config_dir(dirs.a))
 		local windows, received, notifications, serial = {}, {}, {}, 0
 		local host = {}
 		function host.show(name)
@@ -101,7 +101,7 @@ function M.with_configuration(body)
 		function f.document(id) return Codec.decode(f.bytes(id)) end
 		function f.switch(id)
 			host.show("paths_editor")
-			local result = require("ui.paths_editor.bridge").on_message({ action = "save", configDir = dirs[id] },
+			local result = require("settings.ui.paths_editor.bridge").on_message({ action = "save", configDir = dirs[id] },
 				{ config_paths = Paths, webview_manager = host, on_reload = function() end })
 			assert(result.saved and Paths.get_config_dir() == dirs[id])
 		end

@@ -1,0 +1,15 @@
+--- tests/unit/settings/scope/test_script_config_authority.lua
+
+--- ==============================================================================
+--- MODULE: Script Config Authority (Linux)
+--- DESCRIPTION:
+--- config.toml's [script] rows win over storage.json at start; a change
+--- rewrites the row the file holds. Replays the shared contract.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+require("tests.lua.settings.script_config_authority_contract").run(helpers, {
+	platform = "linux", manifest = require("infra.manifest_reader"),
+	aliases = require("settings.engine.scope.script_scope").alias_names(), file_adapter = nil,
+})

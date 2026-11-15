@@ -43,11 +43,11 @@ local OWNED_MODULES = {
 	"hs",
 	"core.logger.engine.boot_profiler",
 	"infra.capsword_auto_off",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.timing.engine.deferred_work",
 	"infra.diagnostic_snapshot",
 	"core.ui.engine.dialog_util",
-	"infra.factory_reset_journal",
+	"settings.engine.factory_reset_journal",
 	"core.fs.engine.dir",
 	"infra.git_status",
 	"core.i18n.engine.i18n",
@@ -58,7 +58,7 @@ local OWNED_MODULES = {
 	"core.ui.engine.notifications",
 	"core.fs.engine.paths",
 	"infra.personal_shortcuts",
-	"infra.preferences",
+	"settings.engine.preferences.preferences",
 	"core.lifecycle.engine.reload.guard",
 	"infra.script_chord_catalogue",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
@@ -116,12 +116,12 @@ local OWNED_MODULES = {
 	"ui.menu.menu_keyboard_layout",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_metrics",
-	"ui.menu.menu_paths",
+	"settings.ui.menu.paths",
 	"ui.menu.menu_shortcuts",
 	"ui.menu.menu_state",
 	"ui.menu.menu_tap_holds",
 	"ui.menu.menu_watchers",
-	"ui.menu.preferences_transaction",
+	"settings.ui.menu.preferences_transaction",
 	"ui.menu.preview_transaction",
 	"ui.menu.program_parameter_transaction",
 	"ui.menu.recoverable_file_moves",
@@ -160,7 +160,7 @@ local function with_menu(body)
 			fixture = require("tests.support.menu_boot_fixture").boot({
 				before_start = function()
 					-- The minimal boot fixture omits this declared healthy UI default.
-					local initial_state = package.loaded["infra.preferences"].build_initial_state()
+					local initial_state = package.loaded["settings.engine.preferences.preferences"].build_initial_state()
 					initial_state.menubar_icon = "v1"
 					local host = hs
 					-- The existing boot fixture models this source-run update boundary.

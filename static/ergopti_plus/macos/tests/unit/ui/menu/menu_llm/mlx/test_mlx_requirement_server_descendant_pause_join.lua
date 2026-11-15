@@ -7,7 +7,7 @@ local MODULES = {
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
 	"core.process.adapters.task_lifecycle",
@@ -39,7 +39,7 @@ local function with_fixture(callback)
 		package.loaded["core.logger.engine.logger"] = logger_stub
 		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			get = function(key)
 				helpers.assert_eq(key, "MlxActiveModelPath")
 				return "/Users/fixture/" .. AppDirs.config.macos_relative .. "/hammerspoon/mlx_active_model.txt"

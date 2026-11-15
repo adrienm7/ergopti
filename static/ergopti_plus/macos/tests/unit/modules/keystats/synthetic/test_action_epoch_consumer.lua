@@ -268,7 +268,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 		end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_timer_failure" end,
 		metrics_dir = function() return "/tmp/ergopti_timer_failure/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti_timer_failure/cache" end,

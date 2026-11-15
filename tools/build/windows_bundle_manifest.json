@@ -99,7 +99,7 @@
 				"static/ergopti_plus/_shared/settings/data/config_schema/**"
 			],
 			"except": ["static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml"],
-			"why": "Port and domain specifications, JSON schemas and config examples consumed by the JS suite and the code generators, whose output is compiled into the exe. The driver reads only the config migrations registry (infra/config_migrate.ahk)."
+			"why": "Port and domain specifications, JSON schemas and config examples consumed by the JS suite and the code generators, whose output is compiled into the exe. The driver reads only the config migrations registry (settings/engine/migration/migrate.ahk)."
 		},
 		{
 			"name": "shared-js-algorithms",

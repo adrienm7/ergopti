@@ -25,7 +25,7 @@ end
 
 helpers.describe("converted path sites keep POSIX backslash bytes (posix-backslash-separator-owner)", function()
 	helpers.it("posix-backslash-separator-owner: a group name keeps a backslash in its file name", function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		on_posix(function()
 			helpers.assert_eq(Preferences.get_group_name("/Users/a/hotstrings/back\\slash.toml"), "back\\slash")
 			helpers.assert_eq(Preferences.get_group_name("/Users/a/back\\slash/emoji.toml"), "emoji")

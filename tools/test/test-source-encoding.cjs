@@ -15,7 +15,7 @@
  *
  *   - Three macOS Lua sources accumulated sixteen double-encoded em dashes,
  *     ellipses and arrows across three unrelated commits. One of them was not a
- *     comment: ui/menu/menu_paths.lua writes that line into the generated
+ *     comment: settings/ui/menu/paths.lua writes that line into the generated
  *     paths.toml, so every fresh install produced a config file whose header was
  *     mojibake - while the docstring above it promised the file stays "visually
  *     identical" to the AutoHotkey driver's.

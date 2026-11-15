@@ -128,7 +128,7 @@ local function collect_paths(schema)
 	local logs_dir = LoggerSink.log_dir()
 	if logs_dir == "" then logs_dir = nil end
 	return {
-		config_dir      = require("infra.config_paths").get_config_dir(),
+		config_dir      = require("settings.engine.paths").get_config_dir(),
 		logs_dir        = logs_dir,
 		log_today       = LoggerSink.main_log_path(),
 		errors_today    = LoggerSink.errors_log_path(),
@@ -454,7 +454,7 @@ function M.configuration_context(schema, overrides)
 		schema   = schema,
 		driver   = M.DRIVER,
 		features = overrides.features or function() return require("infra.manifest_reader").features() end,
-		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
+		path_of  = overrides.path_of or function(id) return require("settings.engine.paths").config(names[id]) end,
 		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
 		clock    = overrides.clock or function() return require("core.logger.engine.monotonic").now_ms() end,

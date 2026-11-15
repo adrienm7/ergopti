@@ -16,7 +16,7 @@ const path = require('node:path');
 
 const SOURCE = path.join(
 	__dirname,
-	'../../static/ergopti_plus/windows/tests/unit/infra/config/transition/test_config_transition_temporal_custody.ahk'
+	'../../static/ergopti_plus/windows/tests/unit/settings/engine/transition/test_temporal_custody.ahk'
 );
 // « acquired-read timer observed on attempt N », runs 43595483595 to 43611736406 (2026-11-14).
 const OBSERVED_ATTEMPTS = Object.freeze([

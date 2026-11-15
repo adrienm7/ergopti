@@ -62,7 +62,7 @@ local function fixture()
 	local fence = writer_fence()
 	local generation = 0
 	local function owner(scope, path)
-		return require("ui.menu.scoped_preferences").new({
+		return require("settings.ui.menu.scoped_preferences").new({
 			scope = scope, path = path, files = adapter, state = {}, preferences = preferences, checkpoint = checkpoint,
 			capture_preferences = function() return {} end,
 			backup_path = function() generation = generation + 1; return path .. "-backup-" .. generation end,

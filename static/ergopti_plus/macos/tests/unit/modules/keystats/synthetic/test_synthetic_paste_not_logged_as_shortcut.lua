@@ -80,7 +80,7 @@ local function load_fixture()
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return nil end }
 	package.loaded["infra.manifest_reader"] = { default_for = function() return true end }
-	package.loaded["infra.config_paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end,
+	package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/tmp" end, metrics_dir = function() return "/tmp/metrics" end,
 		metrics_cache_dir = function() return "/tmp/metrics_cache" end }
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -157,7 +157,7 @@ local function load_fixture()
 				"platform.input.synthetic_input",
 				"modules.keymap",
 				"infra.manifest_reader",
-				"infra.config_paths",
+				"settings.engine.paths",
 			}) do
 				package.loaded[name] = nil
 			end

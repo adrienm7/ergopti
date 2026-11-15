@@ -48,7 +48,7 @@ CapsWord are untouched. The dormant hook owner stays unreachable (nothing passes
 - `infra/keyboard_layout_scope.lua`: the global restore and clear write the rows,
   then the participant settles only on the layout manager's answer. An inert
   choice is acknowledged with its reason; a load the session refuses reverts the
-  rows; a reload refused during a rollback stays owed. `infra/global_scope.lua`
+  rows; a reload refused during a rollback stays owed. `settings/engine/scope/global_scope.lua`
   takes a continuation for that reason.
 
 ## What needs a real desktop

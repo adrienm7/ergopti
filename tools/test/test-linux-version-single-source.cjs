@@ -71,7 +71,7 @@ const CONSUMERS = [
 	'ui/menu/builder.lua',
 	'ui/healthcheck/bridge.lua',
 	'ui/changelog/bridge.lua',
-	'ui/paths_editor/bridge.lua',
+	'settings/ui/paths_editor/bridge.lua',
 	'ergopti_hotstrings.lua'
 ];
 for (const rel of CONSUMERS) {

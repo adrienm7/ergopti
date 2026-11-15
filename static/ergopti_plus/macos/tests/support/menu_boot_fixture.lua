@@ -28,7 +28,7 @@ local M = {}
 local REAL_MODULES = {
 	"ui.menu.init",
 	"ui.menu.menu_state",
-	"ui.menu.preferences_transaction",
+	"settings.ui.menu.preferences_transaction",
 	"ui.menu.session_demotions",
 	"ui.menu.keymap_lifecycle",
 	"ui.menu.global_actions_transaction",
@@ -126,7 +126,7 @@ function M.boot(opts)
 			return true
 		end,
 	}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function() return state end,
 		load = function()
 			if opts.load_status == "corrupt" then return {}, "corrupt" end
@@ -167,13 +167,13 @@ function M.boot(opts)
 		invalidate_cache = noop,
 	}
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = noop }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 		open_editor = noop,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(config_path) return config_path .. ".ergopti-reset-journal-v1.json" end,
 		create = function()
 			return {

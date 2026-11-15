@@ -40,7 +40,7 @@ local function run_fixture(body, source)
 		files[path] = value; controls.writes = controls.writes + 1; return true
 	end
 	package.loaded["core.fs.adapters.file_system"] = file_port
-	package.loaded["infra.config_paths"] = { get = function() return "config" end }
+	package.loaded["settings.engine.paths"] = { get = function() return "config" end }
 	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
@@ -150,7 +150,7 @@ local function run_fixture(body, source)
 	local taps = require("modules.shortcuts.tap_keys")
 	local script = require("modules.shortcuts.script_control")
 	local shortcuts = require("modules.shortcuts")
-	local prefs = require("infra.preferences")
+	local prefs = require("settings.engine.preferences.preferences")
 	local saved = prefs.load("config")
 	local state = { shortcuts = true, script_control_enabled = true,
 		script_control_shortcuts = { script_altgr_enter = "open_url", script_altgr_backspace = "none",
@@ -173,7 +173,7 @@ local function run_fixture(body, source)
 	helpers.assert_eq(start_script(), true)
 	local modules = { gestures = gestures, shortcuts_mod = shortcuts }
 	local demotions = require("ui.menu.session_demotions").new()
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(prefs, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(prefs, {
 		path = "config", state = state, hotfiles = {}, core_modules = modules,
 		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
 		snapshot_view = demotions.persisted_view,

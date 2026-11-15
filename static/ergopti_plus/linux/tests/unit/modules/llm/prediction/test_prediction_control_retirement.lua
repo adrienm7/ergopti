@@ -656,7 +656,7 @@ do
 			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
 				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
 				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
-				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
+				"settings.engine.paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
@@ -673,7 +673,7 @@ do
 			local function yes() return true end
 			local function no() return false end
 			local function put(name, module) package.loaded[name] = module; return module end
-			put("infra.config_paths", { config = function(name)
+			put("settings.engine.paths", { config = function(name)
 			  local file = marker .. "." .. name; owned_paths[file] = true; return file
 			end, get_config_dir = function() return marker .. ".config-dir" end })
 			put("core.fs.adapters.storage", require("tests.fakes").storage())
@@ -684,7 +684,7 @@ do
 			put("core.logger.engine.shim", logger)
 			put("core.logger.engine.sink", { install = yes })
 			put("core.lifecycle.engine.shutdown.session_lock", { protect = yes, acquire = yes })
-			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
+			put("settings.engine.scope.script_settings", { apply = yes, current = function() return "ERROR" end })
 			put("core.logger.engine.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
 			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
 			put("modules.diagnostics.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
@@ -811,7 +811,7 @@ do
 			local environment = setmetatable({ arg = launch_args, require = function(name)
 			  if name == "settings.engine.migration.migrate" then return startup_migration end
 			  -- The legacy folder move is an inert boundary too: no account folder moves.
-			  if name == "infra.legacy_folder_migration" then return require("tests.support.legacy_folder_migration_stub") end
+			  if name == "settings.engine.migration.legacy_folder_migration" then return require("tests.support.legacy_folder_migration_stub") end
 			  return require(name)
 			end, os = setmetatable({ exit = function(code) error("controlled Main exit " .. tostring(code)) end }, { __index = os }) }, { __index = _G })
 			if setfenv then setfenv(main, environment) else main = assert(loadfile(root .. "/ergopti_hotstrings.lua", "t", environment)) end

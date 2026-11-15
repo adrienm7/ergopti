@@ -18,7 +18,7 @@ local function with_fixture(listing, callback)
 	local module_names = {
 		"modules.diagnostics.crash_reporter",
 		"core.fs.adapters.file_system",
-		"infra.config_paths",
+		"settings.engine.paths",
 		"core.i18n.engine.i18n",
 		"core.logger.engine.logger",
 		"core.fs.engine.dir",

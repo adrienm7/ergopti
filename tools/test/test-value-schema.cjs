@@ -89,14 +89,14 @@ const MESSAGE_KEYS = [
 const PORTS = [
 	{
 		port: '_shared/settings/engine/value_check.lua',
-		test: 'macos/tests/unit/infra/config/test_value_check_vectors.lua'
+		test: 'macos/tests/unit/settings/test_value_check_vectors.lua'
 	},
 	{
 		port: '_shared/settings/engine/value_check.lua',
-		test: 'linux/tests/unit/infra/config/test_value_check_vectors.lua',
+		test: 'linux/tests/unit/settings/test_value_check_vectors.lua',
 		wiring: {
 			file: 'linux/tests/test_manifest.lua',
-			needle: '"tests.unit.infra.config.test_value_check_vectors"'
+			needle: '"tests.unit.settings.test_value_check_vectors"'
 		}
 	},
 	{

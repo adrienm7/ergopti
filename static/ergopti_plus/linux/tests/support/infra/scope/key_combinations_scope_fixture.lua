@@ -66,7 +66,7 @@ local function with_owner(body, managed, public_chords)
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
 			package.loaded["core.fs.adapters.file_system"]=files
-			package.loaded["infra.config_paths"]={config=function() return path end}
+			package.loaded["settings.engine.paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.native then
 					state.retired=state.native:release_all()
@@ -124,7 +124,7 @@ end
 local function with_menu(body, public_chords)
 	with_owner(function(s)
 		package.loaded["core.fs.adapters.file_system"]=s.files
-		package.loaded["infra.config_paths"]={config=function() return path end}
+		package.loaded["settings.engine.paths"]={config=function() return path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
 		local renderer=require("infra.manifest_menu")

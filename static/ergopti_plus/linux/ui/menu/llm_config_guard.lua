@@ -31,7 +31,7 @@ local DIALECT = {
 --- The locale key naming why config.toml cannot be written now, or nil.
 --- @return string|nil reason_key
 function M.reason()
-	return Shared.reason_key(require("infra.config_paths").config("config.toml"), require("settings.engine.migration.migrate"))
+	return Shared.reason_key(require("settings.engine.paths").config("config.toml"), require("settings.engine.migration.migrate"))
 end
 
 --- Wraps every action of a provider tree, in place, so a click asks again.

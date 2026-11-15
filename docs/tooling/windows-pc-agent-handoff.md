@@ -227,7 +227,7 @@ readable through `archive/2026-10-31/<branch>`. Then:
 
 - False-green ratchet red on dev since 9aa90d28a5's batch:
   `tools/test/find-false-greens.cjs` reports an unfloored source-scan loop in
-  `windows/tests/unit/infra/config/scope/test_hotstring_dynamic_menu_scope.ahk:26`
+  `windows/tests/unit/settings/engine/scope/test_hotstring_dynamic_menu_scope.ahk:26`
   (the loop never asserts it matched anything). Assert the match count after
   the loop, then rerun the ratchet.
 
@@ -423,7 +423,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   the compiled comment of `macos/apps/Encryptor.app/Contents/Resources/Scripts/main.scpt`
   (its `main.applescript` source already says keystats); it needs `osacompile`
   on a Mac, not the PC.
-- Config policy items 33 and 42 (Windows): the cleanup (`windows/infra/config_unused_keys.ahk`)
+- Config policy items 33 and 42 (Windows): the cleanup (`windows/settings/engine/migration/unused_keys.ahk`)
   still cannot offer bare root keys nor an unknown `[[x]]` generation, which the
   Lua engine does (`_shared/settings/engine/migration/unused_keys.lua`, pinned by
   `_shared/tests/lua/settings/cleanup_roots_contract.lua`: a dotted, an inline and
@@ -663,9 +663,9 @@ The owned-runtimes commit of `b8894bb73c` overlapped a PC commit; the PC drops i
 macOS and Linux now mask the configuration folder at write time: the logger's
 redactor receives the folder the path owner resolves at boot and every folder
 the user moves to afterwards (`Logger.follow_config_dir` in
-`macos/core/logger/engine/logger.lua`, called by `macos/infra/config_paths.lua`;
+`macos/core/logger/engine/logger.lua`, called by `macos/settings/engine/paths.lua`;
 `logger_sink.follow_config_dir` in `linux/core/logger/engine/sink.lua`, called by
-`linux/infra/config_paths.lua`). Every line then shows the folder as
+`linux/settings/engine/paths.lua`). Every line then shows the folder as
 `config_placeholder` and each name below it as `config_name_placeholder` from
 `_shared/diagnostics/data/redaction.json`, except `config_known_names`.
 

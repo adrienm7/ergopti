@@ -18,7 +18,7 @@ local MODULES = {
 	"core.fs.adapters.json_codec",
 	"core.process.adapters.shell_runner",
 	"core.events.timer_scheduler",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"core.logger.engine.logger",
 	"core.timing.engine.timings",
 	"modules.llm.api_common",
@@ -47,7 +47,7 @@ local function with_fixture(run)
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key)
 			helpers.assert_eq(key, "MlxActiveModelPath")
 			return secure_path

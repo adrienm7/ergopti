@@ -168,7 +168,7 @@ helpers.describe("magic key: the user's choice outranks the shipped default", fu
 		restore_manifest(); restore_storage()
 		if not ok then error(err, 0) end
 		local source = '[hotstrings]\ntrigger_char = "e"\n'
-		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("settings.ui.menu.unused_keys_cleanup").collect)
 		helpers.assert_eq(#scan.keys, 1, "the cleanup offers the key the reader ignores")
 		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "hotstrings", "trigger_char" })
 	end)

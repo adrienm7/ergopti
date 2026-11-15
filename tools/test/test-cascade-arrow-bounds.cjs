@@ -82,7 +82,9 @@ assert.ok(
 	ahkEngine.includes(`global HSE_CASCADE_MAX_ARROWS := ${high}`),
 	'the Windows upper bound'
 );
-const ahkReader = read(path.join(windows, 'feature_state.ahk'));
+const ahkReader = read(
+	path.join(REPO_ROOT, 'static/ergopti_plus/windows/settings/engine/preferences/feature_state.ahk')
+);
 assert.ok(
 	ahkReader.includes(`(Raw is Integer) and Raw >= ${low} and Raw <= ${high}`),
 	'the Windows config reader restates the same range'

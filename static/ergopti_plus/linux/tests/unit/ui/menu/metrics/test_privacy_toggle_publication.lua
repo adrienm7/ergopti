@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local uv = require("luv")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local Preferences = require("infra.metrics_preferences")
 local I18n = require("core.i18n.engine.i18n")
 

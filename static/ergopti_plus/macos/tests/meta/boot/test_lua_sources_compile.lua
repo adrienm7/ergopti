@@ -58,6 +58,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "vendor",
 	DRIVER_ROOT .. "_generated",
 	DRIVER_ROOT .. "core",
+	DRIVER_ROOT .. "settings",
 	helpers.shared(""),
 }
 

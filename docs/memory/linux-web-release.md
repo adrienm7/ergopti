@@ -840,7 +840,7 @@ puts back an older same-named build keeps it (`stale_keymap`). A compositor
 recompiles only when the selected id changes, so Wayland builds alternate
 between `<id>` and `<id>_live`; never rewrite the selected slot and expect a
 reload. The layout scope settles from that answer, which arrives after a child
-process, so `infra/global_scope.lua` is asynchronous: never reintroduce the
+process, so `settings/engine/scope/global_scope.lua` is asynchronous: never reintroduce the
 "every participant settles synchronously" assertion.
 
 ### project-linux-install-is-proven-by-the-distribution-matrix

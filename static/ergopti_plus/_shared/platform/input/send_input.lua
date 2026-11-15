@@ -7,7 +7,7 @@
 --- for the macOS and Linux drivers: the text to type, the key to press and the
 --- modifiers-plus-key to press. The grammar is pinned by
 --- _shared/tests/corpus/action_parameters/send_input_vectors.json, which the
---- Windows suite replays against infra/send_input_parameter.ahk too.
+--- Windows suite replays against settings/engine/send_input_parameter.ahk too.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Pure: the caller passes the vocabulary it decoded from

@@ -28,12 +28,12 @@ local JsonCodec        = require("core.fs.adapters.json_codec")
 local NativePath = require("core.fs.engine.native_path")
 local Logger           = require("core.logger.engine.logger")
 local fs_dir           = require("core.fs.engine.dir")
-local menu_paths       = require("infra.config_paths")
+local menu_paths       = require("settings.engine.paths")
 local keymap           = require("modules.keymap")
 local hotstring_editor = require("ui.hotstring_editor")
 
 local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
-local Adoption = require("infra.personal_file_adoption")
+local Adoption = require("settings.engine.preferences.personal_file_adoption")
 local LOG = "personal_hotstrings"
 local _inventory = {}
 local _unavailable_directories = {}

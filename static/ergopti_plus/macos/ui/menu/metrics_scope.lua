@@ -3,7 +3,7 @@
 --- Owns Metrics configuration without deleting history or converting stored text.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 local TableUtil = require("core.text.engine.table_util")
 
 local clone = TableUtil.deep_copy
@@ -81,7 +81,7 @@ function M.new(options)
 		end,
 		restore = restore,
 	}
-	return require("ui.menu.scoped_preferences").new(ports)
+	return require("settings.ui.menu.scoped_preferences").new(ports)
 end
 
 return M

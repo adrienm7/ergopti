@@ -55,11 +55,11 @@ end
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings", "core.fs.adapters.storage" }
+		local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.profile_settings", "core.fs.adapters.storage" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["llm.profiles.active"] = "raw", ["llm.profiles.num_predictions"] = 9,
 			} })

@@ -22,7 +22,7 @@
 ; (The clear-path twin this file once pinned is gone, and so is the global
 ; « tout désactiver » row whose bulk flip it guarded.)
 ;
-; SCOPE: source introspection of infra/config_io.ahk.
+; SCOPE: source introspection of settings/engine/io.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -39,7 +39,7 @@
 
 _KSSR_ReadCoversPersistedSlots() {
 	Body := _DriverFuncBody("ReadKeyboardShortcutsConfig")
-	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in infra/config_io.ahk")
+	Assert(Body != "", "ReadKeyboardShortcutsConfig() must exist in settings/engine/io.ahk")
 
 	Assert(InStr(Body, "_IniCache") > 0,
 		"ReadKeyboardShortcutsConfig must consult the persisted config section — reading only KEYBOARD_SHORTCUT_DEFAULTS silently drops every slot the user added, on the very reload that was meant to save it")

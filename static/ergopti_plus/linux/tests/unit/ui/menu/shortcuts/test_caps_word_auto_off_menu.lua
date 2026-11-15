@@ -36,7 +36,7 @@ local function with_menu(source, body)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
 			local context = { path = path, changes = 0, errors = 0 }
 			local i18n = require("core.i18n.engine.i18n")

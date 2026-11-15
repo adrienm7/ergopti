@@ -30,7 +30,7 @@ local function collision_dependency(name)
 	return loaded and type(owner) == "table" and owner or nil
 end
 local CollisionPreferences = collision_dependency("infra.llm_preferences")
-local CollisionRoutes = collision_dependency("infra.config_paths")
+local CollisionRoutes = collision_dependency("settings.engine.paths")
 local CollisionWriter = collision_dependency("core.text.engine.toml_codec.writer")
 local collision_many = CollisionPreferences and CollisionPreferences.get_many
 local collision_revision = CollisionPreferences and CollisionPreferences.is_current_revision
@@ -239,7 +239,7 @@ function M.capture_collision_configuration()
 			and rawequal(package.loaded["infra.llm_preferences"], CollisionPreferences)
 			and CollisionPreferences.get_many == collision_many and CollisionPreferences.is_current_revision == collision_revision
 			and CollisionPreferences.generation == collision_generation
-			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
+			and rawequal(package.loaded["settings.engine.paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
 			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], CollisionWriter) and CollisionWriter.read_classified == collision_read
 			and rawequal(package.loaded["infra.manifest_reader"], Manifest) and Manifest.default_for == collision_default
 			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode

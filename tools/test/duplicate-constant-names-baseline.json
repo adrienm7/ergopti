@@ -40,7 +40,7 @@
 	"MAX_BYTES": {
 		"files": [
 			"_shared/core/network/engine/pac_check.lua",
-			"windows/infra/config_registry_cache.ahk"
+			"windows/settings/engine/publication/registry_cache.ahk"
 		],
 		"divergent": true
 	},

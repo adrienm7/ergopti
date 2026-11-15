@@ -285,7 +285,7 @@ end
 function M.with_manager_session(options, body)
 	options = options or {}
 	M.with_session(options, function(s)
-		local ConfigPaths = require("infra.config_paths")
+		local ConfigPaths = require("settings.engine.paths")
 		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
 		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }

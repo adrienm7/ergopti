@@ -12,7 +12,7 @@
 ; ROOT CAUSE ENCODED: the chord a slot id names and the native spec the
 ; registrar builds from it are two translations; this pins both for meta_space,
 ; and the menu label the slot shows. The default binding itself lives in
-; infra/feature_state.ahk, which the suite does not load; the JS gate
+; settings/engine/preferences/feature_state.ahk, which the suite does not load; the JS gate
 ; test-keyboard-slot-recommended-bindings.cjs pins it to the manifest.
 ; Explicit editor assignments follow the same owner: existing assignments win,
 ; an explicit removal persists, and the action can move to another chord.

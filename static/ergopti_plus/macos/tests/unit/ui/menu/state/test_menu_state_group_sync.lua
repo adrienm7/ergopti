@@ -398,7 +398,7 @@ local DELIMITER_CONFIG = table.concat({
 
 helpers.describe("menu_state: saved delimiter states replay without ERROR (config-outdated-terminators)", function()
 	helpers.it("applies built-in and custom states and only warns about a retired key", function()
-		helpers.with_fresh_modules({ "core.logger.engine.shim", "layouts.engine.layers.terminators", "settings.engine.migration.outdated", "infra.preferences" },
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "layouts.engine.layers.terminators", "settings.engine.migration.outdated", "settings.engine.preferences.preferences" },
 			function()
 				local errors, warnings = {}, {}
 				local shim = helpers.make_logger_stub()
@@ -406,7 +406,7 @@ helpers.describe("menu_state: saved delimiter states replay without ERROR (confi
 				shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 				package.loaded["core.logger.engine.shim"] = shim
 				local Terminators = require("layouts.engine.layers.terminators")
-				local Preferences = helpers.load_with_stubs("infra.preferences")
+				local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 				local saved = Preferences.flatten_document(require("core.text.engine.toml_codec").decode(DELIMITER_CONFIG))
 				helpers.assert_eq(saved.terminator_states, { comma = false, custom_at = false })
 

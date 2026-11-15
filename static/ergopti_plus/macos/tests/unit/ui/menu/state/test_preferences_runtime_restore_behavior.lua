@@ -20,9 +20,9 @@ helpers.describe("menu preference rollback: restore runtime-owned values", funct
 			ensure_started = function() return true end,
 		}
 		package.loaded["modules.keystats.text_cipher"] = { set_enabled = noop }
-		package.loaded["ui.menu.preferences_transaction"] = nil
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
 		package.loaded["ui.menu.menu_state"] = nil
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local MenuState = require("ui.menu.menu_state")
 
 		local state = {

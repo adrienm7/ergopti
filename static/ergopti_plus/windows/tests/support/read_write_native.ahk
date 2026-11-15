@@ -6,7 +6,7 @@
 #Warn VarUnset, Off
 #Include core/logger/engine/file_read_activity.ahk
 #Include core/fs/adapters/file_system.ahk
-#Include infra/config_write_lease.ahk
+#Include settings/engine/publication/write_lease.ahk
 
 global _RW_State := 0
 global _RW_Pass := 0, _RW_Fail := 0

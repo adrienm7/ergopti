@@ -66,14 +66,14 @@ local function with_subject(stage, body, options)
 				return renamed, detail
 			end
 			local ran, problem = xpcall(function()
-				for _, name in ipairs({ "infra.preferences", "core.text.engine.toml_codec.writer", "ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
+				for _, name in ipairs({ "settings.engine.preferences.preferences", "core.text.engine.toml_codec.writer", "settings.ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
 				local logs, logger = {}, helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do logger[level] = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end end
 				package.loaded["core.logger.engine.logger"] = logger
 				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
-				package.loaded["infra.config_paths"] = { get = function() return path end }
+				package.loaded["settings.engine.paths"] = { get = function() return path end }
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
-				local preferences = require("infra.preferences"); preferences.load(path)
+				local preferences = require("settings.engine.preferences.preferences"); preferences.load(path)
 				local keyboard = require("modules.shortcuts.keyboard_shortcuts")
 				helpers.assert_eq(keyboard.get_action("primary_1"), "none")
 				local parameters, state = { retained = "unrelated" }, {}
@@ -89,7 +89,7 @@ local function with_subject(stage, body, options)
 					replace_action_parameters = function(snapshot) parameters = copy(snapshot); return true end,
 				}
 				local noop = function() return true end
-				local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+				local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(preferences, {
 					path = path, state = state, hotfiles = {}, core_modules = { gestures = gestures }, initial_state = state,
 					initial_preferences = preferences.snapshot(state, {}, { gestures = gestures }), restore_runtime = noop,
 				})
@@ -105,7 +105,7 @@ local function with_subject(stage, body, options)
 				local owner = require("ui.menu.program_parameter_transaction").new({
 					path = path, files = adapter, gestures = gestures, preferences = preferences, checkpoint = checkpoint,
 					admission = global.run_exclusive, paused = function() return false end, save_prefs = save, current_path = function() return path end,
-					capture_checkpoint_candidate = function() return { state = require("ui.menu.preferences_transaction").clone(state), preferences = preferences.snapshot(state, {}, { gestures = gestures }) } end,
+					capture_checkpoint_candidate = function() return { state = require("settings.ui.menu.preferences_transaction").clone(state), preferences = preferences.snapshot(state, {}, { gestures = gestures }) } end,
 				})
 				local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "primary_1",
 					read = function() return keyboard.get_action("primary_1") end,

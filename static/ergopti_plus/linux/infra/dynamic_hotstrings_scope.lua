@@ -25,7 +25,7 @@ local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.dynamic_hotstrings_scope"
 local PROGRAMMABLE_PATH = ConfigKeys.KEY.HOTSTRINGS_DYNAMIC_USER_CODE
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("dynamic_hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("dynamic_hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction through the actual runtime owners.
 --- @param options table Configuration/backup paths, config, preferences, dynamic, files.
@@ -160,7 +160,7 @@ function M.apply(enabled, dynamic, config)
 	if type(enabled) ~= "boolean" then return false, "invalid dynamic bulk posture" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "dynamic rollback is pending" end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path,
 		backup_path = path .. ".dynamic-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 		config = config or require("modules.hotstrings.hotstrings_config"),

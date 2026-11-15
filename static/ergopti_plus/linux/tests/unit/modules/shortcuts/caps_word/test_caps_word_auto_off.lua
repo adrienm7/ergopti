@@ -39,7 +39,7 @@ local function with_caps_word(source, body)
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local context = { now = 1000, deferred = {}, resolution = 0 }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.logger.engine.monotonic"] = {
 				now_ms = function() return context.now end,
 				now_sec = function() return context.now / 1000 end,

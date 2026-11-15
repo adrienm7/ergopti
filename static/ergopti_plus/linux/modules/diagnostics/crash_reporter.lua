@@ -147,7 +147,7 @@ local function _build_facts()
 		return require("infra.diagnostic_snapshot").resolve_commit()
 	end)
 	local ok_config, config_dir = pcall(function()
-		return require("infra.config_paths").get_config_dir()
+		return require("settings.engine.paths").get_config_dir()
 	end)
 	local ok_version, version = pcall(function()
 		return require("infra.version").VERSION

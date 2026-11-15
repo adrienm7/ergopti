@@ -70,7 +70,7 @@ local function load_keystats(options)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
 	}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti-test" end,
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,

@@ -39,10 +39,10 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				helpers.assert_type(requested.options[name], "function")
 			end
 			helpers.assert_nil(requested.options.confirm, "neither Configuration row asks")
-			local previous_script = package.loaded["infra.script_scope"]
+			local previous_script = package.loaded["settings.engine.scope.script_scope"]
 			local native_options, constructed = nil, 0
 			local native_owner = {}
-			package.loaded["infra.script_scope"] = { new = function(options)
+			package.loaded["settings.engine.scope.script_scope"] = { new = function(options)
 				native_options, constructed = options, constructed + 1
 				return native_owner
 			end }
@@ -64,7 +64,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				helpers.assert_true(first ~= second)
 				helpers.assert_eq(native_options.storage_backup_path(), second .. ".settings")
 			end)
-			package.loaded["infra.script_scope"] = previous_script
+			package.loaded["settings.engine.scope.script_scope"] = previous_script
 			if not checked then error(failure) end
 			-- « Tout effacer », beside it since 2026-09-30: the same composition,
 			-- in clear mode, one transaction whose owners each back up first.

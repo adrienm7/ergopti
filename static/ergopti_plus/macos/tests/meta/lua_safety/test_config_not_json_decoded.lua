@@ -49,7 +49,7 @@ end
 
 helpers.describe("boot config: the TOML config is never JSON-decoded (json-decode-toml-config)", function()
 	helpers.it("ConfigTomlPath resolves to a .toml file", function()
-		local menu_paths = helpers.load_with_stubs("ui.menu.menu_paths")
+		local menu_paths = helpers.load_with_stubs("settings.ui.menu.paths")
 		local path = menu_paths.get("ConfigTomlPath")
 		helpers.assert_true(type(path) == "string" and path:match("%.toml$") ~= nil,
 			"ConfigTomlPath must point at a .toml file, got: " .. tostring(path))

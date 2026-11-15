@@ -434,7 +434,7 @@ end
 --- stored "none" clears a default the user removed. Idempotent.
 local function load_assignments()
 	if _loaded then return end
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	local content, status, detail = Writer.read_classified(path)
 	if status ~= "ok" and status ~= "absent" then
 		error("keyboard_shortcuts: cannot read configuration: " .. tostring(detail))
@@ -526,7 +526,7 @@ function M.set_action(slot_id, action_id)
 	end
 	load_assignments()
 
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 
 	if type(action_id) ~= "string" or action_id == "" then action_id = "none" end
 	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
@@ -1082,7 +1082,7 @@ KeyboardPublication.register(M, M.published_binding_catalogue)
 function M.capture_collision_inventory()
 	load_assignments()
 	if _configuration_owner ~= nil then return nil end
-	local Routes = require("infra.config_paths")
+	local Routes = require("settings.engine.paths")
 	local route, read, factory = Routes.config, Writer.read_classified, M.capture_collision_inventory
 	local path = route("config.toml")
 	local bytes, status = read(path)
@@ -1099,7 +1099,7 @@ function M.capture_collision_inventory()
 			and _configuration_owner == nil and _dispatch_generation == epoch
 			and rawequal(_assignments, actual) and rawequal(_explicit_assignments, explicit)
 			and same(actual, expected.assignments) and same(explicit, expected.explicit_assignments)
-			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
+			and rawequal(package.loaded["settings.engine.paths"], Routes) and Routes.config == route
 			and Writer.read_classified == read and M.capture_collision_inventory == factory
 	end
 	local function current()

@@ -91,7 +91,7 @@ local SURVIVORS = {
 	{ { "updater", "channel" }, SUBSCRIBED_NON_DEFAULT },
 }
 
-local Cleanup = helpers.load_module("ui.menu.unused_keys_cleanup")
+local Cleanup = helpers.load_module("settings.ui.menu.unused_keys_cleanup")
 
 Contract.register(helpers, {
 	driver = "linux",
@@ -139,7 +139,7 @@ local function driver_state(path)
 	package.loaded["modules.updater.manager"] = previous_updater
 	if not ok_updater then error(updater_err, 0) end
 
-	local paths = require("infra.config_paths")
+	local paths = require("settings.engine.paths")
 	local previous_config, previous_chatgpt = paths.config, package.loaded["modules.shortcuts.chatgpt"]
 	local previous_preferences = package.loaded["infra.hotstring_preferences"]
 	local previous_magic_key = package.loaded["modules.hotstrings.magic_key"]
@@ -306,7 +306,7 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 
 			-- The wrong-typed AI leaf is read as absent; its neighbours still read.
 			Sandbox.with_config(source, function(path)
-				local paths = require("infra.config_paths")
+				local paths = require("settings.engine.paths")
 				local previous_config, previous_preferences = paths.config, package.loaded["infra.llm_preferences"]
 				paths.config = function() return path end
 				package.loaded["infra.llm_preferences"] = nil
@@ -404,8 +404,8 @@ end
 
 helpers.describe("unused keys (linux): tray wiring", function()
 	helpers.it("unused keys: the Configuration submenu opens the cleanup host without native dialogs", function()
-		local previous, called = package.loaded["ui.menu.unused_keys_cleanup"], false
-		package.loaded["ui.menu.unused_keys_cleanup"] = {
+		local previous, called = package.loaded["settings.ui.menu.unused_keys_cleanup"], false
+		package.loaded["settings.ui.menu.unused_keys_cleanup"] = {
 			run_from_menu = function(deps) helpers.assert_eq(deps, nil); called = true; return true end,
 		}
 		local ok, detail = pcall(function()
@@ -418,7 +418,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 			callback()
 			helpers.assert_eq(called, true)
 		end)
-		package.loaded["ui.menu.unused_keys_cleanup"] = previous
+		package.loaded["settings.ui.menu.unused_keys_cleanup"] = previous
 		if not ok then error(detail, 0) end
 	end)
 

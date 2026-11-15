@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 local MODULES = {
-	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "infra.config_paths",
-	"infra.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
+	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "settings.engine.paths",
+	"settings.engine.preferences.preferences", "core.timing.engine.deferred_work", "core.ui.engine.dialog_util", "core.logger.engine.logger",
 	"modules.shortcuts", "modules.shortcuts.bindings", "modules.shortcuts.keyboard_shortcuts",
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 	"tests.support.keyboard_config_fixture", "infra.manifest_menu", "menu.engine.renderer", "core.i18n.engine.i18n",
-	"ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction",
+	"settings.ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction",
 }
 
 --- Owns the real facade and its canonical persistence boundary for one UI case.

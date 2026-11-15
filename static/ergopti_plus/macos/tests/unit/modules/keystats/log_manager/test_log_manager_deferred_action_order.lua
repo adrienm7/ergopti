@@ -14,13 +14,13 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 --- Establishes an actual absent source before asking the cipher to admit plaintext.
 local function plaintext_cipher()
-	package.loaded["infra.preferences"] = nil
+	package.loaded["settings.engine.preferences.preferences"] = nil
 	local path = os.tmpname()
 	assert(os.remove(path))
 	local logger = require("core.logger.engine.logger")
 	local previous, errors = logger.error, {}
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
-	local _, status = helpers.load_with_stubs("infra.preferences").load(path)
+	local _, status = helpers.load_with_stubs("settings.engine.preferences.preferences").load(path)
 	logger.error = previous
 	helpers.assert_eq(status, "absent", table.concat(errors, "; "))
 	return require("modules.keystats.text_cipher")

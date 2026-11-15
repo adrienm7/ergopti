@@ -23,7 +23,7 @@ function M.check(scenario)
 	require("core.fs.adapters.storage")
 	require("core.text.engine.toml_codec.writer")
 	require("settings.engine.migration.file_inverse")
-	local paths_name, storage_name = "infra.config_paths", "core.fs.adapters.storage"
+	local paths_name, storage_name = "settings.engine.paths", "core.fs.adapters.storage"
 	local previous_paths, previous_storage = package.loaded[paths_name], package.loaded[storage_name]
 	local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-updater-storage-XXXXXX"))
 	local path = directory .. "/" .. FOLDER .. "/storage.json"

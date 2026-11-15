@@ -124,7 +124,7 @@
 				"static/ergopti_plus/linux/infra/shortcuts_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_script_chords.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_shortcuts_scope_terminal_shortcut.lua"
+				"static/ergopti_plus/linux/tests/unit/settings/scope/test_shortcuts_scope_terminal_shortcut.lua"
 			]
 		},
 		"dynamic_master": {
@@ -138,7 +138,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/config/test_empty_config_neutral.lua",
+				"static/ergopti_plus/linux/tests/unit/settings/test_empty_config_neutral.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_dynamic_rule_families.lua"
 			]
 		},
@@ -486,7 +486,7 @@
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
+				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
 		"simultaneous_chord_settings": {
@@ -504,7 +504,7 @@
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
+				"static/ergopti_plus/linux/tests/unit/settings/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
 		"layout_emulation": {
@@ -580,7 +580,7 @@
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_user_code_contract.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_user_hotstring_runtime.lua",
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_user_hotstring_runtime.lua",
 				"static/ergopti_plus/linux/tests/unit/platform/input/synthetic_input/test_user_hotstring_destination.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/menu/hotstrings/test_user_hotstring_menu.lua"
 			]
@@ -608,9 +608,9 @@
 			"proof_tier": "integration",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/infra/script_settings.lua",
+				"static/ergopti_plus/linux/settings/engine/scope/script_settings.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_script_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_script_settings.lua"
 			]
 		},
 		"script.show_error_dialog": {
@@ -1157,7 +1157,7 @@
 				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
 				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
@@ -1177,7 +1177,7 @@
 				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
 				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
@@ -1197,7 +1197,7 @@
 				"static/ergopti_plus/linux/adapters/input_source_switch.lua",
 				"static/ergopti_plus/linux/ui/menu/pause_layout_rows.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_pause_layout_preferences.lua",
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_pause_layout_preferences.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_pause_layout_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/adapters/layout/test_input_source_switch.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/menu/structure/test_pause_layout_rows.lua"
@@ -1215,7 +1215,7 @@
 				"static/ergopti_plus/linux/modules/keystats/keystats.lua",
 				"static/ergopti_plus/linux/ui/menu/app_exclusion_rows.lua",
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_metrics_preferences.lua"
+				"static/ergopti_plus/linux/tests/unit/settings/preferences/test_metrics_preferences.lua"
 			]
 		}
 	}

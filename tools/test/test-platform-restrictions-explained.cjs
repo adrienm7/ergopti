@@ -124,7 +124,7 @@ const MANIFEST = path.join(
 // Linux leaves out are refused there by the declared validation policy. The one entered
 // in the ledger, the AI-profile section, is a wrong declaration rather than a missing
 // reason: macOS stores the active profile and the prediction count under the same
-// llm.profiles keys (infra/preferences.lua), so no true reason exists. Opening it to
+// llm.profiles keys (settings/engine/preferences/preferences.lua), so no true reason exists. Opening it to
 // macOS adds both keys to the macOS AI scope, a behaviour change that goes with the
 // manifest-matches-readers work once the macOS AI scope suite is green again.
 // 2026-10-24: 1 → 3 on integration. The macOS user profiles moved to llm.user_profiles

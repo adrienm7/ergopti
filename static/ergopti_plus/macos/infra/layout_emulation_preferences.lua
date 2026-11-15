@@ -4,7 +4,7 @@
 --- MODULE: Layout Emulation Preferences (macOS)
 --- DESCRIPTION:
 --- Reads and writes the [layout] settings of the layout emulation through the
---- menu's preference state (infra/preferences.lua flat keys layout_emulated_layout,
+--- menu's preference state (settings/engine/preferences/preferences.lua flat keys layout_emulated_layout,
 --- layout_ergopti_variant, layout_ergopti_base, layout_ergopti_alt_gr and
 --- layout_emulate_<row>), so the keyboard-layout scope's restore and clear, the
 --- session demotions and every save see them like any other row. The emulation
@@ -20,7 +20,7 @@ local LOG = "infra.layout_emulation_preferences"
 
 --- The flat state key of one [layout] path.
 local function flat_key(path)
-	return assert(require("infra.preferences").flat_key_for(path), "no preference owner for " .. tostring(path))
+	return assert(require("settings.engine.preferences.preferences").flat_key_for(path), "no preference owner for " .. tostring(path))
 end
 
 --- The emulation settings the menu state holds.

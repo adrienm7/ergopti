@@ -10,7 +10,7 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Scope = require("infra.preferences_scope")
+local Scope = require("settings.engine.scope.preferences_scope")
 
 --- Creates the session owner for the two existing whole-gesture menu commands.
 --- @param options table Native, persistence and admission ports.
@@ -100,7 +100,7 @@ function M.new(options)
 			return true
 		end,
 	}
-	return require("ui.menu.scoped_preferences").new(ports)
+	return require("settings.ui.menu.scoped_preferences").new(ports)
 end
 
 return M

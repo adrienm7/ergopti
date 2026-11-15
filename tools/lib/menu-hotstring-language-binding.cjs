@@ -2095,7 +2095,7 @@ const PERSONAL_SECTION_FACTORY_BODY = `return function()
 			end
 		end
 		local will_enable = not (ctx.keymap and type(ctx.keymap.is_section_enabled) == "function" and ctx.keymap.is_section_enabled(group_name, sec_name) or false)
-		if PersonalFiles.components(group_name) and require("infra.preferences").personal_choices_available({
+		if PersonalFiles.components(group_name) and require("settings.engine.preferences.preferences").personal_choices_available({
 			{ group = group_name, section = sec_name, enabled = will_enable },
 		}) ~= true then
 			return KeymapLifecycle.commit_mutation(ctx, "admit canonical personal section choice", function() return false end)
@@ -2241,7 +2241,7 @@ function personalSectionChoicePublication(source, platform, manifest) {
 		};
 		const imports = {
 			ManifestMenu: 'infra.manifest_menu',
-			PersonalFileScope: 'infra.personal_file_scope',
+			PersonalFileScope: 'settings.engine.scope.personal_file_scope',
 			KeymapLifecycle: 'ui.menu.keymap_lifecycle',
 			PersonalFiles: 'hotstrings.engine.catalogue.personal_files',
 			Labels: 'menu.engine.labels'

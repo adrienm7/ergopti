@@ -600,7 +600,7 @@ local function with_configured_prediction(source, body, options)
 			for name in pairs(package.loaded) do
 				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
 			end
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			local observations = { polls = 0, requests = 0, applied = {}, visible = false, path = path }
 			local overlay = {
 				show = function() observations.visible = true; return true end,

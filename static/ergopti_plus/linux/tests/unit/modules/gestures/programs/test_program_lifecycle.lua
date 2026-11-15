@@ -417,14 +417,14 @@ end)
 
 local function with_bindings(callback)
 	local modules = { "modules.gestures.manager", "modules.shortcuts.keyboard_shortcuts",
-		"infra.config_paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "ui.gesture_conflicts" }
+		"settings.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.shim", "ui.gesture_conflicts" }
 	local saved = {}
 	for _, name in ipairs(modules) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path = os.tmpname()
 	local initial = assert(io.open(path, "wb")); initial:write("# retained foreign note\n"); initial:close()
 	local manager
 	local ok, failure = xpcall(function()
-		package.loaded["infra.config_paths"] = { config = function() return path end, get_config_dir = function() return "/tmp" end }
+		package.loaded["settings.engine.paths"] = { config = function() return path end, get_config_dir = function() return "/tmp" end }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }

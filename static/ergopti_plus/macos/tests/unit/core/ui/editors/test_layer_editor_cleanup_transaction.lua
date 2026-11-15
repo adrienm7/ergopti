@@ -16,7 +16,7 @@ local function with_editor(scenario)
 	local records = { views = {}, bridges = {}, deletes = 0, errors = {} }
 	local ok, err = xpcall(function()
 		helpers.with_stub_scope({ "ui.layer_editor", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
-			"core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system", "platform.input.keycodes",
+			"core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system", "platform.input.keycodes",
 			"platform.remap.nav_layer", "layouts.engine.layers.editor", "layouts.engine.layers.layers" }, function()
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message, ...)
@@ -28,7 +28,7 @@ local function with_editor(scenario)
 				shared_root = function() return helpers.shared() end,
 				shared = function(path) return helpers.shared(path) end,
 			}
-			package.loaded["infra.config_paths"] = { get_config_dir = function() return "/virtual/config" end }
+			package.loaded["settings.engine.paths"] = { get_config_dir = function() return "/virtual/config" end }
 			_G.hs = { webview = { usercontent = { new = function()
 				local bridge = {}
 				function bridge:setCallback(callback)

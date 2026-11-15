@@ -21,7 +21,7 @@ if mode == "index" then
 	local ok = pcall(Config.language_packs)
 	assert(not ok, "a FIFO index must be refused")
 elseif mode == "default" then
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	ConfigPaths.home = function() return root end
 	assert(Config.init({}, nil) == false, "a FIFO directory must be refused")
 elseif mode == "override" or mode == "denied" then

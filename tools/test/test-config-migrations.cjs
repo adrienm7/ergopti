@@ -21,7 +21,7 @@
  *    would change a value again on replay, so its from and to sets must be
  *    disjoint; a move into its own subtree is refused likewise.
  * 3. Replay. The reference interpreter below is a third implementation of the
- *    op semantics (after windows/infra/config_migrate.ahk and
+ *    op semantics (after windows/settings/engine/migration/migrate.ahk and
  *    _shared/settings/engine/migration/migrate.lua). It decides every case's outcome, compares
  *    the migrated model with expected.toml and replays the steps on their own
  *    output, which must change nothing.
@@ -1226,45 +1226,38 @@ for (const corpus of ['config_migrations', 'config_migration_registries']) {
 }
 // The Windows interpreter names the same registry, and the AHK suite that
 // replays the corpus with the ahk driver id is one run_all.ahk actually runs.
-const ahkEngine = readSource(shared('..', 'windows', 'infra', 'config_migrate.ahk'));
+const ahkEngine = readSource(
+	shared('..', 'windows', 'settings', 'engine', 'migration', 'migrate.ahk')
+);
 if (!ahkEngine.includes(`static Relative := "${REGISTRY_RELATIVE}"`)) {
 	fail(
 		'wiring',
-		`windows/infra/config_migrate.ahk must name the registry as "${REGISTRY_RELATIVE}"`
+		`windows/settings/engine/migration/migrate.ahk must name the registry as "${REGISTRY_RELATIVE}"`
 	);
 }
 // The field table has one Windows owner: the generated file the no-drift gate
 // compares with its generator. A hand-written Map here would be a second copy.
 if (
-	!ahkEngine.includes('#Include ../_generated/config_migration_ops.ahk') ||
+	!ahkEngine.includes('#Include ../../../_generated/config_migration_ops.ahk') ||
 	!ahkEngine.includes('Fields := ConfigMigrateOpFieldsData()') ||
 	/"rename_prefix",\s*\[\[/.test(ahkEngine)
 ) {
 	fail(
 		'wiring',
-		'windows/infra/config_migrate.ahk must read its op fields from _generated/config_migration_ops.ahk'
+		'windows/settings/engine/migration/migrate.ahk must read its op fields from _generated/config_migration_ops.ahk'
 	);
 }
 // The table validates the registry, so a cached validated registry must not
 // outlive it.
 if (
-	!readSource(shared('..', 'windows', 'infra', 'config_registry_cache.ahk')).includes(
-		'\\_generated\\config_migration_ops.ahk'
-	)
+	!readSource(
+		shared('..', 'windows', 'settings', 'engine', 'publication', 'registry_cache.ahk')
+	).includes('\\_generated\\config_migration_ops.ahk')
 ) {
 	fail('wiring', 'the registry cache identity must hash _generated/config_migration_ops.ahk');
 }
 const ahkSuite = readSource(
-	shared(
-		'..',
-		'windows',
-		'tests',
-		'unit',
-		'infra',
-		'config',
-		'migration',
-		'test_config_migrate.ahk'
-	)
+	shared('..', 'windows', 'tests', 'unit', 'settings', 'engine', 'migration', 'test_migrate.ahk')
 );
 if (
 	!ahkSuite.includes('\\tests\\corpus\\config_migrations"') ||
@@ -1272,27 +1265,27 @@ if (
 ) {
 	fail(
 		'wiring',
-		'windows/tests/unit/infra/config/migration/test_config_migrate.ahk must replay the corpus for driver "ahk"'
+		'windows/tests/unit/settings/engine/migration/test_migrate.ahk must replay the corpus for driver "ahk"'
 	);
 }
 if (!ahkSuite.includes('\\tests\\corpus\\config_migration_registries"')) {
 	fail(
 		'wiring',
-		'windows/tests/unit/infra/config/migration/test_config_migrate.ahk must replay tests/corpus/config_migration_registries'
+		'windows/tests/unit/settings/engine/migration/test_migrate.ahk must replay tests/corpus/config_migration_registries'
 	);
 }
 const runAll = readSource(shared('..', 'windows', 'tests', 'run_all.ahk'));
 for (const include of [
-	'#Include ../infra/config_migrate.ahk',
-	'#Include unit/infra/config/migration/test_config_migrate.ahk'
+	'#Include ../settings/engine/migration/migrate.ahk',
+	'#Include unit/settings/engine/migration/test_migrate.ahk'
 ]) {
 	if (!runAll.split(/\r?\n/).includes(include)) {
 		fail('wiring', `windows/tests/run_all.ahk must hold "${include}"`);
 	}
 }
 for (const [driver, id, runnerPath] of [
-	['macos', 'hs', 'tests/unit/infra/config/test_config_migrate.lua'],
-	['linux', 'linux', 'tests/unit/infra/config/test_config_migrate.lua']
+	['macos', 'hs', 'tests/unit/settings/migration/test_migrate.lua'],
+	['linux', 'linux', 'tests/unit/settings/migration/test_migrate.lua']
 ]) {
 	const runner = readSource(shared('..', driver, ...runnerPath.split('/')));
 	if (

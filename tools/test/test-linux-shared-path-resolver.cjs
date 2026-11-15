@@ -158,7 +158,7 @@ for (const b of BOOTSTRAPS) {
 // a literal directory named "~" beside the process. "/home/user" is the worst of
 // the three: a plausible path belonging to nobody, so a write there looks like it
 // worked.
-const HOME_EXEMPT = new Set(['infra/config_paths.lua']);
+const HOME_EXEMPT = new Set(['settings/engine/paths.lua']);
 const USER_ENV = /os\.getenv\(\s*"(HOME|XDG_CONFIG_HOME|XDG_DATA_HOME)"\s*\)/;
 
 for (const abs of files) {
@@ -171,7 +171,7 @@ for (const abs of files) {
 			const m = line.match(USER_ENV);
 			if (!m) return;
 			errors.push(
-				`${rel}:${i + 1}: reads ${m[1]} directly — require("infra.config_paths"). Fifteen files ` +
+				`${rel}:${i + 1}: reads ${m[1]} directly — require("settings.engine.paths"). Fifteen files ` +
 					'once did this with six different fallbacks, two of them broken: a bare concatenation ' +
 					'throws on nil, and "~" is never expanded by io.open.'
 			);

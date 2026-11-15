@@ -52,15 +52,15 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		return files_port.write_if_unchanged(path, value, { status = status, content = content })
 	end
 	package.loaded["core.fs.adapters.file_system"] = files_port
-	package.loaded["infra.preferences"] = nil
-	local preferences = require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	local preferences = require("settings.engine.preferences.preferences")
 	preferences.load("config")
 	local previous_get_actions = gestures.get_all_actions
 	gestures.get_all_actions = function()
 		if kind == "gesture" then return { tap_3 = read_action() } end
 		return previous_get_actions and previous_get_actions() or {}
 	end
-	local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+	local save, checkpoint = require("settings.ui.menu.preferences_transaction").bind(preferences, {
 		path = "config", state = state, hotfiles = {}, core_modules = { gestures = gestures },
 		initial_state = state, initial_preferences = preferences.snapshot(state, {}, { gestures = gestures }),
 		restore_runtime = noop,
@@ -90,7 +90,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		paused = function() return false end, admission = global.run_exclusive,
 		current_path = function() return controls.current_path or "config" end,
 		capture_checkpoint_candidate = function()
-			return { state = require("ui.menu.preferences_transaction").clone(state),
+			return { state = require("settings.ui.menu.preferences_transaction").clone(state),
 				preferences = preferences.snapshot(state, {}, { gestures = gestures }) }
 		end,
 		save_prefs = function(on_error)

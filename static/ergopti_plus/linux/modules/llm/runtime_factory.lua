@@ -40,7 +40,7 @@ function M.new(engine, profiles)
 		preferences = require("infra.llm_preferences"), profiles = profiles,
 		writer = require("core.text.engine.toml_codec.writer"), manifest = require("infra.manifest_reader"),
 		engine = engine, backend_key = engine.backend_key,
-		path = require("infra.config_paths").config("config.toml"),
+		path = require("settings.engine.paths").config("config.toml"),
 	})
 	local process = require("ai.engine.policy.process_port").new(require("core.lifecycle.engine.native_worker_owner"),
 		require("core.process.adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))

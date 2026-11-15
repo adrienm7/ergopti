@@ -90,7 +90,7 @@ end
 local function start_session()
 	package.loaded["core.fs.adapters.file_system"] = nil
 	Outdated.reset_for_tests()
-	local preferences = helpers.load_with_stubs("infra.preferences")
+	local preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	local values, status = preferences.load(PATH)
 	helpers.assert_eq(status, "ok")
 	local state = { hotstrings = {}, keymap = true,
@@ -128,7 +128,7 @@ end
 
 helpers.describe("hotstring-section-order: menu, config.toml and restart round trip", function()
 	helpers.it("persists a move, shows it after a restart, refuses a stale menu and resets", function()
-		helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
+		helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim" }, function()
 		local logger = helpers.make_logger_stub()
 		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
 		local file = assert(io.open(PATH, "wb"))

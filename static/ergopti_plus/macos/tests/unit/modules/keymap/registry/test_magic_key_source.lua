@@ -220,13 +220,13 @@ end)
 
 helpers.describe("magic key source: config.toml", function()
 	helpers.it("(magic-key-source) a stored key reaches the menu state, an outdated one is offered", function()
-		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "settings.engine.preferences.preferences" }, function()
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
 			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 			package.loaded["core.logger.engine.shim"] = shim
 			helpers.load_with_stubs("settings.engine.migration.outdated")
-			local Preferences = helpers.load_with_stubs("infra.preferences")
+			local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 			local TomlCodec = require("core.text.engine.toml_codec")
 
 			local chosen = "[hotstrings]\nmagic_key_source = \"Semicolon\"\n"

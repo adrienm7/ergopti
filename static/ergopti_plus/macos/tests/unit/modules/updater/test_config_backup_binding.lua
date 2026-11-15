@@ -26,7 +26,7 @@ local function with_binding(tree, body)
 		"modules.updater.config_backup",
 		"core.fs.adapters.file_system",
 		"core.fs.engine.dir",
-		"infra.config_paths",
+		"settings.engine.paths",
 		"core.fs.engine.paths",
 	}, function()
 		package.loaded["core.fs.adapters.file_system"] = {
@@ -73,7 +73,7 @@ local function with_binding(tree, body)
 				return names, true
 			end,
 		}
-		package.loaded["infra.config_paths"] = {
+		package.loaded["settings.engine.paths"] = {
 			get_config_dir = function() return "/Users/me/" .. AppDirs.config.macos_relative .. "/" end,
 			ensure_dir = function() return true end,
 		}

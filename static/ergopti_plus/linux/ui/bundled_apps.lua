@@ -50,7 +50,7 @@ local DEFAULT_DEPS = {
 	locale = function() return require("core.i18n.engine.i18n").get_locale() end,
 	text = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	getenv = os.getenv,
-	data_home = function() return require("infra.config_paths").data_home() end,
+	data_home = function() return require("settings.engine.paths").data_home() end,
 	-- `environment` overrides the daemon's own variables of the same name.
 	spawn = function(executable, args, environment, on_exit)
 		local uv = require("luv")

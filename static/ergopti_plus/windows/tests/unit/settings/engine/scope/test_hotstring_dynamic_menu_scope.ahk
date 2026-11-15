@@ -1,0 +1,401 @@
+﻿; tests/unit/settings/engine/scope/test_hotstring_dynamic_menu_scope.ahk
+
+; ==============================================================================
+; MODULE: Dynamic Hotstrings Menu Scope
+; DESCRIPTION:
+; The dynamic hotstrings submenu runs its shipped command through the live
+; configuration owner, refuses invalid postures before any write, and
+; follows the shared command head, order and metadata.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; The headless runner deliberately omits tray_menu.ahk's auto-execute block.
+; Read the real tray and personal-information declarations and feature manifest:
+; no second curated order or hard-coded live feature map belongs in a fixture.
+_HSCS_TrayMapLiteral(Source, Name, MinimumConstants := 0) {
+	if !RegExMatch(Source, "ms)^global " . Name . " := Map\((.*?)^\)", &Found)
+		throw Error("The tray boot owner has no Map declaration for " . Name . ".")
+	; A real declaration names generated path constants; read each through its owner
+	; so the JSON reading below stays the strict gate for any other non-literal value.
+	Literal := RegExReplace(Found[1], ",\s*$"), Position := 1, Resolved := 0
+	while RegExMatch(Literal, "\b(ConfigKey|ConfigLeaf)\.([A-Z0-9_]+)\b", &Constant, Position) {
+		Owner := Constant[1] == "ConfigKey" ? ConfigKey : ConfigLeaf
+		Value := JsonStringLiteral(Owner.%Constant[2]%)
+		Literal := SubStr(Literal, 1, Constant.Pos - 1) . Value . SubStr(Literal, Constant.Pos + Constant.Len)
+		Position := Constant.Pos + StrLen(Value)
+		Resolved += 1
+	}
+	; PersonalInformation is all literals; the tray maps must prove the scan still sees their constants.
+	Assert(Resolved >= MinimumConstants, "the tray Map declaration must name generated path constants: " . Name)
+	Values := JsonParse("[" . Literal . "]")
+	if !(Values is Array) || Mod(Values.Length, 2)
+		throw Error("The tray boot Map declaration has incomplete pairs: " . Name . ".")
+	Result := Map()
+	loop Values.Length // 2
+		Result[Values[2 * A_Index - 1]] := Values[2 * A_Index]
+	return Result
+}
+
+_HSCS_WithDynamicBootState(Body) {
+	Assert(IsSet(MenuLabelFromManifestEntry), "the headless menu must load its real manifest label owner")
+	global Features, _LegacyTopCategoryMap, _LegacyDynamicHotstringsKeyMap, _DYNAMIC_HOTSTRINGS_ORDER
+	global PersonalInformation, _TomlCountCache, _V1CatToV2CatMap
+	HadInformation := IsSet(PersonalInformation), OldInformation := HadInformation ? PersonalInformation : 0
+	HadCounts := IsSet(_TomlCountCache), OldCounts := HadCounts ? _TomlCountCache : 0
+	HadFeatures := IsSet(Features), OldFeatures := HadFeatures ? Features : 0
+	HadTop := IsSet(_LegacyTopCategoryMap), OldTop := HadTop ? _LegacyTopCategoryMap : 0
+	HadCategoryMap := IsSet(_V1CatToV2CatMap), OldCategoryMap := HadCategoryMap ? _V1CatToV2CatMap : 0
+	HadKeys := IsSet(_LegacyDynamicHotstringsKeyMap), OldKeys := HadKeys ? _LegacyDynamicHotstringsKeyMap : 0
+	HadOrder := IsSet(_DYNAMIC_HOTSTRINGS_ORDER), OldOrder := HadOrder ? _DYNAMIC_HOTSTRINGS_ORDER : 0
+	try {
+		Source := _StripFullLineComments(FileRead(_DriverDir . "\ui\tray_menu.ahk", "UTF-8"))
+		_LegacyTopCategoryMap := _HSCS_TrayMapLiteral(Source, "_LegacyTopCategoryMap", 1)
+		_V1CatToV2CatMap := _HSCS_TrayMapLiteral(Source, "_V1CatToV2CatMap", 1)
+		Assert(InStr(Source, "global _LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()"),
+			"the real tray must consume the shared family alias owner")
+		Assert(InStr(Source, "global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()"),
+			"the real tray must consume the shared family order owner")
+		_LegacyDynamicHotstringsKeyMap := _MR_DynamicHotstringsKeyMap()
+		_DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
+		Assert(_DYNAMIC_HOTSTRINGS_ORDER is Array, "the real tray order must be an array")
+		for Id in _DYNAMIC_HOTSTRINGS_ORDER {
+			if Id == "-"
+				continue
+			Assert(_LegacyDynamicHotstringsKeyMap.Has(Id), "the boot order must name an owned dynamic family")
+			Assert(ManifestFindEntryByPath("hotstrings.dynamic." . _LegacyDynamicHotstringsKeyMap[Id]) is Map,
+				"the boot family must resolve through the real feature manifest")
+		}
+		BootSource := _StripFullLineComments(FileRead(_DriverDir . "\ErgoptiPlus.ahk", "UTF-8"))
+		PersonalInformation := _HSCS_TrayMapLiteral(BootSource, "PersonalInformation")
+		_TomlCountCache := Map()
+		Features := ManifestBuildFeaturesMap()
+		Body.Call()
+	} finally {
+		PersonalInformation := HadInformation ? OldInformation : unset
+		_TomlCountCache := HadCounts ? OldCounts : unset
+		Features := HadFeatures ? OldFeatures : unset
+		_LegacyTopCategoryMap := HadTop ? OldTop : unset
+		_V1CatToV2CatMap := HadCategoryMap ? OldCategoryMap : unset
+		_LegacyDynamicHotstringsKeyMap := HadKeys ? OldKeys : unset
+		_DYNAMIC_HOTSTRINGS_ORDER := HadOrder ? OldOrder : unset
+	}
+}
+
+; Walk the real native order subtree, including dispatcher ownership and the
+; edge/pause restrictions. A new parent cannot replace a family or its editor.
+_HSCS_DynamicOrderSubtree(Built, Position, Labels) {
+	global _MenuDispatchCallbacks
+	AssertEqual(t("menu.hotstrings.section_order"), _CTC_LabelAt(Built, Position), "the order parent follows the complete family list")
+	Handle := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+	Assert(Handle != 0, "the order row opens a real native submenu")
+	OrderMenu := MenuFromHandle(Handle)
+	AssertEqual(Labels.Length + 2, TrayMenuItemCount(OrderMenu), "each family plus the separator and reset has one owned row")
+	for Index, Label in Labels {
+		AssertEqual(Label, _CTC_LabelAt(OrderMenu, Index - 1), "movable families retain their native order and caption")
+		ChildHandle := DllCall("GetSubMenu", "ptr", Handle, "int", Index - 1, "ptr")
+		Assert(ChildHandle != 0, "each family owns its move commands")
+		Moves := MenuFromHandle(ChildHandle)
+		AssertEqual(2, TrayMenuItemCount(Moves), "each family has exactly the two directional commands")
+		for Direction, Key in ["menu.hotstrings.move_up", "menu.hotstrings.move_down"] {
+			AssertEqual(t(Key), _CTC_LabelAt(Moves, Direction - 1))
+			Id := DllCall("GetMenuItemID", "ptr", ChildHandle, "int", Direction - 1, "uint")
+			Assert(_MenuDispatchCallbacks.Has(Id), "each order command belongs to the real menu dispatcher")
+			State := DllCall("GetMenuState", "ptr", ChildHandle, "uint", Direction - 1, "uint", 0x400, "uint")
+			Assert(State != 0xFFFFFFFF, "the native command state must be readable")
+			Disabled := A_IsSuspended || Direction == 1 && Index == 1 || Direction == 2 && Index == Labels.Length
+			AssertEqual(Disabled, !!(State & 3), "edge moves and every paused move are disabled")
+		}
+	}
+	AssertTrue(TrayMenuIsSeparatorAt(OrderMenu, Labels.Length), "reset is separated from the family moves")
+	AssertEqual(t("hs_config.btn_reset_default"), _CTC_LabelAt(OrderMenu, Labels.Length + 1))
+	ResetId := DllCall("GetMenuItemID", "ptr", Handle, "int", Labels.Length + 1, "uint")
+	Assert(_MenuDispatchCallbacks.Has(ResetId), "reset belongs to the same native dispatcher")
+	State := DllCall("GetMenuState", "ptr", Handle, "uint", Labels.Length + 1, "uint", 0x400, "uint")
+	Assert(State != 0xFFFFFFFF, "the reset state must be readable")
+	AssertEqual(A_IsSuspended, !!(State & 3), "reset respects pause")
+}
+
+; Dynamic scopes have eight canonical families and their master,
+; hotstrings.dynamic.enabled, which the whole-family selection writes with them.
+; The native submenu applies in-process while the master or pause is off. The
+; programmable hotstrings keep their own row: a bulk click once switched them on
+; (2026-10-17, « [hotstrings.dynamic.user_code] enabled = true »).
+_HSCS_DynamicMenuLive(Enabled, Paused := false) {
+	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
+		"iban_prefixes", "user_code", "text_expansion_personal_information"]
+	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.dynamic]`nenabled = false`n'
+	for Index, Name in Names {
+		Value := Name == "user_code" ? !Enabled : Mod(Index, 2)
+		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Value ? "true" : "false") . '`n'
+		if Name == "date"
+			Source .= 'time_activation_seconds = 0.75`n'
+	}
+	Source .= '[hotstrings.dynamic.future_family]`nenabled = true`n[private]`ncredential = "retain-dynamic-fixture"`n'
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", false, "Rolls", true), Check)
+	Check(Fixture, Options, Calls) {
+		global CategoryEnabled, _DYNAMIC_HOTSTRINGS_ORDER, _LegacyDynamicHotstringsKeyMap
+		SavedSuspend := A_IsSuspended, Built := 0
+		try {
+			Suspend(Paused)
+			Built := _BuildDynamicHotstringsSubmenu(Options)
+			AssertEqual(13, TrayMenuItemCount(Built), "two commands, two separators, seven families, their editor and the order parent")
+			Labels := []
+			for Id in _DYNAMIC_HOTSTRINGS_ORDER {
+				if Id == "-"
+					continue
+				Entry := ManifestFindEntryByPath("hotstrings.dynamic." . _LegacyDynamicHotstringsKeyMap[Id])
+				Labels.Push(MenuRowFromManifest(Entry, "DynamicHotstrings")["label"])
+			}
+			_HSCS_DynamicOrderSubtree(Built, 12, Labels)
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")), "there is no invented dynamic category switch")
+			AssertEqual(1, _CTC_CountLabel(Built, t("menu.shortcuts.edit_personal_info")), "the existing editor stays reachable")
+			AssertTrue(_HSCS_ClickBulk(Built, Enabled), "one native click commits one whole-family selection")
+			AssertEqual(Paused, A_IsSuspended, "the selection never resumes a paused driver")
+		} finally {
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+			Suspend(SavedSuspend)
+		}
+		AssertEqual(1, Calls.live, "the dynamic families apply in-process")
+		AssertEqual(0, Calls.reload)
+		AssertFalse(CategoryEnabled["Hotstrings"], "the native engine master stays off")
+		AssertTrue(CategoryEnabled["Rolls"], "another category keeps its native gate")
+		AssertEqual(Names.Length + 1, ManifestFeaturesForSection("hotstrings.dynamic").Length,
+			"every current dynamic family and the master belong to the canonical inventory")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		for Name in Names {
+			if Name == "user_code"
+				AssertEqual(!Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic.user_code"),
+					"the programmable hotstrings are not part of the families' bulk selection")
+			else
+				AssertEqual(Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic." . Name), "the explicit posture of " . Name)
+		}
+		AssertFalse(Parsed["category_enabled"]["hotstrings"])
+		AssertTrue(Parsed["category_enabled"]["rolls"])
+		AssertFalse(Parsed["category_enabled"].Has("dynamichotstrings"), "no additional category gate is written")
+		AssertEqual(Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic"), "the master follows the whole-family selection")
+		AssertTrue(Parsed["hotstrings.dynamic.future_family"]["enabled"], "unrecognized future families stay untouched")
+		AssertEqual(0.75, Parsed["hotstrings.dynamic.date"]["time_activation_seconds"])
+		AssertEqual("retain-dynamic-fixture", Parsed["private"]["credential"])
+	}
+}
+
+for _HSCS_Enabled in [true, false] {
+	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " keeps the master and applies live (hotstrings-submenu-live)",
+		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuLive.Bind(_HSCS_Enabled)))
+	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " preserves pause (hotstrings-submenu-live)",
+		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuLive.Bind(_HSCS_Enabled, true)))
+}
+
+_HSCS_DynamicInvalidPosture() {
+	for Value in ["true", 2]
+		_HSCS_DynamicInvalidPostureFor(Value)
+}
+
+; One invalid posture per call, so the refused closure reads its parameter and
+; not the loop variable (test-ahk-loop-capture).
+_HSCS_DynamicInvalidPostureFor(Value) {
+	Launches := 0
+	Count(*) {
+		Launches += 1
+		return true
+	}
+	Fixture := _ScopeOwnerFixture()
+	try {
+		AssertThrows(() => ToggleDynamicAllSections(Value, Map("live", Count, "reload", Count)),
+			"an invalid request cannot publish a partial selection")
+		AssertEqual(0, Launches)
+		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+	} finally _ScopeOwnerCleanup(Fixture)
+}
+Test("hotstring-dynamic-menu-owner: invalid postures are refused before any write", _HSCS_DynamicInvalidPosture)
+
+; This layout-only regression runs unchanged against the old zero-argument
+; builder: the original checkbox fails before any native action is invoked.
+_HSCS_DynamicMenuHead() {
+	Built := _BuildDynamicHotstringsSubmenu()
+	try {
+		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0), "the first command has explicit enable intent")
+		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1), "the second command has explicit disable intent")
+		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the state-dependent checkbox is retired")
+	} finally _CTC_ReleaseMenu(Built)
+}
+Test("hotstring dynamic submenu: explicit shared command head (hotstring-dynamic-menu-head)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuHead))
+
+
+; The golden records were captured from the native owners before centralization.
+; Injecting another published order must reach the actual native Menu object.
+_HSCS_DynamicSharedOrder(Corpus, Vector) {
+	Root := _MM_GetManifestRoot()
+	Assert(Root is Map, "the real shared menu declaration must be readable")
+	Previous := Root["dynamic_hotstring_families"]
+	Rows := []
+	for Index in Vector["indices"]
+		Rows.Push(Corpus["rows"][Index])
+	Root["dynamic_hotstring_families"] := Map("rows", Rows)
+	try _HSCS_WithDynamicBootState(Check)
+	finally Root["dynamic_hotstring_families"] := Previous
+	Check() {
+		global _DYNAMIC_HOTSTRINGS_ORDER, _LegacyDynamicHotstringsKeyMap
+		Expected := Vector["windows"]
+		AssertEqual(Expected.Length, _DYNAMIC_HOTSTRINGS_ORDER.Length)
+		for Index, Id in Expected
+			AssertEqual(Id, _DYNAMIC_HOTSTRINGS_ORDER[Index], "the boot order must follow the independent vector")
+		Built := _BuildDynamicHotstringsSubmenu()
+		try {
+			AssertEqual(13, TrayMenuItemCount(Built), "all shared commands, families, separators, editor and order parent survive")
+			Position := 3, Labels := []
+			for Index, Id in Expected {
+				if Id == "-" {
+					State := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+					Assert(State != 0xFFFFFFFF && (State & 0x800), "the independent separator remains in its exact position")
+				} else {
+					ExpectedId := Corpus["rows"][Vector["indices"][Index]]["id"]
+					AssertEqual(ExpectedId, _LegacyDynamicHotstringsKeyMap[Id], "the published alias keeps its canonical feature")
+					Entry := ManifestFindEntryByPath("hotstrings.dynamic." . ExpectedId)
+					Assert(Entry is Map, "the independently named native row requires a real feature")
+					Row := MenuRowFromManifest(Entry, "DynamicHotstrings")
+					Assert(Row is Map, "the independent family must produce its native row")
+					AssertEqual(Row["label"], _CTC_LabelAt(Built, Position), "the actual native menu must follow the shared order")
+					Labels.Push(Row["label"])
+					if ExpectedId == "text_expansion_personal_information" {
+						Position += 1
+						AssertEqual(t("menu.shortcuts.edit_personal_info"), _CTC_LabelAt(Built, Position),
+							"the native editor follows the personal-information family")
+					}
+				}
+				Position += 1
+			}
+			AssertEqual(12, Position, "the original family and editor rows precede the order parent")
+			_HSCS_DynamicOrderSubtree(Built, Position, Labels)
+			Position += 1
+			AssertEqual(TrayMenuItemCount(Built), Position, "every native row including the complete order subtree is accounted for")
+		} finally _CTC_ReleaseMenu(Built)
+	}
+}
+
+_HSCS_DynamicSharedMetadata() {
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))
+	Root := _MM_GetManifestRoot()
+	AssertEqual(KL_JsonEncode(Corpus["rows"]), KL_JsonEncode(Root["dynamic_hotstring_families"]["rows"]),
+		"the independently captured published metadata stays exact")
+	First := _MR_GetDynamicHotstringFamilies(), Second := _MR_GetDynamicHotstringFamilies()
+	First[1]["section"] := "changed-in-first-caller"
+	First.Push(Map("separator", true))
+	AssertEqual("datelongfr", Second[1]["section"])
+	AssertEqual(8, Second.Length)
+	AssertEqual(KL_JsonEncode(Corpus["rows"]), KL_JsonEncode(Root["dynamic_hotstring_families"]["rows"]),
+		"native callers cannot mutate the manifest cache")
+}
+Test("hotstring dynamic shared metadata: independent and detached", _HSCS_DynamicSharedMetadata)
+for _HSCS_MenuVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8"))["vectors"]
+	Test("hotstring dynamic shared order: " . _HSCS_MenuVector["id"],
+		_HSCS_DynamicSharedOrder.Bind(JsonParse(FileRead(_SharedDir . "\tests\corpus\dynamic_hotstrings\menu_vectors.json", "UTF-8")), _HSCS_MenuVector))
+
+
+; The independently inventoried writers run through the real configuration
+; lease and native file publication. Repaint is a receipt of a committed order.
+_HSCS_OrderNativePublication() {
+	_HSCS_WithLiveConfig('private_root = { flag = true, names = ["A", "a"] }`n'
+		. '[private]`ncredential = "keep-order-fixture"`n', Map("Hotstrings", false), Check)
+	Check(Fixture, _Options, _Calls) {
+		Repaints := 0, Notices := 0, Refusals := [], SavedSuspend := A_IsSuspended
+		Repaint(*) => Repaints += 1
+		Notify(Message, *) {
+			Notices += 1
+			Refusals.Push(Message)
+		}
+		try {
+			Suspend(false)
+			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
+			Assert(Snapshot is Map, "the real menu must capture its admitted configuration source")
+			AssertTrue(_HS_OrderCommit(Snapshot, ["date", "datefr"], 0, Repaint, Notify),
+				"the native publisher must commit: " . KL_JsonEncode(Refusals))
+			AssertEqual(1, Repaints)
+			AssertEqual(0, Notices)
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertEqual('["date","datefr"]', KL_JsonEncode(Parsed["hotstrings.order_overrides"]["dynamichotstrings"]))
+			AssertEqual("keep-order-fixture", Parsed["private"]["credential"], "native publication preserves unrelated configuration")
+			Written := FSReadUtf8Exact(Fixture.path)
+			Document := TOML_ParseDocumentShared(Written)
+			Original := TOML_ParseDocumentShared(Fixture.source)
+			AssertTrue(TOML_SameValue(Original["_meta"], Document["_meta"]), "root schema metadata keeps its exact typed value")
+			AssertTrue(TOML_SameValue(Original["private_root"], Document["private_root"]), "unrelated root inline data survives the native writer")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the genuine native writer retains schema admission after publication")
+			AssertFalse(_HS_OrderCommit(Snapshot, 0, 0, Repaint, Notify), "an old menu cannot reset the intervening native publication")
+			AssertEqual(Written, FSReadUtf8Exact(Fixture.path))
+			AssertEqual(1, Repaints, "a stale source cannot repaint a success")
+			AssertEqual(1, Notices, "the canonical owner reports the stale-source refusal")
+			Snapshot := _HS_OrderSnapshot("dynamichotstrings", Fixture.path)
+			for Receipt in [0, "1", 2] {
+				Writer := ((Value) => (*) => Value)(Receipt)
+				AssertFalse(_HS_OrderCommit(Snapshot, 0, Writer, Repaint, Notify), "refused or malformed native receipts cannot acknowledge reset")
+				AssertEqual(Written, FSReadUtf8Exact(Fixture.path))
+				AssertEqual(1, Repaints)
+			}
+			AssertEqual(4, Notices, "each malformed native receipt is reported")
+			AssertTrue(_HS_OrderCommit(Snapshot, 0, 0, Repaint, Notify), "a fresh reset commits through the same native owner")
+			Parsed := TOML_ParseFreshFile(Fixture.path)
+			AssertFalse(Parsed.Has("hotstrings.order_overrides") && Parsed["hotstrings.order_overrides"].Has("dynamichotstrings"))
+			AssertEqual("keep-order-fixture", Parsed["private"]["credential"])
+			ResetDocument := TOML_ParseDocumentShared(FSReadUtf8Exact(Fixture.path))
+			AssertTrue(TOML_SameValue(Original["private_root"], ResetDocument["private_root"]), "reset retains unrelated root data too")
+			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "reset keeps the native source generation admitted")
+			AssertEqual(2, Repaints, "only the two native commits repaint")
+		} finally Suspend(SavedSuspend)
+	}
+}
+Test("hotstring-section-order: native publication, stale source and strict receipts own repaint", _HSCS_OrderNativePublication)
+
+
+; A family switched on while the dynamic master is off would stay silent: the
+; one write carries the master with it, and switching it off leaves the master.
+_HSCS_DynamicFamilyCarriesMaster(Enable) {
+	Source := '[category_enabled]`nhotstrings = true`n[hotstrings.dynamic]`nenabled = ' . (Enable ? "false" : "true") . '`n'
+		. '[hotstrings.dynamic.date]`nenabled = ' . (Enable ? "false" : "true") . '`n'
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", true), Check)
+	Check(Fixture, Options, Calls) {
+		global Features
+		AssertTrue(_HS_WriteHotstringFamily("hotstrings.dynamic.date", Enable), "the section's switch is persisted")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		AssertEqual(Enable, _HSCS_Stored(Parsed, "hotstrings.dynamic.date"), "the family follows the request")
+		AssertEqual(true, _HSCS_Stored(Parsed, "hotstrings.dynamic"),
+			Enable ? "enabling a family writes the master with it" : "disabling a family leaves the master on")
+		Desired := MasterGateDesiredFeatures(Features)
+		AssertEqual(Enable, Desired["hotstrings"]["dynamic"]["date"]["enabled"] ? true : false, "the desired state follows")
+		AssertEqual(Enable, Features["hotstrings"]["dynamic"]["date"]["enabled"] ? true : false,
+			"the runtime projection follows once the master is on")
+	}
+}
+Test("hotstring dynamic master: enabling a family writes the master (hotstrings-dynamic-master)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicFamilyCarriesMaster.Bind(true)))
+Test("hotstring dynamic master: disabling a family keeps the master (hotstrings-dynamic-master)",
+	_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicFamilyCarriesMaster.Bind(false)))
+
+; The master gates the families in the runtime projection and nowhere else: the
+; choices stay in the retained state for when the master returns.
+_HSCS_DynamicMasterGatesProjection() {
+	Candidate := ManifestBuildFeaturesMap()
+	Candidate["hotstrings"]["dynamic"]["enabled"] := false
+	Candidate["hotstrings"]["dynamic"]["date"]["enabled"] := true
+	Candidate["hotstrings"]["dynamic"]["user_code"]["enabled"] := true
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (*) => true)
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "a family is off while the master is off")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["user_code"]["enabled"], "the programmable hotstrings follow the master")
+	Candidate["hotstrings"]["dynamic"]["enabled"] := true
+	Candidate["hotstrings"]["dynamic"]["date"]["enabled"] := true
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (*) => true)
+	AssertTrue(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "the master on leaves a family as chosen")
+	ApplyMasterGatesToFeatures(Candidate, Map("keys", Map()), (Category) => Category != "Hotstrings")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["date"]["enabled"], "the Hotstrings master still zeroes every family")
+	AssertFalse(Candidate["hotstrings"]["dynamic"]["enabled"], "and the dynamic master with them")
+}
+Test("hotstring dynamic master: gates the families in the projection (hotstrings-dynamic-master)",
+	_HSCS_DynamicMasterGatesProjection)

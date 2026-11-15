@@ -23,6 +23,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "adapters",
 	DRIVER_ROOT .. "core",
 	DRIVER_ROOT .. "platform",
+	DRIVER_ROOT .. "settings",
 	helpers.shared(""),
 }
 local ROW_ITERATOR = "^%s*for%s.-%sin%s+[%w_%.]*db:[nu]?rows%("

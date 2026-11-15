@@ -17,7 +17,7 @@ local function with_binding(body, options)
 	local ok, err = pcall(function()
 		Sandbox.with_config(SOURCE, function(path)
 			local seen = { commands = {}, other = 0, queue = {} }
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end,
 				set = function() error("canonical bindings must not write legacy storage") end }
 			package.loaded["core.process.adapters.shell_runner"] = {

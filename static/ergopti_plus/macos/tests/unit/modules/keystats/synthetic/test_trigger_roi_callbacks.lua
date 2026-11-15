@@ -16,7 +16,7 @@ local PreferenceManifest = helpers.load_with_stubs("infra.manifest_reader")
 local function fixture()
 	local f = Fixtures.load_keystats()
 	package.loaded["infra.manifest_reader"] = PreferenceManifest
-	package.loaded["infra.preferences"] = nil
+	package.loaded["settings.engine.preferences.preferences"] = nil
 	f.hs.caffeinate = { watcher = { new = function()
 		return { start = function(self) return self end, stop = function(self) return self end }
 	end } }
@@ -34,7 +34,7 @@ local function fixture()
 	package.loaded["core.logger.engine.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
 	local source_path = os.tmpname()
 	assert(os.remove(source_path))
-	local _, source_status = require("infra.preferences").load(source_path)
+	local _, source_status = require("settings.engine.preferences.preferences").load(source_path)
 	helpers.assert_eq(source_status, "absent", "the plaintext fixture owns a real absent preference source")
 	helpers.assert_true(require("modules.keystats.text_cipher").set_enabled(false))
 	f.start()
@@ -246,7 +246,7 @@ helpers.describe("macOS trigger ROI admission", function()
 	}) do
 		helpers.it("denies textual ROI from the actual non-OFF source " .. source:gsub("\n", " "), function()
 			local f, c = fixture()
-			local prefs = require("infra.preferences")
+			local prefs = require("settings.engine.preferences.preferences")
 			local cipher = require("modules.keystats.text_cipher")
 			for _ = 1, 4 do c.key("candidate ") end
 			c.key("fragment")
@@ -284,7 +284,7 @@ helpers.describe("macOS trigger ROI admission", function()
 
 	helpers.it("revokes a refused reload before native I/O and keeps input free from reads and decoding", function()
 		local f, c = fixture()
-		local prefs = require("infra.preferences")
+		local prefs = require("settings.engine.preferences.preferences")
 		local cipher = require("modules.keystats.text_cipher")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write("[metrics]\nencrypt = false\n")); assert(file:close())
@@ -333,7 +333,7 @@ helpers.describe("macOS trigger ROI admission", function()
 	for _, source in ipairs({ '[metrics]\nencrypt = true\n', '[metrics]\nencrypt = "true"\n', '[metrics\n' }) do
 		helpers.it("revokes a changed read-only source without adopting it " .. source:gsub("\n", " "), function()
 			local f, c = fixture()
-			local prefs = require("infra.preferences")
+			local prefs = require("settings.engine.preferences.preferences")
 			local cipher = require("modules.keystats.text_cipher")
 			local path = os.tmpname()
 			local function write(contents)
@@ -366,7 +366,7 @@ helpers.describe("macOS trigger ROI admission", function()
 
 	helpers.it("keeps the exact source receipt when a reload is refused during an owned publication", function()
 		local f, c = fixture()
-		local prefs = require("infra.preferences")
+		local prefs = require("settings.engine.preferences.preferences")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); assert(file:write("[metrics]\nencrypt = false\n")); assert(file:close())
 		helpers.assert_eq(select(2, prefs.load(path)), "ok")

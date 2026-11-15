@@ -135,7 +135,7 @@ end
 --- @return table keymap
 local function fake_keymap(controls)
 	local Manifest = require("infra.manifest_reader")
-	local Preferences = require("infra.preferences")
+	local Preferences = require("settings.engine.preferences.preferences")
 	package.loaded["layouts.engine.layers.terminators"] = nil
 	package.loaded["layouts.engine.layers.terminators_catalogue"] = nil
 	local Terminators = require("layouts.engine.layers.terminators")
@@ -290,8 +290,8 @@ local function fixture(options)
 	}
 	package.loaded["core.fs.adapters.file_system"] = adapter
 	package.loaded["ui.menu.hotstrings_scope"] = nil
-	package.loaded["ui.menu.scoped_preferences"] = nil
-	local prefs = helpers.load_with_stubs("infra.preferences")
+	package.loaded["settings.ui.menu.scoped_preferences"] = nil
+	local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	prefs.load("config")
 	local km = fake_keymap(controls)
 	-- The new scalar owner is the actual programmable facade and manager. This
@@ -352,7 +352,7 @@ local function fixture(options)
 	assert(km.set_terminators_consume(consumed))
 	local hotfiles = { "autocorrection", "rolls", "personal", "dynamichotstrings" }
 	local core = { keymap = km }
-	local PT = require("ui.menu.preferences_transaction")
+	local PT = require("settings.ui.menu.preferences_transaction")
 	local save, checkpoint = PT.bind(prefs, { path = "config", state = state, hotfiles = hotfiles, core_modules = core,
 		initial_state = state, initial_preferences = prefs.snapshot(state, hotfiles, core),
 		restore_runtime = function() return true end })

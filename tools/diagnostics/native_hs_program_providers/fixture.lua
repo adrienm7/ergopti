@@ -8,7 +8,7 @@ package.path = source .. "/static/ergopti_plus/macos/?.lua;" .. source .. "/stat
 local configured = input.config
 local logs = 0
 local logger = setmetatable({}, { __index = function() return function() logs = logs + 1 end end })
-package.loaded["infra.config_paths"] = { get_config_dir = function() return configured end }
+package.loaded["settings.engine.paths"] = { get_config_dir = function() return configured end }
 package.loaded["core.fs.engine.paths"] = { shared = function(relative)
     return source .. "/static/ergopti_plus/_shared/" .. relative
 end }

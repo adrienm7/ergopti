@@ -274,7 +274,7 @@ function M.new(directory, backend)
 		if not same(archive_identity, archive) then return nil, "archive_identity_changed" end
 		if archive.size ~= verified_size then return nil, "archive_size_mismatch" end
 		if not exact_directory(paths.stage, stage_identity) then return nil, "archive_not_verified" end
-		local zstd, zstd_refusal = require("infra.owned_programs").zstd_tar_option()
+		local zstd, zstd_refusal = require("settings.engine.preferences.owned_programs").zstd_tar_option()
 		if not zstd then return nil, zstd_refusal end
 		return "tar", { zstd, "--extract", "--file", paths.archive, "--directory", paths.stage,
 			"--no-same-owner", "--no-same-permissions" }

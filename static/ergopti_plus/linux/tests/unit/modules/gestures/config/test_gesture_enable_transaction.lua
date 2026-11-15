@@ -149,7 +149,7 @@ assert(manager.is_enabled() == false)
 		assert(shell.run("mkfifo -- " .. shell.quote(path)))
 		local code = string.format([[package.path = %q
 local manager = require("modules.gestures.manager")
-require("infra.config_paths").config = function() return %q end
+require("settings.engine.paths").config = function() return %q end
 local calls = 0
 os.execute = function() calls = calls + 1; return 0 end
 assert(manager.execute_action("open_personal_info"))
@@ -175,7 +175,7 @@ assert(calls == 0, "a special endpoint must not be opened as a file")
 
 	helpers.it("still opens a regular or absent personal file", function()
 		local path = os.tmpname()
-		local Paths, original_execute = require("infra.config_paths"), os.execute
+		local Paths, original_execute = require("settings.engine.paths"), os.execute
 		local original_config, calls = Paths.config, 0
 		local ok, err = pcall(function()
 			Paths.config = function() return path end

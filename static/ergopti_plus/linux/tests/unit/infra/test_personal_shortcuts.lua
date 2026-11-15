@@ -19,12 +19,12 @@ local function with_folder(body)
 	os.remove(dir)
 	local made = os.execute("mkdir -p '" .. dir .. "'")
 	assert(made == true or made == 0, "mkdir")
-	local saved_paths = package.loaded["infra.config_paths"]
+	local saved_paths = package.loaded["settings.engine.paths"]
 	local saved_module = package.loaded["infra.personal_shortcuts"]
-	package.loaded["infra.config_paths"] = { config = function(rel) return dir .. "/" .. rel end }
+	package.loaded["settings.engine.paths"] = { config = function(rel) return dir .. "/" .. rel end }
 	package.loaded["infra.personal_shortcuts"] = nil
 	local ok, err = pcall(body, require("infra.personal_shortcuts"), dir)
-	package.loaded["infra.config_paths"] = saved_paths
+	package.loaded["settings.engine.paths"] = saved_paths
 	package.loaded["infra.personal_shortcuts"] = saved_module
 	os.execute("rm -rf '" .. dir .. "'")
 	if not ok then error(err, 0) end

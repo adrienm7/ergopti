@@ -100,7 +100,7 @@ helpers.describe("layout submenu: the Karabiner virtual keyboard is one choice r
 		local fh = assert(io.open(tmp, "w"))
 		fh:write("[layout]\nvirtual_keyboard = \"iso\"\n")
 		fh:close()
-		local Prefs = helpers.load_with_stubs("infra.preferences")
+		local Prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local flat = Prefs.load(tmp)
 		pcall(os.remove, tmp)
 		helpers.assert_eq(flat.layout_virtual_keyboard, "iso")

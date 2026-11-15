@@ -116,7 +116,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			"adapters.app_launcher",
 			"core.events.timer_scheduler",
 			"adapters.clipboard",
-			"infra.config_paths",
+			"settings.engine.paths",
 			"core.ui.engine.dialog_util",
 			"modules.shortcuts.actions.apps",
 		}
@@ -139,7 +139,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["adapters.clipboard"] = {
 				get_text = function() return "" end,
 			}
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				get_config_dir = function() return "/tmp/ergopti" end,
 			}
 			package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }

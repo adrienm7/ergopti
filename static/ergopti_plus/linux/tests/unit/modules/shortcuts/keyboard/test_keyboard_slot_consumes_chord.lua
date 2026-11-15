@@ -51,7 +51,7 @@ local function fixture(stored)
 		lines[#lines + 1] = key:match("([^.]+)$") .. " = " .. string.format("%q", value)
 	end
 	Sandbox.write_bytes(config_path, table.concat(lines, "\n") .. "\n")
-	replace("infra.config_paths", { config = function() return config_path end })
+	replace("settings.engine.paths", { config = function() return config_path end })
 	replace("modules.shortcuts.chatgpt", { open = function() seen.chatgpt = seen.chatgpt + 1 return true end })
 	replace("modules.gestures.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "script_reload" or id == "open_chatgpt" end,

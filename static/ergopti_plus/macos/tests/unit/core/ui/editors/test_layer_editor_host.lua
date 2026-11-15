@@ -78,7 +78,7 @@ end
 --- Loads a fresh editor with native doubles and runs one scenario.
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
-	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system",
+	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system",
 		"core.ui.ui.builder", "ui.layer_editor", "platform.remap.nav_layer", "platform.input.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"core.ui.engine.notifications" }
@@ -101,7 +101,7 @@ local function with_editor(scenario)
 			shared_root = function() return helpers.shared() end,
 			shared = function(rel) return helpers.shared(rel) end,
 		}
-		package.loaded["infra.config_paths"] = { get_config_dir = function() return world.dir end }
+		package.loaded["settings.engine.paths"] = { get_config_dir = function() return world.dir end }
 		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new("ergopti", "iso")
 		-- The owner of the layer's wheel bindings, which Hammerspoon runs.
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_layer_wheel = function()

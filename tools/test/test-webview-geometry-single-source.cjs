@@ -249,7 +249,7 @@ for (const [name, source] of [
 // ── macOS: each module must DEFER to the manifest, never hardcode a size ──────
 // id → module file (relative to static/ergopti_plus/macos).
 const MACOS_MODULES = {
-	config_cleanup: 'ui/config_cleanup/init.lua',
+	config_cleanup: 'settings/ui/cleanup.lua',
 	action_picker: 'ui/action_picker/init.lua',
 	hotstrings_config_window: 'ui/hotstrings_config_window/init.lua',
 	prompt_editor: 'ui/prompt_editor/init.lua',
@@ -260,7 +260,7 @@ const MACOS_MODULES = {
 	layer_editor: 'ui/layer_editor/init.lua',
 	physical_shortcuts: 'ui/physical_shortcuts/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
-	paths_editor: 'ui/menu/menu_paths.lua',
+	paths_editor: 'settings/ui/menu/paths.lua',
 	layout_manager: 'ui/layout_manager/init.lua',
 	layout_editor_window: 'ui/layout_manager/init.lua',
 	healthcheck: 'ui/healthcheck/core.lua',
@@ -324,7 +324,7 @@ const WINDOWS_APPS = {
 		}
 	},
 	config_cleanup: {
-		file: 'ui/config_cleanup/init.ahk',
+		file: 'settings/ui/cleanup.ahk',
 		checks: () => [
 			/class ConfigCleanupWindow extends WebViewHost/,
 			/Host\.AppId\s*:=\s*"config_cleanup"/,
@@ -383,7 +383,7 @@ const WINDOWS_APPS = {
 		]
 	},
 	paths_editor: {
-		file: 'ui/paths_editor/init.ahk',
+		file: 'settings/ui/paths_editor/init.ahk',
 		checks: (m) => [new RegExp(`\\bw${m.width}\\s+h${m.height}\\b`)]
 	},
 	layout_manager: {

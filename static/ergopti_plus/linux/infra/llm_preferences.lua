@@ -3,7 +3,7 @@
 --- Owns declared AI preferences in canonical config.toml without legacy imports.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
 local Logger = require("core.logger.engine.shim")

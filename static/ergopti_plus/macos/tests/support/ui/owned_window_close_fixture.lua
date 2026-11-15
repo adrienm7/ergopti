@@ -16,7 +16,7 @@ require("core.logger.engine")
 --- @param scenario function Receives controller and native observations.
 local function run_window(module_name, scenario)
 	helpers.with_stub_scope({
-		"ui.config_cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
+		"settings.ui.cleanup", "settings.engine.migration.cleanup_session", "config_cleanup", "ui.onboarding", "onboarding.engine.answers",
 		"ui.update_check", "updater.engine.check_session", "modules.updater", "adapters.update_launcher",
 		"ui.metrics_apps", "core.ui.engine.dialog_util", "core.text.engine.toml.writer", "core.text.engine.toml.codec", "infra.manifest_reader",
 		"tests.support.onboarding_shared_data", "core.fs.adapters.file_system", "hs.spaces",
@@ -25,7 +25,7 @@ local function run_window(module_name, scenario)
 		"settings.engine.migration.migrate", "core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
 		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.cleanup_roots", "settings.engine.publication.user_models",
 		"core.ui.engine.notifications", "settings.engine.publication.defaults", "core.text.engine.utils_core", "hotstrings.engine.catalogue.personal_files", "core.lifecycle.engine.compat.utf8",
-		"core.fs.engine.dir", "core.ui.adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "infra.config_paths",
+		"core.fs.engine.dir", "core.ui.adapters.webview_result", "settings.engine.migration.file_inverse", "onboarding.engine.publication", "settings.engine.paths",
 		"ai.engine.local_servers.model_catalogue", "core.process.adapters.shell_runner", "core.ui.engine.webview.document_csp", "diagnostics.engine.runtime_log",
 		"core.process.adapters.task_environment", "modules.updater.config_backup", "updater.engine.release_sources", "updater.engine.channels",
 		"updater.engine.version_core", "updater.engine.release_install", "updater.engine.release_assets", "core.network.engine.failure", "updater.engine.config_backup_core",
@@ -78,7 +78,7 @@ local function run_window(module_name, scenario)
 		})
 		-- The cleanup window is named by the shared manifest through the real
 		-- translator; the loader's passthrough would leave it a bare key, refused.
-		if module_name == "ui.config_cleanup" then package.loaded["core.i18n.engine.i18n"] = nil end
+		if module_name == "settings.ui.cleanup" then package.loaded["core.i18n.engine.i18n"] = nil end
 		if module_name == "ui.onboarding" then require("tests.support.onboarding_shared_data").install() end
 		if module_name == "ui.changelog" then
 			local files = require("core.fs.adapters.file_system")
@@ -101,7 +101,7 @@ local function run_window(module_name, scenario)
 		function h.show()
 			if module_name == "ui.model_browser" then return window.open({ presets = {}, active_backend = "mlx" }) end
 			if module_name == "ui.changelog" then return window.open() end
-			if module_name == "ui.config_cleanup" then return window.open({ path = "/virtual/config.toml" }) end
+			if module_name == "settings.ui.cleanup" then return window.open({ path = "/virtual/config.toml" }) end
 			if module_name == "ui.onboarding" then return window.run("/virtual/config.toml") end
 			if module_name == "ui.update_check" then return window.open({
 				channel_owner = { get = function() return "dev" end, set = function() return true end },
@@ -110,7 +110,7 @@ local function run_window(module_name, scenario)
 			return window.show()
 		end
 		function h.close()
-			if module_name == "ui.config_cleanup" then
+			if module_name == "settings.ui.cleanup" then
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close", session = "" } })
 			elseif module_name == "ui.update_check" then
 				h.script_refs[h.controllers[#h.controllers]]({ body = { action = "close" } })

@@ -460,7 +460,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr" # preserve comment\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local prior = Paths.get
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
@@ -478,7 +478,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr" # existing\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths = require("infra.config_paths")
+		local Paths = require("settings.engine.paths")
 		local prior, prior_scheduler = Paths.get, package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior(key) end
 		local ok, err = xpcall(function()
@@ -499,7 +499,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		local published
@@ -526,7 +526,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -552,7 +552,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local function write(value) local f = assert(io.open(path, "wb")); f:write(value); f:close() end
 		local function read() local f = assert(io.open(path, "rb")); local value = f:read("*a"); f:close(); return value end
 		write(original)
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -576,7 +576,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		prior_set("ergopti.i18n_locale", "fr")
@@ -643,7 +643,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 	helpers.it("holds the real storage cohort and removes its exact backup after commit", function()
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
-		local Paths, prior_scheduler = require("infra.config_paths"), package.loaded["core.events.timer_scheduler"]
+		local Paths, prior_scheduler = require("settings.engine.paths"), package.loaded["core.events.timer_scheduler"]
 		local prior_get, prior_set = Paths.get, hs.settings.set
 		local directory, base = path:match("^(.*)/([^/]+)$")
 		local function backups()
@@ -704,7 +704,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Storage = require("infra.config_paths"), require("core.fs.adapters.storage")
+		local Paths, Storage = require("settings.engine.paths"), require("core.fs.adapters.storage")
 		local prior_get, prior_scheduler = Paths.get, package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
 		local foreign = {}
@@ -937,7 +937,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		helpers.it("(locale-superseded-reload) a " .. refusal .. " refusal hands the accepted reload back", function()
 			local path = os.tmpname()
 			local file = assert(io.open(path, "wb")); file:write('[script]\nlocale = "fr"\n'); file:close()
-			local Paths = require("infra.config_paths")
+			local Paths = require("settings.engine.paths")
 			local prior_get, prior_reload = Paths.get, hs.reload
 			local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 			local reloads = {}
@@ -974,7 +974,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
+		local Paths, Writer = require("settings.engine.paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_publish = Paths.get, Writer.publish_if_unchanged
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end
@@ -997,7 +997,7 @@ helpers.describe("i18n: set_locale / persist_locale / set_locale_no_reload", fun
 		local path = os.tmpname()
 		local original = '[script]\nlocale = "fr"\n'
 		local file = assert(io.open(path, "wb")); file:write(original); file:close()
-		local Paths, Writer = require("infra.config_paths"), require("core.text.engine.toml_codec.writer")
+		local Paths, Writer = require("settings.engine.paths"), require("core.text.engine.toml_codec.writer")
 		local prior_get, prior_batch = Paths.get, Writer.batch_write
 		local prior_scheduler = package.loaded["core.events.timer_scheduler"]
 		Paths.get = function(key) if key == "ConfigTomlPath" then return path end return prior_get(key) end

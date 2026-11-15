@@ -6,7 +6,7 @@
 --- The rule the macOS and Linux drivers apply to the four script-management
 --- chords of _shared/shortcuts/data/actions/script_chords.json (AltGr, or the right
 --- Option key on macOS, with Enter, Backspace, Delete or Escape). Windows
---- applies the same rule in infra/config_io.ahk (ScriptShortcutSlotRunsAction);
+--- applies the same rule in settings/engine/io.ahk (ScriptShortcutSlotRunsAction);
 --- tools/test/test-script-chords-three-os.cjs pins the three drivers together.
 ---
 --- FEATURES & RATIONALE:

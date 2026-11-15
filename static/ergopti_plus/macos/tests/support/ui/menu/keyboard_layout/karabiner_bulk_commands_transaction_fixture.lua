@@ -77,7 +77,7 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 -- backup under the remap file; both boundaries are doubles for the whole
 -- module, restored at its end.
 local SAVED_DIALOGS = package.loaded["core.ui.engine.dialog_util"]
-local SAVED_PATHS = package.loaded["infra.config_paths"]
+local SAVED_PATHS = package.loaded["settings.engine.paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
 package.loaded["core.ui.engine.dialog_util"] = {
 	block_alert = function(_, _, no, yes)
@@ -85,7 +85,7 @@ package.loaded["core.ui.engine.dialog_util"] = {
 		return CONFIRMATION.answer == "yes" and yes or no
 	end,
 }
-package.loaded["infra.config_paths"] = {
+package.loaded["settings.engine.paths"] = {
 	get = function(key)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return "/remap/tap_hold.toml"

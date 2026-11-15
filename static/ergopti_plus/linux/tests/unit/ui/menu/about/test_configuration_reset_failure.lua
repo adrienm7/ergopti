@@ -61,12 +61,12 @@ end
 --- @param report table The report it answers with.
 --- @return table shown Every zenity command the click ran.
 local function click(row_key, committed, report)
-	local names = { "infra.global_scope", "ui.menu.builder" }
+	local names = { "settings.engine.scope.global_scope", "ui.menu.builder" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local shown
 	local ok, err = pcall(function()
-		package.loaded["infra.global_scope"] = {
+		package.loaded["settings.engine.scope.global_scope"] = {
 			participants = function() return {} end,
 			apply = function(_, _, done) done(committed, report); return true end,
 		}

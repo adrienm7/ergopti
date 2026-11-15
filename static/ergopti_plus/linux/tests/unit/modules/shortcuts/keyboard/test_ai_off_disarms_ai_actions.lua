@@ -84,7 +84,7 @@ local function keyboard_fixture()
 	config_path = os.tmpname()
 	Sandbox.write_bytes(config_path,
 		"[shortcuts.keyboard]\nprimary_j = \"llm_generate_prediction\"\nprimary_k = \"select_line\"\n")
-	replace("infra.config_paths", { config = function() return config_path end })
+	replace("settings.engine.paths", { config = function() return config_path end })
 	replace("modules.gestures.manager", {
 		is_assignable = function(id) return id == "select_line" or id == "llm_generate_prediction" end,
 		execute_action = function(action, binding) seen.executed[#seen.executed + 1] = action .. "@" .. binding end,
@@ -148,13 +148,13 @@ end)
 helpers.describe("AI tap keys (ai-off-inert-linux)", function()
 	helpers.it("types the key while the AI is off and claims it once the AI is on", function()
 		with_ai(function(state)
-			local names = { "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager",
+			local names = { "core.fs.adapters.storage", "settings.engine.paths", "modules.gestures.manager",
 				"modules.shortcuts.tap_keys" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 			local path = os.tmpname()
 			Sandbox.write_bytes(path, "[shortcuts.tap_keys]\nnumber_row_left = \"llm_generate_prediction\"\n")
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 			local executed, deferred = {}, {}
 			package.loaded["modules.gestures.manager"] = {

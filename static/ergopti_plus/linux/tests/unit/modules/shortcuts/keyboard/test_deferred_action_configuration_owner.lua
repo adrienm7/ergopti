@@ -15,7 +15,7 @@ local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 --- @param body function body(context)
 local function with_owner(domain, body)
 	local module_name = domain == "tap" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_chords"
-	local names = { "infra.config_paths", "modules.gestures.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
+	local names = { "settings.engine.paths", "modules.gestures.manager", "core.logger.engine.shim", "modules.shortcuts.script_chords", module_name }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local source = '[shortcuts.tap_keys]\nnumber_row_left = "screen_capture"\n'
 		.. '[shortcuts.script_control]\nchords_enabled = true\nscript_altgr_enter = "screen_capture"\n'
@@ -28,7 +28,7 @@ local function with_owner(domain, body)
 				if line:find("fired", 1, true) and ctx.on_log then ctx.on_log() end
 			end)
 			package.loaded["core.logger.engine.shim"] = Logger
-			package.loaded["infra.config_paths"] = { config = function() return path end }
+			package.loaded["settings.engine.paths"] = { config = function() return path end }
 			-- Each persist revalidates every slot, so the catalogue also accepts
 			-- the manifest defaults of the slots the source leaves unset.
 			local assignable = { screen_capture = true, send_text = true, script_pause_toggle = true }

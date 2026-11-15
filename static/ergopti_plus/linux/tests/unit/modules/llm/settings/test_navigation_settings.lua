@@ -116,12 +116,12 @@ helpers.describe("tray (linux): shared prediction modifier rows", function()
 	local SOURCE = '# private independent neighbor\n[llm.navigation]\nfuture = "retain" # unknown\n[other]\nvalue = 42\n'
 	local function with_native_navigation(variant, body)
 		Sandbox.with_config(type(variant) == "table" and variant.source or SOURCE, function(path)
-			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
+			local names = { "settings.engine.paths", "infra.llm_preferences", "modules.llm.navigation_settings", "modules.llm.trigger_settings", "modules.llm.display_settings", "modules.llm.profile_settings", "infra.manifest_menu", "ui.menu.builder", "core.fs.adapters.storage", "ui.error_dialog.bridge", "ui.menu.start_at_login", "core.i18n.engine.i18n" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local previous_execute, previous_rename = os.execute, os.rename
 			local notices, changed, refused_publications = 0, 0, 0
 			local ok, failure = xpcall(function()
-				package.loaded["infra.config_paths"] = { config = function() return path end,
+				package.loaded["settings.engine.paths"] = { config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.
 					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end }

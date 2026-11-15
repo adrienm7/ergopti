@@ -53,14 +53,14 @@ end
 --- @param callback function Assertion callback, outside production catches.
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "settings.engine.preferences.preferences",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
 		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
-		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
+		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "settings.ui.menu.preferences_transaction",
 	}, function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local FileSystem = require("core.fs.adapters.file_system")
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { removes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }

@@ -54,6 +54,7 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "adapters",
 	DRIVER_ROOT .. "core",
 	DRIVER_ROOT .. "platform",
+	DRIVER_ROOT .. "settings",
 	helpers.shared(""),
 }
 

@@ -67,7 +67,7 @@ local function genuine_shared_providers(damage)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key_source",
-		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "infra.config_paths",
+		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "settings.engine.paths",
 		"core.fs.adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
@@ -173,7 +173,7 @@ local function genuine_trigger_providers(damage, default_source)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
-		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"infra.hotstring_preferences", "settings.engine.paths", "core.fs.adapters.storage",
 		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local restore, found = function() end, {}
@@ -447,7 +447,7 @@ local function genuine_language_providers(damage, exercise)
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer",
-		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"infra.hotstring_preferences", "settings.engine.paths", "core.fs.adapters.storage",
 		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
 	local directory, path, filesystem, created
 	local restore = function() end
@@ -790,10 +790,17 @@ local function registered_providers(omitted_delegate)
 	local sources, visited = { source }, { ["ui.menu.builder"] = true }
 	local index = 1
 	while index <= #sources do
-		for name in sources[index]:gmatch('require%("(ui%.menu%.[a-z0-9_%.]+)"%)') do
-			if not visited[name] and name ~= omitted_delegate then
-				visited[name] = true
-				local delegate = assert(io.open(helpers.driver_root() .. "/" .. name:gsub("%.", "/") .. ".lua", "r"))
+		-- The menu modules sit under ui.menu, then in their features' ui/menu
+		-- (settings.ui.menu.language) and the menu feature's ui tree, so each is
+		-- matched by that place and found by its name; a menu module outside the
+		-- driver (a shared one) owns no provider.
+		for name in sources[index]:gmatch('require%("([%w_%.]+)"%)') do
+			local menu_ui = name:find("^ui%.menu[%._]") or name:find("%.ui%.menu[%._]") or name:find("^menu%.ui%.")
+			local path = menu_ui and not visited[name] and name ~= omitted_delegate
+				and helpers.driver_module_path(name)
+			visited[name] = true
+			if path then
+				local delegate = assert(io.open(path, "r"))
 				sources[#sources + 1] = helpers.expand_config_keys(assert(delegate:read("*a"))); assert(delegate:close())
 			end
 		end

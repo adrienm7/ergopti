@@ -60,7 +60,7 @@ local function result_folder()
 	if _folder then return _folder end
 	local root = os.getenv("XDG_RUNTIME_DIR")
 	if root == nil or root == "" then
-		local home = require("infra.config_paths").account_home()
+		local home = require("settings.engine.paths").account_home()
 		if home == nil then return nil, "neither XDG_RUNTIME_DIR nor an absolute HOME is set" end
 		root = home .. "/.cache"
 	end

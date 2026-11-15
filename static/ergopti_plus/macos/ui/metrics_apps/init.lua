@@ -36,7 +36,7 @@ local Paths      = require("core.fs.engine.paths")
 local dialog     = require("core.ui.engine.dialog_util")
 local i18n       = require("core.i18n.engine.i18n")
 local FileSystem = require("core.fs.adapters.file_system")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local TimerScheduler = require("core.events.timer_scheduler")
 local CategoryStore = require("metrics.engine.apps.category_store")
 

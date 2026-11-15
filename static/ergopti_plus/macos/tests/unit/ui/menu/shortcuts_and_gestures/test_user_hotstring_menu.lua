@@ -4,7 +4,7 @@
 require("tests.lua.hotstrings.user_hotstring_menu_contract").run(require("tests.helpers"), require("infra.manifest_menu"), require("core.logger.engine.logger"))
 
 local helpers = require("tests.helpers")
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 helpers.describe("programmable canonical macOS preferences", function()
 	helpers.it("reads both declared nested leaves without evaluating source", function()
 		local decoded = { hotstrings = { dynamic = { user_code = { enabled = true, time_activation_seconds = 0.125 } } } }

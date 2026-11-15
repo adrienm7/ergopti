@@ -76,8 +76,8 @@ local function _config_dir()
 	-- The default configuration folder, never the ConfigDirPath override: the
 	-- override itself is stored here, so the store must not move with it. The
 	-- builds before the single folder name kept it in a second folder, which
-	-- infra/legacy_folder_migration.lua moves here once at boot.
-	local ConfigPaths = require("infra.config_paths")
+	-- settings/engine/migration/legacy_folder_migration.lua moves here once at boot.
+	local ConfigPaths = require("settings.engine.paths")
 	return ConfigPaths.default_config_dir() .. "/"
 end
 

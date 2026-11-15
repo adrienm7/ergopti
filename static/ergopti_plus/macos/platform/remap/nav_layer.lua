@@ -614,7 +614,7 @@ function M.load(opts)
 	end
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
-	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
+	local config_dir = opts.config_dir or require("settings.engine.paths").get_config_dir()
 	if type(shared_root) ~= "string" then error("nav_layer: the _shared tree is unreachable", 2) end
 	if type(config_dir) ~= "string" then error("nav_layer: the configuration folder is unknown", 2) end
 	-- The shipped registry and vocabulary first: a broken copy raises before this
@@ -742,7 +742,7 @@ end
 function M.import_recommended(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root or require("core.fs.engine.paths").shared_root()
-	local config_dir = opts.config_dir or require("infra.config_paths").get_config_dir()
+	local config_dir = opts.config_dir or require("settings.engine.paths").get_config_dir()
 	local LayerPreset = require("layouts.engine.layers.preset")
 	Logger.start(LOG, "Importing the recommended navigation layer into '%s' when it has none…", tostring(config_dir))
 	local ok, import, err, failed = pcall(LayerPreset.import_if_absent, {

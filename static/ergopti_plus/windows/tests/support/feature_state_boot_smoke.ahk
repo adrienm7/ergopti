@@ -37,7 +37,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\_generated\logger_sub_files.ahk
 #Include ..\..\_generated\app_dirs.ahk
 #Include ..\..\infra\app_folders.ahk
-#Include ..\..\infra\legacy_folder_migration.ahk
+#Include ..\..\settings\engine\migration\legacy_folder_migration.ahk
 #Include ..\..\core\logger\engine\tick_count.ahk
 #Include ..\..\core\logger\engine\wall_clock.ahk
 #Include ..\..\core\logger\engine\logger.ahk
@@ -50,16 +50,16 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\manifest_reader.ahk
 ; The getter consumes the actual configuration-owner binding policy.
 #Include ..\..\core\text\engine\toml\config_loader.ahk
-#Include ..\..\infra\feature_state.ahk
+#Include ..\..\settings\engine\preferences\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\tap_keys.ahk
-#Include ..\..\infra\config_io.ahk
-#Include ..\..\infra\config_scope.ahk
+#Include ..\..\settings\engine\io.ahk
+#Include ..\..\settings\engine\scope\scope.ahk
 ; Real journal dependencies; no test-only native issuer or READY metadata.
-#Include ..\..\infra\config_transition.ahk
-#Include ..\..\infra\config_transition_runtime.ahk
-#Include ..\..\infra\config_migrate.ahk
+#Include ..\..\settings\engine\migration\transition.ahk
+#Include ..\..\settings\engine\migration\transition_runtime.ahk
+#Include ..\..\settings\engine\migration\migrate.ahk
 #Include ..\..\infra\first_boot.ahk
 #Include ..\..\modules\gestures\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.

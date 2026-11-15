@@ -40,14 +40,14 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
-		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
+		"ui.menu.preview_transaction", "settings.ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
 	}, function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local FileSystem = require("core.fs.adapters.file_system")
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Preview = require("ui.menu.preview_transaction")
 		translate = translate or function(key) return key end

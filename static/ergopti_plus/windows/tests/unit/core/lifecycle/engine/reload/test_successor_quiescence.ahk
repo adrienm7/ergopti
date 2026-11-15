@@ -372,7 +372,7 @@ _RQS_ExhaustedBudget(Mode) {
 	}
 	ChildPath := A_Temp . "/ergopti-reload-budget-" . DllCall("GetCurrentProcessId") . "-" . Serial . ".ahk"
 	ReceiptPath := ChildPath . ".receipt"
-	Probe := StrReplace(Template, "@@LEASE@@", TestsRoot . "/../infra/config_write_lease.ahk")
+	Probe := StrReplace(Template, "@@LEASE@@", TestsRoot . "/../settings/engine/publication/write_lease.ahk")
 	Probe := StrReplace(Probe, "@@HANDOFF@@", TestsRoot . "/../core/lifecycle/engine/reload/terminal_handoff.ahk")
 	Probe := StrReplace(Probe, "@@BODY@@", Bodies)
 	Probe := StrReplace(Probe, "@@MODE@@", _RQS_SourceString(Mode))

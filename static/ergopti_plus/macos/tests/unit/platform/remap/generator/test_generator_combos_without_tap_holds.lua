@@ -156,7 +156,7 @@ end
 
 helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"platform.input.keycodes",
 	"core.logger.engine.logger",
 	"core.text.engine.toml.codec",
@@ -166,7 +166,7 @@ helpers.with_fresh_modules({
 	"core.text.engine.toml_codec",
 }, function()
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
 	package.loaded["platform.input.keycodes"] = {

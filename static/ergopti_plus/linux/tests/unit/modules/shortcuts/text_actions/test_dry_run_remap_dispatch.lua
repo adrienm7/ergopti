@@ -60,7 +60,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
-		local routes = require("infra.config_paths")
+		local routes = require("settings.engine.paths")
 		local original_route = routes.config
 		routes.config = function(name)
 			if name == "config.toml" then return config_path end

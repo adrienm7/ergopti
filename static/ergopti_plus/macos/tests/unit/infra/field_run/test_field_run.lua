@@ -1098,13 +1098,13 @@ end)
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
 		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
-			"infra.config_paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
+			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
 			local files = { ["/cfg/config.toml"] = "a = 1\n" }
 			local settings = { llm_backend = "ollama", keep = true }
-			package.loaded["infra.config_paths"] = { get = function(key)
+			package.loaded["settings.engine.paths"] = { get = function(key)
 				return key == "ConfigTomlPath" and "/cfg/config.toml" or ("/cfg/" .. key)
 			end }
 			package.loaded["core.fs.adapters.file_system"] = {
@@ -1156,10 +1156,10 @@ end)
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
 		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
-			"infra.config_paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
+			"settings.engine.paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
+			package.loaded["settings.engine.paths"] = { get = function(key) return "/cfg/" .. key end }
 			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 				write = function() return true end,
@@ -1200,7 +1200,7 @@ helpers.describe("field run ports: the MLX model step", function()
 	--- @param write_ok boolean|nil False makes putting the file back fail.
 	--- @return table outcome { verdict, codes, files }
 	local function run_mlx_model(initial, write_ok)
-		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "infra.config_paths",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "settings.engine.paths",
 			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run",
 			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
 		local outcome = {}
@@ -1208,7 +1208,7 @@ helpers.describe("field run ports: the MLX model step", function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local active = "/cfg/mlx_active_model.txt"
 			local files = { [active] = initial, ["/shared/models.json"] = "{}" }
-			package.loaded["infra.config_paths"] = { get = function(key)
+			package.loaded["settings.engine.paths"] = { get = function(key)
 				assert(key == "MlxActiveModelPath", "only the active-model path is asked for")
 				return active
 			end }

@@ -31,7 +31,7 @@ local Logger = require("core.logger.engine.shim")
 local LOG = "infra.keyboard_layout_scope"
 local SCOPE = "keyboard_layout"
 local _owner, _sequence = nil, 0
-require("infra.scope_registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
+require("settings.engine.scope.registry").register("keyboard_layout_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
 --- Builds one recoverable transaction over config.toml's layout rows.
 --- @param options table path, backup_path and an optional files port.
@@ -67,7 +67,7 @@ function M.apply(mode)
 		return false, "keyboard layout rollback is pending"
 	end
 	_sequence = _sequence + 1
-	local path = require("infra.config_paths").config("config.toml")
+	local path = require("settings.engine.paths").config("config.toml")
 	_owner = M.new({ path = path,
 		backup_path = path .. ".layout-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak" })
 	Logger.start(LOG, "Keyboard layout scope '%s' started.", mode)

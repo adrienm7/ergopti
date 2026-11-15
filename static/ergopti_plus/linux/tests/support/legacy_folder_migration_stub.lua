@@ -3,12 +3,12 @@
 --- ==============================================================================
 --- MODULE: Inert Legacy Folder Migration For Main Harnesses
 --- DESCRIPTION:
---- Main runs infra/legacy_folder_migration.lua before the logger and the
+--- Main runs settings/engine/migration/legacy_folder_migration.lua before the logger and the
 --- bootstrap storage. The harnesses that load all of ergopti_hotstrings.lua
 --- over controlled imports give it this double instead: it moves nothing,
 --- touches no folder and logs nothing, so the account's XDG folders stay
 --- untouched. The migration itself is tested in
---- tests/unit/infra/config/test_legacy_folder_migration.lua.
+--- tests/unit/settings/migration/test_legacy_folder_migration.lua.
 --- ==============================================================================
 
 local M = {}

@@ -69,7 +69,7 @@ function M.main(argv)
 	local t = require("apps.app_strings").load(options.locales_dir, options.locale)
 	local dialogs = require("apps.dialogs").new()
 	-- The private runtime's openssl, never a host copy (resolve: a child logs nothing).
-	local openssl = require("infra.owned_programs").resolve("openssl")
+	local openssl = require("settings.engine.preferences.owned_programs").resolve("openssl")
 	local quote = require("core.text.engine.utils_core").shell_quote
 	local probe = openssl:sub(1, 1) == "/" and ("test -x " .. quote(openssl)) or ("command -v " .. quote(openssl) .. " >/dev/null")
 	if require("core.ui.ui.native_dialog").exit_code(os.execute(probe)) ~= 0 then

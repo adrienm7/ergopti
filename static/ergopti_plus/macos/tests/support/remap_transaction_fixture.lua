@@ -19,7 +19,7 @@ local OWNED_MODULES = {
 	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
-	"infra.config_paths",
+	"settings.engine.paths",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -492,7 +492,7 @@ return function(run, dependencies)
 			-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 			-- at start. The folder exists, as the product's does, so choosing the
 			-- layer hold imports the recommended layer the way a Mac would.
-			package.loaded["infra.config_paths"] = {
+			package.loaded["settings.engine.paths"] = {
 				get = function() return "missing-config.toml" end,
 				get_config_dir = function() return config_dir end,
 			}

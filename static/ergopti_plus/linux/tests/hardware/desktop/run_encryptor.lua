@@ -134,7 +134,7 @@ local function run()
 
 	local seen = {}
 	check(row.action() == true, "the row starts the Encryptor child")
-	local data_home = require("infra.config_paths").data_home()
+	local data_home = require("settings.engine.paths").data_home()
 	local entry = read_file(data_home .. "/applications/ergopti-encryptor.desktop") or ""
 	local launcher = data_home .. "/ergopti/apps/ergopti-encryptor.sh"
 	check(entry:find("MimeType=application/octet-stream;", 1, true) ~= nil

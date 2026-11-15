@@ -19,8 +19,8 @@ local function load_preferences(file_system)
 			return file_system.write(path, content)
 		end
 	package.loaded["core.fs.adapters.file_system"] = file_system
-	package.loaded["infra.preferences"] = nil
-	return require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	return require("settings.engine.preferences.preferences")
 end
 
 local function minimal_save(preferences)
@@ -94,7 +94,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		helpers.assert_eq(load_status, "ok")
 		helpers.assert_type(loaded, "table")
 
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { preview_star_enabled = false }
 		local restores = 0
 		local save = transaction.bind(preferences, {
@@ -150,7 +150,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 		local loaded, load_status = preferences.load(path)
 		helpers.assert_eq(load_status, "ok")
 		helpers.assert_type(loaded, "table")
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { preview_star_enabled = false }
 		local restores = 0
 		local save = transaction.bind(preferences, {
@@ -219,7 +219,7 @@ helpers.describe("Preferences.save: exact atomic publication result", function()
 end)
 
 helpers.describe("menu preference side effects are success-gated", function()
-	local transaction = require("ui.menu.preferences_transaction")
+	local transaction = require("settings.ui.menu.preferences_transaction")
 
 	helpers.it("leaves every cache untouched on false, nil, or raise", function()
 		for _, save in ipairs({
@@ -313,7 +313,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		end
 		package.loaded["core.logger.engine.logger"] = logger
 		local MenuState = helpers.load_with_stubs("ui.menu.menu_state")
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = {
 			hotstrings = {},
 			keymap = false,
@@ -350,7 +350,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 		local committed = save()
 		package.loaded["core.logger.engine.logger"] = nil
 		package.loaded["ui.menu.menu_state"] = nil
-		package.loaded["ui.menu.preferences_transaction"] = nil
+		package.loaded["settings.ui.menu.preferences_transaction"] = nil
 
 		helpers.assert_eq(committed, false)
 		helpers.assert_eq(state.preview_star_enabled, false)
@@ -363,7 +363,7 @@ helpers.describe("menu preferences: first-click rollback", function()
 	end)
 
 	helpers.it("preserves retained nested table identities during rollback", function()
-		local transaction = require("ui.menu.preferences_transaction")
+		local transaction = require("settings.ui.menu.preferences_transaction")
 		local state = { nested = { enabled = true, values = { 1, 2 } } }
 		local nested_ref = state.nested
 		local values_ref = state.nested.values
@@ -639,6 +639,6 @@ end)
 -- Do not leak the final FileSystem double into later test modules in the same
 -- Lua process; those modules intentionally exercise the real atomic adapter.
 package.loaded["core.fs.adapters.file_system"] = nil
-package.loaded["infra.preferences"] = nil
+package.loaded["settings.engine.preferences.preferences"] = nil
 
 return true

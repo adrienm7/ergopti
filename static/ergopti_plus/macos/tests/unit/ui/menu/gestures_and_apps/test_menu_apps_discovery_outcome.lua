@@ -276,7 +276,7 @@ local function with_native_apps_parent(language, body)
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
 		for _, name in ipairs({ "ui.menu.menu_apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
-			"infra.manifest_menu", "infra.config_paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
+			"infra.manifest_menu", "settings.engine.paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
 			"core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
 		end
@@ -290,7 +290,7 @@ local function with_native_apps_parent(language, body)
 			if name == "ERGOPTI_PATHS_FILE" then return scratch .. "/paths.toml" end
 			return previous_getenv(name)
 		end
-		local paths = require("infra.config_paths"); helpers.assert_eq(paths.init(scratch .. "/"), true)
+		local paths = require("settings.engine.paths"); helpers.assert_eq(paths.init(scratch .. "/"), true)
 		package.loaded["core.i18n.engine.i18n"] = nil
 		native = require("core.i18n.engine.i18n")
 		local backend = require("core.i18n.engine.locale")

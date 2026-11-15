@@ -500,7 +500,7 @@ end
 --- @param path string Absolute file path.
 --- @return string origin "user", "bundled" or "origin unknown".
 function M.file_origin(path)
-	local loaded, ConfigPaths = pcall(require, "infra.config_paths")
+	local loaded, ConfigPaths = pcall(require, "settings.engine.paths")
 	if not loaded or type(ConfigPaths) ~= "table" or type(ConfigPaths.get_config_dir) ~= "function" then
 		return "origin unknown"
 	end

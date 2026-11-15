@@ -18,7 +18,7 @@ local helpers, build_mock_state = Fixture.helpers, Fixture.build_mock_state
 
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("paths_editor_bridge", function()
-    local handler = helpers.load_module("ui.paths_editor.bridge")
+    local handler = helpers.load_module("settings.ui.paths_editor.bridge")
 
 		local function paths_state()
 			local values = { config_dir = "/tmp/ergopti-current", logs_dir = "/tmp/ergopti-logs" }
@@ -97,7 +97,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local epoch = 1
 			state.webview_manager.current_epoch = function() return epoch end
 			state.webview_manager.page_current = function(_, value) return epoch == value end
-			local picker = require("ui.config_dir_picker")
+			local picker = require("settings.ui.dir_picker")
 			local original = picker.pick
 			picker.pick = function() epoch = 2; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
@@ -112,7 +112,7 @@ helpers.describe("ui.bridge_handlers", function()
 			local ready = true
 			state.webview_manager.current_epoch = function() return 1 end
 			state.webview_manager.page_current = function() return ready end
-			local picker, original = require("ui.config_dir_picker"), require("ui.config_dir_picker").pick
+			local picker, original = require("settings.ui.dir_picker"), require("settings.ui.dir_picker").pick
 			picker.pick = function() ready = false; return "/tmp/selected" end
 			local ok, result = pcall(handler.on_message, { action = "browse" }, state,
 				{ app_name = "paths_editor", epoch = 1 })
@@ -761,8 +761,8 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 	end
 
 	local function with_real_locale(options)
-		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.config_paths", "core.fs.adapters.storage",
-			"infra.script_scope", "infra.scope_registry" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "settings.engine.paths", "core.fs.adapters.storage",
+			"settings.engine.scope.script_scope", "settings.engine.scope.registry" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local root = os.tmpname()
@@ -781,13 +781,13 @@ helpers.describe("wizard explicit locale acknowledgment", function()
 		local ok, err = xpcall(function()
 			-- config() is where the locale owner rewrites a held [script] locale.
 			-- default_config_dir() is where the storage adapter keeps storage.json.
-			package.loaded["infra.config_paths"] = { config_home = function() return root end,
+			package.loaded["settings.engine.paths"] = { config_home = function() return root end,
 				default_config_dir = function() return root .. "/" .. FOLDER end,
 				config = function(name) return root .. "/config/" .. name end }
 			package.loaded["core.i18n.engine.locale"] = nil
 			package.loaded["core.fs.adapters.storage"] = nil
-			package.loaded["infra.script_scope"] = nil
-			package.loaded["infra.scope_registry"] = nil
+			package.loaded["settings.engine.scope.script_scope"] = nil
+			package.loaded["settings.engine.scope.registry"] = nil
 			package.loaded["core.i18n.engine.i18n"] = nil
 			local i18n = require("core.i18n.engine.i18n")
 			i18n.init()

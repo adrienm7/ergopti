@@ -152,7 +152,7 @@ local function pac_download(url, timeout_ms, limits)
 	local secure = url:lower():match("^https://") ~= nil
 	local code, chunks, bytes, overflow = nil, {}, 0, false
 	-- The status follows the body as three digits ("000" when none came).
-	local process, pid = uv.spawn(require("infra.owned_programs").resolve("curl"), {
+	local process, pid = uv.spawn(require("settings.engine.preferences.owned_programs").resolve("curl"), {
 		args = { "--disable", "--silent", "--noproxy", "*", "--location",
 			"--max-redirs", tostring(limits.max_redirects), "--proto", "=http,https",
 			"--proto-redir", secure and "=https" or "=http,https",
@@ -338,10 +338,10 @@ local function curl_capabilities()
 		close(stdout)
 		close(stderr)
 	end
-	-- The private runtime's curl, the one every request runs (infra/owned_programs.lua).
+	-- The private runtime's curl, the one every request runs (settings/engine/preferences/owned_programs.lua).
 	-- resolve(), not path(): stdout is this helper's receipt, and path() logs the
 	-- source-run mode through a shim whose fallback prints to stdout here.
-	process, pid = uv.spawn(require("infra.owned_programs").resolve("curl"), {
+	process, pid = uv.spawn(require("settings.engine.preferences.owned_programs").resolve("curl"), {
 		args = { "--disable", "--version" }, stdio = { nil, stdout, stderr },
 	}, function(exit_code, signal)
 		exited, code = true, signal == 0 and exit_code or -1

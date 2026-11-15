@@ -9,7 +9,7 @@
 --- opens on macOS and Windows and the other way round.
 ---
 --- FEATURES & RATIONALE:
---- 1. The private runtime's openssl does the work (infra/owned_programs.lua),
+--- 1. The private runtime's openssl does the work (settings/engine/preferences/owned_programs.lua),
 ---    with every format constant read from the shared format file rather than
 ---    repeated here.
 --- 2. The password reaches OpenSSL through a file in a private folder

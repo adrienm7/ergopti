@@ -17,9 +17,9 @@ local function with_preferences(body, source, fresh_writer)
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
-			local paths = {}; for key, value in pairs(require("infra.config_paths")) do paths[key] = value end
+			local paths = {}; for key, value in pairs(require("settings.engine.paths")) do paths[key] = value end
 			paths.config = function() return path end
-			package.loaded["infra.config_paths"] = paths
+			package.loaded["settings.engine.paths"] = paths
 			package.loaded["infra.hotstring_preferences"] = nil
 			package.loaded["modules.hotstrings.preview_settings"] = nil
 			if fresh_writer then package.loaded["core.text.engine.toml_codec.writer"] = nil end

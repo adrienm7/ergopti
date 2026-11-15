@@ -181,7 +181,7 @@ const manifest = toml.parse(
 );
 const input = {
 	slots: (manifest.entries || []).filter((entry) => entry.path_prefix === 'shortcuts.keyboard'),
-	ahk: read('windows/infra/feature_state.ahk'),
+	ahk: read('windows/settings/engine/preferences/feature_state.ahk'),
 	lua: {
 		hs: read('macos/modules/shortcuts/keyboard_shortcuts.lua'),
 		linux: read('linux/modules/shortcuts/keyboard_shortcuts.lua')

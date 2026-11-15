@@ -246,7 +246,7 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True only after storage confirms the explicit selection.
 function M.persist_locale(code)
-	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
+	if not require("settings.engine.scope.script_scope").retry_locale() or not _scope.admit_change() then return false end
 	if type(code) ~= "string" or code == "" then return false end
 
 	-- Verify the locale is available.
@@ -260,7 +260,7 @@ function M.persist_locale(code)
 	end
 
 	-- The alias, runtime and an existing config row commit under one owner.
-	if not require("infra.script_scope").edit_locale(code) then
+	if not require("settings.engine.scope.script_scope").edit_locale(code) then
 		Logger.error(LOG, "Locale '%s' was not committed.", code)
 		return false
 	end
@@ -273,7 +273,7 @@ end
 --- @param code string Locale code (must be in _available).
 --- @return boolean True when the active locale needs no change or was persisted.
 function M.set_locale(code)
-	if not require("infra.script_scope").retry_locale() or not _scope.admit_change() then return false end
+	if not require("settings.engine.scope.script_scope").retry_locale() or not _scope.admit_change() then return false end
 	if code == _locale then return true end
 	return M.persist_locale(code)
 end

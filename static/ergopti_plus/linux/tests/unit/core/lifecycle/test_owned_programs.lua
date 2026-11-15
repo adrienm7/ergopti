@@ -31,21 +31,21 @@ end
 helpers.describe("owned_programs: the private runtime's programs only", function()
 
 	helpers.it("resolves every owned program inside the prefix (owned-runtimes-programs)", function()
-		local Owned = helpers.load_module("infra.owned_programs")
+		local Owned = helpers.load_module("settings.engine.preferences.owned_programs")
 		for _, name in ipairs({ "luajit", "curl", "sqlite3", "openssl", "zstd" }) do
 			helpers.assert_eq(Owned.path(name, env("/usr/lib/ergopti/runtime")), "/usr/lib/ergopti/runtime/bin/" .. name)
 		end
 	end)
 
 	helpers.it("a source run uses PATH and says so once (owned-runtimes-programs)", function()
-		local Owned = helpers.load_module("infra.owned_programs")
+		local Owned = helpers.load_module("settings.engine.preferences.owned_programs")
 		Owned._reset_for_test()
 		helpers.assert_eq(Owned.path("sqlite3", env(nil)), "sqlite3")
 		helpers.assert_eq(Owned.path("curl", env("")), "curl")
 	end)
 
 	helpers.it("the SQLite helper process resolves without the logger it cannot load (owned-runtimes-programs)", function()
-		local Owned = helpers.load_module("infra.owned_programs")
+		local Owned = helpers.load_module("settings.engine.preferences.owned_programs")
 		Owned._reset_for_test()
 		local loaded, preload = package.loaded["core.logger.engine.shim"], package.preload["core.logger.engine.shim"]
 		package.loaded["core.logger.engine.shim"] = nil
@@ -73,7 +73,7 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 				},
 			},
 			["core.fs.engine.private_sqlite_file"] = { admit = function() return true end, creation_mask = 63 },
-			["infra.owned_programs"] = {
+			["settings.engine.preferences.owned_programs"] = {
 				resolve = function(...)
 					resolved[#resolved + 1] = { ... }
 					return "/opt/runtime/bin/sqlite3"
@@ -92,13 +92,13 @@ helpers.describe("owned_programs: the private runtime's programs only", function
 	end)
 
 	helpers.it("refuses a program the prefix does not carry and a relative prefix (owned-runtimes-programs)", function()
-		local Owned = helpers.load_module("infra.owned_programs")
+		local Owned = helpers.load_module("settings.engine.preferences.owned_programs")
 		helpers.assert_true(not pcall(Owned.path, "python3", env("/opt/runtime")))
 		helpers.assert_true(not pcall(Owned.path, "curl", env("relative/runtime")))
 	end)
 
 	helpers.it("unpacks zstd through the prefix's zstd, not tar's own (owned-runtimes-zstd)", function()
-		local Owned = helpers.load_module("infra.owned_programs")
+		local Owned = helpers.load_module("settings.engine.preferences.owned_programs")
 		helpers.assert_eq(Owned.zstd_tar_option(env("/tmp/.mount_Ergo/usr")), "--use-compress-program=/tmp/.mount_Ergo/usr/bin/zstd")
 		local option, reason = Owned.zstd_tar_option(env("/home/a user/runtime"))
 		helpers.assert_nil(option, "tar would split the program at the blank")

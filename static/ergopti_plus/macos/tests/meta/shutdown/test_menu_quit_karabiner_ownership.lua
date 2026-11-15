@@ -75,7 +75,7 @@ local function load_menu_quit_action()
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.preferences"] = {
+	package.loaded["settings.engine.preferences.preferences"] = {
 		build_initial_state = function()
 			return {
 				hotstrings = {},
@@ -91,12 +91,12 @@ local function load_menu_quit_action()
 	}
 	package.loaded["ui.menu.builder"] = { generate = function() return {} end }
 	package.loaded["ui.menu.hotstring_counter"] = { invalidate_cache = function() end }
-	package.loaded["ui.menu.menu_paths"] = {
+	package.loaded["settings.ui.menu.paths"] = {
 		is_initialized = function() return true end,
 		get = function() return "/virtual/config.toml" end,
 		get_config_dir = function() return "/virtual" end,
 	}
-	package.loaded["infra.factory_reset_journal"] = {
+	package.loaded["settings.engine.factory_reset_journal"] = {
 		path_for = function(config_path)
 			if type(config_path) ~= "string" or config_path == "" then return nil end
 			return config_path .. ".ergopti-reset-journal-v1.json"

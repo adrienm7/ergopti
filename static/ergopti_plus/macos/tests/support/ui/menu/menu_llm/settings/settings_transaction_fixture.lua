@@ -43,7 +43,7 @@ local MODULES = {
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
 	"infra.manifest_menu",
-	"infra.preferences",
+	"settings.engine.preferences.preferences",
 }
 
 local DEFAULT_STATE = {
@@ -121,7 +121,7 @@ end
 local function with_fixture(options, callback)
 	options = options or {}
 	require("core.fs.engine.paths").shared_root()
-	local preferences_owner = options.preferences or require("infra.preferences")
+	local preferences_owner = options.preferences or require("settings.engine.preferences.preferences")
 	local saved_modules = {}
 	for _, name in ipairs(MODULES) do
 		saved_modules[name] = package.loaded[name]
@@ -178,7 +178,7 @@ local function with_fixture(options, callback)
 	local display_generation = 0
 	local persisted = clone_value(state)
 	local publication_id = 0
-	package.loaded["infra.preferences"] = options.preferences or {
+	package.loaded["settings.engine.preferences.preferences"] = options.preferences or {
 		flat_key_for = preferences_owner.flat_key_for,
 		state_value_for = preferences_owner.state_value_for,
 		current_view = function() return clone_value(persisted), {status = "ok", content = "owned fixture"} end,
@@ -433,11 +433,11 @@ local function with_fixture(options, callback)
 
 	local owned_save
 	if options.preference_source then
-		owned_save = require("ui.menu.preferences_transaction").bind(options.preferences, {
+		owned_save = require("settings.ui.menu.preferences_transaction").bind(options.preferences, {
 			path = options.preference_source, state = state, hotfiles = {}, core_modules = {},
 			initial_state = state, initial_preferences = state,
 			restore_runtime = function(snapshot)
-				return require("ui.menu.preferences_transaction").restore_table(runtime, snapshot)
+				return require("settings.ui.menu.preferences_transaction").restore_table(runtime, snapshot)
 			end,
 		})
 	end

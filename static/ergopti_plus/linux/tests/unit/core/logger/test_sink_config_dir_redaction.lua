@@ -42,9 +42,9 @@ local NAME = RULES.config_name_placeholder
 --- @param body function Receives (Sink, Logger, log_path).
 local function with_sink(options, body)
 	options = options or {}
-	local real_paths = helpers.fresh_module("infra.config_paths")
-	local previous_paths = package.loaded["infra.config_paths"]
-	package.loaded["infra.config_paths"] = setmetatable({
+	local real_paths = helpers.fresh_module("settings.engine.paths")
+	local previous_paths = package.loaded["settings.engine.paths"]
+	package.loaded["settings.engine.paths"] = setmetatable({
 		get_config_dir = function() return options.config_dir or real_paths.default_config_dir() end,
 	}, { __index = real_paths })
 	local Sink = helpers.load_module("core.logger.engine.sink")
@@ -59,7 +59,7 @@ local function with_sink(options, body)
 		body(Sink, Logger, dir .. "/ErgoptiPlus_" .. os.date("%Y-%m-%d") .. ".log")
 	end, debug.traceback)
 	Sink.uninstall(Logger)
-	package.loaded["infra.config_paths"] = previous_paths
+	package.loaded["settings.engine.paths"] = previous_paths
 	os.execute("rm -rf '" .. dir .. "'")
 	if not ok then error(err, 0) end
 end
@@ -142,7 +142,7 @@ helpers.describe("config_paths: hands its folder to the log sink (linux-logger-c
 				quote = function(value) return "'" .. value .. "'" end,
 			}
 			local ok, err = pcall(function()
-				local ConfigPaths = helpers.fresh_module("infra.config_paths")
+				local ConfigPaths = helpers.fresh_module("settings.engine.paths")
 				helpers.assert_true(ConfigPaths.set_config_dir("/srv/Moved/Jean Dupont"), "the move must commit")
 				local redact = assert(Sink.capture_redactor())
 				helpers.assert_eq(redact("Loaded /srv/Moved/Jean Dupont/famille.toml"), "Loaded " .. CONFIG .. "/" .. NAME,

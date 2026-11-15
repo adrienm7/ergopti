@@ -846,6 +846,10 @@ const PUBLISHED_RECORDS = [
 
 const MODULE_NAME_FILES = [
 	{
+		file: 'tools/lib/linux-menu-parts.cjs',
+		why: 'PART_MODULES and ROOT_LOG name the Linux tray root and its part modules'
+	},
+	{
 		file: 'tools/test/test-linux-portable-commands.cjs',
 		why: 'LUA_LAUNCHERS is keyed by the module names of the Linux launchers it scans'
 	},

@@ -29,7 +29,7 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")
 local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
@@ -489,7 +489,7 @@ function M.new(options)
 			return true
 		end,
 	}
-	local owner = require("ui.menu.scoped_preferences").new(ports)
+	local owner = require("settings.ui.menu.scoped_preferences").new(ports)
 	--- Why this owner cannot serve a composed restore now, or nil. The global
 	--- restore skips and names such a category instead of refusing every other
 	--- one with it: an override file whose source did not read cleanly, one

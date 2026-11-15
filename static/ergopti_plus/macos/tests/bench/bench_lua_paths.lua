@@ -249,7 +249,7 @@ workload("hotstring_load_warm", function()
 end)
 
 workload("preferences_save", function()
-	local Preferences = helpers.load_with_stubs("infra.preferences")
+	local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 	local path = scratch .. "/config.toml"
 	write_file(path, read_file(CONFIG_TEMPLATE))
 	local state, status = Preferences.load(path)

@@ -8,7 +8,7 @@ day a folder moves. Every name comes from its one declaration instead:
 _shared/core/fs/data/paths/app_dirs.toml for the folders and the log file names,
 _shared/core/logger/data/sub_files.toml for the topical log files. The
 paths.toml the launcher keeps wins over both defaults, as it does in the
-driver (infra/config_paths.lua): its configuration and logs folder keys move
+driver (settings/engine/paths.lua): its configuration and logs folder keys move
 the personal hotstrings and the logs. Only the topical logs the caller names
 are listed: the hotstring and keystroke logs can carry typed text.
 """
@@ -94,7 +94,7 @@ def main():
     default_log_dir = folder(logs["macos"]["base"], logs["macos"]["segments"], app)
     log_dir = override(paths, logs["override_key"])
     # The driver appends the app folder to a LogsDirPath whose last folder is
-    # not it (normalize_logs_dir_override in infra/config_paths.lua); reading
+    # not it (normalize_logs_dir_override in settings/engine/paths.lua); reading
     # the override as is copied yesterday's logs (field report 2026-11-05).
     if log_dir is not None and os.path.basename(log_dir) != app:
         log_dir = os.path.join(log_dir, app)

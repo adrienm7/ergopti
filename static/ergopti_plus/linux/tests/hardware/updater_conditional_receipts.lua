@@ -5,9 +5,9 @@
 local uv = require("luv")
 local root = assert(os.getenv("HTTP_CONDITIONAL_ROOT"))
 local mode = assert(os.getenv("HTTP_CONDITIONAL_MODE"))
-local Paths = require("infra.config_paths")
+local Paths = require("settings.engine.paths")
 Paths.home = function() return root end
--- Boot creates the cache folder (infra/legacy_folder_migration.lua run());
+-- Boot creates the cache folder (settings/engine/migration/legacy_folder_migration.lua run());
 -- the updater only makes a request conditional when it exists.
 assert(os.execute("mkdir -p '" .. Paths.cache() .. "'"), "the cache folder is prepared like boot does")
 local M = require("modules.updater.manager")

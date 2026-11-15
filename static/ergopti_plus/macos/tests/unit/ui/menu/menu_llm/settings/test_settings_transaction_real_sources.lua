@@ -24,12 +24,12 @@ local with_fixture = Fixture.with_fixture
 helpers.describe("macOS real-source indentation compensation", function()
 	for _, race in ipairs({"before menu construction", "before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
 	helpers.it("preserves a real foreign master winner " .. race .. " through compensation and a fresh second click for indentation (shared-indentation)", function()
-		local path = require("infra.config_paths").get("ConfigTomlPath")
+		local path = require("settings.engine.paths").get("ConfigTomlPath")
 		local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.display]\npred_indent = 1\nstreaming = false\nstreaming_multi = true\n[llm.profiles]\nnum_predictions = 3\n[private]\nfuture = 42\n'
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"]
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
@@ -45,8 +45,8 @@ helpers.describe("macOS real-source indentation compensation", function()
 				return true
 			end,
 		}
-		package.loaded["infra.preferences"] = nil
-		local preferences = require("infra.preferences")
+		package.loaded["settings.engine.preferences.preferences"] = nil
+		local preferences = require("settings.engine.preferences.preferences")
 		local ok, err = xpcall(function()
 			local _, status = preferences.load(path)
 			helpers.assert_eq(status, "ok")
@@ -113,7 +113,7 @@ helpers.describe("macOS real-source indentation compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -167,12 +167,12 @@ end)
 helpers.describe("macOS real-source Info Bar compensation", function()
 	for _, race in ipairs({"before menu construction", "before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
 	helpers.it("preserves a real foreign master winner " .. race .. " through compensation and a fresh second click for Info Bar (shared-info-bar)", function()
-		local path = require("infra.config_paths").get("ConfigTomlPath")
+		local path = require("settings.engine.paths").get("ConfigTomlPath")
 		local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.display]\npred_indent = 1\nshow_info_bar = true\nstreaming = false\nstreaming_multi = true\n[llm.profiles]\nnum_predictions = 3\n[private]\nfuture = 42\n'
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"]
 		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
@@ -188,8 +188,8 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 				return true
 			end,
 		}
-		package.loaded["infra.preferences"] = nil
-		local preferences = require("infra.preferences")
+		package.loaded["settings.engine.preferences.preferences"] = nil
+		local preferences = require("settings.engine.preferences.preferences")
 		local ok, err = xpcall(function()
 			local _, status = preferences.load(path)
 			helpers.assert_eq(status, "ok")
@@ -256,7 +256,7 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -342,9 +342,9 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 	for _, case in ipairs(SPARSE) do
 		helpers.it("keeps both rows enabled and persists a click with " .. case.name .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
-				local path = require("infra.config_paths").get("ConfigTomlPath")
+				local path = require("settings.engine.paths").get("ConfigTomlPath")
 				local disk = case.source
-				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"]
 				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function() return disk, "ok" end,
 					write = function() error("a privacy row never writes unconditionally") end,
@@ -354,8 +354,8 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 						return true
 					end,
 				}
-				package.loaded["infra.preferences"] = nil
-				local preferences = require("infra.preferences")
+				package.loaded["settings.engine.preferences.preferences"] = nil
+				local preferences = require("settings.engine.preferences.preferences")
 				local ok, err = xpcall(function()
 					local _, status = preferences.load(path)
 					helpers.assert_eq(status, "ok")
@@ -376,7 +376,7 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 						end
 					end)
 				end, debug.traceback)
-				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)
@@ -392,11 +392,11 @@ helpers.describe("Privacy native publication source ownership", function()
 		"before forward acknowledgement", "after forward acknowledgement", "between own acknowledgement and receipt admission"}) do
 		helpers.it("retains foreign bytes and acknowledged source debt " .. race .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
-				local path = require("infra.config_paths").get("ConfigTomlPath")
+				local path = require("settings.engine.paths").get("ConfigTomlPath")
 				local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.trigger]\nurl_bar_filter_enabled = false\nsecure_filter_enabled = false\n[private]\nfuture = 42\n'
 				local external = initial:gsub('enabled = true', 'enabled = false'):gsub('future = 42', 'future = 73')
 				local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"]
 				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function(read_path)
 						if read_path ~= path then wrong_path = true end
@@ -412,8 +412,8 @@ helpers.describe("Privacy native publication source ownership", function()
 						return true
 					end,
 				}
-				package.loaded["infra.preferences"] = nil
-				local preferences = require("infra.preferences")
+				package.loaded["settings.engine.preferences.preferences"] = nil
+				local preferences = require("settings.engine.preferences.preferences")
 				local ok, err = xpcall(function()
 					local _, status = preferences.load(path)
 					helpers.assert_eq(status, "ok")
@@ -467,7 +467,7 @@ helpers.describe("Privacy native publication source ownership", function()
 						helpers.assert_eq(disk, external)
 					end)
 				end, debug.traceback)
-				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["settings.engine.preferences.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)

@@ -1,6 +1,6 @@
 # _shared/tests/corpus/config_migration_registries/cases.toml
 # Registry defects every interpreter must reject: the Windows loader
-# (windows/infra/config_migrate.ahk), the Lua engine
+# (windows/settings/engine/migration/migrate.ahk), the Lua engine
 # (_shared/settings/engine/migration/migrate.lua) and tools/test/test-config-migrations.cjs.
 # A registry one driver accepts and another refuses would migrate a file on one
 # driver and leave the session read-only on the other.

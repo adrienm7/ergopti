@@ -26,7 +26,7 @@
  *     append     MenuRenderer_Append*(...)        a declared row it places
  *     static     Map("label", t("key") ...)       a row labelled by a fixed key
  *     separator  Map("separator", true)           a separator it inserts
- *   macOS and Linux, every .lua under ui/menu/:
+ *   macOS and Linux, every menu .lua (ui/menu/ and its feature-first homes):
  *     static     label/title = i18n...("key")     a row labelled by a fixed key
  *     separator  title = "-" / separator = true   a separator it inserts
  *     native     { title = <computed>, fn|menu }  a renderer-shaped row it builds
@@ -118,6 +118,24 @@ function sourceFiles(dir, ext) {
 		}
 	})(dir);
 	return files.sort();
+}
+
+// A driver's menu sources, by their path inside the driver: ui/menu/ before
+// the structure moves, then each feature's ui/menu/ or ui/menu_<x> and the
+// menu feature's own ui/ tree after them. A scan rooted at one ui/menu folder
+// would silently lose every section a structure step moves out of it.
+const MENU_SOURCE = /(?:^|\/)ui\/menu[/_]|^menu\/ui\//;
+
+/**
+ * The menu source files of one driver, wherever its feature folders keep them.
+ * @param {string} root The driver's folder.
+ * @param {string} ext '.ahk' or '.lua'.
+ * @returns {string[]} Absolute paths, sorted.
+ */
+function menuSourceFiles(root, ext) {
+	return sourceFiles(root, ext).filter((file) =>
+		MENU_SOURCE.test(path.relative(root, file).split(path.sep).join('/'))
+	);
 }
 
 /**
@@ -219,12 +237,12 @@ function admittedSourceRetirements(driver, traversed) {
 		['windows', '.ahk'],
 		['linux', '.lua']
 	]) {
-		const menuRoot = path.join(SP, platform, 'ui/menu');
+		const driverRoot = path.join(SP, platform);
 		assert.ok(
-			fs.existsSync(menuRoot) && fs.statSync(menuRoot).isDirectory(),
+			fs.existsSync(driverRoot) && fs.statSync(driverRoot).isDirectory(),
 			`retired live-menu admission requires actual menu owner root: ${platform}`
 		);
-		for (const file of sourceFiles(menuRoot, ext))
+		for (const file of menuSourceFiles(driverRoot, ext))
 			for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), ext))
 				assert.ok(
 					!symbols.has(token.value) &&
@@ -310,8 +328,7 @@ function admittedSelectorRetirement() {
  * @returns {string[]} Its native sites.
  */
 function inventory(driver) {
-	const roots =
-		driver === 'windows' ? [path.join(SP, 'windows')] : [path.join(SP, driver, 'ui', 'menu')];
+	const roots = [path.join(SP, driver)];
 	const ext = driver === 'windows' ? '.ahk' : '.lua';
 	const sites = [];
 	const traversed = new Set();
@@ -320,7 +337,8 @@ function inventory(driver) {
 			fs.existsSync(root) && fs.statSync(root).isDirectory(),
 			`${driver}: mandatory source root must exist: ${root}`
 		);
-		for (const file of sourceFiles(root, ext)) {
+		const files = driver === 'windows' ? sourceFiles(root, ext) : menuSourceFiles(root, ext);
+		for (const file of files) {
 			const rel = path.relative(SP, file).split(path.sep).join('/');
 			if (WINDOWS_RENDERER.has(rel)) continue;
 			const text = fs.readFileSync(file, 'utf8');
@@ -413,7 +431,7 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 // minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
 const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
-const LEGACY_SHA256 = '2bb8292c3adf3c808c8dbebdb40d263fedf17b1e92d84c8dc83b315ecfe927f7';
+const LEGACY_SHA256 = '8e8441a38474348460e748dd85d9abdeb4d6d62f72015f9995a35ea14b215174';
 const legacyBytes = fs.readFileSync(LEGACY_PATH);
 assert.equal(
 	crypto.createHash('sha256').update(legacyBytes).digest('hex'),
@@ -468,7 +486,7 @@ for (const driver of DRIVERS) {
 const current = {};
 // Cross-driver retirement inspection cannot replace a missing original root's refusal.
 for (const driver of DRIVERS) {
-	const sourceRoot = path.join(SP, driver === 'windows' ? 'windows' : `${driver}/ui/menu`);
+	const sourceRoot = path.join(SP, driver);
 	assert.ok(
 		fs.existsSync(sourceRoot) && fs.statSync(sourceRoot).isDirectory(),
 		`${driver}: mandatory source root must exist: ${sourceRoot}`

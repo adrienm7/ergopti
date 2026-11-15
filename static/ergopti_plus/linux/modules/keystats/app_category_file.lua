@@ -23,7 +23,7 @@ local M = {}
 local Json = require("core.text.engine.json")
 local Logger = require("core.logger.engine.shim")
 local Store = require("metrics.engine.apps.category_store")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 local RegularFileReader = require("core.fs.engine.regular_file_reader")
 local RegularFileWriter = require("core.fs.engine.regular_file_writer")
 

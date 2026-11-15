@@ -121,7 +121,7 @@ end
 --- hs.configdir, which inside the packaged app is the bundle's resources.
 --- @return string Absolute path, or "" when config_paths is not initialised.
 local function _config_dir()
-	local ok, ConfigPaths = pcall(require, "infra.config_paths")
+	local ok, ConfigPaths = pcall(require, "settings.engine.paths")
 	if ok and type(ConfigPaths) == "table" and type(ConfigPaths.is_initialized) == "function"
 		and ConfigPaths.is_initialized() then
 		return ConfigPaths.get_config_dir()

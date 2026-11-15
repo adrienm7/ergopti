@@ -172,7 +172,7 @@ check('every budget is the value its declaration holds', () => {
 	assert.equal(
 		described.budgets['preferences.save'],
 		Number(
-			read('static/ergopti_plus/macos/infra/preferences.lua').match(
+			read('static/ergopti_plus/macos/settings/engine/preferences/preferences.lua').match(
 				/^local SLOW_SAVE_REPORT_MS = (\d+)/m
 			)[1]
 		)
@@ -218,7 +218,7 @@ try {
 		};
 		copy('static/ergopti_plus/_shared/core/timing/data/constants.toml');
 		copy('static/ergopti_plus/macos/core/lifecycle/engine/main_thread_hold.lua');
-		copy('static/ergopti_plus/macos/infra/preferences.lua', (text) =>
+		copy('static/ergopti_plus/macos/settings/engine/preferences/preferences.lua', (text) =>
 			text.replace(/^local SLOW_SAVE_REPORT_MS = /m, 'local SAVE_REPORT_MS = ')
 		);
 		copy('static/ergopti_plus/macos/modules/keystats/ingest_trace.lua');

@@ -19,7 +19,7 @@ local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 -- Check each real delegation edge instead of accepting a detached editor call.
 local edges = {
 	{ symbol = "local function global_default_delay_ms",
-		call = 'require("infra.personal_file_controls").apply(binding, requested_section, field, value)' },
+		call = 'require("settings.engine.preferences.personal_file_controls").apply(binding, requested_section, field, value)' },
 	{ symbol = "MODULE: Personal File Metadata Controller",
 		call = "Config.prepare_personal_metadata(owner, binding.record, section, field, value)" },
 	{ symbol = "function M.prepare_personal_metadata(owner, record, section, field, value)",

@@ -164,7 +164,7 @@ elseif preactivation then
 			assert(debt, "pause acknowledged physical retirement before owned worker exit")
 		elseif mode == "preactivation_program_binding" then
 			local scalar = require("core.text.engine.json").encode({ version = 1, executable = "/bin/true", arguments = { "owned-program-binding" } })
-			configuration = require("infra.program_binding_transaction").new({
+			configuration = require("settings.engine.preferences.program_binding_transaction").new({
 				binding = "tap_3", scalar = scalar, path = arg[4], backup_path = arg[4] .. ".owned-program-binding",
 				is_paused = function() return paused end,
 			})

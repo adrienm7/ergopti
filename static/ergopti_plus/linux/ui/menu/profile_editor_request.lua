@@ -18,7 +18,7 @@ local M = {}
 --- @return function|nil delete
 function M.capture(owner)
 	local Prefs = require("infra.llm_preferences")
-	local Paths = require("infra.config_paths")
+	local Paths = require("settings.engine.paths")
 	local list, snapshot, save = owner.list_user, owner.configuration_snapshot, owner.save_user_profile
 	local select_profile, delete_profile = owner.set, owner.delete_user_profile
 	local config, get_many, generation = Paths.config, Prefs.get_many, Prefs.generation
@@ -33,7 +33,7 @@ function M.capture(owner)
 			and owner.set == select_profile and owner.delete_user_profile == delete_profile
 			and package.loaded["infra.llm_preferences"] == Prefs and Prefs.get_many == get_many
 			and Prefs.generation == generation and Prefs.is_current_revision == revision_current
-			and Prefs.set_many == publish and package.loaded["infra.config_paths"] == Paths and Paths.config == config
+			and Prefs.set_many == publish and package.loaded["settings.engine.paths"] == Paths and Paths.config == config
 	end
 	local root_ok, root = pcall(config, "config.toml")
 	if not root_ok or type(root) ~= "string" or not ports_current() then return nil end

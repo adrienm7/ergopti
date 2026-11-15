@@ -4,7 +4,7 @@
 --- windows/tests/test_llm_menu_regressions.ahk where the platform shares the bug class.
 
 local helpers = require("tests.helpers")
-local prefs   = helpers.load_with_stubs("infra.preferences")
+local prefs   = helpers.load_with_stubs("settings.engine.preferences.preferences")
 local codec   = helpers.load_with_stubs("core.text.engine.toml.codec")
 local with_count_menu = require("tests.support.llm_count_menu_fixture")
 
@@ -166,7 +166,7 @@ helpers.describe("LLM menu regressions — Hammerspoon", function()
 	end)
 
 	helpers.it("preferences own llm_val_modifiers at its persisted path", function()
-		local prefs = helpers.load_with_stubs("infra.preferences")
+		local prefs = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		helpers.assert_eq(prefs.flat_key_for("llm.navigation.val_modifiers"), "llm_val_modifiers",
 			"the validation modifiers must persist through the preference owner")
 	end)

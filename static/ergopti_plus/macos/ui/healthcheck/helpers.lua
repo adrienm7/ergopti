@@ -83,7 +83,7 @@ end
 --- @param report_subdir string The schema's report.subdir.
 --- @return table
 function H.collect_paths(report_subdir)
-	local ConfigPaths = require("infra.config_paths")
+	local ConfigPaths = require("settings.engine.paths")
 	local logs_dir = Logger.logs_dir()
 	return {
 		config_dir      = ConfigPaths.is_initialized() and ConfigPaths.get_config_dir() or nil,
@@ -341,7 +341,7 @@ function H.configuration_context(schema, overrides)
 	--- @param id string Schema file id.
 	--- @return string path
 	local function path_of(id)
-		local ConfigPaths = require("infra.config_paths")
+		local ConfigPaths = require("settings.engine.paths")
 		if id == "config" then return ConfigPaths.get("ConfigTomlPath") end
 		return ConfigPaths.get_config_dir() .. names[id]
 	end

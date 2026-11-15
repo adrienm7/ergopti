@@ -184,7 +184,7 @@ check(
 	`the manifest must declare four Windows script slots, found ${manifestSlots.length}`
 );
 
-const featureState = path.join(WIN, 'infra', 'feature_state.ahk');
+const featureState = path.join(WIN, 'settings', 'engine', 'preferences', 'feature_state.ahk');
 const slots = globalLiteral(featureState, 'SCRIPT_SHORTCUT_SLOTS') || [];
 const fallbacks = new Map(pairs(globalLiteral(featureState, 'SCRIPT_SHORTCUT_FALLBACKS')));
 const scanCodes = new Map(pairs(globalLiteral(featureState, 'SCRIPT_SHORTCUT_SCAN_CODES')));

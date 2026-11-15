@@ -104,8 +104,8 @@ local function dynamic_personal_scope_fixture(enabled, outcome, absent)
 			files[path] = content; return true
 		end,
 	}
-	package.loaded["infra.preferences"] = nil
-	local preferences = require("infra.preferences")
+	package.loaded["settings.engine.preferences.preferences"] = nil
+	local preferences = require("settings.engine.preferences.preferences")
 	preferences.load("config")
 	local shared = assert(require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
 		helpers.driver_root() .. "../_shared/hotstrings/data/catalogue/_index.toml")))

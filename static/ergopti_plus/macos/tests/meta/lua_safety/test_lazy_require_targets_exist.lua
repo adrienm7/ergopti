@@ -33,7 +33,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan, matching the sibling meta guards.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core", "settings" }
 
 -- package.path roots the driver injects at boot (init.lua:14-28), in search
 -- order. "../_shared" is the module root shared with the Windows and Linux

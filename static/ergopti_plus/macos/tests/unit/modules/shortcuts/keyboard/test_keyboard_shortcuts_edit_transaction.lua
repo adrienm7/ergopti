@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.fs.adapters.storage",
-	"infra.preferences",
-	"infra.config_paths",
+	"settings.engine.preferences.preferences",
+	"settings.engine.paths",
 	"platform.input.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",

@@ -57,7 +57,7 @@ local function install_common_stubs()
 	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
 	package.loaded["core.ui.engine.notifications"] = {notify = function() end}
-	package.loaded["infra.config_paths"] = {
+	package.loaded["settings.engine.paths"] = {
 		get = function(key)
 			helpers.assert_eq(key, "MlxActiveModelPath")
 			return "/Users/fixture/" .. AppDirs.config.macos_relative .. "/hammerspoon/mlx_active_model.txt"
@@ -278,7 +278,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-dispatch-stale) deduplicates a stale handoff and false dispatch result", function()
 		local modules = {
-			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "infra.config_paths",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "settings.engine.paths",
 			"modules.llm", "core.ui.engine.dialog_util", "ui.menu.menu_llm.profile_label",
 			"ui.menu.menu_llm.model_switcher",
 		}
@@ -644,7 +644,7 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-freshness-fail-closed) rejects nil and throwing generation predicates", function()
 		local modules = {
-			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "infra.config_paths",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "settings.engine.paths",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"core.process.adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}

@@ -178,7 +178,7 @@ function replayerCounts(contract, held, label) {
 	const name = path.basename(contract, '.lua');
 	const found = [];
 	for (const relative of [
-		'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
+		'static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_shared_decode.lua',
 		'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 	]) {
 		const match = fs
@@ -195,7 +195,7 @@ const LUA_COUNTS = {
 	toml_batch_write(corpus) {
 		const found = [];
 		for (const relative of [
-			'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
+			'static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_shared_decode.lua',
 			'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 		]) {
 			const match = fs
@@ -223,7 +223,7 @@ const LUA_COUNTS = {
 	toml_leaf_rows(corpus) {
 		const found = [];
 		for (const relative of [
-			'static/ergopti_plus/linux/tests/unit/infra/config/test_toml_codec_shared_decode.lua',
+			'static/ergopti_plus/linux/tests/unit/settings/test_toml_codec_shared_decode.lua',
 			'static/ergopti_plus/macos/tests/unit/core/text/toml/test_writer_transaction.lua'
 		]) {
 			const match = fs

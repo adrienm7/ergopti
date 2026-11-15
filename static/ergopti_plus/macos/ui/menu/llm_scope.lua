@@ -3,7 +3,7 @@
 --- Applies the complete LLM preference scope through its native terminal owner.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Preferences = require("infra.preferences")
+local Preferences = require("settings.engine.preferences.preferences")
 local Transaction = require("settings.engine.scope.transaction")
 local Writer = require("core.text.engine.toml_codec.writer")
 local Codec = require("core.text.engine.toml_codec")
@@ -74,7 +74,7 @@ function M.new(options)
 		end
 		return Transaction.new(transaction_options)
 	end
-	return require("ui.menu.scoped_preferences").new(ports)
+	return require("settings.ui.menu.scoped_preferences").new(ports)
 end
 
 return M

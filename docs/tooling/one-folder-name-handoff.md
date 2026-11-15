@@ -50,7 +50,7 @@ ids `com.ergoptiplus.*` are not folder names and are unchanged.
 The shared core is `_shared/settings/engine/migration/legacy_folder_migration_core.lua`, replayed from
 `_shared/tests/corpus/paths/legacy_folder_migration_vectors.json` by the Lua
 contract (macOS, Linux) and by
-`windows/tests/unit/infra/config/migration/test_legacy_folder_migration.ahk`
+`windows/tests/unit/settings/engine/migration/test_legacy_folder_migration.ahk`
 (on a private tree under `A_Temp`). Rules:
 
 - A move is a rename and never overwrites. An empty destination folder gives
@@ -84,7 +84,7 @@ Drivers:
 - **Linux** `infra/legacy_folder_migration.lua`, from `ergopti_hotstrings.lua`
   before the logger sink: each XDG base's `ergopti_plus` merges into its
   `ergopti`; the backup is `<base>/ergopti/before-folder-migration/`.
-- **Windows** `infra/legacy_folder_migration.ahk`, from `boot.ahk` before the
+- **Windows** `settings/engine/migration/legacy_folder_migration.ahk`, from `boot.ahk` before the
   transition recovery and never under the startup smoke: the Roaming
   `%APPDATA%\Ergopti\paths.toml`, `%USERPROFILE%\.config\ergopti_plus`, every
   entry of `%LOCALAPPDATA%\ergopti_plus`, then `ergopti_plus_ollama` and the

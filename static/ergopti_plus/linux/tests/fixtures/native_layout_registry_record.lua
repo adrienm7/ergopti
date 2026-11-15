@@ -17,7 +17,7 @@ for _, key in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XD
 	assert(assert(os.getenv(key)):sub(1, #folder + 1) == folder .. "/", "each worker requires its own XDG roots")
 end
 local Shell, Json, uv = require("core.process.adapters.shell_runner"), require("core.text.engine.json"), require("luv")
-local ConfigPaths = require("infra.config_paths")
+local ConfigPaths = require("settings.engine.paths")
 -- Ergopti's own Python is installed: the record fixture never downloads it.
 package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, "python3") end }
 local Registry, Runner = require("modules.keymap.layout_registry"), require("core.process.adapters.runner")

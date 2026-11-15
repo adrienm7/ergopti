@@ -71,7 +71,7 @@ const MANIFEST = path.join(DRIVERS_DIR, '_shared', 'settings', 'data', 'features
 const BASELINE = 3;
 
 // The older macOS `[llm.profiles] user_profiles` array has a reader that imports it into
-// `llm.user_profiles` and a row that deletes it (infra/preferences.lua). It names the key
+// `llm.user_profiles` and a row that deletes it (settings/engine/preferences/preferences.lua). It names the key
 // through the generated LEAF constant, which this gate now reads as the literal, so the
 // surface became visible; it is read-and-retired legacy, deleted with the registry op that
 // re-encodes a value, and never a surface the driver keeps writing.
@@ -379,7 +379,7 @@ function isCanonicalParameterWrite(
 ) {
 	if (
 		driver !== 'linux' ||
-		relative !== 'infra/program_binding_transaction.lua' ||
+		relative !== 'settings/engine/preferences/program_binding_transaction.lua' ||
 		surface !== 'gesture_parameters'
 	)
 		return false;
@@ -473,7 +473,7 @@ function isCanonicalParameterWrite(
 			executableMatch(/Transaction\.new\(\{ path = options\.path/, body) &&
 			executableMatch(/operations = updates, presets = \{\}/, body) &&
 			executableMatch(/transaction\.apply\("program_binding", "configured"\)/, body) &&
-			executableMatch(/require\("infra\.config_paths"\)\.config\("config\.toml"\)/, source) &&
+			executableMatch(/require\("settings\.engine\.paths"\)\.config\("config\.toml"\)/, source) &&
 			executableMatch(/_current = M\.new\(\{ path = path,/, source) &&
 			executableMatch(/local CONFIG_SECTION_PARAMS = "gesture_parameters"/, storageOwner) &&
 			executableMatch(/section = CONFIG_SECTION_PARAMS, key = key, value = value/, storageOwner) &&
@@ -776,10 +776,10 @@ const parameterStorageOwner = fs.readFileSync(
 	path.join(DRIVERS_DIR, 'linux/modules/gestures/manager.lua'),
 	'utf8'
 );
-const parameterWriterPath = 'infra/program_binding_transaction.lua';
+const parameterWriterPath = 'settings/engine/preferences/program_binding_transaction.lua';
 // Retain the genuine e525 producer as literal historical morphology, not current authority.
 // Its original assertion/mutation block below remains byte-exact and meaningful.
-const parameterWriter = String.raw`--- infra/program_binding_transaction.lua
+const parameterWriter = String.raw`--- settings/engine/preferences/program_binding_transaction.lua
 
 --- Publishes an executable parameter and its binding under exact runtime ownership.
 local M = {}
@@ -994,7 +994,7 @@ function M.apply(binding, scalar, is_paused)
 	local ok, accepted = pcall(function()
 		if _current and _current.pending() and _current.retry_restore() ~= true then return false end
 		_sequence = _sequence + 1
-		local path = require("infra.config_paths").config("config.toml")
+		local path = require("settings.engine.paths").config("config.toml")
 		_current = M.new({ path = path, backup_path = path .. ".program-binding-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
 			binding = binding, scalar = scalar, is_paused = is_paused })
 		return _current.apply()

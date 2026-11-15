@@ -54,7 +54,7 @@ local function with_onboarding(controls, callback)
 		"ui.onboarding", "core.ui.ui.builder", "core.logger.engine.logger", "core.i18n.engine.i18n",
 		"core.text.engine.toml.writer", "core.text.engine.toml.codec", "core.ui.engine.notifications", "core.fs.engine.paths",
 		"core.timing.engine.deferred_work", "core.text.engine.utils", "infra.manifest_reader",
-		"core.ui.engine.dialog_util", "ui.menu.menu_paths", "core.fs.adapters.file_system",
+		"core.ui.engine.dialog_util", "settings.ui.menu.paths", "core.fs.adapters.file_system",
 		"core.fs.adapters.storage", "hs", "tests.stubs.hs",
 	}, function()
 		local hs_stub = fresh_hs()
@@ -82,7 +82,7 @@ local function with_onboarding(controls, callback)
 		package.loaded["core.fs.adapters.file_system"] = {}
 		package.loaded["core.fs.adapters.storage"] = {}
 		package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return true end}
-		package.loaded["ui.menu.menu_paths"] = {
+		package.loaded["settings.ui.menu.paths"] = {
 			persist_config_dir_for_wizard = function() return false, "synthetic persistence refusal" end,
 		}
 		package.loaded["core.ui.ui.builder"] = {

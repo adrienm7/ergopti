@@ -165,7 +165,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/infra/preferences.lua",
+			"source": "static/ergopti_plus/macos/settings/engine/preferences/preferences.lua",
 			"template": "Slow preferences save %d ms (prepare=%d write=%d ms; operations=%d; ",
 			"line": "2026-10-30 10:00:00:123 [WARNING] [preferences] Slow preferences save 2086 ms (prepare=1268 write=817 ms; operations=293; prepare: snapshot=7).",
 			"expect": {

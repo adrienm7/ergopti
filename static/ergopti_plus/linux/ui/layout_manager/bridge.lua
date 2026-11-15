@@ -150,7 +150,7 @@ local function new_handler(spec)
 		if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
 		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
 		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
-		local config_paths = dependency(state, "config_paths", "infra.config_paths")
+		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
 		local keystats_writer = dependency(state, "keystats_writer", "modules.keystats.sqlite_writer")
 		if keystats_writer and type(keystats_writer.get_revision) ~= "function" then keystats_writer = nil end
 		local preferences = dependency(state, "layout_emulation_preferences", "infra.layout_emulation_preferences")

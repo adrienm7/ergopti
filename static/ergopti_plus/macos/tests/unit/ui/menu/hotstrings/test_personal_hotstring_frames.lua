@@ -34,7 +34,7 @@ local function with_personal_frame(body, options)
 			if name == "ERGOPTI_PATHS_FILE" then return scratch .. "/paths.toml" end
 			return previous_getenv(name)
 		end
-		local paths = require("infra.config_paths"); assert(paths.init(scratch .. "/") == true)
+		local paths = require("settings.engine.paths"); assert(paths.init(scratch .. "/") == true)
 		package.loaded["core.i18n.engine.i18n"] = nil
 		native = require("core.i18n.engine.i18n")
 		local backend = require("core.i18n.engine.locale")
@@ -309,10 +309,10 @@ local function with_registered_personal_sections(frame, scenario, posture)
 		"modules.keymap", "modules.keymap.init", "modules.keymap.state",
 		"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
 		"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "infra.personal_file_controls",
+		"modules.keymap.terminator_replay", "infra.personal_hotstrings", "settings.engine.preferences.personal_file_controls",
 	}, function()
 		local lfs = require("lfs")
-		local paths = require("infra.config_paths")
+		local paths = require("settings.engine.paths")
 		local original_get = paths.get
 		local original_attributes, original_symlink_attributes = hs.fs.attributes, hs.fs.symlinkAttributes
 		local root, path, state_module, original_new, native_keymap
@@ -373,7 +373,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 			frame.context.paused = posture == "paused"
 			local notices = 0
 			frame.context.notify_feature = function() notices = notices + 1 end
-			local current = require("infra.personal_file_scope").bind(frame.context, record)
+			local current = require("settings.engine.scope.personal_file_scope").bind(frame.context, record)
 			assert(current() == true, "the genuine registered descriptor and actual physical source admit this section owner")
 			scenario({ frame = frame, registry = registry, state = state, name = name, path = path,
 				current = current, read = read_source, repair = write_source, source = source,
@@ -534,7 +534,7 @@ helpers.describe("shared personal section leaf policy", function()
 	end)
 		helpers.it("restores actual section fixture paths stat ports and module owners after a scenario raises", function()
 		with_personal_frame(function(frame)
-			local paths = require("infra.config_paths")
+			local paths = require("settings.engine.paths")
 			local before_get, before_attributes, before_links = paths.get, hs.fs.attributes, hs.fs.symlinkAttributes
 			local before_registry = rawget(package.loaded, "modules.keymap.registry")
 			local path, primary = nil, { message = "personal section scenario sentinel" }

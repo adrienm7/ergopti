@@ -13,7 +13,7 @@ local Json = require("core.text.engine.json")
 
 local MODULES = {
 	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
-	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
+	"settings.engine.preferences.preferences", "settings.engine.paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
 }

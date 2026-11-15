@@ -360,15 +360,15 @@ end)
 -- menubar. Only the logical native gate is controllable; no Karabiner deployment
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
-	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
+	return helpers.with_stub_scope({ "settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "core.ui.engine.notifications",
-		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
+		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "settings.ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "infra.manifest_reader",
 		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Chords = require("ui.menu.script_chords_transaction")
 		local MenuState = require("ui.menu.menu_state")

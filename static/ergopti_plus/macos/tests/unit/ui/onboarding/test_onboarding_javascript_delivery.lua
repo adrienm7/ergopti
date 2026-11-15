@@ -115,7 +115,7 @@ helpers.describe("onboarding JavaScript delivery", function()
 	end)
 	helpers.it("(onboarding-js-delivery) cancelled folder picker publishes nothing", function()
 		with_delivery(function(_, state, _, errors, evaluations)
-			package.loaded["ui.menu.menu_paths"].pick_config_dir = function() return nil end
+			package.loaded["settings.ui.menu.paths"].pick_config_dir = function() return nil end
 			state.receiver({ body = { action = "pickConfigDir", current = "/virtual/current" } })
 			helpers.assert_eq(#evaluations, 0)
 			helpers.assert_eq(#errors, 0)
@@ -123,7 +123,7 @@ helpers.describe("onboarding JavaScript delivery", function()
 	end)
 	helpers.it("(onboarding-js-delivery) a raising folder picker is reported, not propagated", function()
 		with_delivery(function(_, state, _, errors, evaluations)
-			package.loaded["ui.menu.menu_paths"].pick_config_dir = function() error("native picker exploded") end
+			package.loaded["settings.ui.menu.paths"].pick_config_dir = function() error("native picker exploded") end
 			state.receiver({ body = { action = "pickConfigDir", current = "/virtual/current" } })
 			helpers.assert_eq(#evaluations, 0)
 			helpers.assert_eq(#errors, 1)

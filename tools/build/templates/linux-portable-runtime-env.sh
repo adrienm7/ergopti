@@ -27,7 +27,7 @@ case "$DRIVER_ROOT$ERGOPTI_PACKAGE_PREFIX" in
     export LUA_CPATH="$ERGOPTI_PACKAGE_PREFIX/lib/lua/5.1/?.so${LUA_CPATH:+;$LUA_CPATH};;"
     ;;
 esac
-# The driver runs its owned programs from this prefix only (infra/owned_programs.lua).
+# The driver runs its owned programs from this prefix only (settings/engine/preferences/owned_programs.lua).
 export ERGOPTI_RUNTIME_PREFIX="$ERGOPTI_PACKAGE_PREFIX"
 export PATH="$ERGOPTI_PACKAGE_PREFIX/bin:$PATH"
 # No LD_LIBRARY_PATH: every staged file finds lib/ through its own RUNPATH, and

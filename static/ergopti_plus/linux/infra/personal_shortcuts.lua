@@ -86,7 +86,7 @@ M.TEMPLATE = [[
 --- The absolute path of the personal source.
 --- @return string|nil path Nil when the configuration folder cannot be resolved.
 function M.path()
-	local ok, path = pcall(function() return require("infra.config_paths").config(FILE_NAME) end)
+	local ok, path = pcall(function() return require("settings.engine.paths").config(FILE_NAME) end)
 	if not ok or type(path) ~= "string" or path == "" then return nil end
 	return path
 end

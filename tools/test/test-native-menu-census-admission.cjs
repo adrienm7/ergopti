@@ -205,7 +205,9 @@ try {
 	}
 
 	for (const driver of DRIVERS) {
-		const scanRoot = path.join(sourceRoot, driver, ...(driver === 'windows' ? [] : ['ui', 'menu']));
+		// The census reads each driver's menu sources wherever its feature folders
+		// keep them, so the driver folder is the root it refuses to lose.
+		const scanRoot = path.join(sourceRoot, driver);
 		reset();
 		fs.renameSync(scanRoot, scanRoot + '-wrong');
 		refusesBoth(/mandatory source root must exist/);

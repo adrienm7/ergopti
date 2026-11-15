@@ -142,7 +142,7 @@ function M.roots()
 		Logger.error(LOG, "The installed layouts' extensions are skipped this boot: %s.", tostring(installed))
 	end
 	roots[#roots + 1] = LayoutRegistry.shipped_extension_root()
-	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "extensions"
+	roots[#roots + 1] = require("settings.engine.paths").get_config_dir() .. "extensions"
 	return roots
 end
 

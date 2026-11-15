@@ -236,7 +236,7 @@ helpers.describe("gesture click retirement", function()
 				state.harvest()
 				return stop()
 			end
-			local owner = require("infra.program_binding_transaction").new({ binding = "swipe_3_left", action = "open_url",
+			local owner = require("settings.engine.preferences.program_binding_transaction").new({ binding = "swipe_3_left", action = "open_url",
 				scalar = "https://example.test", path = path, backup_path = backup,
 				is_paused = function() return false end, parameters = manager })
 			local ok, detail = xpcall(function()
@@ -393,7 +393,7 @@ helpers.describe("gesture click retirement", function()
 				local ok, err = xpcall(function()
 					helpers.assert_eq(manager.set_enabled(false), false)
 					state.harvest(); helpers.assert_eq(edges(state), { "mousedown:1" })
-					helpers.assert_true(require("infra.scope_registry").pending())
+					helpers.assert_true(require("settings.engine.scope.registry").pending())
 					helpers.assert_eq(manager.set_enabled(true), false)
 					local x = assert(io.open(path, "rb")); local bytes = x:read("*a"); assert(x:close())
 					helpers.assert_eq(bytes, mode == "foreign" and '[gestures]\nenabled = true\n# foreign\n' or original)
@@ -569,7 +569,7 @@ helpers.describe("gesture click retirement", function()
 						return release(token)
 					end
 				end
-				local owner = require("infra.program_binding_transaction").new({ binding = "swipe_3_left",
+				local owner = require("settings.engine.preferences.program_binding_transaction").new({ binding = "swipe_3_left",
 					action = "open_url", scalar = "https://example.test", path = path, backup_path = backup,
 					is_paused = function() return false end, parameters = manager, files = files })
 				local ok, detail = xpcall(function()

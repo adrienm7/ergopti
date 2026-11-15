@@ -56,7 +56,7 @@
 #     libayatana-appindicator, which the freedesktop runtime does not carry, so
 #     the icon and menu stay absent until that library is added as a module too.
 #   - Flatpak points XDG_CONFIG_HOME and XDG_DATA_HOME at ~/.var/app/<app-id>/,
-#     and infra/config_paths.lua honours both. The Flatpak therefore keeps its
+#     and settings/engine/paths.lua honours both. The Flatpak therefore keeps its
 #     own config and data there and does NOT read an existing ~/.config/ergopti
 #     left by a .deb, .rpm or install.sh install.
 #   - Autostart is not the desktop entry's job here: a Flatpak autostarts via

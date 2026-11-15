@@ -54,7 +54,7 @@ end
 local function lock_root()
 	local root = os.getenv("XDG_RUNTIME_DIR")
 	if root == nil or root == "" then
-		local home = require("infra.config_paths").account_home()
+		local home = require("settings.engine.paths").account_home()
 		if home == nil then return nil, "Neither XDG_RUNTIME_DIR nor an absolute HOME is set; no session lock folder." end
 		root = home .. FALLBACK_ROOT
 	end

@@ -105,7 +105,7 @@ local function load_bridge(controls)
 			end,
 			set = function(key, value) context.stored[key] = value; return true end,
 		},
-		["infra.script_scope"] = {
+		["settings.engine.scope.script_scope"] = {
 			retry_edit = function() return true end,
 			edit_setting = function(key, value)
 				context.stored[key] = value

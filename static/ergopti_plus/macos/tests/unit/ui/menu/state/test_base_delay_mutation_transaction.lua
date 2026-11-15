@@ -32,14 +32,14 @@ end
 
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"settings.engine.preferences.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
 		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config", "ui.menu.base_delay_transaction",
-		"ui.menu.preferences_transaction", "ui.menu.global_actions_transaction", "ui.menu.menu_state",
+		"settings.ui.menu.preferences_transaction", "ui.menu.global_actions_transaction", "ui.menu.menu_state",
 	}, function()
-		local Preferences = helpers.load_with_stubs("infra.preferences")
+		local Preferences = helpers.load_with_stubs("settings.engine.preferences.preferences")
 		local FileSystem = require("core.fs.adapters.file_system")
-		local Transaction = require("ui.menu.preferences_transaction")
+		local Transaction = require("settings.ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Baseline = require("ui.menu.base_delay_transaction")
 		local MenuState = require("ui.menu.menu_state")

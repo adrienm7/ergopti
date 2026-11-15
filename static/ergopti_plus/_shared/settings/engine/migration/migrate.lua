@@ -6,7 +6,7 @@
 --- Versions a driver's config.toml at boot. It reads ``[_meta] schema_version``,
 --- runs the shared registry's steps for this driver in order, and publishes the
 --- migrated file once, after a verified byte-exact backup. The Lua counterpart
---- of windows/infra/config_migrate.ahk, shared by the macOS and Linux drivers;
+--- of windows/settings/engine/migration/migrate.ahk, shared by the macOS and Linux drivers;
 --- the registry is _shared/settings/data/config_schema/migrations.toml and the decision
 --- record docs/adr/009-config-versioning.md.
 ---

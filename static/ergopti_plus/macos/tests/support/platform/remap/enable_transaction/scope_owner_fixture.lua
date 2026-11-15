@@ -40,11 +40,11 @@ local function scoped_remap(fixture)
 		disk.expected[#disk.expected + 1] = expected or false
 		return save(state, path, overwrite, expected)
 	end
-	package.loaded["infra.config_paths"].get = function(key)
+	package.loaded["settings.engine.paths"].get = function(key)
 		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return "/remap/tap_hold.toml"
 	end
-	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
+	package.loaded["settings.engine.paths"].get_config_dir = function() return CONFIG_DIR end
 	local files = require("core.fs.adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil

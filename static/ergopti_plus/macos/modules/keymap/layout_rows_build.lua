@@ -398,7 +398,7 @@ function M.default_deps(overrides)
 		encode_json = Json.encode,
 		layouts_dir = FileSystem.expand_path("~/Library/Keyboard Layouts") .. "/",
 		file_prefix = "ErgoptiRows-",
-		record_path = require("infra.config_paths").get_config_dir() .. "layouts/rows_builds.json",
+		record_path = require("settings.engine.paths").get_config_dir() .. "layouts/rows_builds.json",
 		enable_source = InputSources.enable_keylayout_source_async,
 		disable_source = InputSources.disable_keylayout_source_async,
 		select_source = InputSources.set_input_source_async,
