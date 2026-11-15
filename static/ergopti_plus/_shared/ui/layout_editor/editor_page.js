@@ -3431,17 +3431,18 @@ var LayoutEditorPage = (function () {
 							}
 						})
 					);
-			// The four Windows DLL images, written in the page (no compiler).
+			// The Windows installable package: the four DLL images, written in the page
+			// (no compiler), with the generic installer and its layout.ini.
 			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
 				buttons.push(
 					el('button', {
 						type: 'button',
 						id: 'le-export-dll',
-						text: tl('export.dll'),
+						text: tl('export.windows_package'),
 						onclick: () => {
 							let file;
 							try {
-								file = LayoutSourceIO.windowsDllArchive(doc());
+								file = LayoutSourceIO.windowsPackage(doc());
 							} catch (error) {
 								notify('error', problemText(error));
 								return;

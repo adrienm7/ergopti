@@ -10,6 +10,10 @@
  * script registers and unregisters the layout as Windows' own layouts are:
  * the KLID key and its four values, a free Layout Id, the input profile added
  * and removed, the current user's Preload and Substitutes entries cleaned.
+ * The generic installer the layout editor ships (emitStubNsis) writes and
+ * removes the same entries once its layout.ini names the layout, refuses any
+ * other layout.ini, a missing DLL and a KLID out of range, and its page copy
+ * (_generated/kbd_setup_stub.js) is the one makensis builds now.
  * ==============================================================================
  */
 
@@ -26,6 +30,7 @@ const { buildDlls } = require('../lib/kbd-dll/build.cjs');
 const { readDll } = require('../lib/kbd-dll/reader.cjs');
 const { compareLayout } = require('../lib/kbd-dll/compare.cjs');
 const Installer = require('../lib/kbd-dll/installer.cjs');
+const LayoutIni = require('../lib/kbd-dll/layout-ini.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const sha = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -108,6 +113,89 @@ try {
 } finally {
 	fs.rmSync(dir, { recursive: true, force: true });
 }
+// The generic installer (one stub for every layout the editor builds) writes
+// the same registry entries and input profile as bepo-setup.exe once its
+// layout.ini names bépo: a static check of the two scripts.
+const stubScript = Installer.emitStubNsis();
+const registryLines = (text) =>
+	text
+		.split('\n')
+		.filter((line) => /WriteReg|DeleteReg|InstallLayoutOrTip|Delete \/REBOOTOK|"KLID"/.test(line))
+		.map((line) => line.trim());
+const named = (line) =>
+	line
+		.replace(
+			/\$UNKEY/g,
+			`${'Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'}\\Ergopti_kbd_bepo`
+		)
+		.replace(/\$DLL/g, 'bepo')
+		.replace(/\$TEXT/g, 'Bépo')
+		.replace(/\$COMPANY/g, model.company)
+		.replace(/\$LANG/g, '040C')
+		.replace(/\$LCID/g, model.lcid);
+assert.deepEqual(
+	registryLines(stubScript).map(named),
+	registryLines(script),
+	'the generic installer writes and removes what bepo-setup.exe does'
+);
+// It refuses anything but the exact layout.ini the editor writes, a missing
+// DLL, and a KLID outside a001<LCID>..a0ff<LCID> before deleting any key.
+for (const needle of [
+	'${IfNot} $READ S== $EXPECTED',
+	'StrCpy $EXPECTED "[layout]$\\r$\\ndll_name=$DLL$\\r$\\nlcid=$LCID$\\r$\\nlayout_text=$TEXT$\\r$\\ncompany=$COMPANY$\\r$\\n"',
+	'StrCpy $ALLOWED "abcdefghijklmnopqrstuvwxyz0123456789"',
+	'StrCpy $ALLOWED "0123456789abcdef"',
+	'${OrIf} $R3 > 8',
+	'${OrIf} $R3 > 64',
+	'${IfNot} ${FileExists} "$EXEDIR\\arm64\\$DLL.dll"',
+	'${IfNot} ${FileExists} "$EXEDIR\\wow64\\$DLL.dll"',
+	'${OrIfNot} $R4 S== "a0"',
+	'${OrIf} $R5 S== "00"'
+])
+	assert.ok(stubScript.includes(needle), `generic installer: ${needle}`);
+const unSection = stubScript.slice(stubScript.indexOf('Section "Uninstall"'));
+assert.ok(
+	unSection.indexOf('Call un.CheckKlid') < unSection.indexOf('DeleteRegKey'),
+	'the uninstaller checks the KLID before deleting its key'
+);
+const installSection = stubScript.slice(stubScript.indexOf('Section "Install"'));
+assert.ok(
+	installSection.indexOf('Call CheckKlid') < installSection.indexOf('WriteRegStr'),
+	'the installer checks the KLID before writing its key'
+);
+// The layout.ini it reads, and the names it cannot hold.
+const ini = Buffer.from(LayoutIni.layoutIni(model));
+assert.deepEqual([...ini.subarray(0, 2)], [0xff, 0xfe], 'UTF-16LE with a BOM');
+assert.equal(
+	ini.subarray(2).toString('utf16le'),
+	`[layout]\r\ndll_name=bepo\r\nlcid=040c\r\nlayout_text=Bépo\r\ncompany=${model.company}\r\n`
+);
+for (const bad of ['', ' Bépo', 'B"po', 'a=b', 'x'.repeat(65)])
+	assert.throws(
+		() => LayoutIni.layoutIni(Object.assign({}, model, { layout_text: bad })),
+		/kbd_installer_text|kbd_text_invalid/,
+		JSON.stringify(bad)
+	);
+// The page's copy of the generic installer is the one makensis builds now.
+const stub = Installer.buildStub();
+const generated = fs.readFileSync(
+	path.join(
+		ROOT,
+		'static',
+		'ergopti_plus',
+		'_shared',
+		'ui',
+		'layout_editor',
+		'_generated',
+		'kbd_setup_stub.js'
+	),
+	'utf8'
+);
+assert.ok(
+	generated.includes(`sha256: '${sha(stub.bytes)}'`),
+	'kbd_setup_stub.js is stale: npm run codegen:kbd-setup-stub:js'
+);
+
 console.log(
-	`[OK] kbd installer: bepo-setup.exe (${built.bytes.length} bytes) holds the four verified DLLs and registers/unregisters the layout`
+	`[OK] kbd installer: bepo-setup.exe (${built.bytes.length} bytes) holds the four verified DLLs and registers/unregisters the layout; the generic installer (${stub.bytes.length} bytes) writes the same entries from a strict layout.ini`
 );

@@ -391,6 +391,7 @@
 		"codegen:layout-editor-export-assets:js": "node ./tools/codegen/codegen-layout-editor-export-assets-js.cjs",
 		"codegen:layout-editor-klc:js": "node ./tools/codegen/codegen-layout-editor-klc-js.cjs",
 		"codegen:key-legend:js": "node ./tools/codegen/codegen-key-legend-js.cjs",
+		"codegen:kbd-setup-stub:js": "node ./tools/codegen/codegen-kbd-setup-stub-js.cjs",
 		"codegen:layout-editor-kbd-dll:js": "node ./tools/codegen/codegen-layout-editor-kbd-dll-js.cjs",
 		"codegen:layout-editor-tables:js": "node ./tools/codegen/codegen-layout-editor-tables-js.cjs",
 		"codegen:layout-composer-corpus": "node ./tools/codegen/codegen-layout-composer-corpus.cjs",

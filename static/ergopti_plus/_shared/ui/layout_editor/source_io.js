@@ -368,7 +368,7 @@ var LayoutSourceIO = (function () {
 	 * compiler-free writer (_generated/kbd_dll_writer.js, from tools/lib/kbd-dll),
 	 * with what the Windows tables cannot hold.
 	 * @param {object} doc
-	 * @returns {{dllName: string, dlls: Object<string, Uint8Array>, omitted: {path: string, reason: string}[]}}
+	 * @returns {{dllName: string, model: object, dlls: Object<string, Uint8Array>, omitted: {path: string, reason: string}[]}}
 	 */
 	function windowsDlls(doc) {
 		if (isPreserved(doc)) throw new SourceIOError('source_preserved', 'imported_keylayout');
@@ -383,29 +383,56 @@ var LayoutSourceIO = (function () {
 		}
 		return {
 			dllName: converted.model.dll_name,
+			model: converted.model,
 			dlls: LayoutKbdDll.writeDlls(converted.model),
 			omitted: converted.omitted
 		};
 	}
 
 	/**
-	 * The Windows DLL download: one stored ZIP with <dll>/<arch>/<dll>.dll for the
-	 * four images and <dll>/omitted.json listing what the tables leave out.
+	 * The Windows installable package: one stored ZIP with, in <dll>/, the
+	 * generic installer as <dll>-setup.exe (_generated/kbd_setup_stub.js, built
+	 * by makensis in the repository), the layout.ini it reads, the four DLL
+	 * images as <arch>/<dll>.dll and omitted.json listing what the tables leave
+	 * out. The same on the site and in the app windows: no page runs makensis.
 	 * @param {object} doc
 	 * @returns {{filename: string, bytes: Uint8Array}}
 	 */
-	function windowsDllArchive(doc) {
+	function windowsPackage(doc) {
+		if (typeof LayoutKbdSetupStub === 'undefined')
+			throw new SourceIOError('kbd_setup_stub_missing', '_generated/kbd_setup_stub.js');
 		const built = windowsDlls(doc);
+		const dll = built.dllName;
+		let ini;
+		try {
+			ini = LayoutKbdDll.layoutIni(built.model);
+		} catch (error) {
+			const match = /^(kbd_[a-z_]+): (.*)$/.exec((error && error.message) || '');
+			if (!match) throw error;
+			throw new SourceIOError(match[1], match[2]);
+		}
 		const files = Object.entries(built.dlls).map(([arch, bytes]) => ({
-			path: `${built.dllName}/${arch}/${built.dllName}.dll`,
+			path: `${dll}/${arch}/${dll}.dll`,
 			bytes
 		}));
-		files.push({
-			path: `${built.dllName}/omitted.json`,
-			text: `${JSON.stringify(built.omitted, null, 2)}\n`,
-			encoding: 'utf8'
-		});
-		return { filename: `${built.dllName}-dll.zip`, bytes: LayoutZipWriter.pack(files) };
+		files.push(
+			{ path: `${dll}/${dll}-setup.exe`, bytes: base64Bytes(LayoutKbdSetupStub.base64) },
+			{ path: `${dll}/layout.ini`, bytes: ini },
+			{
+				path: `${dll}/omitted.json`,
+				text: `${JSON.stringify(built.omitted, null, 2)}\n`,
+				encoding: 'utf8'
+			}
+		);
+		return { filename: `${dll}-windows.zip`, bytes: LayoutZipWriter.pack(files) };
+	}
+
+	/** The bytes of a base64 text. */
+	function base64Bytes(text) {
+		const binary = atob(text);
+		const bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+		return bytes;
 	}
 
 	// The native images a host installs beside the .keylayout, by platform: the
@@ -833,7 +860,7 @@ var LayoutSourceIO = (function () {
 		startFrom,
 		startFromDocument,
 		windowsDlls,
-		windowsDllArchive,
+		windowsPackage,
 		fillLayer,
 		keylayoutFile,
 		macosBundleArchive,

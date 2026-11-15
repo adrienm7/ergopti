@@ -8,7 +8,8 @@
  * repository tool's Windows keyboard layout DLL writer (tools/lib/kbd-dll:
  * constants, model, emit-c, shortcut-keys, source and pe-writer) as a classic script defining
  * `LayoutKbdDll`, so the layout editor page builds the same four DLL images the
- * tool writes with `--writer pe`, with no compiler.
+ * tool writes with `--writer pe`, with no compiler, and the layout.ini of the
+ * generic installer (layout-ini.cjs).
  *
  * FEATURES & RATIONALE:
  * 1. Verbatim: each module's text is wrapped, never rewritten, in a CommonJS
@@ -36,7 +37,8 @@ const MODULES = Object.freeze([
 		file: 'source.cjs',
 		requires: ['./constants.cjs', './model.cjs', './shortcut-keys.cjs', 'node:fs', '../paths.cjs']
 	},
-	{ file: 'pe-writer.cjs', requires: ['./constants.cjs', './model.cjs', './emit-c.cjs'] }
+	{ file: 'pe-writer.cjs', requires: ['./constants.cjs', './model.cjs', './emit-c.cjs'] },
+	{ file: 'layout-ini.cjs', requires: ['./model.cjs'] }
 ]);
 // Required only to read the repository; the page passes physicalKeys instead.
 const REPOSITORY_ONLY = Object.freeze(['node:fs', '../paths.cjs']);
@@ -96,7 +98,8 @@ function buildSource() {
 		"\t\tModel: load('./model.cjs'),",
 		'\t\tfromSource: Source.fromSource,',
 		'\t\twriteDlls: Writer.writeDlls,',
-		'\t\tIMAGES: Writer.IMAGES',
+		'\t\tIMAGES: Writer.IMAGES,',
+		"\t\tlayoutIni: load('./layout-ini.cjs').layoutIni",
 		'\t};',
 		'})();',
 		''

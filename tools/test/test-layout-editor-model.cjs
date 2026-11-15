@@ -37,6 +37,7 @@ const PAGE_SCRIPTS = [
 	'vendor/smol-toml.js',
 	'layout_composer/target_compiler.js',
 	'layout_editor/_generated/kbd_dll_writer.js',
+	'layout_editor/_generated/kbd_setup_stub.js',
 	'layout_editor/source_io.js',
 	'layout_editor/editor_model.js'
 ];
@@ -54,7 +55,8 @@ function loadEditor() {
 		TextDecoder,
 		Blob,
 		Response,
-		DecompressionStream
+		DecompressionStream,
+		atob
 	});
 	for (const file of PAGE_SCRIPTS) {
 		// A top-level const is not a property of the context; the page reads these as globals.
@@ -67,12 +69,12 @@ function loadEditor() {
 		vm.runInContext(source, context, { filename: file });
 	}
 	return vm.runInContext(
-		'({ IO: LayoutSourceIO, M: LayoutEditorModel, Zip: LayoutZipWriter, W: LayoutEditorWorkspace, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA })',
+		'({ IO: LayoutSourceIO, M: LayoutEditorModel, Zip: LayoutZipWriter, W: LayoutEditorWorkspace, LayerModel, LayoutComposer, DATA: LAYER_EDITOR_DATA, COMPOSER: LAYOUT_COMPOSER_DATA, STUB: LayoutKbdSetupStub })',
 		context
 	);
 }
 
-const { IO, M, Zip, W, LayerModel, LayoutComposer, DATA, COMPOSER } = loadEditor();
+const { IO, M, Zip, W, LayerModel, LayoutComposer, DATA, COMPOSER, STUB } = loadEditor();
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const registry = (id) =>
 	fs.readFileSync(path.join(ROOT, 'static', 'layouts', 'registry', id, `${id}.keylayout`), 'utf8');
@@ -780,9 +782,10 @@ test('the page writes the Windows DLLs the repository tool writes, and the Windo
 			`${arch} reads back as its model`
 		);
 	}
-	// The download: the four images and what the tables leave out.
-	const archive = IO.windowsDllArchive(doc);
-	assert.equal(archive.filename, `${page.dllName}-dll.zip`);
+	// The download: the generic installer, its layout.ini, the four images and
+	// what the tables leave out.
+	const archive = IO.windowsPackage(doc);
+	assert.equal(archive.filename, `${page.dllName}-windows.zip`);
 	const zipText = Buffer.from(archive.bytes).toString('latin1');
 	for (const arch of Object.keys(page.dlls))
 		assert.ok(
@@ -790,6 +793,18 @@ test('the page writes the Windows DLLs the repository tool writes, and the Windo
 			`${arch} in the ZIP`
 		);
 	assert.ok(zipText.includes(`${page.dllName}/omitted.json`));
+	assert.ok(zipText.includes(`${page.dllName}/${page.dllName}-setup.exe`), 'the installer');
+	assert.ok(zipText.includes(`${page.dllName}/layout.ini`), 'its layout.ini');
+	const stubBytes = Buffer.from(STUB.base64, 'base64');
+	assert.ok(
+		Buffer.from(archive.bytes).indexOf(stubBytes) > 0,
+		'the generic installer, byte for byte'
+	);
+	const iniBytes = Buffer.from(require('../lib/kbd-dll/layout-ini.cjs').layoutIni(tool.model));
+	assert.ok(
+		Buffer.from(archive.bytes).indexOf(iniBytes) > 0,
+		"the tool's layout.ini, byte for byte"
+	);
 	const x64At = Buffer.from(archive.bytes).indexOf(Buffer.from(page.dlls.x64));
 	assert.ok(x64At > 0, 'the image is stored byte for byte');
 	// composer_save on Windows carries every image, base64.

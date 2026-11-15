@@ -1896,6 +1896,54 @@
 				"zh"
 			]
 		},
+		"layout_editor.error.kbd_installer_text": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.export.windows_package": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.fill.level.altgr": {
 			"reason": "keyboard-key-name",
 			"locales": [

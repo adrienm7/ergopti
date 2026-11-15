@@ -312,6 +312,10 @@ const GENERATORS = [
 		outputs: ['static/ergopti_plus/_shared/ui/_generated/key_legend.js']
 	},
 	{
+		script: 'codegen/codegen-kbd-setup-stub-js.cjs',
+		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/kbd_setup_stub.js']
+	},
+	{
 		script: 'codegen/codegen-layout-editor-kbd-dll-js.cjs',
 		outputs: ['static/ergopti_plus/_shared/ui/layout_editor/_generated/kbd_dll_writer.js']
 	},

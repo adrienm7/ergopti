@@ -656,7 +656,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       test-windows-lua-export-identity.cjs checks them, and the Windows lane runs the byte-equality proof.
 - [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
       an app; the footer made every Studio page 80 px taller than the screen.
-- [ ] **Studio screenshot remarks (maintainer, 2026-11-15).** Taken by worker T in this order: (a), 2, 6, 7, 8,
+- [x] **Studio screenshot remarks (maintainer, 2026-11-15).** Taken by worker T in this order: (a), 2, 6, 7, 8,
       5, then 3, 4, 9, then 1.
       (a) [x] The site's editor opens on a copy of Ergopti too, like the app's (`startFrom` in standalone.js; one
       `openInitial` decides the first document, so a restored draft can come first). Done 2026-11-15
@@ -708,11 +708,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       starts through its exact importer, any other from its library entry (base, Shift, AltGr and dead keys,
       LAYOUT_FORMATS.toSource); proof: `start-any-layout` in layout-editor.playwright.cjs (site and app window:
       sorted, searchable, Colemak-DH's letters on the board).
-      1 [ ] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
-      and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
-      installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
-      review by the maintainer.
-      [CODE] Left (2026-11-15): remark 1.
+      1 [x] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
+      and in the app. Done 2026-11-15 (`claude/ergopti-todo-windows-package`): « Download the Windows installer »
+      gives `<dll>-windows.zip` (the four DLLs, a strict layout.ini, the generic installer as `<dll>-setup.exe`),
+      the same code on the site and in the app; the installer is one NSIS stub built by its generator
+      (approved by the coordinator 2026-11-15, to review by the maintainer); proof: test-kbd-installer.cjs (the
+      same registry entries as bepo-setup.exe, the strict layout.ini, the stub current), test-layout-editor-model.cjs
+      and `windows-package` in layout-editor.playwright.cjs; the install itself is in TODO-tests-windows.md.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is
@@ -765,7 +767,8 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       macOS open panel (`source_pick`), in the `layout_editor_window` items of the three TODO-tests files.
       Progress (2026-11-11): macOS and Linux open the editor from the layout manager window and save its files through the host (`layouts/source_store.lua`, `layout_sources/` of the configuration folder). Windows: the WebView2 host needs `source_open`/`source_save` and `source_editor` in `windows/ui/layout_manager/init.ahk` as described in [layout-editor.md](docs/design/layout-editor.md#hosts); the page hides the button there meanwhile (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). « Install and use » sends the source and its compiled `.keylayout` through the composer host, which installs it as the composed layout and switches to it (macOS defers to the next login when it must). Linux, in a container (2026-11-11): `tests/hardware/run_layout_editor_webview.lua` opens the real layout manager window in WebKit2GTK under Xvfb, clicks « Editor », opens the Ergopti source, « Install and use », « Yes »; the composer host stores the source and the page's Linux emulation table, installs the composed layout, and the server's keymap read back after loading it types a/A, the Kana level on AltGr (<, œ), ê on the ISO key and $ on `TLDE` (CI step « Install a layout source from the editor in the daemon's WebView », desktop-webview shard). The installer refuses to write a desktop setting as root, so a root run checks that refusal and a user run checks the switch. Proven as a regular user on CI run 43105583384 (desktop-webview): installed and selected, the GNOME input sources start with the composed layout, 27/27. The same probe first runs « Emulate without installing »: nothing installed, `composed` becomes the emulated layout, and the daemon's emulation types a, ê and $ for KeyA, IntlBackslash and Backquote from the composer folder's copy. Entry point (2026-11-11, maintainer request): « Create or edit a layout… » in the Keyboard layout menu opens the editor directly (macOS, Linux; greyed on Windows with its reason); « New » starts blank or from QWERTY, AZERTY, Bépo, Ergo-L or Ergopti; « Install on the system » and « Emulate without installing » (`composer_emulate`: no system install, no admin; the emulation reads the composer folder's copy) each say what they do; the site page links ErgoptiPlus and its downloads and says the Windows DLL and installer come from `tools/kbd-dll.cjs`. Left: a native check of that install on a Mac and on a real Linux desktop (GNOME, KDE), the Windows host (`windows/ui/layout_manager/composer.ahk` accepts no source yet), and a Mac check of the native open panel the macOS host now shows for « Open » (`source_pick`).
 
-- [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller and `<dll>-setup.exe` (SHA-256,
+- [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller, `<dll>-setup.exe` and the layout
+      editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`; added 2026-11-15) (SHA-256,
       RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » says.
       [RELEASE] Left (2026-11-15): not started; tools/kbd-dll.cjs reports `signed: false` until SignPath or the PFX
       exists (the job wiring itself is [CODE] once it does).

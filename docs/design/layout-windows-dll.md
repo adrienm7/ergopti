@@ -148,6 +148,26 @@ verified images, and checks the script.
 - Decided by the coordinator on 2026-11-11, to review by the maintainer: NSIS (free, builds on Linux, small stub)
   rather than WiX or Inno Setup; unsigned, as the request states.
 
+### Generic installer (layout editor)
+
+The layout editor (site and app windows) cannot run `makensis`, so its « Download the Windows installer » gives
+`<dll>-windows.zip`: in `<dll>/`, the four images as `<arch>/<dll>.dll`, `omitted.json`, a `layout.ini` and one
+generic installer renamed `<dll>-setup.exe`. That installer is the same for every layout: `emitStubNsis` in
+`kbd-dll/installer.cjs`, built by `npm run codegen:kbd-setup-stub:js` into
+`_shared/ui/layout_editor/_generated/kbd_setup_stub.js` (base64 and SHA-256; `makensis` required, as for every
+installer). Approved by the coordinator on 2026-11-15, to review by the maintainer.
+
+- **layout.ini:** written by `kbd-dll/layout-ini.cjs` (bundled into the page's DLL writer): one `[layout]` section with
+  `dll_name`, `lcid`, `layout_text` and `company`, in that order, UTF-16LE with a BOM and CRLF line ends. The
+  installer rebuilds that exact text from the values it read and refuses any other file, then checks `dll_name`
+  (`[a-z][a-z0-9]{0,7}`), `lcid` (four lower-case hex digits) and both names (1 to 64 characters).
+- **Files:** the four `<arch>/<dll>.dll` must be beside it, else it stops before writing anything; they are copied as a
+  layout's own installer places them, and `layout.ini` goes to the install folder for the uninstaller.
+- **Registry:** the same lines as a layout's own installer (`registrationLines`, `unregistrationLines`), with the
+  names read from `layout.ini`; `tools/test/test-kbd-installer.cjs` checks statically that, for bépo, it writes and
+  removes exactly what `bepo-setup.exe` does. A KLID read back from the uninstall entry outside
+  `a001<LCID>`…`a0ff<LCID>` is refused before any key is written or deleted.
+
 ## Signing (maintainer)
 
 The images and the installer are unsigned. Windows loads unsigned keyboard layout DLLs (MSKLC's are unsigned too),
@@ -199,6 +219,9 @@ build/kbd-dll/bepo` (or take the CI artifact) and install `bepo-setup.exe` as ad
 4. Use the layout for a day, then Event Viewer → Windows Logs → Application: filter on source « Application Error »
    and check that no fault names `ctfmon.exe` (or names the layout DLL) since the install.
 5. Repeat with `kbdergop-setup.exe` from `static/layouts/sources/ergopti.toml`: Right Alt holds the Kana level.
-6. Uninstall from Settings → Apps; check that `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts` no longer
+6. From the layout editor (site or app), « Download the Windows installer » on Ergopti: unzip, run
+   `kbdergop-setup.exe` as administrator; the same checks as step 5. Edit `layout.ini` (add a space, a key or a
+   line) and run it again: it refuses before writing anything.
+7. Uninstall from Settings → Apps; check that `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts` no longer
    holds the `a0nn040c` key, that `HKCU\Keyboard Layout\Preload` and `Substitutes` name it nowhere, and that the
    DLL is gone from System32 and SysWOW64 after a reboot.
