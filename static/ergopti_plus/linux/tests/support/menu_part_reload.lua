@@ -14,23 +14,47 @@
 --- itself, so the test process does it: a searcher placed after the preload
 --- searcher forgets every cached section module just before the root's file
 --- runs, whatever way a test reloads it.
+---
+--- The sections are read from the root itself: each is bound there as
+--- `require("<module>").build` (the contract tools/lib/linux-menu-parts.cjs
+--- enforces), so the set follows every section wherever its feature folder
+--- puts it, instead of a module-name prefix the feature-first tree no longer
+--- shares. The native dialogs the sections import are listed by name.
 --- ==============================================================================
 
 local M = {}
 
 local ROOT = "ui.menu.builder"
-local PART = "^ui%.menu%.menu_"
+-- Modules every section imports that the root does not bind as a section.
+local SHARED_PARTS = { "ui.menu.menu_dialogs" }
 
 local _installed = false
+
+--- Reads the modules the root binds as sections, from the root's own source.
+--- @return table names The section module names, at least one.
+local function section_names()
+	local path = assert(package.searchpath(ROOT, package.path), "the tray root " .. ROOT .. " is not on package.path")
+	local handle = assert(io.open(path, "rb"))
+	local source = handle:read("*a")
+	handle:close()
+	local names, seen = {}, {}
+	for name in source:gmatch('require%("([%w_%.]+)"%)%.build') do
+		if not seen[name] then seen[name], names[#names + 1] = true, name end
+	end
+	assert(#names > 0, "the tray root " .. path .. " binds no section module")
+	return names
+end
 
 --- Forgets every cached tray section module, never the root itself. A test
 --- that runs the root's file with loadfile, bypassing require, calls it first.
 function M.forget_parts()
-	local cached = {}
-	for name in pairs(package.loaded) do
-		if type(name) == "string" and name ~= ROOT and name:match(PART) then cached[#cached + 1] = name end
+	for _, name in ipairs(section_names()) do
+		if name ~= ROOT then package.loaded[name] = nil end
 	end
-	for _, name in ipairs(cached) do package.loaded[name] = nil end
+	for _, name in ipairs(SHARED_PARTS) do
+		assert(package.searchpath(name, package.path), "the shared tray part " .. name .. " is not on package.path")
+		package.loaded[name] = nil
+	end
 end
 
 --- Installs the searcher once, before any test module loads.

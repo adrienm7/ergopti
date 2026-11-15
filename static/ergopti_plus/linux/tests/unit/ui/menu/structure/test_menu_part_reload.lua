@@ -14,33 +14,40 @@
 local helpers = require("tests.helpers")
 
 local ROOT = "ui.menu.builder"
-local PART = "ui.menu.menu_reload_probe"
+-- A section the root binds, the dialogs every section imports, and a module
+-- the root does not bind.
+local PART = "ui.menu.menu_quit"
+local DIALOGS = "ui.menu.menu_dialogs"
 local NEIGHBOUR = "ui.menu.reload_probe_neighbour"
 
 helpers.describe("tray section modules reload with the tray root", function()
 	helpers.it("forgets a cached section module when the root file runs again", function()
-		local part, neighbour = { probe = "part" }, { probe = "neighbour" }
-		package.loaded[PART], package.loaded[NEIGHBOUR] = part, neighbour
+		local part, dialogs, neighbour = { probe = "part" }, { probe = "dialogs" }, { probe = "neighbour" }
+		local saved_part, saved_dialogs = package.loaded[PART], package.loaded[DIALOGS]
+		package.loaded[PART], package.loaded[DIALOGS], package.loaded[NEIGHBOUR] = part, dialogs, neighbour
 		local ok, err = pcall(function()
 			local builder = helpers.load_module(ROOT)
 			helpers.assert_eq(type(builder.build), "function", "the real root loaded")
-			helpers.assert_nil(package.loaded[PART], "a section module cached before the reload is forgotten")
+			helpers.assert_true(not rawequal(package.loaded[PART], part),
+				"a section module cached before the reload is forgotten")
+			helpers.assert_true(not rawequal(package.loaded[DIALOGS], dialogs),
+				"the shared dialogs cached before the reload are forgotten")
 			helpers.assert_true(rawequal(package.loaded[NEIGHBOUR], neighbour),
-				"a module outside the section naming is kept")
+				"a module the root does not bind is kept")
 		end)
-		package.loaded[PART], package.loaded[NEIGHBOUR] = nil, nil
+		package.loaded[PART], package.loaded[DIALOGS], package.loaded[NEIGHBOUR] = saved_part, saved_dialogs, nil
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("keeps cached section modules while the root itself stays cached", function()
 		require(ROOT)
-		local part = { probe = "part" }
+		local part, saved_part = { probe = "part" }, package.loaded[PART]
 		package.loaded[PART] = part
 		local ok, err = pcall(function()
 			require(ROOT)
 			helpers.assert_true(rawequal(package.loaded[PART], part), "a cached root runs nothing")
 		end)
-		package.loaded[PART] = nil
+		package.loaded[PART] = saved_part
 		if not ok then error(err, 0) end
 	end)
 

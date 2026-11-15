@@ -541,8 +541,12 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- the full run.lua suite was order/GC-dependently RED at menu_karabiner.lua:317
 	-- (i18n.section nil), masking real regressions behind a flaky failure (F-T1).
 	-- Setting an existing key to nil during pairs() is safe (only ADDING keys is not).
+	-- The menu modules sit under ui.menu before the structure moves and under each
+	-- feature's ui/menu (settings.ui.menu.paths, updater.ui.menu_about) and the menu
+	-- feature itself after them, so the sweep names both trees rather than one prefix.
 	for name in pairs(loaded) do
-		if type(name) == "string" and name:match("^ui%.menu") then
+		if type(name) == "string" and (name:find("^ui%.menu%f[^%w_]")
+			or name:find("^[%w_]+%.ui%.menu") or name:find("^menu%.ui%f[^%w_]")) then
 			loaded[name] = nil
 		end
 	end
