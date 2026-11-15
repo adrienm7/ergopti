@@ -59,6 +59,7 @@
 		"test:host-context-menu": "node ./tools/test/test-host-context-menu.cjs",
 		"test:layout-composer-model": "node ./tools/test/test-layout-composer-model.cjs",
 		"test:layout-analysis-engine": "node ./tools/test/test-layout-analysis-engine.cjs",
+		"test:corpus-count-tables": "node ./tools/test/test-corpus-count-tables.cjs",
 		"test:analyser-scores": "node ./tools/test/test-analyser-scores.cjs",
 		"test:layout-comparer-page": "node ./tools/test/test-layout-comparer-page.cjs",
 		"test:key-legend": "node ./tools/test/test-key-legend.cjs",

@@ -3,6 +3,33 @@
 	"schema_version": 1,
 	"audited": "2026-11-14",
 	"files": {
+		"frequency/leipzig/en_wikipedia_2016_1M.json": {
+			"title": "Character, bigram and trigram counts of 1,000,000 sentences of English Wikipedia, 2016",
+			"source": "Leipzig Corpora Collection (eng_wikipedia_2016_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_wikipedia_2016_1M.tar.gz",
+			"licence": "CC BY-SA 3.0 (Wikipedia text); Leipzig compilation licence unconfirmed",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipedia contributors (CC BY-SA)",
+			"status": "hold",
+			"note": "Held for the maintainer (agent, 2026-11-15): the sentences are 2016 English Wikipedia text (CC BY-SA 3.0 before Wikipedia moved to 4.0 in 2023), but the Leipzig licence page answers automated clients with an anti-bot challenge (Anubis) and the archive carries no licence file; third parties cite older Leipzig releases as CC BY-NC 4.0. Only the counts ship (no sentence), n-grams rarer than 1e-7 of their table dropped (pruned_below). Ship it by setting status to ship and listing it in corpora.json."
+		},
+		"frequency/leipzig/fr_wikipedia_2021_1M.json": {
+			"title": "Character, bigram and trigram counts of 1,000,000 sentences of French Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (fra_wikipedia_2021_1M), counted by tools/build/import-count-tables.cjs",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_wikipedia_2021_1M.tar.gz",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
+			"status": "ship",
+			"note": "The same Leipzig release family as original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt, shipped under CC BY 4.0 by the maintainer's choice (2026-11-14); its licence page cannot be read by automated clients (Anubis challenge) and the archive carries no licence file. The sentences are Wikipédia text (CC BY-SA 3.0 in 2021): its contributors are credited. Only the counts ship (no sentence): each line's « number<TAB> » is removed and the rest counted by the analysis engine, so bigrams and trigrams cross words; n-grams rarer than 1e-7 of their table are dropped (pruned_below)."
+		},
+		"frequency/lexique/fr_lexique_4_10.json": {
+			"title": "Character, bigram and trigram counts of the French word forms of Lexique 4.10",
+			"source": "Lexique 4.10 (Lexique4.1.tsv, column 10_FreqMot), counted by tools/build/import-count-tables.cjs",
+			"url": "https://www.lexique.org/databases/Lexique410/Lexique4.1.zip",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Lexique 4 by B. New, C. Pallier, G. Schalchli, J. Bourgin and M. Gimenes (Behavior Research Methods, 2026), www.lexique.org (CC BY-SA 4.0)",
+			"status": "ship",
+			"note": "Licence read on www.lexique.org (« Lexique est distribuée sous une licence Creative Commons Attribution – Partage dans les mêmes conditions 4.0 ») and in the archive's README-Lexique.txt (« CC BY SA40.0 »), fetched 2026-11-15. Frequencies come from a 316-million-word subtitle corpus: spoken French. Each distinct form (1_Mot) counts once, weighted by the sum of its rows' frequencies per million (10_FreqMot, one row per lemma and part of speech) times 1,000, rounded; forms of weight 0 and the 290 multi-word rows (« citizen band ») are left out. The form total 11_FreqOrtho is not used: one form (« ben ») carries two different values of it. A word list: its n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. N-grams rarer than 1e-7 of their table are dropped (pruned_below)."
+		},
 		"frequency/opensubtitles_2018/de_50k.txt": {
 			"title": "German word frequencies from subtitles (50,000 words)",
 			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",

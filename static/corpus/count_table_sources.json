@@ -1,0 +1,33 @@
+{
+	"_description": "The sources of the count tables under static/corpus/frequency (format ergopti-count-table): one entry per table, read by tools/build/import-count-tables.cjs, which downloads url (or takes the archive from --archive-dir), refuses it unless its SHA-256 is sha256, reads member from it, counts it with the analysis engine's own rules and writes output. kind: leipzig_sentences (a Leipzig Corpora Collection sentence file, « number<TAB>sentence » per line, counted as text, so bigrams and trigrams cross words) or lexique_words (Lexique's TSV, each distinct word of word_column weighted by the sum of its rows' frequency_column per million, times scale, counted by the word-list rule, so its n-grams stay inside words and at their edges). prune_ratio drops, from each table, the n-grams rarer than that share of its total, and the table records the counts it kept from (pruned_below). The licence, attribution and status of each table are in static/corpus/register.json, its one source.",
+	"schema_version": 1,
+	"tables": [
+		{
+			"output": "frequency/leipzig/fr_wikipedia_2021_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/fra_wikipedia_2021_1M.tar.gz",
+			"sha256": "73eadebaa2fe3600ebf4e41bac5241e821d7baa4c9906afc11969fb6c8aaec86",
+			"member": "fra_wikipedia_2021_1M/fra_wikipedia_2021_1M-sentences.txt",
+			"prune_ratio": 1e-7
+		},
+		{
+			"output": "frequency/leipzig/en_wikipedia_2016_1M.json",
+			"kind": "leipzig_sentences",
+			"url": "https://downloads.wortschatz-leipzig.de/corpora/eng_wikipedia_2016_1M.tar.gz",
+			"sha256": "42cc4e689b93a320151fa4378572db9d6c5a5eee6e13c966fdefe77954d6596d",
+			"member": "eng_wikipedia_2016_1M/eng_wikipedia_2016_1M-sentences.txt",
+			"prune_ratio": 1e-7
+		},
+		{
+			"output": "frequency/lexique/fr_lexique_4_10.json",
+			"kind": "lexique_words",
+			"url": "https://www.lexique.org/databases/Lexique410/Lexique4.1.zip",
+			"sha256": "d6d7b99801e1f0aeab90ed1623a83ba45b8333b6a646ee33f524a6c047ff4b23",
+			"member": "Lexique4.1/Lexique4.1.tsv",
+			"word_column": "1_Mot",
+			"frequency_column": "10_FreqMot",
+			"scale": 1000,
+			"prune_ratio": 1e-7
+		}
+	]
+}

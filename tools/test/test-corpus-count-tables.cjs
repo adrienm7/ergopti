@@ -1,0 +1,220 @@
+// tools/test/test-corpus-count-tables.cjs
+
+/**
+ * ==============================================================================
+ * MODULE: Corpus Count Tables Test
+ * DESCRIPTION:
+ * Pins the count-table format of static/corpus/frequency (ergopti-count-table)
+ * and its importer, tools/build/import-count-tables.cjs: every committed table
+ * passes the codegen's strict reader, has its pinned source and its register
+ * entry with the same URL; the importer's rules give hand-written counts on
+ * small inputs (a Leipzig sentence file counts as text, across words; a
+ * Lexique table sums a form's rows and leaves multi-word entries out; pruning
+ * keeps the counts at its floor, sorted by count); and the reader refuses a
+ * malformed table.
+ * ==============================================================================
+ */
+
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const zlib = require('node:zlib');
+const { REPO_ROOT } = require('../lib/paths.cjs');
+const Analysis = require('../codegen/codegen-layout-analysis-data-js.cjs');
+const Import = require('../build/import-count-tables.cjs');
+
+const CORPUS = path.join(REPO_ROOT, 'static', 'corpus');
+const plain = (value) => JSON.parse(JSON.stringify(value));
+let checks = 0;
+
+// Every committed table is read by the codegen and traces to its pin and register entry.
+{
+	const sources = JSON.parse(
+		fs.readFileSync(path.join(CORPUS, 'count_table_sources.json'), 'utf8')
+	);
+	const register = JSON.parse(fs.readFileSync(path.join(CORPUS, 'register.json'), 'utf8')).files;
+	const outputs = new Set(sources.tables.map((source) => source.output));
+	const committed = [];
+	const walk = (dir) => {
+		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+			const full = path.join(dir, entry.name);
+			if (entry.isDirectory()) walk(full);
+			else if (entry.name.endsWith('.json'))
+				committed.push(path.relative(CORPUS, full).split(path.sep).join('/'));
+		}
+	};
+	walk(path.join(CORPUS, 'frequency'));
+	assert(committed.length >= 3, 'the count tables are committed');
+	for (const file of committed) {
+		assert(outputs.has(file), `${file} has a pinned source`);
+		const source = sources.tables.find((entry) => entry.output === file);
+		assert(/^[0-9a-f]{64}$/.test(source.sha256), `${file}: its archive is pinned by SHA-256`);
+		assert.equal(
+			register[file] && register[file].url,
+			source.url,
+			`${file}: the register names its URL`
+		);
+		const counts = Analysis.countTableCounts(
+			fs.readFileSync(path.join(CORPUS, file), 'utf8'),
+			file
+		);
+		assert(Object.keys(counts.trigrams).length > 0, `${file} has trigrams`);
+	}
+	checks++;
+}
+
+// A Leipzig sentence file: the numbers go, each line counts as text, across words.
+{
+	const engine = Analysis.loadEngine();
+	const counts = plain(Import.leipzigCounts('1\tab c\n2\tc\n', engine));
+	assert.deepEqual(counts.chars, { a: 1, b: 1, ' ': 1, c: 2 });
+	assert.deepEqual(counts.bigrams, { ab: 1, 'b ': 1, ' c': 1 });
+	assert.deepEqual(counts.trigrams, { 'ab ': 1, 'b c': 1 });
+	// Counting in chunks gives the counts of the whole text (lines end segments).
+	const lines = Array.from({ length: 45000 }, (_, i) => `${i}\tmot ${i % 7}`).join('\n');
+	assert.deepEqual(
+		plain(Import.leipzigCounts(lines, engine)),
+		plain(engine.ngramsFromText(lines.replace(/^\d+\t/gm, '')))
+	);
+	checks++;
+}
+
+// A Lexique table: a form's rows are summed, a multi-word entry is left out.
+{
+	const tsv = [
+		'1_Mot\t10_FreqMot\textra',
+		'le\t1.5\tA',
+		'le\t0.5\tB',
+		'ça va\t9\tC',
+		'rare\t0.0001\tD'
+	].join('\n');
+	const counts = plain(
+		Import.lexiqueCounts(tsv, {
+			output: 'test',
+			word_column: '1_Mot',
+			frequency_column: '10_FreqMot',
+			scale: 1000
+		})
+	);
+	// « le » weighs (1.5 + 0.5) × 1000 = 2000; « rare » rounds to 0 and is dropped.
+	assert.deepEqual(counts.chars, { l: 2000, e: 2000, ' ': 2000 });
+	assert.deepEqual(counts.bigrams, { ' l': 2000, le: 2000, 'e ': 2000 });
+	assert.throws(
+		() =>
+			Import.lexiqueCounts('1_Mot\n', {
+				output: 'test',
+				word_column: '1_Mot',
+				frequency_column: '10_FreqMot',
+				scale: 1000
+			}),
+		/no 1_Mot or 10_FreqMot column/
+	);
+	checks++;
+}
+
+// Pruning keeps the counts at its floor, sorted by count then n-gram, and the
+// file written is one the reader admits.
+{
+	const counts = {
+		chars: { a: 50, b: 30, c: 20 },
+		bigrams: { ab: 9, 10: 1 },
+		trigrams: { abc: 5 }
+	};
+	const { tables, prunedBelow } = Import.prune(counts, 0.25);
+	assert.deepEqual(prunedBelow, { chars: 25, bigrams: 3, trigrams: 2 });
+	assert.deepEqual(tables.chars, [
+		['a', 50],
+		['b', 30]
+	]);
+	assert.deepEqual(
+		tables.bigrams,
+		[['ab', 9]],
+		'an integer-like n-gram below the floor is dropped'
+	);
+	const text = Import.tableText(tables, prunedBelow);
+	assert.deepEqual(plain(Analysis.countTableCounts(text, 'test').chars), { a: 50, b: 30 });
+	const kept = Import.prune({ chars: { 10: 5, a: 7 }, bigrams: {}, trigrams: {} }, 0).tables.chars;
+	assert.deepEqual(
+		kept,
+		[
+			['a', 7],
+			['10', 5]
+		],
+		'an integer-like n-gram keeps its place by count'
+	);
+	checks++;
+}
+
+// The reader refuses another format, a wrong n-gram length and a count under the floor.
+{
+	const good = {
+		format: Analysis.COUNT_TABLE_FORMAT,
+		version: Analysis.COUNT_TABLE_VERSION,
+		pruned_below: { chars: 2, bigrams: 1, trigrams: 1 },
+		chars: { a: 3 },
+		bigrams: { ab: 1 },
+		trigrams: { abc: 1 }
+	};
+	Analysis.countTableCounts(JSON.stringify(good), 'good');
+	for (const [label, change] of [
+		['format', { format: 'other' }],
+		['field', { extra: 1 }],
+		['length', { bigrams: { abc: 1 } }],
+		['floor', { chars: { a: 1 } }],
+		['pruned_below', { pruned_below: { chars: 1 } }]
+	])
+		assert.throws(
+			() => Analysis.countTableCounts(JSON.stringify({ ...good, ...change }), label),
+			/corpora\.json/,
+			label
+		);
+	checks++;
+}
+
+// The zip reader takes a stored and a deflated member, and names a missing one.
+{
+	const entries = [
+		{ name: 'a/stored.txt', data: Buffer.from('stored text'), method: 0 },
+		{ name: 'a/deflated.txt', data: Buffer.from('deflated text'.repeat(20)), method: 8 }
+	];
+	const locals = [];
+	const centrals = [];
+	let offset = 0;
+	for (const entry of entries) {
+		const body = entry.method === 8 ? zlib.deflateRawSync(entry.data) : entry.data;
+		const name = Buffer.from(entry.name);
+		const local = Buffer.alloc(30);
+		local.writeUInt32LE(0x04034b50, 0);
+		local.writeUInt16LE(entry.method, 8);
+		local.writeUInt32LE(body.length, 18);
+		local.writeUInt32LE(entry.data.length, 22);
+		local.writeUInt16LE(name.length, 26);
+		const central = Buffer.alloc(46);
+		central.writeUInt32LE(0x02014b50, 0);
+		central.writeUInt16LE(entry.method, 10);
+		central.writeUInt32LE(body.length, 20);
+		central.writeUInt32LE(entry.data.length, 24);
+		central.writeUInt16LE(name.length, 28);
+		central.writeUInt32LE(offset, 42);
+		locals.push(local, name, body);
+		centrals.push(central, name);
+		offset += 30 + name.length + body.length;
+	}
+	const directory = Buffer.concat(centrals);
+	const end = Buffer.alloc(22);
+	end.writeUInt32LE(0x06054b50, 0);
+	end.writeUInt16LE(entries.length, 10);
+	end.writeUInt32LE(directory.length, 12);
+	end.writeUInt32LE(offset, 16);
+	const zip = Buffer.concat([...locals, directory, end]);
+	assert.equal(Import.zipMember(zip, 'a/stored.txt').toString(), 'stored text');
+	assert.equal(Import.zipMember(zip, 'a/deflated.txt').toString(), 'deflated text'.repeat(20));
+	assert.throws(() => Import.zipMember(zip, 'a/missing.txt'), /has no a\/missing\.txt/);
+	checks++;
+}
+
+console.log(
+	`[OK] corpus count tables: ${checks} checks (committed tables, Leipzig and Lexique rules, pruning, reader, zip)`
+);

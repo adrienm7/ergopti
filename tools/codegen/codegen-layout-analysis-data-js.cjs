@@ -49,7 +49,11 @@ const SHIP_STATUS = 'ship';
 const REGISTER_STATUSES = ['ship', 'hold', 'refused'];
 // The folders of static/corpus the register covers: texts, and word frequency lists.
 const CORPUS_FOLDERS = ['original', 'frequency'];
-const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv'];
+const CORPUS_FORMATS = ['text', 'word_frequencies', 'tsv', 'count_table'];
+// The count-table file (static/corpus/frequency/<source>/<id>.json) a large corpus
+// ships instead of its text: tools/corpus/import-count-tables.cjs writes it.
+const COUNT_TABLE_FORMAT = 'ergopti-count-table';
+const COUNT_TABLE_VERSION = 1;
 const CREDITS_PATH = shared('layouts', 'data', 'analysis', 'layout_credits.json');
 const INFO_SOURCES_PATH = shared('layouts', 'data', 'analysis', 'sources.json');
 // The repository and the host a repository document is linked on (one source each).
@@ -446,6 +450,42 @@ function wordListCounts(text, id) {
 }
 
 /**
+ * The tables of a count-table file, checked: each of chars, bigrams and trigrams
+ * maps a string of exactly 1, 2 or 3 characters to a positive integer count,
+ * and pruned_below gives, per table, the smallest count it kept.
+ * @param {string} text - The file.
+ * @param {string} id - The corpus id, for errors.
+ * @returns {{chars: object, bigrams: object, trigrams: object}} Counts.
+ * @throws {Error} On another format or version, an unknown key, or a bad entry.
+ */
+function countTableCounts(text, id) {
+	const table = JSON.parse(text);
+	if (table.format !== COUNT_TABLE_FORMAT || table.version !== COUNT_TABLE_VERSION)
+		throw new Error(`corpora.json: ${id} is not a ${COUNT_TABLE_FORMAT} v${COUNT_TABLE_VERSION}`);
+	const lengths = { chars: 1, bigrams: 2, trigrams: 3 };
+	for (const key of Object.keys(table))
+		if (!['format', 'version', 'pruned_below', ...Object.keys(lengths)].includes(key))
+			throw new Error(`corpora.json: ${id} count table has an unknown field ${key}`);
+	// The counts each table was kept from (tools/build/import-count-tables.cjs prune).
+	const pruned = table.pruned_below;
+	if (
+		!pruned ||
+		Object.keys(pruned).join() !== Object.keys(lengths).join() ||
+		!Object.values(pruned).every((n) => Number.isSafeInteger(n) && n >= 1)
+	)
+		throw new Error(`corpora.json: ${id} count table has no valid pruned_below`);
+	for (const [name, length] of Object.entries(lengths)) {
+		const counts = table[name];
+		if (!counts || typeof counts !== 'object' || Array.isArray(counts))
+			throw new Error(`corpora.json: ${id} count table has no ${name}`);
+		for (const [gram, n] of Object.entries(counts))
+			if (Array.from(gram).length !== length || !Number.isSafeInteger(n) || n < pruned[name])
+				throw new Error(`corpora.json: ${id} ${name} entry ${JSON.stringify(gram)} is invalid`);
+	}
+	return { chars: table.chars, bigrams: table.bigrams, trigrams: table.trigrams };
+}
+
+/**
  * The n-gram tables of every built-in corpus, counted by the engine itself.
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @returns {{catalogue: object[], tables: object}} The list the page shows and
@@ -484,7 +524,11 @@ function buildCorpora(engine) {
 				.join('\n');
 		}
 		const counts =
-			format === 'word_frequencies' ? wordListCounts(text, corpus.id) : engine.ngramsFromText(text);
+			format === 'word_frequencies'
+				? wordListCounts(text, corpus.id)
+				: format === 'count_table'
+					? countTableCounts(text, corpus.id)
+					: engine.ngramsFromText(text);
 		const sorted = (table) =>
 			Object.fromEntries(
 				Object.entries(table).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
@@ -875,6 +919,10 @@ function main() {
 if (require.main === module) main();
 
 module.exports = {
+	countTableCounts,
+	loadEngine,
+	COUNT_TABLE_FORMAT,
+	COUNT_TABLE_VERSION,
 	buildData,
 	buildSource,
 	corpusSource,
