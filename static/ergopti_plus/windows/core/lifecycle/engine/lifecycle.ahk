@@ -856,36 +856,6 @@ Ergopti_OnSuspendResume() {
 		return true
 }
 
-; Whether keep-awake ran when the driver paused; the resume starts it again.
-global _LifecycleKeepAwakeAtPause := false
-
-; Starts keep-awake again after a resume when it ran at the pause (the
-; maintainer's decision of 2026-11-14): a pause stops it, the resume gives it
-; back as it was, as on macOS and Linux.
-; @param StartFn {Func} Starts keep-awake; StartActivitySimulation by default.
-; @return {Boolean} False when it ran at the pause and could not start again.
-_LifecycleRestoreKeepAwake(StartFn := 0) {
-	global _LifecycleKeepAwakeAtPause
-	if !_LifecycleKeepAwakeAtPause
-		return true
-	_LifecycleKeepAwakeAtPause := false
-	if !HasMethod(StartFn, "Call") {
-		if !IsSet(StartActivitySimulation)
-			return true
-		StartFn := StartActivitySimulation
-	}
-	try Started := StartFn.Call()
-	catch as Err {
-		try LoggerError("Lifecycle", "Keep-awake could not start again on resume: {1}.", Err.Message)
-		return false
-	}
-	if Started != true {
-		try LoggerError("Lifecycle", "Keep-awake could not start again on resume.")
-		return false
-	}
-	return true
-}
-
 ; Runs the quit transition: one owner, the switch to the pause layout. Its
 ; debt is logged; nothing past the terminal gates may refuse the exit.
 _LifecycleApplyQuitLayout() {

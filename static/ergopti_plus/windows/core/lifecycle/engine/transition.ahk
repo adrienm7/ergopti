@@ -136,3 +136,35 @@ _LifecycleValidateTransaction(Transaction) {
 				!= ObjPtr(Transaction)
 		throw Error("stale lifecycle transaction")
 }
+
+; Whether keep-awake ran when the driver paused; the resume starts it again.
+; Held here, beside the transition bookkeeping, so the state that crosses the
+; pause has the same owner in the driver and in the shared test runner.
+global _LifecycleKeepAwakeAtPause := false
+
+; Starts keep-awake again after a resume when it ran at the pause (the
+; maintainer's decision of 2026-11-14): a pause stops it, the resume gives it
+; back as it was, as on macOS and Linux.
+; @param StartFn {Func} Starts keep-awake; StartActivitySimulation by default.
+; @return {Boolean} False when it ran at the pause and could not start again.
+_LifecycleRestoreKeepAwake(StartFn := 0) {
+	global _LifecycleKeepAwakeAtPause
+	if !_LifecycleKeepAwakeAtPause
+		return true
+	_LifecycleKeepAwakeAtPause := false
+	if !HasMethod(StartFn, "Call") {
+		if !IsSet(StartActivitySimulation)
+			return true
+		StartFn := StartActivitySimulation
+	}
+	try Started := StartFn.Call()
+	catch as Err {
+		try LoggerError("Lifecycle", "Keep-awake could not start again on resume: {1}.", Err.Message)
+		return false
+	}
+	if Started != true {
+		try LoggerError("Lifecycle", "Keep-awake could not start again on resume.")
+		return false
+	}
+	return true
+}
