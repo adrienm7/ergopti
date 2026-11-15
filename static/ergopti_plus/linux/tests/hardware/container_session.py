@@ -506,8 +506,10 @@ class Session:
         return self.log.read_text(errors="replace") if self.log.exists() else ""
 
     def dump_log(self, lines=60):
-        print("  --- daemon log (last lines) ---")
-        for line in self.log_text().splitlines()[-lines:]:
+        """Prints the daemon log's last `lines` lines, or all of it with None."""
+        text = self.log_text().splitlines()
+        print("  --- daemon log (%s) ---" % ("whole" if lines is None else "last lines"))
+        for line in text if lines is None else text[-lines:]:
             print("  " + line)
 
     def stop(self):

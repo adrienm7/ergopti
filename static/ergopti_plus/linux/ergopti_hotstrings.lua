@@ -3696,6 +3696,12 @@ local function main()
 		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
 		or "configured, but inert without the keyboard grab (--no-grab)")
 
+	-- Each character the text callback keeps from the engines is told as it
+	-- happens (debug), not only in the shutdown summary.
+	require("infra.typed_input_withheld").set_observer(function(reason, error_type)
+		Logger.debug(LOG, "Typed input withheld from the engines: %s%s.", reason,
+			error_type and (" (prediction error type " .. error_type .. ")") or "")
+	end)
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
 	if not privacy_owners.startup_checkpoint() then return end
@@ -3801,6 +3807,7 @@ local function main()
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
 	-- What the text callback kept from the engines this session, by reason.
 	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
+	require("infra.typed_input_withheld").set_observer(nil)
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	-- The interval since the last summary, which a short session never reached.

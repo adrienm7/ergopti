@@ -199,7 +199,9 @@ def proof():
         editor, _ = session.editor_state()
         cs.check(editor == expected, "the editor is unchanged by the password-field typing")
     except cs.ProofFailure:
-        session.dump_log()
+        # The whole log: a prediction never asked is decided by the AI path's
+        # debug lines (held, not armed, withheld), which can lie far above the end.
+        session.dump_log(lines=None)
         raise
     finally:
         session.stop()

@@ -580,7 +580,10 @@ function _debounce.preview_holds(live)
 end
 
 local function schedule(context, output_context, event, live)
-	if type(context) ~= "string" or context == "" then return false end
+	if type(context) ~= "string" or context == "" then
+		Logger.debug(LOG, "No prediction armed: the typing context is empty.")
+		return false
+	end
 	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local decisions = _debounce.input(event)
 	local arm
@@ -593,7 +596,11 @@ local function schedule(context, output_context, event, live)
 			arm = decision
 		end
 	end
-	if not arm then return false end
+	if not arm then
+		Logger.debug(LOG, "No prediction armed for this %s: the debounce plan decided none.",
+			type(event) == "table" and tostring(event.cause) or "event")
+		return false
+	end
 	if not _debounce.drain_retired() or _runtime_closed or _scope_owner then return false end
 	local captured = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
@@ -777,6 +784,7 @@ function M.on_char(ch, buffer, output_context)
 	if not _enabled then
 		-- Typing over an agent's offer dismisses it.
 		if _predicting or #_suggestions > 0 then M.dismiss() end
+		Logger.debug(LOG, "No prediction asked for this keystroke: the AI is switched off.")
 		return
 	end
 	-- Retain the first character's native target across debounce/manual requests.
@@ -805,12 +813,17 @@ function M.on_char(ch, buffer, output_context)
 	-- (llm.trigger.while_hotstring_tooltip). The preview's expiry asks again
 	-- when llm.trigger.after_hotstring is on.
 	if type(output_context) == "table" and output_context.hotstring_preview_visible == true
-		and (_live or not M.shows_with_hotstring_rows()) then return end
+		and (_live or not M.shows_with_hotstring_rows()) then
+		Logger.debug(LOG, "%s prediction held for this keystroke: a hotstring preview is shown.",
+			_live and "Live" or "Typing")
+		return
+	end
 	if _live then
 		-- The live prompt, count and debounce replace the menu's; a new keystroke
 		-- has already withdrawn the request in flight above.
 		local config = live_config()
-		if config then schedule(buffer, output_context, { cause = "typing", ends_word = ends_word(buffer, ch) }, true) end
+		if config then schedule(buffer, output_context, { cause = "typing", ends_word = ends_word(buffer, ch) }, true)
+		else Logger.debug(LOG, "No live prediction asked for this keystroke: live mode has no usable configuration.") end
 		return
 	end
 	schedule(buffer, output_context, { cause = "typing", ends_word = ends_word(buffer, ch) })
@@ -825,11 +838,20 @@ function M.on_hotstring_expired(context, output_context)
 	-- The automatic agent held its pause back while the preview was shown
 	-- (on_char); arm_agent arms nothing while the AI is switched off.
 	arm_agent(context, output_context)
-	if not _enabled then return false end
+	if not _enabled then
+		Logger.debug(LOG, "No prediction asked at the preview's expiry: the AI is switched off.")
+		return false
+	end
 	-- Live mode held its request back while the preview was shown (on_char).
-	if not _live and TriggerSettings.get(require("settings.engine.keys").LEAF.AFTER_HOTSTRING) ~= true then return false end
+	if not _live and TriggerSettings.get(require("settings.engine.keys").LEAF.AFTER_HOTSTRING) ~= true then
+		Logger.debug(LOG, "No prediction asked at the preview's expiry: llm.trigger.after_hotstring is off.")
+		return false
+	end
 	-- Shown together, the keystroke's own request already ran beside the preview.
-	if not _live and M.shows_with_hotstring_rows() then return false end
+	if not _live and M.shows_with_hotstring_rows() then
+		Logger.debug(LOG, "No prediction asked at the preview's expiry: it was asked beside the preview.")
+		return false
+	end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
 	if _live then return schedule(context, output_context, { cause = "expiry" }, true) end
 	return schedule(context, output_context, { cause = "expiry" })

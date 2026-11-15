@@ -15,6 +15,9 @@
 ---    alone, without the central logger, and must keep doing so.
 --- 3. A refused prediction keeps the error's type only, since its message can
 ---    quote typed text.
+--- 4. Each record can be told as it happens: the daemon installs an observer
+---    (set_observer) that logs it as a debug line, so a run that lost its input
+---    says where without waiting for the shutdown summary.
 --- ==============================================================================
 
 local M = {}
@@ -26,6 +29,8 @@ local KNOWN = {}
 for _, reason in ipairs(M.REASONS) do KNOWN[reason] = true end
 
 local _counts, _last_reason, _last_ms, _last_error_type = {}, nil, nil, nil
+-- observer(reason, error_type) told of each record; nil when none is installed.
+local _observer = nil
 
 --- The monotonic stamp of a record, from the daemon's clock owner.
 --- @return number|nil
@@ -44,6 +49,17 @@ function M.record(reason, error_value)
 	_counts[reason] = (_counts[reason] or 0) + 1
 	_last_reason, _last_ms = reason, now_ms()
 	if reason == "prediction_refused" then _last_error_type = type(error_value) end
+	-- A failing observer never withholds a record: the counts stay the truth.
+	if _observer then pcall(_observer, reason, reason == "prediction_refused" and type(error_value) or nil) end
+end
+
+--- Installs the function told of each record, or removes it with nil.
+--- @param observer function|nil observer(reason, error_type) error_type for "prediction_refused" only.
+function M.set_observer(observer)
+	if observer ~= nil and type(observer) ~= "function" then
+		error("typed_input_withheld: the observer must be a function or nil", 2)
+	end
+	_observer = observer
 end
 
 --- A copy of the counts and the last record.
@@ -71,6 +87,7 @@ end
 --- Forgets every record. Test seam.
 function M._reset_for_test()
 	_counts, _last_reason, _last_ms, _last_error_type = {}, nil, nil, nil
+	_observer = nil
 end
 
 return M

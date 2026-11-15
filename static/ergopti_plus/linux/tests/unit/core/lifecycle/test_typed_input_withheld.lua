@@ -69,6 +69,25 @@ helpers.describe("typed input withheld counters", function()
 		if not ok then error(err, 0) end
 	end)
 
+	helpers.it("tells its observer of each record, never failing a record (ai-inline-preview-hold)", function()
+		local counters, restore = fresh(10)
+		local ok, err = pcall(function()
+			local told = {}
+			counters.set_observer(function(reason, error_type) told[#told + 1] = { reason, error_type } end)
+			counters.record("field_not_admitted")
+			counters.record("prediction_refused", "a message quoting typed text")
+			helpers.assert_eq(told, { { "field_not_admitted" }, { "prediction_refused", "string" } },
+				"the observer learns the reason and a refusal's error type, never its message")
+			counters.set_observer(function() error("observer down") end)
+			counters.record("press_not_admitted")
+			helpers.assert_eq(counters.snapshot().counts.press_not_admitted, 1, "a failing observer withholds no record")
+			counters.set_observer(nil)
+			helpers.assert_true(not pcall(counters.set_observer, "not a function"), "only a function observes")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 	helpers.it("records Main's silent text returns without a logger in the callback", function()
 		-- The harnesses compile handle_char alone, with no central logger: the
 		-- counters must be reached by require, never through Logger.
