@@ -77,7 +77,7 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
     rows: {number, top, home, bottom},
     trigramClasses: {roll3_in, roll3_out, alternation, redirect, roll_mixed, same_finger},
     keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, cost: {metric: part},
-                  worst: {event: [[[codes], %], ...]}, sfbWith: [[code, %], ...]}, ...},
+                  worst: {event: [[[codes], %], ...]}}, ...},
     coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams},
     score: {total, contributions: {metric: points}, weights}
   }
@@ -85,8 +85,7 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
 
   `keys` feeds the Studio's live heatmaps: each key's share of the presses and
   the share of the bigrams (`sfb`, `lsb`, `scissors` full and half) or trigrams
-  (`sfs`, `redirect`) it takes part in, with its three worst same-finger
-  partners (`sfbWith`). `cost` holds, for each metric of `KEY_COST_METRICS`
+  (`sfs`, `redirect`) it takes part in. `cost` holds, for each metric of `KEY_COST_METRICS`
   (the events `KEY_EVENTS` = `sfb`, `sfs`, `lsb`, `scissors`, `half_scissors`,
   `redirect`, `redirect_bad`, then `distance`, `finger_imbalance`,
   `pinky_load`, `outer_column`), the part of that metric's value the key

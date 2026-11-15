@@ -512,6 +512,16 @@ async function exerciseStudioComparer(page) {
 		['^', '¨'].sort(),
 		"Ergopti's base dead keys as bare accents"
 	);
+	// (studio-key-heatmap) A layout's details heatmap names each key's worst SFB
+	// partners from the engine's worst groups.
+	await page.click('#la-table tbody tr');
+	await page.selectOption('#la-heat-metric', 'sfb');
+	assert.ok(
+		await page.$$eval('#la-heatmap .la-key', (keys) =>
+			keys.some((key) => /: [\d.,]+ % \(.+ [\d.,]+ %/.test(key.title))
+		),
+		'the Comparer heatmap names SFB partners'
+	);
 	// (studio-file-buttons) The file inputs never show the browser's own words
 	// (« Choose File », « No file chosen »): each is hidden inside a label whose
 	// button carries the page's translated text.

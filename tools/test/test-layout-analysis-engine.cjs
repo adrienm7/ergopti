@@ -92,7 +92,7 @@ for (const vector of vectors) {
 // The heatmap's per-key data: both keys of an SFB carry it, each names the other.
 const heat = E.analyse(byId.get('qwerty'), E.ngramsFromText('ed'), { keyboard: 'iso' }).keys;
 check(heat.KeyE.sfb === 100 && heat.KeyD.sfb === 100, 'keys: both keys of "ed" carry the SFB');
-check(heat.KeyE.sfbWith[0][0] === 'KeyD', 'keys: KeyE names KeyD as its SFB partner');
+check(heat.KeyE.worst.sfb[0][0][0] === 'KeyD', 'keys: KeyE names KeyD as its SFB partner');
 check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry nothing');
 
 // =====================================
@@ -513,10 +513,6 @@ for (const layout of library) {
 	check(
 		JSON.stringify(grouped.KeyE.worst.sfb.map(([others]) => others)) === JSON.stringify([['KeyD']]),
 		`worst groups: KeyE's SFB partner is ${JSON.stringify(grouped.KeyE.worst.sfb)}`
-	);
-	check(
-		JSON.stringify(grouped.KeyE.sfbWith.map(([other]) => other)) === JSON.stringify(['KeyD']),
-		'worst groups: sfbWith names the same partner'
 	);
 	const redirect = grouped.KeyA.worst.redirect_bad.map(([others]) => others.slice().sort());
 	check(

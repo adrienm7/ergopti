@@ -639,8 +639,10 @@
 				key.style.width = `${(code === 'Space' ? 6 : 1) * HEAT_UNIT_PX - 4}px`;
 				if (code === 'Space') key.style.left = `${(board.x[k] - 3 - minX) * HEAT_UNIT_PX}px`;
 				key.style.background = `color-mix(in srgb, var(--la-bad) ${Math.round(share * 100)}%, var(--la-good))`;
-				const partners = (result.keys[code].sfbWith || [])
-					.map(([other, pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`)
+				const partners = result.keys[code].worst.sfb
+					.map(
+						([[other], pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`
+					)
 					.join(', ');
 				key.title = `${t(`layout_analysis.heat.${state.heat}`)}: ${format(values[k], 2)} %${
 					state.heat === 'sfb' && partners ? ` (${partners})` : ''

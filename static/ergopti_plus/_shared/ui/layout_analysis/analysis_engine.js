@@ -1093,13 +1093,12 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   to their presses);
 	 * - worst: for each event metric, the key's WORST_GROUPS heaviest groups
 	 *   with it (the other key of a pair, the two others of a redirect), each
-	 *   [codes, % of the bigrams or trigrams];
-	 * - sfbWith: worst.sfb as [code, %] pairs.
+	 *   [codes, % of the bigrams or trigrams].
 	 * @param {object} board - From keyboard().
 	 * @param {object} m - What analyse() measured: keyCount, allPresses, pressed
 	 *   (every press but the thumbs'), fingerLoad, ideal, perKey, groups, counts.
 	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
-	 *   cost, worst, sfbWith}.
+	 *   cost, worst}.
 	 */
 	function keyReport(board, m) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
@@ -1134,8 +1133,7 @@ var LAYOUT_ANALYSIS = (function () {
 				scissors: share('scissors') + share('half_scissors'),
 				redirect: share('redirect'),
 				cost,
-				worst,
-				sfbWith: []
+				worst
 			};
 		});
 		// One pass per event: each key keeps its WORST_GROUPS heaviest groups (id, n).
@@ -1162,8 +1160,6 @@ var LAYOUT_ANALYSIS = (function () {
 					return [others, pct(n, whole(event))];
 				});
 		}
-		for (const code of board.codes)
-			keys[code].sfbWith = keys[code].worst.sfb.map(([others, share]) => [others[0], share]);
 		return keys;
 	}
 
