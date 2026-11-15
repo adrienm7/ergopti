@@ -321,7 +321,7 @@ assert.ok(
 );
 assert.ok(containerSmokeBody.includes('libgtk-3-0 stalonetray x11-utils'));
 // Ubuntu 22.04's lua-posix 33.4 is one monolithic posix.so, which the stager's
-// split-layout check refuses ("Native network packaging refused."): the build
+// split-layout check refuses ("Native network packaging refused: ..."): the build
 // container compiles luaposix from the manifest's pin and installs no lua-posix.
 assert.ok(
 	!/apt_install[^\n]*(\\\n[^\n]*)*\blua-posix\b/.test(containerBuildBody),

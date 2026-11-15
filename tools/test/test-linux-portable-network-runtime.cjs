@@ -1233,6 +1233,45 @@ print('PASS PPID owner/view controls: 12 passed; 0 skipped; native authority unq
 	);
 	console.log('PPID census literal controls: 15 passed; 0 skipped.');
 	console.log('PPID owner/view controls: 12 passed; 0 skipped.');
+
+	// A refusal names its fixed reason, relayed from the worker the stager
+	// supervises, so a red packaging job says which check refused; an error
+	// that may carry a filename or native bytes stays the bare refusal.
+	const refusalApp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-refusal-appdir-'));
+	fs.chmodSync(refusalApp, 0o700);
+	const stagerRefusal = (catalogue) =>
+		spawnSync(
+			'python3',
+			[
+				path.join(root, 'tools/build/stage-linux-network-runtime.py'),
+				'--appdir',
+				refusalApp,
+				'--catalogue',
+				catalogue,
+				'--template',
+				path.join(root, environmentTemplate)
+			],
+			{ cwd: '/', encoding: 'utf8' }
+		);
+	const named = stagerRefusal(path.join(root, generator.SOURCE));
+	assert.equal(named.status, 1);
+	assert.equal(named.stdout, '');
+	assert.equal(named.stderr, 'Native network packaging refused: Installed runtime probe absent.\n');
+	const probe = path.join(refusalApp, 'usr/lib/ergopti/core/network/adapters/runtime_probe.lua');
+	fs.mkdirSync(path.dirname(probe), { recursive: true });
+	fs.writeFileSync(probe, '');
+	// The worker's unreadable catalogue is an OSError: it prints the bare
+	// refusal, which the supervisor does not relay, naming only that its worker
+	// command was refused.
+	const bare = stagerRefusal(path.join(refusalApp, 'absent-catalogue.json'));
+	assert.equal(bare.status, 1);
+	assert.equal(
+		bare.stderr,
+		'Native network packaging refused: Native packaging command refused: stage-linux-network-runtime.py.\n'
+	);
+	assert.ok(!bare.stderr.includes('absent-catalogue'), 'a filename never escapes');
+	fs.rmSync(refusalApp, { recursive: true, force: true });
+	console.log('Stager refusal reason controls: 2 passed; 0 skipped.');
 }
 
 if (process.argv.includes('--native')) {
@@ -1298,7 +1337,17 @@ if (process.argv.includes('--native')) {
 		const refused = nativeProbe();
 		assert.equal(refused.status, 1, 'Missing installed component must refuse without abort');
 		assert.equal(refused.stdout, '');
-		assert.equal(refused.stderr, 'Native network packaging refused.\n');
+		// Every runtime probe failure exits 1, so the worker names the refused
+		// owned command; a probe that answers without the component is refused
+		// as an installed admission.
+		assert.ok(
+			[
+				'Native network packaging refused: Native packaging command refused: ergopti-owned-runtime.\n',
+				'Native network packaging refused: Native packaging command refused: ergopti-owned-programs.\n',
+				'Native network packaging refused: Installed native packaging admission refused.\n'
+			].includes(refused.stderr),
+			'Missing installed component names its fixed refusal: ' + refused.stderr
+		);
 		fs.renameSync(original + '.owned-disabled', original);
 		assert.equal(nativeProbe().status, 0);
 	}

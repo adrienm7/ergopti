@@ -34,6 +34,20 @@ class RuntimeRefused(RuntimeError):
     """A fixed, private-output-free packaging refusal."""
 
 
+# The one line a refusal prints: its fixed reason, never a filename, a setting
+# or native output. The supervisor relays its worker's line only in this
+# shape, so a red packaging job names the check that refused.
+REFUSAL_PREFIX = "Native network packaging refused"
+REFUSAL_LINE = re.compile(
+    r"Native network packaging refused: [A-Z][A-Za-z0-9 ,;:'()/._+-]{0,200}\."
+)
+
+
+def refusal_line(reason):
+    """The printed refusal for one fixed reason."""
+    return f"{REFUSAL_PREFIX}: {reason}"
+
+
 # Linux kernel child ownership and a WNOWAIT-reserved session leader fence
 # every signal; capability refusal never substitutes a closure receipt.
 
@@ -155,6 +169,20 @@ def subreaper(enabled=None):
     if enabled is not None and native(36, int(enabled), 0, 0, 0) != 0:
         raise RuntimeRefused("Native child ownership unavailable.")
     return old
+
+
+def command_label(arguments):
+    """The program a refused command ran, as this stager names it.
+
+    The executable's own name, or the $0 label of a bash -c step; never an
+    argument, a path or what the command printed.
+    """
+    program = Path(str(arguments[0])).name
+    if program == "bash" and len(arguments) > 3 and arguments[1] == "-c":
+        program = Path(str(arguments[3])).name
+    if Path(str(arguments[0])).name.startswith("python") and len(arguments) > 1:
+        program = Path(str(arguments[1])).name
+    return program if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,63}", program) else "unnamed"
 
 
 def run(arguments, *, env=None, budget_seconds=20, pass_fds=()):
@@ -358,7 +386,13 @@ def run(arguments, *, env=None, budget_seconds=20, pass_fds=()):
         or status != 0
         or (_STAGE_DEADLINE is not None and time.monotonic() >= _STAGE_DEADLINE)
     ):
-        raise RuntimeRefused("Native packaging command refused.")
+        refused = RuntimeRefused(f"Native packaging command refused: {command_label(arguments)}.")
+        # A worker of this stager names its own fixed reason as its last line;
+        # anything else a command writes stays private.
+        lines = captures[1].decode("utf-8", errors="replace").splitlines()
+        if lines and REFUSAL_LINE.fullmatch(lines[-1]):
+            refused.relayed = lines[-1]
+        raise refused
     return captures[0].decode("utf-8", errors="strict")
 
 
@@ -1088,9 +1122,12 @@ def main():
             print("PASS installed package native network runtime admitted.")
         else:
             stage(arguments.appdir, arguments.catalogue, arguments.template)
-    except (RuntimeRefused, OSError, ValueError, KeyError) as error:
-        # No filenames, certificate bytes, settings or native output escape.
-        raise SystemExit("Native network packaging refused.") from error
+    except RuntimeRefused as error:
+        # A fixed reason, or the worker's own fixed-reason line it relayed.
+        raise SystemExit(getattr(error, "relayed", None) or refusal_line(str(error))) from error
+    except (OSError, ValueError, KeyError) as error:
+        # These may carry filenames or native bytes: no detail escapes.
+        raise SystemExit(f"{REFUSAL_PREFIX}.") from error
 
 
 if __name__ == "__main__":
