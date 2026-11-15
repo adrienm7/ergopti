@@ -2737,7 +2737,7 @@ static/ergopti_plus/macos/modules/keymap/magic_key_source.lua	static/ergopti_plu
 static/ergopti_plus/macos/modules/keymap/number_row_live.lua	static/ergopti_plus/macos/layouts/engine/emulation/number_row_live.lua	S29
 static/ergopti_plus/macos/modules/keymap/one_shot_shift.lua	static/ergopti_plus/macos/tap_hold/engine/one_shot_shift.lua	S34
 static/ergopti_plus/macos/modules/keymap/pending_layout_activation.lua	static/ergopti_plus/macos/layouts/engine/pending_layout_activation.lua	S29
-static/ergopti_plus/macos/modules/keymap/registry.lua	static/ergopti_plus/macos/settings/engine/registry.lua	S18
+static/ergopti_plus/macos/modules/keymap/registry.lua	static/ergopti_plus/macos/hotstrings/engine/expander/registry.lua	S26
 static/ergopti_plus/macos/modules/keymap/registry_groups.lua	static/ergopti_plus/macos/hotstrings/engine/expander/registry_groups.lua	S26
 static/ergopti_plus/macos/modules/keymap/registry_index.lua	static/ergopti_plus/macos/hotstrings/engine/expander/registry_index.lua	S26
 static/ergopti_plus/macos/modules/keymap/section_keys.lua	static/ergopti_plus/macos/hotstrings/engine/expander/section_keys.lua	S26

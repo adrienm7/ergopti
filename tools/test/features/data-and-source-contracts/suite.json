@@ -954,6 +954,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-windows-lua-export-identity.cjs"],
 			"repro": "npm run test:windows-lua-export-identity"
+		},
+		{
+			"id": "structure-keymap-registry",
+			"ordinal": 674,
+			"name": "structure plan keeps the macOS hotstring registry beside its expander siblings",
+			"cmd": "node",
+			"args": ["tools/test/test-structure-keymap-registry.cjs"],
+			"repro": "npm run test:structure-keymap-registry"
 		}
 	]
 }

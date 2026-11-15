@@ -720,7 +720,11 @@ function mapCode(rel, tree) {
 			if (rest[0] === 'layout' && rest.length > 1) return place('layouts', 'engine', rest.slice(1));
 			if (rest[0] === 'keylayout') return place('layouts', 'engine', rest);
 			const own = rest.length === 1 ? classify(LOGIC_FEATURES, classStem(rest[0])) : null;
-			if (own && own !== 'hotstrings') return place(own, 'engine', rest);
+			// keymap/registry.lua is the hotstring registry beside registry_groups
+			// and registry_index, not the settings registry the stem names on
+			// Windows (infra/registry.ahk).
+			const hotstringRegistry = own === 'settings' && classStem(rest[0]) === 'registry';
+			if (own && own !== 'hotstrings' && !hotstringRegistry) return place(own, 'engine', rest);
 			// The rest of keymap is the macOS hotstring expander: a sub-module of
 			// hotstrings, kept apart from modules/hotstrings so the two never meet.
 			return place('hotstrings', 'engine', ['expander', ...rest]);
