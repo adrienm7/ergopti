@@ -192,6 +192,45 @@ known active. Regressions: `test_pause_ends_capsword`,
 `test_watchers_capsword_auto_off` `(paused-ends-capsword)`; field point
 `pause_ends_capsword`.
 
+## Background behaviours census (2026-11-14, worker P)
+
+The maintainer listed what must stop at pause on the three OS: keystroke
+metrics, application usage metrics, and the keep-awake action that moves the
+mouse (Ctrl+M on macOS, Win+M on Windows) with every other mouse action. The
+census then covered every background behaviour driven by keys, the pointer or
+the active application.
+
+| Behaviour                                                        | Windows | macOS              | Linux         |
+| ---------------------------------------------------------------- | ------- | ------------------ | ------------- |
+| Keystroke metrics                                                | stops   | stops              | stops (fixed) |
+| Application time, app switches, window titles                    | stops   | stops (fixed edge) | stops (fixed) |
+| Pointer clicks, scroll, distance, tap-to-click                   | stops   | stops (fixed edge) | stops (fixed) |
+| Window topology, capture presence, network and VPN rows          | stops   | stops              | stops (fixed) |
+| System day counters (lock, sleep, mute, Wi-Fi, battery, desktop) | stops   | stops              | stops (fixed) |
+| Clipboard copy and paste metrics                                 | stops   | stops              | stops         |
+| Keep-awake and activity simulation                               | stops   | stops              | stops         |
+| Keyboard-slot and gesture actions, mouse moves and click holds   | stops   | stops              | stops         |
+| Mouse spotlight overlay                                          | stops   | stops              | stops (fixed) |
+| Mouse-layer wheel                                                | stops   | stops              | stops         |
+| Hotstrings, auto-corrections, previews, WPM                      | stops   | stops              | stops         |
+| AI predictions, agent, Info Bar, warmups                         | stops   | stops              | stops         |
+
+Linux: keystats kept recording everything but keystrokes while paused, its
+single gate `may_record` reading only the Metrics menu's pause.
+`keystats.set_script_paused`, set by the pause listener, now closes it for
+every writer; the system day sampler waits for the resume, the pause dismisses
+the spotlight, and the resume opens the focused application's time again.
+macOS: the pause left the foreground interval open, so the resume dropped the
+time before the pause and a reload while paused credited none
+(`keystats.close_app_interval_for_pause`, in the pause inventory); the paused
+maintenance tick kept the distance seed, crediting the pause's travel at the
+resume. Regressions: Linux `test_paused_driver_records_no_keys`,
+`test_window_titles` and `test_excluded_span_boundary` (`driver-paused`);
+macOS `test_pause_closes_app_interval`, `test_pause_forgets_mouse_seed`.
+
+Open, for the maintainer: macOS restarts the keep-awake on resume, Windows and
+Linux leave it off.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
