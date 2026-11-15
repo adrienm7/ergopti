@@ -33,6 +33,7 @@
 local M = {}
 
 local Json = require("core.text.engine.json")
+local TableUtil = require("core.text.engine.table_util")
 
 -- A failure code the page receives.
 local CODE = "^[a-z_]+$"
@@ -222,11 +223,8 @@ function M.new(env)
 			on_done(false, settings.failures.unreadable, failure)
 			return
 		end
-		local ids = {}
-		for id in pairs(layouts) do ids[#ids + 1] = id end
-		table.sort(ids)
 		local texts = {}
-		for index, id in ipairs(ids) do texts[index] = layouts[id] end
+		for index, id in ipairs(TableUtil.sorted_keys(layouts)) do texts[index] = layouts[id] end
 		on_done(true, texts, nil)
 	end
 
