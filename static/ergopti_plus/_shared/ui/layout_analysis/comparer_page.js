@@ -41,6 +41,10 @@
  *    summing to 100 %), kept with the other conveniences.
  * 10. The user's fingering profile (fingering_editor.js: finger of each key,
  *    home key of each finger) is edited here and applies to every analysis.
+ * 11. A link may open the comparison on a corpus, a keyboard and a keyboard
+ *    format (?corpus=<id>&keyboard=<id>&format=<id>, the site's benchmark page), over the saved
+ *    choice; a value the page does not know is named in the console and the
+ *    saved choice stays.
  * ==============================================================================
  */
 
@@ -364,13 +368,18 @@
 				DATA.corpora.map((corpus) => ({ id: corpus.id, title: corpus.title, builtin: corpus }))
 			)
 			.concat([{ id: CUSTOM_ID }]);
+		const linked = linkedChoices(corpora);
 		const state = {
-			corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
-			keyboard: DATA.model.keyboards[saved.keyboard] ? saved.keyboard : 'iso',
+			corpus:
+				linked.corpus ||
+				(corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id),
+			keyboard: linked.keyboard || (DATA.model.keyboards[saved.keyboard] ? saved.keyboard : 'iso'),
 			// The keyboard format (the editor's « Format » too): compact_fit measures on it.
-			format: E.keyboardFormats().some((f) => f.id === saved.format)
-				? saved.format
-				: E.defaultKeyboardFormat(),
+			format:
+				linked.format ||
+				(E.keyboardFormats().some((f) => f.id === saved.format)
+					? saved.format
+					: E.defaultKeyboardFormat()),
 			// Whether the user chose the ticked layouts; until then they follow the keyboard.
 			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
 			selected: null,
@@ -386,8 +395,35 @@
 		state.selected = state.selectionChosen
 			? new Set(saved.selected.filter((id) => byId.has(id)))
 			: defaultSelection(state.keyboard);
-		if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined)
+		if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined && !linked.corpus)
 			state.corpus = HOST.corpora[0].id;
+
+		/**
+		 * The corpus, keyboard and keyboard format a link asks for
+		 * (?corpus=&keyboard=&format=), each only when the page knows it; the
+		 * ticked layouts stay the visitor's (selectionChosen) or the keyboard's.
+		 * @returns {{corpus?: string, keyboard?: string, format?: string}}
+		 */
+		function linkedChoices(known) {
+			const query = new URLSearchParams(location.search);
+			const out = {};
+			const corpus = query.get('corpus');
+			if (corpus !== null) {
+				if (known.some((c) => c.id === corpus && c.id !== CUSTOM_ID)) out.corpus = corpus;
+				else console.warn(`layout comparer: the link names no built-in corpus ${corpus}`);
+			}
+			const keyboard = query.get('keyboard');
+			if (keyboard !== null) {
+				if (DATA.model.keyboards[keyboard]) out.keyboard = keyboard;
+				else console.warn(`layout comparer: the link names no keyboard ${keyboard}`);
+			}
+			const format = query.get('format');
+			if (format !== null) {
+				if (E.keyboardFormats().some((f) => f.id === format)) out.format = format;
+				else console.warn(`layout comparer: the link names no keyboard format ${format}`);
+			}
+			return out;
+		}
 
 		/** Whether a saved value still reads as a layout. */
 		function isLayout(value) {

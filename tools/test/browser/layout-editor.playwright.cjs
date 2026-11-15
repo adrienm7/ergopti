@@ -1683,6 +1683,53 @@ async function exercisePhoneWidth(browser, origin) {
 	assert.notEqual(backgrounds[0], backgrounds[1], 'the dark theme changes the page background');
 }
 
+/**
+ * (benchmarks-shared-engine) A link opens the Comparer on a corpus, a
+ * keyboard and a keyboard format over the saved choice, as the site's benchmark page does; a value
+ * the page does not know is named in the console and the saved choice stays.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseComparerLink(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const page = await context.newPage();
+	const errors = [];
+	const warnings = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	page.on('console', (message) => {
+		if (message.type() === 'warning') warnings.push(message.text());
+	});
+	const choices = async (query) => {
+		await page.goto(`${origin}/ui/layout_analysis/index.html?lang=en&${query}`);
+		await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
+		return [
+			await page.inputValue('#la-corpus'),
+			await page.inputValue('#la-keyboard'),
+			await page.inputValue('#la-format')
+		];
+	};
+	assert.deepEqual(await choices('corpus=fr_nemolivier&keyboard=ergodox&format=60'), [
+		'fr_nemolivier',
+		'ergodox',
+		'60'
+	]);
+	// The link wins over the choice the visitor saved last time.
+	await page.selectOption('#la-keyboard', 'ansi');
+	assert.deepEqual((await choices('corpus=en_wikipedia&keyboard=iso')).slice(0, 2), [
+		'en_wikipedia',
+		'iso'
+	]);
+	const [corpus, keyboard] = await choices('corpus=nowhere&keyboard=nokeyboard&format=nope');
+	// A link's choice is not saved: the visitor's last own choice (ANSI) stays.
+	assert.equal(corpus, 'fr_nemolivier', 'an unknown corpus keeps the saved one');
+	assert.equal(keyboard, 'ansi', 'an unknown keyboard keeps the saved one');
+	assert.ok(warnings.some((text) => /no built-in corpus nowhere/.test(text)));
+	assert.ok(warnings.some((text) => /no keyboard nokeyboard/.test(text)));
+	assert.ok(warnings.some((text) => /no keyboard format nope/.test(text)));
+	assert.deepEqual(errors, [], 'comparer link: page errors');
+	await context.close();
+}
+
 (async () => {
 	const server = await serve();
 	const origin = `http://127.0.0.1:${server.address().port}`;
@@ -2057,6 +2104,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
 		await exerciseShortcuts(browser, origin);
+		await exerciseComparerLink(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
 		await exerciseHeatmap(browser, origin);
