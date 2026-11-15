@@ -92,8 +92,10 @@ pause or resume settles) to the settled resume, and its menu rows, the switch,
 keyboard slots, parameterized actions and the editor legacy shortcut run while
 paused. Linux `script_chords` answers presses from the chords live at pause
 time. Windows greys the Shortcuts submenu while paused; its global restore or
-clear while paused reloads with the new chords at once, a question sent to the
-coordinator at 22:03 Paris (recommended: record under « EDD-1 on AHK »).
+clear while paused reloaded with the new chords at once. The coordinator chose
+to fix it now (22:05 Paris): the chords of pause time travel in
+`suspend_restore.chords` beside the suspend marker. The AHK suite cannot run in
+the Linux container; CI proves it.
 
 Traps met in (2): `tools/test/test-script-chords-three-os.cjs` pins the Linux
 `ScriptChords.runs` call; `test_hotstring_editor_shortcut_transaction` needs

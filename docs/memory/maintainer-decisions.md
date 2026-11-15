@@ -97,7 +97,9 @@ available and nothing that acts on typing is active.
   and takes effect only on resume; the chord that resumes stays the one active
   when the pause began. macOS keeps the change in `script_control`'s deferred
   table until the resume settles; Linux `script_chords` answers presses from
-  the chords live at pause time while that pause lasts. Do not apply a paused
+  the chords live at pause time while that pause lasts; Windows carries them
+  across a reload while paused in `suspend_restore.chords` beside the suspend
+  marker. Do not apply a paused
   chord change at once: moving the pause toggle would strand a paused driver.
 
 macOS and Linux follow it through `edd1-paused-writes` regressions (the

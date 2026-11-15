@@ -135,9 +135,14 @@ lasts (`pause_epoch`). Its keyboard slots already follow SCD-1: no Linux slot
 runs through a pause, and each press reads the configuration.
 
 Windows: the tray greys the Shortcuts submenu while paused, so no slot row
-changes then. A global restore or clear from the Configuration menu while
-paused rewrites the chords and reloads born suspended with them; it is put to
-the maintainer through the coordinator.
+changes then, but a global restore or clear while paused reloaded born
+suspended with the new chords at once (decided by the coordinator on
+2026-11-14 to fix now). The chord gate now reads the chords of pause time while
+paused (`ScriptShortcutPausedChords`, taken by `Ergopti_OnSuspendEnter`,
+dropped by `Ergopti_OnSuspendResume`); a reload while paused writes them to
+`suspend_restore.chords` beside the suspend marker before preparing it, and the
+replayed pause reads them back. A file no replayed pause claims is removed.
+Regression: `test_script_chords_follow_their_slot.ahk` `(paused-chord-change)`.
 
 ## Left (next pass, listed rather than guessed)
 
