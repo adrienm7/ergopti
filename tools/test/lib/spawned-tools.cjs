@@ -32,7 +32,9 @@
  * 5. On Windows (AutoHotkey and PowerShell, the vendored workers included, since
  *    the driver starts them) a program is a `<name>.exe` token outside a comment,
  *    a name table row or an `ahk_exe` criterion, or the first word of a literal
- *    command given to Run or RunWait.
+ *    command given to Run or RunWait. The executables the driver runs from
+ *    windows/vendor by their shared name (identifiers.json windows_vendor,
+ *    read through the generated Identifiers.WindowsVendor) are programs too.
  * ==============================================================================
  */
 
@@ -47,6 +49,11 @@ const DRIVERS = Object.freeze({
 	macos: 'static/ergopti_plus/macos',
 	windows: 'static/ergopti_plus/windows'
 });
+// The shared names of the executables the Windows driver runs from its vendor
+// folder: the generated identifiers.ahk that carries them is not read.
+const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.json';
+const WINDOWS_VENDOR_GROUP = 'windows_vendor';
+
 // Folders that hold tests, vendored libraries or generated data, not driver code.
 const SKIPPED_FOLDERS = new Set([
 	'tests',
@@ -414,6 +421,19 @@ function spawnedTools(driver) {
 		for (const name of programsOf(file)) {
 			if (!tools.has(name)) tools.set(name, []);
 			tools.get(name).push(file);
+		}
+	}
+	if (driver === 'windows') {
+		const group = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS), 'utf8'))[
+			WINDOWS_VENDOR_GROUP
+		];
+		if (!group) throw new Error(`${IDENTIFIERS} has no ${WINDOWS_VENDOR_GROUP} group`);
+		for (const value of Object.values(group)) {
+			const match = /^([A-Za-z][A-Za-z0-9_-]*)\.exe$/i.exec(value);
+			if (!match) continue;
+			const name = match[1].toLowerCase();
+			if (!tools.has(name)) tools.set(name, []);
+			tools.get(name).push(IDENTIFIERS);
 		}
 	}
 	return tools;

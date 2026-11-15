@@ -172,6 +172,15 @@ check('a long name-table row is read in linear time', () => {
 	assert(Date.now() - started < 2000, 'the name-table reader must stay linear');
 });
 
+check('a vendor executable named only in the shared identifiers is a Windows program', () => {
+	// The layout editor runs ergopti_lua_export.exe by Identifiers.WindowsVendor,
+	// so no driver source types its name; the extractor reads the shared group.
+	const derived = Spawned.spawnedTools('windows');
+	assert.deepEqual(derived.get('ergopti_lua_export'), [
+		'static/ergopti_plus/_shared/core/text/data/identifiers.json'
+	]);
+});
+
 // A malformed registry or an undecided row fails here, before any check.
 const registry = Registry.load();
 

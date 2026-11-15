@@ -1338,6 +1338,21 @@
 		},
 		{
 			"os": "windows",
+			"tool": "`ergopti_lua_export.exe`",
+			"programs": ["ergopti_lua_export.exe"],
+			"used_for": "The layout editor's export steps in Lua 5.4.6 (`windows/vendor/ergopti_lua_export.exe`, `windows/vendor/ergopti_lua_export.json`, `windows/ui/layout_manager/editor_window.ahk`)",
+			"today": "Built by the Windows CI with its licence; until it is committed the editor builds its downloads with fengari",
+			"current_class": "PIN",
+			"version_needed": "pinned",
+			"if_missing": "The editor's downloads are built in the page (fengari)",
+			"pin_possible": "Done",
+			"decision": "PIN",
+			"decision_text": "PIN (done)",
+			"alternative": null,
+			"status": "done"
+		},
+		{
+			"os": "windows",
 			"tool": "`ergopti-proxy-relay.exe`",
 			"programs": ["ergopti-proxy-relay.exe"],
 			"used_for": "Local NTLM/Negotiate sign-in for the managed Ollama (`windows/vendor/ergopti-proxy-relay.exe`, `windows/vendor/ergopti-proxy-relay.json`)",
