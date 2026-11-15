@@ -6,21 +6,17 @@
 ; Shows the shared navigation layer editor (_shared/ui/layer_editor) in a
 ; WebView2 window through the manifest-driven WebViewHost factory, answers its
 ; "ready" with the user's layers.toml, the legends of the layout the user types
-; with and the key whose hold enters the layer, and saves what it sends: the
-; text must load without an error on every OS
-; (platform/remap/layers_loader.ahk), is published atomically, and the driver
-; reloads so NavLayer_Init registers the edited layer. The macOS and Linux
-; hosts implement the same contract through _shared/layouts/engine/layers/editor.lua.
+; with and the key whose hold enters the layer, and saves what it sends through
+; the window-free platform/remap/nav_layer_save.ahk, which the layout editor's
+; « Apply the navigation layer » calls too; this host only adds the page's
+; exact opening source and its answers.
 ;
 ; FEATURES & RATIONALE:
-; 1. The page offers only what exists on Windows; the host still refuses any
-;    text one of the three OS loaders would reject or drop, so the editor can
-;    never write a layers.toml another machine reads differently.
-; 2. Atomic write: the text is staged beside layers.toml, flushed, then moved
-;    over it in one write-through rename; a refused save leaves it untouched.
-; 3. The layer is registered once per process (nav_layer_table.ahk), so a saved
+; 1. The page offers only what exists on Windows; the save still refuses any
+;    text one of the three OS loaders would reject or drop.
+; 2. The layer is registered once per process (nav_layer_table.ahk), so a saved
 ;    layer applies through the pause-preserving reload every setting uses.
-; 4. Legends: a key that types a character (the registry sends it by scan
+; 3. Legends: a key that types a character (the registry sends it by scan
 ;    code, ahk_send null) shows what the layout emulation types there
 ;    unshifted (a registry layout, the digit row, the Ergopti base layer read
 ;    from its .keylayout), else what the layout the user types with (the
@@ -29,7 +25,7 @@
 ;    without a printable character shows its registry code on the page, and
 ;    the reason is logged once (_shared/tests/corpus/layer_editor/legends.json).
 ;    The page asks again when its window comes back to the front.
-; 5. The layer key is the tap-hold key whose hold enters NAV_LAYER_ID in the
+; 4. The layer key is the tap-hold key whose hold enters NAV_LAYER_ID in the
 ;    retained tap-hold configuration (MasterGateDesiredTapHold).
 ; ==============================================================================
 
@@ -39,13 +35,6 @@
 ; The shared page's id in _shared/ui/apps.manifest.json.
 global LAYER_EDITOR_APP_ID := "layer_editor"
 global LAYER_EDITOR_OS := "windows"
-; The largest layers.toml the editor accepts is [limits] layer_file_bytes of the
-; shared timing registry, read by LayerEditor_Validate at call time (a global
-; initializer runs before TimingsLoadShared) and by the Lua hosts.
-; The error codes this host adds to the loader's.
-global LAYER_EDITOR_INVALID_PAYLOAD := "invalid_payload"
-global LAYER_EDITOR_WRITE_FAILED := "write_failed"
-global LAYER_EDITOR_FILE_UNREADABLE := "file_unreadable"
 ; Where the legends were read, the Lua hosts' LEGEND_SOURCE_* (pinned by the suite).
 global LAYER_EDITOR_LEGEND_SOURCE_EMULATION := "emulation"
 global LAYER_EDITOR_LEGEND_SOURCE_OS := "os"
@@ -79,127 +68,9 @@ global _LayerEditorReported := Map()
 
 
 
-; =============================
-; =============================
-; ======= 1/ Validation =======
-; =============================
-; =============================
-
-; Loads a text on every OS and returns each distinct error once.
-_LayerEditor_ErrorsOnEveryOs(Text, Ctx) {
-	Errors := []
-	Seen := Map()
-	for Os in Ctx["platforms"] {
-		for Err in KeymapLayers_Load(Os, Ctx, Text)["errors"] {
-			Signature := KeymapLayers_ErrorSignature(Err)
-			if Seen.Has(Signature)
-				continue
-			Seen[Signature] := true
-			Errors.Push(Err)
-		}
-	}
-	return Errors
-}
-
-_LayerEditor_Error(Code, Detail) {
-	return Map("code", Code, "layer", "", "section", "", "key", "", "detail", Detail, "reason_key", "")
-}
-
-/**
- * Validates the text of a layer file the page asks to save.
- * @param {Any} Text - The payload's text.
- * @param {Map} Ctx - The loader context.
- * @returns {Array} What is wrong; empty when every OS loads it cleanly.
- */
-LayerEditor_Validate(Text, Ctx) {
-	global LAYER_EDITOR_INVALID_PAYLOAD
-	if !(Text is String)
-		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD, "the save carries no layer file text")]
-	MaxBytes := TimingsGet("limits", "layer_file_bytes")
-	Bytes := StrPut(Text, "UTF-8") - 1
-	if (Bytes > MaxBytes)
-		return [_LayerEditor_Error(LAYER_EDITOR_INVALID_PAYLOAD,
-			"the layer file is " . Bytes . " bytes, more than " . MaxBytes)]
-	return _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
-}
-
-/**
- * Validates then atomically publishes the user's layers.toml.
- * @param {Any} Text - The payload's text.
- * @param {Map} Ctx - The loader context.
- * @param {string} ConfigDir - The configuration folder.
- * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
- * @param {WebViewHost|Integer} Host - The opening source's host, or zero for an explicit write.
- * @returns {Map} saved (Boolean), path, errors (Array).
- */
-LayerEditor_Save(Text, Ctx, ConfigDir, Opening := 0, Host := 0) {
-	global FS_STATUS_OK, FS_STATUS_ABSENT
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LayerEditor_Save(Text, Ctx, ConfigDir, Opening, Host)
-		finally Critical(InheritedCritical)
-	}
-	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
-	if A_IsSuspended
-		return _LayerEditor_SaveRefused(Path, "the driver is suspended")
-	Owner := _ConfigWriteLeaseTryAcquire(Path, "layer-editor")
-	if !(Owner is Object)
-		return _LayerEditor_SaveRefused(Path, "another configuration transaction owns publication")
-	; This native guard closes admission even when pause arrives during loading,
-	; validation or staging. Only the final rename uses a short Critical span.
-	Admission := () => !A_IsSuspended && _ConfigWriteLeaseOwns(Owner, Path)
-		&& (!(Opening is Object) || (_LayerEditor_OpeningCurrent(Host, Opening)
-			&& _ConfigWriteLeaseKey(Path) == Opening.TargetKey
-			&& _ConfigWriteLeaseKey(Opening.Path) == Opening.TargetKey))
-	try {
-		Errors := LayerEditor_Validate(Text, Ctx)
-		if (Errors.Length > 0)
-			return Map("saved", false, "path", Path, "errors", Errors)
-		if !Admission.Call()
-			return _LayerEditor_SaveRefused(Path, "the configuration write is no longer admitted")
-		if Opening is Object {
-			Expected := Opening.Source
-			if !Opening.Offered || (Expected["status"] != FS_STATUS_OK && Expected["status"] != FS_STATUS_ABSENT)
-				return _LayerEditor_SaveRefused(Path, "the layer editor has no admitted opening source")
-			SourceAdmission := () => Admission.Call() && Opening.Source == Expected
-			Result := FSWriteIfUnchangedAdmitted(Path, Text, Expected, 0, SourceAdmission)
-			if !Result["committed"]
-				return _LayerEditor_SaveRefused(Path, Result["detail"])
-			PreviousCritical := Critical("On")
-			try {
-				if _LayerEditor_OpeningCurrent(Host, Opening) && Opening.Source == Expected
-					Opening.Source := Map("status", FS_STATUS_OK, "content", Text, "detail", "")
-			} finally Critical(PreviousCritical)
-			return Map("saved", true, "path", Path, "errors", [])
-		}
-		Stage := Path . ".tmp"
-		if !FSWriteDurable(Stage, Text) {
-			try FSDeleteStrict(Stage)
-			return _LayerEditor_SaveRefused(Path, "'" . Stage . "' could not be written")
-		}
-		if !FSConfigAtomicMoveReplace(Stage, Path, , Admission) {
-			try FSDeleteStrict(Stage)
-			return _LayerEditor_SaveRefused(Path, "'" . Path . "' could not be replaced")
-		}
-		return Map("saved", true, "path", Path, "errors", [])
-	} finally _ConfigWriteLeaseRelease(Owner)
-}
-
-; Keep pre-publication refusal in the same envelope as native write failure.
-_LayerEditor_SaveRefused(Path, Detail) {
-	global LAYER_EDITOR_WRITE_FAILED
-	return Map("saved", false, "path", Path, "errors",
-		[_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, Detail)])
-}
-
-
-
-
-
 ; ==========================
 ; ==========================
-; ======= 2/ Legends =======
+; ======= 1/ Legends =======
 ; ==========================
 ; ==========================
 
@@ -389,7 +260,7 @@ _LayerEditor_CurrentLayerKeys() {
 
 ; =======================================
 ; =======================================
-; ======= 3/ Messages to the page =======
+; ======= 2/ Messages to the page =======
 ; =======================================
 ; =======================================
 
@@ -443,7 +314,7 @@ _LayerEditor_StringsJson(Values) {
  * @returns {string} JavaScript to evaluate in the page.
  */
 LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "", Opening := 0) {
-	global LAYER_EDITOR_OS, LAYER_EDITOR_FILE_UNREADABLE, FS_STATUS_OK, FS_STATUS_ABSENT
+	global LAYER_EDITOR_OS, NAV_LAYER_SAVE_FILE_UNREADABLE, FS_STATUS_OK, FS_STATUS_ABSENT
 	if !IsObject(Legends)
 		Legends := LayerEditor_CurrentLegends(Ctx)
 	if !IsObject(LayerKeys)
@@ -459,16 +330,16 @@ LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "", Opening := 0)
 			if SubStr(Text, 1, 1) == Chr(0xFEFF)
 				Text := SubStr(Text, 2)
 			TextJson := JsonStringLiteral(Text)
-			Errors := _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
+			Errors := NavLayerSave_ErrorsOnEveryOs(Text, Ctx)
 		} else if Opening.Source["status"] != FS_STATUS_ABSENT
-			Errors := [_LayerEditor_Error(LAYER_EDITOR_FILE_UNREADABLE, Opening.Source["detail"])]
+			Errors := [NavLayerSave_Error(NAV_LAYER_SAVE_FILE_UNREADABLE, Opening.Source["detail"])]
 	} else if FileExist(Path) {
 		try {
 			Text := FSReadStrict(Path)
 			TextJson := JsonStringLiteral(Text)
-			Errors := _LayerEditor_ErrorsOnEveryOs(Text, Ctx)
+			Errors := NavLayerSave_ErrorsOnEveryOs(Text, Ctx)
 		} catch as Err {
-			Errors := [_LayerEditor_Error(LAYER_EDITOR_FILE_UNREADABLE, Err.Message)]
+			Errors := [NavLayerSave_Error(NAV_LAYER_SAVE_FILE_UNREADABLE, Err.Message)]
 		}
 	}
 	return "if(window.init)window.init({"
@@ -491,7 +362,7 @@ LayerEditor_SetLegendsJs(Legends) {
 
 /**
  * The page's saveResult() call.
- * @param {Map} Result - From LayerEditor_Save, plus applied when it was saved.
+ * @param {Map} Result - From NavLayerSave_Save, plus applied when it was saved.
  * @returns {string} JavaScript to evaluate in the page.
  */
 LayerEditor_SaveResultJs(Result) {
@@ -508,7 +379,7 @@ LayerEditor_SaveResultJs(Result) {
 
 ; =============================
 ; =============================
-; ======= 4/ The window =======
+; ======= 3/ The window =======
 ; =============================
 ; =============================
 
@@ -638,64 +509,10 @@ _LayerEditor_OnMessage(Host, Payload, ApplyFn := ReloadPreservingSuspend) {
 		Opening.Busy := true
 	} finally Critical(PreviousCritical)
 	try {
-		Result := LayerEditor_SaveAndApply(Payload.Has("text") ? Payload["text"] : JSON_NULL,
-			_SharedDir, Opening.Directory, ApplyFn, Opening, Host)
+		Result := NavLayerSave_SaveAndApply(Payload.Has("text") ? Payload["text"] : JSON_NULL,
+			_SharedDir, Opening.Directory, ApplyFn, Opening, () => _LayerEditor_OpeningCurrent(Host, Opening),
+			(Path, Text) => _LayerEditor_SavedSourceCurrent(Host, Opening, Path, Text))
 		if _LayerEditor_PageCurrent(Host, Opening)
 			Host.Eval(LayerEditor_SaveResultJs(Result))
 	} finally Opening.Busy := false
-}
-
-/**
- * Saves a layer file the page sent, then applies it.
- * @param {Any} Text - The payload's text.
- * @param {string} SharedDir - The _shared folder.
- * @param {string} ConfigDir - The configuration folder.
- * @param {Func} ApplyFn - Applies the saved layer; returns false when refused.
- * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
- * @param {WebViewHost|Integer} Host - The opening source's host, or zero for an explicit write.
- * @returns {Map} saved, path, errors and, once saved, applied.
- */
-LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, Host := 0) {
-	global LAYER_EDITOR_WRITE_FAILED
-	InheritedCritical := A_IsCritical
-	if InheritedCritical {
-		Critical("Off")
-		try return LayerEditor_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening, Host)
-		finally Critical(InheritedCritical)
-	}
-	if A_IsSuspended
-		return _LayerEditor_SaveRefused("", "the driver is suspended")
-	LoggerStart("LayerEditor", "Saving the navigation layer…")
-	if A_IsSuspended {
-		LoggerError("LayerEditor", "The navigation layer was not saved: {1}.", "the driver is suspended")
-		return _LayerEditor_SaveRefused("", "the driver is suspended")
-	}
-	try {
-		Ctx := KeymapLayers_LoadContext(SharedDir)
-	} catch as Err {
-		LoggerError("LayerEditor", "The navigation layer was not saved: {1}.", Err.Message)
-		return Map("saved", false, "errors", [_LayerEditor_Error(LAYER_EDITOR_WRITE_FAILED, Err.Message)])
-	}
-	Result := LayerEditor_Save(Text, Ctx, ConfigDir, Opening, Host)
-	if !Result["saved"] {
-		for Err in Result["errors"]
-			LoggerWarn("LayerEditor", "Refused: {1} ({2}.{3}.{4}) — {5}.", Err["code"], Err["layer"],
-				Err["section"], Err["key"], Err["detail"])
-		LoggerError("LayerEditor", "The navigation layer was not saved to '{1}'.", Result["path"])
-		return Result
-	}
-	LoggerSuccess("LayerEditor", "Navigation layer saved to '{1}'; reloading to apply it.", Result["path"])
-	; A reload that goes through never returns here; a refused one says why in
-	; its own log and leaves the saved file for the next start.
-	; The writer released its lease before Reload can acquire the terminal
-	; barrier. A pause during the completion log keeps the durable save but
-	; cannot authorize a fresh apply request. The exact GUI source also remains
-	; necessary after a completion log retires its page or changes folders.
-	; Never report that durable save as undone.
-	Result["applied"] := !A_IsSuspended
-		&& (!(Opening is Object) || _LayerEditor_SavedSourceCurrent(Host, Opening, Result["path"], Text))
-		&& ApplyFn.Call() ? true : false
-	if !Result["applied"]
-		LoggerError("LayerEditor", "The saved navigation layer is not applied: the reload was refused.")
-	return Result
 }

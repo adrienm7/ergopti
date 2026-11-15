@@ -146,8 +146,8 @@ local function new_handler(spec)
 		end
 		local shell = dependency(state, "shell", "core.process.adapters.shell_runner")
 		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
-		local layer_editor = dependency(state, "layer_editor_bridge", "ui.layer_editor.bridge")
-		if layer_editor and type(layer_editor.apply_text) ~= "function" then layer_editor = nil end
+		local nav_layer_save = dependency(state, "nav_layer_save", "modules.keymap.nav_layer_save")
+		if nav_layer_save and type(nav_layer_save.apply_text) ~= "function" then nav_layer_save = nil end
 		local keystats_reader = dependency(state, "keystats_reader", "modules.keystats.sqlite_reader")
 		if keystats_reader and type(keystats_reader.read_studio_ngrams) ~= "function" then keystats_reader = nil end
 		local config_paths = dependency(state, "config_paths", "settings.engine.paths")
@@ -223,10 +223,10 @@ local function new_handler(spec)
 				return state.on_reload() == true
 			end,
 			-- The layout editor applies a source's navigation layer through the
-			-- navigation layer editor's own save (ui/layer_editor/bridge.lua).
-			apply_nav = layer_editor and function(text, done)
+			-- window-free layers.toml save (modules/keymap/nav_layer_save.lua).
+			apply_nav = nav_layer_save and function(text, done)
 				if not current() then return false end
-				local result = layer_editor.apply_text(text, state)
+				local result = nav_layer_save.apply_text(text, state)
 				if current() then done(result) end
 			end or nil,
 			-- Ergopti Studio reads the user's own typing from the local keystats

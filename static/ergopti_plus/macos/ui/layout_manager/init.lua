@@ -435,7 +435,7 @@ local Editor = new_window(EDITOR_SPEC)
 -- =============================
 
 --- Binds the layout editor's « Apply the navigation layer » to the navigation
---- layer editor's save (ui/layer_editor apply_text). A window opened before
+--- layer save (modules/keymap/nav_layer_save apply_text). A window opened before
 --- this offers no such button.
 --- @param applier function|nil applier(text) -> { saved, applied, errors }
 function M.set_nav_applier(applier)

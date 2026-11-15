@@ -472,11 +472,11 @@ _LayMgrWeb_SourceOpen(Deps) {
 	return _LayMgrWeb_PushPayload(Deps, "sourceData", Data)
 }
 
-; « Apply the navigation layer »: the navigation layer editor's own save, then
+; « Apply the navigation layer »: the window-free layers.toml save, then
 ; the pause-preserving reload that applies it.
 _LayMgrWeb_ApplyNav(Text) {
 	global _SharedDir, _ConfigDir
-	return LayerEditor_SaveAndApply(Text, _SharedDir, _ConfigDir, ReloadPreservingSuspend)
+	return NavLayerSave_SaveAndApply(Text, _SharedDir, _ConfigDir, ReloadPreservingSuspend)
 }
 
 /**

@@ -79,7 +79,7 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "settings.engine.paths", "core.fs.adapters.file_system",
-		"core.ui.ui.builder", "ui.layer_editor", "platform.remap.nav_layer", "platform.input.keycodes",
+		"core.ui.ui.builder", "ui.layer_editor", "modules.keymap.nav_layer_save", "platform.remap.nav_layer", "platform.input.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"core.ui.engine.notifications" }
 	local saved = {}
@@ -180,6 +180,7 @@ local function with_editor(scenario)
 			end,
 		}
 		package.loaded["ui.layer_editor"] = nil
+		package.loaded["modules.keymap.nav_layer_save"] = nil
 		scenario(require("ui.layer_editor"), world)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -465,8 +466,9 @@ helpers.describe("macOS navigation layer editor host", function()
 		end)
 	end)
 
-	helpers.it("applies the layout editor's navigation layer through the same save, with no window (layout-editor-nav-apply)", function()
-		with_editor(function(editor, world)
+	helpers.it("applies the layout editor's navigation layer through the window-free save (layout-editor-nav-apply)", function()
+		with_editor(function(_, world)
+			local editor = require("modules.keymap.nav_layer_save")
 			local text = read_file(FIXTURE)
 			local result = editor.apply_text(text, { karabiner = world.karabiner })
 			helpers.assert_eq(result.saved, true)

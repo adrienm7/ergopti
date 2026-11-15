@@ -219,7 +219,7 @@ _LRDS_StaleSource(Record) {
 	External := StrReplace(Original, '"KeyS" = "arrow_up"', '"KeyS" = "arrow_down"', , &Changed)
 	_LRDS_Require(Changed == 1 && External != Original, "The independent edit changes an actual navigation binding.")
 	Ctx := KeymapLayers_LoadContext(_SharedDir)
-	_LRDS_Require(LayerEditor_Validate(External, Ctx).Length == 0, "The newer durable configuration must be valid on every OS.")
+	_LRDS_Require(NavLayerSave_Validate(External, Ctx).Length == 0, "The newer durable configuration must be valid on every OS.")
 	_LRDS_Require(FSWriteDurable(_LRDS.LayerPath, External), "The independent editor must really publish the changed binding.")
 	Record.Host.Opts["OnMessage"] := _LRDS_SaveMessage
 	Message := '{"action":"save","text":' . JsonStringLiteral(Original) . '}'

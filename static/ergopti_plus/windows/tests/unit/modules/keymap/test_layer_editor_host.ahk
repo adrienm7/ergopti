@@ -159,7 +159,7 @@ _LEH_InvalidSavesWriteNothing() {
 	Apply := _LEH_FakeApply()
 	try {
 		for Scenario in Cases {
-			Result := LayerEditor_SaveAndApply(Scenario[1], _LEH_SharedDir(), Dir, Apply)
+			Result := NavLayerSave_SaveAndApply(Scenario[1], _LEH_SharedDir(), Dir, Apply)
 			AssertFalse(Result["saved"], "case " . A_Index . " must be refused")
 			AssertEqual(Scenario[2], _LEH_Codes(Result["errors"]), "case " . A_Index . " refusal")
 		}
@@ -186,7 +186,7 @@ _LEH_SessionReachesTheHotkeyTable() {
 	Text := _LEH_FixtureText()
 	Apply := _LEH_FakeApply()
 	try {
-		Result := LayerEditor_SaveAndApply(Text, _LEH_SharedDir(), Dir, Apply)
+		Result := NavLayerSave_SaveAndApply(Text, _LEH_SharedDir(), Dir, Apply)
 		AssertTrue(Result["saved"], "the page's session must be saved")
 		AssertTrue(Result["applied"], "the saved layer must be applied")
 		AssertEqual(1, Apply.Calls, "one reload applies the saved layer")
@@ -209,7 +209,7 @@ _LEH_RefusedReloadIsReported() {
 	Apply := _LEH_FakeApply()
 	Apply.Accept := false
 	try {
-		Result := LayerEditor_SaveAndApply(_LEH_FixtureText(), _LEH_SharedDir(), Dir, Apply)
+		Result := NavLayerSave_SaveAndApply(_LEH_FixtureText(), _LEH_SharedDir(), Dir, Apply)
 		AssertTrue(Result["saved"], "the file is saved before the reload is asked for")
 		AssertFalse(Result["applied"], "a refused reload leaves the layer not applied")
 		AssertTrue(InStr(LayerEditor_SaveResultJs(Result), '"saved":true,"applied":false'), "the page is told")
@@ -272,12 +272,12 @@ _LEH_ContractMatchesTheLuaHosts() {
 	Registry := ParseTomlFile(_LEH_SharedDir() . "\core\timing\data\constants.toml")
 	MaxBytes := Integer(IniCacheGet(Registry, "limits", "layer_file_bytes"))
 	AssertEqual(TimingsGet("limits", "layer_file_bytes"), MaxBytes, "the host reads the registry value")
-	Refused := LayerEditor_Validate(Format("{:" . (MaxBytes + 1) . "}", ""), Map())
+	Refused := NavLayerSave_Validate(Format("{:" . (MaxBytes + 1) . "}", ""), Map())
 	AssertEqual(Refused.Length, 1, "one byte over [limits] layer_file_bytes is refused")
-	AssertEqual(Refused[1]["code"], LAYER_EDITOR_INVALID_PAYLOAD, "the size refusal is an invalid payload")
+	AssertEqual(Refused[1]["code"], NAV_LAYER_SAVE_INVALID_PAYLOAD, "the size refusal is an invalid payload")
 	AssertTrue(InStr(Refused[1]["detail"], "more than " . MaxBytes) > 0, "the refusal names the registry limit")
-	Codes := Map("INVALID_PAYLOAD", LAYER_EDITOR_INVALID_PAYLOAD, "WRITE_FAILED", LAYER_EDITOR_WRITE_FAILED,
-		"FILE_UNREADABLE", LAYER_EDITOR_FILE_UNREADABLE)
+	Codes := Map("INVALID_PAYLOAD", NAV_LAYER_SAVE_INVALID_PAYLOAD, "WRITE_FAILED", NAV_LAYER_SAVE_WRITE_FAILED,
+		"FILE_UNREADABLE", NAV_LAYER_SAVE_FILE_UNREADABLE)
 	for Name, Code in Codes {
 		AssertTrue(RegExMatch(Source, "m)^M\." . Name . ' = "([a-z_]+)"\r?$', &Declared), "the Lua hosts declare " . Name)
 		AssertEqual(Declared[1], Code, Name . " is one error code on every OS")

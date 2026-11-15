@@ -1664,9 +1664,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	WindowToggle.set_opener("layer_editor", function()
 		return require("ui.layer_editor").open({ karabiner = karabiner })
 	end)
-	-- The layout editor applies a source's navigation layer through the same save.
+	-- The layout editor applies a source's navigation layer through the window-free save.
 	require("ui.layout_manager").set_nav_applier(function(text)
-		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
+		return require("modules.keymap.nav_layer_save").apply_text(text, { karabiner = karabiner })
 	end)
 	-- « Emulate without installing » in the layout editor stores the composed
 	-- layout as the emulated one, as the « Layout to emulate » menu does.

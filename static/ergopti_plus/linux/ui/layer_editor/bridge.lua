@@ -7,12 +7,10 @@
 ---
 --- The page asks for the user's layers.toml ("ready"), saves the text it built
 --- ({action = "save", text}), closes ({action = "cancel"}) or, back in front,
---- asks for the legends again ({action = "legends"}). The shared host logic
---- (_shared/layouts/engine/layers/editor.lua) checks a saved text against every
---- OS's loader and publishes it atomically; the remap manager then regenerates
---- its configuration, which reads layers.toml again, so the layer applies.
---- The Linux part stays this thin on purpose: only the apply call knows which
---- engine carries the layer.
+--- asks for the legends again ({action = "legends"}). The save and its apply
+--- are the window-free modules/keymap/nav_layer_save.lua, which the layout
+--- editor's « Apply the navigation layer » calls too; this bridge only adds the
+--- page's exact opening source and its answers.
 ---
 --- Legends: each key that types a character shows what the keymap the daemon
 --- loaded (adapters/keyboard_layout, the session's own XKB keymap, which it
@@ -32,6 +30,7 @@ local TomlCodec   = require("core.text.engine.toml_codec")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
 local LayerPreset = require("layouts.engine.layers.preset")
+local NavLayerSave = require("modules.keymap.nav_layer_save")
 local Writer      = require("core.text.engine.toml_codec.writer")
 
 local LOG = "bridge.layer_editor"
@@ -80,16 +79,6 @@ local function close_page(state, context)
 	end
 	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	return manager ~= nil and type(manager.hide) == "function" and manager.hide(APP_NAME) == true
-end
-
---- The folders the layer data and the user's file live in.
---- @return string shared_root
---- @return string config_dir
-local function folders(state)
-	local paths = dependency(state, "paths", "core.fs.engine.paths")
-	local config_paths = dependency(state, "config_paths", "settings.engine.paths")
-	if not paths or not config_paths then error("the shared tree or the configuration folder is unknown", 0) end
-	return paths.shared_root(), config_paths.get_config_dir()
 end
 
 --- Retains the page and exact file which supplied the editor's current draft.
@@ -168,16 +157,6 @@ local function opening_files(owner, state, context)
 	}
 end
 
---- The layer loader's context, read from the shipped registry and vocabulary.
-local function load_context(shared_root)
-	return Layers.load_context({
-		shared_root = shared_root,
-		json_decode = Json.decode,
-		toml_decode = TomlCodec.decode,
-		read_file   = LayerEditor.read_shipped,
-	})
-end
-
 --- The legends of the layout the user types with: the emulated one, else the
 --- keymap the daemon loaded.
 --- @param state table Daemon state.
@@ -231,60 +210,6 @@ local function layer_keys(state, ctx, shared_root)
 	return codes
 end
 
---- Asks the remap manager to regenerate and reload its configuration.
---- @return boolean applied
-local function apply(state)
-	local remap = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
-	if not remap or type(remap.reload) ~= "function" then
-		Logger.error(LOG, "No remap manager: the saved navigation layer cannot be applied.")
-		return false
-	end
-	local ok, applied = pcall(remap.reload)
-	if not ok then
-		Logger.error(LOG, "The native remap reload raised: %s.", tostring(applied))
-		return false
-	end
-	return applied == true
-end
-
-
-
-
-
---- Validates and publishes a layers.toml text, then applies it: the one save
---- path of the navigation layer editor window and of the layout editor's
---- « Apply the navigation layer » (ui/layout_manager/bridge.lua).
---- @param state table Daemon state.
---- @param opts table { text, ctx, config_dir, file_adapter, current } where
----   current() says whether the saved folder is still the configuration folder.
---- @return table result LayerEditor.save's, with `applied`, or `stale` when the
----   folder changed after the save.
-local function save_text(state, opts)
-	local result = LayerEditor.save({
-		text = opts.text, ctx = opts.ctx, config_dir = opts.config_dir, toml_decode = TomlCodec.decode,
-		file_adapter = opts.file_adapter,
-	})
-	if not result.saved then
-		for _, err in ipairs(result.errors) do
-			Logger.warn(LOG, "Refused: %s (%s.%s.%s) — %s.", tostring(err.code), tostring(err.layer or ""),
-				tostring(err.section or ""), tostring(err.key or ""), tostring(err.detail))
-		end
-		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
-		return result
-	end
-	if not opts.current() then
-		result.applied, result.stale = false, true
-		return result
-	end
-	result.applied = apply(state)
-	if result.applied then
-		Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
-	else
-		Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
-	end
-	return result
-end
-
 
 
 
@@ -312,9 +237,9 @@ function M.on_message(payload, state, context)
 			owner.offered = pushed == true and opening_current(owner, state, context)
 			return { pushed = owner.offered, data = owner.data }
 		end
-		local ok, shared_root, config_dir = pcall(folders, state)
+		local ok, shared_root, config_dir = pcall(NavLayerSave.folders, state)
 		local ok_ctx, ctx = false, shared_root
-		if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
+		if ok then ok_ctx, ctx = pcall(NavLayerSave.load_context, shared_root) end
 		if not ok or not ok_ctx then
 			Logger.error(LOG, "The layer editor cannot read the layer data: %s.", tostring(ctx))
 			return { pushed = false }
@@ -358,7 +283,7 @@ function M.on_message(payload, state, context)
 		if owner.saving then return { saved = false, busy = true } end
 		owner.saving = true
 		local function save_and_apply()
-			local result = save_text(state, {
+			local result = NavLayerSave.save(state, {
 				text = payload.text, ctx = owner.ctx, config_dir = owner.config_dir,
 				file_adapter = opening_files(owner, state, context),
 				current = function() return committed_folder_current(owner, state) end,
@@ -397,9 +322,9 @@ function M.on_message(payload, state, context)
 		return { cancelled = true, closed = close_page(state, context) }
 	end
 	if payload.action == "legends" then
-		local ok, shared_root = pcall(folders, state)
+		local ok, shared_root = pcall(NavLayerSave.folders, state)
 		local ok_ctx, ctx = false, shared_root
-		if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
+		if ok then ok_ctx, ctx = pcall(NavLayerSave.load_context, shared_root) end
 		if not ok or not ok_ctx then
 			Logger.error(LOG, "The layer editor cannot read the layer data: %s.", tostring(ctx))
 			return { pushed = false }
@@ -409,34 +334,6 @@ function M.on_message(payload, state, context)
 	end
 	Logger.warn(LOG, "Ignored the unknown layer editor action '%s'.", tostring(payload.action))
 	return nil
-end
-
---- Saves and applies a layers.toml the layout editor built from a source's
---- navigation layer, through the window's own save path. The destination is
---- the user's layers.toml as read now: it is replaced only while it still holds
---- those bytes (LayerEditor.save's exact-byte precondition).
---- @param text any The layers.toml text.
---- @param state table Daemon state.
---- @return table result { saved, applied, errors }
-function M.apply_text(text, state)
-	state = type(state) == "table" and state or {}
-	Logger.start(LOG, "Applying the navigation layer from the layout editor…")
-	local ok, shared_root, config_dir = pcall(folders, state)
-	local ok_ctx, ctx = false, shared_root
-	if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
-	if not ok or not ok_ctx then
-		local detail = "the layer data could not be read: " .. tostring(ctx)
-		Logger.error(LOG, "The navigation layer was not applied: %s.", detail)
-		return { saved = false, applied = false, errors = { { code = LayerEditor.WRITE_FAILED, detail = detail } } }
-	end
-	local result = save_text(state, {
-		text = text, ctx = ctx, config_dir = config_dir, file_adapter = nil,
-		current = function()
-			local still, _, dir = pcall(folders, state)
-			return still and dir == config_dir
-		end,
-	})
-	return { saved = result.saved == true, applied = result.applied == true, errors = result.errors or {} }
 end
 
 return M

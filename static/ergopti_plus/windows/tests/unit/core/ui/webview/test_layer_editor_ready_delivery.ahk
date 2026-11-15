@@ -38,7 +38,7 @@ _LRDT_ChildSource(ObserveLayerResult := false) {
 		Code .= Line . "`n"
 	}
 	Seen := Map()
-	for Symbol in ["LayerEditor_Open", "KeymapLayers_LoadContext", "WebView_SharedEnvironment",
+	for Symbol in ["LayerEditor_Open", "NavLayerSave_SaveAndApply", "KeymapLayers_LoadContext", "WebView_SharedEnvironment",
 		"Ergopti_OnSuspendResume", "_TrayRootErrorIsSilent", "LLM_DisplayIndentValues", "LLM_Menu_ApplySharedDefaults",
 		"Keylayout_Parse", "LayoutRegistry_Keycodes", "MagicEditorRecordLayoutFallback",
 		"KeylayoutEmulation_LayerIsActive", "NumberRowEffectiveMode", "GetForegroundKeyboardLayout",
@@ -50,7 +50,7 @@ _LRDT_ChildSource(ObserveLayerResult := false) {
 		AssertTrue(Owner != "", "The readiness child requires its genuine whole owner: " . Symbol)
 		if !Seen.Has(Owner) {
 			Seen[Owner] := true
-			if ObserveLayerResult && Symbol == "LayerEditor_Open" {
+			if ObserveLayerResult && Symbol == "NavLayerSave_SaveAndApply" {
 				LayerCode := FSReadStrict(Owner)
 				; Observe the real owner's terminal Map; no return status,
 				; admission, dispatch or durable operation is replaced.
@@ -58,16 +58,14 @@ _LRDT_ChildSource(ObserveLayerResult := false) {
 				LayerCode := StrReplace(LayerCode, Needle,
 					"`t_LRDS_ObserveLayerResult(Result)`n" . Needle, , &Replaced)
 				AssertEqual(1, Replaced, "Only the complete save-and-apply owner's final return is observed")
-				LayerCode := StrReplace(LayerCode,
-					"#Include %A_LineFile%\..\..\..\_generated\config_keys.ahk",
-					"#Include " . _DriverDir . "\_generated\config_keys.ahk", , &Replaced)
-				AssertEqual(1, Replaced, "Only the copied complete owner's relative include must resolve from its original driver")
+				AssertFalse(InStr(LayerCode, "%A_LineFile%"),
+					"The copied save owner must have no include relative to its original file")
 				Code .= LayerCode . "`n"
 			} else
 				Code .= "#Include " . Owner . "`n"
 		}
 	}
-	AssertEqual(19, Seen.Count, "The whole host, resume/menu and real data-policy owners must be nonempty and distinct")
+	AssertEqual(20, Seen.Count, "The whole host, save, resume/menu and real data-policy owners must be nonempty and distinct")
 	PromiseOwner := _DriverDir . "\vendor\Promise.ahk"
 	Fixture := _DriverDir . "\tests\fixtures\layer_editor_ready_delivery_body.ahk"
 	AssertTrue(FileExist(PromiseOwner) && FileExist(Fixture))

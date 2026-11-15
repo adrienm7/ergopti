@@ -237,6 +237,7 @@ global _DefaultLogsDir := _LogsDir
 ; The layer-file loader reads _shared/layouts/data and the physical-key registry at run
 ; time; meta/corpus/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
 #Include ../platform/remap/layers_loader.ahk
+#Include ../platform/remap/nav_layer_save.ahk
 ; The navigation layer's hotkey table, built from layer files; registration is
 ; injectable, so unit/platform/remap/layers/test_nav_layer_table.ahk drives it without a live hook.
 #Include ../platform/remap/nav_layer_table.ahk

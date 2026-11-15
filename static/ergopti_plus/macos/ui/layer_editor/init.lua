@@ -6,12 +6,9 @@
 --- Shows the shared navigation layer editor (_shared/ui/layer_editor) in a
 --- webview, answers its "ready" with the user's layers.toml, the legends of the
 --- current input source and the key whose hold enters the layer, and saves
---- what it sends. The shared host logic (_shared/layouts/engine/layers/editor.lua) checks
---- the text against every OS's loader and publishes it through the atomic
---- FileSystem adapter; the Karabiner rules are then regenerated, and every
---- regeneration reads layers.toml again, so the edited layer applies. The
---- wheel bindings, which Karabiner cannot take, are handed to their
---- Hammerspoon owner.
+--- what it sends through the window-free modules/keymap/nav_layer_save.lua,
+--- which the layout editor's « Apply the navigation layer » calls too; this
+--- host only adds the page's exact opening source and its answers.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One window: a second open brings the first to the front.
@@ -53,6 +50,7 @@ local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
 local Keycodes    = require("platform.input.keycodes")
 local NavLayer    = require("platform.remap.nav_layer")
+local NavLayerSave = require("modules.keymap.nav_layer_save")
 
 local LOG = "layer_editor"
 
@@ -85,17 +83,6 @@ local _serial = 0
 -- ======= 2/ Helpers =======
 -- ==========================
 -- ==========================
-
---- The layer loader's context, read from the shipped registry and vocabulary.
---- @return table ctx
-local function load_context()
-	return Layers.load_context({
-		shared_root = Paths.shared_root(),
-		json_decode = Json.decode,
-		toml_decode = TomlCodec.decode,
-		read_file   = LayerEditor.read_shipped,
-	})
-end
 
 --- An override of a registry key for the ISO form, when it has one.
 --- @param entry table A registry key.
@@ -207,40 +194,6 @@ local function close_session(session)
 	return true
 end
 
---- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
---- Karabiner, to their owner (modules/shortcuts/bindings.lua).
-local function reconcile_wheel()
-	local ok, committed = pcall(function()
-		return require("modules.shortcuts.bindings").reconcile_layer_wheel()
-	end)
-	if not ok then
-		Logger.error(LOG, "The layer's wheel bindings could not be applied: %s.", tostring(committed))
-	elseif committed ~= true then
-		Logger.warn(LOG, "The layer's wheel bindings apply with the next Shortcuts start: a start is in progress.")
-	end
-end
-
---- Asks the remap engine to regenerate the Karabiner rules.
---- @param karabiner table The remap facade.
---- @return boolean requested True when the regeneration was accepted.
-local function request_regeneration(karabiner)
-	local ok, accepted = pcall(karabiner.regenerate, function(done, reason)
-		if done ~= true then
-			Logger.warn(LOG, "The edited navigation layer is saved but not deployed yet: %s.", tostring(reason))
-			local sent, notify_err = require("core.ui.engine.notifications").notify(i18n.get("layer_editor.window_title"),
-				i18n.get("layer_editor.apply_failed"), "error")
-			if not sent then
-				Logger.error(LOG, "The late regeneration failure could not be notified: %s.", tostring(notify_err))
-			end
-		end
-	end)
-	if not ok then
-		Logger.error(LOG, "The Karabiner regeneration request raised: %s.", tostring(accepted))
-		return false
-	end
-	return accepted == true
-end
-
 
 
 
@@ -271,7 +224,7 @@ local function push_init(session)
 	if _session ~= session or session.retired or not session.webview then return end
 	local opening = session.opening
 	if not opening then
-		local ok_ctx, ctx = pcall(load_context)
+		local ok_ctx, ctx = pcall(NavLayerSave.load_context)
 		if not ok_ctx then
 			Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
 			return
@@ -334,49 +287,12 @@ end
 --- Sends the page the legends of the input source in use now.
 --- @param session table
 local function push_legends(session)
-	local ok_ctx, ctx = pcall(load_context)
+	local ok_ctx, ctx = pcall(NavLayerSave.load_context)
 	if not ok_ctx then
 		Logger.error(LOG, "The layer data could not be read: %s.", tostring(ctx))
 		return
 	end
 	call_page(session, "setLegends", current_legends(ctx))
-end
-
---- Validates and publishes a layers.toml text, then applies it: the one save
---- path of the navigation layer editor window and of the layout editor's
---- « Apply the navigation layer » (ui/layout_manager).
---- @param opts table { text, ctx, config_dir, file_adapter, karabiner, current }
----   where current() says whether the caller still owns the destination.
---- @return table result { saved, applied, errors, path }
-local function save_and_apply(opts)
-	local result = LayerEditor.save({
-		text = opts.text, ctx = opts.ctx, config_dir = opts.config_dir,
-		toml_decode = TomlCodec.decode, file_adapter = opts.file_adapter,
-	})
-	if not result.saved then
-		for _, err in ipairs(result.errors) do
-			Logger.warn(LOG, "Refused: %s (%s) — %s.", tostring(err.code),
-				table.concat({ tostring(err.layer or ""), tostring(err.section or ""), tostring(err.key or "") }, "."),
-				tostring(err.detail))
-		end
-		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
-		return { saved = false, errors = result.errors, path = result.path }
-	end
-	local stale = { saved = true, applied = false, errors = {}, path = result.path }
-	if not opts.current() then
-		Logger.warn(LOG, "The layer was saved, but its editor destination changed before application.")
-		return stale
-	end
-	local applied = request_regeneration(opts.karabiner)
-	if not opts.current() then return stale end
-	reconcile_wheel()
-	if not opts.current() then return stale end
-	if applied then
-		Logger.success(LOG, "Navigation layer saved to '%s'; the Karabiner rules are regenerating.", result.path)
-	else
-		Logger.error(LOG, "Navigation layer saved to '%s' but its regeneration was refused.", result.path)
-	end
-	return { saved = true, applied = applied, errors = {}, path = result.path }
 end
 
 --- Validates and saves the page's text, then applies it.
@@ -391,7 +307,7 @@ local function save(session, text)
 			errors = { { code = LayerEditor.WRITE_FAILED, detail = "the layer editor source is no longer current" } } })
 		return
 	end
-	local result = save_and_apply({
+	local result = NavLayerSave.save({
 		text = text, ctx = opening.ctx, config_dir = opening.config_dir,
 		file_adapter = opening_files(session, opening), karabiner = session.karabiner,
 		current = function() return opening_current(session, opening) end,
@@ -499,40 +415,6 @@ function M.open(opts)
 	session.webview = webview
 	Logger.info(LOG, "Layer editor opened.")
 	return true
-end
-
---- Saves and applies a layers.toml the layout editor built from a source's
---- navigation layer, through the window's own save path. The destination is
---- the user's layers.toml as read now: it is replaced only while it still holds
---- those bytes (LayerEditor.save's exact-byte precondition).
---- @param text any The layers.toml text.
---- @param opts table { karabiner = the remap facade }.
---- @return table result { saved, applied, errors }
-function M.apply_text(text, opts)
-	Logger.start(LOG, "Applying the navigation layer from the layout editor…")
-	local karabiner = type(opts) == "table" and opts.karabiner or nil
-	local function refused(detail)
-		Logger.error(LOG, "The navigation layer was not applied: %s.", detail)
-		return { saved = false, applied = false, errors = { { code = LayerEditor.WRITE_FAILED, detail = detail } } }
-	end
-	if type(karabiner) ~= "table" or type(karabiner.regenerate) ~= "function" then
-		return refused("the remap facade is unavailable")
-	end
-	local ok_ctx, ctx = pcall(load_context)
-	if not ok_ctx then return refused("the layer data could not be read: " .. tostring(ctx)) end
-	local get_config_dir = ConfigPaths.get_config_dir
-	local dir_ok, config_dir = pcall(get_config_dir)
-	if not dir_ok or type(config_dir) ~= "string" or config_dir == "" then
-		return refused("the configuration folder is unknown")
-	end
-	local result = save_and_apply({
-		text = text, ctx = ctx, config_dir = config_dir, file_adapter = FileSystem, karabiner = karabiner,
-		current = function()
-			local ok, dir = pcall(ConfigPaths.get_config_dir)
-			return ok and dir == config_dir
-		end,
-	})
-	return { saved = result.saved, applied = result.applied == true, errors = result.errors }
 end
 
 --- The open window, for ui/window_toggle (nil when closed).

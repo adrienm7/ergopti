@@ -68,10 +68,10 @@ helpers.describe("layout manager bridge (Linux)", function()
 			"an action outside the allowlist is refused")
 	end)
 
-	helpers.it("applies the layout editor's navigation layer through the layer editor's save (layout-editor-nav-apply)", function()
+	helpers.it("applies the layout editor's navigation layer through the window-free save (layout-editor-nav-apply)", function()
 		local Bridge, state, daemon_state = bridge()
 		local applied = {}
-		daemon_state.layer_editor_bridge = {
+		daemon_state.nav_layer_save = {
 			apply_text = function(text, given_state)
 				applied[#applied + 1] = { text = text, state = given_state }
 				return { saved = true, applied = true, errors = {} }
@@ -91,9 +91,9 @@ helpers.describe("layout manager bridge (Linux)", function()
 		helpers.assert_eq(#applied, 1)
 	end)
 
-	helpers.it("offers no navigation layer save without the layer editor (layout-editor-nav-apply)", function()
+	helpers.it("offers no navigation layer save without the save module (layout-editor-nav-apply)", function()
 		local Bridge, state, daemon_state = bridge()
-		daemon_state.layer_editor_bridge = { }
+		daemon_state.nav_layer_save = { }
 		Bridge.on_message({ action = "ready" }, daemon_state)
 		helpers.assert_contains(state.pushes[1].js, '"nav_apply":false')
 		helpers.assert_true(Bridge.on_message({ action = "nav_save", text = "x" }, daemon_state).handled == false)
