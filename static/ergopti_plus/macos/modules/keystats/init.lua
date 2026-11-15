@@ -2627,21 +2627,6 @@ end
 --- suppresses everything while paused, which also means an app switch made DURING
 --- a pause never updated the cached context — and nothing else re-syncs it.
 --- @return boolean True when the context was re-synchronised.
---- Closes the foreground application's interval as the driver pauses: the
---- time up to the pause is credited, the paused time never is, and the resume
---- opens a new interval (resync_context). Left open, the resume dropped the
---- time before the pause and a reload while paused credited none of it.
---- @return boolean settled Always true: no open interval is a closed one, and a
----   refused close is logged, never a reason to keep the driver from pausing.
-function M.close_app_interval_for_pause()
-	if not _state or type(ContextTracker.close_active_app) ~= "function" then return true end
-	local ok, err = pcall(ContextTracker.close_active_app)
-	if not ok then
-		Logger.error(LOG, "The foreground interval could not be closed at pause: %s.", tostring(err))
-	end
-	return true
-end
-
 function M.resync_context()
 	CoreState.foreground_refresh_pending = true
 	local results = table.pack(pcall(_physical_lifecycle.run, "resync", function()
