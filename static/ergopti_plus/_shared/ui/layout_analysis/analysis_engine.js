@@ -152,31 +152,42 @@ var LAYOUT_ANALYSIS = (function () {
 
 	const keyboardCache = new Map();
 
+	const unknownKey = (code) =>
+		new AnalysisError('fingering_unknown_key', { key: String(code) }, `unknown key ${code}`);
+	const unknownFinger = (finger) =>
+		new AnalysisError(
+			'fingering_unknown_finger',
+			{ finger: String(finger) },
+			`unknown finger ${finger}`
+		);
+
 	/**
 	 * Checks a fingering profile: the user's own model of which finger presses
 	 * each key and where each finger rests.
 	 * @param {object} profile - {id?, name?, base?: 'standard'|'angle',
 	 *   fingers?: {code: finger}, home?: {finger: code}}.
 	 * @returns {object} The profile, with empty maps filled in.
-	 * @throws {Error} On an unknown base, finger or key.
+	 * @throws {AnalysisError} On an unknown base, finger or key.
 	 */
 	function fingeringProfile(profile) {
 		const { model, geometry } = data();
 		if (!profile || typeof profile !== 'object')
-			throw new Error('layout_analysis: a fingering profile is an object');
+			throw new AnalysisError('fingering_not_object', {}, 'a fingering profile is an object');
 		if (profile.base !== undefined && !model.fingerings[profile.base])
-			throw new Error(`layout_analysis: unknown fingering ${profile.base}`);
+			throw new AnalysisError(
+				'fingering_unknown_base',
+				{ base: String(profile.base) },
+				`unknown fingering ${profile.base}`
+			);
 		const fingers = profile.fingers || {};
 		const home = profile.home || {};
 		for (const [code, finger] of Object.entries(fingers)) {
-			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
-			if (!model.fingers.includes(finger))
-				throw new Error(`layout_analysis: unknown finger ${finger}`);
+			if (!geometry[code]) throw unknownKey(code);
+			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
 		}
 		for (const [finger, code] of Object.entries(home)) {
-			if (!model.fingers.includes(finger))
-				throw new Error(`layout_analysis: unknown finger ${finger}`);
-			if (!geometry[code]) throw new Error(`layout_analysis: unknown key ${code}`);
+			if (!model.fingers.includes(finger)) throw unknownFinger(finger);
+			if (!geometry[code]) throw unknownKey(code);
 		}
 		return {
 			id: profile.id || 'custom',
@@ -254,7 +265,7 @@ var LAYOUT_ANALYSIS = (function () {
 				: geometry[code] && geometry[code][form];
 			if (!g) continue;
 			const finger = model.fingers.indexOf(fingerId);
-			if (finger < 0) throw new Error(`layout_analysis: unknown finger ${fingerId}`);
+			if (finger < 0) throw unknownFinger(fingerId);
 			const grid = board3d
 				? g.col + g.width / 2
 				: g.col + g.width / 2 + model.ortho_row_offsets[String(g.row)];
@@ -281,16 +292,20 @@ var LAYOUT_ANALYSIS = (function () {
 		board.homeOf = model.fingers.map((fingerId) => {
 			const k = board.index.get(homeKeys[fingerId]);
 			if (k === undefined)
-				throw new Error(
-					`layout_analysis: home key ${homeKeys[fingerId]} of ${fingerId} is not on ${keyboardId}`
+				throw new AnalysisError(
+					'home_key_not_on_keyboard',
+					{ key: String(homeKeys[fingerId]), finger: fingerId, keyboard: keyboardId },
+					`home key ${homeKeys[fingerId]} of ${fingerId} is not on ${keyboardId}`
 				);
 			// The space bar is wide: both thumbs rest on it, whichever presses it.
 			if (
 				model.fingers[board.finger[k]] !== fingerId &&
 				!model.shared_home_keys.includes(homeKeys[fingerId])
 			)
-				throw new Error(
-					`layout_analysis: home key ${homeKeys[fingerId]} is not pressed by ${fingerId}`
+				throw new AnalysisError(
+					'home_key_other_finger',
+					{ key: homeKeys[fingerId], finger: fingerId },
+					`home key ${homeKeys[fingerId]} is not pressed by ${fingerId}`
 				);
 			return k;
 		});

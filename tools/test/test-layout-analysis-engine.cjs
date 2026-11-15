@@ -377,19 +377,27 @@ check(
 		E.analyse(byId.get('qwerty'), ngrams, {}).score.total,
 	'profile: an empty profile is the default'
 );
-for (const bad of [
-	{ fingers: { KeyQ: 'nose' } },
-	{ fingers: { NoKey: 'lp' } },
-	{ home: { li: 'KeyJ' } },
-	{ base: 'diagonal' }
+// Each refusal carries a stable code and the values its message names, so the
+// page shows it in the reader's language (layout_analysis.error.<code>).
+for (const [bad, code, values] of [
+	[{ fingers: { KeyQ: 'nose' } }, 'fingering_unknown_finger', { finger: 'nose' }],
+	[{ fingers: { NoKey: 'lp' } }, 'fingering_unknown_key', { key: 'NoKey' }],
+	[{ home: { li: 'KeyJ' } }, 'home_key_other_finger', { key: 'KeyJ', finger: 'li' }],
+	[{ base: 'diagonal' }, 'fingering_unknown_base', { base: 'diagonal' }],
+	['not a profile', 'fingering_not_object', {}]
 ]) {
-	let threw = false;
+	let refusal = null;
 	try {
 		E.keyboard('iso', bad);
-	} catch {
-		threw = true;
+	} catch (error) {
+		refusal = error;
 	}
-	check(threw, `profile: ${JSON.stringify(bad)} must throw`);
+	check(
+		refusal instanceof E.AnalysisError &&
+			refusal.code === code &&
+			JSON.stringify(refusal.values) === JSON.stringify(values),
+		`profile: ${JSON.stringify(bad)} is refused as ${code} ${JSON.stringify(values)}`
+	);
 }
 
 // Split, ortholinear and column-staggered boards: their own positions, fingers
