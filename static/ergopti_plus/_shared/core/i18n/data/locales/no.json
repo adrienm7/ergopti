@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Oppsettet emuleres av ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Navigasjonslaget er lagret og tatt i bruk.",
 	"layout_editor.status.nav_imported": "Navigasjonslaget fra {name} importert.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Navigasjonslaget er lagret, men ikke tatt i bruk ennå.",
 	"layout_editor.status.opened": "{name} åpnet.",
 	"layout_editor.status.saved": "{name} lagret.",

@@ -310,6 +310,76 @@ async function exerciseOpensOnErgopti(browser, origin) {
 }
 
 /**
+ * (studio-nav-entry) The drivers' « Navigation layer » entries open the Studio
+ * on its nav layer: studioNav, pushed before the source as the hosts do, waits
+ * for the opening start (a copy of Ergopti), then imports the user's
+ * layers.toml as the nav layer held by the key the host names. Without that
+ * key the « Navigation » tool opens and says to choose it.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseStudioNav(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const keylayout = fs.readFileSync(KEYLAYOUT, 'utf8');
+	const layers = fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8');
+	const openWindow = async (nav) => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.addInitScript((strings) => {
+			window._i18n_strings = strings;
+			window.__posted = [];
+			window.webkit = {
+				messageHandlers: {
+					layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+				}
+			};
+		}, strings);
+		await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+		await page.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+		await page.evaluate((nav) => window.studioNav(nav), nav);
+		await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
+		await page.waitForSelector('#layout-editor #le-board');
+		await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_open'));
+		await page.evaluate(
+			(text) =>
+				window.composerData({
+					sources: [{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text }]
+				}),
+			keylayout
+		);
+		return { page, errors };
+	};
+
+	const held = await openWindow({ text: layers, hold: 'CapsLock' });
+	await held.page.waitForSelector('.le-tab.active[data-layer="nav"]');
+	await tool(held.page, 'details');
+	assert.equal(
+		await held.page.inputValue('#le-name'),
+		strings['layout_editor.start.copy_name'].replace('{name}', 'Ergopti'),
+		'the nav layer joins the opening start, not a document it then replaces'
+	);
+	// Asked again on a document that has its nav layer: it is shown, not imported twice.
+	await held.page.click('.le-tab[data-layer="base"], [data-layer="base"]');
+	await held.page.evaluate((text) => window.studioNav({ text, hold: 'CapsLock' }), layers);
+	await held.page.waitForSelector('.le-tab.active[data-layer="nav"]');
+	assert.deepEqual(held.errors, []);
+	await held.page.close();
+
+	const unheld = await openWindow({ text: layers, hold: '' });
+	await unheld.page.waitForSelector('#le-tool-tab-navigation.active');
+	assert.equal(
+		(await unheld.page.textContent('#le-message')).trim(),
+		strings['layout_editor.status.nav_missing']
+	);
+	assert.equal(await unheld.page.$('.le-tab[data-layer="nav"]'), null, 'nothing is imported');
+	assert.deepEqual(unheld.errors, []);
+	await unheld.page.close();
+}
+
+/**
  * (site-opens-on-ergopti) The site's standalone editor opens on a copy of
  * Ergopti too, from the registry it serves; without that registry (the main
  * check's loopback server) it keeps the empty keyboard.
@@ -2265,6 +2335,7 @@ async function exerciseComparerLink(browser, origin) {
 		await exerciseManager(browser, origin);
 		await exerciseDownloadWithoutLuaVm(browser, origin);
 		await exerciseOpensOnErgopti(browser, origin);
+		await exerciseStudioNav(browser, origin);
 		await exerciseCompareEdited(browser, origin);
 		await exerciseSiteOpensOnErgopti(browser, origin);
 		await exerciseLayerSelector(browser, origin);

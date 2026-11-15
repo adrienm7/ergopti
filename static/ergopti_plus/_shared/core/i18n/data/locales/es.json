@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Distribución emulada por ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Capa de navegación guardada y aplicada.",
 	"layout_editor.status.nav_imported": "Capa de navegación de {name} importada.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Capa de navegación guardada, pero aún no aplicada.",
 	"layout_editor.status.opened": "{name} abierto.",
 	"layout_editor.status.saved": "{name} guardado.",

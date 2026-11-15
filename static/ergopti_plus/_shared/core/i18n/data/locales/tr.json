@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Düzen ErgoptiPlus tarafından öykünülüyor.",
 	"layout_editor.status.nav_applied": "Gezinme katmanı kaydedildi ve uygulandı.",
 	"layout_editor.status.nav_imported": "{name} gezinme katmanı içe aktarıldı.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Gezinme katmanı kaydedildi ama henüz uygulanmadı.",
 	"layout_editor.status.opened": "{name} açıldı.",
 	"layout_editor.status.saved": "{name} kaydedildi.",

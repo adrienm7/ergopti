@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Układ jest emulowany przez ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Warstwa nawigacji zapisana i zastosowana.",
 	"layout_editor.status.nav_imported": "Zaimportowano warstwę nawigacji z {name}.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Warstwa nawigacji zapisana, ale jeszcze nie zastosowana.",
 	"layout_editor.status.opened": "Otwarto {name}.",
 	"layout_editor.status.saved": "Zapisano {name}.",

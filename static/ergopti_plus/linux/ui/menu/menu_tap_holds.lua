@@ -423,14 +423,14 @@ local function _build_tap_holds(ctx)
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
 	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
 
-	-- The navigation layer editor: the shared page, saved and applied by
-	-- ui/layer_editor/bridge.lua.
+	-- The navigation layer: Ergopti Studio on the source's nav layer, applied
+	-- through modules/keymap/nav_layer_save.lua.
 	render_ctx.commands[require("settings.engine.keys").COMMAND.EDIT_NAV_LAYER] = function()
 		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
-			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
+			Logger.error(LOG, "No webview manager in the menu context — Ergopti Studio cannot open.")
 			return
 		end
-		ctx.webview.show("layer_editor")
+		require("ui.layout_manager.bridge").open_editor_window(ctx.webview, { nav = true })
 	end
 
 	local rows = ManifestMenu

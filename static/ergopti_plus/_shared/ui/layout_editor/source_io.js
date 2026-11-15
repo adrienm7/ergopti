@@ -817,12 +817,52 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
-	 * Writes the source's `nav` layer as the drivers' layers.toml.
+	 * The FNV-1a 32-bit hash of a text's UTF-8 bytes, as 8 hex digits: enough
+	 * to tell a hand-edited layers.toml from the one the Studio compiled, not
+	 * a security check.
+	 * @param {string} text
+	 * @returns {string}
+	 */
+	function fnv1a32(text) {
+		let hash = 0x811c9dc5;
+		for (const byte of new TextEncoder().encode(text)) {
+			hash ^= byte;
+			hash = Math.imul(hash, 0x01000193) >>> 0;
+		}
+		return hash.toString(16).padStart(8, '0');
+	}
+
+	// The comment lines naming the source a compiled layers.toml comes from.
+	const NAV_FILE_SOURCE = '# source: ';
+	const NAV_FILE_HASH = '# body-fnv1a32: ';
+
+	/**
+	 * Writes the source's `nav` layer as the drivers' layers.toml. The layout
+	 * source is the one source of truth and layers.toml its compiled form
+	 * (coordinator, 2026-11-15, to review by the maintainer): the file opens
+	 * with the source's id and the hash of the body below, so a hand edit is
+	 * recognisable. The loaders read it as any layers.toml and do not refuse
+	 * an edited one: files written before this header have none.
 	 * @param {object} doc
 	 * @param {object} data - LAYER_EDITOR_DATA.
 	 * @returns {string}
 	 */
 	function navLayerFile(doc, data) {
+		const body = navLayerBody(doc, data);
+		return (
+			[
+				`# Compiled by Ergopti Studio from the navigation layer of « ${doc.layout.id} ».`,
+				'# Edit that layer in the Studio and apply it again: a change made here is',
+				'# replaced the next time it is applied.',
+				NAV_FILE_SOURCE + doc.layout.id,
+				NAV_FILE_HASH + fnv1a32(body),
+				''
+			].join('\n') + body
+		);
+	}
+
+	/** The layers.toml body of the source's `nav` layer, without the source header. */
+	function navLayerBody(doc, data) {
 		const layer = (doc.layers || []).find((l) => l.id === NAV_LAYER);
 		const sections = {};
 		if (layer) {
@@ -870,6 +910,9 @@ var LayoutSourceIO = (function () {
 		installPayload,
 		emulationTable,
 		withNavLayer,
-		navLayerFile
+		navLayerFile,
+		fnv1a32,
+		NAV_FILE_SOURCE,
+		NAV_FILE_HASH
 	};
 })();

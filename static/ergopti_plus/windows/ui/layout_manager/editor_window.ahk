@@ -471,15 +471,54 @@ _LayEdWin_RemoveExportInput(Path) {
  * @returns {Boolean} Whether the window is shown.
  */
 LayoutEditorWindow_Open(*) {
+	return _LayEdWin_TryOpen() ? true : false
+}
+
+; Whether a « Navigation layer » entry waits for the Studio's page to show it.
+global _LayEdWin_NavWanted := false
+
+/**
+ * Opens Ergopti Studio on the source's navigation layer: the « Navigation
+ * layer » menu row, gesture and shortcut (open_layer_editor). The page imports
+ * the user's layers.toml as that layer when the source has none.
+ * @returns {Boolean} Whether the window is shown.
+ */
+LayoutEditorWindow_OpenOnNav(*) {
+	global _LayEdWin_NavWanted
+	_LayEdWin_NavWanted := true
+	Host := _LayEdWin_TryOpen()
+	if !Host
+		return false
+	; A page that already answered its ready takes it now; a new one on its ready.
+	if Host.ReadyFired
+		_LayEdWin_PushNav(Host)
+	return true
+}
+
+; The window's host, opened or brought to the front, or "" when WebView2 is unavailable.
+_LayEdWin_TryOpen() {
 	Host := WebViewHost.TryOpen("layout_editor_window", Map(
 		"Title", t("layout_editor.title"),
 		"OnReady", _LayEdWin_OnReady,
 		"OnMessage", _LayEdWin_OnMessage))
-	if !Host {
+	if !Host
 		LoggerError("LayoutEditorWindow", "The layout editor could not open: WebView2 is unavailable.")
-		return false
+	return Host
+}
+
+; Sends the page the navigation layer a « Navigation layer » entry asked for, once.
+_LayEdWin_PushNav(Host) {
+	global _LayEdWin_NavWanted
+	if !_LayEdWin_NavWanted
+		return
+	_LayEdWin_NavWanted := false
+	try {
+		Nav := NavLayerSave_StudioNav()
+	} catch as Err {
+		LoggerError("LayoutEditorWindow", "The navigation layer could not be read for the Studio: {1}.", Err.Message)
+		Nav := Map("error", Err.Message)
 	}
-	return true
+	_LayEdWin_Push(Host, "studioNav", Nav)
 }
 
 ; The ports of one window: pushes go to that exact host only.
@@ -530,6 +569,7 @@ _LayEdWin_OnReady(Host) {
 	try LayoutEditorWindow_HandleMessage(Map("action", "ready"), _LayEdWin_Deps(Host))
 	catch as Err
 		LoggerError("LayoutEditorWindow", "The layout editor could not be initialized: {1}.", Err.Message)
+	_LayEdWin_PushNav(Host)
 }
 
 ; The page's own ready is already answered by _LayEdWin_OnReady.

@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Indeling geëmuleerd door ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Navigatielaag opgeslagen en toegepast.",
 	"layout_editor.status.nav_imported": "Navigatielaag van {name} geïmporteerd.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Navigatielaag opgeslagen, maar nog niet toegepast.",
 	"layout_editor.status.opened": "{name} geopend.",
 	"layout_editor.status.saved": "{name} opgeslagen.",

@@ -147,6 +147,10 @@ Account and tester actions (maintainer, from the PC):
       Studio »: both tabs and their unsaved edits are back, from `layout_sources\studio_workspace.json`; « Export
       all » writes `ergopti-studio-layouts.zip` to the Downloads folder and « Import » of that file reopens every
       layout.
+      Navigation layer in the Studio (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the Tap-Holds menu's « Edit the navigation layer… » row and a
+      gesture bound to « Navigation layer » open Ergopti Studio on its « nav » layer, holding the current layer
+      key, with the user's layers.toml bindings; « Apply the navigation layer » then changes the layer live, and
+      layers.toml starts with « # source: » and « # body-fnv1a32: ».
 
 - [ ] Layout editor downloads (2026-11-14, `layout_editor_downloads`): the editor window's XKB, KLC, DLL and macOS
       bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext »,

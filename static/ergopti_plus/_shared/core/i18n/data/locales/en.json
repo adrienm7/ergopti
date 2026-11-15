@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Layout emulated by ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Navigation layer saved and applied.",
 	"layout_editor.status.nav_imported": "Navigation layer of {name} imported.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Navigation layer saved, but not applied yet.",
 	"layout_editor.status.opened": "{name} opened.",
 	"layout_editor.status.saved": "{name} saved.",

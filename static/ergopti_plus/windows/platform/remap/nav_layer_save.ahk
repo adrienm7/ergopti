@@ -34,6 +34,18 @@ global NAV_LAYER_SAVE_INVALID_PAYLOAD := "invalid_payload"
 global NAV_LAYER_SAVE_WRITE_FAILED := "write_failed"
 global NAV_LAYER_SAVE_FILE_UNREADABLE := "file_unreadable"
 
+; Tap-hold key id (the ahk column of [tap_hold.catalog]) -> the registry code of
+; that physical key. The Windows remap files name their keys by literal scan
+; codes, so this is the one table that ties the two vocabularies;
+; tools/test/test-layer-editor-legends.cjs holds it to the catalogue and, through
+; the Linux engine's evdev codes, to the registry.
+global NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES := Map(
+	"escape", "Escape", "tab", "Tab", "caps_lock", "CapsLock", "left_shift", "ShiftLeft",
+	"left_ctrl", "ControlLeft", "win", "MetaLeft", "left_alt", "AltLeft", "space", "Space",
+	"alt_gr", "AltRight", "right_ctrl", "ControlRight", "right_shift", "ShiftRight",
+	"enter", "Enter", "backspace", "Backspace", "delete", "Delete"
+)
+
 
 
 
@@ -218,4 +230,57 @@ NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, Ope
 	if !Result["applied"]
 		LoggerError("NavLayerSave", "The saved navigation layer is not applied: the reload was refused.")
 	return Result
+}
+
+
+
+
+
+; =================================
+; =================================
+; ======= 3/ Ergopti Studio =======
+; =================================
+; =================================
+
+/**
+ * The registry codes of the keys whose hold enters the navigation layer.
+ * @param {Map} TapHoldSource - A tap-hold configuration (LoadTapHoldToml's shape).
+ * @returns {Array} Codes in tap-hold id order.
+ */
+NavLayerSave_LayerKeys(TapHoldSource) {
+	global NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES, NAV_LAYER_ID
+	Codes := []
+	for Id, Code in NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES {
+		if (TapHoldHoldLayer(TapHoldSource, Id) == NAV_LAYER_ID)
+			Codes.Push(Code)
+	}
+	return Codes
+}
+
+; The layer keys of the retained tap-hold configuration.
+NavLayerSave_CurrentLayerKeys() {
+	global TapHold
+	return NavLayerSave_LayerKeys(MasterGateDesiredTapHold(IsSet(TapHold) ? TapHold : Map("keys", Map())))
+}
+
+/**
+ * What Ergopti Studio shows for the « Navigation layer » entries: the user's
+ * layers.toml, else the recommended one (an absent file binds no key today,
+ * and the preset is where a layer starts), and the key whose hold enters the
+ * layer.
+ * @returns {Map} text (String) and hold (a registry code, or "" when no key enters it).
+ */
+NavLayerSave_StudioNav() {
+	global _ConfigDir, _SharedDir, FS_STATUS_OK, FS_STATUS_ABSENT
+	Ctx := KeymapLayers_LoadContext(_SharedDir)
+	Path := KeymapLayers_UserFilePath(Ctx, _ConfigDir)
+	Source := FSReadWithStatus(Path)
+	if (Source["status"] == FS_STATUS_OK)
+		Text := Source["content"]
+	else if (Source["status"] == FS_STATUS_ABSENT)
+		Text := TapHoldRecommendedLayer(_SharedDir)["text"]
+	else
+		throw Error("'" . Path . "' is unreadable: " . Source["detail"])
+	Keys := NavLayerSave_CurrentLayerKeys()
+	return Map("text", Text, "hold", Keys.Length ? Keys[1] : "")
 }

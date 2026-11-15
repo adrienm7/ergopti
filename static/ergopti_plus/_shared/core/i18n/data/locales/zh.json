@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "布局正由 ErgoptiPlus 模拟。",
 	"layout_editor.status.nav_applied": "导航层已保存并应用。",
 	"layout_editor.status.nav_imported": "已导入 {name} 的导航层。",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "导航层已保存，但尚未应用。",
 	"layout_editor.status.opened": "已打开 {name}。",
 	"layout_editor.status.saved": "已保存 {name}。",

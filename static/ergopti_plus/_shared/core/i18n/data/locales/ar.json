@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "يحاكي ErgoptiPlus التخطيط الآن.",
 	"layout_editor.status.nav_applied": "حُفظت طبقة التنقل وطُبّقت.",
 	"layout_editor.status.nav_imported": "تم استيراد طبقة التنقّل من {name}.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "حُفظت طبقة التنقل لكنها لم تُطبَّق بعد.",
 	"layout_editor.status.opened": "تم فتح {name}.",
 	"layout_editor.status.saved": "تم حفظ {name}.",

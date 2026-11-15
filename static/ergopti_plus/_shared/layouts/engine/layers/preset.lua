@@ -112,6 +112,25 @@ function M.read(shared_root, toml_decode)
 	return { text = text, user_file = meta.user_file, layer_id = layer_id }
 end
 
+--- The layers.toml text Ergopti Studio shows as the navigation layer: the
+--- user's file, else the preset. An absent file binds no key today, and the
+--- preset is where a layer starts, as the first-run import does.
+--- @param opts table { shared_root, path, toml_decode, file_adapter|nil } where
+---   path is the user's layers.toml.
+--- @return string text
+--- @return string origin "user" or "preset".
+function M.studio_text(opts)
+	if type(opts) ~= "table" or type(opts.path) ~= "string" or opts.path == "" then
+		error("layer_preset.studio_text needs the user's layers.toml path", 2)
+	end
+	local content, status, detail = TomlWriter.read_classified(opts.path, opts.file_adapter)
+	if status == "ok" then return content, "user" end
+	if status ~= "absent" then
+		error("layer_preset: '" .. opts.path .. "' is unreadable: " .. tostring(detail), 2)
+	end
+	return M.read(opts.shared_root, opts.toml_decode).text, "preset"
+end
+
 --- Creates the user's layers.toml from the preset when the folder has none.
 --- @param opts table { shared_root, config_dir, toml_decode, file_adapter|nil }
 ---   where file_adapter is the driver's atomic FileSystem adapter, or nil for

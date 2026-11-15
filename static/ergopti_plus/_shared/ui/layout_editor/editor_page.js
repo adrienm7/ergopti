@@ -282,8 +282,11 @@ var LayoutEditorPage = (function () {
 	 *   and no restored workspace; compare(layout) receives the edited layout from
 	 *   the analysis panel's « Compare with other layouts » (the app's Studio);
 	 *   workspace {load(): Promise<string|null>, save(text): Promise,
-	 *   persist?(): Promise<boolean>} keeps the tabs (LayoutEditorWorkspace).
-	 * @returns {{open: function(string, string): void, current: function(): object}}
+	 *   persist?(): Promise<boolean>} keeps the tabs (LayoutEditorWorkspace);
+	 *   startNav {text, hold} opens the editor on its navigation layer, as
+	 *   showNav does (the drivers' « Navigation layer » entries).
+	 * @returns {{open: function(string, string): void, current: function(): object,
+	 *   showNav: function(object): void}}
 	 */
 	function mount(root, host) {
 		const data = LAYER_EDITOR_DATA;
@@ -1007,6 +1010,31 @@ var LayoutEditorPage = (function () {
 			} catch (error) {
 				notify('error', problemText(error));
 			}
+		}
+
+		/**
+		 * Shows the navigation layer, once the first document is in place. A
+		 * document without one takes the driver's layers.toml (nav.text) as its
+		 * navigation layer, held by nav.hold, the key whose hold enters the layer
+		 * today; without that key the « Navigation » tool opens and says to choose
+		 * it. layers.toml stays the compiled form: « Apply the navigation layer »
+		 * writes it back from this layer.
+		 * @param {{text?: string|null, hold?: string|null}} nav
+		 */
+		function showNav(nav) {
+			initialSettled.then(() => {
+				if ((doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER)) {
+					showLayer(LayoutSourceIO.NAV_LAYER);
+					return;
+				}
+				if (nav && typeof nav.hold === 'string' && nav.hold) state.navHold = nav.hold;
+				if (nav && typeof nav.text === 'string' && state.navHold) {
+					importNav('layers.toml', nav.text);
+					return;
+				}
+				state.tool = 'navigation';
+				notify('error', tl('status.nav_missing'));
+			});
 		}
 
 		function ask(text, onYes) {
@@ -3939,22 +3967,25 @@ var LayoutEditorPage = (function () {
 		 * The first document: the host's workspace restored when it holds tabs, else
 		 * the host's initial text, else a copy of its start source.
 		 */
+		/**
+		 * Opens the first document: the restored tabs, else the start one.
+		 * @returns {Promise<void>} Settles once that document is in place.
+		 */
 		function openInitial() {
-			if (!host.workspace) {
-				openStart();
-				return;
-			}
-			fromHost(() => host.workspace.load()).then(
+			if (!host.workspace) return Promise.resolve(openStart());
+			return fromHost(() => host.workspace.load()).then(
 				(text) => {
-					if (!restoreWorkspace(text)) openStart();
+					const started = restoreWorkspace(text) ? null : openStart();
 					render();
+					return started;
 				},
 				(error) => {
 					// The tabs could not be read: the page says so, saves nothing over them,
 					// and still opens the start document.
 					refuseWorkspace(error);
-					openStart();
+					const started = openStart();
 					render();
+					return started;
 				}
 			);
 		}
@@ -3971,7 +4002,7 @@ var LayoutEditorPage = (function () {
 				// untouched first document is replaced; without that source it stays. The
 				// locale's arrival renames that document without touching it (i18n:applied).
 				const opened = replacements;
-				loadFillSources().then(() => {
+				return loadFillSources().then(() => {
 					const entry = (state.fillSources || []).find((source) => source.id === host.startFrom);
 					const touched = replacements !== opened || state.dirty || state.history.canUndo();
 					if (!entry || touched) return;
@@ -3991,8 +4022,9 @@ var LayoutEditorPage = (function () {
 			}
 		}
 
-		openInitial();
+		const initialSettled = openInitial();
 		render();
+		if (host.startNav) showNav(host.startNav);
 		if (host.workspace) {
 			if (typeof host.workspace.persist === 'function')
 				fromHost(() => host.workspace.persist()).then(
@@ -4028,6 +4060,7 @@ var LayoutEditorPage = (function () {
 		return {
 			open: (name, text) => openText(name, text),
 			current: () => doc(),
+			showNav,
 			// Saves the tabs now instead of after the delay.
 			flushAutosave,
 			// The keyboard format shown, which the Studio passes on to its Comparer.

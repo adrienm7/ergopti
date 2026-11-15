@@ -31,6 +31,8 @@ local Json        = require("core.text.engine.json")
 local TomlCodec   = require("core.text.engine.toml_codec")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
+local LayerPreset = require("layouts.engine.layers.preset")
+local NavLayer    = require("platform.remap.nav_layer")
 
 local LOG = "keymap.nav_layer_save"
 
@@ -135,6 +137,59 @@ function M.save(opts)
 		Logger.error(LOG, "Navigation layer saved to '%s' but its regeneration was refused.", result.path)
 	end
 	return { saved = true, applied = applied, errors = {}, path = result.path }
+end
+
+--- An override of a registry key for the ISO form, when it has one.
+--- @param entry table A registry key.
+--- @param field string hs | karabiner.
+--- @return any
+function M.iso_field(entry, field)
+	local override = entry["macos_" .. NavLayer.KEYBOARD_FORM]
+	if type(override) == "table" and override[field] ~= nil then return override[field] end
+	return entry[field]
+end
+
+--- The registry codes of the keys whose hold enters the layer.
+--- @param ctx table The loader context.
+--- @param karabiner table The remap facade.
+--- @return table codes
+function M.layer_keys(ctx, karabiner)
+	local codes = {}
+	local karabiner_key_code = function(entry)
+		local event = M.iso_field(entry, "karabiner")
+		return type(event) == "table" and event.key_code or nil
+	end
+	for _, key in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
+		if karabiner.get_hold_action(key.id) == NavLayer.HOLD_ACTION_ID then
+			local key_code = type(key.from) == "table" and key.from.key_code or nil
+			local code = LayerEditor.code_of(ctx, karabiner_key_code, key_code)
+			if code then
+				codes[#codes + 1] = code
+			else
+				-- Fn has no place on the registry's board: nothing to mark.
+				Logger.debug(LOG, "The layer key '%s' is not on the registry's board.", tostring(key.id))
+			end
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
+--- What Ergopti Studio shows for the « Navigation layer » entries: the user's
+--- layers.toml (else the preset) and the key whose hold enters the layer.
+--- @param opts table { karabiner = the remap facade }.
+--- @return table nav { text, hold } where hold is nil when no key enters it.
+function M.studio_nav(opts)
+	local karabiner = type(opts) == "table" and opts.karabiner or nil
+	if type(karabiner) ~= "table" or type(karabiner.get_hold_action) ~= "function" then
+		error("the remap facade is unavailable", 0)
+	end
+	local ctx = M.load_context()
+	local text = LayerPreset.studio_text({
+		shared_root = Paths.shared_root(), path = Layers.user_file_path(ConfigPaths.get_config_dir(), ctx),
+		toml_decode = TomlCodec.decode, file_adapter = FileSystem,
+	})
+	return { text = text, hold = M.layer_keys(ctx, karabiner)[1] }
 end
 
 --- Saves and applies a layers.toml the layout editor built from a source's

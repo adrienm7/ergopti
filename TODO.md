@@ -887,6 +887,18 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       `layers.toml` through it).
       [CODE] Left (2026-11-15): the composer part is done (0f23c3fee9); `_shared/ui/layer_editor` and `nav_save` remain,
       and no driver reads the source's `nav` layer yet (Linux nav_layer.lua reads layers.toml).
+      Single source (decided by the coordinator on 2026-11-15, to review by the maintainer): the layout source's `nav`
+      layer, edited in Ergopti Studio, is the one source; `layers.toml` is its compiled form, written only by « Apply
+      the navigation layer », and the drivers keep reading it through their proven loaders. The compiled file opens
+      with `# source: <id>` and `# body-fnv1a32: <hash>` (source_io.js navLayerFile); the loaders do not refuse a
+      hand-edited file, since files written before this header have none.
+      Step 1 done (2026-11-15, `claude/ergopti-todo-retire-layer-editor-2`): the save and apply moved out of
+      `ui/layer_editor` (Linux and macOS modules/keymap/nav_layer_save.lua, Windows platform/remap/nav_layer_save.ahk).
+      Step 2 done (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the « Navigation layer » menu row, gesture and
+      shortcut (`open_layer_editor`, id kept for users' bindings) open the Studio on its `nav` layer, importing the
+      user's layers.toml (else the preset) held by the current layer key; proof: `studio-nav-entry` in
+      layout-editor.playwright.cjs, test_layout_manager_bridge.lua and test_layer_editor_host.lua (macOS). Left:
+      step 3, deleting the page, its three hosts, their tests and strings.
 
 ## Parity audit pause and resumption
 

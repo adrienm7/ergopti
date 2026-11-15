@@ -24,6 +24,7 @@ local Logger      = require("core.logger.engine.shim")
 local TomlCodec   = require("core.text.engine.toml_codec")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
+local LayerPreset = require("layouts.engine.layers.preset")
 
 local M = {}
 
@@ -126,6 +127,46 @@ function M.save(state, opts)
 		Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
 	end
 	return result
+end
+
+--- The registry codes of the keys whose hold enters the navigation layer.
+--- @param state table Daemon state.
+--- @param ctx table The loader context.
+--- @param shared_root string The _shared folder.
+--- @return table codes
+function M.layer_keys(state, ctx, shared_root)
+	local manager = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
+	local engine = dependency(state, "tap_hold_engine", "platform.remap.tap_hold_engine")
+	local ok, keys = pcall(function() return manager.keys() end)
+	if not ok or type(keys) ~= "table" or not engine then
+		Logger.warn(LOG, "The tap-hold keys are unknown, so no layer key is marked: %s.", tostring(keys))
+		return {}
+	end
+	local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
+	local codes = {}
+	for id, entry in pairs(keys) do
+		if type(entry) == "table" and entry.hold_layer == layer_id then
+			local evdev = engine.KEY_CODES[id]
+			local code = evdev and LayerEditor.code_of(ctx, function(key) return key.evdev end, evdev) or nil
+			if code then codes[#codes + 1] = code end
+		end
+	end
+	table.sort(codes)
+	return codes
+end
+
+--- What Ergopti Studio shows for the « Navigation layer » entries: the user's
+--- layers.toml (else the preset) and the key whose hold enters the layer.
+--- @param state table Daemon state.
+--- @return table nav { text, hold } where hold is nil when no key enters it.
+function M.studio_nav(state)
+	state = type(state) == "table" and state or {}
+	local shared_root, config_dir = M.folders(state)
+	local ctx = M.load_context(shared_root)
+	local text = LayerPreset.studio_text({
+		shared_root = shared_root, path = Layers.user_file_path(config_dir, ctx), toml_decode = TomlCodec.decode,
+	})
+	return { text = text, hold = M.layer_keys(state, ctx, shared_root)[1] }
 end
 
 --- Saves and applies a layers.toml the layout editor built from a source's

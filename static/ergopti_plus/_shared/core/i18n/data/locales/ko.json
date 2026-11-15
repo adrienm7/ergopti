@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "ErgoptiPlus가 자판을 에뮬레이트하고 있습니다.",
 	"layout_editor.status.nav_applied": "탐색 레이어를 저장하고 적용했습니다.",
 	"layout_editor.status.nav_imported": "{name}의 탐색 레이어를 가져왔습니다.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "탐색 레이어를 저장했지만 아직 적용되지 않았습니다.",
 	"layout_editor.status.opened": "{name}을(를) 열었습니다.",
 	"layout_editor.status.saved": "{name}을(를) 저장했습니다.",

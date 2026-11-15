@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "הפריסה מודמית על ידי ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "שכבת הניווט נשמרה והוחלה.",
 	"layout_editor.status.nav_imported": "שכבת הניווט של {name} יובאה.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "שכבת הניווט נשמרה אך עדיין לא הוחלה.",
 	"layout_editor.status.opened": "{name} נפתח.",
 	"layout_editor.status.saved": "{name} נשמר.",

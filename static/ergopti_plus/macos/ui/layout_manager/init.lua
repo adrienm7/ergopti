@@ -154,6 +154,9 @@ local function new_window(spec)
 	local _retiring_lease = nil
 	local _settling_retired_window = false
 	local _opening_window = false
+	-- The reader of the navigation layer a « Navigation layer » entry asked
+	-- this window to show, until its page takes it.
+	local _nav_reader = nil
 
 	--- Settles exact window and callback owners before admitting another window.
 	--- @return boolean settled Native cleanup committed or already consumed the window.
@@ -234,6 +237,15 @@ local function new_window(spec)
 			end or nil,
 			strings = function() return page_strings(spec.strings_file) end,
 			editor_window = spec.editor_window,
+			take_nav = spec.editor_window and function()
+				local reader = _nav_reader
+				_nav_reader = nil
+				if reader == nil then return nil end
+				local read, nav = pcall(reader)
+				if read then return nav end
+				Logger.error(LOG, "The navigation layer could not be read for the Studio: %s.", tostring(nav))
+				return { error = tostring(nav) }
+			end or nil,
 			open_editor_window = not spec.editor_window and function() return M.open_editor() end or nil,
 			open_url = function(url)
 				local ok, ui_builder = pcall(require, "core.ui.ui.builder")
@@ -299,6 +311,14 @@ local function new_window(spec)
 			return result
 		end
 		return controller
+	end
+
+	--- Asks this window's page to show the navigation layer that reader()
+	--- returns: at once when its page is ready, else when it says so.
+	--- @param reader function reader() -> { text, hold }
+	function W.want_nav(reader)
+		_nav_reader = reader
+		if _controller then _controller.show_nav() end
 	end
 
 	--- Opens this window, or focuses it when it is already open.
@@ -486,6 +506,16 @@ M.open = Manager.open
 --- last saved source once its page is ready.
 --- @return boolean opened
 M.open_editor = Editor.open
+
+--- Opens Ergopti Studio on the source's navigation layer: the « Navigation
+--- layer » menu row, gesture and shortcut (open_layer_editor). The page imports
+--- the user's layers.toml as that layer when the source has none.
+--- @param opts table { karabiner = the remap facade }.
+--- @return boolean opened
+function M.open_editor_on_nav(opts)
+	Editor.want_nav(function() return require("modules.keymap.nav_layer_save").studio_nav(opts) end)
+	return Editor.open()
+end
 
 --- The open layout manager window, for ui/window_toggle (nil when closed).
 --- @return userdata|nil view

@@ -145,7 +145,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (*) => GestureToggleOrFocusUI(MenuCommand.LAYOUT_MANAGER),
 		},
 		"open_layer_editor", {
-				Fn: (*) => GestureToggleOrFocusUI("layer_editor"),
+				Fn: (*) => GestureToggleOrFocusUI("studio_nav"),
 		},
 		"open_model_browser", {
 				Fn: (*) => GestureToggleOrFocusUI("model_browser"),
@@ -1073,11 +1073,12 @@ _GestureToggleUIPage(which) {
 						}
 				case MenuCommand.LAYOUT_MANAGER:
 						return { Hwnd: () => _GestureGuiHwnd(_LayMgrWeb_Gui), Open: () => LayoutManager_Open() }
-				case "layer_editor":
+				case "studio_nav":
+						; Ergopti Studio, opened on the source's navigation layer.
 						return {
-								Hwnd: () => WebViewHost._Instances.Has(LAYER_EDITOR_APP_ID)
-										? _GestureGuiHwnd(WebViewHost._Instances[LAYER_EDITOR_APP_ID].Gui) : 0,
-								Open: () => LayerEditor_Open(),
+								Hwnd: () => WebViewHost._Instances.Has("layout_editor_window")
+										? _GestureGuiHwnd(WebViewHost._Instances["layout_editor_window"].Gui) : 0,
+								Open: () => LayoutEditorWindow_OpenOnNav(),
 						}
 				case "model_browser":
 						return {

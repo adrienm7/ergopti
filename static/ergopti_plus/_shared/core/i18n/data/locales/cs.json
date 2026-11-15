@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Rozložení emuluje ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Navigační vrstva uložena a použita.",
 	"layout_editor.status.nav_imported": "Navigační vrstva z {name} importována.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Navigační vrstva uložena, ale zatím nepoužita.",
 	"layout_editor.status.opened": "{name}: otevřeno.",
 	"layout_editor.status.saved": "{name}: uloženo.",

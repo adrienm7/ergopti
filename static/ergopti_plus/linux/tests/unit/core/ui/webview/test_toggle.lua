@@ -85,7 +85,8 @@ helpers.describe("window actions reach the toggle (Linux)", function()
 		open_paths_editor = "paths_editor",
 		open_hotstrings_settings = "hotstrings_config_window",
 		open_layout_manager = "layout_manager",
-		open_layer_editor = "layer_editor",
+		-- The navigation layer is edited in Ergopti Studio (retire-layer-editor).
+		open_layer_editor = "layout_editor_window",
 		open_model_browser = "model_browser",
 		open_changelog = "changelog",
 		open_healthcheck = "healthcheck",
@@ -110,8 +111,8 @@ helpers.describe("window actions reach the toggle (Linux)", function()
 				Gestures.execute_action(action_id, "test__slot")
 				helpers.assert_eq(#toggled, 1, action_id .. " toggles exactly one window")
 				helpers.assert_eq(toggled[1].app, app_name, action_id .. " toggles its own page")
-				helpers.assert_eq(toggled[1].has_opener, app_name == "healthcheck",
-					action_id .. ": only the diagnostics page opens through its bridge")
+				helpers.assert_eq(toggled[1].has_opener, app_name == "healthcheck" or app_name == "layout_editor_window",
+					action_id .. ": only the diagnostics page and the Studio on its nav layer open through a bridge")
 			end
 		end)
 		package.loaded["core.ui.ui.webview_manager"] = previous

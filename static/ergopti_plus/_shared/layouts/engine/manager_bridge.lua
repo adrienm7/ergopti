@@ -494,6 +494,9 @@ end
 --- deps.open_editor_window() opens (or focuses) the layout editor window; without
 ---   it open_editor is refused.
 --- deps.editor_window is true for the controller of the layout editor window.
+--- deps.take_nav() returns, once, the { text, hold } the drivers' « Navigation
+---   layer » entries asked that window to show (nil when none is pending); the
+---   page receives it as studioNav once it is ready.
 --- deps.read_keystats(on_done) optionally reads the user's keystats n-grams for
 ---   Ergopti Studio; on_done({ ok = true, ngrams } or { ok = false, code }).
 ---   Only the editor window offers it; elsewhere keystats_ngrams is refused.
@@ -565,6 +568,7 @@ function M.new(deps)
 				lua_export = editor_window and type(deps.registry.source_export_step) == "function" })
 			-- The editor window lists no catalogue: it needs the platform alone.
 			if not editor_window then deps.registry.refresh(function() push_state() end) end
+			if editor_window then controller.show_nav() end
 			if editor_wanted then
 				editor_wanted = false
 				M.handle_source(deps, "source_open", {})
@@ -731,6 +735,16 @@ function M.new(deps)
 		if page_ready then return M.handle_source(deps, "source_open", {}) end
 		editor_wanted = true
 		return true
+	end
+
+	--- Shows the navigation layer a « Navigation layer » entry asked for, now
+	--- when the page is ready, else on its ready.
+	--- @return boolean pushed
+	function controller.show_nav()
+		if not editor_window or not page_ready or type(deps.take_nav) ~= "function" then return false end
+		local nav = deps.take_nav()
+		if nav == nil then return false end
+		return deps.push("studioNav", nav) ~= false
 	end
 
 	return controller

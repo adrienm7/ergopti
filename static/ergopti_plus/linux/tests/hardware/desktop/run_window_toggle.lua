@@ -30,7 +30,7 @@ local ACTIONS = {
 	{ "open_paths_editor", "paths_editor" },
 	{ "open_hotstrings_settings", "hotstrings_config_window" },
 	{ "open_layout_manager", "layout_manager" },
-	{ "open_layer_editor", "layer_editor" },
+	{ "open_layer_editor", "layout_editor_window" },
 	{ "open_model_browser", "model_browser" },
 	{ "open_changelog", "changelog" },
 	{ "open_healthcheck", "healthcheck" },

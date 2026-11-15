@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "लेआउट ErgoptiPlus द्वारा एम्युलेट किया जा रहा है।",
 	"layout_editor.status.nav_applied": "नेविगेशन परत सहेजी और लागू की गई।",
 	"layout_editor.status.nav_imported": "{name} की नेविगेशन लेयर आयात की गई।",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "नेविगेशन परत सहेजी गई, पर अभी लागू नहीं हुई।",
 	"layout_editor.status.opened": "{name} खोला गया।",
 	"layout_editor.status.saved": "{name} सहेजा गया।",

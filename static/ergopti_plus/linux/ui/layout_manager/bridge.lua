@@ -72,6 +72,8 @@ local function new_handler(spec)
 	local H = { bridge_name = spec.bridge_name }
 	-- Registry work can outlive a page; its UI callbacks retain that exact owner.
 	local _controller, _controller_owner, _registry_observer = nil, nil, nil
+	-- Whether a « Navigation layer » entry waits for this window's page.
+	local _nav_wanted = false
 
 	--- The controller wired to this daemon.
 	--- @param state table
@@ -183,6 +185,16 @@ local function new_handler(spec)
 			end or nil,
 			strings = function() return page_strings(i18n, spec.strings_file) end,
 			editor_window = spec.editor_window,
+			-- The navigation layer a « Navigation layer » entry asked for, read
+			-- when the page takes it (modules/keymap/nav_layer_save.lua).
+			take_nav = spec.editor_window and function()
+				if not _nav_wanted then return nil end
+				_nav_wanted = false
+				local read, nav = pcall(nav_layer_save.studio_nav, state)
+				if read then return nav end
+				Logger.error(LOG, "The navigation layer could not be read for the Studio: %s.", tostring(nav))
+				return { error = tostring(nav) }
+			end or nil,
 			-- The manager page's « Layout editor » shows the editor's own window.
 			open_editor_window = not spec.editor_window and function()
 				if not current() or type(manager.show) ~= "function" then return false end
@@ -297,9 +309,17 @@ local function new_handler(spec)
 		_controller, _controller_owner = nil, nil
 	end
 
+	--- Asks this window's page to show the navigation layer: at once when its
+	--- page is ready, else when it says so.
+	function H.want_nav()
+		_nav_wanted = true
+		if _controller then _controller.show_nav() end
+	end
+
 	--- Test seam: forgets the controller and revokes all retained callbacks.
 	function H._reset()
 		_controller, _controller_owner, _registry_observer = nil, nil, nil
+		_nav_wanted = false
 	end
 
 	return H
@@ -312,12 +332,15 @@ M.editor = new_handler(EDITOR_SPEC)
 --- layout… »), or brings the open one to the front: its controller answers the
 --- page's ready with the last saved source, and an open editor keeps its work.
 --- @param manager table The webview manager (ui.webview_manager).
+--- @param opts table|nil { nav = true } opens it on the navigation layer: the
+---   « Navigation layer » menu row, gesture and shortcut (open_layer_editor).
 --- @return boolean shown
-function M.open_editor_window(manager)
+function M.open_editor_window(manager, opts)
 	if type(manager) ~= "table" or type(manager.show) ~= "function" then
 		Logger.error(LOG, "No webview manager — the layout editor window cannot open.")
 		return false
 	end
+	if type(opts) == "table" and opts.nav == true then M.editor.want_nav() end
 	return manager.show(EDITOR_SPEC.app_name) ~= false
 end
 

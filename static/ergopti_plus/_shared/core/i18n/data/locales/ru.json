@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Раскладка эмулируется ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Навигационный слой сохранён и применён.",
 	"layout_editor.status.nav_imported": "Слой навигации из {name} импортирован.",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "Навигационный слой сохранён, но ещё не применён.",
 	"layout_editor.status.opened": "{name} открыт.",
 	"layout_editor.status.saved": "{name} сохранён.",

@@ -17,6 +17,10 @@
 // (_shared/metrics/engine/view/studio_ngrams.lua), read only and never sent
 // anywhere; the page reads it once when the window opens (« My typing » is the
 // app's default corpus) and again on « Analyse my typing ».
+// The drivers' « Navigation layer » entries open this window on the source's
+// navigation layer: the host calls studioNav({text, hold}) with the user's
+// layers.toml and the key whose hold enters the layer, before or after the
+// editor is mounted.
 // The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
 // bundle) are built here, offline, with the export data the app ships
 // (layout_editor/_generated/export_assets.js); source_export hands their bytes
@@ -424,6 +428,21 @@ window.sourcePicked = function (data) {
  * The first one mounts the editor; a later one (the menu asked again) opens it.
  * @param {Object} data
  */
+// The navigation layer the host asked to show before the editor was mounted.
+let _pendingNavShow = null;
+
+/**
+ * Called by the host to show the navigation layer: { text, hold }, where text
+ * is the user's layers.toml (or the shipped one) and hold the registry code
+ * of the key whose hold enters the layer, null when unknown.
+ * @param {Object} nav
+ */
+window.studioNav = function (nav) {
+	if (!nav || typeof nav !== 'object') return;
+	if (_editor) _editor.showNav(nav);
+	else _pendingNavShow = nav;
+};
+
 window.sourceData = function (data) {
 	const initial = data && typeof data.text === 'string' ? data.text : null;
 	// A host that does not seed window._i18n_strings (Windows) sends the editor's strings here.
@@ -443,6 +462,7 @@ window.sourceData = function (data) {
 		saveBinary: _hostExports ? hostSaveBinary : null,
 		exportAssets: _hostExports ? hostExportAssets : null,
 		workspace: _hostWorkspace ? hostWorkspace : null,
+		startNav: _pendingNavShow,
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,

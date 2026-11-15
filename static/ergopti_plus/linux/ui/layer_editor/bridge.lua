@@ -29,7 +29,6 @@ local Logger      = require("core.logger.engine.shim")
 local TomlCodec   = require("core.text.engine.toml_codec")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
-local LayerPreset = require("layouts.engine.layers.preset")
 local NavLayerSave = require("modules.keymap.nav_layer_save")
 local Writer      = require("core.text.engine.toml_codec.writer")
 
@@ -184,32 +183,6 @@ local function current_legends(state, ctx)
 	return legends
 end
 
---- The registry codes of the keys whose hold enters the edited layer.
---- @param state table Daemon state.
---- @param ctx table The loader context.
---- @param shared_root string The _shared folder.
---- @return table codes
-local function layer_keys(state, ctx, shared_root)
-	local manager = dependency(state, "tap_hold", "platform.remap.tap_hold_manager")
-	local engine = dependency(state, "tap_hold_engine", "platform.remap.tap_hold_engine")
-	local ok, keys = pcall(function() return manager.keys() end)
-	if not ok or type(keys) ~= "table" or not engine then
-		Logger.warn(LOG, "The tap-hold keys are unknown, so no layer key is marked: %s.", tostring(keys))
-		return {}
-	end
-	local layer_id = LayerPreset.read(shared_root, TomlCodec.decode).layer_id
-	local codes = {}
-	for id, entry in pairs(keys) do
-		if type(entry) == "table" and entry.hold_layer == layer_id then
-			local evdev = engine.KEY_CODES[id]
-			local code = evdev and LayerEditor.code_of(ctx, function(key) return key.evdev end, evdev) or nil
-			if code then codes[#codes + 1] = code end
-		end
-	end
-	table.sort(codes)
-	return codes
-end
-
 
 
 
@@ -253,7 +226,7 @@ function M.on_message(payload, state, context)
 				if owner.source.status == "absent" then return nil end
 				error(owner.read_error or "the layer file is unreadable", 0)
 			end, toml_decode = TomlCodec.decode,
-			legends = current_legends(state, ctx), layer_keys = layer_keys(state, ctx, shared_root),
+			legends = current_legends(state, ctx), layer_keys = NavLayerSave.layer_keys(state, ctx, shared_root),
 		})
 		owner.data = data
 		local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")

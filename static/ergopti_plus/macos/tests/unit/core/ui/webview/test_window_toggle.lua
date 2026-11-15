@@ -97,19 +97,19 @@ helpers.describe("window toggle (macOS)", function()
 	end)
 
 	helpers.it("a context page opens only through its registered opener", function()
-		with_page("layer_editor", function(state)
-			helpers.assert_eq(WindowToggle.toggle("layer_editor"), false,
+		with_page("studio_nav", function(state)
+			helpers.assert_eq(WindowToggle.toggle("studio_nav"), false,
 				"without the session's opener nothing opens and the refusal is reported")
 			local calls = 0
-			WindowToggle.set_opener("layer_editor", function()
+			WindowToggle.set_opener("studio_nav", function()
 				calls = calls + 1
-				state.view = { page = "layer_editor" }
+				state.view = { page = "studio_nav" }
 				return true
 			end)
-			helpers.assert_true(WindowToggle.toggle("layer_editor"))
+			helpers.assert_true(WindowToggle.toggle("studio_nav"))
 			helpers.assert_eq(calls, 1, "the registered opener ran")
 			state.focused = true
-			helpers.assert_true(WindowToggle.toggle("layer_editor"))
+			helpers.assert_true(WindowToggle.toggle("studio_nav"))
 			helpers.assert_eq(state.closed, 1, "a focused context page closes through its module")
 		end)
 	end)

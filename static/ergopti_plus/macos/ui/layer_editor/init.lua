@@ -49,7 +49,6 @@ local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local Layers      = require("layouts.engine.layers.layers")
 local LayerEditor = require("layouts.engine.layers.editor")
 local Keycodes    = require("platform.input.keycodes")
-local NavLayer    = require("platform.remap.nav_layer")
 local NavLayerSave = require("modules.keymap.nav_layer_save")
 
 local LOG = "layer_editor"
@@ -84,16 +83,6 @@ local _serial = 0
 -- ==========================
 -- ==========================
 
---- An override of a registry key for the ISO form, when it has one.
---- @param entry table A registry key.
---- @param field string hs | karabiner.
---- @return any
-local function iso_field(entry, field)
-	local override = entry["macos_" .. NavLayer.KEYBOARD_FORM]
-	if type(override) == "table" and override[field] ~= nil then return override[field] end
-	return entry[field]
-end
-
 --- The legends of the layout the user types with: the emulated one, else the
 --- current input source.
 --- @param ctx table The loader context.
@@ -107,39 +96,13 @@ local function current_legends(ctx)
 		character = function(code, entry)
 			local emulated = emulating and Emulation.legend(code) or nil
 			if emulated ~= nil then return emulated end
-			local keycode = iso_field(entry, "hs")
+			local keycode = NavLayerSave.iso_field(entry, "hs")
 			return type(keycode) == "number" and Keycodes.character_for(keycode) or nil
 		end,
 	})
 	LayerEditor.report_unresolved(unresolved, "the current input source types nothing printable there",
 		function(message) Logger.warn(LOG, "%s", message) end)
 	return legends
-end
-
---- The registry codes of the keys whose hold enters the layer.
---- @param ctx table The loader context.
---- @param karabiner table The remap facade.
---- @return table codes
-local function layer_keys(ctx, karabiner)
-	local codes = {}
-	local karabiner_key_code = function(entry)
-		local event = iso_field(entry, "karabiner")
-		return type(event) == "table" and event.key_code or nil
-	end
-	for _, key in ipairs(karabiner.TAP_HOLD_KEYS or {}) do
-		if karabiner.get_hold_action(key.id) == NavLayer.HOLD_ACTION_ID then
-			local key_code = type(key.from) == "table" and key.from.key_code or nil
-			local code = LayerEditor.code_of(ctx, karabiner_key_code, key_code)
-			if code then
-				codes[#codes + 1] = code
-			else
-				-- Fn has no place on the registry's board: nothing to mark.
-				Logger.debug(LOG, "The layer key '%s' is not on the editor's board.", tostring(key.id))
-			end
-		end
-	end
-	table.sort(codes)
-	return codes
 end
 
 --- Calls one of the page's functions with a JSON payload.
@@ -247,7 +210,7 @@ local function push_init(session)
 				error(detail or "the layer file is unreadable", 0)
 			end,
 			toml_decode = TomlCodec.decode, legends = current_legends(ctx),
-			layer_keys = layer_keys(ctx, session.karabiner),
+			layer_keys = NavLayerSave.layer_keys(ctx, session.karabiner),
 		})
 	end
 	if not opening_current(session, opening) then return end

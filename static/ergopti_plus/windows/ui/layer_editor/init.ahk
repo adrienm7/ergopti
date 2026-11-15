@@ -39,18 +39,6 @@ global LAYER_EDITOR_OS := "windows"
 global LAYER_EDITOR_LEGEND_SOURCE_EMULATION := "emulation"
 global LAYER_EDITOR_LEGEND_SOURCE_OS := "os"
 
-; Tap-hold key id (the ahk column of [tap_hold.catalog]) -> the registry code of
-; that physical key. The Windows remap files name their keys by literal scan
-; codes, so this is the one table that ties the two vocabularies;
-; tools/test/test-layer-editor-legends.cjs holds it to the catalogue and, through
-; the Linux engine's evdev codes, to the registry.
-global LAYER_EDITOR_TAP_HOLD_KEY_CODES := Map(
-	"escape", "Escape", "tab", "Tab", "caps_lock", "CapsLock", "left_shift", "ShiftLeft",
-	"left_ctrl", "ControlLeft", "win", "MetaLeft", "left_alt", "AltLeft", "space", "Space",
-	"alt_gr", "AltRight", "right_ctrl", "ControlRight", "right_shift", "ShiftRight",
-	"enter", "Enter", "backspace", "Backspace", "delete", "Delete"
-)
-
 ; The OS calls a legend needs, all in platform/input/key_state.ahk: the layout the
 ; user types with now, a scan code's virtual key on it, and what that key types
 ; unshifted there, read without arming a dead key. The unit suite passes a fake.
@@ -233,27 +221,6 @@ LayerEditor_CurrentLegends(Ctx) {
 	return Legends
 }
 
-/**
- * The registry codes of the keys whose hold enters the navigation layer.
- * @param {Map} TapHoldSource - A tap-hold configuration (LoadTapHoldToml's shape).
- * @returns {Array} Codes in tap-hold id order.
- */
-LayerEditor_LayerKeys(TapHoldSource) {
-	global LAYER_EDITOR_TAP_HOLD_KEY_CODES, NAV_LAYER_ID
-	Codes := []
-	for Id, Code in LAYER_EDITOR_TAP_HOLD_KEY_CODES {
-		if (TapHoldHoldLayer(TapHoldSource, Id) == NAV_LAYER_ID)
-			Codes.Push(Code)
-	}
-	return Codes
-}
-
-; The layer keys of the retained tap-hold configuration.
-_LayerEditor_CurrentLayerKeys() {
-	global TapHold
-	return LayerEditor_LayerKeys(MasterGateDesiredTapHold(IsSet(TapHold) ? TapHold : Map("keys", Map())))
-}
-
 
 
 
@@ -309,7 +276,7 @@ _LayerEditor_StringsJson(Values) {
  * @param {Map} Ctx - The loader context.
  * @param {string} ConfigDir - The configuration folder.
  * @param {Map} Legends - From LayerEditor_Legends; the layout in force by default.
- * @param {Array} LayerKeys - From LayerEditor_LayerKeys; the retained tap-holds' by default.
+ * @param {Array} LayerKeys - From NavLayerSave_LayerKeys; the retained tap-holds' by default.
  * @param {Object|Integer} Opening - The captured GUI source, or zero to read the file directly.
  * @returns {string} JavaScript to evaluate in the page.
  */
@@ -318,7 +285,7 @@ LayerEditor_InitJs(Ctx, ConfigDir, Legends := "", LayerKeys := "", Opening := 0)
 	if !IsObject(Legends)
 		Legends := LayerEditor_CurrentLegends(Ctx)
 	if !IsObject(LayerKeys)
-		LayerKeys := _LayerEditor_CurrentLayerKeys()
+		LayerKeys := NavLayerSave_CurrentLayerKeys()
 	Path := Opening is Object ? Opening.Path : KeymapLayers_UserFilePath(Ctx, ConfigDir)
 	TextJson := "null"
 	Errors := []

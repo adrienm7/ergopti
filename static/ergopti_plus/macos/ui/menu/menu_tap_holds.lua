@@ -1307,10 +1307,10 @@ function M.build(ctx)
 		end,
 		[ConfigKeys.COMMAND.SCOPE_RESTORE] = function() return run_scope(karabiner, "recommended", update_menu) end,
 		[ConfigKeys.COMMAND.SCOPE_CLEAR] = function() return run_scope(karabiner, "clear", update_menu) end,
-		-- Required on the click: the editor loads the layer data and its window
-		-- stack, which a menu build has no use for.
+		-- Required on the click: Ergopti Studio, on the source's navigation layer,
+		-- loads the layer data and its window stack, which a menu build has no use for.
 		[ConfigKeys.COMMAND.EDIT_NAV_LAYER] = function()
-			return require("ui.layer_editor").open({ karabiner = karabiner })
+			return require("ui.layout_manager").open_editor_on_nav({ karabiner = karabiner })
 		end,
 	}
 

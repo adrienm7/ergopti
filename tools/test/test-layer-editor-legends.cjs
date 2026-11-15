@@ -42,6 +42,8 @@ const PRESET = TOML.parse(read(shared('layouts', 'data', 'layers.recommended.tom
 const LUA_HOST = read(shared('layouts', 'engine', 'layers', 'editor.lua'));
 const MODEL = read(shared('ui', 'layer_editor', 'layer_model.js'));
 const WINDOWS_HOST = read(path.join(DRIVERS, 'windows', 'ui', 'layer_editor', 'init.ahk'));
+// The tap-hold key table lives with the window-free save (Ergopti Studio reads it too).
+const WINDOWS_NAV = read(path.join(DRIVERS, 'windows', 'platform', 'remap', 'nav_layer_save.ahk'));
 const LINUX_ENGINE = read(path.join(DRIVERS, 'linux', 'platform', 'remap', 'tap_hold_engine.lua'));
 const MACOS_NAV_LAYER = read(path.join(DRIVERS, 'macos', 'platform', 'remap', 'nav_layer.lua'));
 
@@ -132,11 +134,11 @@ for (const [name, list] of [
 // ===============================
 // ===============================
 
-const tableMatch = /global LAYER_EDITOR_TAP_HOLD_KEY_CODES := Map\(([\s\S]*?)\n\)/.exec(
-	WINDOWS_HOST
+const tableMatch = /global NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES := Map\(([\s\S]*?)\n\)/.exec(
+	WINDOWS_NAV
 );
 const windowsCodes = {};
-if (!tableMatch) fail('init.ahk has no LAYER_EDITOR_TAP_HOLD_KEY_CODES table');
+if (!tableMatch) fail('nav_layer_save.ahk has no NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES table');
 else {
 	const pairs = [...tableMatch[1].matchAll(/"([a-z_]+)",\s*"([A-Za-z]+)"/g)];
 	for (const [, id, code] of pairs) windowsCodes[id] = code;

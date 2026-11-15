@@ -438,6 +438,29 @@ test('the navigation layer converts both ways without changing a binding on any 
 	assert.equal(IO.parse(IO.serialize(doc)).ok, true);
 });
 
+test('a compiled layers.toml names its source and the hash of its body (studio-nav-compiled)', () => {
+	const recommended = fs.readFileSync(shared('layouts', 'data', 'layers.recommended.toml'), 'utf8');
+	const doc = IO.withNavLayer(IO.create('my_layout', 'Mine'), recommended, ['CapsLock'], DATA);
+	const written = IO.navLayerFile(doc, DATA);
+	const lines = written.split('\n');
+	const source = lines.find((line) => line.startsWith(IO.NAV_FILE_SOURCE));
+	const hash = lines.find((line) => line.startsWith(IO.NAV_FILE_HASH));
+	assert.equal(source, `${IO.NAV_FILE_SOURCE}my_layout`);
+	const body = written.slice(written.indexOf('\n', written.indexOf(hash)) + 1);
+	assert.equal(
+		hash,
+		IO.NAV_FILE_HASH + IO.fnv1a32(body),
+		'the hash covers the body below the header'
+	);
+	assert.ok(body.startsWith('# layers.toml'), 'the body is the layer file the loaders read');
+	// The published FNV-1a vectors, so the hash is the standard one.
+	assert.equal(IO.fnv1a32(''), '811c9dc5');
+	assert.equal(IO.fnv1a32('a'), 'e40c292c');
+	assert.equal(IO.fnv1a32('foobar'), 'bf9cf968');
+	// A hand edit no longer matches the recorded hash.
+	assert.notEqual(IO.fnv1a32(body.replace('arrow_left', 'arrow_right')), IO.fnv1a32(body));
+});
+
 test('navigation layer refusals name their cause', () => {
 	const file = (binding) =>
 		`[_meta]\nschema_version = 1\n\n[layers.nav.all]\n"KeyA" = "${binding}"\n`;

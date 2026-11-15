@@ -484,7 +484,8 @@ local OPEN_WINDOW = {
 	["open_paths_editor"]        = "paths_editor",
 	["open_hotstrings_settings"] = ConfigKeys.COMMAND.HOTSTRINGS_CONFIG_WINDOW,
 	["open_layout_manager"]      = ConfigKeys.COMMAND.LAYOUT_MANAGER,
-	["open_layer_editor"]        = "layer_editor",
+	-- The navigation layer is edited in Ergopti Studio, on the source's nav layer.
+	["open_layer_editor"]        = "layout_editor_window",
 	["open_model_browser"]       = "model_browser",
 	["open_changelog"]           = "changelog",
 	["open_healthcheck"]         = ConfigKeys.COMMAND.HEALTHCHECK,
@@ -494,6 +495,11 @@ local OPEN_WINDOW = {
 --- diagnostics window starts its probes in its bridge's open().
 local OPEN_WINDOW_OPENER = {
 	[ConfigKeys.COMMAND.HEALTHCHECK] = function() return require("ui.healthcheck.bridge").open() end,
+	-- Opened by open_layer_editor only, so on its navigation layer.
+	["layout_editor_window"] = function()
+		return require("ui.layout_manager.bridge").open_editor_window(require("core.ui.ui.webview_manager"),
+			{ nav = true })
+	end,
 }
 
 --- The user-editable file each `open_*` action reveals, as a path resolver.

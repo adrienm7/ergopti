@@ -224,6 +224,37 @@ helpers.describe("layout manager bridge (Linux)", function()
 		Editor._reset()
 	end)
 
+	helpers.it("the « Navigation layer » entry opens the Studio on its nav layer (studio-nav-entry)", function()
+		local Bridge, state, daemon_state = emulating_bridge()
+		local Editor = Bridge.editor
+		Editor._reset()
+		local shown = {}
+		daemon_state.webview_manager.show = function(app) shown[#shown + 1] = app; return true end
+		daemon_state.nav_layer_save = {
+			apply_text = function() return { saved = true, applied = true, errors = {} } end,
+			studio_nav = function(given) return { text = "[_meta]\nschema_version = 1\n", hold = "CapsLock", given = given == daemon_state } end,
+		}
+		-- Asked before the window exists: the page takes it on its ready.
+		helpers.assert_true(Bridge.open_editor_window(daemon_state.webview_manager, { nav = true }))
+		helpers.assert_eq(shown, { "layout_editor_window" })
+		Editor.on_message({ action = "ready" }, daemon_state)
+		local navs = {}
+		for _, push in ipairs(state.pushes) do
+			if push.js:find("window.studioNav(", 1, true) then navs[#navs + 1] = push.js end
+		end
+		helpers.assert_eq(#navs, 1, "the page receives the navigation layer once")
+		helpers.assert_contains(navs[1], '"hold":"CapsLock"')
+		helpers.assert_contains(navs[1], '"given":true')
+		-- Asked again while the page is ready: pushed at once.
+		Bridge.open_editor_window(daemon_state.webview_manager, { nav = true })
+		helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioNav(")
+		-- A plain open shows no navigation layer.
+		local before = #state.pushes
+		Bridge.open_editor_window(daemon_state.webview_manager)
+		helpers.assert_eq(#state.pushes, before)
+		Editor._reset()
+	end)
+
 	helpers.it("the manager's « Layout editor » shows the editor window (layout-editor-own-window)", function()
 		local Bridge, state, daemon_state = emulating_bridge()
 		local shown = {}

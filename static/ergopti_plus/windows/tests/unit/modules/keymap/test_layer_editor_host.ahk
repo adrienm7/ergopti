@@ -427,7 +427,7 @@ Test("layer editor host: a legend is printable text", _LEH_LegendTextRefusesTheU
 
 _LEH_LayerKeysFollowTheTapHolds() {
 	Corpus := _LEH_Corpus()
-	Shipped := LayerEditor_LayerKeys(LoadTapHoldToml(_LEH_SharedDir() . "\tap_hold\data\defaults.toml"))
+	Shipped := NavLayerSave_LayerKeys(LoadTapHoldToml(_LEH_SharedDir() . "\tap_hold\data\defaults.toml"))
 	Want := ""
 	for Index, Code in Corpus["recommended_layer_keys"]["windows"]
 		Want .= (Index == 1 ? "" : ",") . Code
@@ -435,10 +435,10 @@ _LEH_LayerKeysFollowTheTapHolds() {
 	for Index, Code in Shipped
 		Got .= (Index == 1 ? "" : ",") . Code
 	AssertEqual(Want, Got, "the shipped tap-holds' layer key")
-	Moved := LayerEditor_LayerKeys(Map("keys", Map("space", Map("hold_layer", "nav"))))
+	Moved := NavLayerSave_LayerKeys(Map("keys", Map("space", Map("hold_layer", "nav"))))
 	AssertEqual(1, Moved.Length, "one layer key")
 	AssertEqual("Space", Moved[1], "the layer key follows the configuration")
-	AssertEqual(0, LayerEditor_LayerKeys(Map("keys", Map())).Length, "no tap-hold, no layer key")
+	AssertEqual(0, NavLayerSave_LayerKeys(Map("keys", Map())).Length, "no tap-hold, no layer key")
 }
 Test("layer editor host: the layer key comes from the tap-hold configuration", _LEH_LayerKeysFollowTheTapHolds)
 

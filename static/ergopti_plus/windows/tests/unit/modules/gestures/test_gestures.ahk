@@ -299,7 +299,7 @@ TestGestures_EveryWindowActionHasATogglePage() {
 		"open_metrics_typing", "metrics_typing", "open_metrics_apps", "metrics_apps",
 		"open_hotstrings_editor", "hotstrings_editor", "open_paths_editor", "paths_editor",
 		"open_hotstrings_settings", "hotstrings_settings", "open_layout_manager", "layout_manager",
-		"open_layer_editor", "layer_editor", "open_model_browser", "model_browser",
+		"open_layer_editor", "studio_nav", "open_model_browser", "model_browser",
 		"open_changelog", "changelog", "open_healthcheck", "healthcheck")
 	Listed := Map()
 	for ActionName in GestureActionPickerIds()

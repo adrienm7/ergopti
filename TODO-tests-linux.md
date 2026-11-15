@@ -94,6 +94,10 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       built-in corpus within a second, an imported layout is still listed after closing and reopening the window,
       and « Analyse my typing » then selects « My typing » in « Comparer ». XKB and KLC downloads (2026-11-15, `claude/ergopti-todo-native-export`): in the layout editor window's « Export » tab, « XKB » and « KLC » write `<id>_xkb.zip` and `<dll>.klc` to the Downloads folder, built by the host’s Lua (lua_export); proven under xvfb in the container.
       Downloads (2026-11-14, `layout_editor_downloads`): the window's XKB, KLC, DLL and macOS bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout installer.
+      Navigation layer in the Studio (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the Tap-Holds menu's « Edit the navigation layer… » row and a
+      gesture bound to « Navigation layer » open Ergopti Studio on its « nav » layer, holding the current layer
+      key, with the user's layers.toml bindings; « Apply the navigation layer » then changes the layer live, and
+      layers.toml starts with « # source: » and « # body-fnv1a32: ».
 - [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,
       α (Right Ctrl, XKB's fifth level), æ (AltGr) and β (Right Ctrl). Proven in a container with xkbcomp and

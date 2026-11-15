@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "Disposition émulée par ErgoptiPlus.",
 	"layout_editor.status.nav_applied": "Couche de navigation enregistrée et appliquée.",
 	"layout_editor.status.nav_imported": "Couche de navigation de {name} importée.",
+	"layout_editor.status.nav_missing": "Cette disposition n’a pas encore de couche de navigation : choisissez la touche maintenue pour elle, puis importez votre layers.toml.",
 	"layout_editor.status.nav_not_applied": "Couche de navigation enregistrée, mais pas encore appliquée.",
 	"layout_editor.status.opened": "{name} ouvert.",
 	"layout_editor.status.saved": "{name} enregistré.",

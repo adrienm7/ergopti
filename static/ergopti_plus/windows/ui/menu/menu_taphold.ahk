@@ -835,5 +835,5 @@ _TH_ScopeCommands(Options := unset) {
 		MenuCommand.TAPHOLDS_TOGGLE, MenuRenderer_CategoryGateCommand("TapHolds"),
 		MenuCommand.SCOPE_RESTORE, (*) => TapHoldScopeApply("recommended", OwnedOptions),
 		MenuCommand.SCOPE_CLEAR, (*) => TapHoldScopeApply("clear", OwnedOptions),
-		MenuCommand.EDIT_NAV_LAYER, LayerEditor_Open)
+		MenuCommand.EDIT_NAV_LAYER, LayoutEditorWindow_OpenOnNav)
 }

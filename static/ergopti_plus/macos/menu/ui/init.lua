@@ -1661,8 +1661,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- session context as their menu rows: the remap facade, the update channel
 	-- owner and the menu state exist only here.
 	local WindowToggle = require("core.ui.ui.window_toggle")
-	WindowToggle.set_opener("layer_editor", function()
-		return require("ui.layer_editor").open({ karabiner = karabiner })
+	WindowToggle.set_opener("studio_nav", function()
+		return require("ui.layout_manager").open_editor_on_nav({ karabiner = karabiner })
 	end)
 	-- The layout editor applies a source's navigation layer through the window-free save.
 	require("ui.layout_manager").set_nav_applier(function(text)

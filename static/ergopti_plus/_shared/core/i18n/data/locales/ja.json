@@ -558,6 +558,7 @@
 	"layout_editor.status.emulated": "レイアウトは ErgoptiPlus がエミュレートしています。",
 	"layout_editor.status.nav_applied": "ナビゲーションレイヤーを保存して適用しました。",
 	"layout_editor.status.nav_imported": "{name} のナビゲーションレイヤーを読み込みました。",
+	"layout_editor.status.nav_missing": "This layout has no navigation layer yet: choose the key held for it, then import your layers.toml.",
 	"layout_editor.status.nav_not_applied": "ナビゲーションレイヤーを保存しましたが、まだ適用されていません。",
 	"layout_editor.status.opened": "{name} を開きました。",
 	"layout_editor.status.saved": "{name} を保存しました。",
