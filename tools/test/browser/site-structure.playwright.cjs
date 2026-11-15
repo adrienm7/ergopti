@@ -158,7 +158,8 @@ async function exerciseHome(page, origin, basePath) {
 /**
  * Each framed page (driver window, Studio tab) loads once: hydration once replaced the
  * prerendered (relative) frame address with the client's absolute one, which
- * reloaded every window and cut off its first load.
+ * reloaded every window and cut off its first load. The frames are lazy, so
+ * the first one is brought into view before its load is awaited.
  */
 async function expectSingleFrameLoads(
 	page,
@@ -175,10 +176,19 @@ async function expectSingleFrameLoads(
 	page.on('request', record);
 	try {
 		await visit(page, origin, basePath, route);
-		await page
-			.locator(frames + '[src]')
-			.first()
-			.waitFor({ state: 'attached' });
+		const first = page.locator(frames + '[src]').first();
+		await first.waitFor({ state: 'attached' });
+		// The frames are lazy: a browser starts one only near the viewport, and
+		// how near depends on the engine and the connection (WebKit waits until
+		// it is close; on a phone the first window sits screens below the fold).
+		// Scroll to it as a reader does, so the frame starts in every engine.
+		await first.scrollIntoViewIfNeeded();
+		await page.waitForFunction((selector) => {
+			const frame = document.querySelector(selector);
+			return Boolean(
+				frame && frame.contentWindow && frame.contentWindow.location.href !== 'about:blank'
+			);
+		}, frames + '[src]');
 		await smoke.settleFrames(page);
 		// Hydration ran before networkidle; give a late replacement time to show.
 		await page.waitForTimeout(500);
