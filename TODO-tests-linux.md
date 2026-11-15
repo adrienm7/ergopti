@@ -102,3 +102,21 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       and a one-shot Shift then waits indefinitely; a gesture or key bound to `sticky_ctrl_shift`, `sticky_cmd_ctrl`
       (Super+Ctrl) and `sticky_altgr` wraps the next key in those modifiers once, in a GTK and a Qt application; a
       tap-hold key set to tap `sticky_altgr` and hold AltGr types one AltGr character after a tap.
+- [ ] <!-- field-point: shortcut_key_carriage --> Native carriage of `shortcut_key` (moved 2026-11-15 from TODO.md
+      « Native carriage of `shortcut_key` (2026-11-15) », its real-OS proof once the [CODE] part is written): the XKB
+      export states that XKB cannot carry `shortcut_key`, and Ergopti+ emulation keeps it on a real desktop: the
+      shortcut sends the shortcut key.
+- [ ] <!-- field-point: incremental_swipes --> Incremental touchpad swipes (moved 2026-11-15 from TODO.md « Windows
+      and Linux: evaluate incremental touchpad gesture modes and step sizes », Cross-platform feature inventory;
+      65b21ccab4, `test_gesture_incremental.lua`): on a real touchpad, an incremental slot's action fires while the
+      fingers move (`modules/gestures/incremental_tracker.lua`), with the step rule and reversal shared with macOS;
+      the travel is in millimetres from the touchpad's own resolution (EVIOCGABS), so the steps set in
+      `[gestures.sensitivities]` and in each swipe slot's submenu match the distance swiped; a pad that reports no
+      resolution fires once, as x1, said in the log.
+- [ ] <!-- field-point: one_folder_name --> One folder name (moved 2026-11-15 from TODO.md « One folder name for
+      Ergopti on the three OS »;
+      [handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the Linux
+      machine against the handoff's Linux list (`~/.config/ergopti_plus`, `~/.local/state/ergopti_plus` and
+      `~/.local/share/ergopti_plus` gone, the daemon log listing each move, the old
+      `~/.cache/ergopti_updater_etag_*.txt` files deleted); the migration is removed only once the maintainer's
+      machines pass.

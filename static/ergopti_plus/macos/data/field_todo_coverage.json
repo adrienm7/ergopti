@@ -809,6 +809,84 @@
 			"title": "One-shot modifiers: no time limit, sticky actions, AltGr tap-hold pair",
 			"checks": [],
 			"not_testable": "Whether a `sticky_*` arm or a Karabiner one-shot AltGr tap stays armed and types the right level is a person's reading of the typed result: no log line decides it."
+		},
+		{
+			"id": "shortcut_key_carriage",
+			"title": "Native carriage of `shortcut_key` in the .keylayout Command level",
+			"checks": [],
+			"not_testable": "Whether an installed .keylayout sends the shortcut key under Command is a person's reading of the shortcut the focused application receives: no field run step installs an exported layout."
+		},
+		{
+			"id": "issue_106_runtime_admission",
+			"title": "GitHub issue 106: owned Karabiner runtime admission on an affected Mac",
+			"checks": [],
+			"not_testable": "Only an affected Mac (one whose owned runtime is refused) writes the refusal lines; a field run on an admitted Mac cannot provoke the refusal, so a person sends the two logs from an affected Mac."
+		},
+		{
+			"id": "recovery_scenarios",
+			"title": "Recovery audit scenarios on an isolated Mac",
+			"checks": [],
+			"not_testable": "The scenarios rename, migrate and restart a profile on APFS under Hammerspoon, which needs an isolated Mac a person sets up; a field run on the maintainer's daily profile must not provoke them."
+		},
+		{
+			"id": "flow_scenarios",
+			"title": "Flow receiving scenarios on an isolated Mac",
+			"checks": [],
+			"not_testable": "Each scenario is a person's native action (focus, selection, keyring prompt, device) on an isolated Mac, named per flow in the report; no field run step drives them."
+		},
+		{
+			"id": "deep_device_scenarios",
+			"title": "Unexecuted device and provider scenarios of the module coverage registers",
+			"checks": [],
+			"not_testable": "The registers name device and provider scenarios (a plugged device, a live provider account) a person provides on the Mac; no field run step plugs a device or signs in to a provider."
+		},
+		{
+			"id": "karabiner_layout_actions",
+			"title": "Karabiner layout actions: the slow half named by the phase lines",
+			"checks": [],
+			"not_testable": "The phase lines are in the driver log a field report copies, but no field run step reads `karabiner.layout_actions.*` or decides a bound for them: a person reads them in the report."
+		},
+		{
+			"id": "one_folder_name",
+			"title": "One folder name: the legacy folders migrated on the maintainer's Mac",
+			"checks": [],
+			"not_testable": "The migration runs once on the maintainer's own legacy folders, which a field run cannot recreate without touching the real profile: a person checks the folders listed in the handoff."
+		},
+		{
+			"id": "owned_runtime_wp9",
+			"title": "Owned Karabiner runtime: the maintainer's WP9 pass on a signed dev build",
+			"checks": [],
+			"not_testable": "The WP9 checklist needs a CI-signed dev build installed by the maintainer, which the field run's developer app (ad hoc signed) is not; a person follows the handoff checklist."
+		},
+		{
+			"id": "migrations_registry_parse",
+			"title": "Boot cost of parsing and validating migrations.toml on a Mac",
+			"checks": [],
+			"not_testable": "No boot phase times the migrations registry parse on its own, so no field run step can read its cost: a person measures it on the Mac."
+		},
+		{
+			"id": "hotstrings_boot_publication",
+			"title": "Hotstrings category boot publication and obsolete-leaf setters, installed",
+			"checks": [],
+			"not_testable": "The publication and the setters are read by a person typing into an installed driver's categories; no field run step names their boot publication."
+		},
+		{
+			"id": "autocorrection_sections",
+			"title": "Common autocorrection sections and dynamic hotstrings, typed on a Mac",
+			"checks": [],
+			"not_testable": "The expansions are what a person's typing produces in a real application with one section chosen at a time; the field run chooses no section and types no corpus."
+		},
+		{
+			"id": "delimiter_transactions",
+			"title": "Native delimiter transactions typed into an installed driver",
+			"checks": [],
+			"not_testable": "A delimiter transaction is what a person's typing commits in a real application; the field run types no delimiter sequence into an installed driver."
+		},
+		{
+			"id": "agent_composed_menu",
+			"title": "AI Agent submenu composed menu on an installed driver",
+			"checks": [],
+			"not_testable": "The composed menu is what a person sees when opening the AI Agent submenu of an installed driver; the field run reads no menu it does not build itself."
 		}
 	]
 }

@@ -154,6 +154,24 @@
 			],
 			"condition": "A real keyboard; a GTK and a Qt application.",
 			"not_testable": "Which modifiers the application received after a `sticky_*` action is a person's reading of the typed result: the report proves only the sticky delay row."
+		},
+		{
+			"id": "shortcut_key_carriage",
+			"title": "Native carriage of `shortcut_key`: XKB omission and emulation",
+			"checks": [],
+			"not_testable": "Whether the emulated shortcut reaches a real application as the shortcut key is a person's reading of the focused application: no field run step drives an exported source."
+		},
+		{
+			"id": "incremental_swipes",
+			"title": "Incremental touchpad swipes on a real touchpad",
+			"checks": [],
+			"not_testable": "Whether one action fires per step of real finger travel is a person's reading of the swipe against the result: the container kernel has no evdev touchpad and no log line measures the travel felt."
+		},
+		{
+			"id": "one_folder_name",
+			"title": "One folder name: the legacy folders migrated on the maintainer's Linux machine",
+			"checks": [],
+			"not_testable": "The migration runs once on the maintainer's own legacy folders, which a field run cannot recreate without touching the real profile: a person checks the folders listed in the handoff."
 		}
 	]
 }

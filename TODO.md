@@ -622,8 +622,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
       .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
       [CODE] Left (2026-11-15): every format reports `shortcut_key` as omitted and the export note says so, which covers
-      Linux; the shortcut VK in the KLC and built DLL, and the .keylayout Command level, are not written. Real-OS proof
-      is [HARDWARE].
+      Linux; the shortcut VK in the KLC and built DLL, and the .keylayout Command level, are not written. The real-OS
+      proofs are in the three TODO-tests files (2026-11-15).
 - [ ] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
       Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
       regression test that fails on the old behaviour.
@@ -634,15 +634,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 
 ## Windows CI reliability (2026-11-07)
 
-- [ ] **[MACOS] Issue #106, owned Karabiner runtime not admitted (Clem, dev.166, macOS 27.3; the maintainer's
-      Mac too):** rules stay fail-closed. The misleading « lease auto-recovery exhausted » error is gone (the
-      recovery stops while the runtime waits for admission), and the installer helper refusal now names its cause
-      (`helper_signature_invalid`, `helper_signature`, `helper_code_hashes`). The helper of
-      `remap-runtime-v16.3.0-ergopti.3` and the dev.166 launcher carry the same leaf (759d8aae…), so the leaf is not
-      the cause. Next: the `remap.runtime_owner` lines (« unavailable: <reason> ») and `launcher.log` « owned runtime
-      install: refused (…) » of a build with these fixes.
-      [HARDWARE] Left (2026-11-15): the fixes are in v1.0.10-dev.175 (f71d6eb884, 84090226ab); the `remap.runtime_owner`
-      and `launcher.log` lines of an affected Mac on dev.175 or later are needed (the latest runtime is now ergopti.6).
+- Moved to TODO-tests-macos.md (2026-11-15): Issue #106, owned Karabiner runtime not admitted.
 - [ ] **[RELEASE] Dev naming handoff:** everything is on `dev`. `v0.0.0-dev.169` is the bridge (ci.yml keeps the
       legacy core up to counter 169), then `v1.0.10-dev.170`; the next merge to `main` carries
       `Release-As: 1.0.10`. Delete the orphan draft `v0.0.0-dev.167` by hand (this session cannot delete releases).
@@ -774,15 +766,11 @@ and the next module candidates. The audit is paused at the maintainer's request.
       PC run 2026-11-11: the AHK mirror of the unavailable-features section (`test_healthcheck_core.ahk`, ui group) passed natively.
       [RELEASE] Left (2026-11-15): the feed-only fallback waits on the release signing key (`public_key_spki_base64`
       empty, enforcement `off` in asset_signing.json).
-- [ ] **Windows/macOS/Linux:** (claimed by worker F, 2026-11-13: macOS and Linux code is done, both getters true; the Windows collision and delivery owners are written, 2026-11-13: `ui/physical_shortcuts/delivery.ahk` ports the shared policy (replaying `_shared/tests/corpus/shortcuts/physical_conflict_vectors.json`, as macOS and Linux now do), takes claims from the other physical slots, the tap keys, every live registrar binding and any AutoHotkey variant already on the key, and registers nothing while the getter answers false; `test_physical_shortcut_delivery.ahk`. The getter stays false until the real-PC check in TODO-tests-windows.md) qualify physical shortcut delivery and its editor; Windows has its host, its delivery refused. Decided by the maintainer on 2026-11-11: both Lua production getters (`keyboard_shortcuts.physical_delivery_available`, Linux and macOS) answer true, every source, collision and output-custody refusal kept; the Mac field report validates it. Before that, both answered false. Preserve the safety refusal until source/collision/output custody is qualified; see LIN-004 in the deep input audit. Windows token-by-token prediction display also remains unvalidated (`platform_reason.token_streaming_unvalidated_on_windows`). Progress (code, 6 November 2026): the refusal is now pinned on the real chain, not an injected answer: on Linux and macOS a test drives the production `keyboard_shortcuts.physical_delivery_available` (false), the real editor host and the shared menu port with the GUI ready, and the editor stays closed with no scope captured. The greyed editor row no longer says « Try reopening it »: it names the cause, `physical_shortcuts.delivery_unqualified` (21 locales, `disabled_reasons` on the row). Left: the Windows host, and the qualification itself, which needs real hardware (under "To confirm on Linux" and "To confirm on the Mac"); only then may a getter turn true. Done (2026-11-11): both getters true; the pinned tests now pin true and keep each refusal under an explicit false answer (`test_physical_delivery_available.lua` on both drivers, `test_physical_shortcuts_row_available.lua`, the scope fixtures); the Windows row reason (`physical_shortcuts.windows_unavailable`, 21 locales) said Windows had no host, neither the editor nor the delivery. Done (Windows host, decided by the maintainer on 2026-11-11): the WebView2 host of the shared page, its scope, the menu port and the key capture (`windows/ui/physical_shortcuts/`, `KHCapturePosition`); the production `PhysicalShortcutDeliveryAvailable` answers false, the row lost its Windows restriction and `windows_unavailable`, and greys with `delivery_unqualified` (`test_physical_shortcut_host.ahk` pins the real chain). Left on Windows (maintainer, real hardware), before the getter may turn true: (1) build the collision owner (the Linux `physical_collisions` counterpart: tap-hold keys, key combinations, script and keyboard slots, layer remaps) and pass it to `PhysicalShortcutsScope`, and a delivery owner that registers each bound slot's scan code with its exact modifiers and dispatches the action; (2) flip the getter in an isolated driver only, open the editor from the tray: the page shows positions by name (A, 1, Pavé num. 7), never `KeyA` or `SC01E`; (3) Capture a key with Ctrl, Shift, Win and none held, on an ISO and an ANSI board, with AZERTY and Ergopti layouts: the captured position is the physical key, AltGr is refused, a key sent by another program (SendInput) is not captured, and the key still types in the focused app; (4) save an action, then edit, move and remove it: config.toml gets one backup and one write each, the reload keeps it, and an external edit of config.toml between opening and saving shows « Configuration changed »; (5) press the bound key: the action runs once, the key's character is not typed, nothing runs while paused, after the driver quit, or for the same key sent synthetically; (6) bind a combination already owned by a tap-hold, a script shortcut or a key combination: the save is refused with `collision`; (7) close the window during a capture and while the picker is open: no capture survives, no draft is saved. Only then may the getter turn true.
-      [HARDWARE] Left (2026-11-15): Windows `PhysicalShortcutDeliveryAvailable()` still returns false until steps (2) to
-      (7) pass on the PC, and token streaming is unvalidated there.
-- [ ] **Windows and Linux:** (claimed by worker F, 2026-11-13: code done on both, only the real touchpad checks below are left) evaluate incremental touchpad gesture modes and step sizes; macOS tracks finger movement while the other drivers handle discrete gestures. Linux done (follow macOS, decision of 2026-11-06): `linux/modules/gestures/incremental_tracker.lua` fires an incremental slot's action while the fingers move, from the decoder's live travel (`mt_decoder` `live()`), with the step rule and reversal shared with macOS (`_shared/gestures/engine/incremental.lua`, `_shared/gestures/engine/sensitivity.lua`); travel is converted to millimetres with the touchpad's own resolution (EVIOCGABS, `touchpad_finder.read_resolution`), the unit of the macOS sensitivities, so the manifest's modes and steps (`gestures.modes`, `gestures.sensitivities`, now declared for `linux`) apply unchanged; a pad that reports no resolution fires once, as x1, said in the log. Modes and steps are read from and written to `[gestures.modes]` / `[gestures.sensitivities]` and offered in each swipe slot's submenu through the shared templates (`test_gesture_incremental.lua`). Windows done (code, decision of 2026-11-11): the driver owns a raw HID digitizer reader (`modules/gestures/raw_touchpad.ahk` over `platform/system/raw_input.ahk`: RegisterRawInputDevices for usage page 0x0D usage 0x05 with RIDEV_INPUTSINK and RIDEV_DEVNOTIFY, the preparsed descriptor read with HidP_GetCaps/HidP_GetValueCaps, contact X/Y, identifier, tip and contact count read with HidP_GetUsageValue/HidP_GetUsages, parallel and hybrid reports assembled into frames by `modules/gestures/touchpad_hid.ahk`); travel is turned into millimetres with the descriptor's logical-to-physical scale (centimetre or inch units and the HID unit exponent), and `modules/gestures/incremental_tracker.ahk` fires an incremental slot while the fingers move through the AutoHotkey ports of the shared direction and step rules (`direction.ahk`, `incremental.ahk`, which replay `_shared/tests/corpus/gestures/incremental_steps.json` and `direction_vectors.json`; the rule numbers come from the timings registry's [gestures] keys). The 3- and 4-finger straight slots of `gestures.modes` / `gestures.sensitivities` are declared for `ahk` and offered through the shared swipe-slot template (`menu_gestures.ahk`); `platform_reason.gesture_modes_and_steps_need_finger_travel` is retired from the 21 locales, the other entries keep `platform_reason.windows_touchpad_slots_are_three_and_four_fingers`. Coexistence with the registry-mapped shortcut: a touch that stepped swallows its swipe's shortcut, before or after the lift (`[gestures] incremental_handoff_ms`), a touch that did not step lets it fire once (decision recorded in docs/memory/maintainer-decisions.md). A descriptor without a physical size fires once, as x1. Tests: `test_gesture_incremental_rule.ahk`, `test_touchpad_hid.ahk`, `test_raw_touchpad_owner.ahk`, `test_gesture_swipe_slot_menu.ahk`. Left: a real touchpad check on Linux (see "To confirm on Linux") and on Windows (see "To confirm on the Windows PC").
-      [HARDWARE] Left (2026-11-15): code done (65b21ccab4; test_touchpad_hid.ahk, test_gesture_incremental.lua); only
-      the real touchpad checks on Linux and Windows.
-- [ ] **Linux Wayland:** focused-application identity on GNOME, KDE and COSMIC, from the findings above: an Ergopti GNOME Shell extension exposing the focused window's WM class, title and pid on the session bus (installed and enabled by the installer), a persistent KWin script calling back a session-bus name the daemon owns on `workspace.windowActivated`, and a native `zcosmic_toplevel_info_v1` client for COSMIC. Each needs its desktop to be qualified on real hardware. Code done for GNOME and KDE (10 November 2026): the GNOME Shell extension (`linux/platform/desktop_focus/gnome/`, `focus@ergopti.fr`, GNOME 45 and later) and the KWin script (`linux/platform/desktop_focus/kwin/`, Plasma 5 and 6) call `org.ergopti.Focus1.Activated(class, title, pid, id)` on the session-bus name `org.ergopti.Focus`, owned by a resident worker (`linux/platform/focus/compositor_focus_worker.lua`, libgio) that admits only the current owner of `org.gnome.Shell` or `org.kde.KWin`; the daemon reads its lines (`linux/platform/focus/compositor_focus.lua`) and `window_info` answers the 4×/s poll from memory, no fork, unknown before the first report, after a malformed one or once the worker exits. `install/compositor_focus.sh` installs and enables them for the running desktop (once: an update keeps a user's off switch; GNOME for the next login when the Shell refuses), run by install.sh and by launch.sh at every start (so .deb, .rpm and AppImage users get them too; Flatpak's private data folder cannot), removed by uninstall.sh. Tests: `test_compositor_focus.lua`, `test_compositor_focus_assets.lua`, `tools/test/test-linux-compositor-focus-install.cjs`, and the worker on a real dbus-daemon (`tests/hardware/run_compositor_focus_bus.lua`). Left: COSMIC (a `zcosmic_toplevel_info_v1` client means hand-built libwayland-client interface tables over FFI that nothing here can run against without cosmic-comp; it stays unknown), and the real-desktop check under « To confirm on Linux ». COSMIC code done (11 November 2026): `linux/platform/focus/cosmic_toplevel_worker.lua` binds `zcosmic_toplevel_info_v1` version 1 through libwayland-client with hand-built interface tables (the clipboard owner's pattern), commits each window on `done` and prints the single activated window as a focus record (app_id as class, no pid; none or two activated is a clear, `finished` ends the worker); `compositor_focus` starts it for `XDG_CURRENT_DESKTOP` COSMIC and `window_info` answers from memory as for GNOME and KDE (identity `cosmic::<id>`). Proved through the real libwayland-client against a LuaJIT protocol fake (`tests/hardware/run_cosmic_toplevel_fake.lua`, 7 receipts, run in the compositor-focus CI step) plus the tracker unit tests; version 1 (rather than v2 and later, which announce windows through ext-foreign-toplevel-list) decided by the coordinator on 2026-11-11 overnight; superseded 2026-11-13 by the maintainer's decision: both generations, chosen by what the compositor offers. Left: a real cosmic-comp run under « To confirm on Linux ».
-      [HARDWARE] Left (2026-11-15): code done (12dac001c1, e87c68be33; test_compositor_focus.lua,
-      run_cosmic_toplevel_fake.lua); only the GNOME, KDE and cosmic-comp desktop checks.
+- Moved to TODO-tests-windows.md (2026-11-15): qualify physical shortcut delivery on Windows.
+- Moved to TODO-tests-linux.md and TODO-tests-windows.md (2026-11-15): incremental touchpad gesture modes and step
+  sizes (the Windows check is « Windows incremental swipes (raw touchpad reader) »).
+- Moved to TODO-tests-linux.md (2026-11-15): focused-application identity on GNOME, KDE and COSMIC (field point
+  `wayland_focus`).
 
 ## Sequential WPM, wrap and personal-info parity follow-up
 
@@ -847,8 +835,8 @@ and the next module candidates. The audit is paused at the maintainer's request.
 ### Qualification and policy follow-up
 
 - [ ] **[NATIVE]** Exercise the retained runtime/editor/diagnostics receiving boundaries on Windows and macOS, and the Linux live GTK/session flows. Worker B 2026-11-14: the Windows and macOS boundaries need a real PC and a real Mac, so they stay for the maintainer; the Linux runtime, editor and diagnostics flows can run in the hosted desktop-webview CI shard and are still to be written there. Replay refused writes, native timer admission, stale epochs and physical cleanup; the private models do not certify these boundaries. Linux, partly (2026-11-11): a live installed session with an in-process WebView (the first-run onboarding window) now receives the reload request instead of crashing (44b2e10f, `tests/hardware/run_webkit_gc_signal.lua` in the desktop-webview CI shard); the runtime/editor/diagnostics flows themselves remain. Mac part routed by worker F (2026-11-13): the field point `native_ui_receiving` in TODO-tests-macos.md.
-      [HARDWARE] Left (2026-11-15): the Windows and macOS boundaries need the machines; [CODE] the Linux live runtime
-      and editor flows in the desktop-webview shard are still to write.
+      [CODE] Left (2026-11-15): the Linux live runtime and editor flows in the desktop-webview shard are still to
+      write. The Windows and macOS boundaries are in TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
 
 ## Migration and update parity follow-up
 
@@ -856,8 +844,7 @@ Evidence: [six-scope recovery/lifecycle audit](docs/audits/platform-parity/2026-
 
 ### Linux
 
-- [ ] **[PHYS-M]:** receive the recovery audit scenarios on isolated macOS: Darwin migration/permission/rename contracts, selected-profile restart adoption and Versions ARMED/refused-exit reconciliation. Linux physical ports do not close Hammerspoon/APFS qualification.
-      [HARDWARE] Left (2026-11-15): not started; needs an isolated Mac.
+- Moved to TODO-tests-macos.md (2026-11-15): receive the recovery audit scenarios on isolated macOS.
 
 ## End-to-end parity follow-up
 
@@ -868,8 +855,9 @@ Evidence: [12-scope flow review](docs/audits/platform-parity/2026-11-04-flows/re
 - [ ] **[PHYS-W] / [PHYS-M] / [PHYS-L]:** execute only the receiving scenarios named by each flow report on isolated native hosts. Source/recording-port tests do not close native focus, selection, keyring, application or device qualification. Linux, partly (2026-11-11, [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)): linux-clipboard X11 target negotiation (`run_clipboard_owner.lua x11`) and the AI selection read and replacement on a real accessibility server (`run_llm_selection_focus.py`, 31 cases) now run in the desktop-webview CI shard. The locked/unlocked keyring and its password prompt (linux-crypto) are received too: a real gnome-keyring and its prompter, answered and dismissed (`run_keyring_receipts.sh`, in CI); it found and fixed a dismissed prompt read as an absent key and a clear on a locked keyring read as done (a6fa8892). The linux-desktop trash and pointer mutations run for real too (`run_desktop_actions_live.sh`: empty_trash cancelled and confirmed on a real gio trash, center_mouse, overlapping toggle_dark_mode; in CI), which found and fixed an empty-trash reported done without GVfs (3da58645). Remaining Linux: a native terminal for LCP-004, chmod (make-executable from a file manager) and eject of a real device (linux-desktop), the case/wrap transforms inside a native editor field. The Wayland clipboard protocol is received too: the clipboard owner over data-control in headless sway (`run_clipboard_owner_wayland.sh`, in CI).
       PC run 2026-11-11: the Windows WCP/WCR/WCF/WDS regressions (`test_clipboard_paste_transaction_ownership.ahk`, `test_keystats_text_cipher.ahk`, `test_wpm_config_types.ahk`, `test_system_actions.ahk`) passed natively on the maintainer's PC, which is not an isolated host.
       Windows, received 2026-11-12 (`tools/test/run-windows-receiving-scenarios.ps1`, temp profile, hosted step « Receive the recovery and flow scenarios »): WCP-001 with two real windows and the real clipboard, a foreground change during the snapshot refusing before any clear or copy chord (the chord is the one recorded port, so nothing is typed), and its control delivering and restoring; WCR on the real DPAPI (round trip read back by an independent Windows PowerShell process; tampered, other-entropy and marker-shaped envelopes refused and never re-persisted) and the metrics cipher sealing marker-shaped typing with the real MachineGuid key; WCF-001 with the widget pair in the real Registry under a private key, read back by the boot loader, and a refused write keeping the previous pair; WDS-002 with the real Clear-RecycleBin failing natively after launch (scoped to an absent drive letter, so the user's bin is never emptied) reaching one error line, and a zero exit reported as done. 8 of 8 passed on the maintainer's PC; every scenario failed once with its owner broken (startup foreground and focus checks, envelope validation, marker skip, pair publication, worker exit observer). Remaining Windows: WCP-002 (the paste into a new foreground window needs real key emission) and a DPAPI blob of another Windows account (a second account).
-      [HARDWARE] Left (2026-11-15): Windows WCP-002 and the DPAPI second account, and every macOS scenario; [CODE] Linux
-      LCP-004 native terminal, chmod, eject (maybe a loop device) and case/wrap in a native editor field.
+      [CODE] Left (2026-11-15): Linux LCP-004 native terminal, chmod, eject (maybe a loop device) and case/wrap in a
+      native editor field. Windows WCP-002, the DPAPI second account and every macOS scenario are in
+      TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
 
 ## Deep OS × module follow-up
 
@@ -879,8 +867,9 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
 
 - [ ] **Native acceptance:** run the unexecuted AHK/account-context/PnP and actual Mac/Linux device/provider scenarios from each module coverage register. Lua/PowerShell recording-port probes are not native desktop certification. Linux, partly (2026-11-11): the metrics privacy owner on a real GTK/AT-SPI desktop (`run_secure_focus_watch.py`, linux-metrics register) now runs in the desktop-webview CI shard, and the installed daemon grabs and re-emits a real uinput keyboard under systemd ([PHYS-L] proof). Remaining Linux: touchpad hotplug and SYN_DROPPED re-query (gestures), multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer metrics, live Wayland layout apply, desktop connectors and real mail/calendar (llm). Live Wayland layout apply on GNOME, received 2026-11-13 (worker D): a headless GNOME Shell 46 loads two builds under alternating slots through the Ergopti extension (`run_input_sources_live.sh gnome tests/hardware/run_user_layout_wayland_live.lua`, W1 to W3, run as an unprivileged user; not in CI, which installs no GNOME Shell); KDE stays.
       PC run 2026-11-11: Windows ran the whole AHK suite natively (14 module groups, 20,286 tests) and `e2e/run_e2e.ahk` 90/90; the account-context and PnP scenarios remain.
-      [HARDWARE] Left (2026-11-15): Windows account-context and PnP, macOS device and provider scenarios; [CODE] Linux
-      touchpad hotplug and SYN_DROPPED, multi-field Tab and grapheme deletion, pointer metrics, KDE live layout apply.
+      [CODE] Left (2026-11-15): Linux touchpad hotplug and SYN_DROPPED, multi-field Tab and grapheme deletion, pointer
+      metrics, KDE live layout apply. Windows account-context and PnP and the macOS device and provider scenarios are
+      in TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
 
 ## Carried over from the 1.0.9 requests (1-2 November)
 
@@ -941,8 +930,9 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
       (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
       on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
-      [HARDWARE] Left (2026-11-15): the Windows PC timings and the macOS field points `rerun_2026_11_02` and
-      `main_thread_holds`; [CODE] a proven cache for the macOS `menu_keyboard_layout.sources` read.
+      [CODE] Left (2026-11-15): a proven cache for the macOS `menu_keyboard_layout.sources` read. The Windows PC
+      timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in TODO-tests-windows.md and
+      TODO-tests-macos.md (2026-11-15).
 - [ ] **Before publishing.** (checked by worker F, 2026-11-13: a release gate for the maintainer, no code step) Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
       all live checks including `quit-over-a-log-flush`, JS, macOS and Linux suites, Windows field report with a driver.
       PC run 2026-11-11: the whole AHK suite ran natively on the maintainer's PC (20,286 tests, reds fixed or reported not executed except TakeNote different-folder) and `e2e/run_e2e.ahk` 90/90; the live checks were 21 pass / 7 fail.
@@ -950,12 +940,7 @@ Released as v1.0.9; these requests of 1-2 November are still open.
 
 ## Remaining code work
 
-- [ ] **Requalify the Windows key-combination and updater cohorts on the real PC after the structure
-      migration.** Each structure step re-pins the immutable cohort receipts (rule C1, decided by the
-      coordinator on 2026-11-12, to review by the maintainer); its commit body lists every old→new pin with the
-      move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once the
-      migration has landed, and confirm the re-pinned frames.
-      [HARDWARE] Left (2026-11-15): both cohorts on the real PC.
+- Moved to TODO-tests-windows.md (2026-11-15): requalify the Windows key-combination and updater cohorts.
 - [x] **Windows AV-surface ceilings (found 2026-11-12).** The first Windows / Build of the current tree, run
       43291765266 (artifact `ergoptiplus-av-surface-43291765266-1`), exceeds four ceilings of
       `tools/ci/windows-exe-av-surface.json`: elevated_run 4/3, elevation_wording 4/3, injection_wording 13/11,
@@ -1086,7 +1071,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       Owned by the parity-b pass (decided by the coordinator on 2026-11-12): its Windows slice for personal hotstrings and personal info is 392ae998, and the remaining gates are listed in [the pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md) on `claude/ergopti-todo-parity-b`.
       [CODE] Left (2026-11-15): the personal info and TOML slice is done (392ae998); the suspend gates of prompt_editor,
       paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker, model_browser, menu_llm and
-      `greyed_when_paused` remain, each classified against windows-inventory.md; a PC run confirms ([HARDWARE]).
+      `greyed_when_paused` remain, each classified against windows-inventory.md; the PC run that confirms them is in
+      TODO-tests-windows.md (2026-11-15).
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
@@ -1099,7 +1085,7 @@ between workers) green alone. All live checks pass, typed by the harness.
   still read `A_IsSuspended` from source. Guards that would send keys, paste or move the cursor when broken (text
   sender, tap-hold, dead keys, `SimulateActivity`) need a seam first. The ROI half-life tick and the click
   handlers are guarded a second time downstream, so a behaviour test of their own guard could not fail.
-- **Field report.** `field/win-2026-11-01-dev` ran with no driver; run it again with one.
+- Moved to TODO-tests-windows.md (2026-11-15): the field report with a driver (step 2 of its order).
 - **Signing follow-ups.** Delete `.github/ci/stable_windows_signing_exception.json` once SignPath is configured; flip
   update enforcement to `required` after the `off` release. The relay exe and the vendor binaries are unsigned.
 - **Older findings.** The seven "Remaining findings" of
@@ -1128,8 +1114,8 @@ between workers) green alone. All live checks pass, typed by the harness.
       the undo burst must go through the same owned output as the expansion (the clipboard owner of
       `_HSE_BeginOwnedNotepadTransaction`, the paced capture of `_HSE_BeginOwnedTerminalTransaction`), which only a
       PC run in Notepad and a terminal can qualify. Until then `HSE_UndoExpansion` keeps refusing both hosts.
-      [HARDWARE] Left (2026-11-15): not started (c448c6d1ff); the Notepad and terminal owners keep no undo record, and
-      only a PC run can qualify the fix.
+      [CODE] Left (2026-11-15): not started (c448c6d1ff); the Notepad and terminal owners keep no undo record. The PC
+      run that qualifies the fix is in TODO-tests-windows.md (2026-11-15).
 
 - [x] **LogsDirPath under the old folder name.** `infra/legacy_folder_migration.ahk` renames a custom logs folder named
       like the old app folder to `Ergopti`, as macOS and Linux do since 2026-11-11 (shared `renamed` rule).
@@ -1179,8 +1165,8 @@ between workers) green alone. All live checks pass, typed by the harness.
   (shipped recommended preset, 6 rounds): layout actions 1.1-1.8 ms, build 27-40 ms, merge 9-30 ms, encode 11-44 ms
   (258617 bytes); so the field 230 ms in `karabiner.layout_actions` is native, not the Lua loop. Next: split that
   phase on the Mac (`Layout.keyboard_form()` registry snapshot vs the 548 `hs.keycodes.map` lookups) before touching
-  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed. Done 2026-11-11: `Config.resolve_layout_actions` times that phase's two halves apart (`karabiner.layout_actions.keyboard_form`, the registry snapshot, and `karabiner.layout_actions.key_codes`, the 548 lookups; regression in `test_actions_not_rebuilt_per_layout`), so the next Mac field report's phase lines and slow-callback attributions name the half to move. Left: read that report, then decide.
-- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. Check the maintainer's machines against `docs/tooling/one-folder-name-handoff.md`; remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31). Checked 2026-11-11: no code step is left here. The runtime folder rename is the maintainer's release step: it changes the compiled runtime, so it needs a rebuilt and republished pinned remap runtime (`vendor/remap-runtime/manifest.json`), which agents do not touch; removing the migration waits for the maintainer's machine checks.
+  it. The menu Apps folder reader already uses `FsDir.try_entries_quiet`; the obsolete `find` follow-up is closed. Done 2026-11-11: `Config.resolve_layout_actions` times that phase's two halves apart (`karabiner.layout_actions.keyboard_form`, the registry snapshot, and `karabiner.layout_actions.key_codes`, the 548 lookups; regression in `test_actions_not_rebuilt_per_layout`), so the next Mac field report's phase lines and slow-callback attributions name the half to move. Left: decide from that report; the read is in TODO-tests-macos.md (2026-11-15).
+- **One folder name for Ergopti on the three OS.** The shared roots and boot migrations are already on dev. The maintainer's machine checks against `docs/tooling/one-folder-name-handoff.md` are in the three TODO-tests files (2026-11-15); remove the migration only once those checks pass. Rename the owned Karabiner runtime folder (`ErgoptiPlus`) in its next rebuild (item 31). Checked 2026-11-11: no code step is left here. The runtime folder rename is the maintainer's release step: it changes the compiled runtime, so it needs a rebuilt and republished pinned remap runtime (`vendor/remap-runtime/manifest.json`), which agents do not touch; removing the migration waits for the maintainer's machine checks.
 - **31. Owned Karabiner runtime** ([ADR 011](static/ergopti_plus/docs/adr/011-owned-karabiner-runtime.md),
   [handoff](docs/tooling/next-release-handoff.md)). Status on 4 November, all on `dev`:
   - Done: the owned runtime is the default (`RUNTIME_DEFAULT = "owned"`, the two Configuration rows and
@@ -1192,8 +1178,8 @@ between workers) green alone. All live checks pass, typed by the harness.
     the field run and the collector (`--installed`) report every install fact.
   - Decided: field-tested on the CI-signed dev build, never the ad hoc developer app; no Developer ID for now (item
     below).
-  - Next: the maintainer's WP9 pass (handoff checklist) once a signed dev build is authorized, then the shared-mode
-    deletion. Checked 2026-11-11: both steps are the maintainer's (a signed dev build and a physical Mac); no code step precedes them. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
+  - Next: the maintainer's WP9 pass (handoff checklist, in TODO-tests-macos.md since 2026-11-15) once a signed dev build
+    is authorized, then the shared-mode deletion. Checked 2026-11-11: both steps are the maintainer's (a signed dev build and a physical Mac); no code step precedes them. Done on 1 November: the per-OS feature requirements table (`docs/design/feature-requirements.md`) and
     the driver-only VirtualHIDDevice update offer (3ebab93a17).
 - **Owned runtime with a Developer ID (maintainer: not now, 2026-11-04).** With the self-signed CI certificate the
   install takes one administrator prompt (the root Core and pqrs' daemon are LaunchDaemons bootstrapped by the
@@ -1331,8 +1317,8 @@ coordinator on 2026-11-11, to review by the maintainer.
       Lua (native `hs.hash.SHA256` of the source, a typed codec that evaluates no cached code, validation kept on a
       hit) rather than a generated mirror, whose staleness only a gate would catch; it needs a Mac to measure the
       30 ms it would save, and config migration is the place a wrong cache would rewrite a user's settings.
-      [DECISION] Left (2026-11-15): port the Windows typed SHA-256 registry cache to Lua or not; the saving can only be
-      measured on a Mac ([HARDWARE]).
+      [DECISION] Left (2026-11-15): port the Windows typed SHA-256 registry cache to Lua or not; the Mac measurement of the
+      saving is in TODO-tests-macos.md (2026-11-15).
 - [ ] Windows counterparts (the maintainer's PC): the same `[Span]` TRACE/DONE pair and names in
       `infra/hotpath_profiler.ahk` for `hotstring.expand`, the tray submenu build and a layout switch; a
       millisecond-stamped kernel-to-output latency (`A_TickCount` against the hook's event time) as
@@ -1350,8 +1336,8 @@ coordinator on 2026-11-11, to review by the maintainer.
       receive no event time (only `vk`, `sc` or the character); only the opt-in input probe's low-level hook sees
       `KBDLLHOOKSTRUCT.time`, and a second permanent low-level hook for a metric would add a hook timeout risk to
       every key.
-      [HARDWARE] Left (2026-11-15): code done (fa8175e636; test_hotpath_span_lines.ahk); the field read on the PC, and
-      the maintainer's review of shipping no `input.latency` on Windows ([DECISION]).
+      [DECISION] Left (2026-11-15): code done (fa8175e636; test_hotpath_span_lines.ahk); the maintainer's review of
+      shipping no `input.latency` on Windows. The field read on the PC is in TODO-tests-windows.md (2026-11-15).
 
 - [x] Keystats boot: `open_db`'s own spawns (mkdir, schema checks), device registration and the open-walk read still
       cost about 30 ms of sqlite3 processes.
@@ -1420,8 +1406,8 @@ Each closes on a named green hosted or native run, recorded here.
       Worker K 2026-11-13: no hosted code work is left here. L32 and L42 are closed above; what remains needs an
       installed driver on a real Mac (Hotstrings category boot publication, obsolete-leaf setters) or item 31's runtime
       build, which the pinned runtime rules keep out of reach: hardware and maintainer only.
-      [HARDWARE] Left (2026-11-15): nothing hosted is left; the Hotstrings boot publication and obsolete-leaf setters
-      need an installed driver on a Mac, and item 31 waits on the runtime build ([RELEASE]).
+      [RELEASE] Left (2026-11-15): nothing hosted is left; item 31 waits on the runtime build. The Hotstrings boot
+      publication and obsolete-leaf setters on an installed Mac are in TODO-tests-macos.md (2026-11-15).
 - [ ] **Ollama Go cell** Claimed by worker K (2026-11-13). (cda1e10c5e) on the final source before a release (passed on run 40021624397).
       Green again on both architectures in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137) (Managed Ollama and Managed Ollama build, Intel and Apple silicon);
       it closes only on the release candidate's own source, which tonight's no-release rule excludes.
@@ -1436,15 +1422,8 @@ Each closes on a named green hosted or native run, recorded here.
       which requires all eight variants to build, merge and publish on the installed app.
       [RELEASE] Left (2026-11-15): the ad hoc signed receipt passed (run 42929436137); the eight variants on a Developer
       ID signed build remain.
-- [ ] **104, 105.** (claimed by worker F, 2026-11-13) Common autocorrection sections (native Windows/macOS, per-section E2E, package); dynamic
-      hotstrings on macOS.
-      Per-section E2E on Linux (2026-11-13, worker F): the daemon E2E types `chatgpt adn adaboost` against the shipped
-      catalogue with one common section chosen at a time (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`):
-      names publishes 34 rules and gives only ChatGPT, abbreviations 95 and only ADN, technical terms 11 and only
-      AdaBoost (`AUTOCORRECT_SCENARIOS`, `ERGOPTI_E2E_AUTOCORRECT`). Left: the native Windows and macOS cases and the
-      macOS dynamic hotstrings on a real machine (maintainer).
-      [HARDWARE] Left (2026-11-15): Linux per-section E2E is done (e13cf14a03, run_e2e.lua); the native Windows and
-      macOS cases and macOS dynamic hotstrings remain.
+- Moved to TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15): 104, 105, the common autocorrection sections
+  and the macOS dynamic hotstrings.
 - [ ] **34, 37, 102, 129.** Native macOS delimiter transactions; macOS packaging with both extension TOML files;
       Windows native cases and Fedora/Alpine ShellRunner fixtures (Linux done in the start-up E2E).
       macOS packaging received 2026-11-11: 85f3dfee20 makes the macOS and Linux builds require every hotstring file the
@@ -1454,13 +1433,11 @@ Each closes on a named green hosted or native run, recorded here.
       received: the full Linux unit suite passes on Fedora's and Alpine's own LuaJIT in 43012051378 (jobs 130494409773, 130494409706) and their Integration rows too. Still open: native macOS delimiter transactions (typing into an
       installed driver on a real Mac) and the Windows native cases (maintainer; Windows counterpart of the payload check:
       run it from the Windows packaging against the registry `windows_bundle_manifest.json` ships).
-      [HARDWARE] Left (2026-11-15): native macOS delimiter transactions and the Windows native cases; [CODE] the payload
-      check (85f3dfee20) runs in the Linux and macOS builds only, not in the Windows packaging.
-- [ ] **121, 123, 137.** (claimed by worker F, 2026-11-13: the CI part is green below; only the installed Mac menu and the Windows part are left, both native) AI Agent submenu composed-menu qualification on macOS and Windows; provider published before
-      model loading on macOS (Linux done).
-      macOS part on hosted CI: the macOS Unit lots (menu_llm, ui) that hold the composed-menu and provider-order tests
-      are green in [42929436137](https://github.com/adrienm7/ergopti/actions/runs/42929436137); a composed menu shown by an installed driver needs a real Mac. Windows part is the maintainer's.
-      [HARDWARE] Left (2026-11-15): the composed menu on an installed Mac, and the Windows part.
+      [CODE] Left (2026-11-15): the payload check (85f3dfee20) runs in the Linux and macOS builds only, not in the
+      Windows packaging. The native macOS delimiter transactions and the Windows native cases are in
+      TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15).
+- Moved to TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15): 121, 123, 137, the AI Agent submenu
+  composed-menu qualification.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
       (a3d69950e5..89b0b774c8) close only once that scan accepts the fixes.
       [RELEASE] Left (2026-11-15): main is still at 4d834c866a; push main, then check the alerts close.
@@ -1477,14 +1454,7 @@ Each closes on a named green hosted or native run, recorded here.
       that the analysis lists the root package, and pin x/sys v0.37.0 there only if it does not.
       [RELEASE] Left (2026-11-15): CodeQL is GitHub's default setup, a repository setting: re-enable Go after
       `native_http` is published.
-- [ ] **Native Windows TLS fixture.** Claimed by worker K (2026-11-13). `X509Store.Add` on the CurrentUser root store blocks on the Windows security
-      warning (`docs/memory/windows-ahk.md`), so these cases need a click; hosted lanes pass in LocalMachine scope.
-      Worker K 2026-11-13: no code change. Windows shows that warning for every CurrentUser root and offers no silent
-      path a fixture may use; writing the store registry key to skip it would defeat the warning. Local runs already
-      report the cases NOT EXECUTED at `ChangeTrust(true)` and `--interactive` gives a person 10 s to click; the
-      LocalMachine scope stays refused outside hosted CI. Hardware only: a person runs the native cases with
-      `--interactive` on the Windows PC.
-      [HARDWARE] Left (2026-11-15): a person runs the native cases with `--interactive` on the PC; no code is needed.
+- Moved to TODO-tests-windows.md (2026-11-15): native Windows TLS fixture.
 - [ ] **Intermittent fixtures.** Claimed by worker K (2026-11-13). Close each after it stays green: Linux window switch, cffi-lua clone, desktop-webview
       AI focus, Windows `config` group, macOS Go `TestIdleDeadlinePhysicallyRetiresPeer`, macOS Swift
       `testBridgeHardDeathLeavesNoReceiptAndGuardianClosesOriginalScope`.

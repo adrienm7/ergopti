@@ -172,3 +172,84 @@ Account and tester actions (maintainer, from the PC):
       one-shot Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level
       on the Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold
       AltGr types one AltGr character after a tap.
+- [ ] Native carriage of `shortcut_key` (moved 2026-11-15 from TODO.md « Native carriage of `shortcut_key`
+      (2026-11-15) », its real-OS proof once the [CODE] part is written): a source with `keys.<code>.shortcut_key`
+      exported to KLC and built into the DLL carries the shortcut VK; with the DLL installed, the shortcut sends that
+      VK.
+- [ ] Qualify physical shortcut delivery on Windows (moved 2026-11-15 from TODO.md « Windows/macOS/Linux: qualify
+      physical shortcut delivery and its editor », Cross-platform feature inventory; the « qualify physical shortcut
+      delivery » steps the « Physical shortcut collision and delivery owners » line names;
+      `test_physical_shortcut_delivery.ahk`, `test_physical_shortcut_host.ahk`): `PhysicalShortcutDeliveryAvailable()`
+      still returns false until steps (2) to (7) pass on the PC: (2) flip the getter in an isolated driver only, open
+      the editor from the tray: the page shows positions by name (A, 1, Pavé num. 7), never `KeyA` or `SC01E`; (3)
+      Capture a key with Ctrl, Shift, Win and none held, on an ISO and an ANSI board, with AZERTY and Ergopti layouts:
+      the captured position is the physical key, AltGr is refused, a key sent by another program (SendInput) is not
+      captured, and the key still types in the focused app; (4) save an action, then edit, move and remove it:
+      config.toml gets one backup and one write each, the reload keeps it, and an external edit of config.toml between
+      opening and saving shows « Configuration changed »; (5) press the bound key: the action runs once, the key's
+      character is not typed, nothing runs while paused, after the driver quit, or for the same key sent
+      synthetically; (6) bind a combination already owned by a tap-hold, a script shortcut or a key combination: the
+      save is refused with `collision`; (7) close the window during a capture and while the picker is open: no capture
+      survives, no draft is saved.. Only then may the getter turn true. Token-by-token prediction display also remains
+      unvalidated on Windows (`platform_reason.token_streaming_unvalidated_on_windows`, the « Live Ollama » line).
+- [ ] Native runtime, editor and diagnostics receiving on Windows (moved 2026-11-15 from TODO.md « [NATIVE] Exercise
+      the retained runtime/editor/diagnostics receiving boundaries », [native UI
+      audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)): on the real PC, replay refused writes,
+      native timer admission, stale epochs and physical cleanup at the retained runtime, editor and diagnostics
+      boundaries; the private models do not certify these boundaries.
+- [ ] Flow receiving scenarios WCP-002 and the DPAPI second account (moved 2026-11-15 from TODO.md « [PHYS-W] /
+      [PHYS-M] / [PHYS-L] », End-to-end parity follow-up; [flow
+      review](docs/audits/platform-parity/2026-11-04-flows/report.md)): on an isolated native host, WCP-002 (the paste
+      into a new foreground window needs real key emission) and a DPAPI blob of another Windows account (a second
+      account). The other WCP/WCR/WCF/WDS scenarios passed 8 of 8 on the maintainer's PC on 2026-11-12
+      (`tools/test/run-windows-receiving-scenarios.ps1`).
+- [ ] Native acceptance, account-context and PnP (moved 2026-11-15 from TODO.md « Native acceptance », Deep OS ×
+      module follow-up; [18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)): run the unexecuted
+      account-context and PnP scenarios from each module coverage register; the whole AHK suite and `e2e/run_e2e.ahk`
+      already ran natively on 2026-11-11.
+- [ ] Windows boot and menu timings (moved 2026-11-15 from TODO.md « Slowness, every driver », branch
+      `wip/windows-boot-time`): on the PC, time the boot (7 s typical and `menu.rebuild` 1.7 s in the 3 November real
+      logs) and a toggle, which must not rebuild 1000 rows, after the deferred emoji and symbol registration
+      (`HSE_DeferRegistration`) and the AI submenu built at its first open; measure each with interleaved
+      base/candidate boots (summed `process_cpu`).
+- [ ] Requalify the Windows key-combination and updater cohorts after the structure migration (moved 2026-11-15 from
+      TODO.md « Remaining code work »; rule C1, decided by the coordinator on 2026-11-12, to review by the
+      maintainer): each structure step re-pins the immutable cohort receipts and its commit body lists every old→new
+      pin with the move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once
+      the migration has landed, and confirm the re-pinned frames.
+- [ ] EDD-1 on AHK, a pause stops typing, not configuration (moved 2026-11-15 from TODO.md « EDD-1 on AHK »; 392ae998,
+      [pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md)): once the suspend
+      gates of prompt_editor, paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker,
+      model_browser, menu_llm and `greyed_when_paused` are removed, a PC run confirms: a save while suspended writes
+      the file, the configuration and install rows stay live, and nothing that acts on typing stays active under
+      Suspend.
+- [ ] Immediate-Backspace restoration after Notepad-paste and terminal expansions (moved 2026-11-15 from TODO.md
+      « Remaining code work »; c448c6d1ff): once the Notepad and terminal owners keep an undo record, a PC run in
+      Notepad and in a terminal qualifies that the undo burst goes through the same owned output as the expansion (the
+      clipboard owner of `_HSE_BeginOwnedNotepadTransaction`, the paced capture of
+      `_HSE_BeginOwnedTerminalTransaction`): a Backspace right after the expansion types the trigger back. Until then
+      `HSE_UndoExpansion` keeps refusing both hosts.
+- [ ] One folder name (moved 2026-11-15 from TODO.md « One folder name for Ergopti on the three OS »;
+      [handoff](docs/tooling/one-folder-name-handoff.md#what-the-maintainer-checks-on-each-machine)): check the PC
+      against the handoff's Windows list (after the first boot, the « Moved legacy folder entry » lines in
+      `%LOCALAPPDATA%\Ergopti\logs\`, the old folders gone, the configuration in `%LOCALAPPDATA%\Ergopti\config\`,
+      `before-folder-migration\` read for clashes); the migration is removed only once the maintainer's machines pass.
+- [ ] Hot-path span lines on Windows (moved 2026-11-15 from TODO.md « Linux performance », « Windows counterparts »;
+      fa8175e636, `test_hotpath_span_lines.ahk`): at DEBUG on the PC, a field log holds the `[TRACE] [Span] <name>…`
+      and `[DONE] [Span] <name> done in N ms (<outcome>)` pairs for `hotstring.expand` (fired, declined or pending),
+      `tray.fill` and `layout.switch`.
+- [ ] Common autocorrection sections, native Windows cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance;
+      the Linux per-section E2E is e13cf14a03, `run_e2e.lua`): with one common section chosen at a time
+      (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT
+      with names, only ADN with abbreviations and only AdaBoost with technical terms, as the Linux daemon E2E
+      (`AUTOCORRECT_SCENARIOS`) does.
+- [ ] Items 34, 37, 102 and 129, the Windows native cases (moved 2026-11-15 from TODO.md « 34, 37, 102, 129 », CI
+      acceptance): run on the PC the Windows native cases of native delimiter transactions and packaging with both
+      extension TOML files (maintainer).
+- [ ] AI Agent submenu composed-menu qualification, the Windows part (moved 2026-11-15 from TODO.md « 121, 123, 137 »,
+      CI acceptance; the macOS Unit lots are green in run 42929436137): on the PC, the AI Agent submenu shows its
+      composed menu (maintainer).
+- [ ] Native Windows TLS fixture (moved 2026-11-15 from TODO.md « CI acceptance »; `docs/memory/windows-ahk.md`):
+      `X509Store.Add` on the CurrentUser root store blocks on the Windows security warning, so a person runs the
+      native cases with `--interactive` on the Windows PC (10 s to click); local runs report them NOT EXECUTED at
+      `ChangeTrust(true)`, and the LocalMachine scope stays refused outside hosted CI. No code is needed.
