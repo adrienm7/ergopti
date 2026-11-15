@@ -19,7 +19,7 @@ local function with_window(module_name, scenario)
 	rawset(_G, "lfs", nil)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "settings.ui.menu.paths",
+			"ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "settings.ui.menu.paths",
 			"settings.engine.paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
 			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "platform.input.keycodes", "core.fs.adapters.file_system",
 			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
@@ -102,15 +102,13 @@ local function with_window(module_name, scenario)
 			end
 			if module_name == "settings.ui.menu.paths" then assert(window.init("/virtual/app/", function() end)) end
 			function h.show()
-				if module_name == "ui.layer_editor" then
-					return window.open({ karabiner = { regenerate = function() return true end } })
-				elseif module_name == "ui.action_picker" then
+				if module_name == "ui.action_picker" then
 					return window.open({ title = "Native close fixture", items = {} }, function() return true end)
 				elseif module_name == "settings.ui.menu.paths" then return window.open_editor()
 				else return window.open() end
 			end
 			function h.close()
-				if module_name == "ui.layer_editor" or module_name == "ui.action_picker" then return window.close() end
+				if module_name == "ui.action_picker" then return window.close() end
 				local bridge = h.bridges[#h.bridges]
 				bridge.callback({ name = bridge.name, webView = h.windows[#h.windows],
 					body = { action = module_name == "ui.layout_manager" and "close" or "cancel" } })
@@ -127,7 +125,7 @@ local function with_window(module_name, scenario)
 end
 
 helpers.describe("editor close retires native references", function()
-	for _, module_name in ipairs({ "ui.layer_editor", "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "settings.ui.menu.paths" }) do
 		helpers.it("retires native user close and reopens " .. module_name, function()
 			with_window(module_name, function(_, h)
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))

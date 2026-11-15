@@ -80,8 +80,8 @@ local function request_regeneration(karabiner)
 	local ok, accepted = pcall(karabiner.regenerate, function(done, reason)
 		if done ~= true then
 			Logger.warn(LOG, "The edited navigation layer is saved but not deployed yet: %s.", tostring(reason))
-			local sent, notify_err = require("core.ui.engine.notifications").notify(i18n.get("layer_editor.window_title"),
-				i18n.get("layer_editor.apply_failed"), "error")
+			local sent, notify_err = require("core.ui.engine.notifications").notify(i18n.get("layout_editor.title"),
+				i18n.get("layout_editor.status.nav_not_applied"), "error")
 			if not sent then
 				Logger.error(LOG, "The late regeneration failure could not be notified: %s.", tostring(notify_err))
 			end

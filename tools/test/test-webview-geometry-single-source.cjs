@@ -257,7 +257,6 @@ const MACOS_MODULES = {
 	model_browser: 'ui/model_browser/init.lua',
 	hotstring_editor: 'ui/hotstring_editor/init.lua',
 	personal_info_editor: 'ui/personal_info_editor/init.lua',
-	layer_editor: 'ui/layer_editor/init.lua',
 	physical_shortcuts: 'ui/physical_shortcuts/init.lua',
 	onboarding: 'ui/onboarding/init.lua',
 	paths_editor: 'settings/ui/menu/paths.lua',
@@ -282,7 +281,10 @@ const MACOS_EXCLUSIONS = {
 		'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
 	numeric_prompt:
 		'no macOS host — hs.dialog asks for a number natively, so there is no window ' +
-		'to size. Linux has no native numeric dialog and needs a webview to ask at all'
+		'to size. Linux has no native numeric dialog and needs a webview to ask at all',
+	layer_editor:
+		'no macOS host since 2026-11-15 — the navigation layer is edited in Ergopti Studio; ' +
+		'the entry leaves the manifest with the Windows host'
 };
 
 // ── Windows: geometry literals that must equal the manifest value ────────────

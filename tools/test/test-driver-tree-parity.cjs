@@ -191,7 +191,12 @@ const ratio = union.size === 0 ? 0 : (shared.length / union.size) * 100;
 //                    ui/field_check/, so the path is shared on all three. The
 //                    measurement had also carried two paths of slack (38 against
 //                    36); tightened to the measurement.
-const BASELINE_SHARED = 62;
+//   61 (2026-11-15) — ui/layer_editor is retired, not moved: the navigation
+//                    layer is edited in Ergopti Studio (ui/layout_manager), so
+//                    the path leaves the shared set with no counterpart. The one
+//                    lowering this ratchet allows is a feature removed from every
+//                    driver (decided by the agent, to review by the maintainer).
+const BASELINE_SHARED = 61;
 
 // The union is ratcheted too, downward: a driver that grows a new unshared
 // directory dilutes the ratio even when nothing was removed. Bounding it stops
