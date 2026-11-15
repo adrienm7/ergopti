@@ -175,8 +175,8 @@ local function run()
 	check(eval_sync(webview, "String(Boolean(document.getElementById('le-install')))") == "false",
 		"the manager's page does not mount the editor")
 	webview = editor_view
-	if not check(wait_for(webview, "document.getElementById('le-install')"),
-		"the editor window mounts the editor with « Install and use »") then return 1 end
+	if not check(wait_for(webview, "document.getElementById('le-tool-tab-export')"),
+		"the editor window mounts the editor with its « Export » tool tab") then return 1 end
 
 	-- The source as the host hands a saved one to the page (window.sourceData).
 	local Json = require("core.text.engine.json")
@@ -184,6 +184,11 @@ local function run()
 		.. "); 'opened'")
 	check(wait_for(webview, "document.getElementById('le-name') && document.getElementById('le-name').value.length"),
 		"the source opens in the editor")
+	-- The editor keeps « Install and use » and « Emulate without installing » in
+	-- its « Export » tool tab, which the user opens once the source is open.
+	eval_sync(webview, "document.getElementById('le-tool-tab-export').click(); 'export'")
+	if not check(wait_for(webview, "document.getElementById('le-install')"),
+		"the « Export » tab offers « Install and use »") then return 1 end
 	local Registry = require("modules.keymap.layout_registry")
 	local function message_text() return eval_sync(webview, "(document.getElementById('le-message') || {}).textContent") end
 	local function settled_after(previous)
