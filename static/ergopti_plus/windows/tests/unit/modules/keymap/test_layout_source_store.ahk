@@ -278,9 +278,9 @@ _LSS_StudioRefusals() {
 	Files := Map()
 	Ports := _LSS_StudioDisk(Files)
 	Invalid := Settings["failures"]["invalid"]
-	for Case in [Map("id", "..\x", "text", '{"id":"..\\x"}'), Map("id", "bepo", "text", '{"id":"bepo"}'),
+	for Entry in [Map("id", "..\x", "text", '{"id":"..\\x"}'), Map("id", "bepo", "text", '{"id":"bepo"}'),
 			Map("id", "user_a", "text", '{"id":"user_b"}'), Map("id", "user_a", "text", "not json")]
-		AssertEqual(Invalid, StudioStore_Save(Settings, "C:\cfg\", Case, Ports)["code"])
+		AssertEqual(Invalid, StudioStore_Save(Settings, "C:\cfg\", Entry, Ports)["code"])
 	AssertEqual(0, Files.Count, "nothing reached the disk")
 	Path := StudioStore_Path(Settings, "C:\cfg\")
 	Files[Path] := "{broken"
