@@ -1541,9 +1541,11 @@ Each closes on a named green hosted or native run, recorded here.
       received: the full Linux unit suite passes on Fedora's and Alpine's own LuaJIT in 43012051378 (jobs 130494409773, 130494409706) and their Integration rows too. Still open: native macOS delimiter transactions (typing into an
       installed driver on a real Mac) and the Windows native cases (maintainer; Windows counterpart of the payload check:
       run it from the Windows packaging against the registry `windows_bundle_manifest.json` ships).
-      [CODE] Left (2026-11-15): the payload check (85f3dfee20) runs in the Linux and macOS builds only, not in the
-      Windows packaging. The native macOS delimiter transactions and the Windows native cases are in
-      TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15).
+      Done 2026-11-15 (`claude/ergopti-todo-win-payload-check`): the Windows packaging runs the same payload check on
+      the static bundle ZIP the exe embeds (`static_bundle.zip::static/layouts/registry`, ci-windows.yml right after
+      « Build static asset bundle »); proof: test-layout-extension-payload.cjs (archive cases and the step order). The
+      native macOS delimiter transactions and the Windows native cases are in TODO-tests-macos.md and
+      TODO-tests-windows.md (2026-11-15).
 - Moved to TODO-tests-macos.md and TODO-tests-windows.md (2026-11-15): 121, 123, 137, the AI Agent submenu
   composed-menu qualification.
 - [ ] **First `main` push after 1.0.9.** CodeQL scans `main` only: the 32 alerts fixed on dev on 4 November
