@@ -1083,6 +1083,14 @@ def verdict_mark(verdict):
     return VERDICT_MARKS.get(verdict, OTHER_MARK)
 
 
+def analysis_path(folder):
+    """The analysis.json of a report: in 0_main once tidied (field-report-tidy.py), else at its root."""
+    for path in (folder / "0_main" / ANALYSIS_JSON, folder / ANALYSIS_JSON):
+        if path.is_file():
+            return path
+    return None
+
+
 def previous_analysis(out):
     """Finds the analysis of the previous report of the same OS tag.
 
@@ -1100,14 +1108,14 @@ def previous_analysis(out):
             if folder.is_dir()
             and folder.name.startswith(tag)
             and folder.name < out.name
-            and (folder / ANALYSIS_JSON).is_file()
+            and analysis_path(folder) is not None
         )
         if out.parent.is_dir()
         else []
     )
     if not candidates:
         return None
-    with (candidates[-1] / ANALYSIS_JSON).open(encoding="utf-8") as handle:
+    with analysis_path(candidates[-1]).open(encoding="utf-8") as handle:
         document = json.load(handle)
     document["_folder"] = candidates[-1].name
     return document
