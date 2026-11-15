@@ -128,7 +128,8 @@ local function new_handler(spec)
 		end
 		-- The composer's and the layout editor's operations take their callback last.
 		for _, method in ipairs({ "composer_open", "composer_save", "composer_remove", "composer_emulate", "source_open",
-			"source_save", "source_export", "studio_list", "studio_save", "studio_remove", "studio_corpus" }) do
+			"source_save", "source_export", "studio_list", "studio_save", "studio_remove", "studio_corpus",
+			"studio_profile_load", "studio_profile_save" }) do
 			local operation = registry[method]
 			if type(operation) == "function" then
 				owned_registry[method] = function(...)

@@ -944,6 +944,43 @@ check(
 		window.studioLayoutResult({ request: remove.request, ok: true });
 		await removing;
 
+		// The fingering profile: one per user, null for the defaults.
+		const profiling = store.loadProfile();
+		await new Promise((resolve) => setImmediate(resolve));
+		const load = messages[messages.length - 1];
+		assert.equal(load.action, 'studio_profile_load');
+		window.studioProfile({ request: load.request, ok: true });
+		assert.equal(await profiling, null, 'no saved profile is the defaults');
+		const profile = { id: 'mine', fingers: { Digit6: 'right_index' }, home: {} };
+		const savingProfile = store.saveProfile(profile);
+		await new Promise((resolve) => setImmediate(resolve));
+		const saveProfile = messages[messages.length - 1];
+		assert.deepEqual(plain(saveProfile), {
+			action: 'studio_profile_save',
+			request: saveProfile.request,
+			text: JSON.stringify(profile)
+		});
+		window.studioProfileResult({ request: saveProfile.request, ok: true });
+		await savingProfile;
+		const reloading = store.loadProfile();
+		await new Promise((resolve) => setImmediate(resolve));
+		window.studioProfile({
+			request: messages[messages.length - 1].request,
+			ok: true,
+			profile: JSON.stringify(profile)
+		});
+		assert.deepEqual(plain(await reloading), profile);
+		const resetting = store.saveProfile(null);
+		await new Promise((resolve) => setImmediate(resolve));
+		const reset = messages[messages.length - 1];
+		assert.deepEqual(plain(reset), {
+			action: 'studio_profile_save',
+			request: reset.request,
+			reset: true
+		});
+		window.studioProfileResult({ request: reset.request, ok: false, code: 'studio_write_failed' });
+		await assert.rejects(resetting, (error) => error.code === 'studio_write_failed');
+
 		// A host without a store refuses every call instead of waiting forever.
 		const quiet = loadEditorPage();
 		const refused = quiet.window.LAYOUT_ANALYSIS_HOST.store.list();

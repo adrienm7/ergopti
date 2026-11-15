@@ -478,3 +478,27 @@ _KLRSource_StudioCorpusMessages() {
 }
 Test("Layout editor window: Ergopti Studio runs a built-in corpus's tables on request (studio-corpus-tables)",
 	_KLRSource_StudioCorpusMessages)
+
+; The Studio window keeps the Comparer's fingering profile with the page's request numbers.
+_KLRSource_StudioProfileMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_save", "request", 2,
+		"text", '{"id":"mine"}'), Deps))
+	AssertContains(Pushed[1], 'studioProfileResult {')
+	AssertContains(Pushed[1], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load", "request", 3), Deps))
+	AssertContains(Pushed[2], 'studioProfile {')
+	AssertContains(Pushed[2], '"profile":"{\"id\":\"mine\"}"')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_save", "request", 4, "reset", true), Deps))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load", "request", 5), Deps))
+	AssertFalse(InStr(Pushed[4], '"profile"'), "reset restores the defaults")
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the Comparer's fingering profile (studio-fingering-profile)",
+	_KLRSource_StudioProfileMessages)

@@ -529,6 +529,11 @@ helpers.describe("Ergopti Studio personal layouts through the controller (studio
 				on_done(false, "studio_write_failed", "disk full")
 			end,
 			studio_remove = function(payload, on_done) on_done(true, nil, payload.id) end,
+			studio_profile_load = function(on_done) on_done(true, '{"id":"mine"}') end,
+			studio_profile_save = function(payload, on_done)
+				saved[#saved + 1] = payload
+				on_done(true)
+			end,
 		}
 		local function controller(editor_window)
 			local pushes = {}
@@ -552,6 +557,12 @@ helpers.describe("Ergopti Studio personal layouts through the controller (studio
 		helpers.assert_true(instance.on_message({ action = "studio_layout_remove", request = 6, id = "user_a" }) == true)
 		helpers.assert_eq(pushes[#pushes].payload, { request = 6, ok = true, detail = "user_a" })
 		helpers.assert_true(instance.on_message({ action = "studio_layouts" }) == false, "a request number is required")
+		helpers.assert_true(instance.on_message({ action = "studio_profile_load", request = 7 }) == true)
+		helpers.assert_eq(pushes[#pushes], { name = "studioProfile",
+			payload = { request = 7, ok = true, profile = '{"id":"mine"}' } })
+		helpers.assert_true(instance.on_message({ action = "studio_profile_save", request = 8, reset = true }) == true)
+		helpers.assert_eq(saved[#saved], { reset = true })
+		helpers.assert_eq(pushes[#pushes], { name = "studioProfileResult", payload = { request = 8, ok = true } })
 		local manager, manager_pushes = controller(false)
 		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
 		helpers.assert_true(manager_pushes[1].payload.studio_store == false)

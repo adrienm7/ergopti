@@ -257,6 +257,10 @@ comparer is embedded were decided by the agent, to be reviewed by the maintainer
   `studio.max_corpus_bytes`), runs it in the page as a classic script and answers `studioCorpus`, or refuses with
   `studio_corpus_unavailable`. The comparer uses it in place of a corpus script tag once worker R's corpus loader
   asks the host (docs/design/layout-analysis.md).
+- Fingering profile: the comparer's « Doigté » profile is `store.loadProfile()` / `store.saveProfile(profile)`
+  (`studio_profile_load`, `studio_profile_save` with `text` or `reset`). Each user has one profile, kept in
+  `layout_sources/studio_profile.json` as the JSON text the page sent, separately from the layouts; `null` (reset)
+  restores the defaults, and an unreadable profile is reported, not replaced by the defaults.
 - « My typing »: the keystats counts loaded with « Analyse my typing » become the comparer's default corpus
   (`studio-ngrams` event).
 

@@ -1280,6 +1280,34 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(listed, { true, {} })
 	end)
 
+	helpers.it("keeps one fingering profile as given and restores the defaults (studio-fingering-profile)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local loaded
+		helpers.assert_true(LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps))
+		helpers.assert_eq(loaded, { true }, "no saved profile is the defaults")
+		local text = '{"id":"mine","fingers":{"Digit6":"right_index"},"home":{}}'
+		local saved
+		helpers.assert_true(LayoutRegistry.studio_profile_save({ text = text }, function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[3]))
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text })
+		for _, refused in ipairs({ {}, { text = "" }, { text = "[1]" }, { text = "{broken" } }) do
+			LayoutRegistry.studio_profile_save(refused, function(...) saved = { ... } end, deps)
+			helpers.assert_eq(saved[2], "studio_invalid_layout")
+		end
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text }, "a refused profile changes nothing")
+		LayoutRegistry.studio_profile_save({ reset = true }, function(...) saved = { ... } end, deps)
+		helpers.assert_true(saved[1])
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true }, "reset restores the defaults")
+		state.files["/cfg/layout_sources/studio_profile.json"] = "{broken"
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded[1], false)
+		helpers.assert_eq(loaded[2], "studio_unreadable")
+	end)
+
 	helpers.it("reads only a generated corpus file for the Studio page (studio-corpus-tables)", function()
 		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
 		deps.config_dir, deps.shared_dir = "/cfg/", "/shared/"

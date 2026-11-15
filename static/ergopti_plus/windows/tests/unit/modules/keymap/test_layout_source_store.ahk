@@ -307,3 +307,21 @@ _LSS_StudioCorpus() {
 	}
 }
 Test("Studio layout store: reads only a generated corpus file for the Studio page (studio-corpus-tables)", _LSS_StudioCorpus)
+
+_LSS_StudioProfile() {
+	Settings := StudioStore_SharedSettings()
+	Files := Map()
+	Ports := _LSS_StudioDisk(Files)
+	AssertEqual("", StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["profile"], "no saved profile is the defaults")
+	Text := '{"id":"mine","fingers":{"Digit6":"right_index"},"home":{}}'
+	AssertTrue(StudioStore_ProfileSave(Settings, "C:\cfg\", Map("text", Text), Ports)["ok"])
+	AssertEqual(Text, StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["profile"])
+	for Refused in [Map(), Map("text", ""), Map("text", "[1]"), Map("text", "{broken")]
+		AssertEqual(Settings["failures"]["invalid"], StudioStore_ProfileSave(Settings, "C:\cfg\", Refused, Ports)["code"])
+	AssertEqual(Text, StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["profile"], "a refused profile changes nothing")
+	AssertTrue(StudioStore_ProfileSave(Settings, "C:\cfg\", Map("reset", true), Ports)["ok"])
+	AssertEqual("", StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["profile"], "reset restores the defaults")
+	Files[StudioStore_ProfilePath(Settings, "C:\cfg\")] := "{broken"
+	AssertEqual(Settings["failures"]["unreadable"], StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["code"])
+}
+Test("Studio layout store: keeps one fingering profile as given (studio-fingering-profile)", _LSS_StudioProfile)

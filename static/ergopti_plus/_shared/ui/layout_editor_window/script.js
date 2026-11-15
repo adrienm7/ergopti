@@ -45,7 +45,9 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'studio_layouts',
 	'studio_layout_save',
 	'studio_layout_remove',
-	'studio_corpus'
+	'studio_corpus',
+	'studio_profile_load',
+	'studio_profile_save'
 ]);
 
 // Locale strings: the catalogue macOS and Linux seed as window._i18n_strings,
@@ -556,6 +558,10 @@ window.studioLayouts = settleStudio;
 window.studioLayoutResult = settleStudio;
 /** Called by the host once a built-in corpus's tables ran in the page: { request, ok, code, detail }. */
 window.studioCorpus = settleStudio;
+/** Called by the host with the fingering profile: { request, ok, profile: json text | absent }. */
+window.studioProfile = settleStudio;
+/** Called by the host once the fingering profile is saved or reset: { request, ok, code, detail }. */
+window.studioProfileResult = settleStudio;
 
 // The Comparer lists the stored layouts as soon as it mounts, which can come
 // before the host's initData says whether it keeps them: every call waits
@@ -605,6 +611,17 @@ Object.assign(window.LAYOUT_ANALYSIS_HOST, {
 		},
 		remove: function (id) {
 			return storeRequest('studio_layout_remove', { id: id }).then(function () {});
+		},
+		// The Comparer's fingering profile (« Doigté »), one per user; null
+		// means the defaults.
+		loadProfile: function () {
+			return storeRequest('studio_profile_load').then(function (result) {
+				return typeof result.profile === 'string' ? JSON.parse(result.profile) : null;
+			});
+		},
+		saveProfile: function (profile) {
+			const extra = profile === null ? { reset: true } : { text: JSON.stringify(profile) };
+			return storeRequest('studio_profile_save', extra).then(function () {});
 		}
 	},
 	// The macOS and Linux hosts inline the page's scripts, so a built-in

@@ -51,7 +51,8 @@ global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"composer_open", true, "composer_save", true, "composer_emulate", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
 	"nav_save", true, "keystats_ngrams", true, "open_link", true,
-	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true)
+	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true,
+	"studio_profile_load", true, "studio_profile_save", true)
 
 
 
@@ -113,6 +114,8 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 		return LayoutEditorWindow_StudioLayouts(Action, Payload, Deps)
 	if (Action == "studio_corpus")
 		return LayoutEditorWindow_StudioCorpus(Payload, Deps)
+	if (Action == "studio_profile_load" || Action == "studio_profile_save")
+		return LayoutEditorWindow_StudioProfile(Action, Payload, Deps)
 	; The Studio's analysis panels open their « i » links in the system browser:
 	; an https URL only.
 	if (Action == "open_link") {
@@ -226,6 +229,38 @@ LayoutEditorWindow_StudioCorpus(Payload, Deps) {
 	; WebView2 runs the tables before the push that follows.
 	Deps["run_script"].Call(Result["text"])
 	return Deps["push"].Call("studioCorpus", Map("request", Request, "ok", LayMgrJsonBool_Of(true)))
+}
+
+/**
+ * Answers the Comparer's fingering profile messages (store.loadProfile and
+ * store.saveProfile), through StudioStore_Profile* (source_store.ahk).
+ * @param {String} Action - studio_profile_load or studio_profile_save.
+ * @param {Map} Payload - { request } and, to save, { text } or { reset: true }.
+ * @param {Map} Deps - "push", "config_dir" and optionally "studio_ports".
+ * @returns {Boolean} Whether the message was accepted.
+ */
+LayoutEditorWindow_StudioProfile(Action, Payload, Deps) {
+	Request := Payload.Get("request", 0)
+	if !(Request is Integer) || Request < 1 {
+		LoggerWarn("LayoutEditorWindow", "Refused an Ergopti Studio profile message without its request number.")
+		return false
+	}
+	Settings := StudioStore_SharedSettings()
+	Ports := Deps.Get("studio_ports", 0)
+	if (Action == "studio_profile_load") {
+		Result := StudioStore_ProfileLoad(Settings, Deps["config_dir"], Ports)
+		Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]))
+		if !Result["ok"]
+			Answer["code"] := Result["code"], Answer["detail"] := Result["detail"]
+		else if (Result["profile"] != "")
+			Answer["profile"] := Result["profile"]
+		return Deps["push"].Call("studioProfile", Answer)
+	}
+	Result := StudioStore_ProfileSave(Settings, Deps["config_dir"], Payload, Ports)
+	Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]), "detail", Result["detail"])
+	if !Result["ok"]
+		Answer["code"] := Result["code"]
+	return Deps["push"].Call("studioProfileResult", Answer)
 }
 
 _LayEdWin_PushRefusal(Deps, Code) {

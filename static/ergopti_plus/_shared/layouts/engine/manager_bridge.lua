@@ -56,6 +56,9 @@
 ---    (registry.studio_corpus) in the page through deps.run_script, then
 ---    answers studioCorpus: the macOS and Linux hosts inline the page's
 ---    scripts, so the page cannot load them from a relative URL.
+---    studio_profile_load and studio_profile_save {request, text | reset} keep the
+---    user's fingering profile (the Comparer's « Doigté ») as the JSON text the
+---    page sent; the page receives studioProfile and studioProfileResult.
 --- 11. PURE Lua: the driver injects the layout registry client, the push to the
 ---    page, the strings, the URL opener and the window close.
 --- ==============================================================================
@@ -87,6 +90,8 @@ M.ACTIONS = {
 	studio_layout_save = true,
 	studio_layout_remove = true,
 	studio_corpus = true,
+	studio_profile_load = true,
+	studio_profile_save = true,
 }
 
 -- The extension file both Lua drivers load as a layout's shortcut menu; the
@@ -349,12 +354,14 @@ end
 --- @return boolean
 local function offers_studio(registry)
 	return type(registry.studio_list) == "function" and type(registry.studio_save) == "function"
-		and type(registry.studio_remove) == "function"
+		and type(registry.studio_remove) == "function" and type(registry.studio_profile_load) == "function"
+		and type(registry.studio_profile_save) == "function"
 end
 
 --- Answers one of the Studio's personal-layout messages.
 --- @param deps table The controller's deps.
---- @param action string studio_layouts, studio_layout_save, studio_layout_remove or studio_corpus.
+--- @param action string studio_layouts, studio_layout_save, studio_layout_remove, studio_corpus,
+---   studio_profile_load or studio_profile_save.
 --- @param payload table The message; request is the page's request number.
 --- @return boolean handled
 function M.handle_studio(deps, action, payload)
@@ -376,6 +383,25 @@ function M.handle_studio(deps, action, payload)
 			else
 				deps.push("studioCorpus", { request = request, ok = true })
 			end
+		end)
+		return true
+	end
+	if action == "studio_profile_load" then
+		deps.registry.studio_profile_load(function(ok, text_or_code, detail)
+			if ok then
+				deps.push("studioProfile", { request = request, ok = true, profile = text_or_code })
+			else
+				deps.push("studioProfile", { request = request, ok = false, code = tostring(text_or_code),
+					detail = detail ~= nil and tostring(detail) or nil })
+			end
+		end)
+		return true
+	end
+	if action == "studio_profile_save" then
+		deps.registry.studio_profile_save({ text = payload.text, reset = payload.reset == true }, function(ok, code, detail)
+			deps.push("studioProfileResult", { request = request, ok = ok == true,
+				code = (not ok and code ~= nil) and tostring(code) or nil,
+				detail = detail ~= nil and tostring(detail) or nil })
 		end)
 		return true
 	end
@@ -543,7 +569,8 @@ function M.new(deps)
 			end
 			return M.handle_studio(deps, action, payload)
 		end
-		if action == "studio_layouts" or action == "studio_layout_save" or action == "studio_layout_remove" then
+		if action == "studio_layouts" or action == "studio_layout_save" or action == "studio_layout_remove"
+			or action == "studio_profile_load" or action == "studio_profile_save" then
 			if not editor_window or not offers_studio(deps.registry) then
 				deps.log("warn", "Refused an Ergopti Studio layout message: only the Studio window of a host that keeps them offers it.")
 				return false

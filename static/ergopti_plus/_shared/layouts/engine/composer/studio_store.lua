@@ -24,7 +24,10 @@
 ---    scripts, so the page cannot load a built-in corpus's generated tables
 ---    itself; corpus reads the one file of the chosen corpus, by an id that
 ---    can only name a file of the generated corpus folder, within its bound.
---- 5. PURE Lua: the driver injects its file ports.
+--- 5. One fingering profile per user (the Comparer's « Doigté »): stored as
+---    the JSON text the page sent, in its own file, so a damaged profile never
+---    touches the layouts; saving none restores the defaults.
+--- 6. PURE Lua: the driver injects its file ports.
 --- ==============================================================================
 
 local M = {}
@@ -50,7 +53,7 @@ M.SCHEMA = 1
 --- @param layout_defaults table Decoded _shared/layouts/data/defaults.json.
 --- @return table|nil settings { folder, file, id_pattern, id_max_length,
 ---   max_layouts, max_layout_bytes, corpus_folder, corpus_prefix,
----   corpus_id_pattern, max_corpus_bytes,
+---   corpus_id_pattern, max_corpus_bytes, profile_file, max_profile_bytes,
 ---   failures = { invalid, write, unreadable, corpus } }
 --- @return string|nil error
 function M.settings(layout_defaults)
@@ -59,7 +62,7 @@ function M.settings(layout_defaults)
 	if type(source) ~= "table" or type(studio) ~= "table" then
 		return nil, "the layout defaults have no source or studio table"
 	end
-	for _, value in ipairs({ source.folder, studio.file }) do
+	for _, value in ipairs({ source.folder, studio.file, studio.profile_file }) do
 		if type(value) ~= "string" or not value:match("^[A-Za-z0-9._-]+$") then
 			return nil, "the studio folder or file is not a plain name"
 		end
@@ -77,7 +80,8 @@ function M.settings(layout_defaults)
 	if type(studio.corpus_prefix) ~= "string" or not studio.corpus_prefix:match("^[a-z0-9_]+$") then
 		return nil, "the studio corpus_prefix is not a plain name"
 	end
-	for _, field in ipairs({ "id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes" }) do
+	for _, field in ipairs({ "id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes",
+		"max_profile_bytes" }) do
 		local value = studio[field]
 		if type(value) ~= "number" or value <= 0 or value % 1 ~= 0 then
 			return nil, "the studio " .. field .. " is not a positive integer"
@@ -100,6 +104,8 @@ function M.settings(layout_defaults)
 		corpus_prefix = studio.corpus_prefix,
 		corpus_id_pattern = studio.corpus_id_pattern,
 		max_corpus_bytes = studio.max_corpus_bytes,
+		profile_file = studio.profile_file,
+		max_profile_bytes = studio.max_profile_bytes,
 		failures = { invalid = failures.invalid, write = failures.write, unreadable = failures.unreadable,
 			corpus = failures.corpus },
 	}, nil
@@ -174,7 +180,7 @@ end
 ---   write(path, text) -> ok, err (atomic, creating the folder),
 ---   log(level, message, ...).
 --- @param env table
---- @return table { list, save, remove, path }
+--- @return table { list, save, remove, path, corpus, profile_load, profile_save, profile_path }
 function M.new(env)
 	local settings = env.settings
 	for _, port in ipairs({ "exists", "read_bounded", "write", "log" }) do
@@ -312,6 +318,72 @@ function M.new(env)
 			return
 		end
 		on_done(true, text, settings.failures.corpus)
+	end
+
+	local function profile_path()
+		return env.config_dir .. settings.folder .. "/" .. settings.profile_file
+	end
+	operations.profile_path = profile_path
+
+	--- The user's fingering profile as the JSON text the page saved, or nil for the defaults.
+	--- @param on_done function on_done(ok, text_or_code, detail)
+	function operations.profile_load(on_done)
+		local file = profile_path()
+		if not env.exists(file) then
+			on_done(true, nil, nil)
+			return
+		end
+		local text, status, detail = env.read_bounded(file, settings.max_profile_bytes + 64)
+		local failure
+		if type(text) ~= "string" or status ~= "ok" then
+			failure = string.format("%s could not be read (%s %s)", file, tostring(status), tostring(detail))
+		else
+			local ok, data = pcall(Json.decode, text)
+			if not ok or type(data) ~= "table" or data.schema ~= M.SCHEMA
+				or (data.profile ~= nil and type(data.profile) ~= "string") then
+				failure = file .. " is not a schema " .. M.SCHEMA .. " fingering profile"
+			else
+				on_done(true, data.profile, nil)
+				return
+			end
+		end
+		env.log("error", "The Ergopti Studio fingering profile is unreadable: %s.", failure)
+		on_done(false, settings.failures.unreadable, failure)
+	end
+
+	--- Stores the user's fingering profile, or restores the defaults.
+	--- @param payload table { text = JSON text of an object } or { reset = true }
+	--- @param on_done function on_done(ok, code, detail)
+	function operations.profile_save(payload, on_done)
+		local reset = type(payload) == "table" and payload.reset == true
+		local text = (type(payload) == "table" and not reset) and payload.text or nil
+		if not reset then
+			local refusal
+			if type(text) ~= "string" or text == "" then
+				refusal = "the profile is empty"
+			elseif #text > settings.max_profile_bytes then
+				refusal = "the profile is larger than its bound"
+			else
+				-- Lua decodes an array to a table too: an object starts with « { ».
+				local ok, profile = pcall(Json.decode, text)
+				if not ok or type(profile) ~= "table" or not text:match("^%s*{") then
+					refusal = "the profile is not a JSON object"
+				end
+			end
+			if refusal then
+				env.log("warn", "Refused an Ergopti Studio fingering profile: %s.", refusal)
+				on_done(false, settings.failures.invalid, refusal)
+				return
+			end
+		end
+		local written, write_err = env.write(profile_path(), Json.encode({ schema = M.SCHEMA, profile = text }) .. "\n")
+		if not written then
+			env.log("error", "The Ergopti Studio fingering profile could not be written: %s.", tostring(write_err))
+			on_done(false, settings.failures.write, tostring(write_err))
+			return
+		end
+		env.log("info", text and "Ergopti Studio fingering profile saved." or "Ergopti Studio fingering profile reset.")
+		on_done(true, nil, nil)
 	end
 
 	return operations

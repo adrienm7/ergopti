@@ -265,6 +265,8 @@ helpers.describe("Ergopti Studio personal layouts (Linux bridge)", function()
 		daemon_state.layout_registry.studio_list = function(on_done) on_done(true, { '{"id":"user_a"}' }) end
 		daemon_state.layout_registry.studio_save = function(payload, on_done) saved[#saved + 1] = payload; on_done(true, nil, payload.id) end
 		daemon_state.layout_registry.studio_remove = function(payload, on_done) on_done(true, nil, payload.id) end
+		daemon_state.layout_registry.studio_profile_load = function(on_done) on_done(true, nil) end
+		daemon_state.layout_registry.studio_profile_save = function(payload, on_done) saved[#saved + 1] = payload; on_done(true) end
 		local Editor = Bridge.editor
 		Editor._reset()
 		local ok, err = pcall(function()
@@ -277,6 +279,12 @@ helpers.describe("Ergopti Studio personal layouts (Linux bridge)", function()
 				text = '{"id":"user_a"}' }, daemon_state).handled)
 			helpers.assert_eq(saved, { { id = "user_a", text = '{"id":"user_a"}' } })
 			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioLayoutResult(")
+			helpers.assert_true(Editor.on_message({ action = "studio_profile_save", request = 4,
+				text = '{"id":"mine"}' }, daemon_state).handled)
+			helpers.assert_eq(saved[#saved], { text = '{"id":"mine"}', reset = false })
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioProfileResult(")
+			helpers.assert_true(Editor.on_message({ action = "studio_profile_load", request = 5 }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioProfile(")
 		end)
 		Editor._reset()
 		helpers.assert_true(ok, tostring(err))
