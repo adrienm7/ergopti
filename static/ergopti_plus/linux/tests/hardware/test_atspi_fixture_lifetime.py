@@ -120,6 +120,25 @@ class FixtureReadinessTest(unittest.TestCase):
     def test_without_a_ready_file_nothing_is_watched(self):
         self.assertEqual(self.launch(["editor"])["handlers"], {})
 
+    def test_state_file_follows_the_window_losing_activation(self):
+        # A window opened over this one makes it inactive in its own process,
+        # after the new window is ready: the third probe read two ACTIVE frames
+        # and answered inconclusive (CI run 43679709990). The runner waits for
+        # this file to say so before it probes.
+        with tempfile.TemporaryDirectory() as folder:
+            state_file = pathlib.Path(folder) / "editor.state"
+            state = self.launch(["editor", "--state-file", str(state_file)])
+            self.assertEqual(state_file.read_text(), "inactive")
+            state["active"] = True
+            state["handlers"]["notify::is-active"]()
+            self.assertEqual(state_file.read_text(), "active")
+            state["active"] = False
+            state["handlers"]["notify::is-active"]()
+            self.assertEqual(state_file.read_text(), "inactive")
+            self.assertEqual(
+                sorted(p.name for p in pathlib.Path(folder).iterdir()), ["editor.state"]
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
