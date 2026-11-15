@@ -141,6 +141,11 @@ Account and tester actions (maintainer, from the PC):
       Studio tabs (2026-11-14, `claude/ergopti-todo-studio-app`): « Comparer » shows the layout ranking for a
       built-in corpus within a second, an imported layout is still listed after closing and reopening the window,
       and « Analyse my typing » then selects « My typing » in « Comparer ». XKB and KLC downloads (2026-11-15, `claude/ergopti-todo-native-export`): in the layout editor window's « Export » tab, « XKB » and « KLC » write `<id>_xkb.zip` and `<dll>.klc` to the Downloads folder, built in the page (fengari, WebView2).
+      Studio tabs and autosave (2026-11-15, `claude/ergopti-todo-studio-w-2`): in « Éditer », « + » opens a second
+      layout in its own tab; edit both, end the driver from the Task Manager, start it again and reopen « Ergopti
+      Studio »: both tabs and their unsaved edits are back, from `layout_sources\studio_workspace.json`; « Export
+      all » writes `ergopti-studio-layouts.zip` to the Downloads folder and « Import » of that file reopens every
+      layout.
 
 - [ ] Layout editor downloads (2026-11-14, `layout_editor_downloads`): the editor window's XKB, KLC, DLL and macOS
       bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext »,

@@ -446,14 +446,24 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       done (f7b366f6ba, 07b19db438, bd5f162320; test-layout-comparer-page.cjs); PDF text is not read, and layouts made
       in « Éditer » do not appear in the comparison list.
 
-- [ ] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
+- [x] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
       tabs; a « + » button opens a new one (blank, from a library layout, or from a file). Everything is saved
       locally on the user's machine as they type: on the site in the browser's persistent storage (IndexedDB, with
       navigator.storage.persist() requested), in the app in the user's data folder; a reload, a crash or F5 restores
       every tab and its unsaved edits; export/import of all personal layouts as files for backup. Nothing is sent to a
       server.
-      [CODE] Left (2026-11-15): not started; the editor holds one document with no tabs, no « + », no IndexedDB or
-      storage.persist(), no autosave or restore, no bulk export or import.
+      Done 2026-11-15 (`claude/ergopti-todo-studio-w-2`; 42e96af5, 24cc6098, c4a99e83): one tab per layout with its own
+      undo, « + » with « Start from » (file, blank, reference or catalogue layout); every tab saved 300 ms after the
+      last change and restored on the next mount, on the site in IndexedDB with storage.persist() asked, in the app in
+      `layout_sources/studio_workspace.json` through the host on Windows, macOS and Linux; « Export all » (one ZIP of
+      sources) and « Import » (.toml, .keylayout, ZIP); a damaged store is reported and never saved over
+      (docs/design/layout-editor.md, « several layouts, never lost »). Proof: layout-editor.playwright.cjs
+      (exerciseWorkspace: F5, crash, damaged store, export and import; exerciseAppWorkspace), test-layout-editor-model.cjs,
+      test_layout_registry.lua and test_layout_manager_bridge.lua (Linux, macOS), test_layout_source_store.ahk and
+      test_keystats_reader_ngram_sources.ahk (Windows). Limit: an archive deflated by another tool needs the webview's
+      DecompressionStream (WebKitGTK 2.40 or later on Linux); the editor's own backups are stored and read
+      everywhere. Tab bar placement decided by the agent, to review by the maintainer. Real-machine checks: the
+      `layout_editor_window` lines of the three TODO-tests files.
 - [ ] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
       keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
       defaults to a built-in corpus).
