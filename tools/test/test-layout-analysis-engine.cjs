@@ -473,6 +473,62 @@ for (const layout of library) {
 	check(Number.isFinite(r.score.total), `library: ${layout.id} has no finite score`);
 }
 
+// =========================================
+// ======= 4b/ Per-key costs (heatmap) =====
+// =========================================
+
+// (studio-key-heatmap) Each key's part of a metric adds up to the metric, so a
+// key's colour and the score it costs are the metric's own numbers, split.
+{
+	const swann = E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 20000));
+	for (const id of ['azerty', 'ergopti', 'qwerty']) {
+		const r = E.analyse(byId.get(id), swann, { keyGroups: true });
+		for (const metric of E.KEY_COST_METRICS) {
+			const sum = Object.values(r.keys).reduce((total, key) => total + key.cost[metric], 0);
+			check(
+				near(sum, r.metrics[metric]),
+				`key costs: ${id} ${metric} keys add up to ${sum}, the metric is ${r.metrics[metric]}`
+			);
+		}
+		const points = Object.values(E.keyScoreCost(r)).reduce((total, cost) => total + cost, 0);
+		const expected = E.KEY_COST_METRICS.reduce(
+			(total, metric) => total + (E.defaultWeights()[metric] || 0) * r.metrics[metric],
+			0
+		);
+		check(
+			near(points, expected),
+			`key costs: ${id} score costs add up to ${points}, not ${expected}`
+		);
+		const doubled = E.keyScoreCost(r, { sfb: 2 * E.defaultWeights().sfb });
+		const code = Object.keys(r.keys).find((c) => r.keys[c].cost.sfb > 0);
+		check(
+			near(doubled[code] - E.keyScoreCost(r)[code], E.defaultWeights().sfb * r.keys[code].cost.sfb),
+			'key costs: a weight changes the score cost by weight × the key part'
+		);
+	}
+	// QWERTY: « ed » is a same-finger pair, « sad » a redirect without the index.
+	const qwerty = byId.get('qwerty');
+	const tiny = E.ngramsFromText('ed ed ed sad sad');
+	const grouped = E.analyse(qwerty, tiny, { keyGroups: true }).keys;
+	check(
+		JSON.stringify(grouped.KeyE.worst.sfb.map(([others]) => others)) === JSON.stringify([['KeyD']]),
+		`worst groups: KeyE's SFB partner is ${JSON.stringify(grouped.KeyE.worst.sfb)}`
+	);
+	check(
+		JSON.stringify(grouped.KeyE.sfbWith.map(([other]) => other)) === JSON.stringify(['KeyD']),
+		'worst groups: sfbWith names the same partner'
+	);
+	const redirect = grouped.KeyA.worst.redirect_bad.map(([others]) => others.slice().sort());
+	check(
+		JSON.stringify(redirect) === JSON.stringify([['KeyD', 'KeyS']]),
+		`worst groups: KeyA's bad redirect is ${JSON.stringify(redirect)}`
+	);
+	check(grouped.KeyA.worst.redirect_bad[0][1] > 0, 'worst groups: a group carries its share');
+	const plainKeys = E.analyse(qwerty, tiny, {}).keys;
+	check(plainKeys.KeyA.worst.redirect_bad.length === 0, 'worst groups: counted only when asked');
+	check(plainKeys.KeyE.worst.sfb.length === 1, 'worst groups: the SFB partners are always counted');
+}
+
 // ========================
 // ======= 5/ Speed =======
 // ========================

@@ -63,8 +63,9 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   `model.ideal_finger_load_hands` gives); a refusal is an `AnalysisError` with
   a stable `code` (`ideal_load_fingers`, `ideal_load_share`, `ideal_load_sum`,
   `ideal_load_order`) and the `values` its message names.
-- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?})` → one result
-  (`idealLoad` replaces the default target of `finger_imbalance`):
+- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?, profile?, keyGroups?})` → one
+  result (`idealLoad` replaces the default target of `finger_imbalance`;
+  `keyGroups: true` counts every key's worst groups for every event, below):
 
   ```js
   {
@@ -75,15 +76,35 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
     hands: {left, right},            // % of the presses, thumbs apart
     rows: {number, top, home, bottom},
     trigramClasses: {roll3_in, roll3_out, alternation, redirect, roll_mixed, same_finger},
-    keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, sfbWith: [[code, %], ...]}, ...},
+    keys: {KeyE: {presses, sfb, sfs, lsb, scissors, redirect, cost: {metric: part},
+                  worst: {event: [[[codes], %], ...]}, sfbWith: [[code, %], ...]}, ...},
     coverage: {typed, unsupported, unsupportedChars: {char: count}, bigrams, trigrams},
     score: {total, contributions: {metric: points}, weights}
   }
   ```
 
-  `keys` feeds the Studio's live heatmap: each key's share of the presses and
-  the share of the bigrams (`sfb`, `lsb`, `scissors`) or trigrams (`sfs`,
-  `redirect`) it takes part in, with its three worst same-finger partners.
+  `keys` feeds the Studio's live heatmaps: each key's share of the presses and
+  the share of the bigrams (`sfb`, `lsb`, `scissors` full and half) or trigrams
+  (`sfs`, `redirect`) it takes part in, with its three worst same-finger
+  partners (`sfbWith`). `cost` holds, for each metric of `KEY_COST_METRICS`
+  (the events `KEY_EVENTS` = `sfb`, `sfs`, `lsb`, `scissors`, `half_scissors`,
+  `redirect`, `redirect_bad`, then `distance`, `finger_imbalance`,
+  `pinky_load`, `outer_column`), the part of that metric's value the key
+  causes: each event is shared equally between the keys it involves (two for
+  a pair or a skipgram, three for a redirect), the distance is the key's
+  reach times its presses, and `finger_imbalance` goes to the keys of the
+  fingers above their ideal load, in proportion to their presses; the keys'
+  parts add up to the metric (pinned by `test-layout-analysis-engine.cjs`).
+  `worst` lists, for each event, the key's three heaviest groups: the other
+  key of a pair, or the two others of a redirect, with the share of the
+  bigrams or trigrams. The SFB groups are always counted; the others only
+  with `keyGroups: true`, because counting them for the whole library costs
+  about 40 % of a ranking (one layout, as the editor asks, costs nothing
+  visible).
+
+- `keyScoreCost(result, weights?)` → `{code: points}`: what each key costs the
+  global score, Σ weight × `cost` over `KEY_COST_METRICS`; the keys' points add
+  up to those metrics' part of the score.
 
 - `score(result, weights?)` → `{total, contributions, weights}`; the given
   weights override the defaults metric by metric.

@@ -635,11 +635,14 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Measures one layout.
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
-	 * @param {{keyboard?: string, weights?: object, idealLoad?: object}} [options]
-	 *   - Board, weights and the ideal finger load of finger_imbalance (finger →
-	 *   % of the non-thumb presses; the model's ideal_finger_load when absent).
+	 * @param {{keyboard?: string, weights?: object, idealLoad?: object, profile?: object,
+	 *   keyGroups?: boolean}} [options] - Board, weights, the ideal finger load of
+	 *   finger_imbalance (finger → % of the non-thumb presses; the model's
+	 *   ideal_finger_load when absent), the fingering profile, and whether each
+	 *   key's worst groups are counted for every event (keys[code].worst; the
+	 *   SFB ones always are).
 	 * @returns {object} {layout, keyboard, metrics, fingers, rows, coverage,
-	 *   trigramClasses, score}.
+	 *   trigramClasses, keys, score}.
 	 */
 	function analyse(layoutInput, ngrams, options) {
 		const opts = options || {};
@@ -675,13 +678,33 @@ var LAYOUT_ANALYSIS = (function () {
 			same_finger_trigram: 0
 		};
 		const unsupportedChars = {};
-		// Per key: how often it takes part in each bad event, for the heatmap.
-		const KEY_EVENTS = ['sfb', 'sfs', 'lsb', 'scissors', 'redirect'];
+		// Per key: how often it takes part in each bad event, and each event's
+		// key groups (a pair, or the trigram of a redirect), for the heatmap.
 		const perKey = {};
-		for (const event of KEY_EVENTS) perKey[event] = new Float64Array(board.codes.length);
-		const sfbPairs = new Map();
-		const blame = (event, n, keys) => {
-			for (const k of keys) perKey[event][k] += n;
+		const groups = {};
+		for (const event of KEY_EVENTS) {
+			perKey[event] = new Float64Array(board.codes.length);
+			groups[event] = new Map();
+		}
+		// A pair's or a trigram's group id holds its keys in increasing order.
+		// Counting every event's groups costs about 40 % on a whole library, so
+		// only the SFB partners the ranking shows are counted unless asked.
+		const grouped = {};
+		for (const event of KEY_EVENTS) grouped[event] = opts.keyGroups === true || event === 'sfb';
+		const count = (event, id, n) => groups[event].set(id, (groups[event].get(id) || 0) + n);
+		const blame2 = (event, n, a, b) => {
+			perKey[event][a] += n;
+			perKey[event][b] += n;
+			if (grouped[event]) count(event, a < b ? a * KEY_BASE + b : b * KEY_BASE + a, n);
+		};
+		const blame3 = (event, n, a, b, d) => {
+			perKey[event][a] += n;
+			perKey[event][b] += n;
+			perKey[event][d] += n;
+			if (!grouped[event]) return;
+			const low = Math.min(a, b, d);
+			const high = Math.max(a, b, d);
+			count(event, (low * KEY_BASE + (a + b + d - low - high)) * KEY_BASE + high, n);
 		};
 
 		const bigram = (k1, k2, n) => {
@@ -695,9 +718,7 @@ var LAYOUT_ANALYSIS = (function () {
 			}
 			if (f1 === f2) {
 				c.sfb += n;
-				blame('sfb', n, [k1, k2]);
-				const pair = k1 < k2 ? k1 * 1000 + k2 : k2 * 1000 + k1;
-				sfbPairs.set(pair, (sfbPairs.get(pair) || 0) + n);
+				blame2('sfb', n, k1, k2);
 				return;
 			}
 			if (board.hand[k1] !== board.hand[k2]) {
@@ -712,12 +733,16 @@ var LAYOUT_ANALYSIS = (function () {
 				const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
 				const shorter = longer === k1 ? k2 : k1;
 				const down = board.row[longer] - board.row[shorter];
-				if (down >= 2) c.scissors += n;
-				else if (down === 1) c.half_scissors += n;
-				if (down >= 1) blame('scissors', n, [k1, k2]);
+				if (down >= 2) {
+					c.scissors += n;
+					blame2('scissors', n, k1, k2);
+				} else if (down === 1) {
+					c.half_scissors += n;
+					blame2('half_scissors', n, k1, k2);
+				}
 				if (board.lateral[k1] || board.lateral[k2]) {
 					c.lsb += n;
-					blame('lsb', n, [k1, k2]);
+					blame2('lsb', n, k1, k2);
 				}
 			}
 			if (o2 > o1) c.roll_in += n;
@@ -732,7 +757,7 @@ var LAYOUT_ANALYSIS = (function () {
 			const f3 = board.finger[k3];
 			if (f1 === f3 && k1 !== k3) {
 				c.sfs += n;
-				blame('sfs', n, [k1, k3]);
+				blame2('sfs', n, k1, k3);
 			}
 			if (f1 === f2 || f2 === f3) {
 				c.same_finger_trigram += n;
@@ -748,9 +773,12 @@ var LAYOUT_ANALYSIS = (function () {
 					else c.roll3_out += n;
 				} else {
 					c.redirect += n;
-					blame('redirect', n, [k1, k2, k3]);
+					blame3('redirect', n, k1, k2, k3);
 					const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
-					if (!index) c.redirect_bad += n;
+					if (!index) {
+						c.redirect_bad += n;
+						blame3('redirect_bad', n, k1, k2, k3);
+					}
 				}
 				return;
 			}
@@ -872,7 +900,16 @@ var LAYOUT_ANALYSIS = (function () {
 				roll_mixed: pct(c.roll_mixed, c.trigrams),
 				same_finger: pct(c.same_finger_trigram, c.trigrams)
 			},
-			keys: keyReport(board, keyCount, allPresses, perKey, c, sfbPairs),
+			keys: keyReport(board, {
+				keyCount,
+				allPresses,
+				pressed,
+				fingerLoad,
+				ideal,
+				perKey,
+				groups,
+				counts: c
+			}),
 			coverage: {
 				// Keys the layout puts characters on that this keyboard lacks (a
 				// 36-key board has no number row): their characters count as unsupported.
@@ -957,6 +994,28 @@ var LAYOUT_ANALYSIS = (function () {
 
 	// Key n-gram codes: k1 * KEY_BASE + k2, and (k1 * KEY_BASE + k2) * KEY_BASE + k3.
 	const KEY_BASE = 1024;
+	// The bad events the heatmap blames on keys: how many keys each one
+	// involves, and those counted over trigrams.
+	const EVENT_KEYS = {
+		sfb: 2,
+		sfs: 2,
+		lsb: 2,
+		scissors: 2,
+		half_scissors: 2,
+		redirect: 3,
+		redirect_bad: 3
+	};
+	const KEY_EVENTS = Object.keys(EVENT_KEYS);
+	const TRIGRAM_EVENTS = new Set(['sfs', 'redirect', 'redirect_bad']);
+	// The metrics whose value the keys share exactly (keyReport cost).
+	const KEY_COST_METRICS = KEY_EVENTS.concat([
+		'distance',
+		'finger_imbalance',
+		'pinky_load',
+		'outer_column'
+	]);
+	// How many of its worst pairs or trigrams each key names.
+	const WORST_GROUPS = 3;
 	const keyNgramCache = new WeakMap();
 
 	/**
@@ -1024,39 +1083,107 @@ var LAYOUT_ANALYSIS = (function () {
 	}
 
 	/**
-	 * The per-key data of the heatmap: each key's share of the presses and of
-	 * each bad event (the share of the bigrams or trigrams it takes part in),
-	 * and its three worst same-finger partners.
+	 * The per-key data of the heatmap.
+	 * - presses, sfb, sfs, lsb, scissors (full and half), redirect: the key's
+	 *   share of the presses, or of the bigrams or trigrams it takes part in;
+	 * - cost: for each metric of KEY_COST_METRICS, the part of that metric's
+	 *   value the key causes; each event is shared equally between the keys it
+	 *   involves, so the keys' parts add up to the metric (finger_imbalance
+	 *   goes to the keys of the fingers above their ideal load, in proportion
+	 *   to their presses);
+	 * - worst: for each event metric, the key's WORST_GROUPS heaviest groups
+	 *   with it (the other key of a pair, the two others of a redirect), each
+	 *   [codes, % of the bigrams or trigrams];
+	 * - sfbWith: worst.sfb as [code, %] pairs.
+	 * @param {object} board - From keyboard().
+	 * @param {object} m - What analyse() measured: keyCount, allPresses, pressed
+	 *   (every press but the thumbs'), fingerLoad, ideal, perKey, groups, counts.
 	 * @returns {object} code → {presses, sfb, sfs, lsb, scissors, redirect,
-	 *   sfbWith: [[code, %], ...]}.
+	 *   cost, worst, sfbWith}.
 	 */
-	function keyReport(board, keyCount, allPresses, perKey, c, sfbPairs) {
+	function keyReport(board, m) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const c = m.counts;
+		const fingerIds = data().model.fingers;
+		const thumb = (k) => board.finger[k] === LEFT_THUMB || board.finger[k] === RIGHT_THUMB;
+		const whole = (event) => (TRIGRAM_EVENTS.has(event) ? c.trigrams : c.bigrams);
+		// Each finger's load above its ideal, in points of the non-thumb presses.
+		const over = fingerIds.map((id, f) =>
+			m.ideal[id] === undefined ? 0 : Math.max(0, pct(m.fingerLoad[f], m.pressed) - m.ideal[id])
+		);
 		const keys = {};
 		board.codes.forEach((code, k) => {
+			const share = (event) => pct(m.perKey[event][k], whole(event));
+			const f = board.finger[k];
+			const cost = {
+				distance: c.chars > 0 ? (board.reach[k] * m.keyCount[k]) / c.chars : 0,
+				finger_imbalance: m.fingerLoad[f] > 0 ? (over[f] * m.keyCount[k]) / m.fingerLoad[f] : 0,
+				pinky_load: !thumb(k) && (f === 0 || f === 9) ? pct(m.keyCount[k], m.pressed) : 0,
+				outer_column: !thumb(k) && board.outer[k] ? pct(m.keyCount[k], m.pressed) : 0
+			};
+			const worst = {};
+			for (const event of KEY_EVENTS) {
+				cost[event] = share(event) / EVENT_KEYS[event];
+				worst[event] = [];
+			}
 			keys[code] = {
-				presses: pct(keyCount[k], allPresses),
-				sfb: pct(perKey.sfb[k], c.bigrams),
-				sfs: pct(perKey.sfs[k], c.trigrams),
-				lsb: pct(perKey.lsb[k], c.bigrams),
-				scissors: pct(perKey.scissors[k], c.bigrams),
-				redirect: pct(perKey.redirect[k], c.trigrams),
+				presses: pct(m.keyCount[k], m.allPresses),
+				sfb: share('sfb'),
+				sfs: share('sfs'),
+				lsb: share('lsb'),
+				scissors: share('scissors') + share('half_scissors'),
+				redirect: share('redirect'),
+				cost,
+				worst,
 				sfbWith: []
 			};
 		});
-		const pairs = Array.from(sfbPairs.entries()).sort((a, b) => b[1] - a[1]);
-		for (const [pair, n] of pairs) {
-			const a = Math.floor(pair / 1000);
-			const b = pair % 1000;
-			for (const [self, other] of [
-				[a, b],
-				[b, a]
-			]) {
-				const list = keys[board.codes[self]].sfbWith;
-				if (list.length < 3) list.push([board.codes[other], pct(n, c.bigrams)]);
+		// One pass per event: each key keeps its WORST_GROUPS heaviest groups (id, n).
+		for (const event of KEY_EVENTS) {
+			const top = new Map();
+			for (const [id, n] of m.groups[event]) {
+				let rest = id;
+				for (let i = 0; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE)) {
+					const k = rest % KEY_BASE;
+					if (!top.has(k)) top.set(k, []);
+					const list = top.get(k);
+					if (list.length && list[list.length - 1][0] === id) continue;
+					if (list.length === WORST_GROUPS && list[WORST_GROUPS - 1][1] >= n) continue;
+					list.push([id, n]);
+					list.sort((x, y) => y[1] - x[1] || x[0] - y[0]);
+					if (list.length > WORST_GROUPS) list.pop();
+				}
 			}
+			for (const [k, list] of top)
+				keys[board.codes[k]].worst[event] = list.map(([id, n]) => {
+					const others = [];
+					for (let i = 0, rest = id; i < EVENT_KEYS[event]; i++, rest = Math.floor(rest / KEY_BASE))
+						if (rest % KEY_BASE !== k) others.unshift(board.codes[rest % KEY_BASE]);
+					return [others, pct(n, whole(event))];
+				});
 		}
+		for (const code of board.codes)
+			keys[code].sfbWith = keys[code].worst.sfb.map(([others, share]) => [others[0], share]);
 		return keys;
+	}
+
+	/**
+	 * What each key costs the global score: the points of the score's penalty
+	 * metrics (KEY_COST_METRICS) it causes, with these weights. The keys' costs
+	 * add up to those metrics' part of the score.
+	 * @param {object} result - analyse() output.
+	 * @param {object} [weights] - As score(); the defaults when absent.
+	 * @returns {object} code → points lost.
+	 */
+	function keyScoreCost(result, weights) {
+		const used = weights ? Object.assign(defaultWeights(), weights) : defaultWeights();
+		const out = {};
+		for (const [code, key] of Object.entries(result.keys)) {
+			let points = 0;
+			for (const id of KEY_COST_METRICS) points += (used[id] || 0) * key.cost[id];
+			out[code] = points;
+		}
+		return out;
 	}
 
 	/**
@@ -1243,6 +1370,8 @@ var LAYOUT_ANALYSIS = (function () {
 		METRICS,
 		LAYER_IDS,
 		AnalysisError,
+		KEY_EVENTS,
+		KEY_COST_METRICS,
 		hashText,
 		keyboard,
 		fingeringProfile,
@@ -1256,6 +1385,7 @@ var LAYOUT_ANALYSIS = (function () {
 		prepareNgrams,
 		analyse,
 		score,
+		keyScoreCost,
 		defaultWeights,
 		defaultIdealLoad,
 		idealLoad,
