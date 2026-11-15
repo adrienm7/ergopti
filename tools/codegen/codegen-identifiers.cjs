@@ -51,7 +51,8 @@ const GROUPS = [
 	'macos_notifications',
 	'linux_stage',
 	'linux_desktop',
-	'locales'
+	'locales',
+	'windows_vendor'
 ];
 // Groups only the Lua drivers read stay out of the shell, Python, JS, Swift and
 // AutoHotkey projections: the bytecode package is the LuaJIT daemon's alone, and
@@ -65,13 +66,21 @@ const LUA_ONLY_GROUPS = new Set(['bytecode_package', 'linux_stage', 'linux_deskt
 // Groups the macOS launcher and its Lua runtime share reach Lua and Swift only:
 // the launcher's quit request to its embedded runtime (MLC-002).
 const MACOS_ONLY_GROUPS = new Set(['macos_notifications']);
+// The files the Windows build puts in windows/vendor and the AutoHotkey driver
+// runs from there (the layout editor's Lua export host) reach AutoHotkey only;
+// Node tools read this file directly.
+const WINDOWS_ONLY_GROUPS = new Set(['windows_vendor']);
 const PROJECTED_GROUPS = GROUPS.filter(
-	(group) => !LUA_ONLY_GROUPS.has(group) && !MACOS_ONLY_GROUPS.has(group)
+	(group) =>
+		!LUA_ONLY_GROUPS.has(group) && !MACOS_ONLY_GROUPS.has(group) && !WINDOWS_ONLY_GROUPS.has(group)
 );
-const SWIFT_GROUPS = GROUPS.filter((group) => !LUA_ONLY_GROUPS.has(group));
+const LUA_GROUPS = GROUPS.filter((group) => !WINDOWS_ONLY_GROUPS.has(group));
+const SWIFT_GROUPS = GROUPS.filter(
+	(group) => !LUA_ONLY_GROUPS.has(group) && !WINDOWS_ONLY_GROUPS.has(group)
+);
 // The system-language fallback reaches AutoHotkey too: Windows falls back to the
 // same catalogue as the Lua drivers (core/i18n/engine/i18n.ahk _I18nDetectSystemLocale, I18W-001).
-const AHK_GROUPS = [...PROJECTED_GROUPS, 'locales'];
+const AHK_GROUPS = [...PROJECTED_GROUPS, 'locales', ...WINDOWS_ONLY_GROUPS];
 const VALUE_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 // The field report names are repository paths and a branch prefix: slash-
 // separated plain segments, with an optional final slash for a prefix.
@@ -130,7 +139,7 @@ const lua = `--- _shared/core/text/engine/identifiers.lua
 --- ==============================================================================
 
 return {
-${GROUPS.map(emitGroup).join('\n')}
+${LUA_GROUPS.map(emitGroup).join('\n')}
 }
 `;
 
@@ -218,7 +227,7 @@ ${SWIFT_GROUPS.map((group) => {
 `;
 
 /** AutoHotkey class name of a group. */
-const AHK_CLASS = { ...SWIFT_ENUM, locales: 'Locales' };
+const AHK_CLASS = { ...SWIFT_ENUM, locales: 'Locales', windows_vendor: 'WindowsVendor' };
 const ahk = `\uFEFF; _generated/identifiers.ahk
 ${BANNER(';')}
 #Requires AutoHotkey v2.0

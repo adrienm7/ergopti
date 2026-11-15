@@ -30,6 +30,8 @@
 ;    refusal codes of _shared/metrics/data/studio_ngrams.json.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\_generated\identifiers.ahk
+
 #Requires AutoHotkey v2.0
 
 
@@ -54,11 +56,6 @@ global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true,
 	"studio_profile_load", true, "studio_profile_save", true, "studio_workspace_load", true,
 	"studio_workspace_save", true, "lua_export", true)
-
-; The editor's export step host and its identity, in the vendor folder
-; (tools/build/build_windows_lua_export.ps1 builds both).
-global LAYOUT_EDITOR_LUA_EXPORT_EXE := "ergopti_lua_export.exe"
-global LAYOUT_EDITOR_LUA_EXPORT_IDENTITY := "ergopti_lua_export.json"
 
 
 
@@ -322,12 +319,11 @@ _LayEdWin_PushRefusal(Deps, Code) {
  * @returns {Map|String} Map("exe", Path), or why the host is not offered.
  */
 LayoutEditorWindow_LuaExportHost(VendorDir) {
-	global LAYOUT_EDITOR_LUA_EXPORT_EXE, LAYOUT_EDITOR_LUA_EXPORT_IDENTITY
-	IdentityPath := VendorDir . "\" . LAYOUT_EDITOR_LUA_EXPORT_IDENTITY
+	IdentityPath := VendorDir . "\" . Identifiers.WindowsVendor.LUA_EXPORT_IDENTITY
 	; Until the Windows CI's executable is committed, this build has no host: the
 	; page then builds its downloads with fengari, as before.
 	if !FileExist(IdentityPath)
-		return "this build ships no export step host (" . LAYOUT_EDITOR_LUA_EXPORT_IDENTITY . " is absent)"
+		return "this build ships no export step host (" . Identifiers.WindowsVendor.LUA_EXPORT_IDENTITY . " is absent)"
 	Text := FSRead(IdentityPath)
 	if !(Text is String)
 		return "the export step host identity cannot be read"
@@ -337,7 +333,7 @@ LayoutEditorWindow_LuaExportHost(VendorDir) {
 	Digest := Identity is Map ? Identity.Get("exe_sha256", "") : ""
 	if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-f]{64}$")
 		return "the export step host identity names no executable digest"
-	ExePath := VendorDir . "\" . LAYOUT_EDITOR_LUA_EXPORT_EXE
+	ExePath := VendorDir . "\" . Identifiers.WindowsVendor.LUA_EXPORT_EXE
 	if !FileExist(ExePath)
 		return "the export step host executable is missing"
 	try Actual := CryptoSha256Bytes(FSReadBytesStrict(ExePath))

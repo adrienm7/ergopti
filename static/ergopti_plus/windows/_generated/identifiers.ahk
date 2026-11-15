@@ -55,4 +55,8 @@ class Identifiers {
 	class Locales {
 		static SYSTEM_FALLBACK := "en"
 	}
+	class WindowsVendor {
+		static LUA_EXPORT_EXE := "ergopti_lua_export.exe"
+		static LUA_EXPORT_IDENTITY := "ergopti_lua_export.json"
+	}
 }
