@@ -834,7 +834,7 @@ helpers.describe("Original Hook physical editor position observation", function(
 					edit = function() writes = writes + 1; return false end }
 				helpers.assert_true(host.open({ scope = scope, is_paused = function() return paused end }),
 					"controlled host prerequisite is not public native delivery qualification")
-				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
+				local function message(value) return host.on_message(require("core.text.engine.json").encode(value), {}, { app_name = "physical_shortcuts", epoch = epoch }) end
 				helpers.assert_true(message({ action = "ready" }))
 				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
 				s.edge("b", 42, 1, 10); s.edge("a", 36, 1, 20)

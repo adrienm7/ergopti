@@ -2,6 +2,7 @@
 
 --- Exercises genuine editor/window/picker callbacks over an exact file receipt.
 local helpers = require("tests.helpers")
+local Json = require("core.text.engine.json")
 local Writer = require("core.text.engine.toml_codec.writer")
 require("core.process.adapters.shell_runner")
 require("ui.physical_shortcuts.bridge")
@@ -88,11 +89,11 @@ local function with_editor(body)
 		local picker = helpers.load_module("ui.action_picker.bridge")
 		function state.open()
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
-			helpers.assert_true(host.on_message({ action = "ready" }, daemon,
+			helpers.assert_true(host.on_message(Json.encode({ action = "ready" }), daemon,
 				{ app_name = "physical_shortcuts", epoch = epochs.physical_shortcuts }))
 		end
 		function state.choose()
-			return host.on_message({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } },
+			return host.on_message(Json.encode({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } }),
 				daemon, { app_name = "physical_shortcuts", epoch = epochs.physical_shortcuts })
 		end
 		function state.confirm(action)
