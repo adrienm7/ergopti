@@ -24,13 +24,14 @@ local BTN_TOUCH = 0x14a
 local TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }
 local EMITTER = "modules.gestures.combo_emitter"
 local MANAGER = "modules.gestures.manager"
-local READER = "adapters.evdev_reader"
+local READER = "platform.input.evdev_reader"
 
 -- Device units per millimetre of the fake pad.
 local UNITS = 10
 
---- The evdev events of a three-finger touch following a path of x offsets.
---- @param path table Offsets in millimetres from the landing point, one frame each.
+--- The evdev events of a three-finger touch following a path of offsets.
+--- @param path table Offsets in millimetres from the landing point, one frame
+---   each: an x offset, or { x, y } for a path that moves vertically too.
 --- @return table events
 local function touch_events(path)
 	local events = {}
@@ -49,9 +50,12 @@ local function touch_events(path)
 	-- The count must hold for the decoder's stable frames before it is the peak.
 	for _ = 1, 4 do push(Decoder.EV_SYN, Decoder.SYN_REPORT, 0) end
 	for _, offset in ipairs(path) do
+		local ox, oy = offset, nil
+		if type(offset) == "table" then ox, oy = offset[1], offset[2] end
 		for index = 0, fingers - 1 do
 			push(Decoder.EV_ABS, Decoder.ABS_MT_SLOT, index)
-			push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(offset * UNITS))
+			push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_X, base_x + index * 200 + math.floor(ox * UNITS))
+			if oy then push(Decoder.EV_ABS, Decoder.ABS_MT_POSITION_Y, base_y + math.floor(oy * UNITS)) end
 		end
 		push(Decoder.EV_SYN, Decoder.SYN_REPORT, 0)
 	end
@@ -142,6 +146,87 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_next")), 4, "15.5 mm right after the reversal: four steps")
 	end)
 
+	-- A diagonal is counted along its own axis. Signed by dx + dy, the
+	-- right_up / left_down axis was noise: a jitter of a tenth of a millimetre
+	-- across the swipe read as reversals while the fingers kept moving forward
+	-- (GSS-001, diagonal-axis-travel).
+	helpers.it("incremental: right_up earns the steps right_down earns (diagonal-axis-travel)", function()
+		local function diagonal(sy)
+			local points = {}
+			for i = 1, 20 do points[#points + 1] = { 1.5 * i, sy * 1.5 * i + ((i % 2 == 0) and 0.1 or -0.1) } end
+			return points
+		end
+		local down, M = pump({ swipe_3_right_down = "tab_next" }, { swipe_3_right_down = "incremental" },
+			touch_events(diagonal(1)), UNITS)
+		local steps = count(down, M.emit_combo_for("tab_next"))
+		helpers.assert_true(steps >= 8, "the right_down control steps (" .. steps .. ")")
+		local up = pump({ swipe_3_right_up = "tab_next" }, { swipe_3_right_up = "incremental" },
+			touch_events(diagonal(-1)), UNITS)
+		helpers.assert_eq(count(up, M.emit_combo_for("tab_next")), steps, "right_up: the same travel, the same steps")
+	end)
+
+	-- A slow diagonal sits a few frames in the band where the classifier names
+	-- the dominant straight axis; the tracker re-classified each frame and
+	-- restarted its count whenever the name turned diagonal, so it never
+	-- stepped while moving (GSL-001, diagonal-decided-axis).
+	helpers.it("incremental: a slow or drifting diagonal steps while moving (diagonal-decided-axis)", function()
+		local slow, drift = {}, {}
+		for i = 1, 40 do slow[#slow + 1] = { 0.4 * i, -0.4 * i } end
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		for label, points in pairs({ slow = slow, drift = drift }) do
+			local pressed, M = pump({ swipe_3_right_up = "tab_next", swipe_3_right = "tab_prev" },
+				{ swipe_3_right_up = "incremental", swipe_3_right = "incremental" }, touch_events(points), UNITS)
+			helpers.assert_true(count(pressed, M.emit_combo_for("tab_next")) >= 4, label .. ": right_up steps")
+			helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 0, label .. ": never the straight slot")
+		end
+	end)
+
+	-- Decided by the maintainer on 2026-11-11 (reverses part of the GSL-001
+	-- change): an unbound diagonal falls back to its dominant straight slot,
+	-- live and completed; a bound diagonal still wins inside the band.
+	helpers.it("incremental: a drifting diagonal with its slot unbound steps the dominant slot (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "incremental" }, touch_events(drift), UNITS)
+		helpers.assert_true(count(pressed, M.emit_combo_for("tab_prev")) >= 4, "the straight right slot steps")
+	end)
+
+	helpers.it("x1: a completed diagonal with its slot unbound runs the dominant slot once (diagonal-unbound-fallback)", function()
+		local drift = {}
+		for i = 1, 40 do drift[#drift + 1] = { 0.5 * i, -0.25 * i } end
+		local pressed, M = pump({ swipe_3_right = "tab_prev" }, { swipe_3_right = "x1" }, touch_events(drift), UNITS)
+		helpers.assert_eq(count(pressed, M.emit_combo_for("tab_prev")), 1, "the straight right slot fires once")
+		local steep = {}
+		for i = 1, 40 do steep[#steep + 1] = { 0.25 * i, -0.5 * i } end
+		local up_pressed, up = pump({ swipe_3_up = "tab_prev" }, { swipe_3_up = "x1" }, touch_events(steep), UNITS)
+		helpers.assert_eq(count(up_pressed, up.emit_combo_for("tab_prev")), 1, "a steeper drift falls back to up")
+	end)
+
+	-- GSD-3 (decided by the maintainer on 2026-11-11): a pair decides its
+	-- direction from the shared 3.0 mm minimum, as macOS; three fingers 1.5 mm.
+	helpers.it("incremental: a pair needs the shared pair minimum before it counts (pair-incremental-minimum)", function()
+		local Direction = require("gestures.engine.direction")
+		local Timings = require("core.timing.engine.timings")
+		helpers.assert_eq(Direction.minimums_mm(2, { swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+			pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+			pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm") }), 3.0,
+			"the shared registry's pair minimum")
+		local function travel(fingers, mm)
+			local fired = 0
+			local tracker = require("modules.gestures.incremental_tracker").new({
+				units_x = UNITS, units_y = UNITS,
+				mode_of = function() return "incremental" end, step_of = function() return 1.0 end,
+				slot_of = function(slot, _, direction) return slot, direction end,
+				fire = function(_, _, _, count) fired = fired + count; return count end,
+			})
+			tracker:update({ fingers = fingers, dx = mm * UNITS, dy = 0 })
+			return fired
+		end
+		helpers.assert_eq(travel(2, 2.5), 0, "2.5 mm is below a pair's minimum")
+		helpers.assert_true(travel(2, 4.0) > 0, "4 mm decides a pair")
+		helpers.assert_true(travel(3, 2.5) > 0, "2.5 mm decides three fingers")
+	end)
+
 	helpers.it("incremental: the sensitivity sets the step, within the shared range", function()
 		local saved = package.loaded[MANAGER]
 		local M = helpers.load_module(MANAGER)
@@ -175,6 +260,35 @@ helpers.describe("linux incremental swipes (linux-incremental-gestures)", functi
 		os.remove(tmp)
 		package.loaded[MANAGER] = saved
 		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("incremental: a mode written in another case takes its manifest spelling (config-enum-case)", function()
+		local saved = package.loaded[MANAGER]
+		local tmp = os.tmpname()
+		local fh = assert(io.open(tmp, "w"))
+		fh:write("[gestures.modes]\nswipe_3_left = \"X1\"\nswipe_3_up = \"Incremental\"\n")
+		fh:close()
+		local ok, failure = pcall(function()
+			local M = helpers.load_module(MANAGER)
+			M.init({ persist = true, config_path = tmp })
+			-- Windows' loader admits a case variant and keeps the manifest spelling.
+			helpers.assert_eq(M.get_mode("swipe_3_left"), "x1")
+			helpers.assert_eq(M.get_mode("swipe_3_up"), "incremental")
+		end)
+		os.remove(tmp)
+		package.loaded[MANAGER] = saved
+		if not ok then error(failure, 0) end
+	end)
+
+	helpers.it("incremental: the cleanup keeps the saved modes and steps (gesture-slot-settings-cleanup)", function()
+		local source = "[gestures.modes]\nswipe_3_left = \"x1\"\nswipe_3_up = \"fast\"\n\n"
+			.. "[gestures.sensitivities]\nswipe_3_up = 12.0\n"
+		local scan = require("settings.engine.migration.unused_keys").find_in_source(source, require("ui.menu.unused_keys_cleanup").collect)
+		local offered = {}
+		for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
+		table.sort(offered)
+		-- Only the mode the loader refuses is offered; a saved choice was before.
+		helpers.assert_eq(offered, { "gestures.modes.swipe_3_up" })
 	end)
 
 	helpers.it("incremental: a pad without a resolution fires once, as x1", function()

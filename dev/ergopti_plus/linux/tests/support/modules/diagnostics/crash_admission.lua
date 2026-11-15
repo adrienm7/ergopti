@@ -6,16 +6,16 @@
 local M = {}
 
 function M.with_admission(body, identity)
-	local Sink = require("infra.logger_sink")
+	local Sink = require("core.logger.engine.sink")
 	local previous = Sink.capture_redactor
-	local root = require("infra.paths").shared_root()
-	local file = assert(io.open(root .. "/modules/diagnostics/redaction.json", "rb"))
+	local root = require("core.fs.engine.paths").shared_root()
+	local file = assert(io.open(root .. "/diagnostics/data/redaction.json", "rb"))
 	local content = file:read("*a"); assert(file:close())
-	local rules = require("json").decode(content)
+	local rules = require("core.text.engine.json").decode(content)
 	identity = identity or { home = require("infra.config_paths").account_home(), user = os.getenv("USER") or os.getenv("LOGNAME") }
 	local context = { home = identity.home, user = identity.user, case_insensitive = false }
 	assert(type(context.home) == "string" and type(context.user) == "string")
-	local apply = require("diagnostics.redact").apply
+	local apply = require("diagnostics.engine.reports.redact").apply
 	local active = true
 	local function redact(text) assert(active); return apply(text, rules, context) end
 	local capture
@@ -32,7 +32,7 @@ end
 --- Models the canonical writer receipts for metadata-only virtual dump consumers.
 --- Native acquisition, privacy and refusal controls remain in test_crash_privacy.
 function M.with_output(body)
-	local Writer = require("infra.regular_file_writer")
+	local Writer = require("core.fs.engine.regular_file_writer")
 	local previous_open, previous_execute, previous_popen = Writer.open, os.execute, io.popen
 	local parts = {}
 	Writer.open = function(_, mode)

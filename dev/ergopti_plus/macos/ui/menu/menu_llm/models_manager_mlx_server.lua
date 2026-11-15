@@ -25,16 +25,16 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
-local i18n          = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
+local i18n          = require("core.i18n.engine.i18n")
 local ConfigPaths   = require("infra.config_paths")
-local text_utils    = require("infra.text_utils")
+local text_utils    = require("core.text.engine.utils")
 local ApiCommon     = require("modules.llm.api_common")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local ShellRunner   = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
+local JsonCodec = require("core.fs.adapters.json_codec")
 
 -- Required to inform the discovery poller of the active server PID so it can
 -- exclude it from zombie kills; safe to require here because api_mlx holds no
@@ -880,7 +880,7 @@ function M.install(ctx)
 		-- the old async pre-probe but synchronously with a hard 1 s curl timeout, so
 		-- it can never stall the boot path the way the async callback could.
 		if not (deps.active_tasks and deps.active_tasks["mlx_server"]) then
-			local SystemCurl = require("adapters.system_curl")
+			local SystemCurl = require("core.network.adapters.system_curl")
 			local ok_probe, body = SystemCurl.check("the MLX adoption probe"), nil
 			if ok_probe then ok_probe, body = pcall(hs.execute,
 				SystemCurl.PATH .. " --silent --max-time 1 --no-keepalive " ..

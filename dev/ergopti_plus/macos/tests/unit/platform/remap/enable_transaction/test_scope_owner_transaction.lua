@@ -35,7 +35,7 @@ helpers.describe("remap scope transaction", function()
 			local accepted, settled = request(remap, "tap_holds", "recommended", "/remap/backup-1")
 			helpers.assert_true(accepted)
 			helpers.assert_eq(disk.files["/remap/backup-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save may only replace the backed-up bytes")
 			local saved = calls.saved_payloads[1]
 			helpers.assert_eq(saved.tap_holds_enabled, require("infra.manifest_reader").recommended_for("tap_holds.enabled"))
@@ -145,8 +145,8 @@ helpers.describe("remap layer fixture: conditional removal", function()
 			local callback_count = 0
 			local on_error = function() callback_count = callback_count + 1 end
 			local expected = { status = "ok", content = disk.files[LAYERS] }
-			helpers.assert_true(require("toml_codec.writer").remove_if_unchanged(LAYERS,
-				require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
+			helpers.assert_true(require("core.text.engine.toml_codec.writer").remove_if_unchanged(LAYERS,
+				require("core.fs.adapters.file_system"), expected, { require_conditional = true, on_error = on_error }))
 			helpers.assert_nil(disk.files[LAYERS])
 			helpers.assert_eq(#disk.removal_calls, 1)
 			helpers.assert_eq(disk.removal_calls[1].path, LAYERS)
@@ -170,8 +170,8 @@ helpers.describe("remap layer fixture: conditional removal", function()
 					helpers.assert_eq(category, "removal")
 					callback_count = callback_count + 1
 				end
-				helpers.assert_eq(require("toml_codec.writer").remove_if_unchanged(path,
-					require("adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").remove_if_unchanged(path,
+					require("core.fs.adapters.file_system"), expected, { require_conditional = true, on_error = on_error }), false)
 				helpers.assert_eq(disk.files[LAYERS], original)
 				helpers.assert_eq(disk.files[foreign], original)
 				helpers.assert_eq(#disk.removal_calls, 1)

@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/llm_prompt_vectors.json")
 
@@ -27,17 +27,26 @@ local function read_corpus()
 	return assert(json.decode(raw), "the llm_prompt corpus is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
 local _gestures = helpers.load_with_stubs("modules.gestures")
 local Actions = require("modules.gestures.actions")
-local PromptAction = require("llm.prompt_action")
+local PromptAction = require("ai.engine.prediction.prompt_action")
 
 helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt corpus", function()
 	local corpus = read_corpus()
+
+	-- The count's bounds are the AI menu setting's, read from the shared value
+	-- schema, never a copy (value-validation).
+	helpers.it("the prediction count bounds are the declared llm.profiles.num_predictions bounds", function()
+		local declared = require("settings.engine.value_check").declaration("llm.profiles.num_predictions")
+		helpers.assert_eq(PromptAction.MIN_PREDICTIONS, declared.min)
+		helpers.assert_eq(PromptAction.MAX_PREDICTIONS, declared.max)
+		helpers.assert_nil(PromptAction.parse("p|" .. tostring(declared.max + 1)), "past the declared maximum")
+	end)
 
 	helpers.it("the parameter is declared and the corpus is loaded", function()
 		helpers.assert_eq(Actions.get_action_parameter_spec("llm_prompt_prediction"), "llm_prompt")
@@ -63,11 +72,11 @@ end)
 
 helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 	helpers.it("lists every prompt of the AI menu, built-ins first, then custom ones", function()
-		local Selector = require("llm.profile_selector")
+		local Selector = require("ai.engine.settings.profile_selector")
 		local builtins = Selector.load_built_in_profiles()
 		for _, profile in ipairs(builtins) do profile.label = "Label of " .. profile.id end
 		local custom = { id = "custom_42", label = "My {n} prompt{s}", system_single = "{context}" }
-		local i18n = package.loaded["infra.i18n"]
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get = i18n.get
 		local ok, err = pcall(helpers.with_fresh_modules, {
 			"modules.llm", "modules.llm.prediction_engine", "ui.menu.menu_llm.profile_label",
@@ -110,6 +119,6 @@ helpers.describe("llm_prompt parameter: native prompt and refusal", function()
 
 	helpers.it("refuses with the llm_prompt error text", function()
 		helpers.assert_eq(Actions.parameter_error("llm_prompt_prediction"),
-			package.loaded["infra.i18n"].get("dialog.gestures.param_err_llm_prompt"))
+			package.loaded["core.i18n.engine.i18n"].get("dialog.gestures.param_err_llm_prompt"))
 	end)
 end)

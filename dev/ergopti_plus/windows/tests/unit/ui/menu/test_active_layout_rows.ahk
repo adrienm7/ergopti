@@ -62,7 +62,7 @@ _ALR_Wiring() {
 	Body := _DriverFuncBody("_MI_StageLayout")
 	Assert(Body != "", "_MI_StageLayout must exist")
 	AssertContains(Body, '"active_layouts",         (*) => _LAY_ActiveLayoutRows()', "the provider is registered")
-	Manifest := JsonParse(FSReadUtf8Exact(_SharedDir . "\modules\menu\menu_manifest.json"))
+	Manifest := JsonParse(FSReadUtf8Exact(_SharedDir . "\menu\data\menu_manifest.json"))
 	Found := false
 	for Row in Manifest["layout_menu"]
 		if (Row.Get("id", "") == "active_layouts") {

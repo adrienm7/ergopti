@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
-require("test.test_prediction_contract")(helpers)
+require("tests.lua.ai.test_prediction_contract")(helpers)
 
 local held = {}
 
@@ -32,7 +32,7 @@ end
 --- @return table engine, table seen
 local function fixture(state)
 	local seen = { chats = {}, notices = {} }
-	replace("logger.shim", state.logger or helpers.make_logger_stub())
+	replace("core.logger.engine.shim", state.logger or helpers.make_logger_stub())
 	replace("modules.llm.profiles", {
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,
@@ -62,7 +62,7 @@ local function latest(seen) return seen.notices[#seen.notices] end
 helpers.describe("Linux test prediction engine", function()
 	helpers.it("sends the sample to the active backend and only shows the answer", function()
 		local engine, seen = fixture({ model = "local-a" })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local ok, err = pcall(function()
 			helpers.assert_eq(engine.test_prediction(), true, "an empty typing buffer refuses nothing")
 			helpers.assert_eq(#seen.chats, 1, "one request")
@@ -92,7 +92,7 @@ helpers.describe("Linux test prediction engine", function()
 	end)
 
 	helpers.it("shows but does not log the backend's untrusted failure text", function()
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local logs = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) logs[#logs + 1] = line end)
@@ -121,7 +121,7 @@ helpers.describe("Linux test prediction engine", function()
 	end)
 
 	helpers.it("refuses a pause, the AI off and no model with their notices, and withdraws on a pause", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, case in ipairs({
 			{ state = { model = "m", paused = true }, key = "llm.manual_prediction.paused" },
 			{ state = { model = "m", enabled = false }, key = "llm.manual_prediction.disabled" },

@@ -20,12 +20,12 @@
 
 local M = {}
 
-local Json = require("json")
-local Logger = require("logger.shim")
-local Store = require("keystats.app_category_store")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local Store = require("metrics.engine.apps.category_store")
 local ConfigPaths = require("infra.config_paths")
-local RegularFileReader = require("infra.regular_file_reader")
-local RegularFileWriter = require("infra.regular_file_writer")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
+local RegularFileWriter = require("core.fs.engine.regular_file_writer")
 
 local LOG = "keystats.app_category_file"
 local ENOENT = 2 -- Linux reports genuine absence separately from read refusal.

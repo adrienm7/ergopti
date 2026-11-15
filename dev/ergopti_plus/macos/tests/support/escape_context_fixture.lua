@@ -9,16 +9,16 @@
 local helpers = require("tests.helpers")
 
 local STUBBED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.keystats",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
@@ -39,12 +39,12 @@ local function load_fixture(options, lifetime)
 	local engine_resets = 0
 	local hides = 0
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return epoch end,
 		defer_after_callback = function(_label, callback)
 			if options.defer_throws then error("DEFER_THROW") end
@@ -53,7 +53,7 @@ local function load_fixture(options, lifetime)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return {}, true
@@ -64,7 +64,7 @@ local function load_fixture(options, lifetime)
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
 	}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		is_letter_char = function() return false end,
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
@@ -73,7 +73,7 @@ local function load_fixture(options, lifetime)
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
@@ -96,7 +96,7 @@ local function load_fixture(options, lifetime)
 		hide_forced_silent = function() hides = hides + 1; return true end,
 		tint = function() return nil end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 
 	package.loaded["modules.llm.prediction_engine"] = setmetatable({
 		init = function() return true end,

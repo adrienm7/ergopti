@@ -10,11 +10,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
-local Paths = require("infra.paths")
-local TomlReader = require("infra.toml.reader")
-local Languages = require("hotstrings.languages")
-local Extensions = require("hotstrings.extensions")
+local Codec = require("core.text.engine.toml_codec")
+local Paths = require("core.fs.engine.paths")
+local TomlReader = require("core.text.engine.toml.reader")
+local Languages = require("hotstrings.engine.languages")
+local Extensions = require("hotstrings.engine.extensions")
 
 -- Independently authored current families: never derive this inventory or the
 -- expected 0.5 s delays from the manifest or the implementation under test.
@@ -80,7 +80,7 @@ local DELIMITER_CONFIG = ORIGINAL_CONFIG:gsub("future = { keep = 1 }",
 --- @param name string Corpus stem.
 --- @return string path
 local function corpus_path(name)
-	local bundled = Paths.shared("modules/hotstrings/" .. name .. ".toml")
+	local bundled = Paths.shared("hotstrings/data/catalogue/" .. name .. ".toml")
 	local handle = io.open(bundled, "rb")
 	if handle then
 		handle:close()
@@ -136,9 +136,9 @@ end
 local function fake_keymap(controls)
 	local Manifest = require("infra.manifest_reader")
 	local Preferences = require("infra.preferences")
-	package.loaded["keymap.terminators"] = nil
-	package.loaded["keymap.terminators_catalogue"] = nil
-	local Terminators = require("keymap.terminators")
+	package.loaded["layouts.engine.layers.terminators"] = nil
+	package.loaded["layouts.engine.layers.terminators_catalogue"] = nil
+	local Terminators = require("layouts.engine.layers.terminators")
 	local registered = { autocorrection = corpus("autocorrection"), rolls = corpus("rolls"),
 		personal = { sections = { { name = "code" } }, metadata = {} } }
 	local groups = { autocorrection = true, rolls = false, personal = true, dynamichotstrings = true }
@@ -288,7 +288,7 @@ local function fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	package.loaded["ui.menu.hotstrings_scope"] = nil
 	package.loaded["ui.menu.scoped_preferences"] = nil
 	local prefs = helpers.load_with_stubs("infra.preferences")
@@ -322,7 +322,7 @@ local function fixture(options)
 	helpers.assert_eq(Config.init({ override_path = "overrides", delay_transaction = km.with_hotstring_delays,
 		toml_resolver = function(category)
 			if category == "autocorrection" or category == "rolls" then return corpus_path(category) end
-			return Paths.shared("modules/hotstrings/" .. category .. ".toml")
+			return Paths.shared("hotstrings/data/catalogue/" .. category .. ".toml")
 		end }), true)
 	local state = { keymap = true, trigger_char = "§", repeat_key_enabled = false, expansion_delay = 0.9,
 		preview_ai_enabled = true, preview_star_enabled = false, preview_autocorrect_enabled = false,
@@ -916,7 +916,7 @@ end)
 helpers.describe("Hotstrings refused secondary publication receipt", function()
 	helpers.it("retains unadopted native debt and external conflicts until the exact inverse settles", function()
 		local f = fixture()
-		local fs = package.loaded["adapters.file_system"]
+		local fs = package.loaded["core.fs.adapters.file_system"]
 		local original = fs.write_if_unchanged
 		local blocked, owed, releases = true, true, 0
 		fs.write_if_unchanged = function(path, content, source)

@@ -117,16 +117,12 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 	global _HotstringsTerminatorRecords
 	OriginalRemovalBody := _HTR_Source()
 	Fixture := _ScopeOwnerFixture(OriginalRemovalBody), PriorSuspend := A_IsSuspended
-	Calls := 0, Acquisitions := 0, Success := 0, Bundle := 0
+	Calls := 0, Success := 0, Bundle := 0
 	Confirm(*) {
 		Calls += 1
 		if PauseAfterConfirmation
 			Suspend(true)
 		return "Yes"
-	}
-	RefuseAcquisition(*) {
-		Acquisitions += 1
-		return 0
 	}
 	Launch(Acknowledged, Borrowed, Refused) {
 		Success := Acknowledged, Bundle := Borrowed
@@ -134,8 +130,6 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 	}
 	Fixture.options["confirm"] := Confirm
 	Fixture.options["reload"] := Launch
-	if PauseAfterConfirmation
-		Fixture.options["acquire"] := RefuseAcquisition
 	try {
 		Suspend(false)
 		AssertEqual(OriginalRemovalBody, SubStr(Fixture.source, InStr(Fixture.source, "`n") + 1),
@@ -145,17 +139,13 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 		Admission := HotstringsTerminatorRecordCapture(_HotstringsTerminatorRecords.Records[1])
 		Outcome := _HS_DelimRemoveRecord(Admission, Fixture.options)
 		AssertEqual(1, Calls, "the real removal helper must receive the confirmation")
-		if PauseAfterConfirmation {
-			AssertEqual(false, Outcome, "a pause during confirmation revokes admission")
-			AssertEqual(0, Acquisitions, "paused confirmation must not acquire transaction ownership")
-			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-		} else {
-			Assert(Outcome is Map)
-			AssertEqual("pending", Outcome["status"], "publication still requires the runtime ACK")
-			AssertEqual("smile", TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))["hotstrings"]["terminators"][1]["key"])
-			Success.Call()
-			AssertEqual("committed", Outcome["status"])
-		}
+		; A pause stops typing, not configuration (EDD-1): a pause during the
+		; confirmation keeps the removal (edd1-paused-writes).
+		Assert(Outcome is Map)
+		AssertEqual("pending", Outcome["status"], "publication still requires the runtime ACK")
+		AssertEqual("smile", TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))["hotstrings"]["terminators"][1]["key"])
+		Success.Call()
+		AssertEqual("committed", Outcome["status"])
 	} finally {
 		Suspend(PriorSuspend)
 		if Bundle is Object
@@ -163,7 +153,7 @@ _HTRB_RemoveAfterModalBody(PauseAfterConfirmation) {
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("terminator-remove: a real post-confirmation pause refuses before acquiring any transaction",
+Test("terminator-remove: a post-confirmation pause keeps the removal (edd1-paused-writes)",
 	_HTRB_RemoveAfterModal.Bind(true))
 Test("terminator-remove: an admitted confirmation removes only its record and still requires runtime ACK",
 	_HTRB_RemoveAfterModal.Bind(false))

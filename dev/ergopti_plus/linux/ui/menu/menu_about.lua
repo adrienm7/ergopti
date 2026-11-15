@@ -10,17 +10,17 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ParentSource = require("menu.frames.parent_source")
+local Logger = require("core.logger.engine.shim")
+local ParentSource = require("menu.engine.frames.parent_source")
 local Version = require("infra.version")
-local Installation = require("infra.installation")
-local VersionLabel = require("updater.version_label")
-local Schedule = require("updater.schedule")
+local Installation = require("core.lifecycle.engine.installation")
+local VersionLabel = require("updater.engine.version_label")
+local Schedule = require("updater.engine.schedule")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 local separator_modules = package.loaded
 local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
-local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
+local uninstall_caption_i18n = rawget(separator_modules, "core.i18n.engine.i18n")
 local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
 
 local _fill = require("ui.menu.menu_dialogs")._fill
@@ -39,7 +39,7 @@ local function uninstall_caption_facade_current()
 		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
 		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
 		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
-		and rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n
+		and rawget(separator_modules, "core.i18n.engine.i18n") == uninstall_caption_i18n
 		and type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get
 end
 
@@ -51,7 +51,7 @@ end
 --- @param up table The updater module.
 --- @return table row A provider row with its items.
 local function _channel_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("settings.engine.keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			local ok, committed = pcall(up.set_channel, id)
 			if not ok or committed ~= true then return false end
@@ -66,7 +66,7 @@ local function _channel_picker(ctx, up)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end,
+		[require("settings.engine.keys").KEY.UPDATER_CHANNEL] = function() return up.get_channel() end,
 		installed_build = function() return not Installation.is_source_run() end,
 	})
 end
@@ -76,7 +76,7 @@ end
 --- @param up table Native updater owner.
 --- @return table row Shared choice provider data.
 local function _frequency_picker(ctx, up)
-	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("settings.engine.keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if up.set_check_interval(seconds) ~= true then return false end
 			if up.start_background_checks() ~= true then return false end
@@ -84,7 +84,7 @@ local function _frequency_picker(ctx, up)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
+		[require("settings.engine.keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
 		end,
 		installed_build = function() return not Installation.is_source_run() end,
@@ -150,8 +150,8 @@ local function _about_update_rows(ctx)
 			end,
 		}
 	elseif source_run then
-		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
+		local source_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not source_run end })
 		if source_row then out[#out + 1] = source_row end
 	else
@@ -172,16 +172,14 @@ local function _about_update_rows(ctx)
 			-- Without a window (no WebKitGTK, no display) the answer is announced
 			-- by a notification instead
 			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
-			up.check_for_updates(nil, function(available, release, err)
-				if available and release then
-					Logger.info(LOG, "Update available: %s.", release.tag)
-				elseif err then
-					Logger.warn(LOG, "Update check failed: %s.", tostring(err))
-				else
-					Logger.info(LOG, "No update available (current: %s).", up.current_version())
-				end
+			up.check_for_updates(nil, function(_, _, err, result)
+				if err then Logger.warn(LOG, "Update check failed: %s.", tostring(err)) end
+				Logger.info(LOG, "Update check answered: %s (current: %s).",
+					tostring(type(result) == "table" and result.state), up.current_version())
+				-- The structured answer the window would show: each outcome keeps its
+				-- own sentence (_shared/updater/engine/check_notice.lua).
 				if type(ctx.on_update_checked) == "function" then
-					ctx.on_update_checked(available, release, err)
+					ctx.on_update_checked(result)
 				end
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			end)
@@ -311,7 +309,7 @@ local function _build_about(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.START_AT_LOGIN] = function()
+		[require("settings.engine.keys").COMMAND.START_AT_LOGIN] = function()
 			if not require("ui.menu.start_at_login").toggle() then
 				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
 			end
@@ -322,14 +320,14 @@ local function _build_about(ctx)
 		-- never sees and call that an About box — while ui/changelog/ was written,
 		-- registered in webview_manager's bridge table and given a window title,
 		-- with no caller anywhere. The page existed and nothing could reach it.
-		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_CHANGELOG] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the release notes cannot open.")
 				return
 			end
 			ctx.webview.show("changelog")
 		end,
-		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_RELEASES_PAGE] = function()
 			if type(ctx.updater) ~= "table" then
 				Logger.error(LOG, "No updater module — the releases page URL is unknown.")
 				return

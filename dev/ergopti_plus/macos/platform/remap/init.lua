@@ -10,7 +10,7 @@
 --- FEATURES & RATIONALE:
 --- 1. CapsWord Watcher: Detects trackpad scroll/gesture events and deactivates
 ---    CapsWord so the user never gets stuck in caps mode after using the trackpad.
---- 2. User Config: config_karabiner.toml is the single runtime truth.
+--- 2. User Config: the shared tap_hold.toml is the single runtime truth.
 ---    On first launch it is created from defaults; after that it is the full
 ---    persisted state — defaults are never recomputed at runtime except when
 ---    the user explicitly clicks "Reset to defaults".
@@ -27,7 +27,7 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local Defaults    = require("platform.remap.defaults")
 local Config      = require("platform.remap.config")
 local Generator   = require("platform.remap.generator")
@@ -38,15 +38,15 @@ local LeaseController = require("platform.remap.lease_controller")
 local LeaseContract = require("platform.remap.lease_contract")
 local GuardianNotice = require("platform.remap.guardian_notice")
 local ManagedRuleRemoval = require("platform.remap.managed_rule_removal")
-local Notifications = require("infra.notifications")
-local i18n        = require("infra.i18n")
+local Notifications = require("core.ui.engine.notifications")
+local i18n        = require("core.i18n.engine.i18n")
 local Watchers    = require("platform.remap.watchers")
-local Registrar   = require("adapters.hotkey_registrar")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings     = require("infra.timings")
-local FileSystem  = require("adapters.file_system")
+local Registrar   = require("platform.input.hotkey_registrar")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings     = require("core.timing.engine.timings")
+local FileSystem  = require("core.fs.adapters.file_system")
 local Manifest    = require("infra.manifest_reader")
-local TomlWriter  = require("toml_codec.writer")
+local TomlWriter  = require("core.text.engine.toml_codec.writer")
 local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
 	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,
 	load = NavLayer.load, observe = NavLayer.capture_configured_inputs }
@@ -109,7 +109,7 @@ local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
 -- macOS-exclusive so there is no reason to put these files in _shared/.
-local _DATA_DIR = (require("native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
+local _DATA_DIR = (require("core.fs.engine.native_path").directory_prefix(debug.getinfo(1, "S").source:sub(2)) or "./") .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
@@ -122,13 +122,13 @@ local KARABINER_KE_TILDE_PATH = require("platform.remap.ke_paths").config_file_f
 -- reference it after init() has run; nil before init().
 local KARABINER_OUT = nil
 
--- The user-editable Karabiner config lives under the user's resolved
--- config dir (paths.toml override honoured) at:
---     <config_dir>/hammerspoon/config_karabiner.toml
+-- The user-editable remap settings live in the shared tap_hold.toml under the
+-- user's resolved config dir (paths.toml override honoured) at:
+--     <config_dir>/hammerspoon/tap_hold.toml
 -- Resolution is deferred to MenuPaths so a relocated config follows.
 local function resolve_user_config()
 	local MenuPaths = require("infra.config_paths")
-	return MenuPaths.get("KarabinerConfigPath")
+	return MenuPaths.get("TapHoldConfigPath")
 end
 local ACTIONS_FILE    = _DATA_DIR .. "actions.json"
 local TAP_HOLD_FILE   = _DATA_DIR .. "tap_hold_keys.json"
@@ -3413,7 +3413,7 @@ function M.open_login_items(on_done)
 		invoke_public_callback("open Login Items", on_done, ok, reason)
 	end
 	local call_ok, accepted_or_err = pcall(function()
-		return require("adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
+		return require("core.process.adapters.shell_runner").open(LOGIN_ITEMS_SETTINGS_URL, function(ok)
 			-- The runner answers a launch it refused synchronously, after
 			-- logging that refusal itself.
 			settle(ok == true, ok == true and "opened"
@@ -3804,7 +3804,7 @@ function M.set_enabled(value, on_done, onboarding_gate)
 				local bytes, status = TomlWriter.read_classified(file.path, FileSystem)
 				restored = status == "ok" and bytes == file.candidate
 			else
-				local called, result = pcall(require("config_file_inverse").restore, file, FileSystem)
+				local called, result = pcall(require("settings.engine.migration.file_inverse").restore, file, FileSystem)
 				restored = called and result == true
 			end
 			if restored ~= true then return false end
@@ -4422,11 +4422,11 @@ retry_bulk_settings_recovery = function()
 	-- must settle before a no-write or sibling shortcut can retire this owner.
 	if transaction.backup_cleanup ~= nil
 		and TomlWriter.retry_publication_cleanup(transaction.backup_cleanup) ~= true then return false end
-	if transaction.file ~= nil and require("config_file_inverse").settle_publication(transaction.file) ~= true then return false end
+	if transaction.file ~= nil and require("settings.engine.migration.file_inverse").settle_publication(transaction.file) ~= true then return false end
 	if transaction.phase == "rollback-persistence" then
 		Logger.warn(LOG, "Retrying retained %s inverse persistence.", transaction.label)
 		if transaction.file ~= nil then
-			if require("config_file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
+			if require("settings.engine.migration.file_inverse").restore(transaction.file, FileSystem) ~= true then return false end
 			if transaction.detached ~= true then publish_settings_state(transaction.snapshot) end
 		elseif not persist_and_publish_settings(
 			transaction.snapshot,
@@ -4530,8 +4530,10 @@ local function reject_bulk_settings_candidate(transaction, reason, refused_befor
 	end
 end
 
---- Reads the remap file and writes one verified backup of its exact bytes, so a
---- scope's candidate can only replace the bytes that backup holds.
+--- Reads the remap file and the config.toml beside it and writes one verified
+--- backup of the exact bytes of each (the config.toml one at
+--- `<backup_path>.config`), so a scope's candidate can only replace the bytes
+--- those backups hold.
 --- @param backup_path string Unique backup destination that must not exist.
 --- @param source_path string|nil The settings file, the running one by default.
 --- @param admitted_source table|nil Optional exact Config read-generation receipt.
@@ -4552,16 +4554,36 @@ local function back_up_settings_source(backup_path, source_path, admitted_source
 			return nil, "remap source changed after recommendation admission"
 		end
 	end
-	if status == "absent" then return { status = "absent" } end
-	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
-	local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(backup_path, content, FileSystem, { status = "absent" })
-	if backed ~= true then
-		local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
-		return nil, "backup refused: " .. tostring(detail), cleanup
+	-- The tap-hold rows of the manifest live in the config.toml beside it: the
+	-- save checks and rewrites both, so both are backed up first.
+	local config_path = require("platform.remap.tap_hold_file").config_toml_path_for(path)
+	local config_content, config_status = FileSystem.read_with_status(config_path)
+	if admitted_source ~= nil and type(admitted_source.config) == "table"
+		and (config_status ~= admitted_source.config.status
+			or (config_status == "ok" and config_content ~= admitted_source.config.content)) then
+		return nil, "remap rows changed after recommendation admission"
 	end
-	local observed, observed_status = FileSystem.read_with_status(backup_path)
-	if observed_status ~= "ok" or observed ~= content then return nil, "backup verification failed" end
-	return { status = "ok", content = content }
+	if config_status ~= "ok" and config_status ~= "absent" then return nil, "config.toml is unreadable" end
+	local config_source = { status = config_status, content = config_status == "ok" and config_content or nil }
+	local function back_up(destination, bytes)
+		local backed, detail, retry_cleanup = TomlWriter.publish_if_unchanged(destination, bytes, FileSystem, { status = "absent" })
+		if backed ~= true then
+			local cleanup = type(retry_cleanup) == "function" and { publication_cleanup = retry_cleanup } or nil
+			return nil, "backup refused: " .. tostring(detail), cleanup
+		end
+		local observed, observed_status = FileSystem.read_with_status(destination)
+		if observed_status ~= "ok" or observed ~= bytes then return nil, "backup verification failed" end
+		return true
+	end
+	if config_status == "ok" then
+		local backed, detail, cleanup = back_up(backup_path .. ".config", config_content)
+		if not backed then return nil, detail, cleanup end
+	end
+	if status == "absent" then return { status = "absent", config = config_source } end
+	if status ~= "ok" or type(content) ~= "string" then return nil, "remap source is unreadable" end
+	local backed, detail, cleanup = back_up(backup_path, content)
+	if not backed then return nil, detail, cleanup end
+	return { status = "ok", content = content, config = config_source }
 end
 
 --- Applies one multi-setting candidate, deploys it, and compensates exactly on
@@ -4921,10 +4943,18 @@ end
 --- @param ms number|nil Per-key override in milliseconds, or nil to clear.
 function M.set_tap_timeout(key_id, ms)
 	if not require_state("set_tap_timeout") then return false end
-	local value = ms == nil and nil or tonumber(ms)
-	if ms ~= nil and (not require("number_policy").within_timer_ceiling(value)
-		or (value > 0 and value % 1 ~= 0)) then
-		Logger.error(LOG, "set_tap_timeout: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	-- nil or a value at or under 0 inherits the global delay; any other value
+	-- passes the per-key declaration of the shared value schema.
+	local inherits = ms == nil
+		or (require("core.text.engine.number_policy").is_finite(ms) and ms <= 0)
+	local admitted, reason = true, nil
+	if not inherits then
+		admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+			require("settings.engine.value_check").KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS, ms, 0.001)
+	end
+	if not admitted then
+		Logger.error(LOG, "set_tap_timeout: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	if value ~= nil and value <= 0 then value = nil end -- inherit the global timeout
@@ -5050,14 +5080,16 @@ end
 --- @param ms number Timeout in milliseconds (must be a positive integer).
 function M.set_tap_hold_timeout(ms)
 	if not require_state("set_tap_hold_timeout") then return false end
-	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
-		Logger.error(LOG, "set_tap_hold_timeout: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	local admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+		require("settings.engine.value_check").KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS, ms, 0.001)
+	if not admitted then
+		Logger.error(LOG, "set_tap_hold_timeout: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_hold_timeout_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_TIMEOUT_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Tap/hold timeout: %d ms.", value) end
 	return committed
 end
@@ -5075,14 +5107,14 @@ end
 --- @param ms number 0 (the strict tap-hold) or a positive whole number of milliseconds.
 function M.set_lone_modifier_tap_max_ms(ms)
 	if not require_state("set_lone_modifier_tap_max_ms") then return false end
-	local valid, value = pcall(require("tap_hold.lone_tap").validate, ms)
+	local valid, value = pcall(require("tap_hold.engine.lone_tap").validate, ms)
 	if not valid then
 		Logger.error(LOG, "set_lone_modifier_tap_max_ms: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.lone_modifier_tap_max_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
 	if committed then Logger.debug(LOG, "Lone modifier tap window: %d ms.", value) end
 	return committed
 end
@@ -5096,17 +5128,17 @@ end
 
 --- Sets the sticky modifier timeout and persists it.
 --- Logs an error and returns without saving if the value is invalid.
---- @param ms number Timeout in milliseconds (must be a positive integer).
+--- @param ms number Timeout in milliseconds: 0 (no time limit) or a positive integer.
 function M.set_sticky_timeout(ms)
 	if not require_state("set_sticky_timeout") then return false end
-	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
+	local value = ms
+	if not require("tap_hold.engine.one_shot_timeout").is_valid(value) then
 		Logger.error(LOG, "set_sticky_timeout: invalid value '%s' — ignoring.", tostring(ms))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.sticky_timeout_ms = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
 	if committed then Logger.debug(LOG, "Sticky timeout: %d ms.", value) end
 	return committed
 end
@@ -5123,14 +5155,16 @@ end
 --- @param ms number Threshold in milliseconds (must be a positive integer).
 function M.set_simultaneous_threshold(ms)
 	if not require_state("set_simultaneous_threshold") then return false end
-	local value = tonumber(ms)
-	if not require("number_policy").within_timer_ceiling(value) or value <= 0 or value % 1 ~= 0 then
-		Logger.error(LOG, "set_simultaneous_threshold: invalid value '%s' — ignoring.", tostring(ms))
+	local value = ms
+	local admitted, reason = require("settings.engine.value_check").check_whole_scaled(
+		require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, ms, 1)
+	if not admitted then
+		Logger.error(LOG, "set_simultaneous_threshold: value '%s' refused (%s) — ignoring.", tostring(ms), tostring(reason))
 		return false
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.simultaneous_threshold_ms = value
-	end, nil, require("config_keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 	if committed then Logger.debug(LOG, "Simultaneous threshold: %d ms.", value) end
 	return committed
 end
@@ -5152,7 +5186,7 @@ function M.set_combo_symmetric(value)
 	local normalized = value == true
 	local committed = commit_state_mutation(function(candidate)
 		candidate.combo_symmetric = normalized
-	end, nil, require("config_keys").KEY.MOD_COMBOS_SYMMETRIC)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_SYMMETRIC)
 	if committed then Logger.debug(LOG, "Combo symmetric: %s.", tostring(normalized)) end
 	return committed
 end
@@ -5180,7 +5214,7 @@ function M.set_tap_holds_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.tap_holds_enabled = value
-	end, nil, require("config_keys").KEY.TAP_HOLDS_ENABLED)
+	end, nil, require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED)
 	if committed then Logger.info(LOG, "Tap-Holds feature: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5227,12 +5261,18 @@ function M.update_virtual_hid_driver(on_done)
 	return true
 end
 
---- The owner's reasons a first install resolves: no runtime files, a job
---- missing, or no VirtualHIDDevice driver at all.
+--- The owner's reasons a first install resolves: no runtime files, or no
+--- VirtualHIDDevice driver at all. A published runtime whose job is not
+--- loaded is the service repair's (MRT-004): the first install refuses an
+--- existing runtime by design.
 M.OWNED_INSTALL_REASONS = {
 	runtime_not_installed = true,
-	runtime_job_not_loaded = true,
 	virtual_hid_absent = true,
+}
+
+--- The owner's reasons the service repair resolves (MRT-004).
+M.OWNED_REPAIR_REASONS = {
+	runtime_job_not_loaded = true,
 }
 
 --- Installs Ergopti's own Karabiner runtime after the user confirmed it. The
@@ -5249,6 +5289,23 @@ function M.install_owned_runtime(on_done)
 		return false
 	end
 	require("adapters.runtime_owner_ports").install_runtime(on_done)
+	return true
+end
+
+--- Restarts the services of the installed owned runtime after the user
+--- confirmed it (« Réparer le service », MRT-004). The caller reloads after
+--- telling the user, so the next owner admits the runtime or names what still
+--- blocks it (ui/owned_runtime_install.lua).
+--- @param on_done function fn(ok, reason|nil, detail|nil) called once.
+--- @return boolean started False when the owned runtime is not blocked by a stopped service.
+function M.repair_owned_runtime(on_done)
+	assert(type(on_done) == "function", "repair_owned_runtime(): a completion callback is required")
+	local status = M.owned_runtime_status()
+	if not M._owned.selected() or type(status) ~= "table" or not M.OWNED_REPAIR_REASONS[status.reason] then
+		Logger.error(LOG, "Owned runtime service repair refused: the runtime is not blocked by a stopped service.")
+		return false
+	end
+	require("adapters.runtime_owner_ports").repair_runtime(on_done)
 	return true
 end
 
@@ -5311,7 +5368,7 @@ function M.set_mod_combos_enabled(value)
 	end
 	local committed = commit_state_mutation(function(candidate)
 		candidate.mod_combos_enabled = value
-	end, nil, require("config_keys").KEY.MOD_COMBOS_ENABLED)
+	end, nil, require("settings.engine.keys").KEY.MOD_COMBOS_ENABLED)
 	if committed then Logger.info(LOG, "Key combinations: %s.", value and "on" or "off") end
 	return committed
 end
@@ -5395,11 +5452,11 @@ local function apply_recommended_bindings(candidate, bindings)
 	end
 end
 
---- The first-run wizard's view of a config_karabiner.toml: the Tap-Holds switch
+--- The first-run wizard's view of a tap_hold.toml: the Tap-Holds switch
 --- in force and each key it configures, as the recommendation or as the user's
 --- own setting. A key it leaves unbound is absent, so the wizard may import it;
 --- it never imports over another one.
---- @param path string The config_karabiner.toml of the folder being set up.
+--- @param path string The tap_hold.toml of the folder being set up.
 --- @return table|nil report `{ enabled = boolean, keys = { [id] = "recommended"|"customised" } }`
 --- @return string|nil err Why the file could not be read.
 function M.recommended_key_report(path)
@@ -5447,7 +5504,7 @@ function M.import_recommended_keys(request, on_done)
 	end, on_done, nil, request.backup_path)
 end
 
---- Saves the same import to a config_karabiner.toml the running bridge does
+--- Saves the same import to a tap_hold.toml the running bridge does
 --- not own: before M.init() (the first-run wizard reloads before the bridge
 --- starts) or for the folder a wizard moves the configuration to. Nothing is
 --- live to publish or deploy there; the next M.init() reads the file. The file
@@ -5515,7 +5572,7 @@ function M.save_recommended_keys(request)
 	return true
 end
 
---- Copies exactly the settings persisted in config_karabiner.toml.
+--- Copies exactly the settings persisted in tap_hold.toml.
 --- Runtime handles and watcher capabilities from `_state` are deliberately
 --- excluded, so the snapshot can be retained by a parent transaction.
 --- @param source table Live or previously captured settings.
@@ -5671,7 +5728,7 @@ end
 			and M.capture_configured_navigation_inventory == ports.capture
 			and package.loaded["platform.remap.config"] == Config and getmetatable(Config) == nil
 			and Config.load_user_config == ports.config and Config.save_user_config == ports.save
-			and package.loaded["adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
+			and package.loaded["core.fs.adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
 			and FileSystem.read_with_status == ports.read and FileSystem.write_if_unchanged == ports.write
 			and package.loaded["platform.remap.nav_layer"] == NavLayer and getmetatable(NavLayer) == nil
 			and NavLayer.load == ports.load and NavLayer.capture_configured_inputs == ports.observe
@@ -5937,7 +5994,7 @@ end
 -- The bulk scope of the Tap-Hold submenu. The key combinations are drawn in
 -- the Shortcuts group with a switch of their own, so the Tap-Hold restore and
 -- clear rows must leave them, and that switch, as the user set them.
-local BULK_SCOPE_TAP_HOLDS = require("config_keys").KEY.TAP_HOLDS
+local BULK_SCOPE_TAP_HOLDS = require("settings.engine.keys").KEY.TAP_HOLDS
 
 --- Resolves a bulk command's scope, refusing an unknown one through its callback.
 --- @param label string Stable operation label.
@@ -6011,10 +6068,10 @@ end
 
 --- The remap file's top-level tables, each owned by the manifest scope whose
 --- prefixes declare it: the keys by tap_holds, the chords by shortcuts.
-local REMAP_SCOPE_SECTIONS = { tap_holds = require("config_keys").KEY.TAP_HOLDS, shortcuts = require("config_keys").KEY.MOD_COMBOS, key_combinations = require("config_keys").KEY.MOD_COMBOS }
+local REMAP_SCOPE_SECTIONS = { tap_holds = require("settings.engine.keys").KEY.TAP_HOLDS, shortcuts = require("settings.engine.keys").KEY.MOD_COMBOS, key_combinations = require("settings.engine.keys").KEY.MOD_COMBOS }
 
 --- Applies the remap part of a manifest scope as one exact transaction: a
---- verified backup of config_karabiner.toml, a save that only replaces those
+--- verified backup of tap_hold.toml, a save that only replaces those
 --- backed-up bytes, and the Karabiner terminal before success. « recommended »
 --- writes the shipped preset, « clear » the neutral none/none; the timings are
 --- parameters whose default is the recommendation. The master comes from the
@@ -6044,13 +6101,13 @@ function M.apply_scope(request, on_done)
 		return false
 	end
 	Logger.debug(LOG, "Remap scope %s '%s' transaction requested.", request.scope, request.mode)
-	local sibling = request.scope == require("config_keys").KEY.TAP_HOLDS and request.mode == "recommended"
+	local sibling = request.scope == require("settings.engine.keys").KEY.TAP_HOLDS and request.mode == "recommended"
 		and require("platform.remap.scope_layer").import() or nil
 	return apply_bulk_settings_transaction(label, function(candidate)
 		local target = request.mode == "recommended"
 			and Config.build_recommended_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
 			or Config.build_default_state(M.TAP_HOLD_KEYS, M.MOD_COMBOS)
-		if section == require("config_keys").KEY.MOD_COMBOS then
+		if section == require("settings.engine.keys").KEY.MOD_COMBOS then
 			-- The shared combination scope keeps its switch on clear, including
 			-- when composed into Shortcuts; restore imports the neutral-on gate.
 			if request.mode ~= "clear" then
@@ -6063,9 +6120,11 @@ function M.apply_scope(request, on_done)
 		end
 		-- The manifest rows of the scope, each with its state field.
 		local fields = {
-			[require("config_keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
+			[require("settings.engine.keys").KEY.TAP_HOLDS_ENABLED] = "tap_holds_enabled",
 			-- config-key-literal-ok: the value is the remap state field, named like its leaf
-			[require("config_keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+			[require("settings.engine.keys").KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS] = "lone_modifier_tap_max_ms",
+			-- config-key-literal-ok: the value is the remap state field, named like its leaf
+			[require("settings.engine.keys").KEY.TAP_HOLDS_STICKY_TIMEOUT_MS] = "sticky_timeout_ms",
 		}
 		for _, row in ipairs(Manifest.scope_plan(request.scope, request.mode).operations) do
 			local path = row.section .. "." .. row.key
@@ -6078,7 +6137,6 @@ function M.apply_scope(request, on_done)
 		end
 		candidate.tap_hold_config = target.tap_hold_config
 		candidate.tap_hold_timeout_ms = target.tap_hold_timeout_ms
-		candidate.sticky_timeout_ms = target.sticky_timeout_ms
 		return #M.TAP_HOLD_KEYS
 	end, on_done, nil, request.backup_path, sibling)
 end
@@ -6479,7 +6537,7 @@ function M.regenerate(
 
 	-- Ensure the parent directory of the KC physical log exists before Karabiner
 	-- starts writing to it via shell_command echo redirects
-	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
+	local kc_parent = Generator.KE_PHYSICAL_KC_LOG and require("core.fs.engine.native_path").dirname(Generator.KE_PHYSICAL_KC_LOG)
 	if kc_parent and not _kc_parent_ensured then
 		-- POSIX single-quoting, not Lua's %q. %q escapes for a LUA literal — it leaves
 		-- $, backticks and ! untouched — so a config dir containing any of them was
@@ -6491,7 +6549,7 @@ function M.regenerate(
 		-- the boot regeneration).
 		local ok_mode, mode = pcall(hs.fs.attributes, kc_parent, "mode")
 		if not (ok_mode and mode == "directory") then
-			pcall(hs.execute, "mkdir -p " .. require("text_utils").shell_quote(kc_parent))
+			pcall(hs.execute, "mkdir -p " .. require("core.text.engine.utils_core").shell_quote(kc_parent))
 		end
 		_kc_parent_ensured = true
 	end
@@ -7005,7 +7063,7 @@ function M._owned.reconcile()
 end
 
 --- Initializes the Karabiner bridge.
---- @param file_system table FileSystem port adapter (adapters/file_system.lua).
+--- @param file_system table FileSystem port adapter (core/fs/adapters/file_system.lua).
 ---   Used to resolve the KE config path through hs.fs.pathToAbsolute so the
 ---   module never hard-codes OS path logic outside the port boundary.
 --- @return boolean initialized True only after every required owner commits.
@@ -7055,6 +7113,16 @@ function M.init(file_system)
 		return false
 	end
 
+	-- An old config_karabiner.toml is carried over into tap_hold.toml once, before
+	-- the first read; one that cannot be is refused like a corrupt file.
+	local imported, import_outcome = timed("import_legacy_tap_hold_file", function()
+		return require("platform.remap.tap_hold_file").import_legacy(resolve_user_config(), FileSystem)
+	end)
+	if not imported then
+		Logger.error(LOG, "Karabiner bridge initialization refused: the old remap settings could not be carried over (%s).",
+			tostring(import_outcome))
+		return false
+	end
 	local user_cfg, user_config_status = timed("load_user_config", function()
 		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	end)
@@ -7064,7 +7132,7 @@ function M.init(file_system)
 	end
 	local first_launch = user_config_status == "absent"
 
-	-- The runtime this boot targets: owned unless config_karabiner.toml keeps
+	-- The runtime this boot targets: owned unless tap_hold.toml keeps
 	-- the shared one by hand. The command line tool every variable writer spells
 	-- is chosen here, once, and an owned boot writes its own complete file.
 	local runtime = user_cfg.runtime or Config.RUNTIME_DEFAULT
@@ -7462,7 +7530,10 @@ function M.teardown_local()
 	if settle_bulk_settings_before_lifecycle("Karabiner local teardown", "local-teardown") ~= true then
 		return false
 	end
-	local status_ok, phase = xpcall(LeaseController.status, debug.traceback)
+	-- A quit before the lease controller started (first-run wizard, no
+	-- Karabiner) has no lease to fence and must not report an error.
+	local status_ok, phase = xpcall(LeaseController.status, debug.traceback,
+		{ before_init = "uninitialized" })
 	if not status_ok then
 		Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
 		return false

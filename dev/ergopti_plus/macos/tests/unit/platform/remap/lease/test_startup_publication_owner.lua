@@ -69,11 +69,11 @@ helpers.describe("startup configuration conditional publication ownership", func
 				local configured = package.loaded["platform.remap.config"]
 				configured.load_tap_hold_keys = function() return { { id = "left_shift" }, { id = "tab" } } end
 				package.loaded["infra.config_paths"].get = function() return path end
-				local captured = require("adapters.file_system")
+				local captured = require("core.fs.adapters.file_system")
 				for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 					captured[method] = fs[method]
 				end
-				package.loaded["adapters.file_system"] = fs
+				package.loaded["core.fs.adapters.file_system"] = fs
 				package.loaded["platform.remap.config"] = nil
 				local actual = helpers.load_with_stubs("platform.remap.config")
 				-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
@@ -86,7 +86,9 @@ helpers.describe("startup configuration conditional publication ownership", func
 					return saved, detail, record
 				end
 				package.loaded["platform.remap.config"] = configured
-				local source = '# exact migration source\n[karabiner]\nintegration_enabled = false\n[tap_holds.config.tab]\ntap = "cmd_tab"\nhold = "none"\n'
+				-- The shared tap_hold.toml layout (_shared/tap_hold/data/SCHEMA.md).
+				local source = '# exact migration source\n[_meta]\nschema_version = 1\n[karabiner]\nintegration_enabled = false\n'
+					.. '[tap_hold.keys.tab]\ntap_action = "cmd_tab"\n'
 				body(remap, calls, fs, control, seed, path, source, receipts)
 			end)
 		end)

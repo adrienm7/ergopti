@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local PortFakes = require("tests.support.port_fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = {
 	"modules.llm.screen_answer", "modules.llm.prediction_engine", "modules.llm",
@@ -18,18 +18,18 @@ local MODULES = {
 	"modules.llm.prompt_builder", "modules.llm.app_filter", "modules.llm.api_common",
 	"modules.llm.api_remote", "modules.llm.api_mlx", "modules.llm.api_ollama",
 	"modules.llm.profiles", "modules.keystats", "modules.shortcuts.script_control",
-	"modules.shortcuts.actions.screenshot_save", "adapters.file_system",
-	"adapters.json_codec", "adapters.storage", "adapters.timer_scheduler",
-	"adapters.mouse_control", "infra.logger", "infra.timings", "infra.keycodes",
-	"ui.tooltip", "llm.vision", "llm.rewrite", "llm.prompt_action", "llm.translate",
-	"text_utils", "compat.utf8",
+	"modules.shortcuts.actions.screenshot_save", "core.fs.adapters.file_system",
+	"core.fs.adapters.json_codec", "core.fs.adapters.storage", "core.events.timer_scheduler",
+	"adapters.mouse_control", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
+	"core.ui.ui.tooltip", "ai.engine.prediction.vision", "ai.engine.prediction.rewrite", "ai.engine.prediction.prompt_action", "ai.engine.prediction.translate",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
 }
 
 local function with_capture(callback)
 	helpers.with_stub_scope(MODULES, function()
 		local f = { captures = {}, posts = {}, loading = 0, hidden = 0, notices = {}, ready = true, paused = false }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local file = assert(io.open(path, "rb"))
 				local bytes = assert(file:read("*a"))
@@ -37,8 +37,8 @@ local function with_capture(callback)
 				return bytes
 			end,
 		}
-		package.loaded["adapters.json_codec"] = { decode = Json.decode }
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.json_codec"] = { decode = Json.decode }
+		package.loaded["core.fs.adapters.storage"] = {
 			-- The real adapter's read and write pair (api_remote's refused thinking fields)
 			get = function() return nil end,
 			read_exact = function() return true, nil end,
@@ -47,7 +47,7 @@ local function with_capture(callback)
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return { x = 0, y = 0, w = 640, h = 480 } end,
 		}
-		package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
+		package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
 			now = function() return 0 end,
 		})
 		package.loaded["modules.llm"] = {
@@ -62,7 +62,6 @@ local function with_capture(callback)
 		}
 		package.loaded["modules.llm.streaming_handler"] = {
 			init = function() return true end,
-			stop_watchdog = function() return true end,
 			reset_failure_count = function() end,
 		}
 		package.loaded["modules.llm.api_mlx"] = { stop_warmup = function() return true end }
@@ -90,7 +89,7 @@ local function with_capture(callback)
 				return true
 			end,
 		}
-		package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
+		package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 			set_navigate_callback = function() end,
 			set_enter_validates = function() end,
 			set_llm_timeout = function() end,
@@ -105,8 +104,8 @@ local function with_capture(callback)
 			show = function(text) f.notices[#f.notices + 1] = text; return true end,
 		})
 		local flow = helpers.load_with_stubs("modules.llm.screen_answer")
-		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
-		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
+		package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		local engine = require("modules.llm.prediction_engine")
 		helpers.assert_true(engine.init({ buffer = "", llm_buffer = "", mappings = {}, DELAYS = {} }))
 		f.flow, f.engine = flow, engine

@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 
 local Fields = require("infra.personal_info_fields")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 helpers.describe("personal info field classification (linux-personal-fields)", function()
 	helpers.it("masks a declared secret and shows a declared open field", function()

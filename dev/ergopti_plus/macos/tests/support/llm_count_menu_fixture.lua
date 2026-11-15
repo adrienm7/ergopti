@@ -15,10 +15,10 @@ return function(callback, options)
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
 			if name:match("^ui%.menu%.menu_llm") or name:match("^modules%.llm")
-				or name == "menu.renderer" then package.loaded[name] = nil end
+				or name == "menu.engine.renderer" then package.loaded[name] = nil end
 		end
-		helpers.load_with_stubs("infra.toml.codec")
-		local file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "r"))
+		helpers.load_with_stubs("core.text.engine.toml.codec")
+		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "r"))
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
 		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
@@ -34,14 +34,14 @@ return function(callback, options)
 		local command_deliveries = 0
 		local function unobserved_command() command_deliveries = command_deliveries + 1 end
 		local outcome = true
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
-		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()
 		local function real_caption(key)
 			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
 		end
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if options.catalogue then return options.catalogue[key] or key end
 			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
@@ -138,7 +138,7 @@ return function(callback, options)
 				return calls.page_open_result
 			end
 		end
-		if options.window_toggle then package.loaded["ui.window_toggle"] = options.window_toggle end
+		if options.window_toggle then package.loaded["core.ui.ui.window_toggle"] = options.window_toggle end
 		local menu = require("ui.menu.menu_llm").create({ state = state,
 			keymap = { set_llm_model = accept }, script_control = options.script_control,
 			save_prefs = accept, update_menu = accept, active_tasks = {} })

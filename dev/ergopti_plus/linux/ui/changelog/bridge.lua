@@ -8,7 +8,7 @@
 --- The page never reaches the network on Linux: this handler fetches the
 --- release list through the shared curl adapter (bounded, proxy variables
 --- honoured by curl), trying the GitHub API first and the public Atom feed
---- second (_shared/lua/updater/release_sources.lua), then pushes the result or
+--- second (_shared/updater/engine/release_sources.lua), then pushes the result or
 --- a translated error key back through window.__hostBridgeResponse.
 ---
 --- The page's subscription banner posts set_channel; the updater manager, the
@@ -17,7 +17,7 @@
 --- pushed to an open page the same way.
 ---
 --- A release's « Install this version » button posts install_release: the
---- shared sequence (_shared/lua/updater/release_install.lua) backs the
+--- shared sequence (_shared/updater/engine/release_install.lua) backs the
 --- configuration up (modules/updater/config_backup.lua), finds the release in
 --- the list this bridge last fetched from the GitHub API, then downloads,
 --- verifies and installs it through the updater manager's update path and
@@ -30,23 +30,23 @@
 local M = {}
 M.bridge_name = "changelog_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.changelog"
 
 -- Read canonical version from the single-source module (SSoT).
 local Version = require("infra.version")
-local Installation = require("infra.installation")
-local Shell = require("adapters.shell_runner")
-local Json = require("json")
-local Base64 = require("compat.base64")
-local ReleaseSources = require("updater.release_sources")
-local RepositoryUrl = require("updater.repository_url")
-local Parser = require("updater.release_parser")
-local ReleaseInstall = require("updater.release_install")
-local VersionOrder = require("updater.version")
-local NetworkFailure = require("network.failure")
-local Paths = require("infra.paths")
-local FileSystem = require("adapters.file_system")
+local Installation = require("core.lifecycle.engine.installation")
+local Shell = require("core.process.adapters.shell_runner")
+local Json = require("core.text.engine.json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local ReleaseSources = require("updater.engine.release_sources")
+local RepositoryUrl = require("updater.engine.repository_url")
+local Parser = require("updater.engine.release_parser")
+local ReleaseInstall = require("updater.engine.release_install")
+local VersionOrder = require("updater.engine.version_core")
+local NetworkFailure = require("core.network.engine.failure")
+local Paths = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
 
 -- The owner and the repository come from the shared updater defaults, their
 -- single source (tools/test/test-repo-url-single-source.cjs). The loader is
@@ -55,7 +55,7 @@ local load_sources
 local APP_NAME = "changelog"
 local HTTP_OWNER = "changelog"
 -- Feeds carry the rendered notes of ten releases (about 0.5 MB today).
-local MAX_CHANGELOG_BYTES = require("infra.timings").count("limits", "changelog_source_bytes")
+local MAX_CHANGELOG_BYTES = require("core.timing.engine.timings").count("limits", "changelog_source_bytes")
 
 local _fetch_generation = 0
 local _sources = nil
@@ -180,10 +180,10 @@ end
 --- @return string|nil error
 load_sources = function()
 	if _sources then return _sources, nil end
-	local ok_paths, Paths = pcall(require, "infra.paths")
-	local path = ok_paths and Paths.shared("modules/updater/defaults.json") or nil
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
+	local path = ok_paths and Paths.shared("updater/data/defaults.json") or nil
 	if not path then return nil, "shared updater defaults path is unavailable" end
-	local raw, status = require("toml_codec.writer").read_classified(path)
+	local raw, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	if status ~= "ok" then return nil, "shared updater defaults are unreadable" end
 	local ok_json, decoded = pcall(Json.decode, raw)
 	if not ok_json then return nil, "shared updater defaults are not valid JSON" end
@@ -200,7 +200,7 @@ end
 --- @param timeout_ms number
 --- @param callback function Receives status, body, err.
 local function default_http_get(url, headers, timeout_ms, callback)
-	local HttpClient = require("adapters.http_client")
+	local HttpClient = require("core.network.adapters.http_client")
 	local completed = false
 	local function finish(status, body, err)
 		if completed then return end
@@ -224,7 +224,7 @@ end
 --- @param payload table
 --- @return boolean pushed
 local function default_push(payload, document_owner)
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
+	local ok_manager, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_manager or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push releases: webview_manager.eval_js is unavailable.")
 		return false
@@ -247,7 +247,7 @@ M._push = default_push
 --- @param channel string Registry channel id.
 --- @return number generation
 function M.start_fetch(channel)
-	local loaded, host = pcall(require, "ui.webview_manager")
+	local loaded, host = pcall(require, "core.ui.ui.webview_manager")
 	local document, epoch = _page_document, _page_epoch
 	_fetch_generation = _fetch_generation + 1
 	local generation = _fetch_generation
@@ -257,7 +257,7 @@ function M.start_fetch(channel)
 			or type(host.document_owner_retained) ~= "function" then return false end
 		local function identity()
 			return generation == _fetch_generation and document == _page_document and epoch == _page_epoch
-				and package.loaded["ui.webview_manager"] == host
+				and package.loaded["core.ui.ui.webview_manager"] == host
 		end
 		if not identity() then return false end
 		local ok, current = pcall(host.document_owner_current, document)
@@ -437,7 +437,7 @@ end
 --- @return table session
 local function trusted_page_epoch(context)
 	if type(context) ~= "table" or context.app_name ~= APP_NAME or type(context.epoch) ~= "number" then return nil end
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	if not ok or type(host.current_epoch) ~= "function" or type(host.is_visible) ~= "function" then return nil end
 	if context.document_owner == nil or type(host.document_owner_current) ~= "function"
 		or host.document_owner_current(context.document_owner) ~= true then return nil end
@@ -446,7 +446,7 @@ end
 
 local function failure_contract()
 	if _failure_contract then return _failure_contract end
-	local path = Paths.shared("modules/network/managed_network.json")
+	local path = Paths.shared("core/network/data/managed_network.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	assert(type(raw) == "string", "the canonical managed network policy is unreadable")
 	_failure_contract = NetworkFailure.new(Json.decode(raw))
@@ -455,7 +455,7 @@ end
 
 --- Captures actual admitted document and pause owners, privately.
 local function failure_owner()
-	local ok, host = pcall(require, "ui.webview_manager")
+	local ok, host = pcall(require, "core.ui.ui.webview_manager")
 	local state, epoch, document = _daemon_state, _page_epoch, _page_document
 	if not ok or type(state) ~= "table" then return nil end
 	return { list = _last_list, generation = _fetch_generation, state = state, epoch = epoch,
@@ -473,7 +473,7 @@ local function failure_current(owner)
 		local state, epoch = host.get_daemon_state(), host.current_epoch(APP_NAME)
 		local visible = host.is_visible(APP_NAME)
 		return state == owner.state and epoch == owner.epoch and visible == true
-			and package.loaded["ui.webview_manager"] == host and owner.document == _page_document
+			and package.loaded["core.ui.ui.webview_manager"] == host and owner.document == _page_document
 			and owner.list ~= nil and owner.list == _last_list and owner.generation == _fetch_generation
 			and owner.state == _daemon_state and owner.state.is_paused == owner.pause
 	end

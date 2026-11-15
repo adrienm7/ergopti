@@ -23,21 +23,21 @@ local TIMEOUT_PARAMETER = "basic.to_if_alone_timeout_milliseconds"
 local COMMAND_FLAGS = { left_command = true, right_command = true }
 
 helpers.with_fresh_modules({
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
-	"infra.keycodes",
-	"infra.logger",
-	"infra.toml.codec",
+	"platform.input.keycodes",
+	"core.logger.engine.logger",
+	"core.text.engine.toml.codec",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"modules.keymap.layout_registry",
-	"toml_codec",
+	"core.text.engine.toml_codec",
 }, function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,
@@ -48,14 +48,14 @@ helpers.with_fresh_modules({
 	-- The catalogues read here are JSON and the shared defaults use the
 	-- pure-Lua reader; the native TOML codec is absent from the headless runner.
 	local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-	package.loaded["toml_codec"] = toml_stub
-	package.loaded["infra.toml.codec"] = toml_stub
+	package.loaded["core.text.engine.toml_codec"] = toml_stub
+	package.loaded["core.text.engine.toml.codec"] = toml_stub
 	local file_cache = {}
 	local function read_once(path)
 		if file_cache[path] == nil then file_cache[path] = SourceFile.read(path) end
 		return file_cache[path]
 	end
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = read_once,
 		read_with_status = function(path) return read_once(path), "ok" end,
 	}

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/llm/thinking_off_vectors.json, which the shared
 ; Lua resolver (macOS, Linux) replays too, through the AutoHotkey port
-; (_shared/modules/llm/thinking_off.ahk), the families the driver loaded from
+; (_shared/ai/data/thinking_off.ahk), the families the driver loaded from
 ; thinking_off.json and the dialects it loaded from api_providers.json. Then
 ; pins both request paths: the prediction payload (LLM_RemoteGenerate_Async)
 ; and the bodies the screen reading and the AI agent write whole

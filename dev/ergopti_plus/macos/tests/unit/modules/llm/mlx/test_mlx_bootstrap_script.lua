@@ -149,9 +149,9 @@ local function new_fixture()
 		.. sh_quote(project .. "/")
 		-- network-retry.sh reads the shared origin inventory three folders up,
 		-- where the bundle and the checkout keep _shared beside the driver.
-		.. " && mkdir -p " .. sh_quote(root .. "/_shared/modules/network") .. " && cp "
-		.. sh_quote(driver .. "../_shared/modules/network/route_origins.json") .. " "
-		.. sh_quote(root .. "/_shared/modules/network/"))
+		.. " && mkdir -p " .. sh_quote(root .. "/_shared/core/network/data") .. " && cp "
+		.. sh_quote(driver .. "../_shared/core/network/data/route_origins.json") .. " "
+		.. sh_quote(root .. "/_shared/core/network/data/"))
 	helpers.assert_eq(made, 0, "the fixture project must be created")
 	write(home .. "/.local/bin/uv", FAKE_UV)
 	run("chmod +x " .. sh_quote(home .. "/.local/bin/uv"))
@@ -598,14 +598,14 @@ helpers.describe("The script and the Lua probe import the same packages (mlx-boo
 		local checker = helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
 			fs = { attributes = function() return nil end },
 		})
-		require("infra.paths").find_from_configdir = function() return script_path end
+		require("core.fs.engine.paths").find_from_configdir = function() return script_path end
 		return checker
 	end
 
 	--- Runs `body` with the paths owner and the checker restored afterwards.
 	--- @param body function
 	local function with_scope(body)
-		helpers.with_stub_scope({ "infra.paths", "modules.llm.mlx_deps_checker" }, body)
+		helpers.with_stub_scope({ "core.fs.engine.paths", "modules.llm.mlx_deps_checker" }, body)
 	end
 
 	helpers.it("the menu's probe is the statement the script runs before publishing and reusing", function()

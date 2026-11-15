@@ -24,20 +24,19 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
-local NativePath = require("native_path")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local NativePath = require("core.fs.engine.native_path")
 
 local hs                = hs
-local ui_builder        = require("ui.ui_builder")
-local Logger            = require("infra.logger")
+local ui_builder        = require("core.ui.ui.builder")
+local Logger            = require("core.logger.engine.logger")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ConfigSchema      = require("modules.hotstrings.hotstrings_config_schema")
-local NumberPolicy      = require("number_policy")
-local TomlReader        = require("infra.toml.reader")
-local FileSystem        = require("adapters.file_system")
-local i18n              = require("infra.i18n")
-local Paths            = require("infra.paths")
-local PersonalFiles    = require("hotstrings.personal_files")
+local TomlReader        = require("core.text.engine.toml.reader")
+local FileSystem        = require("core.fs.adapters.file_system")
+local i18n              = require("core.i18n.engine.i18n")
+local Paths            = require("core.fs.engine.paths")
+local PersonalFiles    = require("hotstrings.engine.catalogue.personal_files")
 
 local LOG = "hotstrings_config_window"
 
@@ -115,7 +114,7 @@ end
 local ASSETS_DIR = (Paths.shared("ui/hotstrings_config_window") or "") .. "/"
 
 -- Display order for the built-in categories — matches the menu and the AHK driver.
-local CATEGORY_ORDER = require("menu.row_order").list("hotstring_config_categories")
+local CATEGORY_ORDER = require("menu.engine.row_order").list("hotstring_config_categories")
 
 -- Friendly labels for each built-in category. Falls back to the TOML's [_meta]
 -- description when this table has no entry for a given key.
@@ -143,7 +142,7 @@ local function common_categories()
 	-- The packs the driver loaded, handed over by M.setup(); a window set up
 	-- without them (the unit harness) shows the built-in categories only.
 	local packs = type(_config.language_packs) == "function" and _config.language_packs() or {}
-	local Languages = require("hotstrings.languages")
+	local Languages = require("hotstrings.engine.languages")
 	local names = {}
 	for _, row in ipairs(require("_generated.locale_table")) do names[row.code] = row.name end
 	for _, pack in ipairs(packs) do
@@ -157,8 +156,8 @@ local function common_categories()
 end
 
 -- Color palette offered in the "couleur" dropdown. The palette is generated from
--- _shared/data/native_theme.toml, the one list the Linux window reads too.
-local NativeTheme = require("native_theme_data")
+-- _shared/core/ui/data/native_theme.toml, the one list the Linux window reads too.
+local NativeTheme = require("core.ui.engine.native_theme_data")
 local COLOR_PRESETS = {}
 local PRESET_HEX = {}
 for _, preset in ipairs(NativeTheme.hotstring_palette) do
@@ -179,7 +178,7 @@ end
 -- Blessed hs.fs.dir wrapper (throw- and state-safe) now lives in infra/fs_dir so
 -- the contract is shared with init.lua's hotstring discovery; see
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
-local safe_dir_entries = require("infra.fs_dir").entries
+local safe_dir_entries = require("core.fs.engine.dir").entries
 
 --- Lists TOML files in a directory, skipping names that start with `_` and
 --- the backups configuration writers leave beside a source.
@@ -309,7 +308,7 @@ end
 
 --- Source-default collision priority (personal 50 / package 30 / common 10) for a
 --- UI group, read from the keymap engine so the window never hardcodes a fourth
---- copy of the tiers (the single source is _shared/modules/hotstrings/priority.json, held
+--- copy of the tiers (the single source is _shared/hotstrings/data/catalogue/priority.json, held
 --- equal across drivers by tools/test/test-priority-parity.cjs). The keymap module
 --- is required lazily — it is loaded long before this window opens, but a headless
 --- harness may lack it, in which case the source default is simply omitted.
@@ -485,7 +484,7 @@ local function build_state()
 				if entry.readonly then entry.title = entry.title .. " — " .. i18n.get("menu.hotstrings.personal_source_unavailable") end
 				if binding then
 					local legacy = hotstrings_config.get_user_override(source.owner, nil) or {}
-					local Metadata = require("hotstrings.personal_metadata")
+					local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 					local reason = i18n.get("menu.hotstrings.personal_metadata_unavailable")
 					entry.readonly_metadata = Metadata.readonly_fields(binding.record.content, nil, legacy)
 					entry.readonly_metadata_reason = reason
@@ -687,17 +686,20 @@ local function on_message(msg, owner)
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid section.")
 		return false
 	end
-	if action == "set_color" and not (canonical_personal and require("hotstrings.personal_metadata").valid("color", body.hex))
+	if action == "set_color" and not (canonical_personal and require("hotstrings.engine.catalogue.personal_metadata").valid("color", body.hex))
 		and not ConfigSchema.is_color(body.hex) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid color.")
 		return false
 	end
-	if action == "set_delay" and (not NumberPolicy.is_finite(body.ms) or body.ms < 0) then
+	-- The shared value schema's declarations, the same rule as the page itself.
+	local ValueCheck = require("settings.engine.value_check")
+	if action == "set_delay"
+		and not ValueCheck.check_whole_scaled(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, body.ms, 0.001) then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid delay.")
 		return false
 	end
-	if action == "set_priority" and (not NumberPolicy.is_finite(body.priority)
-		or body.priority < 0 or body.priority > 100) then
+	if action == "set_priority" and not ValueCheck.check_value(
+		ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY), body.priority).ok then
 		Logger.error(LOG, "Rejected a hotstrings configuration message with an invalid priority.")
 		return false
 	end

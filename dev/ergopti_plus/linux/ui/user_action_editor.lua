@@ -21,11 +21,11 @@
 
 local M = {}
 
-local ChoicePrompt = require("ui.choice_prompt")
-local TextPrompt = require("ui.text_prompt")
-local I18n = require("infra.i18n")
-local Parameter = require("user_action_parameter")
-local Logger = require("logger.shim")
+local ChoicePrompt = require("core.ui.ui.choice_prompt")
+local TextPrompt = require("core.ui.ui.text_prompt")
+local I18n = require("core.i18n.engine.i18n")
+local Parameter = require("shortcuts.engine.user_action_parameter")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "ui.user_action_editor"
 
@@ -33,7 +33,7 @@ local LOG = "ui.user_action_editor"
 M.KINDS = { command = true, path = true }
 
 -- Escapes text for a dialog's --text, which is Pango markup.
-local markup_plain = require("ui.native_dialog").plain_markup
+local markup_plain = require("core.ui.ui.native_dialog").plain_markup
 
 --- The choices of a closed option set, labelled through the locale.
 --- @param options table Array of { value, key }.
@@ -86,7 +86,7 @@ end
 function M.ask_path(title, prompt, prior, deps)
 	deps = deps or {}
 	local pick = deps.pick or ChoicePrompt.pick
-	local shell = deps.shell or require("adapters.shell_runner")
+	local shell = deps.shell or require("core.process.adapters.shell_runner")
 	local stored = Parameter.parse("path", prior)
 	local kind = pick(title, prompt, labelled({
 		{ value = "file", key = "dialog.gestures.param_path_kind_file" },

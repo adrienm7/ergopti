@@ -109,7 +109,7 @@ helpers.describe("prefix expansions: what is built", function()
 	end)
 
 	helpers.it("requires the configured magic key for the two-digit phone prefix", function()
-		local engine = require("hotstring_engine").new()
+		local engine = require("hotstrings.engine.matcher").new()
 		engine:load_mappings(Prefix.build(INFO, nil, "\\"))
 		helpers.assert_nil(engine:on_char("0"))
 		helpers.assert_nil(engine:on_char("7"), "ordinary two-digit typing must not insert a phone number")
@@ -144,7 +144,7 @@ helpers.describe("prefix expansions: what is built", function()
 		-- The shortest prefix holding five non-space characters, which for
 		-- "1 99 99 99…" runs to the seventh byte. Taken from the shared helper
 		-- rather than typed out, so this reads the same rule the build does.
-		local Engine = require("dynamic_hotstrings")
+		local Engine = require("hotstrings.engine.dynamic.core")
 		local spaced = by_trigger(Engine.spaced_prefix(INFO.social_security_number, 5))
 		helpers.assert_not_nil(spaced, "the spaced trigger must exist alongside the raw one")
 		helpers.assert_eq(spaced.replacement, INFO.social_security_number,
@@ -259,8 +259,8 @@ helpers.describe("prefix expansions: the switches", function()
 	helpers.it("takes a switched-off family out of the category's count", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local storage = Fakes.storage({})
-		local previous_storage = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = storage
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
+		package.loaded["core.fs.adapters.storage"] = storage
 
 		local path = os.tmpname()
 		local fh = assert(io.open(path, "w"))
@@ -277,7 +277,7 @@ helpers.describe("prefix expansions: the switches", function()
 		dh.set_rule_enabled("phoneprefixes", false)
 		local after = dh.active_count()
 
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		os.remove(path)
 
 		helpers.assert_true(before > after,
@@ -289,8 +289,8 @@ helpers.describe("prefix expansions: the switches", function()
 	end)
 
 	helpers.it("passes the configured magic key through the real prefix provider", function()
-		local previous_storage = package.loaded["adapters.storage"]
-		package.loaded["adapters.storage"] = helpers.load_module("tests.fakes").storage({})
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
+		package.loaded["core.fs.adapters.storage"] = helpers.load_module("tests.fakes").storage({})
 		local path = os.tmpname()
 		local file = assert(io.open(path, "w"))
 		file:write('[info]\nphone_number = "0750399576"\n')
@@ -300,7 +300,7 @@ helpers.describe("prefix expansions: the switches", function()
 			manager.init({ trigger_char = "\\", personal_info_path = path })
 			manager.set_enabled(true)
 			require("tests.support.dynamic_hotstrings_fixture").prefer_families(manager)
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			engine:load_mappings(manager.prefix_mappings())
 			helpers.assert_nil(engine:on_char("0"))
 			helpers.assert_nil(engine:on_char("7"))
@@ -308,7 +308,7 @@ helpers.describe("prefix expansions: the switches", function()
 			helpers.assert_not_nil(result)
 			helpers.assert_eq(result.replacement, INFO.phone_number)
 		end)
-		package.loaded["adapters.storage"] = previous_storage
+		package.loaded["core.fs.adapters.storage"] = previous_storage
 		os.remove(path)
 		if not ok then error(err, 0) end
 	end)
@@ -344,7 +344,7 @@ helpers.describe("prefix expansions: reaching the engine", function()
 	local function loaded_with(provider)
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given, publications = {}, 0
-		local engine = require("hotstring_engine").new()
+		local engine = require("hotstrings.engine.matcher").new()
 		local load = engine.load_mappings
 		engine.load_mappings = function(self, mappings)
 			given = mappings
@@ -395,7 +395,7 @@ helpers.describe("prefix expansions: reaching the engine", function()
 		-- its phone, SSN and IBAN completions as well.
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given = nil
-		local engine = require("hotstring_engine").new()
+		local engine = require("hotstrings.engine.matcher").new()
 		local load = engine.load_mappings
 		engine.load_mappings = function(self, mappings) given = mappings; return load(self, mappings) end
 		config.init(engine, nil, nil)

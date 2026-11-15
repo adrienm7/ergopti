@@ -10,10 +10,10 @@
 local helpers = require("tests.helpers")
 
 local OWNERS = {
-	"adapters.timer_scheduler", "infra.deferred_work", "infra.logger",
+	"core.events.timer_scheduler", "core.timing.engine.deferred_work", "core.logger.engine.logger",
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
 	"ui.menu.menu_keyboard_layout", "infra.manifest_menu",
-	"infra.notifications", "infra.i18n",
+	"core.ui.engine.notifications", "core.i18n.engine.i18n",
 }
 
 --- Exercises one real rendered action through both retained continuations.
@@ -27,12 +27,12 @@ local function exercise_failure(site)
 		logger.error = function(_, template, ...)
 			errors[#errors + 1] = string.format(template, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- Input-source construction loaded deferred work and its scheduler. Both
 		-- continuation owners must capture this fixture's current logger and port.
-		package.loaded["adapters.timer_scheduler"] = nil
-		package.loaded["infra.deferred_work"] = nil
-		local scheduler = require("adapters.timer_scheduler")
+		package.loaded["core.events.timer_scheduler"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
+		local scheduler = require("core.events.timer_scheduler")
 		local marker = "controlled " .. site .. " callback failure"
 		local dispatched, refreshed, business_done = 0, 0, nil
 		sources.list_active_keyboard_layouts = function()
@@ -48,13 +48,13 @@ local function exercise_failure(site)
 		end
 		install.pick_latest_bundle = function() return nil end
 		install.highest_installed = function() return nil end
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+		local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 		local labels = assert(Json.decode(assert(file:read("*a"))))
 		assert(file:close())
-		require("infra.i18n").get = function(key) return labels[key] or key end
+		require("core.i18n.engine.i18n").get = function(key) return labels[key] or key end
 		local renderer = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
 			template_rows = renderer.template_rows,

@@ -34,8 +34,8 @@ local helpers = require("tests.helpers")
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+package.loaded["core.logger.engine.logger"] = nil
+local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed. fetch_llm_prediction is
@@ -99,8 +99,6 @@ package.loaded["modules.llm.prompt_builder"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) return true end,
-	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
 	cancel_streaming    = function() return true end,
 }
@@ -117,19 +115,19 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 
 -- Stub ui.tooltip — set_navigate_callback/set_enter_validates are called at
 -- module load time; mark_chain_complete is called unconditionally by reset().
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,

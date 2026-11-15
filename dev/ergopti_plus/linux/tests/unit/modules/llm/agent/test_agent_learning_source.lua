@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Reads exact fixture bytes, including an absent quarantined source.
 --- @param path string
@@ -33,7 +33,7 @@ local function with_source(source, body)
 	Learning._reset_for_test({ path = path, scheduler = {
 		after = function() return { armed = true } end, cancel = function() return true end,
 	} })
-	local config = assert(Json.decode_lossless(assert(read(helpers.driver_root() .. "/../_shared/modules/llm/agent.json"))))
+	local config = assert(Json.decode_lossless(assert(read(helpers.driver_root() .. "/../_shared/ai/data/agent.json"))))
 	local ok, detail = xpcall(function() body(Learning, path, config) end, debug.traceback)
 	Learning._reset_for_test()
 	package.loaded["modules.llm.agent_learning"] = previous
@@ -128,7 +128,7 @@ helpers.describe("agent learning source admission", function()
 	helpers.it("preserves a newer learning file published during staging", function()
 		with_source(PREFIX .. "7" .. SUFFIX, function(Learning, path, config)
 			Learning.record(config, "Mine", "calendar", true)
-			local writer, original = require("infra.regular_file_writer"), nil
+			local writer, original = require("core.fs.engine.regular_file_writer"), nil
 			original = writer.open
 			local successor = '{"version":1,"apps":{"Other":{"used":8,"thresholds":{"calendar":0.4}}}}'
 			writer.open = function(...)
@@ -179,7 +179,7 @@ helpers.describe("agent learning source admission", function()
 		with_source(source, function(Learning, path, config)
 			local okay, learned = pcall(Learning.record, config, "fresh", "calendar", true)
 			helpers.assert_true(okay, "all-infinite LRU entries cannot make the oldest key nil")
-			helpers.assert_eq(learned, require("llm.agent").learn(config, config.system1.threshold, true))
+			helpers.assert_eq(learned, require("ai.engine.agent.agent").learn(config, config.system1.threshold, true))
 			helpers.assert_eq(read(path .. ".corrupt"), source)
 			helpers.assert_true(Learning.flush())
 			local saved = assert(Json.decode_lossless(read(path)))
@@ -210,7 +210,7 @@ helpers.describe("agent learning quarantine ownership", function()
 				local source = PREFIX .. "7" .. SUFFIX
 				with_source(source, function(Learning, path, config)
 					local open, fault, handles, opened, closed = io.open, true, {}, 0, 0
-					local Reader = require("infra.regular_file_reader")
+					local Reader = require("core.fs.engine.regular_file_reader")
 					local open_source, wrapped = Reader.open_source, {}
 					local function refused()
 						if refusal == "throw" then error("controlled stream refusal", 0) end
@@ -274,7 +274,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		local source = PREFIX .. "7" .. SUFFIX
 		with_source(source, function(Learning, path, config)
 			local open, fault = io.open, true
-			local Reader = require("infra.regular_file_reader")
+			local Reader = require("core.fs.engine.regular_file_reader")
 			local open_source = Reader.open_source
 			io.open = function(candidate, mode)
 				if fault and candidate == path and mode == "r" then return nil, "controlled read refusal", 13 end
@@ -294,7 +294,7 @@ helpers.describe("agent learning quarantine ownership", function()
 				helpers.assert_nil(read(path .. ".corrupt"))
 				fault = false
 				local learned = Learning.record(config, "Mail", "calendar", true)
-				helpers.assert_eq(learned, require("llm.agent").learn(config, 0.2, true))
+				helpers.assert_eq(learned, require("ai.engine.agent.agent").learn(config, 0.2, true))
 				helpers.assert_true(Learning.flush())
 				local saved = assert(Json.decode_lossless(read(path)))
 				helpers.assert_eq(saved.apps.Mail.used, 8)
@@ -309,7 +309,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		helpers.it("(agent-learning-quarantine) preserves an occupied " .. occupied .. " recovery path", function()
 			local source = "invalid original learning"
 			with_source(source, function(Learning, path, config)
-				local Shell = require("adapters.shell_runner")
+				local Shell = require("core.process.adapters.shell_runner")
 				if occupied == "file" then
 					local file = assert(io.open(path .. ".corrupt", "wb"))
 					assert(file:write("previous recovery")); assert(file:close())
@@ -330,7 +330,7 @@ helpers.describe("agent learning quarantine ownership", function()
 		helpers.it("(agent-learning-quarantine) blocks publication after a " .. refusal .. " preservation receipt", function()
 			local source = "invalid source retained during recovery refusal"
 			with_source(source, function(Learning, path, config)
-				local Move = require("infra.no_replace_move")
+				local Move = require("core.fs.engine.no_replace_move")
 				local rename, move, fault = os.rename, Move.move, true
 				local function refused()
 					if refusal == "throw" then error("controlled preservation refusal", 0) end
@@ -378,7 +378,7 @@ helpers.describe("agent learning native source admission", function()
 		{ kind = "regular", mode = "threshold" },
 	}) do
 		helpers.it("(agent-learning-native-source) bounds " .. candidate.kind .. " " .. candidate.mode, function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			assert(os.remove(folder))
 			assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))

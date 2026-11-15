@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = source:match("^(.*)/tests/e2e/clipboard_deadline_child%.lua$") or "."
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. driver .. "/../_shared/lua/?.lua;" .. driver .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. driver .. "/../_shared/?.lua;" .. driver .. "/../_shared/?/init.lua;" .. package.path
 
 local uv = require("luv")
 local root = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-clipboard-e2e-XXXXXX"))
@@ -38,7 +38,7 @@ local okay, detail = xpcall(function()
 	assert(uv.os_setenv("WAYLAND_DISPLAY", "ergopti-private-fixture"))
 	assert(uv.os_setenv("XDG_SESSION_TYPE", "wayland"))
 	assert(uv.os_setenv("PATH", root .. ":" .. assert(os.getenv("PATH"))))
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local current, delayed = Shell.quote(root .. "/current"), Shell.quote(root .. "/delayed")
 	-- A text-only selection: the stage lists the advertised types before it
 	-- borrows the clipboard, and refuses one holding another format it cannot
@@ -89,7 +89,7 @@ for _, name in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "X
 	local path = root .. "/" .. name
 	if uv.fs_stat(path) then
 		-- Runtime diagnostics can create files below the private cache.
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("rm -rf " .. Shell.quote(path)))
 	end
 end

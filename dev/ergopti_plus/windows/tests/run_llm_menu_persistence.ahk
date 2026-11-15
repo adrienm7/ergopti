@@ -12,29 +12,29 @@ global _ConfigDir := A_Temp . "\ergopti_llm_persistence_test_" . DllCall("GetCur
 global _AhkSubDir := ""
 global ConfigurationFile := _ConfigDir . "config.toml"
 global _LogsDir := _ConfigDir . "logs\"
-#Include ../infra/tick_count.ahk
-#Include ../infra/wall_clock.ahk
+#Include ../core/logger/engine/tick_count.ahk
+#Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/config_keys.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
 #Include ../_generated/logger_sub_files.ahk
-#Include ../infra/logger.ahk
-#Include ../adapters/crypto.ahk
-#Include ../adapters/file_system.ahk
-#Include ../adapters/timer_scheduler.ahk
-#Include ../infra/json.ahk
-#Include ../infra/locale.ahk
+#Include ../core/logger/engine/logger.ahk
+#Include ../core/crypto/crypto.ahk
+#Include ../core/fs/adapters/file_system.ahk
+#Include ../core/events/timer_scheduler.ahk
+#Include ../core/text/engine/json.ahk
+#Include ../core/i18n/engine/locale.ahk
 #Include ../_generated/locale_table.ahk
-#Include ../infra/i18n.ahk
+#Include ../core/i18n/engine/i18n.ahk
 #Include ../infra/chord.ahk
-#Include ../adapters/hotkey_registrar.ahk
+#Include ../platform/input/hotkey_registrar.ahk
 #Include ../infra/hotpath_profiler.ahk
-#Include ../infra/toml/toml_helpers.ahk
-#Include ../infra/toml/toml_loader.ahk
-#Include ../infra/toml/toml_config_loader.ahk
+#Include ../core/text/engine/toml/helpers.ahk
+#Include ../core/text/engine/toml/loader.ahk
+#Include ../core/text/engine/toml/config_loader.ahk
 #Include ../infra/manifest_reader.ahk
-#Include ../infra/master_gates.ahk
+#Include ../core/lifecycle/engine/master_gates.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/config_transition.ahk
 #Include ../infra/config_transition_runtime.ahk

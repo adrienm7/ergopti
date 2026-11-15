@@ -23,11 +23,11 @@ local M = {}
 
 local hs            = hs
 local pasteboard    = hs.pasteboard
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
-local i18n          = require("infra.i18n")
-local FileSystem    = require("adapters.file_system")
-local TaskLifecycle = require("adapters.task_lifecycle")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
+local i18n          = require("core.i18n.engine.i18n")
+local FileSystem    = require("core.fs.adapters.file_system")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 local PythonInterpreter = require("adapters.python_interpreter")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
 

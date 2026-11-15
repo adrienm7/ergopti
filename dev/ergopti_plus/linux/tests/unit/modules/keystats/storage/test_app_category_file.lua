@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Json = require("json")
-local Store = require("keystats.app_category_store")
+local Json = require("core.text.engine.json")
+local Store = require("metrics.engine.apps.category_store")
 
 --- Runs a body with the config folder replaced by a scratch directory.
 --- @param body function Receives the file module, the file path and the directory.
@@ -86,7 +86,7 @@ helpers.describe("app category file: access", function()
 		with_config_dir(function(file, path)
 			local model, _, source = file.load()
 			assert(Store.set(model, "Firefox", "Browsers", 1))
-			local writer, replacement = require("infra.regular_file_writer"), path .. ".foreign"
+			local writer, replacement = require("core.fs.engine.regular_file_writer"), path .. ".foreign"
 			local original = writer.open
 			writer.open = function(...)
 				local stream, detail, errno, cleanup, current = original(...)
@@ -155,7 +155,7 @@ helpers.describe("app category file: import of the SQLite store", function()
 
 	helpers.it("keeps a concurrent edit when legacy import finishes staging", function()
 		with_config_dir(function(file, path)
-			local writer = require("infra.regular_file_writer")
+			local writer = require("core.fs.engine.regular_file_writer")
 			local original = writer.open
 			local successor = '{"Other":{"type":"Work","score":2}}'
 			writer.open = function(...)
@@ -192,6 +192,7 @@ helpers.describe("app category file: the keystats edit path", function()
 			fake_writer = setmetatable({
 				open_db = function() return true end,
 				ensure_token_encoding = function() return true end,
+				ensure_awake_definition = function() return true end,
 				register_device = function() return true end,
 				read_open_walk = function() return nil, true end,
 				upsert_open_walk = function() return true end,
@@ -330,7 +331,7 @@ helpers.describe("app category file: the keystats edit path", function()
 
 	helpers.it("refuses a dashboard edit if the category file changes during staging", function()
 		with_keystats({}, function(keystats, _, path)
-			local writer = require("infra.regular_file_writer")
+			local writer = require("core.fs.engine.regular_file_writer")
 			local original = writer.open
 			local successor = '{"Other":{"type":"Work","score":2}}'
 			writer.open = function(...)

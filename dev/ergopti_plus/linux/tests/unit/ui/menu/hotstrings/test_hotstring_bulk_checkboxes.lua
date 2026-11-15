@@ -92,7 +92,7 @@ end
 --- @return table|nil
 local function hotstrings_menu(config, dyn, paused, snapshot_paused)
 	local mb = helpers.load_module("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local title = i18n.get("menu.hotstrings.title")
 	local ctx = { config = config, _version = "9.9.9", dyn_hotstrings = dyn or fake_dyn(true, true),
 		-- A live getter can change after the menu snapshot was constructed.
@@ -112,7 +112,7 @@ end
 --- @param key string
 --- @return table|nil
 local function row_for(rows, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(rows or {}) do
 		if type(row.title) == "string" and row.title:sub(1, #text) == text then return row end
 	end
@@ -122,7 +122,7 @@ end
 --- Asserts that no row of the tree still draws a retired label.
 --- @param rows table
 local function assert_no_retired(rows)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local retired = {}
 	for _, key in ipairs({ "menu.hotstrings.category_on", "menu.hotstrings.category_off",
 		"menu.hotstrings.enable_all", "menu.hotstrings.disable_all" }) do
@@ -148,13 +148,13 @@ helpers.describe("word delimiter admission", function()
 		local menu = hotstrings_menu(config)
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
-				if row.title == require("infra.i18n").get("menu.hotstrings.add_delimiter") then return row end
+				if row.title == require("core.i18n.engine.i18n").get("menu.hotstrings.add_delimiter") then return row end
 				local found = find(row.menu); if found then return found end
 			end
 		end
 		local add = find(menu)
 		helpers.assert_true(add ~= nil)
-		local modal = require("ui.modal")
+		local modal = require("core.ui.ui.modal")
 		local previous, execute, calls, command = modal.run, os.execute, 0, nil
 		os.execute = function(text) command = text; return true end
 		modal.run = function(fn)
@@ -167,7 +167,7 @@ helpers.describe("word delimiter admission", function()
 		modal.run, os.execute = previous, execute
 		assert(ok, err)
 		helpers.assert_eq(calls, 3, "entry, consumption question, then error dialog")
-		helpers.assert_true(command:find(string.format(require("infra.i18n").get("editor.hotstrings.err_id_exists"), ","), 1, true) ~= nil)
+		helpers.assert_true(command:find(string.format(require("core.i18n.engine.i18n").get("editor.hotstrings.err_id_exists"), ","), 1, true) ~= nil)
 	end)
 end)
 
@@ -181,7 +181,7 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 				local category = row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection")
 				helpers.assert_true(category ~= nil and type(category.menu) == "table")
 				local row = category.menu[enabled and 1 or 2]
-				helpers.assert_eq(row.title, require("infra.i18n").get(enabled
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(enabled
 					and "menu.hotstrings.scope_enable_all" or "menu.hotstrings.scope_disable_all"))
 				helpers.assert_nil(row.checked)
 				row.fn()
@@ -223,7 +223,7 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 					helpers.assert_true(category ~= nil and type(category.menu) == "table")
 					helpers.assert_eq(category.checked, posture, "effective category state stays visible")
 					for index, key in ipairs({ "menu.hotstrings.scope_enable_all", "menu.hotstrings.scope_disable_all" }) do
-						helpers.assert_eq(category.menu[index].title, require("infra.i18n").get(key))
+						helpers.assert_eq(category.menu[index].title, require("core.i18n.engine.i18n").get(key))
 						helpers.assert_nil(category.menu[index].checked, "explicit requests are commands")
 						helpers.assert_eq(category.menu[index].disabled == true, false, "the bulk request is independent of its closed category gate")
 					end
@@ -252,13 +252,13 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 end)
 
 helpers.describe("dynamic bulk menu: pause ownership", function()
-	helpers.it("dynamic bulk menu: paused snapshot keeps the feature disabled without starting capture", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("dynamic bulk menu: a paused tray keeps the menu without starting capture (edd1-paused-writes)", function()
 		local config = fake_config(false, true)
 		local dyn, log = fake_dyn(true, true)
 		local menu, row = hotstrings_menu(config, dyn, true, true)
-		helpers.assert_nil(menu, "the existing paused top-level policy strips feature descendants")
-		helpers.assert_true(row.disabled)
-		helpers.assert_nil(row.fn)
+		helpers.assert_true(type(menu) == "table", "a paused tray keeps the Hotstrings submenu")
+		helpers.assert_true(row.disabled ~= true)
 		helpers.assert_eq(log.scoped, {})
 		helpers.assert_eq(log.rules, {})
 		helpers.assert_eq(log.set_enabled, {})
@@ -268,7 +268,7 @@ end)
 
 --- Records the existing keyboard-released dialog owner and restores all wrappers.
 local function with_bulk_error_receipts(body)
-	local Modal = require("ui.modal")
+	local Modal = require("core.ui.ui.modal")
 	local modal_run, execute = Modal.run, os.execute
 	local inside, notices, releases = false, {}, 0
 	Modal.run = function(callback)
@@ -331,7 +331,7 @@ helpers.describe("aggregate hotstring checkbox acknowledges the durable owner", 
 					if notices[1] then
 						helpers.assert_eq(notices[1].keyboard_released, true)
 						local rendered = notices[1].command:gsub("'\\''", "'")
-						helpers.assert_true(rendered:find(require("infra.i18n").get("dialog.bulk_toggle.save_failed"), 1, true) ~= nil)
+						helpers.assert_true(rendered:find(require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed"), 1, true) ~= nil)
 					end
 				end)
 			end)
@@ -361,7 +361,7 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						.. '[private]\nfuture = "retained foreign source"\n'
 					Choices.with_file(Config, source, function(path)
 						local published = {}
-						local engine = require("hotstring_engine").new()
+						local engine = require("hotstrings.engine.matcher").new()
 						local load = engine.load_mappings
 						engine.load_mappings = function(self, mappings)
 							local committed = load(self, mappings)
@@ -377,7 +377,7 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						view.is_section_checked = Config.is_section_checked
 						with_bulk_error_receipts(function(notices)
 							local row = assert(aggregate_row(hotstrings_menu(view), kind))
-							local Writer = require("toml_codec.writer")
+							local Writer = require("core.text.engine.toml_codec.writer")
 							local batch_write, writes = Writer.batch_write, 0
 							Writer.batch_write = function()
 								writes = writes + 1
@@ -424,13 +424,13 @@ local function with_dynamic_family_owners(body)
 	end
 	write(path, source)
 	write(personal, '[info]\nphone = "0000000000"\n[letters]\np = "phone"\n')
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local batch_write = Writer.batch_write
 	local Preferences
 	local called, failure = pcall(function()
 		Preferences = helpers.load_module("infra.hotstring_preferences")
 		assert(Preferences._set_file_for_test(path))
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.prefix_rules"] = nil
 		local dynamic = helpers.load_module("modules.dynamic_hotstrings.manager")
 		assert(dynamic.init({ personal_info_path = personal, trigger_char = "★" }))
@@ -456,7 +456,7 @@ local function dynamic_family_row(dynamic, section)
 		paused = false, is_paused = function() return false end,
 		on_menu_changed = function() seen.refreshes = seen.refreshes + 1 end }
 	local builder = helpers.load_module("ui.menu.builder")
-	local title = require("infra.i18n").get("category.dynamic_hotstrings")
+	local title = require("core.i18n.engine.i18n").get("category.dynamic_hotstrings")
 	local label
 	for _, family in ipairs(dynamic.rule_families()) do
 		if family.section == section then label = family.label end
@@ -512,7 +512,7 @@ helpers.describe("dynamic family menu acknowledges its actual owner", function()
 						helpers.assert_eq(retry_committed, true)
 						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true)
 						helpers.assert_eq(seen, { reloads = section == "phoneprefixes" and 1 or 0, refreshes = 1 })
-						local document = require("toml_codec").decode(owner.read(owner.path))
+						local document = require("core.text.engine.toml_codec").decode(owner.read(owner.path))
 						helpers.assert_eq(document.private.future, "independent retained neighbor")
 						helpers.assert_true(owner.preferences.refresh())
 						helpers.assert_eq(owner.dynamic.is_rule_enabled(nil, section), true, "actual disk reload owns the new choice")
@@ -635,10 +635,10 @@ local function with_dynamic_section_frame(body)
 		local names = { "infra.manifest_menu", "ui.menu.builder" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local called, detail = xpcall(function()
-			local translator = require("infra.i18n")
-			local renderer = assert(require("menu.renderer").new({ platform = "linux",
-				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-				json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+			local translator = require("core.i18n.engine.i18n")
+			local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+				manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+				json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
 			}))
 			package.loaded["infra.manifest_menu"] = renderer
 			local root = renderer.get_root()
@@ -658,7 +658,7 @@ helpers.describe("dynamic families consume the genuine shared boundaries", funct
 		with_dynamic_section_frame(function(f)
 			local category = assert(f.build())
 			local children = assert(category.menu)
-			helpers.assert_eq(children[4].title, require("infra.i18n").get("menu.shortcuts.edit_personal_info"))
+			helpers.assert_eq(children[4].title, require("core.i18n.engine.i18n").get("menu.shortcuts.edit_personal_info"))
 			for _, index in ipairs({ 5, 12 }) do
 				helpers.assert_eq(children[index].title, "-", "the independent old family order fixes this boundary")
 				helpers.assert_nil(children[index].fn); helpers.assert_nil(children[index].menu)
@@ -693,7 +693,7 @@ end)
 --- Retains the real dynamic engine, manifest binding and genuine Hotstrings constructor/category subtree.
 local function with_personal_info_leaf(body)
 	with_dynamic_family_owners(function(owner)
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = assert(require("infra.manifest_menu"))
 		local builder = helpers.load_module("ui.menu.builder")
@@ -832,7 +832,7 @@ helpers.describe("hotstring section order native menu", function()
 			local up = assert(row_for(parent.menu[2].menu, "menu.hotstrings.move_up"))
 			helpers.assert_eq(up.fn(), true)
 			local written = assert(io.open(path, "rb")); local content = written:read("*a"); written:close()
-			helpers.assert_eq(require("toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(content).hotstrings.order_overrides.autocorrection, { "second", "-", "first" })
 			menu = hotstrings_menu(config)
 			category = assert(row_for(menu, "category.autocorrection") or row_for(menu, "autocorrection"))
 			parent = assert(row_for(category.menu, "menu.hotstrings.section_order"))
@@ -847,7 +847,7 @@ helpers.describe("hotstring section order native menu", function()
 			local move = assert(row_for(dynamic_order.menu[2].menu, "menu.hotstrings.move_up"))
 			helpers.assert_eq(move.fn(), true)
 			local dynamic_file = assert(io.open(path, "rb")); local source = dynamic_file:read("*a"); dynamic_file:close()
-			helpers.assert_eq(require("toml_codec").decode(source).hotstrings.order_overrides.dynamichotstrings, { "tags", "dates" })
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(source).hotstrings.order_overrides.dynamichotstrings, { "tags", "dates" })
 		end, debug.traceback)
 		preferences._set_file_for_test(nil)
 		os.remove(path)

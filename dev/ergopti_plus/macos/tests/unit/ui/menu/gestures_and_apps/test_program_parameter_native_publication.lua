@@ -66,11 +66,11 @@ local function with_subject(stage, body, options)
 				return renamed, detail
 			end
 			local ran, problem = xpcall(function()
-				for _, name in ipairs({ "infra.preferences", "toml_codec.writer", "ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
+				for _, name in ipairs({ "infra.preferences", "core.text.engine.toml_codec.writer", "ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction", "modules.shortcuts.keyboard_shortcuts" }) do package.loaded[name] = nil end
 				local logs, logger = {}, helpers.make_logger_stub()
 				for _, level in ipairs({ "error", "warn", "info", "debug" }) do logger[level] = function(_, template, ...) logs[#logs + 1] = string.format(template, ...) end end
-				package.loaded["infra.logger"] = logger
-				package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
+				package.loaded["core.logger.engine.logger"] = logger
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 				package.loaded["infra.config_paths"] = { get = function() return path end }
 				package.loaded["modules.gestures.actions"] = { is_assignable = function() return true end }
 				local preferences = require("infra.preferences"); preferences.load(path)
@@ -281,7 +281,7 @@ helpers.describe("actual private native publication ownership", function()
 			local prior = adapter.read_with_status(path)
 			helpers.assert_eq(select("#", adapter.write(path, prior)), 2)
 			helpers.assert_eq(select("#", adapter.write_if_unchanged(path, prior, { status = "ok", content = prior })), 2)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			helpers.assert_eq(select("#", writer.publish_if_unchanged(path, prior, adapter, { status = "ok", content = prior })), 1)
 			helpers.assert_eq(select("#", writer.batch_write(path, {}, adapter, { status = "ok", content = prior })), 3)
 		end)
@@ -312,7 +312,7 @@ helpers.describe("non-program actual file publication ownership", function()
 			helpers.assert_eq(apply(), true)
 			helpers.assert_eq(inspect().action, "open_url")
 			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__primary_1__open_url = "https://example.com" })
-			local decoded = require("toml_codec").decode(inspect().content)
+			local decoded = require("core.text.engine.toml_codec").decode(inspect().content)
 			helpers.assert_eq(decoded.shortcuts.keyboard.primary_1, "open_url")
 			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__primary_1__open_url, "https://example.com")
 			helpers.assert_eq(preferences.source_snapshot(path).content, inspect().content)

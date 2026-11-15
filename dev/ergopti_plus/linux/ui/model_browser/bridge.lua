@@ -12,11 +12,11 @@
 local M = {}
 M.bridge_name = "model_browser_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
-local ModelCatalogue = require("llm.model_catalogue")
-local Paths = require("infra.paths")
-local Shell = require("adapters.shell_runner")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
+local Paths = require("core.fs.engine.paths")
+local Shell = require("core.process.adapters.shell_runner")
 
 local APP_NAME = "model_browser"
 local LOG = "bridge.model_browser"
@@ -25,9 +25,9 @@ local _catalogue = nil
 local _projection, _page_epoch = nil, nil
 -- The menu's transactions and dialogs for the page (bind()).
 local _bound = nil
-local ModelIdentifier = require("llm.model_identifier")
+local ModelIdentifier = require("ai.engine.local_servers.model_identifier")
 local BackendBrands = require("modules.llm.backend_brands")
-local ApiModelListing = require("llm.api_model_listing")
+local ApiModelListing = require("ai.engine.api.model_listing")
 
 -- Borrowed, never re-implemented: ModelCatalogue.build decides which row is
 -- ACTIVE with this exact rule, and the lookup below decides which rows are
@@ -37,8 +37,8 @@ local normalise_name = ModelCatalogue.normalise_name
 
 local function load_catalogue()
 	if _catalogue then return _catalogue end
-	local path = Paths.shared("modules/llm/models.json")
-	local body = path and require("infra.regular_file_reader").read_source(path) or nil
+	local path = Paths.shared("ai/data/models.json")
+	local body = path and require("core.fs.engine.regular_file_reader").read_source(path) or nil
 	if not body then return nil end
 	local ok, decoded = pcall(Json.decode, body)
 	if not ok or type(decoded) ~= "table" then
@@ -195,7 +195,7 @@ end
 
 local function retained(frame)
 	if not frame or _projection ~= frame or _page_epoch ~= frame.epoch
-		or package.loaded["ui.webview_manager"] ~= frame.manager or frame.state.llm ~= frame.llm then return false end
+		or package.loaded["core.ui.ui.webview_manager"] ~= frame.manager or frame.state.llm ~= frame.llm then return false end
 	for name, port in pairs(frame.manager_ports) do if frame.manager[name] ~= port then return false end end
 	for name, port in pairs(frame.llm_ports) do if frame.llm[name] ~= port then return false end end
 	return true
@@ -301,7 +301,7 @@ end
 local function capture_projection(state, context)
 	if type(state) ~= "table" or type(state.llm) ~= "table" or type(context) ~= "table"
 		or context.app_name ~= APP_NAME or context.epoch ~= _page_epoch or context.document_owner == nil then return nil end
-	local manager = package.loaded["ui.webview_manager"]
+	local manager = package.loaded["core.ui.ui.webview_manager"]
 	if type(manager) ~= "table" then return nil end
 	local frame = { state = state, llm = state.llm, manager = manager, document = context.document_owner,
 		epoch = context.epoch, manager_ports = {}, llm_ports = {}, rows = {}, urls = {}, runs = {},

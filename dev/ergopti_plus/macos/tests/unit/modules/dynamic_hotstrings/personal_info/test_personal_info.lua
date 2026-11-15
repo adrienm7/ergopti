@@ -100,8 +100,8 @@ end)
 
 
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local PI = helpers.load_with_stubs("modules.dynamic_hotstrings.personal_info")
 
@@ -138,7 +138,7 @@ helpers.describe("PersonalInfo defaults remain immutable across restart", functi
 	helpers.it("does not resurrect saved personal data after the file is removed", function()
 		local path = "/virtual/personal-info-default-alias.toml"
 		local disk = nil
-		local file_system = require("adapters.file_system")
+		local file_system = require("core.fs.adapters.file_system")
 		local original_read = file_system.read_with_status
 		local original_create = file_system.create_if_absent
 		local original_write = file_system.write_if_unchanged

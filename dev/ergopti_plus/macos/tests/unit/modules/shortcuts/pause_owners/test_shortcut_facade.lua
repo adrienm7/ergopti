@@ -79,16 +79,16 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			start = function() return true end,
 			stop = function() return true end,
 		}, { __index = function() return function() return true end end })
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			set_delivery_guard = function(guard)
 				helpers.assert_true(guard())
 				return true
 			end,
 		}
-		package.loaded["infra.startup_transaction"] = {
+		package.loaded["core.lifecycle.engine.startup_transaction"] = {
 			run = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local shortcuts = helpers.load_with_stubs("modules.shortcuts")
 		local url_state = { chatgpt_url = live_url }
 		local url_owner = require("ui.menu.chatgpt_url_transaction").new({
@@ -133,13 +133,13 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			update_channel = "dev",
 			update_check_interval_seconds = 3600,
 		}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-		package.loaded["infra.text_utils"] = {
+		package.loaded["core.text.engine.utils"] = {
 			escape_gsub_replacement = function(value) return value end,
 			shell_quote = function(value) return value end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.ui_restore"] = {}
 		package.loaded["infra.preferences"] = {
 			build_initial_state = function() return state end,
@@ -220,13 +220,13 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			setMenu = function() return true end,
 			destroy = noop,
 		}
-		package.loaded["chord"] = { format = function() return "ctrl+x" end }
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function() return {} end,
 			setEnabled = function() return true end,
 			unbind = function() return true end,
 		}
-		package.loaded["infra.termination_coordinator"] = {
+		package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 			request_exit = function() return true end,
 			request_reload = function() return true end,
 		}
@@ -301,9 +301,9 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			get_profile_hks = function() return {} end,
 		})
 
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}
@@ -339,12 +339,12 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 		local facade = {}
 		local switch_ctx = nil
 		local startup_ctx = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
-		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-		local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 			return key
 		end }
@@ -426,12 +426,12 @@ helpers.describe("HS-012 real shortcuts facade wiring", function()
 			row_disabled = function() return false end,
 			title_health_dot = function() return nil end,
 		}
-		local profile_renderer = assert(require("menu.renderer").new({
+		local profile_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
-			i18n = {get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get},
-			logger = package.loaded["infra.logger"],
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
+			i18n = {get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get},
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			template_rows = profile_renderer.template_rows,

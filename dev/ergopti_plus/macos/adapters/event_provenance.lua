@@ -25,8 +25,8 @@ M.STATUS_FOREIGN   = "foreign"
 M.STATUS_UNREADABLE = "unreadable"
 
 local hs             = hs
-local Logger         = require("infra.logger")
-local SyntheticInput = require("adapters.synthetic_input")
+local Logger         = require("core.logger.engine.logger")
+local SyntheticInput = require("platform.input.synthetic_input")
 local LOG             = "adapters.event_provenance"
 
 local event_api = assert(hs and hs.eventtap and hs.eventtap.event,

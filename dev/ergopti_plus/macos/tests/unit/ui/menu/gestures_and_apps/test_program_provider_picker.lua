@@ -5,7 +5,7 @@
 local helpers = require("tests.helpers")
 -- The real registry reader, bound before the fixture stubs infra.paths: the shared
 -- program provider module reads its catalogue cap from [limits] when it loads
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local SCALAR = '{"version":1,"executable":"/private/tool","arguments":["two words",""]}'
 
 local function fixture(body)
@@ -13,14 +13,14 @@ local function fixture(body)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local f = { pages = {}, owners = {}, calls = {}, delete_throws = false }
 	local ok, failure = xpcall(function()
-		package.loaded.program_provider_picker = nil
+		package.loaded["apps.engine.program_provider_picker"] = nil
 		package.loaded["ui.action_picker"] = nil
-		package.loaded["ui.webview_controller_pool"] = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.paths"] = { shared = function() return "/controlled/shared" end }
-		package.loaded["infra.timings"] = Timings
-		package.loaded["adapters.program_providers"] = { create = function()
+		package.loaded["core.ui.ui.webview_controller_pool"] = nil
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/controlled/shared" end }
+		package.loaded["core.timing.engine.timings"] = Timings
+		package.loaded["core.process.adapters.program_providers"] = { create = function()
 			local owner = { resolutions = 0, invalidations = 0, retired = false }
 			owner.discover = function() return { choices = { { key = "opaque-choice", label = "Reviewed provider" } } } end
 			owner.resolve = function(key)
@@ -38,7 +38,7 @@ local function fixture(body)
 			f.content = content
 			return content
 		end } }, json = { encode = function(payload) f.payload = payload; return "{}" end } }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 600, height = 500 } end,
 			get_centered_frame = function() return {} end,
 			show_webview = function(options)
@@ -57,15 +57,15 @@ local function fixture(body)
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
-		package.loaded["adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.process.adapters.shell_runner"] = { run_async = function() error("native query forbidden") end }
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, save) return save, f.typed end,
 			block_alert = function(_, reason) f.warning = reason end,
 		}
 		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
 		f.native = require("adapters.apple_shortcuts_native")
 		f.utils = require("ui.menu.shortcut_utils")
-		f.locale = package.loaded["infra.i18n"]
+		f.locale = package.loaded["core.i18n.engine.i18n"]
 		f.native_tasks = 0
 		_G.hs.task = { new = function() f.native_tasks = f.native_tasks + 1; error("native task forbidden") end }
 		f.picker = require("ui.action_picker")
@@ -85,7 +85,7 @@ local function fixture(body)
 	_G.hs = old_hs
 	for key in pairs(package.loaded) do if saved[key] == nil then package.loaded[key] = nil end end
 	for key, value in pairs(saved) do package.loaded[key] = value end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(failure, 0) end
 end
 
@@ -275,7 +275,7 @@ local UNAVAILABLE = "platform_reason.program_runner_unavailable"
 helpers.describe("Actual macOS reserved program assignment availability", function()
 	helpers.it("manual reserved refusal keeps the editor retryable for an ordinary repair", function()
 		fixture(function(f)
-			_G.hs.json.encode = require("json").encode
+			_G.hs.json.encode = require("core.text.engine.json").encode
 			helpers.assert_true(f.open())
 			local page = f.pages[1]
 			f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })
@@ -291,7 +291,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	end)
 	helpers.it("resolved reserved descriptors obey the same host refusal", function()
 		fixture(function(f)
-			_G.hs.json.encode = require("json").encode
+			_G.hs.json.encode = require("core.text.engine.json").encode
 			helpers.assert_true(f.open())
 			f.owners[1].resolve = function() return RESERVED end
 			f.confirm(f.pages[1])
@@ -313,7 +313,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	}) do
 		helpers.it("actual native predicate presentation: " .. case[1], function()
 			fixture(function(f)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local scalar = Json.encode({ version = 1, executable = case[2], arguments = Json.array(case[3]) })
 				helpers.assert_eq(f.native.is_chosen_program(case[2], case[3]), case[4])
 				helpers.assert_eq(f.utils.program_assignment_reason(scalar), case[4] and UNAVAILABLE or nil)
@@ -323,7 +323,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	end
 	helpers.it("malformed syntax stays with the existing parameter owner", function()
 		fixture(function(f)
-			helpers.assert_eq(require("program_parameter").parse("not JSON", "posix"), nil)
+			helpers.assert_eq(require("settings.engine.program_parameter").parse("not JSON", "posix"), nil)
 			helpers.assert_eq(f.utils.program_assignment_reason("not JSON"), nil)
 			helpers.assert_eq(f.native_tasks, 0)
 		end)
@@ -332,7 +332,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 		helpers.it("unavailable native classifier refuses without disabling ordinary repair: " .. mode, function()
 			fixture(function(f)
 				local original = f.native.is_chosen_program
-				_G.hs.json.encode = require("json").encode
+				_G.hs.json.encode = require("core.text.engine.json").encode
 				helpers.assert_true(f.open())
 				if mode == "missing" then f.native.is_chosen_program = nil
 				else f.native.is_chosen_program = function()
@@ -382,7 +382,7 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 	helpers.it("reason encoding replacement cannot warn the retired page", function()
 		fixture(function(f)
 			helpers.assert_true(f.open())
-			local old, Json = f.pages[1], require("json")
+			local old, Json = f.pages[1], require("core.text.engine.json")
 			local old_scripts = #old.scripts
 			local original = Json.quote
 			local ok, err = xpcall(function()
@@ -452,9 +452,9 @@ helpers.describe("Actual macOS reserved program assignment availability", functi
 		fixture(function(f)
 			f.typed = RESERVED
 			local scalar = f.utils.ask_parameter_value({ parameter_prompt = function() return "Program" end }, "run_program", "program", "T", RESERVED)
-			local planner = require("shortcuts.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
+			local planner = require("shortcuts.engine.physical_entries").new({ parse = function() return true end, owns = function() return true end }, {
 				is_assignable = function() return true end, get_action_parameter_spec = function() return "program" end,
-				validate_action_parameter = function(_, value) return require("program_parameter").parse(value, "posix") ~= nil end,
+				validate_action_parameter = function(_, value) return require("settings.engine.program_parameter").parse(value, "posix") ~= nil end,
 				split_action_parameter_key = function() return nil end,
 			}, { parameter_section = "gestures.action_parameters" })
 			local rows, reason = planner.plan({ operation = "add", slot = "position", action = "run_program", parameter = scalar }, { assignments = {}, parameters = {} })
@@ -469,7 +469,7 @@ end)
 helpers.describe("action picker scalar native JSON boundary", function()
 	helpers.it("(hs-scalar-json-picker) actual unavailable reason reaches the retained picker with native table-only JSON", function()
 		fixture(function(f)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local reason = 'Unavailable é漢😀\r\n\t"\\");globalThis.__injected=true;//'
 			f.locale.get = function(key) return key == UNAVAILABLE and reason or key end
 			local native_tables = 0
@@ -497,7 +497,7 @@ helpers.describe("action picker scalar native JSON boundary", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(hs-scalar-json-picker) unavailable reason quotation " .. mode .. " cannot confirm", function()
 			fixture(function(f)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local original = Json.quote
 				local ok, err = xpcall(function()
 					helpers.assert_true(f.open())
@@ -519,7 +519,7 @@ helpers.describe("action picker scalar native JSON boundary", function()
 	end
 	helpers.it("(hs-scalar-json-picker) reason encoding reentry cannot target a replacement picker", function()
 		fixture(function(f)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local original = Json.quote
 			local ok, err = xpcall(function()
 				helpers.assert_true(f.open())
@@ -551,7 +551,7 @@ helpers.it("(hs-scalar-json-picker) invalid UTF-8 reason neither dispatches nor 
 		local page = f.pages[1]
 		local initial_scripts = #page.scripts
 		local errors = {}
-		package.loaded["infra.logger"].error = function(_, template, ...)
+		package.loaded["core.logger.engine.logger"].error = function(_, template, ...)
 			errors[#errors + 1] = string.format(template, ...)
 		end
 		f.message(page, { action = "confirm", id = "run_program", parameter = RESERVED })

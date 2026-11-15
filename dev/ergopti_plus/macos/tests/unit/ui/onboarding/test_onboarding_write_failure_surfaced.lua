@@ -148,8 +148,8 @@ end)
 --- Drives the real Finish handler with generic exact-byte publication effects.
 --- The controlled prepare installs no native configuration admission journal.
 local function with_published_boundary(scenario)
-	local before = '[_meta]\nschema_version = 20\n[llm]\nenabled = false\n'
-	local candidate = '[_meta]\nschema_version = 20\n[llm]\nenabled = true\n'
+	local before = '[_meta]\nschema_version = 22\n[llm]\nenabled = false\n'
+	local candidate = '[_meta]\nschema_version = 22\n[llm]\nenabled = true\n'
 	local f = { bytes = before, writes = 0, cleanups = 0, inverses = 0,
 		inverse_cleanups = 0, settled = false }
 	local function inverse(path, content, expected, _, admission)
@@ -212,7 +212,7 @@ helpers.describe("macOS wizard generic publication compensation at actual Finish
 
 	helpers.it("keeps the original publication owner across reopen and an unrelated successor", function()
 		with_published_boundary(function(f)
-			local foreign = '[_meta]\nschema_version = 20\n[llm]\nenabled = false\n# external successor\n'
+			local foreign = '[_meta]\nschema_version = 22\n[llm]\nenabled = false\n# external successor\n'
 			f.bytes, f.settled = foreign, true
 			helpers.assert_eq(f.onboarding.run("/virtual/another-destination.toml"), false)
 			f.state.finish(ANSWERS)
@@ -257,7 +257,7 @@ local function with_canonical_finish(scenario, fresh_writer_after_inverse)
 		local temporary = os.getenv("TMPDIR") or os.getenv("TEMP") or os.getenv("TMP") or "/tmp"
 		local path = temporary:gsub("[/\\]+$", "") .. "/ergopti_wizard_native_"
 			.. tostring(os.time()) .. "_" .. tostring({}):gsub("[^%w]", "") .. ".toml"
-		local before = '# native Finish original\n[_meta]\nschema_version = 20\n[llm]\nenabled = false\n[future]\nkeep = "owned by another feature"\n'
+		local before = '# native Finish original\n[_meta]\nschema_version = 22\n[llm]\nenabled = false\n[future]\nkeep = "owned by another feature"\n'
 		local created = assert(io.open(path, "w")); assert(created:write(before)); assert(created:close())
 		local f = { path = path, before = before, unlocks = 0, close_refusals = 0, refuse_unlock = false }
 		local adapter = physical.make_adapter(nil, nil, nil, nil, nil, function()
@@ -318,8 +318,11 @@ helpers.describe("wizard genuine canonical admitted native Finish with private p
 			f.state.finish(ANSWERS)
 			local content, status = f.files.read_with_status(f.path)
 			helpers.assert_eq(status, "ok")
-			local decoded = require("toml_codec").decode(content)
-			helpers.assert_eq(decoded._meta.schema_version, 20)
+			local decoded = require("core.text.engine.toml_codec").decode(content)
+			-- The stamp is the registry's current version, never a literal copy.
+			local Migrate = require("settings.engine.migration.migrate")
+			local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
+			helpers.assert_eq(decoded._meta.schema_version, registry.current)
 			helpers.assert_eq(decoded.llm.enabled, true)
 			helpers.assert_eq(decoded.hotstrings.trigger_char, "ù")
 			helpers.assert_eq(decoded.future.keep, "owned by another feature")
@@ -337,7 +340,7 @@ helpers.describe("wizard genuine canonical admitted native Finish with private p
 			helpers.assert_true(f.close_refusals > 0, "the genuine retained owner must refuse both unlock and close")
 			local candidate, status = f.files.read_with_status(f.path)
 			helpers.assert_eq(status, "ok")
-			helpers.assert_eq(require("toml_codec").decode(candidate).llm.enabled, true)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(candidate).llm.enabled, true)
 			helpers.assert_eq(f.state.notifications, 0)
 			helpers.assert_eq(f.state.deferred, 0)
 			helpers.assert_eq(f.onboarding.run(f.path .. ".other"), false,
@@ -363,14 +366,14 @@ helpers.describe("wizard canonical successor inverse helper cohort", function()
 	helpers.it("settles actual native cleanup and inverse after reloading its registered canonical writer", function()
 		with_canonical_finish(function(f)
 			helpers.assert_true(not rawequal(f.state.previous_shared_writer, f.state.current_shared_writer))
-			helpers.assert_eq(package.loaded["toml_codec.writer"], f.state.current_shared_writer)
-			helpers.assert_eq(package.loaded["config_file_inverse"], f.state.retained_inverse_module)
+			helpers.assert_eq(package.loaded["core.text.engine.toml_codec.writer"], f.state.current_shared_writer)
+			helpers.assert_eq(package.loaded["settings.engine.migration.file_inverse"], f.state.retained_inverse_module)
 			f.refuse_unlock = true
 			f.state.finish(ANSWERS)
 			helpers.assert_true(f.close_refusals > 0, "actual retained cleanup refuses both native release primitives")
 			local candidate, status = f.files.read_with_status(f.path)
 			helpers.assert_eq(status, "ok")
-			helpers.assert_eq(require("toml_codec").decode(candidate).llm.enabled, true)
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(candidate).llm.enabled, true)
 			helpers.assert_eq(f.state.notifications, 0)
 			helpers.assert_eq(f.state.deferred, 0)
 			helpers.assert_eq(f.onboarding.run(f.path .. ".other"), false)

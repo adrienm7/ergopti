@@ -7,7 +7,7 @@
 --- selected files' paths, as Explorer and Finder do on the other drivers;
 --- elsewhere it opens what the primary selection names (a URL, an IP address,
 --- localhost, a mail address, a file or a folder) through xdg-open, or searches
---- the web for plain text. The classification is _shared/lua/open_target,
+--- the web for plain text. The classification is _shared/shortcuts/engine,
 --- shared with macOS and ported to Windows.
 ---
 --- FEATURES & RATIONALE:
@@ -18,7 +18,7 @@
 ---    name, a registry key or a Windows path) is logged and notified, never
 ---    searched instead: the user asked to open that thing.
 --- 3. A file manager publishes its selection as text/uri-list after Ctrl+C.
----    The clipboard adapter reads that target, _shared/lua/file_selection
+---    The clipboard adapter reads that target, _shared/core/fs/engine
 ---    decodes its file: URIs, and the clipboard keeps the paths, one per line.
 ---    Ctrl+C is sent only to a known file manager: in a terminal it would
 ---    interrupt the running program. A compositor that names no focused
@@ -29,11 +29,12 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local OpenTarget = require("open_target")
-local FileSelection = require("file_selection")
-local Logger = require("logger.shim")
+local OpenTarget = require("shortcuts.engine.open_target")
+local FileSelection = require("core.fs.engine.file_selection")
+local Logger = require("core.logger.engine.shim")
+local FileManagerFolder = require("core.fs.adapters.file_manager_folder")
 
 local LOG = "shortcuts.open_selection"
 
@@ -45,29 +46,19 @@ local REPORT_KEYS = {
 	failed = "open_target.open_failed",
 }
 
--- The focused application identities (X11 process names, Wayland app ids)
--- of the file managers whose Ctrl+C publishes the selected files. A
--- reverse-DNS id also matches by its last component (org.gnome.Nautilus).
-local FILE_MANAGERS = {
-	["nautilus"] = true, ["nemo"] = true, ["caja"] = true, ["thunar"] = true,
-	["dolphin"] = true, ["konqueror"] = true, ["pcmanfm"] = true, ["pcmanfm-qt"] = true,
-	["spacefm"] = true, ["krusader"] = true, ["doublecmd"] = true, ["peony"] = true,
-	["io.elementary.files"] = true, ["pantheon-files"] = true,
-}
-
 local DEFAULT_DEPS = {
 	open = function(target, on_done) return require("adapters.desktop_opener").open(target, on_done) end,
-	exists = function(path) return require("adapters.file_system").exists(path) end,
-	path_status = function(path) return require("adapters.file_system").path_status(path) end,
-	notify = function(message) return require("adapters.notifier").send(message, { level = "error" }) end,
-	message = function(key) return require("infra.i18n").get(key) end,
+	exists = function(path) return require("core.fs.adapters.file_system").exists(path) end,
+	path_status = function(path) return require("core.fs.adapters.file_system").path_status(path) end,
+	notify = function(message) return require("platform.system.notifier").send(message, { level = "error" }) end,
+	message = function(key) return require("core.i18n.engine.i18n").get(key) end,
 	getenv = os.getenv,
-	focused_app = function() return require("adapters.window_info").getFocused().appId end,
+	focused_app = function() return require("platform.focus.window_info").getFocused().appId end,
 	focused_context = function()
-		local info, identity = require("adapters.window_info").focused_snapshot()
+		local info, identity = require("platform.focus.window_info").focused_snapshot()
 		local app = info and type(info.appId) == "string" and info.appId ~= "" and info.appId or nil
 		if app and type(identity) == "string" and identity ~= "" then return app, identity end
-		local snapshot, conclusive = require("adapters.atspi_focus").get_context_snapshot()
+		local snapshot, conclusive = require("platform.focus.atspi_focus").get_context_snapshot()
 		if conclusive == true and snapshot and type(snapshot.window_bus_name) == "string"
 			and type(snapshot.window_object_path) == "string" then
 			if app and snapshot.app_id ~= app then return app, nil end
@@ -77,7 +68,7 @@ local DEFAULT_DEPS = {
 	end,
 	-- Bounded helper process with a hard deadline; needs a desktop session.
 	active_frame_app = function()
-		local snapshot = require("adapters.atspi_focus").get_context_snapshot()
+		local snapshot = require("platform.focus.atspi_focus").get_context_snapshot()
 		return snapshot and snapshot.app_id or nil
 	end,
 	read_uri_list = function(admitted)
@@ -86,11 +77,11 @@ local DEFAULT_DEPS = {
 			return require("modules.gestures.combo_emitter").press(combo)
 		end
 		return require("adapters.clipboard").read_selection_uri_list(
-			guarded_press, require("adapters.event_loop").sleep_ms)
+			guarded_press, require("core.events.loop").sleep_ms)
 	end,
 	write_clipboard = function(text) return require("adapters.clipboard").write(text) end,
 	notify_success = function(message)
-		return require("adapters.notifier").send(message, { level = "success" })
+		return require("platform.system.notifier").send(message, { level = "success" })
 	end,
 }
 local deps = DEFAULT_DEPS
@@ -150,9 +141,7 @@ end
 --- @param app any
 --- @return boolean
 local function is_file_manager(app)
-	if type(app) ~= "string" or app == "" then return false end
-	local id = app:lower()
-	return FILE_MANAGERS[id] == true or FILE_MANAGERS[id:match("([^.]+)$")] == true
+	return FileManagerFolder.file_manager_name(app) ~= nil
 end
 
 local function capture_manager(app, identity)

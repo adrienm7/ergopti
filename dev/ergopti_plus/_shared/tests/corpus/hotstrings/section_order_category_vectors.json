@@ -1,0 +1,53 @@
+{
+	"description": "The key each hotstring category stores its section order under, hotstrings.order_overrides.<id>. A category of a language folder is keyed by its group id, <folder>_<stem>, never by its file stem: the French and neutral autocorrection files are both autocorrection.toml.",
+	"vectors": [
+		{
+			"name": "neutral autocorrection is keyed by its file stem",
+			"folder": "",
+			"stem": "autocorrection",
+			"id": "autocorrection"
+		},
+		{
+			"name": "neutral magic key is keyed by its file stem",
+			"folder": "",
+			"stem": "magickey",
+			"id": "magickey"
+		},
+		{
+			"name": "distances reduction is keyed by its file stem",
+			"folder": "",
+			"stem": "distancesreduction",
+			"id": "distancesreduction"
+		},
+		{
+			"name": "sfbs reduction is keyed by its file stem",
+			"folder": "",
+			"stem": "sfbsreduction",
+			"id": "sfbsreduction"
+		},
+		{
+			"name": "rolls is keyed by its file stem",
+			"folder": "",
+			"stem": "rolls",
+			"id": "rolls"
+		},
+		{
+			"name": "dynamic hotstrings are keyed by their category name",
+			"folder": "",
+			"stem": "dynamichotstrings",
+			"id": "dynamichotstrings"
+		},
+		{
+			"name": "french autocorrection is keyed by its group id, not its file stem",
+			"folder": "french",
+			"stem": "autocorrection",
+			"id": "french_autocorrection"
+		},
+		{
+			"name": "french magic key is keyed by its group id, not its file stem",
+			"folder": "french",
+			"stem": "magickey",
+			"id": "french_magickey"
+		}
+	]
+}

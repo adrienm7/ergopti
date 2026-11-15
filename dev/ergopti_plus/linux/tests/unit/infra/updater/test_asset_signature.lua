@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 local Signature = helpers.load_module("infra.asset_signature")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read_vectors()
 	local path = helpers.driver_root() .. "/../_shared/tests/corpus/updater/asset_signature_vectors.json"
@@ -61,7 +61,7 @@ helpers.describe("update asset signature (Linux)", function()
 	end)
 
 	helpers.it("(linux-asset-signature) a public key with trailing DER bytes is refused", function()
-		local Base64 = require("compat.base64")
+		local Base64 = require("core.lifecycle.engine.compat.base64")
 		local extended = Base64.encode(assert(Base64.decode(V.public_key_spki_base64)) .. "junk")
 		local ok, reason = Signature.verify(extended, valid_record(), V.valid.signature_base64)
 		helpers.assert_true(not ok, "a valid key prefix cannot authorize a malformed complete key")
@@ -77,7 +77,7 @@ helpers.describe("update asset signature (Linux)", function()
 		helpers.assert_eq(reason, "bad_key")
 	end)
 
-	-- The archive digest (infra/fd_sha256.lua) declares EVP_MD_CTX_new too. When
+	-- The archive digest (core/network/engine/fd_sha256.lua) declares EVP_MD_CTX_new too. When
 	-- it loaded first, LuaJIT refused the signature check's whole declaration
 	-- block, which then reported OpenSSL as missing on the distros where the
 	-- shard ran the digest tests earlier.
@@ -104,10 +104,10 @@ helpers.describe("update asset signature (Linux)", function()
 				return { fake = true }
 			end,
 		}
-		package.loaded["infra.openssl_library"] = nil
-		local ok, Library = pcall(require, "infra.openssl_library")
+		package.loaded["core.network.engine.openssl_library"] = nil
+		local ok, Library = pcall(require, "core.network.engine.openssl_library")
 		package.loaded["ffi"] = real_ffi
-		package.loaded["infra.openssl_library"] = nil
+		package.loaded["core.network.engine.openssl_library"] = nil
 		helpers.assert_true(ok, tostring(Library))
 		helpers.assert_eq(Library.soname, "libcrypto.so.4")
 		helpers.assert_eq(table.concat(tried, ","), "libcrypto.so.3,libcrypto.so.4")

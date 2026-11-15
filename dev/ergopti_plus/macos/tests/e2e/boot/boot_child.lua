@@ -36,7 +36,7 @@ local SHARED = RESOURCES .. "/_shared"
 -- modules (the hs stub and this harness) come from the repository.
 package.path = table.concat({
 	DRIVER .. "/?.lua", DRIVER .. "/?/init.lua",
-	SHARED .. "/lua/?.lua", SHARED .. "/lua/?/init.lua",
+	SHARED .. "/?.lua", SHARED .. "/?/init.lua",
 	package.path,
 }, ";")
 table.insert(package.searchers, 2, function(name)
@@ -119,7 +119,7 @@ World.record("FACT", "pointer_taps=" .. pointer_taps)
 if ACTION == "restore_recommended" then
 	-- The user's click on Configuration › « Restore recommended values », the
 	-- row that restores every category at once.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.configuration.title"), i18n.get("common.restore_recommended") }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" then
@@ -131,7 +131,7 @@ if ACTION == "restore_recommended" then
 	end
 elseif ACTION == "select_layout_natively" then
 	-- A real menu click must leave ABC even when setLayout declines the name.
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local path = { i18n.get("menu.layout.title"), "French" }
 	local row = World.find_row(World.menu_items(), path)
 	if type(row) ~= "table" or type(row.fn) ~= "function" or row.disabled then
@@ -201,8 +201,8 @@ elseif ACTION == "type_for_wpm" then
 	local stats = require("modules.keystats").get_live_stats()
 	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
 	local visible, recovered = 0, false
-	local config = require("toml_codec").decode(require("tests.support.source_file").read(
-		SHARED .. "/modules/wpm_widget/constants.toml"))
+	local config = require("core.text.engine.toml_codec").decode(require("tests.support.source_file").read(
+		SHARED .. "/metrics/data/wpm_widget/constants.toml"))
 	local compact = config.compact
 	local screen = hs.screen.mainScreen():fullFrame()
 	for _, canvas in ipairs(hs.canvas.__instances) do

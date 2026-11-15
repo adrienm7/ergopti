@@ -4,7 +4,7 @@
 --- MODULE: Composer Check Window (Linux)
 --- DESCRIPTION:
 --- The Debug menu's one-click « Test the composed layout »: a click runs the
---- shared steps (_shared/lua/layouts/composer_check.lua) over this driver's
+--- shared steps (_shared/layouts/engine/composer/check_core.lua) over this driver's
 --- composer environment (modules/keymap/composer_check.lua), writes the one
 --- evidence record to the log and shows the result, one line per step, with a
 --- « Copy report » button.
@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local Window = require("ui.field_check.window")
-local Check  = require("layouts.composer_check")
+local Check  = require("layouts.engine.composer.check_core")
 
 return Window.new({
 	label = "Composer check",

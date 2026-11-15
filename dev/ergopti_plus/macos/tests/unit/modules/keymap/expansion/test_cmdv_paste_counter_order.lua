@@ -50,9 +50,8 @@ local function load_fixture()
 			name:match("^modules%.keymap")
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
-			or name:match("^ui%.tooltip")
-			or name:match("^adapters%.")
-			or name:match("^infra%.")
+			or name:match("^core%.ui%.ui%.tooltip")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
@@ -105,7 +104,7 @@ local function load_fixture()
 	helpers.assert_not_nil(callback, "the production keyDown callback must exist")
 	return {
 		keymap = keymap,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		hs = hs_stub,
 		handle = callback,
 	}

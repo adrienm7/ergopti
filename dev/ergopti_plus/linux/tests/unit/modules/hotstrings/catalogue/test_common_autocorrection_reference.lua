@@ -8,10 +8,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
-local Json = require("json")
-local Reader = require("toml_codec.reader")
-local Codec = require("toml_codec.codec")
+local Paths = require("core.fs.engine.paths")
+local Json = require("core.text.engine.json")
+local Reader = require("core.text.engine.toml_codec.reader")
+local Codec = require("core.text.engine.toml_codec.codec")
 
 --- Reads one required source or independent reference file.
 --- @param path string
@@ -89,8 +89,8 @@ end)
 --- @param writer table Exact writer whose publication method this fixture injects.
 --- @return table Fresh native configuration owner.
 local function load_config_with_migration_writer(writer)
-	helpers.load_module_with_dependency("hotstrings.common_autocorrection_migration",
-		"toml_codec.writer", writer)
+	helpers.load_module_with_dependency("hotstrings.engine.catalogue.common_autocorrection_migration",
+		"core.text.engine.toml_codec.writer", writer)
 	return helpers.load_module("modules.hotstrings.hotstrings_config")
 end
 
@@ -106,15 +106,15 @@ helpers.describe("common autocorrection failed override admission", function()
 		helpers.it("(common-autocorrection-split) applies admission only to a requested common family: "
 			.. tostring(selection.group) .. "/" .. tostring(selection.family)
 			.. (selection.warm_writer and "/warm-writer" or ""), function()
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local publish, stale_publications = Writer.publish_if_unchanged, 0
 			if selection.warm_writer then
 				local stale_writer = setmetatable({ publish_if_unchanged = function(...)
 					stale_publications = stale_publications + 1
 					return publish(...)
 				end }, { __index = Writer })
-				helpers.load_module_with_dependency("hotstrings.common_autocorrection_migration",
-					"toml_codec.writer", stale_writer)
+				helpers.load_module_with_dependency("hotstrings.engine.catalogue.common_autocorrection_migration",
+					"core.text.engine.toml_codec.writer", stale_writer)
 			end
 			local Config = load_config_with_migration_writer(Writer)
 			local engine = require("modules.hotstrings.engine").new()
@@ -132,7 +132,7 @@ helpers.describe("common autocorrection failed override admission", function()
 			source = source .. '[hotstrings.modules.magickey]\ntext_expansion_symbols = true\n'
 			local path = os.tmpname(); os.remove(path)
 			local directory = path .. "-overrides"
-			assert(require("adapters.shell_runner").run("mkdir -p " .. require("adapters.shell_runner").quote(directory)))
+			assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. require("core.process.adapters.shell_runner").quote(directory)))
 			local override_path = directory .. "/hotstrings_overrides.toml"
 			local original = '[autocorrection.caps]\ndelay = 0.3\n# retain every legacy byte\n'
 			local handle = assert(io.open(override_path, "wb")); assert(handle:write(original)); assert(handle:close())
@@ -169,12 +169,12 @@ helpers.describe("common autocorrection failed override admission", function()
 	end
 end)
 
-require("test.common_autocorrection_split_contract").register(helpers, Paths.shared)
+require("tests.lua.common_autocorrection_split_contract").register(helpers, Paths.shared)
 
 helpers.describe("common autocorrection shipped split engine", function()
 	for _, selected in ipairs({ "all", "names", "abbreviations", "technical_terms" }) do
 		helpers.it("(common-autocorrection-split) publishes and executes the real " .. selected .. " selection", function()
-			local reference, assignment = require("test.common_autocorrection_split_contract").reference(Paths.shared)
+			local reference, assignment = require("tests.lua.common_autocorrection_split_contract").reference(Paths.shared)
 			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 			local engine = require("modules.hotstrings.engine").new()
 			local published = {}
@@ -252,7 +252,7 @@ helpers.describe("common autocorrection migrated runtime policies", function()
 		local load = engine.load_mappings
 		engine.load_mappings = function(self, mappings) published = mappings; return load(self, mappings) end
 		local directory = os.tmpname(); os.remove(directory)
-		assert(require("adapters.shell_runner").run("mkdir -p " .. require("adapters.shell_runner").quote(directory)))
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. require("core.process.adapters.shell_runner").quote(directory)))
 		local path = directory .. "/hotstrings_overrides.toml"
 		local input = read_file(Paths.shared("tests/corpus/common_autocorrection_migration/input.toml"))
 		local expected = read_file(Paths.shared("tests/corpus/common_autocorrection_migration/expected.toml"))
@@ -298,7 +298,7 @@ end)
 
 helpers.describe("common autocorrection classified cold startup", function()
 	helpers.it("(common-autocorrection-split) publishes unrelated real startup rules while common admission remains unavailable", function()
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local Config = load_config_with_migration_writer(Writer)
 		local engine = require("modules.hotstrings.engine").new()
 		local source = '[hotstrings.groups]\nautocorrection = true\nmagickey = true\n'
@@ -306,7 +306,7 @@ helpers.describe("common autocorrection classified cold startup", function()
 			.. '[hotstrings.modules.magickey]\ntext_expansion_symbols = true\n'
 		local scratch = os.tmpname(); os.remove(scratch)
 		local directory = scratch .. "-cold-overrides"
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		assert(Shell.run("mkdir -p " .. Shell.quote(directory)))
 		local path = directory .. "/hotstrings_overrides.toml"
 		local original = '[autocorrection.caps]\ndelay = 0.3\n# retain the failed source exactly\n'

@@ -61,9 +61,9 @@ local function load_fixture(buffer)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name == "modules.keystats"
-			or name:match("^adapters%.")
-			or name == "infra.logger"
-			or name == "infra.timings"
+			or helpers.is_driver_module(name)
+			or name == "core.logger.engine.logger"
+			or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil
 		end
@@ -73,8 +73,8 @@ local function load_fixture(buffer)
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
 		ms = function(_, key)
 			assert(key == "hotpath_slow_ms", "unexpected millisecond timing " .. tostring(key))
@@ -89,9 +89,9 @@ local function load_fixture(buffer)
 		set_buffer = function() end,
 		log_hotstring = function() end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() end }
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local expander = require("modules.keymap.expander")
 	local state = make_state(buffer)
 	expander.init(state, make_registry(), make_llm())

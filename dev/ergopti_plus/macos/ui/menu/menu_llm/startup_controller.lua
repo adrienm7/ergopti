@@ -21,14 +21,14 @@ local M = {}
 
 local hs      = hs
 local llm_mod = require("modules.llm")
-local Logger  = require("infra.logger")
-local Errors  = require("adapter_errors")
-local TimerScheduler = require("adapters.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
+local Logger  = require("core.logger.engine.logger")
+local Errors  = require("diagnostics.engine.adapter_errors")
+local TimerScheduler = require("core.events.timer_scheduler")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "startup_ctrl"
 -- The lifecycle line Windows writes for the same boot (menu_llm/init.ahk)

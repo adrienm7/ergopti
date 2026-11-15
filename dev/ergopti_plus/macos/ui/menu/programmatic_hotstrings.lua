@@ -9,15 +9,15 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("menu.programmable_hotstrings")
+local Policy = require("menu.engine.programmable_hotstrings")
 local Manifest = require("infra.manifest_menu")
-local Dialog = require("infra.dialog_util")
-local Shell = require("adapters.shell_runner")
-local I18n = require("infra.i18n")
+local Dialog = require("core.ui.engine.dialog_util")
+local Shell = require("core.process.adapters.shell_runner")
+local I18n = require("core.i18n.engine.i18n")
 local User = require("modules.dynamic_hotstrings")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Features = require("infra.manifest_reader")
-local Publication = require("dynamic_hotstrings.menu_publication").new()
+local Publication = require("hotstrings.engine.dynamic.menu_publication").new()
 
 --- Builds declared rows around the currently owned menu state.
 --- @param ctx table Menu state, exact preference save and refresh ports.
@@ -29,18 +29,12 @@ function M.build(ctx)
 	local function get()
 		local enabled, seconds = ctx.state.dynamichotstrings_user_code_enabled,
 			ctx.state.dynamichotstrings_user_code_time_activation_seconds
-		if enabled == nil then enabled = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED) end
-		if seconds == nil then seconds = Features.default_for(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS) end
+		if enabled == nil then enabled = Features.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED) end
+		if seconds == nil then seconds = Features.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS) end
 		return enabled, seconds
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,
 		master = function() return ctx.keymap.is_group_enabled("dynamichotstrings") == true end,
-		paused = function()
-			if ctx.paused == true or type(ctx.script_control) ~= "table"
-				or type(ctx.script_control.is_paused) ~= "function" then return true end
-			local called, paused = pcall(ctx.script_control.is_paused)
-			return not called or paused ~= false
-		end,
 		set = function(enabled, seconds)
 			local old_enabled, old_seconds = ctx.state.dynamichotstrings_user_code_enabled,
 				ctx.state.dynamichotstrings_user_code_time_activation_seconds
@@ -65,6 +59,10 @@ function M.build(ctx)
 			local button, value = Dialog.text_prompt(I18n.get("menu.hotstrings.user_code.title"),
 				I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds), I18n.get("common.ok"), I18n.get("common.cancel"))
 			if button == I18n.get("common.ok") then return value end
+		end,
+		refusal = function(message)
+			Logger.warn("programmable_hotstrings", "Typed activation delay refused.")
+			pcall(Dialog.block_alert, I18n.get("dialog.value_check.title"), message, I18n.get("common.ok"))
 		end,
 	})
 end

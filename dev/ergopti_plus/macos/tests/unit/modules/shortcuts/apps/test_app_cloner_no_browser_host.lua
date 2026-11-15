@@ -43,10 +43,10 @@ helpers.describe("App Cloner web clones", function()
 	end)
 
 	helpers.it("tells the user no browser is involved, in every locale (app-cloner-no-browser)", function()
-		local JsonCodec = require("adapters.json_codec")
+		local JsonCodec = require("core.fs.adapters.json_codec")
 		for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl",
 			"no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local catalogue = assert(JsonCodec.decode(read("../_shared/data/locales/" .. code .. ".json")), code)
+			local catalogue = assert(JsonCodec.decode(read("../_shared/core/i18n/data/locales/" .. code .. ".json")), code)
 			for key, value in pairs(catalogue) do
 				if key:find("^apps%.cloner%.") then
 					helpers.assert_nil(value:find("--app=", 1, true), code .. " " .. key)

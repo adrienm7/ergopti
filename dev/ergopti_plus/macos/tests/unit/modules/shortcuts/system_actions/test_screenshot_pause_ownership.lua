@@ -12,16 +12,16 @@ local helpers = require("tests.helpers")
 
 
 local function fresh_screenshot()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.screenshot_save",
-		"adapters.shell_runner",
-		"adapters.file_system",
-		"adapters.screen_capture",
+		"core.process.adapters.shell_runner",
+		"core.fs.adapters.file_system",
+		"platform.system.screen_capture",
 		"modules.shortcuts.actions.screen_capture_flow",
-		"infra.logger",
-		"infra.notifications",
-		"infra.i18n",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -35,7 +35,7 @@ local function fresh_screenshot()
 		fixture.next_options[#fixture.next_options + 1] = options or {}
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, callback)
 			local options = table.remove(fixture.next_options, 1) or {}
 			local task = {
@@ -105,7 +105,7 @@ local function fresh_screenshot()
 	-- Every capture produced its image and the clipboard accepted it: this file
 	-- exercises lifecycle ownership, not the capture verdict.
 	local temp_files = 0
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		expand_path = function() return "/tmp/hs012-home" end,
 		create_secure_temp_file = function()
 			temp_files = temp_files + 1
@@ -124,7 +124,7 @@ local function fresh_screenshot()
 			return "\137PNG\r\n\26\n" .. string.rep("\0", 4) .. "IHDR" .. string.pack(">I4I4", 10, 10), "ok"
 		end,
 	}
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,
@@ -136,8 +136,8 @@ local function fresh_screenshot()
 			return "encoded"
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
@@ -146,7 +146,7 @@ local function fresh_screenshot()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key
@@ -158,7 +158,7 @@ local function fresh_screenshot()
 	}
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	fixture.subject = require("modules.shortcuts.actions.screenshot_save")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

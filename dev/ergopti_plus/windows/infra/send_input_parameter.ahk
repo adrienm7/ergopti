@@ -6,9 +6,9 @@
 ; Parses the parameters of the send_text, send_key and send_shortcut actions:
 ; the text to type, the key to press and the modifiers-plus-key to press. The
 ; vocabulary (named keys, modifiers, their AutoHotkey names, the text limit) is
-; _shared/modules/actions/send_keys.json, and the grammar is pinned by the shared
+; _shared/shortcuts/data/actions/send_keys.json, and the grammar is pinned by the shared
 ; corpus _shared/tests/corpus/action_parameters/send_input_vectors.json, which
-; the macOS and Linux suites replay against _shared/lua/send_input too.
+; the macOS and Linux suites replay against _shared/platform/input too.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Pure parse, separate emission: the unit suite replays the corpus without a
@@ -48,7 +48,7 @@ SendKeysVocabulary() {
 	global _SEND_INPUT_VOCABULARY, _SEND_INPUT_VOCABULARY_JSON, _SharedDir
 	if (_SEND_INPUT_VOCABULARY is Map)
 		return _SEND_INPUT_VOCABULARY
-	Path := _SharedDir . "\modules\actions\send_keys.json"
+	Path := _SharedDir . "\shortcuts\data\actions\send_keys.json"
 	if !FSExists(Path)
 		throw Error("The send-input vocabulary is missing: " . Path)
 	Text := FSRead(Path)
@@ -279,7 +279,7 @@ _SendInputReadOutputGroup(Inner, &Text, &Entry, &Count) {
 
 ; Parses a hotstring output into what it types and what it presses. The grammar is
 ; the rule of _shared/tests/corpus/hotstrings/output_token_vectors.json; the macOS
-; and Linux drivers replay the same vectors against _shared/lua/send_input.
+; and Linux drivers replay the same vectors against _shared/platform/input.
 ; @param {String} Value The output as the TOML holds it.
 ; @returns {Map} "tokens", an ordered Array of Map("kind", "text", "value", ...)
 ;   and Map("kind", "key", "id", ..., "entry", ..., "count", ...); "text", the typed

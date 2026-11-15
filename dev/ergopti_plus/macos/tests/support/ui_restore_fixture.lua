@@ -9,7 +9,7 @@
 local helpers = require("tests.helpers")
 local M = {}
 local MODULE_NAMES = {
-	"adapters.storage", "adapters.timer_scheduler", "infra.logger", "infra.timings",
+	"core.fs.adapters.storage", "core.events.timer_scheduler", "core.logger.engine.logger", "core.timing.engine.timings",
 	"infra.ui_restore", "ui.hotstring_editor", "ui.metrics_typing", "ui.metrics_typing.init",
 	"ui.metrics_apps", "ui.metrics_apps.init",
 }
@@ -35,7 +35,7 @@ function M.with_fixture(options, scenario)
 				},
 			}
 			local function noop() end
-			package.loaded["infra.logger"] = setmetatable({}, {
+			package.loaded["core.logger.engine.logger"] = setmetatable({}, {
 				__index = function(_, method)
 					if method == "error" then
 						return function(_log, format, ...)
@@ -45,7 +45,7 @@ function M.with_fixture(options, scenario)
 					return noop
 				end,
 			})
-			package.loaded["infra.timings"] = { sec = function() return 1 end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 
 			package.loaded["ui.hotstring_editor"] = {
 				is_open = function() return ui_state.open end,
@@ -86,7 +86,7 @@ function M.with_fixture(options, scenario)
 				handle.timer = nil
 				return true
 			end
-			package.loaded["adapters.timer_scheduler"] = scheduler
+			package.loaded["core.events.timer_scheduler"] = scheduler
 
 			local ui_restore = require("infra.ui_restore")
 			local result = table.pack(xpcall(function()

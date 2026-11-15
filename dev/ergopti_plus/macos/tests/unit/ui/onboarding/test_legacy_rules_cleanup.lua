@@ -13,8 +13,8 @@
 local helpers    = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
 
-local MODULES = { "ui.legacy_rules_cleanup", "infra.logger", "infra.i18n", "infra.dialog_util",
-	"infra.deferred_work" }
+local MODULES = { "ui.legacy_rules_cleanup", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+	"core.timing.engine.deferred_work" }
 
 --- Installs recording doubles and loads the dialog module.
 --- @param h table Harness receiving the recordings.
@@ -27,15 +27,15 @@ local function load_cleanup(h)
 			h.logs[#h.logs + 1] = { level = level, message = string.format(message, ...) }
 		end
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(message, informative, first, second, style)
 			h.alerts[#h.alerts + 1] = { message = message, informative = informative, first = first,
 				second = second, style = style, during_remap_callback = h.in_remap_callback == true }
 			return h.answer
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(delay, callback, label)
 			h.deferred[#h.deferred + 1] = { delay = delay, callback = callback, label = label }
 			return true
@@ -44,7 +44,7 @@ local function load_cleanup(h)
 	local cleanup = helpers.load_with_stubs("ui.legacy_rules_cleanup")
 	-- The loader installs its echoing i18n stub, which the module captured:
 	-- give that same table a format that shows its arguments.
-	package.loaded["infra.i18n"].format = function(key, ...)
+	package.loaded["core.i18n.engine.i18n"].format = function(key, ...)
 		local parts = { key }
 		for index = 1, select("#", ...) do parts[#parts + 1] = tostring(select(index, ...)) end
 		return table.concat(parts, "|")
@@ -174,7 +174,7 @@ helpers.describe("the legacy Karabiner rules cleanup dialog (karabiner-legacy-cl
 	end)
 
 	helpers.it("keeps the maintainer's reference wording (karabiner-legacy-cleanup)", function()
-		local locales = helpers.driver_root() .. "../_shared/data/locales/"
+		local locales = helpers.driver_root() .. "../_shared/core/i18n/data/locales/"
 		local fr = hs.json.decode(SourceFile.read(locales .. "fr.json"))
 		local en = hs.json.decode(SourceFile.read(locales .. "en.json"))
 		helpers.assert_eq(fr["karabiner.legacy_cleanup.remove"], "Retirer les anciennes règles")

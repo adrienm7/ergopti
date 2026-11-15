@@ -12,14 +12,14 @@ helpers.describe("hotstring priority overrides", function()
 		local Engine = helpers.load_module("modules.hotstrings.engine")
 		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local previous_paths = package.loaded["infra.config_paths"]
-		local previous_shell = package.loaded["adapters.shell_runner"]
-		local previous_storage = package.loaded["adapters.storage"]
+		local previous_shell = package.loaded["core.process.adapters.shell_runner"]
+		local previous_storage = package.loaded["core.fs.adapters.storage"]
 		local previous_load_catalogue = Loader.load_catalogue
 		local previous_open = io.open
 		local previous_rename = os.rename
 		local previous_remove = os.remove
 		local override_path = "/virtual-home/.config/ergopti/hotstrings_overrides.toml"
-		local temporary_path = override_path .. ".tmp"
+		local temporary_path = helpers.stage_path(override_path)
 		local persisted = nil
 		local staged = nil
 		local fail_writes = false
@@ -96,11 +96,11 @@ helpers.describe("hotstring priority overrides", function()
 
 		local release_source = helpers.route_source_through_stdio(override_path, true)
 		local ok, failure = xpcall(function()
-			package.loaded["adapters.storage"] = require("tests.fakes").storage()
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage()
 			package.loaded["infra.config_paths"] = {
 				config = function() return "/virtual-home/.config/ergopti" end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command)
 					created_config_dir = command
@@ -177,10 +177,12 @@ helpers.describe("hotstring priority overrides", function()
 			helpers.assert_eq(winner(restarted_engine), "FIRST",
 				"clearing priority must restore the registration-order tiebreak")
 
-			helpers.assert_eq(restarted.set_override("first", nil, "priority", 100), true)
-			local extension_category = require("hotstrings.extensions").category_key("sample-pack", "second")
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 101), false,
+				"a priority past the declared 0-100 range is refused at the setter (value-validation)")
+			helpers.assert_eq(restarted.set_override("first", nil, "priority", 95), true)
+			local extension_category = require("hotstrings.engine.extensions").category_key("sample-pack", "second")
 			local category_values = { delay = 1.25, color = "#123456", show_tooltip = true, priority = 90 }
-			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 120 }
+			local section_values = { delay = 2.5, color = "#abcdef", show_tooltip = false, priority = 100 }
 			for _, category in ipairs({ "second", extension_category }) do
 				for field, value in pairs(category_values) do
 					helpers.assert_eq(restarted.set_override(category, nil, field, value), true)
@@ -280,10 +282,10 @@ helpers.describe("hotstring priority overrides", function()
 		os.rename = previous_rename
 		os.remove = previous_remove
 		os.remove(choice_path)
-		os.remove(choice_path .. ".tmp")
+		os.remove(choice_path .. ".tmp"); os.remove(helpers.stage_path(choice_path))
 		Loader.load_catalogue = previous_load_catalogue
-		package.loaded["adapters.storage"] = previous_storage
-		package.loaded["adapters.shell_runner"] = previous_shell
+		package.loaded["core.fs.adapters.storage"] = previous_storage
+		package.loaded["core.process.adapters.shell_runner"] = previous_shell
 		package.loaded["infra.config_paths"] = previous_paths
 		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
 		if not ok then error(failure, 0) end
@@ -314,11 +316,11 @@ helpers.describe("hotstring override leaf ownership", function()
 		assert(assert(io.open(choices, "w")):close())
 		local old_config = package.loaded["modules.hotstrings.hotstrings_config"]
 		local old_open, old_rename, old_remove = io.open, os.rename, os.remove
-		local NativeWriter = require("infra.regular_file_writer")
+		local NativeWriter = require("core.fs.engine.regular_file_writer")
 		local old_stage = NativeWriter.open
-		local old_shell = package.loaded["adapters.shell_runner"]
+		local old_shell = package.loaded["core.process.adapters.shell_runner"]
 		local ok, failure = xpcall(function()
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			local config = require("modules.hotstrings.hotstrings_config")
 			assert(config._set_override_config_dir_for_test(root))
@@ -330,8 +332,8 @@ helpers.describe("hotstring override leaf ownership", function()
 		end, debug.traceback)
 		io.open, os.rename, os.remove, NativeWriter.open = old_open, old_rename, old_remove, old_stage
 		package.loaded["modules.hotstrings.hotstrings_config"] = old_config
-		package.loaded["adapters.shell_runner"] = old_shell
-		os.remove(path .. ".tmp")
+		package.loaded["core.process.adapters.shell_runner"] = old_shell
+		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		os.remove(path)
 		os.remove(choices)
 		os.remove(root)
@@ -393,11 +395,11 @@ helpers.describe("hotstring override leaf ownership", function()
 	helpers.it("rechecks source after staging before acknowledging a public change", function()
 		with_owner(source, function(config, path, read, write, changes)
 			local cached = config.resolve("ext:future:pack", "literal.section")
-			local NativeWriter = require("infra.regular_file_writer")
+			local NativeWriter = require("core.fs.engine.regular_file_writer")
 			local old_stage, staged = NativeWriter.open, 0
 			local foreign = source .. "# Edit after staging.\n"
 			NativeWriter.open = function(name, mode)
-				if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+				if name ~= helpers.stage_path(path) or mode ~= "wx" then return old_stage(name, mode) end
 				local function opened(handle, ...)
 					if not handle then return handle, ... end
 					return {
@@ -494,10 +496,10 @@ helpers.describe("hotstring override leaf ownership", function()
 		for _, fault in ipairs({ "open", "write_nil", "write_false", "write_throw", "close", "rename" }) do
 			with_owner(source, function(config, path, read, _, changes)
 				local cached = config.resolve("ext:future:pack", "literal.section")
-				local NativeWriter = require("infra.regular_file_writer")
+				local NativeWriter = require("core.fs.engine.regular_file_writer")
 				local old_stage, old_rename, faults = NativeWriter.open, os.rename, 0
 				NativeWriter.open = function(name, mode)
-					if name ~= path .. ".tmp" or mode ~= "wx" then return old_stage(name, mode) end
+					if name ~= helpers.stage_path(path) or mode ~= "wx" then return old_stage(name, mode) end
 					if fault == "open" then faults = faults + 1; return nil, "owned open refusal" end
 					local function opened(handle, ...)
 						if not handle then return handle, ... end
@@ -541,7 +543,7 @@ helpers.describe("hotstring override leaf ownership", function()
 
 	helpers.it("keeps source authority across held scope publication and exact restoration", function()
 		with_owner(source, function(config, path, read)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original = config.configuration_snapshot()
 			local owner = {}
 			local candidate = source:gsub("delay_offset = 0.5", "delay_offset = 7.75")
@@ -572,7 +574,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			end, debug.traceback)
 			Loader.load_catalogue = load_catalogue
 			if not okay then error(failure, 0) end
-		end, nil, require("hotstring_engine").new())
+		end, nil, require("hotstrings.engine.matcher").new())
 	end)
 
 	helpers.it("retains the actual absent or present-empty scope target before ordinary setters", function()
@@ -581,7 +583,7 @@ helpers.describe("hotstring override leaf ownership", function()
 			if content == false then initial = nil end
 			with_owner(initial, function(config, path, read)
 				local owner = {}
-				local participant = require("config_scope_file").new({ path = path,
+				local participant = require("settings.engine.scope.file").new({ path = path,
 					backup_path = path .. ".backup", remove = os.remove })
 				config.load_all = function() return {}, true end
 				helpers.assert_true(participant.prepare({}))

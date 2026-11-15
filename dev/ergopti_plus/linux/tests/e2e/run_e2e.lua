@@ -36,7 +36,7 @@ local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
 local shared_root  = drivers_root .. "/_shared"
-local shared_lua   = shared_root .. "/lua"
+local shared_lua   = shared_root .. ""
 local corpus_path  = shared_root .. "/tests/corpus/hotstrings/vectors.json"
 
 package.path = table.concat({
@@ -53,7 +53,7 @@ package.path = table.concat({
 -- this harness cannot open the end-char path for a character the driver would
 -- leave alone. Deciding that here by hand is what made a correct engine look
 -- wrong against a correct vector.
-local terminators = require("keymap.terminators")
+local terminators = require("layouts.engine.layers.terminators")
 local Contract = require("tests.e2e.contract")
 local ChildCapture = require("tests.support.e2e.child_capture")
 
@@ -384,7 +384,7 @@ assert_true("corpus assertion floor", corpus_assertions >= Contract.MIN_CORPUS_A
 -- this driver ships and replayed exactly as a corpus vector.
 print("\n--- Shipped hotstring family samples ---")
 local static_root = drivers_root:match("^(.*)/[^/]+$")
-local ok_samples, samples = pcall(require("test.hotstring_family_samples").load, static_root)
+local ok_samples, samples = pcall(require("tests.lua.hotstrings.family_samples").load, static_root)
 if not ok_samples then
 	fail("mandatory family samples", "resolved samples", tostring(samples))
 else
@@ -447,7 +447,7 @@ end
 
 local ok_sequences, sequences = pcall(function()
 	local handle = assert(io.open(shared_root .. "/tests/corpus/hotstrings/sequence_vectors.json", "r"))
-	local decoded = require("json").decode(handle:read("*a"))
+	local decoded = require("core.text.engine.json").decode(handle:read("*a"))
 	handle:close()
 	assert(type(decoded.vectors) == "table" and #decoded.vectors > 0, "sequence_vectors.json has no vectors")
 	return decoded.vectors
@@ -475,6 +475,25 @@ end
 -- word-only cases first type a real separator and retain it in the independent
 -- screen oracle; an empty modeled field never grants the engine that knowledge.
 local DAEMON_SCENARIOS = {
+	-- Item 50: fb gives facebook, facebook gives Facebook, as one edit; the
+	-- expectations are _shared/tests/corpus/hotstrings/cascade_vectors.json's
+	-- fb_* vectors. cascade = "<arrows>[,consume]" sets the private config.
+	{ name = "item 50: fb + Space at three arrows cascades and keeps the Space", keys = " fb ", screen = " Facebook ",
+		cascade = "3" },
+	{ name = "item 50: fb + Space at two arrows cascades", keys = " fb ", screen = " Facebook ", cascade = "2" },
+	{ name = "item 50: fb + Space at one arrow is a single expansion", keys = " fb ", screen = " facebook ",
+		cascade = "1" },
+	{ name = "item 50: fb + consumed Space cascades and swallows it once", keys = " fb ", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + consumed Space at one arrow", keys = " fb ", screen = " facebook", cascade = "1,consume" },
+	{ name = "item 50: fb + Enter at three arrows keeps the Enter", keys = " fb{ENTER}", screen = " Facebook\n",
+		cascade = "3" },
+	{ name = "item 50: fb + consumed Enter cascades and swallows it", keys = " fb{ENTER}", screen = " Facebook",
+		cascade = "3,consume" },
+	{ name = "item 50: fb + Enter at one arrow", keys = " fb{ENTER}", screen = " facebook\n", cascade = "1" },
+	{ name = "item 50: fb + the magic key cascades and swallows it", keys = " fb★", screen = " Facebook", cascade = "2" },
+	{ name = "item 50: fb + the magic key at one arrow", keys = " fb★", screen = " facebook", cascade = "1" },
+	{ name = "item 50: fb + the magic key at three arrows", keys = " fb★", screen = " Facebook", cascade = "3" },
 	{ name = "an end-char trigger expands and keeps its terminator", keys = " adn ", screen = " ADN " },
 	{ name = "Enter is a terminator", keys = " adn{ENTER}", screen = " ADN\n" },
 	{ name = "an auto-expanding trigger fires on its last character", keys = "pk★", screen = "parce que" },
@@ -562,6 +581,18 @@ local DYNAMIC_SCENARIOS = {
 		screen = " uptd★" },
 	{ name = "\"update\" never proposes \"date\" (dynamic-word-start)", dynamic = "dates", keys = " update★",
 		screen = " update★" },
+}
+
+-- Items 104, 105: each common autocorrection section fires alone. With only
+-- one section on, its trigger expands and the other two sections' triggers
+-- stay as typed (_shared/tests/corpus/hotstrings/common_autocorrection_entries.json).
+local AUTOCORRECT_SCENARIOS = {
+	{ name = "the names section alone expands a name", autocorrect = "names",
+		keys = " chatgpt adn adaboost ", screen = " ChatGPT adn adaboost " },
+	{ name = "the abbreviations section alone expands an abbreviation", autocorrect = "abbreviations",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt ADN adaboost " },
+	{ name = "the technical terms section alone expands a technical term", autocorrect = "technical_terms",
+		keys = " chatgpt adn adaboost ", screen = " chatgpt adn AdaBoost " },
 }
 
 -- A real consumed down owns repeats only while its native epochs and owners
@@ -714,7 +745,9 @@ do
 			env[#env + 1] = { "ERGOPTI_E2E_TAP_WRAP", scenario.tap_wrap or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_MAGIC_REPEAT", scenario.magic_repeat or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_DYNAMIC", scenario.dynamic or "none" }
+			env[#env + 1] = { "ERGOPTI_E2E_AUTOCORRECT", scenario.autocorrect or "none" }
 			env[#env + 1] = { "ERGOPTI_E2E_QUEUE_OUTPUT", scenario.queue_output and "1" or "0" }
+			env[#env + 1] = { "ERGOPTI_E2E_CASCADE", scenario.cascade or "none" }
 			local command = daemon_child_command(interpreter, env, device, scenario.keys, false)
 			local expected_before = type(scenario.screen) == "function" and scenario.screen() or scenario.screen
 			local output, status = ChildCapture.run(command)
@@ -763,6 +796,7 @@ do
 	run_key_scenarios(home_env, "", TAP_WRAP_SCENARIOS)
 	run_key_scenarios(home_env, "", MAGIC_REPEAT_SCENARIOS)
 	run_key_scenarios(home_env, "", DYNAMIC_SCENARIOS)
+	run_key_scenarios(home_env, "", AUTOCORRECT_SCENARIOS)
 
 	-- hardening-e-presets: the same keys over the recommended preset, committed
 	-- by a start-up child through the menu's own composition in a folder tree

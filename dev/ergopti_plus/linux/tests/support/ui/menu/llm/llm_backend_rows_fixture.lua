@@ -174,7 +174,7 @@ end
 --- @param scenario string
 --- @param body function
 local function with_real_api_add(provider_id, scenario, body)
-	local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows", "adapters.http_client" }
+	local names = { "modules.llm.api_entries", "modules.llm.api_remote", "ui.menu.llm_backend_rows", "core.network.adapters.http_client" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local path, rename = assert(os.tmpname()), os.rename
@@ -183,7 +183,7 @@ local function with_real_api_add(provider_id, scenario, body)
 	local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
 	local state = { prompts = {}, errors = {}, infos = {}, requests = {}, changes = 0, backends = 0, stages = 0 }
 	local ok, failure = xpcall(function()
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, headers, payload, done)
 				state.requests[#state.requests + 1] = { url = url, headers = headers, payload = payload }
 				state.done = done
@@ -228,7 +228,7 @@ local function with_real_api_add(provider_id, scenario, body)
 		assert(exact(rows, "➕ " .. provider.label), "the actual Add action must be present").action()
 		state.entry, state.list = entries.active(), entries.list()
 		local handle = assert(io.open(path, "rb")); state.bytes = handle:read("*a"); assert(handle:close())
-		state.image = require("json").decode(state.bytes)
+		state.image = require("core.text.engine.json").decode(state.bytes)
 		if state.done then
 			if scenario == "http-refused" then
 				state.done({ ok = false, status = 401, error_body = '{"error":{"message":"inert key required"}}' })

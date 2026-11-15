@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ui.menu.menu_llm.model_selector_page", "ui.menu.menu_llm.custom_models",
-	"ui.menu.menu_llm.backend_labels", "infra.dialog_util", "infra.deferred_work",
+	"ui.menu.menu_llm.backend_labels", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work",
 	"modules.llm", "modules.llm.api_mlx",
 	"ui.menu.menu_llm.mlx_repair_offer", "ui.menu.menu_llm.api_panel", "ui.download_window", "ui.model_browser",
 }
@@ -64,11 +64,11 @@ local CATALOGUE = { { label = "Alibaba", families = { { label = "Qwen", models =
 local function with_page(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
 		local calls = { switch = {}, select = {}, pulls = {}, saves = 0, api = {} }
-		package.loaded["infra.dialog_util"] = { block_alert = function()
-			return opts.confirm_remove and require("infra.i18n").get("button.remove") or "OK"
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function()
+			return opts.confirm_remove and require("core.i18n.engine.i18n").get("button.remove") or "OK"
 		end,
 			text_prompt = function() return "OK", opts.typed_model or "" end }
-		package.loaded["infra.deferred_work"] = { after = function(_, fn) fn(); return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 		package.loaded["ui.menu.menu_llm.mlx_repair_offer"] = { set_alternative = function() end }
 		package.loaded["ui.download_window"] = { set_percent_listener = function(fn) calls.percent_listener = fn end }
 		package.loaded["ui.model_browser"] = { inject_progress = function(update)
@@ -94,6 +94,7 @@ local function with_page(opts, body)
 		} }
 		package.loaded["ui.menu.menu_llm.api_panel"] = {
 			set_entry_model = function(_, id, model) calls.api[#calls.api + 1] = "model:" .. id .. ":" .. model; return true end,
+			set_entry_token = function(_, id, token) calls.api[#calls.api + 1] = "token:" .. id .. ":" .. token; return true end,
 			clear_active_entry = function() calls.api[#calls.api + 1] = "clear"; return true end,
 		}
 		local Page = require("ui.menu.menu_llm.model_selector_page")
@@ -267,7 +268,7 @@ helpers.describe("model selector page owner", function()
 		local opts = { ollama = { installed = false, pending = true } }
 		with_page(opts, function(Page, ctx, _, collected, p)
 			local attempts, pending = 0, nil
-			package.loaded["infra.deferred_work"].after = function(_, callback)
+			package.loaded["core.timing.engine.deferred_work"].after = function(_, callback)
 				attempts = attempts + 1
 				if attempts == 1 then
 					if mode == "throws" then error("timer unavailable") end
@@ -341,8 +342,12 @@ helpers.describe("model selector page owner", function()
 			helpers.assert_eq(Page.handle_action(ctx, { action = "select_model", backend = "mlx", name = "Qwen-A" }, p, collected), false)
 			helpers.assert_eq(#calls.select + #calls.switch, 0)
 		end)
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): a choice runs while paused.
+	helpers.it("selects an installed model while paused (edd1-paused-writes)", function()
 		with_page({ paused = true }, function(Page, ctx, calls, collected, p)
-			helpers.assert_eq(Page.handle_action(ctx, { action = "select_model", backend = "ollama", name = "Qwen-A" }, p, collected), false)
+			helpers.assert_true(Page.handle_action(ctx, { action = "select_model", backend = "ollama", name = "Qwen-A" }, p, collected))
 		end)
 	end)
 
@@ -418,6 +423,36 @@ helpers.describe("model selector page owner", function()
 			local keyless = row_of(payload, "api", "Groq/llama")
 			helpers.assert_eq(keyless.available, false)
 			helpers.assert_eq(keyless.hint_key, "model_browser.hint_api_no_key")
+		end)
+	end)
+
+	-- Decided by the maintainer on 2026-11-11: an entry restored from a backup
+	-- without its Keychain key asks for it again (macos-api-key-restored-missing).
+	helpers.it("greys an entry restored without its key and its « API key… » action takes a new one", function()
+		local entries = {
+			{ id = "e3", name = "Groq/llama", provider = "groq", model = "llama", active = true,
+				key_missing = true, key_absent = true },
+		}
+		with_page({ entries = entries, typed_model = "gsk-new" }, function(Page, ctx, calls, collected, p)
+			local row = row_of(Page.build_payload(ctx, p, collected), "api", "Groq/llama")
+			helpers.assert_eq(row.available, false)
+			helpers.assert_eq(row.hint_key, "model_browser.hint_api_key_reenter")
+			helpers.assert_eq(row.actions[1].id, "set_key", "a new key comes first")
+			local ids = {}
+			for _, action in ipairs(row.actions) do ids[#ids + 1] = action.id end
+			helpers.assert_eq(ids, { "set_key", "test", "remove" }, "no other model to pick; the active entry keeps Test and Remove")
+			helpers.assert_eq(row.actions[1].text, require("core.i18n.engine.i18n").get("menu.llm.local_servers.api_key"))
+			helpers.assert_true(Page.handle_action(ctx, { action = "row_action", backend = "api", name = "Groq/llama",
+				id = "set_key" }, p, collected))
+			helpers.assert_eq(calls.api[1], "token:e3:gsk-new", "the typed key goes to the entry")
+			helpers.assert_eq(Page.handle_action(ctx, { action = "row_action", backend = "api", name = "Groq/llama",
+				id = "other_model" }, p, collected), false, "a greyed row offers nothing else")
+		end)
+		with_page({ entries = { { id = "e4", name = "Groq/llama", provider = "groq", model = "llama", active = true,
+			key_missing = true, key_absent = false } } }, function(Page, ctx, calls, collected, p)
+			helpers.assert_eq(Page.handle_action(ctx, { action = "row_action", backend = "api", name = "Groq/llama",
+				id = "set_key" }, p, collected), false, "a key the entry never had is not offered here")
+			helpers.assert_eq(#calls.api, 0)
 		end)
 	end)
 

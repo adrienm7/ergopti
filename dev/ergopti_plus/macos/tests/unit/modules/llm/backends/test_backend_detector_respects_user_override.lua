@@ -77,14 +77,14 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 		"modules.llm.api_token_crypto",
 		"modules.llm.api_common",
 		"modules.llm.parser",
-		"adapters.http_client",
-		"adapters.json_codec",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
-		"infra.logger",
-		"infra.notifications",
-		"infra.paths",
-		"infra.i18n",
+		"core.network.adapters.http_client",
+		"core.fs.adapters.json_codec",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.fs.engine.paths",
+		"core.i18n.engine.i18n",
 		"hs",
 		"tests.stubs.hs",
 	}
@@ -99,22 +99,22 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	package.loaded["hs"] = hs_stub
 
 	-- Standard stubs (mirror what load_with_stubs injects)
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
 		shared_llm_path = function(name)
-			return helpers.shared("modules/llm/" .. name)
+			return helpers.shared("ai/data/" .. name)
 		end,
 		find_from_configdir = function(relative_target)
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		send  = function() end,
 		error = function() end,
 	}
@@ -144,7 +144,7 @@ local function load_llm_init_with_deferred_probes(ollama_status, ollama_body, ml
 	end
 
 	-- Load the real modules.llm.init — load_shared_defaults() runs now, reading
-	-- _shared/modules/llm/defaults.json via lib.paths stub (requires lib.paths to be set
+	-- _shared/ai/data/defaults.json via lib.paths stub (requires lib.paths to be set
 	-- before this line)
 	local LLM = require("modules.llm")
 
@@ -180,9 +180,9 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 	local keys_to_clear = {
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"modules.llm.api_common", "modules.llm.parser", "adapters.http_client",
-		"adapters.json_codec", "adapters.timer_scheduler", "adapters.shell_runner",
-		"infra.logger", "infra.notifications", "infra.paths", "infra.i18n", "hs", "tests.stubs.hs",
+		"modules.llm.api_common", "modules.llm.parser", "core.network.adapters.http_client",
+		"core.fs.adapters.json_codec", "core.events.timer_scheduler", "core.process.adapters.shell_runner",
+		"core.logger.engine.logger", "core.ui.engine.notifications", "core.fs.engine.paths", "core.i18n.engine.i18n", "hs", "tests.stubs.hs",
 	}
 	for _, key in ipairs(keys_to_clear) do package.loaded[key] = nil end
 
@@ -191,20 +191,20 @@ local function load_llm_init_with_one_leg_throwing(throw_on_url_substr, other_st
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get        = function(key) return key end,
 		get_locale = function() return "fr" end,
 		set_locale = function() end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(rel) return helpers.shared(rel) end,
 		shared_root = function() return helpers.shared() end,
-		shared_llm_path = function(name) return helpers.shared("modules/llm/" .. name) end,
+		shared_llm_path = function(name) return helpers.shared("ai/data/" .. name) end,
 		find_from_configdir = function(relative_target)
 			return helpers.driver_root() .. "../../" .. relative_target
 		end,
 	}
-	package.loaded["infra.notifications"] = { send = function() end, error = function() end }
+	package.loaded["core.ui.engine.notifications"] = { send = function() end, error = function() end }
 
 	package.loaded["modules.llm.profiles"]         = make_profiles_stub()
 	package.loaded["modules.llm.api_ollama"]       = make_api_stub()
@@ -453,7 +453,7 @@ helpers.describe("llm.init — auto-detect callback failures are visible (HS-016
 			200, '{"version":"0.5.0"}',
 			404, ""
 		)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.ring_buffer_clear()
 		local calls = 0

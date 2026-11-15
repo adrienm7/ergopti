@@ -27,15 +27,15 @@
 
 local M = {}
 
-local Logger        = require("infra.logger")
-local DeferredWork  = require("infra.deferred_work")
-local i18n          = require("infra.i18n")
-local dialog        = require("infra.dialog_util")
-local notifications = require("infra.notifications")
+local Logger        = require("core.logger.engine.logger")
+local DeferredWork  = require("core.timing.engine.deferred_work")
+local i18n          = require("core.i18n.engine.i18n")
+local dialog        = require("core.ui.engine.dialog_util")
+local notifications = require("core.ui.engine.notifications")
 local llm_mod       = require("modules.llm")
 local ApiPanel      = require("ui.menu.menu_llm.api_panel")
-local ServerMenu    = require("llm.local_server_menu")
-local TextUtils = require("text_utils")
+local ServerMenu    = require("ai.engine.local_servers.menu")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "menu_llm.local_servers"
 

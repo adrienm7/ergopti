@@ -28,14 +28,14 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
-local Queries = require("keystats.queries")
+local Logger = require("core.logger.engine.logger")
+local Queries = require("metrics.engine.queries")
 -- One owner of SQL text values: db:exec ends a statement at a NUL, so doubling
 -- apostrophes alone let one cut a literal (sql-literal-nul-2026-10-21).
-local Literal = require("sqlite.literal")
-local i18n   = require("infra.i18n")
-local FsDir  = require("infra.fs_dir")
-local RunningApplication = require("adapters.running_application")
+local Literal = require("core.fs.engine.sqlite.literal")
+local i18n   = require("core.i18n.engine.i18n")
+local FsDir  = require("core.fs.engine.dir")
+local RunningApplication = require("platform.focus.running_application")
 local ForeignLedgerSnapshot = require("adapters.foreign_ledger_snapshot")
 local LOG    = "keystats.export"
 
@@ -569,7 +569,7 @@ function M.sync_foreign_data_sql(on_applied)
 	local function unavailable_directory(path)
 		if not M.cleanup() then return nil, "foreign verification reader cleanup refused" end
 		if type(path) ~= "string" or path == "" then return nil, "foreign metrics directory is unavailable" end
-		local called, _, status = pcall(require("adapters.file_system").classify_no_follow, path)
+		local called, _, status = pcall(require("core.fs.adapters.file_system").classify_no_follow, path)
 		if called and status == "absent" then return synced_devices end
 		return nil, "foreign metrics directory cannot be inspected"
 	end

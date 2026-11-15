@@ -2,10 +2,10 @@
 ; Isolated native WPM surface ownership; no physical keystrokes or registry writes.
 #Requires AutoHotkey v2.0
 #Include test_wpm_empty_source_hold_owner.ahk
-#Include ../webview/test_model_browser_close_pause_owner.ahk
+#Include ../../core/ui/webview/test_model_browser_close_pause_owner.ahk
 _WPMG_Source(Directory, Canon) {
 	global _DriverDir, _SharedDir
-	TimingText := FileRead(_SharedDir . "\modules\timings\constants.toml", "UTF-8")
+	TimingText := FileRead(_SharedDir . "\core\timing\data\constants.toml", "UTF-8")
 	AssertTrue(RegExMatch(TimingText, "m)^wpm_widget_update_ms\s*=\s*(\d+)\s*$", &Timing) > 0)
 	TickMs := Integer(Timing[1])
 	AssertTrue(TickMs > 0, "the real WPM update interval must arm the timer")

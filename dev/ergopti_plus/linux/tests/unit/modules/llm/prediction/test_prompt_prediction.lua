@@ -21,10 +21,10 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local Rewrite = require("llm.rewrite")
-local PromptBuilder = require("llm.prompt_builder")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
 local REWRITE_CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/rewrite_vectors.json"
@@ -37,7 +37,7 @@ local RELOADED = {
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -73,12 +73,12 @@ local function scenario(opts, body)
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local world = { posts = {}, ollama = {}, notices = {}, injected = {}, shown = {},
 			preferences = preferences, buffer = opts.buffer }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
 				return true
@@ -195,7 +195,7 @@ end
 --- @param id string
 --- @return string
 local function menu_name(id)
-	return (require("infra.i18n").get("llm.profile." .. id .. ".label"):gsub("%s+\226\128\148.*$", ""))
+	return (require("core.i18n.engine.i18n").get("llm.profile." .. id .. ".label"):gsub("%s+\226\128\148.*$", ""))
 end
 
 --- Asserts the menu's profile and count were left exactly as they were.
@@ -365,7 +365,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 
 	helpers.it("runs a custom prompt by its id", function()
 		scenario({ buffer = "Bonjour Marc", stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)
@@ -383,7 +383,7 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("tap_3", "user_deleted|2"), false)
 			helpers.assert_eq(#world.posts, 0, "nothing is sent, not even with another prompt")
 			helpers.assert_eq(#world.notices, 1, "the user is told")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.prompt_prediction.unknown_prompt"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.prompt_prediction.unknown_prompt"))
 			assert_menu_untouched(world)
 		end)
 	end)
@@ -391,20 +391,20 @@ helpers.describe("prompt prediction: the binding's prompt and count, for this re
 	helpers.it("refuses like the manual prediction while the AI is off", function()
 		scenario({ buffer = "Bonjour Marc", disabled = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_predict_rewrite("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(#world.posts, 0)
 		end)
 	end)
 
 	helpers.it("custom-profile-shortcut: a configured custom prompt is inert while the AI is off", function()
 		scenario({ buffer = "Bonjour Marc", disabled = true, stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_formal", label = "Formal", system_single = "Continue formally.", batch = false },
 			}),
 		} }, function(world)
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("keyboard__primary_p", "user_formal|2"), false)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			assert_menu_untouched(world)
 		end)
 	end)
@@ -433,7 +433,7 @@ helpers.describe("prompt prediction: what a rewrite sends", function()
 		scenario({ buffer = "\n  " }, function(world)
 			helpers.assert_eq(world.handlers.llm_prompt_prediction("tap_3", "rewrite"), false)
 			helpers.assert_eq(#world.posts, 0, "there is nothing to rewrite")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.empty_context"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.empty_context"))
 		end)
 	end)
 
@@ -532,10 +532,10 @@ end)
 -- ============================================
 -- ============================================
 
--- The retry policy of _shared/modules/llm/inference.json, which macOS and
+-- The retry policy of _shared/ai/data/inference.json, which macOS and
 -- Windows already apply: max_multiplier attempts per requested prediction,
 -- and a failed or empty attempt followed by one with more room and warmth.
-local INFERENCE = helpers.driver_root() .. "/../_shared/modules/llm/inference.json"
+local INFERENCE = helpers.driver_root() .. "/../_shared/ai/data/inference.json"
 
 --- The shared retry policy, read from its single source.
 --- @return table

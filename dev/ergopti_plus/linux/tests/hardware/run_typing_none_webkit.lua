@@ -35,7 +35,7 @@ if not ok_webkit then
 end
 local Gtk = lgi.require("Gtk", "3.0")
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local profile = assert(uv.fs_mkdtemp("/tmp/ergopti-typing-none-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	local directory = profile .. "/" .. name:lower()
@@ -43,7 +43,7 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", directory))
 end
 print("OWNED_PROFILE " .. profile)
-local J=require('json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
+local J=require('core.text.engine.json'); local K=require('modules.keystats.keystats'); local W=require('modules.keystats.sqlite_writer')
 -- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
 local Drain=require('tests.support.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))
@@ -55,7 +55,7 @@ assert(W.upsert_app_day('owned-webkit','2000-01-01','Editor',{chars=7,time_ms=70
 assert(W.upsert_ngrams('owned-webkit','2000-01-01','Editor',{h={c=7,td=700,cd=7}},'ngram_chars'))
 assert(W.upsert_app_day('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{chars=3,time_ms=300}))
 assert(W.upsert_ngrams('owned-webkit',os.date('%Y-%m-%d'),'Unknown',{u={c=3,td=300,cd=3}},'ngram_chars'))
-local Manager=require('ui.webview_manager'); Manager.set_daemon_state({keystats=K})
+local Manager=require('core.ui.ui.webview_manager'); Manager.set_daemon_state({keystats=K})
 local checks,failed=0,0
 local function check(name,fn) checks=checks+1; local ok,e=xpcall(fn,debug.traceback); print((ok and 'PASS ' or 'FAIL ')..name..(ok and '' or ': '..e)); if not ok then failed=failed+1 end end
 print('ENGINE WebKit '..WK.get_major_version()..'.'..WK.get_minor_version()..'.'..WK.get_micro_version()..'; real SQLite; virtual X11; deadline180s; sandbox enabled')

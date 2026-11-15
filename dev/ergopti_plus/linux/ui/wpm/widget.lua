@@ -10,8 +10,8 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Everything it decides is shared. What to draw, in which colour, when to
----    show and where by default comes from _shared/lua/wpm_widget/model.lua
----    and _shared/modules/wpm_widget/constants.toml, the same code and file
+---    show and where by default comes from _shared/metrics/engine/wpm_widget_model.lua
+---    and _shared/metrics/data/wpm_widget/constants.toml, the same code and file
 ---    macOS uses; this module holds only the user's choices and the timing.
 --- 2. It really draws. It used to call a renderer function that did not exist,
 ---    read a stats table that carried no speed and no source, and so drew
@@ -21,15 +21,15 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger    = require("logger.shim")
+local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
-local Timings   = require("infra.timings")
+local Timings   = require("core.timing.engine.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
-local Model     = require("wpm_widget.model")
-local ConfigKeys = require("config_keys")
+local Model     = require("metrics.engine.wpm_widget_model")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "ui.wpm.widget"
 
@@ -92,7 +92,7 @@ local clone = TableUtil.deep_copy
 -- =========================================
 
 local function storage()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return nil end
 	return Storage
 end
@@ -186,7 +186,7 @@ end
 
 --- The unit under the number, in the user's language, as on macOS and Windows.
 local function unit_label()
-	local ok, I18n = pcall(require, "infra.i18n")
+	local ok, I18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok or type(I18n.get) ~= "function" then error("i18n is unavailable") end
 	return I18n.get("menu.metrics.wpm_unit")
 end
@@ -209,11 +209,11 @@ end
 --- stay up while one is.
 --- @return boolean
 function M.tooltip_visible()
-	local ok, Preview = pcall(require, "ui.tooltip.preview")
+	local ok, Preview = pcall(require, "core.ui.ui.tooltip.preview")
 	if ok and type(Preview) == "table" and type(Preview.is_visible) == "function" and Preview.is_visible() then
 		return true
 	end
-	local ok_llm, Llm = pcall(require, "ui.tooltip.llm")
+	local ok_llm, Llm = pcall(require, "core.ui.ui.tooltip.llm")
 	return ok_llm and type(Llm) == "table" and type(Llm.is_showing) == "function" and Llm.is_showing() == true
 end
 
@@ -421,11 +421,17 @@ end
 --- at the shared refresh rate however often it is called.
 --- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
+--- @param paused boolean|nil The script's pause: the widget hides at once, as
+---   on Windows and macOS.
 --- @return table|nil The frame drawn, for tests and diagnostics.
-function M.tick(stats, now_s)
+function M.tick(stats, now_s, paused)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
 	if _hide_pending and not hide() then return nil end
+	if paused == true then
+		if _state.shown then hide() end
+		return nil
+	end
 	if _state.last_draw_s and (now_s - _state.last_draw_s) < UPDATE_S then return nil end
 	_state.last_draw_s = now_s
 	local canon = Constants.load()

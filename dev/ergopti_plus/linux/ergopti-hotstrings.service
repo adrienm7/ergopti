@@ -38,7 +38,7 @@ ExecStart=%h/.local/bin/ergopti-hotstrings --tray
 Restart=on-failure
 RestartSec=3s
 # 78 (EX_CONFIG) is the daemon saying the session cannot read the keyboard or
-# write /dev/uinput (infra/input_access.lua). The graphical launcher requests
+# write /dev/uinput (platform/input/access.lua). The graphical launcher requests
 # missing permissions and refreshes its groups before starting the daemon;
 # retrying a refused setup would repeat the prompt every three seconds.
 RestartPreventExitStatus=78
@@ -46,7 +46,7 @@ RestartPreventExitStatus=78
 # NO Environment=DISPLAY. It used to be pinned to :0 — wrong on a second seat,
 # wrong under Wayland, and worst of all silently RIGHT often enough that the bug
 # only ever appeared for the users who switch. The daemon probes the session at
-# runtime (infra/display_server.lua) and re-probes on demand, so the unit must
+# runtime (core/ui/engine/display_server.lua) and re-probes on demand, so the unit must
 # not tell it an answer.
 #
 # DBUS_SESSION_BUS_ADDRESS is not pinned either: a systemd --user service

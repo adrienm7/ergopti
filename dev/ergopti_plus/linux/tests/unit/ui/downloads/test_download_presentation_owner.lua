@@ -11,15 +11,15 @@
 local helpers = require("tests.helpers")
 
 local function with_session(run)
-	local names = { "lgi", "infra.monotonic", "infra.timings", "infra.managed_http_deadline",
-		"adapters.event_loop", "adapters.notifier", "ui.webkit_host", "ui.webview_manager",
-		"ui.download_window.bridge", "infra.manifest_reader", "logger.shim", "infra.i18n" }
+	local names = { "lgi", "core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline",
+		"core.events.loop", "platform.system.notifier", "core.ui.ui.webkit_host", "core.ui.ui.webview_manager",
+		"ui.download_window.bridge", "infra.manifest_reader", "core.logger.engine.shim", "core.i18n.engine.i18n" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local document
 	local ok, primary = xpcall(function()
-		package.loaded["logger.shim"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["ui.download_window.bridge"] = nil
 		local bridge = require("ui.download_window.bridge")
 		document = require("tests.support.document_fixture").new("download_window", bridge, {})

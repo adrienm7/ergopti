@@ -15,7 +15,7 @@
 			"type": "command",
 			"id": "llm_profile_shortcut",
 			"i18n": "menu.profiles.shortcut_prefix",
-			"disabled_when": ["llm_custom_profile_ready"],
+			"disabled_when": ["llm_custom_profile_shortcut_ready"],
 			"platforms": ["hs"],
 			"unavailable": "hide"
 		},

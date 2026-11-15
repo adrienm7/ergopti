@@ -25,8 +25,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Returns a unique writable temp path for each test case.
 --- @param name string Short discriminator so concurrent tests never collide.
@@ -41,7 +41,7 @@ end
 --- @param path string Override file path.
 --- @return table Freshly-initialised module.
 local function fresh_module(path)
-	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+	package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = function() return nil end })

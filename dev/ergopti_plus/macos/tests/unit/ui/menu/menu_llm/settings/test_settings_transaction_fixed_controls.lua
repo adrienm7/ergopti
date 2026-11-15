@@ -38,8 +38,8 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 	helpers.it("the modifier frame owns translated choices and retains every physical-key callback", function()
 		-- The choices name their modifiers from the shared key name table in the
 		-- user's language: French reads « Maj », never the English « Shift ».
-		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
-		local french = require("adapters.json_codec").decode(file:read("*a"))
+		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
+		local french = require("core.fs.adapters.json_codec").decode(file:read("*a"))
 		file:close()
 		local translate = function(key) return key:find("^key_name%.") and french[key] or nil end
 		with_fixture({ translate = translate }, function(f)
@@ -94,8 +94,8 @@ helpers.describe("Complete LLM fixed controls: real transaction owners", functio
 				end, debug.traceback)
 				root[section] = declaration
 				if not ok then error(detail, 0) end
-				helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(rebuild()),
-					require("test.menu_native_child_rows").hierarchy(before))
+				helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(rebuild()),
+					require("tests.lua.menu.native_child_rows").hierarchy(before))
 			end)
 		end)
 	end
@@ -108,9 +108,9 @@ local function with_fixed_controls_locale(locale, scenario)
 	local native, owner, receipt, acquired, scratch, fresh_bridge
 	local ok, err = pcall(function()
 		local driver = helpers.driver_root():gsub("/+$", "")
-		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname())
 		assert(os.remove(scratch))
 		assert(hs.fs.mkdir(scratch))
@@ -126,9 +126,9 @@ local function with_fixed_controls_locale(locale, scenario)
 		local paths = require("infra.config_paths")
 		helpers.assert_eq(paths.init(scratch .. "/"), true)
 		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -146,8 +146,8 @@ local function with_fixed_controls_locale(locale, scenario)
 	local cleanup_ok, cleanup_error = pcall(function()
 		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
 		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)
 			helpers.assert_eq(scheduler.activeCount(), 0)
 		end
@@ -176,7 +176,7 @@ end
 local function complete_control_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_complete_control_frames.json"), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(bytes))
+	return assert(require("core.fs.adapters.json_codec").decode(bytes))
 end
 
 helpers.describe("Complete LLM generation: independent native images", function()
@@ -226,7 +226,7 @@ helpers.describe("Complete LLM generation: independent native images", function(
 				end, debug.traceback)
 				root[section] = declaration
 				if not ok then error(detail, 0) end
-				helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(rebuild()), require("test.menu_native_child_rows").hierarchy(before))
+				helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(rebuild()), require("tests.lua.menu.native_child_rows").hierarchy(before))
 			end)
 		end)
 	end
@@ -241,9 +241,9 @@ helpers.describe("Complete LLM outer boundary context", function()
 			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
 				with_fixture({parent_only = true}, function(fixture)
 					fixture.state.llm_enabled, fixture.state.llm_model = enabled, model
-					local i18n = require("infra.i18n")
+					local i18n = require("core.i18n.engine.i18n")
 					local head = function(key) return (i18n.get(key):match("^[^%%{]*")) end
-					require("test.ai_menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
+					require("tests.lua.ai.menu_layout_contract").assert_block(helpers, fixture.top_level_callbacks().rebuild(), {
 						profile = head("menu.profiles.profile_label_prefix"),
 						test = head("menu.llm.test_prediction"),
 						trigger = head("menu.llm.trigger_menu_title"),

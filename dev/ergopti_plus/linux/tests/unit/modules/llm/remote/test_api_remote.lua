@@ -10,13 +10,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Loads the module over a scripted HTTP client.
 --- @return table remote, table calls
 local function load_remote()
 	local calls = {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function(url, headers, options, callback)
 			calls.probes = calls.probes or {}
 			calls.probes[#calls.probes + 1] = { url = url, headers = headers, callback = callback, options = options }
@@ -34,7 +34,7 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 end
 
@@ -342,7 +342,7 @@ end)
 
 
 helpers.describe("Remote provider error envelopes", function()
-	local contract = require("test.response_error_contract")
+	local contract = require("tests.lua.response_error_contract")
 	assert(#contract.vectors == 23, "every independent Lua response vector executes")
 	helpers.it("keeps the full error-envelope matrix for every completion format", function()
 		helpers.assert_eq(table.concat(contract.shape_gaps(contract.vectors), ", "), "")
@@ -370,7 +370,7 @@ end)
 
 helpers.describe("Shared provider response error ownership", function()
 	helpers.it("checks only a decoded root's own field and preserves false and null", function()
-		local formats = require("llm.remote_formats")
+		local formats = require("ai.engine.api.remote_formats")
 		for _, body in ipairs({ '{"error":null}', '{"error":false}', '{"error":""}', '{"error":{}}' }) do
 			helpers.assert_true(formats.response_has_error(assert(Json.decode(body))), body)
 		end

@@ -20,7 +20,7 @@
 ---
 --- WHAT THE THREE LAYERS ARE:
 ---   1. infra/xkb_keymap.lua   — text to (keysym, keycode, level). Pure.
----   2. infra/keysym.lua       — keysym name to character. Pure, plus an
+---   2. platform/input/keysym.lua       — keysym name to character. Pure, plus an
 ---                               optional libxkbcommon path.
 ---   3. this adapter           — the join, the cache, and the refusal to guess.
 --- Each is asserted here through the layer above it, because the seam between
@@ -105,7 +105,7 @@ end)
 helpers.describe("keysym: name to character", function()
 
 	helpers.it("resolves the names that spell themselves", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("a"), "a", "a letter names its own character")
 		helpers.assert_eq(ks.to_char("A"), "A", "and so does the capital")
@@ -113,7 +113,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves the ones that do not", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("eacute"), "é", "the whole point of the table")
 		helpers.assert_eq(ks.to_char("ccedilla"), "ç", "French needs this one constantly")
@@ -124,7 +124,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves ASCII punctuation by its protocol name", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("ampersand"), "&", "AZERTY puts this where US puts 1")
 		helpers.assert_eq(ks.to_char("space"), " ", "space is a keysym like any other")
@@ -132,7 +132,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves the Unicode spellings a modern keymap uses", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		-- Everything without a legacy name is written this way, which is how a
 		-- keymap expresses ★ or a narrow no-break space.
@@ -142,7 +142,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("produces nothing for a dead key, even when the library answers", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		-- Driven with a library that DOES return a character for dead_acute, which
 		-- is the case that matters: on a machine with libxkbcommon the guard is
 		-- the only thing standing between the injector and a wrong answer. With
@@ -161,14 +161,14 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("produces nothing for a modifier", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("Shift_L"), nil, "a modifier is not a character")
 		helpers.assert_eq(ks.to_char("ISO_Level3_Shift"), nil, "nor is AltGr")
 	end)
 
 	helpers.it("rejects surrogate keysyms and non-scalar values", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		for _, cp in ipairs({ 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0 / 0, 0.5 }) do
 			helpers.assert_eq(ks.utf8_encode(cp), nil, "only integer Unicode scalar values are encodable")
@@ -180,7 +180,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("encodes above the basic plane", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		helpers.assert_eq(ks.utf8_encode(0x1F600), "\240\159\152\128",
 			"four-byte UTF-8, because a keymap may legally carry an emoji")
 		helpers.assert_eq(ks.utf8_encode(0x110000), nil, "and nothing above the range")
@@ -244,7 +244,7 @@ helpers.describe("keyboard_layout: resolving against the session's own layout", 
 	helpers.it("prefers the lowest level for every character with two homes", function()
 		local layout = loaded()
 		local kb = helpers.load_module("infra.xkb_keymap")
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 
 		-- Computed independently rather than spot-checked. "~" sits on two keys in
 		-- this fixture, and asserting one expected level passes by accident when
@@ -664,23 +664,31 @@ end)
 
 
 helpers.describe("keyboard_layout: automatic X11 acknowledgement cohort", function()
-	helpers.it("refuses an equal-group native source epoch replacement", function()
+	-- Decided by the maintainer on 2026-11-11: the same group with a re-read
+	-- keymap equal to the capture's map renews; a map the probe does not
+	-- acknowledge (one that really differs) keeps the receipt revoked.
+	helpers.it("renews an equal-group native source epoch replacement with an acknowledged map", function()
 		cohort_fixture(function(_, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
+				local _, _, old = layout.plan("z")
 				state.native_generation = 8
-				helpers.assert_eq(layout.is_ready(), false)
-				helpers.assert_nil(layout.resolve("z"))
-				helpers.assert_nil(layout.plan("z"))
+				helpers.assert_eq(layout.is_ready(), true)
+				helpers.assert_eq(layout.resolve("z").keycode, 44)
+				helpers.assert_eq(layout.plan_current(old), false, "the old receipt is never revived")
 			end)
 		end)
 	end)
-	helpers.it("never revives after native keymap acknowledgement is lost", function()
+	helpers.it("stays revoked while the native keymap is not acknowledged, and renews fresh once it is", function()
 		cohort_fixture(function(_, layout, state, backend)
 			desktop_cohort(layout, backend, state, function()
-				state.acknowledged = false
-				helpers.assert_eq(layout.is_ready(), false)
+				local _, _, old = layout.plan("z")
+				state.acknowledged = false; state.native_generation = 8
+				helpers.assert_eq(layout.is_ready(), false, "a different keymap keeps the layout revoked")
+				helpers.assert_nil(layout.resolve("z"))
+				helpers.assert_nil(layout.plan("z"))
 				state.acknowledged = true
-				helpers.assert_eq(layout.is_ready(), false)
+				helpers.assert_eq(layout.is_ready(), true, "an identical keymap renews through a fresh receipt")
+				helpers.assert_eq(layout.plan_current(old), false, "the old receipt is never revived")
 			end)
 		end)
 	end)
@@ -736,8 +744,8 @@ helpers.describe("keyboard_layout: exact native authority and preserved logical 
 	end)
 	helpers.it("keeps Wayland logical refresh without manufacturing a native seat receipt", function()
 		cohort_fixture(function(_, layout, _, backend)
-			local display = require("infra.display_server")
-			local shell = require("adapters.shell_runner")
+			local display = require("core.ui.engine.display_server")
+			local shell = require("core.process.adapters.shell_runner")
 			local old_exec = shell.exec_checked
 			display._set_for_test("wayland")
 			shell.exec_checked = function() return true, "xkb_keymap { controlled logical source }", nil end
@@ -839,8 +847,8 @@ end)
 
 helpers.describe("explicit keymap admission", function()
 	helpers.it("an unreadable explicit keymap never falls back to the server", function()
-		local Display = require("infra.display_server")
-		local Shell = require("adapters.shell_runner")
+		local Display = require("core.ui.engine.display_server")
+		local Shell = require("core.process.adapters.shell_runner")
 		local saved_kind, saved_desktop = Display.kind(), Display.desktop()
 		local original_exec, previous_layout = Shell.exec_checked, package.loaded["adapters.keyboard_layout"]
 		local calls = 0

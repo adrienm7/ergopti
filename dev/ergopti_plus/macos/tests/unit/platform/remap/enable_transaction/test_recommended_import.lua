@@ -4,7 +4,7 @@
 --- MODULE: The Wizard's Tap-Holds Import In The Remap Owner
 --- DESCRIPTION:
 --- The first-run wizard's checked tap-hold keys reach the remap owner, the only
---- writer of config_karabiner.toml. A running bridge takes them in its exact
+--- writer of tap_hold.toml. A running bridge takes them in its exact
 --- settings transaction and reports success only on the Karabiner terminal;
 --- a folder it does not run gets the same candidate saved through Config. Each
 --- checked key becomes exactly its shipped recommendation, the Tap-Holds switch
@@ -25,9 +25,9 @@ local PRESET = {
 	escape = { "none", "none" },
 }
 local KEYS = { { id = "left_shift" }, { id = "caps_lock" }, { id = "escape" } }
-local RUNNING = "/remap/config_karabiner.toml"
-local WIZARD = "/wizard/config_karabiner.toml"
-local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+local RUNNING = "/remap/tap_hold.toml"
+local WIZARD = "/wizard/tap_hold.toml"
+local SOURCE = '[tap_hold]\nenabled = false\n[future]\nkeep = true\n'
 
 --- Loads an enabled remap that knows three keys and the preset above, with an
 --- observable regeneration and an in-memory disk holding both settings files.
@@ -46,10 +46,10 @@ local function importing_remap(fixture)
 		return save(state, path, overwrite, expected)
 	end
 	package.loaded["infra.config_paths"].get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
 		return RUNNING
 	end
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	files.read_with_status = function(path)
 		local content = disk.files[path]
 		return content, content and "ok" or "absent"
@@ -96,7 +96,7 @@ helpers.describe("the remap owner imports the wizard's checked keys", function()
 			helpers.assert_true(remap.import_recommended_keys({ keys = { "caps_lock" }, backup_path = "/remap/b-1" },
 				function(ok, reason) settled[#settled + 1] = { ok = ok, reason = reason } end))
 			helpers.assert_eq(disk.files["/remap/b-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save replaces only the bytes the backup holds")
 			helpers.assert_eq(#settled, 0, "no success before the Karabiner terminal")
 			helpers.assert_eq(deploy.regenerations, 1)
@@ -168,7 +168,7 @@ helpers.describe("the remap owner imports the wizard's checked keys", function()
 			helpers.assert_true(saved_ok, tostring(detail))
 			helpers.assert_eq(paths, { WIZARD }, "the folder's own file is read")
 			helpers.assert_eq(disk.files["/wizard/b-1"], SOURCE, "the exact bytes are backed up first")
-			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE } },
+			helpers.assert_eq(disk.expected, { { status = "ok", content = SOURCE, config = { status = "absent" } } },
 				"the save replaces only the bytes the backup holds")
 			local saved = calls.saved_payloads[1]
 			helpers.assert_eq(saved.tap_holds_enabled, true)

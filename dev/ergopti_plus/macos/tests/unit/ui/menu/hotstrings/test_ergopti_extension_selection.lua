@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
-require("test.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
+require("tests.lua.ergopti_extension_selection_contract").run(helpers, require("infra.manifest_reader").features())
 
 --- Provides the real files beneath a shipped scanner root.
 --- @return table Scanner filesystem collaborators.
@@ -51,7 +51,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 	helpers.it("(ergopti-extension-selection) persists the actual replacement gate, reloads it and rolls back refusals", function()
 		helpers.with_stub_scope({ "modules.keymap", "modules.keymap.init", "modules.keymap.state",
 			"modules.keymap.utils", "modules.keymap.expander", "modules.keymap.llm_bridge",
-			"infra.extension_packs", "infra.preferences", "infra.i18n", "adapters.storage", "adapters.file_system" }, function()
+			"infra.extension_packs", "infra.preferences", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.fs.adapters.file_system" }, function()
 			package.loaded["modules.keymap.utils"] = setmetatable({
 				is_ignored_window = function() return false, 0 end,
 				is_secure_field = function() return false end,
@@ -69,10 +69,10 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				return tap
 			end
 			local Keymap = helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
-			package.loaded["infra.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
-				{ __index = require("infra.i18n") })
+			package.loaded["core.i18n.engine.i18n"] = setmetatable({ build_language_menu_items = function() return {} end },
+				{ __index = require("core.i18n.engine.i18n") })
 			local FixtureFiles = require("tests.support.file_system_write_stub")
-			package.loaded["adapters.file_system"] = setmetatable({
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				read = function(path) return FixtureFiles.read_with_status(path) end,
 			}, { __index = FixtureFiles })
 			package.loaded["modules.hotstrings.hotstrings_config"] = {
@@ -83,13 +83,13 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 			Packs._reset()
 			local found = Packs.discover({ { pack = helpers.driver_root() .. "../../layouts/registry/ergopti" } }, scanner_io())
 			helpers.assert_eq(#found, 1, "the shipped pack needs no installed-layout record")
-			local common = helpers.shared("modules/hotstrings/magickey.toml")
+			local common = helpers.shared("hotstrings/data/catalogue/magickey.toml")
 			local path, sources = Packs.route("magickey", common)
 			helpers.assert_true(Keymap.load_toml("magickey", path, sources))
 			local suffix_path = Packs.route("french_distancesreduction", nil)
 			helpers.assert_true(Keymap.load_toml("french_distancesreduction", suffix_path))
 			helpers.assert_true(Keymap.set_magic_key_source("KeyJ"))
-			CaptionFixture.install(require("infra.i18n"))
+			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["ui.menu.builder"] = nil
 			local Registry = require("modules.keymap.registry")
 			local Hotstrings = require("ui.menu.menu_hotstrings")
@@ -126,7 +126,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(initial, "table", "the metadata-only feature draws an actual extension row")
 				local tree = require("ui.menu.builder").generate(ctx, { hotstrings = Hotstrings },
 					setmetatable({}, { __index = function() return function() end end }))
-				local extension_title = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+				local extension_title = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 				local function find(rows, title)
 					for _, candidate in ipairs(rows or {}) do
 						if candidate.title == title then return candidate end
@@ -147,24 +147,14 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				helpers.assert_type(extension, "table", "the actual native renderer shows the shipped extension")
 				helpers.assert_type(find(extension.menu, initial.label), "table", "the localized replacement is inside Ergopti")
 				local suffix = Keymap.get_sections("french_distancesreduction")[1]
-				local locale = require("infra.i18n").get_locale()
+				local locale = require("core.i18n.engine.i18n").get_locale()
 				local suffix_title = suffix.description[locale] or suffix.description.en
 				helpers.assert_type(find(extension.menu, suffix_title .. " (24)"), "table",
 					"all suffixes are visible in the extension's actual category subtree")
 				helpers.assert_true(type(initial.action) == "function")
-				for _, read in ipairs({ function() return nil end, function() return true end,
-					function() error("pause unavailable") end }) do
-					ctx.is_paused = read
-					local called, accepted = pcall(initial.action)
-					helpers.assert_true(called, "pause failures must not escape the menu action")
-					helpers.assert_eq(accepted, false, "unknown or paused state must not change the extension")
-					local bulk = Hotstrings.build_extension_bulk_actions(ctx, {}, Hotstrings.bound_sections(ctx).ergopti)
-					local bulk_called, bulk_accepted = pcall(bulk[1].action)
-					helpers.assert_true(bulk_called)
-					helpers.assert_eq(bulk_accepted, false, "bulk changes must also consult the live pause owner")
-					helpers.assert_eq(saves, 0)
-				end
-				ctx.is_paused = function() return false end
+				-- A pause stops typing, not configuration (EDD-1): the extension's
+				-- rows commit without consulting the pause owner (edd1-paused-writes).
+				ctx.is_paused = function() error("the extension rows do not read the pause") end
 				helpers.assert_true(initial.action())
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true)
 				local saved = Preferences.load(prefs_file)
@@ -175,10 +165,7 @@ helpers.describe("Shipped Ergopti menu and physical replacement", function()
 				refuse = true
 				helpers.assert_eq(initial.action(), false)
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "save refusal rolls back native and cache")
-				local before = saves; ctx.paused = true
-				helpers.assert_eq(initial.action(), false)
-				helpers.assert_eq(saves, before, "a retained paused callback cannot write")
-				ctx.paused, refuse = false, false
+				refuse = false
 				helpers.assert_true(Registry.disable_section("magickey", "replace"))
 				helpers.assert_true(Registry.apply_hotstring_preferences(saved))
 				helpers.assert_eq(Registry.is_section_enabled("magickey", "replace"), true, "canonical boot projection restores replacement")

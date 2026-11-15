@@ -10,9 +10,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Report = require("field_check_report")
+local Report = require("diagnostics.engine.field_check.report")
 local Check = require("infra.field_check_local_servers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function run(catalogue, views)
 	local report = Report.new_report("local_servers")
@@ -29,7 +29,7 @@ end
 
 helpers.describe("field check local servers: every declared server named, read-only (field-local-servers)", function()
 	helpers.it("names each server of the shipped list with its verdict and port source", function()
-		local path = helpers.shared("modules/llm/local_servers.json")
+		local path = helpers.shared("ai/data/local_servers.json")
 		local handle = assert(io.open(path, "rb"))
 		local root = Json.decode(handle:read("*a"))
 		handle:close()

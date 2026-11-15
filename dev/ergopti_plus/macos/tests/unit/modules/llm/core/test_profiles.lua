@@ -11,24 +11,24 @@
 local helpers = require("tests.helpers")
 local saved_core = package.loaded["modules.llm"]
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub lib.i18n: profiles.lua calls i18n.get() at module load time to
 -- decorate each built-in profile with its label. The real lib.i18n depends
 -- on hs.settings and locale JSON files that are unavailable in unit tests.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get        = function(key) return key end,
 	get_locale = function() return "fr" end,
 }
 
 --- Stub Paths so that any load of api_remote (or catalogue users) can resolve
---- _shared/modules/llm/*.json from the real source tree during headless test runs.
-package.loaded["infra.paths"] = {
+--- _shared/ai/data/*.json from the real source tree during headless test runs.
+package.loaded["core.fs.engine.paths"] = {
 	shared = function(rel) return helpers.shared(rel) end,
 	shared_root = function() return helpers.shared() end,
 	shared_llm_path = function(name)
-		return helpers.shared("modules/llm/" .. name)
+		return helpers.shared("ai/data/" .. name)
 	end,
 }
 
@@ -70,7 +70,7 @@ helpers.describe("Profiles.BUILTIN_PROFILES", function()
 			helpers.assert_eq(profile.label, "llm.profile." .. id .. ".label", id .. " label key")
 		end
 		-- The tone rungs precede them, from the most familiar to the most formal
-		local Tone = require("llm.tone")
+		local Tone = require("ai.engine.prediction.tone")
 		local first_rung = total - #TRANSLATIONS - #Tone.LADDER + 1
 		helpers.assert_eq(Profiles.BUILTIN_PROFILES[first_rung - 1].id, "rewrite",
 			"the rewrite profile comes right before the tone ladder")
@@ -95,7 +95,7 @@ helpers.describe("Profiles.BUILTIN_PROFILES", function()
 		-- The legacy ``system_multi`` function field was replaced by the
 		-- JSON-shaped ``system_multi_template`` string (with a ``{n}``
 		-- placeholder) when profiles.lua started loading the shared
-		-- ``_shared/modules/llm/profiles.json``. Only the batch profile defines it.
+		-- ``_shared/ai/data/profiles.json``. Only the batch profile defines it.
 		for _, p in ipairs(Profiles.BUILTIN_PROFILES) do
 			if p.id == "batch_advanced" then
 				helpers.assert_eq(type(p.system_multi_template), "string")
@@ -342,7 +342,7 @@ helpers.describe("Profiles.resolve_system_prompt", function()
 	end)
 
 	helpers.it("resolves every placeholder and warns on degraded fallback", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_warn = Logger.warn
 		local warnings = {}

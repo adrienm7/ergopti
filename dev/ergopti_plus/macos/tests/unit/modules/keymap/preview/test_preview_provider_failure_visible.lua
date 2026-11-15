@@ -14,9 +14,9 @@ local helpers = require("tests.helpers")
 --- Runs the provider-failure scenario with isolated process-global modules.
 local function run_scenario()
 	local dependency_names = {
-		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
-		"infra.logger",
+		"platform.input.synthetic_input",
+		"core.events.timer_scheduler",
+		"core.logger.engine.logger",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
@@ -28,7 +28,7 @@ local function run_scenario()
 		"modules.llm",
 		"modules.llm.prediction_engine",
 		"modules.diagnostics.hid_diagnostic_mailbox",
-		"ui.tooltip",
+		"core.ui.ui.tooltip",
 		"modules.keymap.llm_bridge",
 	}
 	local previous = {}
@@ -50,10 +50,10 @@ local function run_scenario()
 		effects.errors[#effects.errors + 1] = string.format(format_string, ...)
 	end
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }
@@ -66,7 +66,7 @@ local function run_scenario()
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["infra.logger"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
@@ -102,7 +102,7 @@ local function run_scenario()
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,

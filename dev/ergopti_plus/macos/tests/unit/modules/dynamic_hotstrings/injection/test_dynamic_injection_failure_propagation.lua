@@ -33,12 +33,11 @@ end
 local function reset_driver_modules()
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:find("^modules%.") or name:find("^adapters%.")
-				or name:find("^infra%.") or name:find("^ui%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -57,7 +56,7 @@ local function logger_capture()
 	logger.info = function(_, format, ...)
 		capture.successes[#capture.successes + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	return capture
 end
 
@@ -104,11 +103,11 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()
 		local epoch = {}
-		package.loaded["adapters.synthetic_input"] = api({
+		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return epoch end,
 		})
-		package.loaded["infra.text_utils"] = require("text_utils")
-		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
+		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function(key)
@@ -117,7 +116,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return false
 			end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			BACKSPACE = 51,
 			RETURN = 36,
@@ -175,11 +174,11 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 		package.loaded["modules.keymap.terminator_replay"] = api()
 		package.loaded["modules.keymap.utils"] = api()
 		package.loaded["adapters.event_provenance"] = api()
-		package.loaded["adapters.synthetic_input"] = api({
+		package.loaded["platform.input.synthetic_input"] = api({
 			current_action_epoch = function() return {} end,
 		})
-		package.loaded["infra.text_utils"] = require("text_utils")
-		package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+		package.loaded["core.text.engine.utils"] = require("core.text.engine.utils_core")
+		package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 		package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function(key)
@@ -188,7 +187,7 @@ helpers.describe("keymap.inject_dynamic: replacement status is preserved", funct
 				return false
 			end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			BACKSPACE = 51,
 			RETURN = 36,
@@ -216,7 +215,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		local logs = logger_capture()
 		package.loaded["modules.keymap.utils"] = { emit_text = function() error("must not emit") end }
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.synthetic_input"] = api()
+		package.loaded["platform.input.synthetic_input"] = api()
 
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
 		local interceptor
@@ -230,6 +229,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			register_lua_group = noop,
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			inject_dynamic = function()
@@ -268,7 +268,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 		}
 		package.loaded["modules.keystats"] = {}
 
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local rules = require("modules.dynamic_hotstrings.rules_engine")
 		local interceptor
 		local fake_keymap = {
@@ -280,6 +280,7 @@ helpers.describe("rules_engine: rejected dynamic replacement does not eat the tr
 			register_lua_group = noop,
 			set_post_load_hook = noop,
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			suppress_rescan = noop,
@@ -313,13 +314,14 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		local hs_stub = reset_driver_modules()
 		local logs = logger_capture()
 		package.loaded["modules.keystats"] = {}
-		package.loaded["adapters.synthetic_input"] = api()
+		package.loaded["platform.input.synthetic_input"] = api()
 
 		local personal = require("modules.dynamic_hotstrings.personal_info")
 		local interceptor
 		local inject_calls = 0
 		local fake_keymap = {
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			classify_trigger = function() return false, false, false end,
 			inject_dynamic = function()
@@ -360,11 +362,12 @@ helpers.describe("personal_info: rejected private replacement does not eat the t
 		logger_capture()
 		package.loaded["modules.keystats"] = {}
 
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local personal = require("modules.dynamic_hotstrings.personal_info")
 		local interceptor
 		local fake_keymap = {
 			register_interceptor = function(callback) interceptor = callback end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = noop,
 			classify_trigger = function() return false, false, false end,
 			suppress_rescan = noop,

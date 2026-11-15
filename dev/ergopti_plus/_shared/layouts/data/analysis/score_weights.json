@@ -1,0 +1,31 @@
+{
+	"_description": "Default weights of the global layout score (one shared source read by the site and the app through _shared/ui/layout_analysis/_generated/analysis_data.js). Each weight is the number of score points one unit of the metric is worth (one percentage point, or one millimetre for distance); the sign comes from the metric's direction, so every weight is positive. The choice of each value is justified in docs/audits/layout-analysers/report.md, section « Default weights ».",
+	"schema_version": 1,
+	"weights": {
+		"sfb": 10,
+		"sfs": 3,
+		"lsb": 2,
+		"scissors": 3,
+		"half_scissors": 1,
+		"redirect": 1.5,
+		"redirect_bad": 3,
+		"roll_in": 1,
+		"roll_out": 0.5,
+		"roll3_in": 1,
+		"roll3_out": 0.5,
+		"alternation": 0.3,
+		"home_row": 0.3,
+		"distance": 1,
+		"finger_imbalance": 0.4,
+		"hand_imbalance": 0.2,
+		"pinky_load": 0.3,
+		"modifier_usage": 0.5,
+		"dead_key_usage": 0.5,
+		"outer_column": 1,
+		"unsupported": 5,
+		"compact_fit": 0.1,
+		"char_coverage": 0.1,
+		"direct_digits": 0.03,
+		"shortcut_left": 0.15
+	}
+}

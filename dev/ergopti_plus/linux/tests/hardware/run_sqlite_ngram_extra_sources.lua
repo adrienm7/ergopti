@@ -8,8 +8,8 @@
 
 -- Bounded native public Reader source audit using accepted production Writer data.
 local uv=require("luv")
-require("compat.utf8").install()
-local Json=require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json=require("core.text.engine.json")
 local root=assert(uv.fs_mkdtemp("/tmp/ergopti-source-reader-XXXXXX"))
 local W=require("modules.keystats.sqlite_writer")
 local R=require("modules.keystats.sqlite_reader")

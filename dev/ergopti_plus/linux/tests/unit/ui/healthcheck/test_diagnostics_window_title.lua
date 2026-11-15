@@ -8,13 +8,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 helpers.describe("shared application native window titles", function()
 	helpers.it("passes every shared application caption to GTK in every locale", function()
-		local names = { "lgi", "ui.webview_manager", "infra.i18n", "adapters.event_loop",
-			"infra.monotonic", "infra.timings", "infra.managed_http_deadline", "adapters.notifier",
-			"ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
+		local names = { "lgi", "core.ui.ui.webview_manager", "core.i18n.engine.i18n", "core.events.loop",
+			"core.logger.engine.monotonic", "core.timing.engine.timings", "core.network.engine.managed_http_deadline", "platform.system.notifier",
+			"core.ui.ui.webkit_host", "ui.changelog.bridge", "ui.download_window.bridge", "infra.manifest_reader" }
 		local saved = {}
 		local close_fixture
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -77,13 +77,13 @@ helpers.describe("shared application native window titles", function()
 					signal_handler_is_connected = function(ucm, id) return ucm.connected[id] == true end,
 				},
 			}
-			package.loaded["adapters.event_loop"] = { add_idle_handler = function() end }
-			package.loaded["infra.i18n"] = { get = function(key)
+			package.loaded["core.events.loop"] = { add_idle_handler = function() end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 				assert(key == label_key)
 				return label
 			end }
-			package.loaded["ui.webview_manager"] = nil
-			local native_manager = require("ui.webview_manager")
+			package.loaded["core.ui.ui.webview_manager"] = nil
+			local native_manager = require("core.ui.ui.webview_manager")
 			native_manager.init()
 			-- Managed documents require the real show() reservation and handshake.
 			-- Keep the original low-level GTK path for all other applications.
@@ -113,26 +113,31 @@ helpers.describe("shared application native window titles", function()
 				end,
 			}, { __index = native_manager })
 			local function read_json(relative)
-				local path = assert(require("infra.paths").shared(relative))
+				local path = assert(require("core.fs.engine.paths").shared(relative))
 				local file = assert(io.open(path, "rb"))
 				local text = file:read("*a")
 				file:close()
 				return Json.decode(text)
 			end
-			local locales = read_json("data/locale_order.json").order
-			local apps = read_json("ui/apps.manifest.json").apps
+			local locales = read_json("core/i18n/data/locale_order.json").order
+			local manifest = read_json("ui/apps.manifest.json")
+			local apps = manifest.apps
+			-- A product name of the title policy is the whole title (window-title-product-name).
+			local whole = {}
+			for _, name in ipairs(manifest.window_title.product_names or {}) do whole[name] = true end
 			helpers.assert_eq(#locales, 21)
 			for _, locale in ipairs(locales) do
 				current_locale = locale
-				local strings = read_json("data/locales/" .. locale .. ".json")
+				local strings = read_json("core/i18n/data/locales/" .. locale .. ".json")
 				for app, entry in pairs(apps) do
 					local key = entry.title_key
 					label_key, label = key, strings[key]
 					helpers.assert_true(type(label) == "string" and label ~= "", locale .. " has " .. key)
-					local bridge = require("ui.webkit_host").bridge_for_app(app)
+					local bridge = require("core.ui.ui.webkit_host").bridge_for_app(app)
 					if bridge then
 						helpers.assert_true(manager._create_gtk_window(app, "<html></html>", { bridge_name = bridge }))
-						helpers.assert_eq(captured, "ErgoptiPlus — " .. label, locale .. " native " .. app .. " title")
+						helpers.assert_eq(captured, whole[label] and label or "ErgoptiPlus — " .. label,
+							locale .. " native " .. app .. " title")
 						helpers.assert_true(manager._destroy_gtk_window(app), "exact controlled child/signal/window retirement")
 					else
 						helpers.assert_eq(app, "permission_dialog", "only the macOS permission-repair dialog lacks a GTK owner")

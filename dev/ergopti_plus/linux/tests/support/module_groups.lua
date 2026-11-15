@@ -36,11 +36,11 @@ M.INTEGRATION = "integration"
 M.GROUPS = {
 	{ name = "integration", prefixes = {
 		"tests/meta/boot/test_daemon_cli.lua",
-		"tests/unit/adapters/processes/test_owned_process_deadline.lua",
-		"tests/unit/infra/lifecycle/test_callback_error_description.lua",
-		"tests/unit/infra/lifecycle/test_native_timer.lua",
+		"tests/unit/core/process/test_owned_process_deadline.lua",
+		"tests/unit/core/lifecycle/test_callback_error_description.lua",
+		"tests/unit/core/lifecycle/test_native_timer.lua",
 		"tests/unit/infra/config/test_personal_info_policy_read.lua",
-		"tests/unit/infra/logger/test_logger_native_files.lua",
+		"tests/unit/core/logger/test_native_files.lua",
 		"tests/unit/infra/config/test_shared_probe_native.lua",
 		"tests/unit/modules/keystats/storage/test_sqlite_first_open.lua",
 		"tests/unit/modules/llm/prediction/test_llm_prediction_engine_integration.lua",

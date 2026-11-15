@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Healthcheck / Configuration Reducer
 ; DESCRIPTION:
-; AHK port of _shared/lua/healthcheck/configuration.lua: turns the user's typed
+; AHK port of _shared/diagnostics/engine/healthcheck/configuration.lua: turns the user's typed
 ; config.toml document into the closed rows of the diagnostics `configuration`
 ; section. Only manifest-declared settings are read, so a key the user invented
 ; never becomes a row.

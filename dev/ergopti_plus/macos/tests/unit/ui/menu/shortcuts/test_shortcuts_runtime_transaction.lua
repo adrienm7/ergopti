@@ -18,10 +18,10 @@ local helpers = require("tests.helpers")
 local function load_menu_fixture(shortcuts, enabled, options)
 	options = options or {}
 	local noop = function() end
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-	package.loaded["infra.dialog_util"] = {}
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+	package.loaded["core.ui.engine.dialog_util"] = {}
 	package.loaded["modules.shortcuts"] = {
 		DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 	}
@@ -29,7 +29,7 @@ local function load_menu_fixture(shortcuts, enabled, options)
 		WRAP_GROUPS = {},
 		build_active_wrap_pairs = function() return {} end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		section = function(key) return key end,
 		decorate_section = function(value) return value end,
@@ -312,8 +312,8 @@ end)
 
 helpers.describe("menu-state shortcut synchronization requires exact lifecycle success", function()
 	helpers.it("returns false when resume_bindings returns false", function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
@@ -334,8 +334,8 @@ helpers.describe("menu-state shortcut synchronization requires exact lifecycle s
 	end)
 
 	helpers.it("returns true only for an exact true pause result", function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.keymap_lifecycle"] = {
 			ensure_started = function() return true end,
 		}
@@ -360,20 +360,20 @@ end)
 -- menubar. Only the logical native gate is controllable; no Karabiner deployment
 -- or physical input acknowledgement is inferred from that Boolean receipt.
 local function with_chord_fixture(mode, body)
-	return helpers.with_stub_scope({ "infra.preferences", "adapters.file_system", "infra.logger",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.fs_dir", "infra.notifications",
+	return helpers.with_stub_scope({ "infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
+		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "core.fs.engine.dir", "core.ui.engine.notifications",
 		"ui.menu.menu_shortcuts", "ui.menu.script_chords_transaction", "ui.menu.preferences_transaction",
 		"ui.menu.global_actions_transaction", "ui.menu.menu_state", "modules.shortcuts",
 		"modules.shortcuts.actions.text", "ui.menu.menu_utils", "ui.menu.shortcut_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "infra.manifest_reader",
-		"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
+		"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Chords = require("ui.menu.script_chords_transaction")
 		local MenuState = require("ui.menu.menu_state")
 		local old_rename = os.rename
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local old_write = FileSystem.write_if_unchanged
 		local failure, inverse_blocked, paused, terminal = mode, false, false, false
 		local called, result = xpcall(function()
@@ -454,18 +454,18 @@ local function with_chord_fixture(mode, body)
 				local function raw_save() calls.saves = calls.saves + 1; return save() end
 				owner = Chords.new({ state = state, script_control = facade, admission = global.run_exclusive,
 					paused = function() return paused end, save_prefs = raw_save })
-				package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end, decorate_section = function(value) return value end }
 				package.loaded["modules.shortcuts"] = { DEFAULT_STATE = { shortcuts = true, chatgpt_url = "https://example.test" } }
 				package.loaded["modules.shortcuts.actions.text"] = { WRAP_GROUPS = {}, build_active_wrap_pairs = function() return {} end }
-				package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-				package.loaded["infra.dialog_util"] = {}
+				package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {}
 				package.loaded["ui.menu.menu_keyboard_slots"] = { provide_rows = function() return {} end }
 				package.loaded["ui.menu.menu_tap_keys"] = { provide_rows = function() return {} end }
-				local renderer = assert(require("menu.renderer").new({ platform = "hs",
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("adapters.json_codec").decode, i18n = package.loaded["infra.i18n"], logger = require("infra.logger") }))
+				local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = package.loaded["core.i18n.engine.i18n"], logger = require("core.logger.engine.logger") }))
 				package.loaded["infra.manifest_menu"] = renderer
 				local context = { state = state, shortcuts = {}, script_control = facade, paused = false,
 					commit_script_chords = owner.toggle, save_prefs = function() return global.run_exclusive("Legacy chord save", raw_save) end,
@@ -567,20 +567,30 @@ helpers.describe("script chord logical mutation admission", function()
 			helpers.assert_eq(status, "ok")
 			helpers.assert_eq(saved.script_control_enabled, nil)
 			helpers.assert_eq(require("infra.manifest_reader").default_for("shortcuts.script_control.chords_enabled"), true)
-			local decoded = require("infra.toml.codec").decode(f.read())
+			local decoded = require("core.text.engine.toml.codec").decode(f.read())
 			helpers.assert_eq(decoded.shortcuts.script_control.chords_enabled, nil)
 			helpers.assert_eq(f.calls.updates, 1)
 		end)
 	end)
-	helpers.it("revokes a held row on actual pause and after native admission", function()
+	-- A pause admits the switch (EDD-1): script_control keeps it until the
+	-- resume settles, so the resume chord stays live. A pause that is not a
+	-- boolean, before or after native admission, is still refused.
+	helpers.it("(paused-chord-change) commits the switch while paused and revokes a malformed pause", function()
 		with_chord_fixture("ok", function(f)
-			f.set_pause(true)
+			f.set_pause(nil)
 			helpers.assert_eq(f.action(), false)
 			helpers.assert_eq(f.calls.native, 0)
-			f.set_pause(false); f.set_after_native(function() f.set_pause(true) end)
+			f.set_pause(false); f.set_after_native(function() f.set_pause(nil) end)
 			helpers.assert_eq(f.action(), false)
 			helpers.assert_eq(f.calls.saves, 0)
 			assert_chord_retained(f)
+		end)
+		with_chord_fixture("ok", function(f)
+			f.set_pause(true)
+			local before = f.runtime()
+			helpers.assert_eq(f.action(), true, "a paused switch commits")
+			helpers.assert_eq(f.runtime(), not before)
+			helpers.assert_eq(f.calls.saves > 0, true, "a paused switch is saved")
 		end)
 	end)
 	helpers.it("retains failed inverse debt and blocks a successor until actual readback recovery", function()
@@ -643,7 +653,7 @@ end)
 helpers.describe("script chord fixture borrowed cache ownership", function()
 	for _, populated in ipairs({ false, true }) do
 		helpers.it("restores borrowed renderer cache " .. (populated and "present" or "absent"), function()
-			local names = { "adapters.json_codec", "menu.renderer", "logger.shim" }
+			local names = { "core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }
 			helpers.with_fresh_modules(names, function()
 				local previous, previous_hs = {}, rawget(_G, "hs")
 				for _, name in ipairs(names) do

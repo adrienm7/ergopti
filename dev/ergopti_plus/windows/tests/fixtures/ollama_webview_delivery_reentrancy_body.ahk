@@ -103,8 +103,8 @@ _ODR_Main() {
 	Primary := 0, CleanupError := 0
 	try {
 		_SharedDir := A_Args[2] . "\shared", _I18nLocale := "fixture"
-		DirCreate(_SharedDir . "\data\locales")
-		FileAppend('{"label":"fixture"}', _SharedDir . "\data\locales\fixture.json", "UTF-8-RAW")
+		DirCreate(_SharedDir . "\core\i18n\data\locales")
+		FileAppend('{"label":"fixture"}', _SharedDir . "\core\i18n\data\locales\fixture.json", "UTF-8-RAW")
 		Locale := OllamaWV_I18nApplyScript(_I18nLocale)
 		_OllamaWV_Epoch += 1
 		_ODR_Install(World.OldView, World.OldController, World.OldGui)

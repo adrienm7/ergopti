@@ -14,7 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SEED = "7f3a9c21e5b04d68"
 local T0 = 1700000000
@@ -22,7 +22,7 @@ local URL = "https://api.github.com/repos/adrienm7/ergopti/releases?per_page=100
 local FEED_URL = "https://github.com/adrienm7/ergopti/releases.atom"
 
 local function read_defaults()
-	local handle = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -409,6 +409,14 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
 	end)
 
+	-- The shared value schema's declaration (value-validation).
+	for _, stored in ipairs({ 2147483648, "3600", 3600.5, 0 / 0 }) do
+		helpers.it("uses the default for a saved interval its declaration refuses: " .. tostring(stored), function()
+			local ctx = build({ now = T0, state = { update_check_interval_seconds = stored } })
+			helpers.assert_eq(ctx.owner.interval(), ctx.timing.default_check_interval_sec)
+		end)
+	end
+
 	helpers.it("a refused save keeps the previous interval", function()
 		local ctx = build({ now = T0, state = { update_check_interval_seconds = 3600 }, save_refused = true })
 		helpers.assert_eq(ctx.owner.set_interval(86400), false)
@@ -417,8 +425,8 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 
 	helpers.it("a menu session wires the production ports and a wake watcher", function()
 		local native = { started = 0, stopped = 0 }
-		for _, name in ipairs({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
-			"adapters.timer_scheduler" }) do
+		for _, name in ipairs({ "core.events.wake_watcher", "core.network.adapters.http_client", "core.fs.adapters.storage",
+			"core.events.timer_scheduler" }) do
 			package.loaded[name] = nil
 		end
 		local AutoCheck = helpers.load_with_stubs("modules.updater.auto_check", {
@@ -455,14 +463,14 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 		local old_new, old_config = AutoCheck.new, AutoCheck.load_config
 		local created, first_stops = 0, 0
 		local ok, err = pcall(function()
-			helpers.with_stub_scope({ "adapters.wake_watcher", "adapters.http_client", "adapters.storage",
-				"adapters.timer_scheduler" }, function()
-				package.loaded["adapters.wake_watcher"] = { new = function() return {
+			helpers.with_stub_scope({ "core.events.wake_watcher", "core.network.adapters.http_client", "core.fs.adapters.storage",
+				"core.events.timer_scheduler" }, function()
+				package.loaded["core.events.wake_watcher"] = { new = function() return {
 					start = function() return true end, stop = function() return true end,
 				} end }
-				package.loaded["adapters.http_client"] = { new = function() return {} end }
-				package.loaded["adapters.storage"] = {}
-				package.loaded["adapters.timer_scheduler"] = {}
+				package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+				package.loaded["core.fs.adapters.storage"] = {}
+				package.loaded["core.events.timer_scheduler"] = {}
 				AutoCheck.load_config = function() return { timeout_sec = 1 } end
 				AutoCheck.new = function()
 					created = created + 1
@@ -495,10 +503,10 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 	helpers.it("announces a release with a click that asks Sparkle for it", function()
 		local sent, checks = {}, {}
 		local previous = {
-			notifications = package.loaded["infra.notifications"],
+			notifications = package.loaded["core.ui.engine.notifications"],
 			launcher = package.loaded["adapters.update_launcher"],
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				sent[#sent + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 				return true
@@ -518,7 +526,7 @@ helpers.describe("updater.auto_check (macOS): Lua owns the cadence and the check
 			sent[1].on_click()
 			helpers.assert_eq(checks, { "dev" }, "the click asks Sparkle for the release's channel")
 		end)
-		package.loaded["infra.notifications"] = previous.notifications
+		package.loaded["core.ui.engine.notifications"] = previous.notifications
 		package.loaded["adapters.update_launcher"] = previous.launcher
 		package.loaded["modules.updater.auto_check"] = nil
 		if not ok then error(err, 0) end
@@ -866,7 +874,7 @@ local RATE_LIMITED = { ok = false, status = 403,
 
 helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API gives no list (update-check-feed-99)", function()
 	helpers.it("reads the feed's repository tags in order, as the update check's list", function()
-		local ReleaseSources = require("updater.release_sources")
+		local ReleaseSources = require("updater.engine.release_sources")
 		local list = assert(ReleaseSources.feed_release_list(FEED, "adrienm7", "ergopti"))
 		helpers.assert_eq(Json.decode(list), {
 			{ tag_name = "v0.0.0-dev.150", published_at = "2026-09-02T00:00:00Z" },
@@ -906,6 +914,35 @@ helpers.describe("updater.auto_check (macOS): the Atom feed answers when the API
 		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
 		helpers.assert_contains(answers[1].detail, "Atom feed: HTTP 200 without an Atom feed")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+	end)
+
+	-- UPD-1 (decided by the maintainer on 2026-11-11): the three drivers read a
+	-- 200 that does not open a JSON array as no connection through one shared
+	-- rule (updater.release_sources.opens_release_array), then the feed.
+	helpers.it("a captive-portal page from the API is no list: the feed answers (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "<html>Please sign in to the hotel Wi-Fi</html>", headers = {} },
+			{ ok = true, status = 200, body = FEED, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 2, "the API, then the feed")
+		helpers.assert_eq(ctx.requests[2].url, FEED_URL)
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("a cut array stays a list that could not be read, with no feed (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = '[{"tag_name":"v1.0.0"}', headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a release list cut short is no connection problem")
+		helpers.assert_eq(answers[1].reason_key, "updater.parse_failed")
+	end)
+
+	helpers.it("a page opening after a byte-order mark is still read as a list (upd1-captive-portal)", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = {
+			{ ok = true, status = 200, body = "\239\187\191[]", headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(#ctx.requests, 1, "a BOM before the array is the list, not a portal page")
 	end)
 
 	helpers.it("a manual check reads no feed for a list the API answered unusable", function()

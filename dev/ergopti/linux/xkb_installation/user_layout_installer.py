@@ -41,11 +41,14 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from desktop_activation import (  # noqa: E402
+    GNOME_SHELL_PROCESS,
+    WAYLAND_GNOME_EXTENSION_MISSING,
+    WAYLAND_NEEDS_RELOGIN,
     WAYLAND_SELECT_REFUSED,
     WAYLAND_SESSION_UNSUPPORTED,
     CleanupStatus,
@@ -53,9 +56,11 @@ from desktop_activation import (  # noqa: E402
     apply_x11_user_tree,
     compile_rmlvo,
     deactivate_layouts,
+    gnome_shell_knows_layout,
     keymap_has_type,
     live_readback_refusal,
     live_slots,
+    process_started_at,
     read_desktop_selection,
     running_as_root,
     select_live_slot,
@@ -68,7 +73,11 @@ from layout_package import (  # noqa: E402
     EXIT_VALIDATION,
     LayoutSpec,
     build_evdev_post,
+    inline_xcompose_block,
+    publish_compose_input_method,
+    running_process_names,
     patch_symbols_default,
+    strip_xcompose_block,
     validate_layout_files,
 )
 
@@ -87,6 +96,9 @@ ENV_USER_HOME = "ERGOPTI_XKB_USER_HOME"
 LAYOUT_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 MANIFEST_NAME = ".ergopti_plus_layouts.json"
+# The Compose input method state the daemon's layout menu reads
+# (linux/ui/menu/compose_input_method_row.lua pins this name).
+COMPOSE_STATE_NAME = ".ergopti_plus_compose_input_method"
 MANIFEST_SCHEMA = 1
 RULES_MARKER = "// ErgoptiPlus managed rules: registry layouts"
 REGISTRY_MARKER = "<!-- ErgoptiPlus managed registry: registry layouts -->"
@@ -221,33 +233,6 @@ def with_file_marker(content: str, layout_id: str) -> str:
     return FILE_MARKER + layout_id + "\n" + content
 
 
-def build_xcompose_block(compose_files: List[Path]) -> List[str]:
-    """The owned ~/.XCompose lines: the marker, then one include per layout."""
-    if not compose_files:
-        return []
-    lines = [XCOMPOSE_MARKER]
-    for path in compose_files:
-        escaped = str(path).replace("\\", "\\\\").replace('"', '\\"')
-        lines.append('include "%s"' % escaped)
-    return lines
-
-
-def strip_xcompose_block(content: str) -> List[str]:
-    """Removes the owned block (the marker and the includes after it)."""
-    lines = content.splitlines()
-    kept = []
-    index = 0
-    while index < len(lines):
-        if lines[index].strip() != XCOMPOSE_MARKER:
-            kept.append(lines[index])
-            index += 1
-            continue
-        index += 1
-        while index < len(lines) and lines[index].lstrip().startswith('include "'):
-            index += 1
-    return kept
-
-
 # ---------------------------------------------------------------------------
 # Files
 # ---------------------------------------------------------------------------
@@ -305,14 +290,29 @@ def owned_by_us(path: Path, marker: str) -> bool:
     return marker in head
 
 
-def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> None:
-    """Writes (or removes, when empty) the rules, the registry, the manifest
-    and the ~/.XCompose block from the installed layouts."""
+def probe_input_method() -> Tuple[Dict[str, str], Set[str], Optional[str]]:
+    """The session's environment, running process names and ibus-daemon path."""
+    return dict(os.environ), running_process_names(), shutil.which("ibus-daemon")
+
+
+def publish_shared_files(
+    root: Path,
+    home: Path,
+    layouts: Dict[str, dict],
+    probe: Optional[Callable[[], Tuple[Dict[str, str], Set[str], Optional[str]]]] = None,
+) -> str:
+    """Writes (or removes, when empty) the rules, the registry, the manifest,
+    the ~/.XCompose block and the GTK 3 Compose input method from the installed
+    layouts; returns the input method state (layout_package IM_STATE_*)."""
     rules = root / "rules" / "evdev"
     registry = root / "rules" / "evdev.xml"
     if layouts:
         write_text(rules, build_rules(list(layouts)))
-        write_text(registry, build_registry(layouts))
+        content = build_registry(layouts)
+        # An unchanged registry keeps its date: GNOME Shell's view of it is
+        # judged by that date (gnome_shell_knows_layout).
+        if not registry.exists() or registry.read_text(encoding="utf-8") != content:
+            write_text(registry, content)
         write_manifest(root, layouts)
     else:
         for path in (rules, registry, root / MANIFEST_NAME):
@@ -320,15 +320,28 @@ def publish_shared_files(root: Path, home: Path, layouts: Dict[str, dict]) -> No
                 path.unlink()
     xcompose = home / ".XCompose"
     existing = xcompose.read_text(encoding="utf-8") if xcompose.exists() else ""
-    kept = strip_xcompose_block(existing)
+    kept, _ = strip_xcompose_block(existing, XCOMPOSE_MARKER)
     composes = [layout_paths(root, layout_id)["compose"] for layout_id in sorted(layouts)]
-    lines = kept + build_xcompose_block([path for path in composes if path.exists()])
+    texts = [(path, path.read_text(encoding="utf-8")) for path in composes if path.exists()]
+    lines = kept + inline_xcompose_block(XCOMPOSE_MARKER, texts)
     content = "\n".join(lines) + ("\n" if lines else "")
     if content.strip():
         if content != existing:
             write_text(xcompose, content)
     elif xcompose.exists():
         xcompose.unlink()
+    # Looked up at call time, so a test can stand in for the session.
+    environ, running, ibus_daemon = (probe or probe_input_method)()
+    # The user tree is $XDG_CONFIG_HOME/xkb: environment.d and autostart are its siblings.
+    state = publish_compose_input_method(
+        root.parent, bool(texts), environ, running, ibus_daemon, write_text
+    )
+    state_file = root / COMPOSE_STATE_NAME
+    if texts:
+        write_text(state_file, state + "\n")
+    elif state_file.exists():
+        state_file.unlink()
+    return state
 
 
 def check_conflicts(root: Path, layout_id: str, installed: Dict[str, dict]) -> None:
@@ -569,6 +582,16 @@ def apply_wayland(
             WAYLAND_SELECT_REFUSED, "the %s layout setting is unreadable" % desktop
         )
     slot = slots[1] if selection.slot_in_use == slots[0] else slots[0]
+    other = slots[0] if slot == slots[1] else slots[1]
+    shell_known = True
+    if desktop == "gnome":
+        # Read before the install rewrites the registry.
+        started = process_started_at(GNOME_SHELL_PROCESS)
+        if started is None:
+            return _live_refusal(
+                WAYLAND_SELECT_REFUSED, "no %s process of this user" % GNOME_SHELL_PROCESS
+            )
+        shell_known = gnome_shell_knows_layout(root / "rules" / "evdev.xml", slot, started)
     report = install(
         slot,
         display_name,
@@ -581,13 +604,40 @@ def apply_wayland(
     )
     if not report["ok"]:
         return report
+    if not shell_known:
+        # Selecting an id the shell never read would switch the session to its
+        # "us" fallback: the setting stays as it is. The unused slot is
+        # registered too, so after one login both alternate live.
+        if selection.slot_in_use != other:
+            mirrored = install(
+                other,
+                display_name,
+                source_dir,
+                languages,
+                root,
+                home,
+                environ,
+                source_id=layout_id,
+            )
+            if not mirrored["ok"]:
+                return mirrored
+        return _live_refusal(
+            WAYLAND_NEEDS_RELOGIN,
+            "GNOME Shell reads %s only at login: log out and back in, then apply again"
+            % (root / "rules" / "evdev.xml"),
+        )
     applied, code = select_live_slot(slot, slots, selection, root, environ)
+    if code == WAYLAND_GNOME_EXTENSION_MISSING:
+        return _live_refusal(
+            code,
+            "the Ergopti GNOME Shell extension (focus@ergopti.fr) is not running: it switches"
+            " GNOME's layout; a new login loads it after an install or an update",
+        )
     if not applied:
         return _live_refusal(code, "not loaded: " + code)
     # The other slot is no longer selected, so rewriting it is invisible to the
     # compositor: both copies now hold this build, and a later activation of
     # either one types it.
-    other = slots[0] if slot == slots[1] else slots[1]
     mirrored = install(
         other, display_name, source_dir, languages, root, home, environ, source_id=layout_id
     )
@@ -646,7 +696,12 @@ def main(argv: Optional[List[str]] = None) -> int:
             report = apply_x11(args.layout_id, root)
         elif args.command == "apply-wayland":
             report = apply_wayland(
-                args.layout_id, args.display_name, args.source_dir, args.language, root, home
+                args.layout_id,
+                args.display_name,
+                args.source_dir,
+                args.language,
+                root,
+                home,
             )
         else:
             report = activate(args.layout_id, root)

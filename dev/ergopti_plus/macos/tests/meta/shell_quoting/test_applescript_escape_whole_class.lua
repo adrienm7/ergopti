@@ -15,7 +15,7 @@
 --- ROOT CAUSE ENCODED:
 --- Not "three files forgot to call the helper" but "the escape rule had no owner
 --- the checker could see". The pre-existing guard
---- (tests/unit/infra/text_and_paths/test_applescript_escaping.lua) enumerates its call sites BY
+--- (tests/unit/core/text/text_and_paths/test_applescript_escaping.lua) enumerates its call sites BY
 --- SYMBOL NAME — `pickConfigDir`, `_terminal_cmd` — and
 --- `helpers.read_driver_source(symbol)` returns only the files whose body
 --- contains that literal string. Those are exactly the two files that were
@@ -34,7 +34,7 @@ local SourceFile = require("tests.support.source_file")
 local CommandLines = require("tests.support.command_lines")
 
 -- Directories that ship runtime code. `tests/` is excluded by the walker.
-local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui" }
+local SCANNED_DIRS = { "modules", "infra", "adapters", "platform", "ui", "core" }
 
 -- A file joins the corpus when it runs AppleScript at all — through
 -- hs.osascript, through the /usr/bin/osascript binary, or through the

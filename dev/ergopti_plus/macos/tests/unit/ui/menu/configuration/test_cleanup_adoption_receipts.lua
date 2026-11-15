@@ -20,16 +20,16 @@ local PATH = "/synthetic/cleanup-adoption/config.toml"
 --- @param callback function Public menu/session exercise.
 local function with_cleanup(callback)
 	helpers.with_stub_scope({
-		"adapters.file_system", "infra.preferences", "config_cleanup_session",
-		"config_unused_keys", "infra.logger", "ui.menu.unused_keys_cleanup",
+		"core.fs.adapters.file_system", "infra.preferences", "settings.engine.migration.cleanup_session",
+		"settings.engine.migration.unused_keys", "core.logger.engine.logger", "ui.menu.unused_keys_cleanup",
 		"infra.config_overrides", "ui.onboarding", "modules.shortcuts.tap_keys",
 		"modules.shortcuts.keyboard_shortcuts",
-		"adapters.hotkey_registrar", "adapters.json_codec", "adapters.keyboard_geometry",
-		"adapters.storage", "adapters.timer_scheduler", "config_migrate", "infra.config_paths",
-		"infra.deferred_work", "infra.hotstring_choice_catalogue", "infra.manifest_reader",
-		"infra.notifications", "infra.personal_file_adoption", "infra.toml.writer",
-		"modules.shortcuts.ai_actions", "toml_codec.reader",
-		"toml_codec.writer", "hotstrings.personal_adoption",
+		"platform.input.hotkey_registrar", "core.fs.adapters.json_codec", "platform.input.keyboard_geometry",
+		"core.fs.adapters.storage", "core.events.timer_scheduler", "settings.engine.migration.migrate", "infra.config_paths",
+		"core.timing.engine.deferred_work", "infra.hotstring_choice_catalogue", "infra.manifest_reader",
+		"core.ui.engine.notifications", "infra.personal_file_adoption", "core.text.engine.toml.writer",
+		"modules.shortcuts.ai_actions", "core.text.engine.toml_codec.reader",
+		"core.text.engine.toml_codec.writer", "hotstrings.engine.catalogue.personal_adoption",
 	}, function()
 		local files, errors, writes = { [PATH] = INITIAL }, {}, {}
 		local adapter = {}
@@ -57,8 +57,8 @@ local function with_cleanup(callback)
 		logger.error = function(_, template, ...)
 			errors[#errors + 1] = string.format(template, ...)
 		end
-		package.loaded["adapters.file_system"] = adapter
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.fs.adapters.file_system"] = adapter
+		package.loaded["core.logger.engine.logger"] = logger
 		local preferences = helpers.load_with_stubs("infra.preferences")
 		helpers.assert_eq(select(2, preferences.load(PATH)), "ok")
 		callback({ files = files, errors = errors, writes = writes, adapter = adapter,
@@ -77,7 +77,7 @@ local function open_session(fixture, owner)
 		path = PATH, file_adapter = fixture.adapter,
 		preferences = owner or fixture.preferences,
 		host = { open = function(options)
-			session = require("config_cleanup_session").new(options)
+			session = require("settings.engine.migration.cleanup_session").new(options)
 			return true
 		end },
 	})

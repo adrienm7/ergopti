@@ -26,8 +26,8 @@ global UPDATER_INI_SECTION := "updater"
 
 ; Locale key of the About version row for each build kind, and of the text
 ; shown for a commit that cannot be determined (Updater_VersionRowLabel). The
-; AHK port of _shared/lua/updater/version_label.lua; both are pinned to
-; _shared/modules/updater/version_label_vectors.json.
+; AHK port of _shared/updater/engine/version_label.lua; both are pinned to
+; _shared/updater/data/version_label_vectors.json.
 global UPDATER_VERSION_ROW_KEYS := Map(
 	"release", "menu.about.version_release",
 	"local",   "menu.about.version_local",
@@ -38,7 +38,7 @@ global UPDATER_UNKNOWN_COMMIT_KEY := "menu.about.commit_unknown"
 ; through the shared registry (_Updater_SelectChannelRelease). GitHub's
 ; /releases/latest ignores prereleases and answers 404 while no stable release
 ; exists, which callers reported as an unreachable network. Mirrors
-; update_check.releases_url in _shared/modules/updater/defaults.json (pinned
+; update_check.releases_url in _shared/updater/data/defaults.json (pinned
 ; by tools/test/test-updater-constants-single-source.cjs).
 global UPDATER_RELEASES_API_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=100"
 ; The public releases Atom feed, read when api.github.com gives no list: a
@@ -52,7 +52,7 @@ global UPDATER_RELEASES_FEED_URL_TEMPLATE := UPDATER_GITHUB_WEB_ROOT . "{owner}/
 global UPDATER_NO_CHANNEL_RELEASE := "[]"
 
 ; Background update-check interval. 0 means "never" (disabled). The default and
-; the presets are the shared ones (_shared/modules/updater/defaults.json, read
+; the presets are the shared ones (_shared/updater/data/defaults.json, read
 ; through modules/updater/schedule.ahk); a saved value outside them snaps to
 ; the nearest preset. Honoured by ``Updater_StartBackgroundChecks``.
 global UPDATER_INI_INTERVAL_KEY    := ConfigLeaf.CHECK_INTERVAL_SECONDS
@@ -75,10 +75,12 @@ global UPDATER_HTTP_RECEIVE_TIMEOUT_MS := 30000    ; response receive
 ; budget than the tiny JSON API calls above. Reusing the 30 s API value made the
 ; WinHttpRequest receive timeout abort the transfer at 30 s on slow/metered links,
 ; defeating the 600 s SetTimer poll ceiling (updater-download-receive-timeout).
-global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := 600000  ; binary download receive
+; Both bounds come from archive_transfer of the shared updater defaults, which
+; macOS and Linux read too (generated as UpdateArchiveTransferData()).
+global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS := UpdateArchiveTransferData()["archive_idle_timeout_ms"]
 ; Absolute wall-clock owner for the complete download transaction. Per-read
 ; timeouts do not stop a peer that sends one byte before every read deadline.
-global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := 1200000
+global UPDATER_HTTP_DOWNLOAD_DEADLINE_MS := UpdateArchiveTransferData()["archive_phase_timeout_ms"]
 
 ; Floor for the downloaded exe size (512 KB). A real ErgoptiPlus binary is
 ; several MB; anything below this is certainly a partial download or a CDN
@@ -1131,14 +1133,10 @@ Updater_SetChannel(Channel, Request := unset, IsSuspended := unset, NotifyFn := 
 	}
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
-		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
-			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
-	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
-		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -1378,13 +1376,14 @@ Updater_LoadCheckInterval() {
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
-	; Only a finite, non-negative whole number carries updater cadence intent.
-	; Coercing a quoted zero or truncating a fraction would disable checks.
-	; A genuine source Boolean remains a TOML_Bool above and is rejected here.
-	if (!(raw is Integer) && !(raw is Float)) || raw != raw || raw < 0
-			|| (raw - raw) != 0 {
-		try LoggerWarn("Updater", "Ignoring invalid check_interval_seconds '{1}' — using default ({2} s).",
-			raw is Object ? Type(raw) : raw, UPDATER_DEFAULT_INTERVAL)
+	; Only a finite whole number within the shared value schema's declaration
+	; carries updater cadence intent. Coercing a quoted zero or truncating a
+	; fraction would disable checks. A genuine source Boolean remains a TOML_Bool
+	; above and is rejected here.
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if !Checked["ok"] {
+		try LoggerWarn("Updater", "Ignoring invalid check_interval_seconds '{1}' ({2}, {3} to {4} s) — using default ({5} s).",
+			raw is Object ? Type(raw) : raw, Checked["reason"], Checked["min"], Checked["max"], UPDATER_DEFAULT_INTERVAL)
 		UPDATER_CHECK_INTERVAL := UPDATER_DEFAULT_INTERVAL
 		return
 	}
@@ -1542,36 +1541,29 @@ Updater_SetCheckInterval(Seconds, Request := unset, IsSuspended := unset, Notify
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
-		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
-			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
-	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
-		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
 	} else if !_Updater_RequestMayPublish(Request, , NotifyFn) {
 		return false
 	}
-	; Coerce defensively: a valid cadence may arrive as a String ("300") or
-	; Float (300.0) — e.g. from a config migration or a future caller, since
-	; Updater_LoadCheckInterval reads strings from TOML. An exact Type() ==
-	; "Integer" test would silently drop those. Reject only genuinely invalid
-	; input (non-numeric or negative) and LoggerWarn so a bad value is visible
-	; in the log rather than disappearing without a trace.
-	try {
-		Seconds := Integer(Seconds)
-	} catch {
-		try LoggerWarn("Updater", "Ignoring non-numeric check interval: {1}.", Seconds)
-		return
-	}
-	if (Seconds < 0) {
-		try LoggerWarn("Updater", "Ignoring negative check interval: {1}.", Seconds)
+	; The consuming boundary checks the shared value schema's declaration. A
+	; whole number written as a string ("300", from a config migration) is
+	; still read as its number; any other string, a fraction (once truncated by
+	; Integer()), NaN, an infinity or a value out of range is refused with a log
+	; line and nothing is written.
+	Candidate := (Seconds is String && RegExMatch(Seconds, "^\d+$")) ? Seconds + 0 : Seconds
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.UPDATER_CHECK_INTERVAL_SECONDS), Candidate)
+	if !Checked["ok"] {
+		try LoggerWarn("Updater", "Ignoring invalid check interval '{1}' ({2}).",
+			IsObject(Seconds) ? Type(Seconds) : Seconds, Checked["reason"])
 		return false
 	}
+	Seconds := Integer(Checked["value"])
 	ActionOwner := _Updater_AcquireAsyncActionLease(
 		"Check-interval change", NotifyFn)
 	if !IsObject(ActionOwner)
@@ -1729,7 +1721,7 @@ _Updater_NormalizeTag(Tag) {
 	return (SubStr(Tag, 1, 1) == "v") ? SubStr(Tag, 2) : Tag
 }
 
-; Semver helpers — canonical algorithm in _shared/modules/updater/version.js.
+; Semver helpers — canonical algorithm in _shared/updater/data/version.js.
 ; Parses "2.5.0-dev.3" into decimal strings { Maj, Min, Pat, PreParts } or 0 on failure.
 _Updater_ParseVersion(Tag) {
 	Norm := _Updater_NormalizeTag(Tag)
@@ -1812,7 +1804,7 @@ _Updater_CompareVersions(A, B) {
 
 ; Returns true when Latest is strictly newer than Current (semver comparison).
 ; Handles pre-release tags (e.g. 2.5.0-dev.3 → 2.5.0-dev.4). Canonical
-; vectors live in _shared/modules/updater/version.js:versionTestVectors().
+; vectors live in _shared/updater/data/version.js:versionTestVectors().
 _Updater_IsNewerVersion(Latest, Current) {
 	return _Updater_CompareVersions(Latest, Current) > 0
 }
@@ -1959,6 +1951,28 @@ _Updater_RequestPolicy(Request, IsSuspended := unset) {
 	}
 	if (Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
 		return UPDATER_REQUEST_POLICY_DROP
+	; A pause stops typing, not what the user asks for (UPD-2, the maintainer's
+	; real pause, as macOS check_now and Linux check_for_updates): a manual check,
+	; window or setting runs and answers whether or not the driver is paused.
+	; Installs keep their own pause policy (_Updater_InstallRequestPolicy).
+	return UPDATER_REQUEST_POLICY_ALLOW
+}
+
+; The policy of an install's request: the self-update transaction stops at a
+; pause (suspend quiesce, staging monitor, staging completion, swap handshake),
+; so an install request born paused drops, and one caught by a pause, or by a
+; pause and resume since it was born, notifies once instead of running on.
+; @param Request {Object} The immutable request context.
+; @param IsSuspended {Boolean} The boundary's pause state; A_IsSuspended by default.
+; @returns {String} One of the UPDATER_REQUEST_POLICY_* values.
+_Updater_InstallRequestPolicy(Request, IsSuspended := unset) {
+	global UPDATER_REQUEST_ORIGIN_MANUAL, UPDATER_REQUEST_POLICY_ALLOW
+	global UPDATER_REQUEST_POLICY_DROP, UPDATER_REQUEST_POLICY_NOTIFY, _UpdaterPauseGeneration
+	if !IsSet(IsSuspended)
+		IsSuspended := A_IsSuspended
+	Policy := _Updater_RequestPolicy(Request, IsSuspended)
+	if (Policy != UPDATER_REQUEST_POLICY_ALLOW or Request.Origin != UPDATER_REQUEST_ORIGIN_MANUAL)
+		return Policy
 	if Request.BornSuspended
 		return UPDATER_REQUEST_POLICY_DROP
 	if (IsSuspended or Request.Generation != _UpdaterPauseGeneration)
@@ -1966,8 +1980,11 @@ _Updater_RequestPolicy(Request, IsSuspended := unset) {
 	return UPDATER_REQUEST_POLICY_ALLOW
 }
 
-; Visible terminal for a manual updater action attempted while paused.
-_Updater_RefuseManualWhileSuspended(NotifyFn := 0) {
+; Tells that an install waits for the end of the pause: the self-update
+; transaction still stops at one (UPD-2 keeps this refusal for installs only).
+; @param NotifyFn {Func|Integer} Replaces NotifierSend (tests only).
+; @returns {Boolean} false, the refused action's result.
+_Updater_RefuseInstallWhileSuspended(NotifyFn := 0) {
 	try {
 		Message := t("script_control.paused")
 		Options := Map("title", t("updater.title_update"), "level", "warning")
@@ -1975,10 +1992,10 @@ _Updater_RefuseManualWhileSuspended(NotifyFn := 0) {
 			NotifyFn.Call(Message, Options)
 		else
 			NotifierSend(Message, Options)
-		try LoggerWarn("Updater", "Manual updater action refused while suspended.")
+		try LoggerWarn("Updater", "Install refused while suspended: the self-update stops at a pause.")
 		return false
 	} catch as Err {
-		try LoggerError("Updater", "Could not surface paused-action refusal: {1}.", Err.Message)
+		try LoggerError("Updater", "Could not surface the paused install refusal: {1}.", Err.Message)
 		return false
 	}
 }
@@ -2010,8 +2027,9 @@ _Updater_QueueManualPauseNotice(Request) {
 	return Added
 }
 
-; Shared terminal policy for every updater/changelog async consumer.
-_Updater_RequestMayPublish(Request, IsSuspended := unset, NotifyFn := 0) {
+; Shared terminal policy for every updater/changelog async consumer. An install
+; passes ForInstall and is held to _Updater_InstallRequestPolicy.
+_Updater_RequestMayPublish(Request, IsSuspended := unset, NotifyFn := 0, ForInstall := false) {
 	global UPDATER_REQUEST_POLICY_ALLOW, UPDATER_REQUEST_POLICY_NOTIFY
 	if !IsSet(IsSuspended)
 		IsSuspended := A_IsSuspended
@@ -2019,7 +2037,8 @@ _Updater_RequestMayPublish(Request, IsSuspended := unset, NotifyFn := 0) {
 		try LoggerError("Updater", "Async completion discarded because request provenance is missing or malformed.")
 		return false
 	}
-	Policy := _Updater_RequestPolicy(Request, IsSuspended)
+	Policy := ForInstall ? _Updater_InstallRequestPolicy(Request, IsSuspended)
+		: _Updater_RequestPolicy(Request, IsSuspended)
 	if (Policy == UPDATER_REQUEST_POLICY_ALLOW)
 		return true
 	if (Policy == UPDATER_REQUEST_POLICY_NOTIFY) {
@@ -2520,14 +2539,10 @@ _Updater_OpenManualUrl(ResolveUrlFn, Request := unset, IsSuspended := unset, Not
 	global UPDATER_REQUEST_ORIGIN_MANUAL
 	HasSuspendOverride := IsSet(IsSuspended)
 	if !IsSet(Request) {
-		if (HasSuspendOverride ? IsSuspended : A_IsSuspended)
-			return _Updater_RefuseManualWhileSuspended(NotifyFn)
 		Request := HasSuspendOverride
 			? _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL, IsSuspended)
 			: _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
 	}
-	if (_Updater_RequestContextValid(Request) and Request.BornSuspended)
-		return _Updater_RefuseManualWhileSuspended(NotifyFn)
 	if HasSuspendOverride {
 		if !_Updater_RequestMayPublish(Request, IsSuspended, NotifyFn)
 			return false
@@ -2666,6 +2681,15 @@ _Updater_InterpretResponse(Status, Body, Etag, Channel, Url, Request := unset,
 		}
 		try LoggerDebug("Updater", "GitHub releases unchanged (304) for channel {1}.", Channel)
 	} else if (Status == 200) {
+		; A 200 that does not open JSON (a captive portal or proxy page) is no
+		; release list: answer none, so the caller reads the Atom feed and says
+		; « no connection » rather than « parse failed » (UPD-1). A body that opens
+		; JSON stays the parser's: a malformed array, or an object such as GitHub's
+		; error document, is still a malformed release response.
+		if !(Body is String) || !RegExMatch(Body, "^\x{FEFF}?\s*[\[{]") {
+			try LoggerWarn("Updater", "GitHub answered HTTP 200 without JSON for '{1}'.", Url)
+			return ""
+		}
 		Json := Body
 		if (Etag is String and Etag != ""
 			and _Updater_JsonPayloadIsUsable(Json)) {
@@ -2793,7 +2817,7 @@ _Updater_NoChannelReleaseMessage(Channel) {
 
 ; Lists the releases of a GitHub releases Atom feed as the JSON array the update
 ; check reads: tag_name and published_at, newest first as the feed orders them.
-; Port of feed_release_list in _shared/lua/updater/release_sources.lua, replaying
+; Port of feed_release_list in _shared/updater/engine/release_sources.lua, replaying
 ; _shared/tests/corpus/updater/check_only_vectors.json: only an entry whose
 ; alternate link is a release tag of this repository counts, and a tag outside
 ; [A-Za-z0-9._+-] is dropped.
@@ -3529,14 +3553,30 @@ _Updater_SwapAsyncRequestsForBoundary(Reason, ReplacementRequests) {
 	global _UpdaterAsyncRequests, _UpdaterPauseGeneration
 	global _UpdaterBackgroundGeneration, _UpdaterPendingReleaseNotification
 	global _UpdaterActiveAsyncTerminalDeliveryCount
-	global UPDATER_CANCEL_REASON_SUSPEND
+	global UPDATER_CANCEL_REASON_SUSPEND, UPDATER_REQUEST_ORIGIN_MANUAL, _UpdaterDownloadRequest
 	if !(ReplacementRequests is Map)
 		throw TypeError("Updater replacement registry must be a Map")
-	if (Reason == UPDATER_CANCEL_REASON_SUSPEND)
+	PendingRequests := _UpdaterAsyncRequests
+	if (Reason == UPDATER_CANCEL_REASON_SUSPEND) {
 		_UpdaterPauseGeneration += 1
+		; A manual request runs through a pause (UPD-2): it keeps its owner and
+		; its poll; the background checks stop, and so does an install's own
+		; request, which the self-update transaction cancels at a pause.
+		Install := IsSet(_UpdaterDownloadRequest) ? _UpdaterDownloadRequest : 0
+		Kept := Map()
+		for Id, Record in PendingRequests {
+			if (Record is Map) && _Updater_RequestContextValid(Record.Get("request", 0))
+					&& Record["request"].Origin == UPDATER_REQUEST_ORIGIN_MANUAL
+					&& !(IsObject(Install) && Record["request"] == Install)
+				Kept[Id] := Record
+		}
+		for Id, Record in Kept {
+			PendingRequests.Delete(Id)
+			ReplacementRequests[Id] := Record
+		}
+	}
 	_UpdaterBackgroundGeneration += 1
 	_UpdaterPendingReleaseNotification := 0
-	PendingRequests := _UpdaterAsyncRequests
 	; Claim non-leased terminals before an empty replacement becomes visible.
 	; Leased records remain covered by the send count and claim on lease release.
 	for _Id, Record in PendingRequests {

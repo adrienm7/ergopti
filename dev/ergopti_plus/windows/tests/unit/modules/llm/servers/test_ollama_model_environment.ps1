@@ -18,7 +18,7 @@ foreach ($file in @('ollama-runtime-launch.ps1', 'ollama-model-pull.ps1')) {
 		. ([ScriptBlock]::Create($node.Extent.Text))
 	}
 }
-$declaration = Join-Path $repository 'static/ergopti_plus/_shared/modules/llm/managed_ollama_environment.json'
+$declaration = Join-Path $repository 'static/ergopti_plus/_shared/ai/data/managed_ollama_environment.json'
 if ($BuilderOnly) {
 	# PowerShell 7 JSON integer typing differs from the production PS5 reader.
 	# This portable mode qualifies only the actual builder and process inheritance.

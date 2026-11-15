@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function fixture_context()
-	return {
+	local ctx = {
 		state = { llm_backend = "api", llm_model = "probe-model" },
 		paused = false,
 		is_paused = function() return false end,
@@ -20,6 +20,10 @@ local function fixture_context()
 		update_menu = function() end,
 		WarmupCtrl = { warmup = function() end },
 	}
+	-- The page hands the real pause to the key test; here it follows the
+	-- fixture's own reader, so a test that swaps is_paused swaps both.
+	ctx.runtime_is_paused = function() return ctx.is_paused() end
+	return ctx
 end
 
 local function install_doubles(args)
@@ -55,7 +59,7 @@ local function install_doubles(args)
 	package.loaded["modules.llm"] = { api_remote = api_remote }
 	-- The two body templates mirror the en.json shapes so the substitution
 	-- wiring is exercised; every other key echoes itself.
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if args.locale_strings then return args.locale_strings[key] or key end
 		if key == "menu.llm.api_test_ok_body" then
 			return '"{1}" answered in {2} ms: {3}'
@@ -65,15 +69,15 @@ local function install_doubles(args)
 		end
 		return key
 	end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.dialog_util"] = {}
+	package.loaded["core.ui.engine.dialog_util"] = {}
 	local notifications = {}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, level)
 			notifications[#notifications + 1] = {
 				title = title, body = body, level = level,
@@ -81,12 +85,12 @@ local function install_doubles(args)
 			return true
 		end,
 	}
-	local command_renderer = assert(require("menu.renderer").new({
+	local command_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-		json_decode = require("adapters.json_codec").decode,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},
@@ -112,13 +116,13 @@ end
 
 
 local function with_api_add_locale(scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
 	local ok, err = pcall(function()
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -128,7 +132,7 @@ local function with_api_add_locale(scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
 		helpers.assert_eq(native.get_locale(), "en")
-		helpers.assert_eq(require("infra.locale").current_locale(), "en")
+		helpers.assert_eq(require("core.i18n.engine.locale").current_locale(), "en")
 		scenario(native)
 	end)
 	local restored, released, forgotten = true, true, true

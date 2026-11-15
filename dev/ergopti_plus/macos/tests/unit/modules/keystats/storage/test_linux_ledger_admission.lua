@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keystats.export")
 
 local function fixture()
@@ -51,7 +51,8 @@ helpers.describe("Linux ledger admitted by the foreign scanner", function()
 		helpers.assert_eq(facts.unreadable, false)
 		helpers.assert_nil(facts.regression)
 		helpers.assert_eq(facts.ids[1], true)
-		helpers.assert_eq(facts.ids[10], true, "the first typing row follows all nine prior raw families, including ROI")
+		helpers.assert_eq(facts.ids[11], true,
+			"the second day's typing row follows all ten raw families of the first, including ROI and the clipboard")
 		helpers.assert_eq(facts.cutoffs[1], 1)
 	end)
 end)

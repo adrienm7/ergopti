@@ -14,11 +14,11 @@ local M = {}
 --- Binds the genuine canonical parent owner for one positive capture fixture.
 --- @return table renderer Actual shared renderer with independent source custody.
 function M.new()
-	return assert(require("menu.renderer").new({
+	return assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-		json_decode = require("json").decode,
-		i18n = require("infra.i18n"), logger = helpers.make_logger_stub(),
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+		json_decode = require("core.text.engine.json").decode,
+		i18n = require("core.i18n.engine.i18n"), logger = helpers.make_logger_stub(),
 	}))
 end
 

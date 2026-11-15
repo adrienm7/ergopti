@@ -20,13 +20,13 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
-	"adapters.file_system",
-	"infra.paths",
-	"infra.logger",
+	"platform.input.hotkey_registrar",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.paths",
+	"core.logger.engine.logger",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -48,23 +48,23 @@ local function with_subject(store, scenario)
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_, fmt, ...) observed.warnings[#observed.warnings + 1] = string.format(fmt, ...) end
 
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			observed.bound[#observed.bound + 1] = chord
 			return { id = #observed.bound }
 		end,
 		unbind = function() return true end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}' end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.gestures.actions"] = {
 		is_assignable = function(action_id) return OFFERED[action_id] == true end,
 		execute_single = function() return true end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	require("tests.support.keyboard_config_fixture").install(store)
@@ -134,13 +134,13 @@ helpers.describe("keyboard shortcuts: unknown action ids", function()
 		-- walk_assignments asserted a table: an older build's `keyboard = "x"`
 		-- made start() fail with an ERROR, rolling back the whole shortcut
 		-- layer, and made the cleanup report the file as unreadable.
-		require("config_outdated").reset_for_tests()
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local stale = "[shortcuts]\nkeyboard = \"x\"\n"
 		local observed = with_subject({}, function(subject)
-			package.loaded["adapters.file_system"].read_with_status = function() return stale, "ok" end
+			package.loaded["core.fs.adapters.file_system"].read_with_status = function() return stale, "ok" end
 			helpers.assert_eq(subject.start(), true, "an outdated value never stops the layer")
 			local marked = {}
-			subject.mark_config_reads(require("toml_codec").decode(stale),
+			subject.mark_config_reads(require("core.text.engine.toml_codec").decode(stale),
 				function(...) marked[#marked + 1] = table.concat({ ... }, ".") end)
 			helpers.assert_eq(marked, {}, "left unmarked, so the cleanup offers it")
 		end)

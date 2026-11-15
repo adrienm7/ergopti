@@ -24,10 +24,10 @@
 
 local M = {}
 
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 local Updater = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "updater.channel"
 

@@ -12,26 +12,27 @@ local TEST_SHA = string.rep("a", 64)
 local CACHE_PATH = "/cache/Karabiner-Elements.dmg"
 
 local MODULE_NAMES = {
-	"adapters.task_environment",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.process.adapters.task_environment",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
 	-- The onboarding names its download cache from the shared folder table.
-	"app_dirs",
+	"core.fs.engine.app_dirs",
 	-- The task lifecycle adapter formats raised errors through the shared owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	"hs",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.launcher_environment",
-	"infra.logger",
-	"infra.notifications",
-	"infra.text_utils",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.lifecycle.engine.launcher_environment",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
 	-- The remap onboarding resolves its own folder, joins a label to its value
 	-- and the scheduler admits delays through these pure owners.
-	"locale.label_value",
-	"native_path",
-	"number_policy",
+	"core.i18n.engine.label_value",
+	"core.fs.engine.native_path",
+	"core.text.engine.number_policy",
 	"platform.remap.ke_paths",
+	"platform.remap.network_download",
 	"platform.remap.onboarding",
 	"tests.stubs.hs",
 }
@@ -39,8 +40,11 @@ local MODULE_NAMES = {
 --- Returns the installer stage represented by an executable path.
 --- @param executable string Native executable path.
 --- @return string stage Stable lifecycle stage.
-local function stage_for_executable(executable)
-	if executable == "/usr/bin/curl" then return "download" end
+--- @param args table|nil Native argv: the download is curl behind the network
+---   route's shell (platform/remap/network_download.lua, NET-001).
+local function stage_for_executable(executable, args)
+	if executable == "/bin/sh" and type(args) == "table" and type(args[2]) == "string"
+		and args[2]:find('exec /usr/bin/curl "$@"', 1, true) then return "download" end
 	if executable == "/usr/bin/shasum" then return "checksum" end
 	if executable == "/usr/bin/hdiutil" then return "mount" end
 	if executable == "/usr/bin/osascript" then return "install" end
@@ -142,7 +146,7 @@ local function run_fixture(options, scenario)
 	local start_indexes = {}
 	local terminate_indexes = {}
 	hs_stub.task.new = function(executable, callback, args)
-		local stage = stage_for_executable(executable)
+		local stage = stage_for_executable(executable, args)
 		local task = {
 			args = args or {},
 			callback = callback,
@@ -299,11 +303,11 @@ local function run_fixture(options, scenario)
 		calls.timers[#calls.timers + 1] = timer
 		return timer, true
 	end
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
+	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(format, value) return string.format(format, value) end,
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
@@ -314,7 +318,16 @@ local function run_fixture(options, scenario)
 		GRABBER = "/test/karabiner_grabber",
 	}
 
-	package.loaded["adapters.task_lifecycle"] = nil
+	-- The download's network route: the shell shape of the production command,
+	-- without the prelude this fixture cannot read (test_network_download.lua).
+	package.loaded["platform.remap.network_download"] = {
+		command = function(tag, curl_args)
+			local args = { "-c", 'exec /usr/bin/curl "$@"', tag }
+			for _, value in ipairs(curl_args) do args[#args + 1] = value end
+			return "/bin/sh", args, function() return nil end
+		end,
+	}
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	package.loaded["platform.remap.onboarding"] = nil
 	onboarding = require("platform.remap.onboarding")
 	onboarding.load_manifest = function()

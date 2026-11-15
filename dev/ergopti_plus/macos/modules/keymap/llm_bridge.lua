@@ -27,14 +27,14 @@ local M = {}
 local hs        = hs
 local km_utils         = require("modules.keymap.utils")
 local EventProvenance  = require("adapters.event_provenance")
-local SyntheticInput   = require("adapters.synthetic_input")
-local text_utils       = require("infra.text_utils")
+local SyntheticInput   = require("platform.input.synthetic_input")
+local text_utils       = require("core.text.engine.utils")
 local core_llm         = require("modules.llm")
-local Logger           = require("infra.logger")
+local Logger           = require("core.logger.engine.logger")
 local PhaseStats       = require("infra.phase_stats")
-local Keycodes         = require("infra.keycodes")
+local Keycodes         = require("platform.input.keycodes")
 local keystats        = require("modules.keystats")
-local tooltip          = require("ui.tooltip")
+local tooltip          = require("core.ui.ui.tooltip")
 local engine           = require("modules.llm.prediction_engine")
 local ToneRewrite      = require("modules.llm.tone_rewrite")
 local ScreenAnswer     = require("modules.llm.screen_answer")
@@ -43,13 +43,13 @@ local AgentRunner      = require("modules.llm.agent_runner")
 local Registry         = require("modules.keymap.registry")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local expander         = require("modules.keymap.expander")
-local TimerScheduler   = require("adapters.timer_scheduler")
+local TimerScheduler   = require("core.events.timer_scheduler")
 local ManifestReader = require("infra.manifest_reader")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
-local Timings          = require("infra.timings")
-local ConfigKeys = require("config_keys")
+local Timings          = require("core.timing.engine.timings")
+local ConfigKeys = require("settings.engine.keys")
 local LlmContext       = require("modules.keymap.llm_context")
-local ContextBuffer    = require("llm.context_buffer")  -- shared navigation rule of the AI context
+local ContextBuffer    = require("ai.engine.policy.context_buffer")  -- shared navigation rule of the AI context
 
 local LOG    = "keymap.llm_bridge"
 local _state = nil  -- Shared CoreState, injected via M.init().
@@ -408,7 +408,7 @@ local ACTIVITY_NEUTRAL_KEYCODES = {}
 for _, name in ipairs({ "F13_KARABINER_RETURN", "F14_KARABINER_BACKSPACE",
 	"F15_KARABINER_ESCAPE", "F18_KARABINER_DELETE", "F16_LLM_CHAIN_SIGNAL",
 	"F17_CYCLE_WINDOWS", "F20_LAYER_NAV_ENTERED", "F19_LAYER_NAV_EXITED",
-	"LAYER_SYN_1", "LAYER_SYN_2", "LAYER_SYN_3" }) do
+	"LAYER_SYN_1", "LAYER_SYN_2", "LAYER_SYN_3", "CONTEXT_MENU_TAP_HOLD_MODIFIER" }) do
 	local code = Keycodes[name]
 	if code ~= nil then ACTIVITY_NEUTRAL_KEYCODES[code] = true end
 end
@@ -1058,7 +1058,7 @@ local function update_preview_body(buf)
 				rows[#rows + 1] = {
 					-- Masked when the value is a declared secret, in full otherwise.
 					-- Which fields are secrets, and how much of one stays visible, is
-					-- _shared/modules/personal_info/fields.toml — read at runtime, so
+					-- _shared/hotstrings/data/personal_info/fields.toml — read at runtime, so
 					-- this driver holds no opinion of its own about it.
 					text          = masked_for_preview(m),
 					personal_source_id = m.mapping and m.mapping.personal_source and m.mapping.personal_source.id or nil,

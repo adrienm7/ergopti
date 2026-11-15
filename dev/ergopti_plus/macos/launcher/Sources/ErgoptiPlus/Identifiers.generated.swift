@@ -1,4 +1,4 @@
-// AUTO-GENERATED from _shared/data/identifiers.json.
+// AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 // DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 
 /// Application names, bundle ids, service labels and external hosts. Hosts are
@@ -42,5 +42,8 @@ enum Identifiers {
 		static let folder = "docs/field-reports"
 		static let baseConfigKey = "ergoptiFieldBase"
 		static let environment = "ERGOPTI_FIELD_RUN_ROOT"
+	}
+	enum MacosNotifications {
+		static let launcherQuitRequest = "com.ergoptiplus.app.quit-request"
 	}
 }

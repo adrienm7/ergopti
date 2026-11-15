@@ -19,7 +19,7 @@
 
 local helpers = require("tests.helpers")
 local Scenario = require("tests.support.agent_scenario")
-local Agent = require("llm.agent")
+local Agent = require("ai.engine.agent.agent")
 
 local SELECTION = "On se voit jeudi 14h avec Paul pour le devis"
 local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Devis avec Paul","start":"2026-10-01T14:00"},'
@@ -92,7 +92,7 @@ end)
 local function expected_prompt(world, source)
 	return Agent.system2_prompt(world.config, {
 		source = source, app = world.window.app, window = world.window.title, now = "2026-09-29T14:05",
-		weekday = "Tuesday", timezone = "Europe/Paris", language = require("infra.i18n").get_locale(),
+		weekday = "Tuesday", timezone = "Europe/Paris", language = require("core.i18n.engine.i18n").get_locale(),
 		tools = world.tools,
 	})
 end
@@ -163,7 +163,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			world.handlers.llm_agent_selection("tap_3")
 			world.wait_for(1)
 			world.respond(1, ANSWER)
-			local EvdevCodes = require("infra.evdev_codes")
+			local EvdevCodes = require("platform.input.evdev_codes")
 			helpers.assert_eq(world.engine.handle_shortcut({ code = EvdevCodes.KEY_DOWN, mods = {} }), true)
 			helpers.assert_eq(world.engine.handle_shortcut({ code = EvdevCodes.KEY_TAB, mods = {} }), true)
 			helpers.assert_eq(#world.runs, 1)
@@ -175,12 +175,12 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 	end)
 
 	helpers.it("does not log private text echoed by a failing provider", function()
-		local previous = package.loaded["logger.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local previous = package.loaded["core.logger.engine.shim"]
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = pcall(function()
 			Scenario.run({ selection = SELECTION }, function(world)
 				world.handlers.llm_agent_selection("tap_3")
@@ -191,17 +191,17 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			helpers.assert_nil(log:find("private_server_echo_628", 1, true))
 			helpers.assert_true(log:find("HTTP 400", 1, true) ~= nil, "the status remains diagnosable")
 		end)
-		package.loaded["logger.shim"] = previous
+		package.loaded["core.logger.engine.shim"] = previous
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("does not log arbitrary model-provided action type or field text", function()
-		local previous = package.loaded["logger.shim"]
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local previous = package.loaded["core.logger.engine.shim"]
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		local lines = {}
 		logger.set_level("trace")
 		logger.set_sink(function(line) lines[#lines + 1] = line end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = pcall(function()
 			Scenario.run({ selection = SELECTION }, function(world)
 				world.handlers.llm_agent_selection("tap_3")
@@ -213,7 +213,7 @@ helpers.describe("AI agent: the selection's actions offered and run", function()
 			helpers.assert_nil(log:find("private_field_493", 1, true))
 			helpers.assert_true(log:find("Agent action refused", 1, true) ~= nil, "a generic refusal is still reported")
 		end)
-		package.loaded["logger.shim"] = previous
+		package.loaded["core.logger.engine.shim"] = previous
 		if not ok then error(err, 0) end
 	end)
 
@@ -412,10 +412,10 @@ end)
 
 helpers.describe("AI agent: native missing-model modal ownership", function()
 	local function native_case(effect, refuse_regrab)
-		local Hook = helpers.load_module("adapters.keyboard_hook")
-		local Reader = require("adapters.evdev_reader")
-		local saved_hook, saved_grab = package.loaded["adapters.keyboard_hook"], Reader.grab
-		package.loaded["adapters.keyboard_hook"] = Hook
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
+		local Reader = require("platform.input.evdev_reader")
+		local saved_hook, saved_grab = package.loaded["platform.input.keyboard_hook"], Reader.grab
+		package.loaded["platform.input.keyboard_hook"] = Hook
 		local observed, caught, world_active, desyncs = nil, nil, nil, 0
 		if refuse_regrab then Reader.grab = function() return false end end
 		Hook._test_drive({ { type = 1, code = 30, value = 1 } }, {
@@ -440,7 +440,7 @@ helpers.describe("AI agent: native missing-model modal ownership", function()
 			end,
 			onEmitRaw = function() return true end,
 		}, true)
-		Reader.grab, package.loaded["adapters.keyboard_hook"] = saved_grab, saved_hook
+		Reader.grab, package.loaded["platform.input.keyboard_hook"] = saved_grab, saved_hook
 		helpers.assert_eq(caught, nil, "assertions inside the real runtime guard must be collected, never swallowed")
 		helpers.assert_true(observed ~= nil, "the actual decoded reader event starts the scenario")
 		observed.desyncs = desyncs
@@ -449,7 +449,7 @@ helpers.describe("AI agent: native missing-model modal ownership", function()
 
 	helpers.it("real while_released resync cancellation preserves only its acknowledged consent", function()
 		local actual = native_case(nil, false)
-		helpers.assert_eq(actual.offers, 1, "actual confirm reaches the native shell boundary through ui.modal")
+		helpers.assert_eq(actual.offers, 1, "actual confirm reaches the native shell boundary through core.ui.ui.modal")
 		helpers.assert_eq(actual.desyncs, 1, "the actual hook delivers the daemon cancellation after regrab")
 		helpers.assert_eq(actual.installs, 1, "that bounded resynchronisation does not invalidate valid manual consent")
 		helpers.assert_eq(actual.posts, 0, "missing-model inference still never carries private text")
@@ -564,7 +564,7 @@ helpers.describe("AI agent: real asynchronous model download composition", funct
 			for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local updates, completes, admission = 0, 0, nil
 			local controls = {}
-			require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+			require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
 			package.loaded["ui.download_window.bridge"] = {
 				show = function() return 19 end,
 				update = function() updates = updates + 1; return true end,
@@ -646,7 +646,7 @@ helpers.describe("AI agent: existing model pull is focus without new consent cus
 				for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 				local old_done, old_retired, completed, focused, admission = 0, 0, 0, 0, nil
 				local controls = {}
-				require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], controls)
+				require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], controls)
 				package.loaded["ui.download_window.bridge"] = {
 					show = function() return 29 end,
 					update = function() return true end,

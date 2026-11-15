@@ -4,7 +4,7 @@
 --- MODULE: macOS n-gram reads come from the shared query catalogue
 --- DESCRIPTION:
 --- read_ngrams and the today split run the catalogue's ngram.tokens and
---- ngram.tokens_by_app (_shared/data/db/queries.sql), the statements Linux
+--- ngram.tokens_by_app (_shared/metrics/data/db/queries.sql), the statements Linux
 --- runs. They used SUM, which overflows and sums a malformed counter as the
 --- number its text starts with; the catalogue form uses TOTAL and returns such
 --- a row raw, for the reader to read as zero (keystats SQL census, finding 7).
@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 --- @param rows table Rows answered for ngram_chars statements.
 --- @return table reader, table statements
 local function reader_with(rows)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,
@@ -35,11 +35,11 @@ local function reader_with(rows)
 end
 
 helpers.describe("macOS n-gram reads: the shared catalogue", function()
-	local Queries = require("keystats.queries")
+	local Queries = require("metrics.engine.queries")
 
 	helpers.it("reads cross-device days even when the local timezone skipped a calendar date", function()
-		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "infra.logger"}, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({"modules.keystats.sqlite_reader", "core.logger.engine.logger"}, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local fake = require("tests.support.fake_ngram_sqlite").new({ngram_chars = {
 				{date = "2011-12-29", app = "Code", token = "a", c = 1},
 				{date = "2011-12-30", app = "Code", token = "a", c = 1},

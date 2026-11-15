@@ -33,15 +33,15 @@ local function run_case(case)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "modules.llm",
 		"modules.keystats", "modules.llm.api_common", "modules.llm.profiles",
 		"modules.llm.ollama_endpoint", "modules.llm.progressive_reveal",
-		"adapters.storage", "adapters.file_system", "infra.notifications",
-		"adapters.shell_runner", "adapters.timer_scheduler", "adapters.json_codec",
-		"modules.llm.parser", "infra.logger" }, function()
+		"core.fs.adapters.storage", "core.fs.adapters.file_system", "core.ui.engine.notifications",
+		"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
+		"modules.llm.parser", "core.logger.engine.logger" }, function()
 		-- The parser only reads the core's defaults. Keep that data port truthful
 		-- without booting unrelated backends or acquiring their module lifetimes.
-		local file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "rb"))
+		local file = assert(io.open(helpers.shared("ai/data/defaults.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())
-		local defaults = assert(require("json").decode(raw))
+		local defaults = assert(require("core.text.engine.json").decode(raw))
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults }
 		package.loaded["modules.keystats"] = { log_llm = function() end }
 		local api = helpers.load_with_stubs("modules.llm.api_ollama")

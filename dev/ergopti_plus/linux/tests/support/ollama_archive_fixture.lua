@@ -1,7 +1,7 @@
 --- tests/support/ollama_archive_fixture.lua
 
 -- Independent fixture copied from the frozen archive qualification; expectations unchanged.
-local Installer = require("llm.ollama_archive_installer")
+local Installer = require("ai.engine.ollama.archive_installer")
 local function expect(value, message) assert(value, message) end
 local sequence = {
 	{ program = "sha256sum", stdout = "GNU coreutils --zero" },

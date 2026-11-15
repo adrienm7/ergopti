@@ -8,7 +8,7 @@
 --- The page asks for the user's layers.toml ("ready"), saves the text it built
 --- ({action = "save", text}), closes ({action = "cancel"}) or, back in front,
 --- asks for the legends again ({action = "legends"}). The shared host logic
---- (_shared/lua/keymap/layer_editor.lua) checks a saved text against every
+--- (_shared/layouts/engine/layers/editor.lua) checks a saved text against every
 --- OS's loader and publishes it atomically; the remap manager then regenerates
 --- its configuration, which reads layers.toml again, so the layer applies.
 --- The Linux part stays this thin on purpose: only the apply call knows which
@@ -16,8 +16,9 @@
 ---
 --- Legends: each key that types a character shows what the keymap the daemon
 --- loaded (adapters/keyboard_layout, the session's own XKB keymap, which it
---- reloads on a layout switch) types on its evdev code at level 1. Linux
---- emulates no layout: an installed Ergopti is the XKB layout itself. The
+--- reloads on a layout switch) types on its evdev code at level 1, or, while a
+--- layout is emulated (modules/keymap/layout_emulation), what the emulation
+--- types there, with the source « emulation » as on Windows (LEH-001). The
 --- layer key is the tap-hold key whose hold enters the edited layer in the
 --- remap manager's keys, found in the registry by its evdev code.
 --- ==============================================================================
@@ -25,13 +26,13 @@
 local M = {}
 M.bridge_name = "layer_editor_bridge"
 
-local Json        = require("json")
-local Logger      = require("logger.shim")
-local TomlCodec   = require("toml_codec")
-local Layers      = require("keymap.layers")
-local LayerEditor = require("keymap.layer_editor")
-local LayerPreset = require("keymap.layer_preset")
-local Writer      = require("toml_codec.writer")
+local Json        = require("core.text.engine.json")
+local Logger      = require("core.logger.engine.shim")
+local TomlCodec   = require("core.text.engine.toml_codec")
+local Layers      = require("layouts.engine.layers.layers")
+local LayerEditor = require("layouts.engine.layers.editor")
+local LayerPreset = require("layouts.engine.layers.preset")
+local Writer      = require("core.text.engine.toml_codec.writer")
 
 local LOG = "bridge.layer_editor"
 local APP_NAME = "layer_editor"
@@ -58,7 +59,7 @@ end
 --- Calls one of the page's functions with a JSON payload.
 --- @return boolean called
 local function call_page(state, fn_name, payload)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" then
 		Logger.error(LOG, "No webview manager: the page's %s() cannot be called.", fn_name)
 		return false
@@ -77,7 +78,7 @@ local function close_page(state, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		return context.close_owned_window() == true
 	end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	return manager ~= nil and type(manager.hide) == "function" and manager.hide(APP_NAME) == true
 end
 
@@ -85,7 +86,7 @@ end
 --- @return string shared_root
 --- @return string config_dir
 local function folders(state)
-	local paths = dependency(state, "paths", "infra.paths")
+	local paths = dependency(state, "paths", "core.fs.engine.paths")
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
 	if not paths or not config_paths then error("the shared tree or the configuration folder is unknown", 0) end
 	return paths.shared_root(), config_paths.get_config_dir()
@@ -94,7 +95,7 @@ end
 --- Retains the page and exact file which supplied the editor's current draft.
 local function capture_opening(state, context, shared_root, config_dir, ctx)
 	local config_paths = dependency(state, "config_paths", "infra.config_paths")
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local path = Layers.user_file_path(config_dir, ctx)
 	local content, status, detail = Writer.read_classified(path)
 	return {
@@ -109,7 +110,7 @@ end
 local function opening_page_matches(owner, state, context)
 	local epoch = type(context) == "table" and context.epoch or nil
 	return owner ~= nil and _opening == owner and epoch == owner.epoch
-		and dependency(state, "webview_manager", "ui.webview_manager") == owner.manager
+		and dependency(state, "webview_manager", "core.ui.ui.webview_manager") == owner.manager
 end
 
 --- A different page cannot receive this draft's save result or close request.
@@ -177,17 +178,23 @@ local function load_context(shared_root)
 	})
 end
 
---- The legends of the keymap the daemon loaded.
+--- The legends of the layout the user types with: the emulated one, else the
+--- keymap the daemon loaded.
 --- @param state table Daemon state.
 --- @param ctx table The loader context.
 --- @return table legends The page's `legends`.
 local function current_legends(state, ctx)
 	local layout = dependency(state, "keyboard_layout", "adapters.keyboard_layout")
 	if not layout then error("the keyboard layout adapter is unavailable", 0) end
+	local emulation = dependency(state, "layout_emulation", "modules.keymap.layout_emulation")
+	if not emulation then error("the layout emulation is unavailable", 0) end
+	local emulating = emulation.status().active == true
 	local legends, unresolved = LayerEditor.legends({
 		ctx       = ctx,
-		source    = LayerEditor.LEGEND_SOURCE_OS,
-		character = function(_, entry)
+		source    = emulating and LayerEditor.LEGEND_SOURCE_EMULATION or LayerEditor.LEGEND_SOURCE_OS,
+		character = function(code, entry)
+			local emulated = emulating and emulation.legend(code) or nil
+			if emulated ~= nil then return emulated end
 			local symbol = type(entry.evdev) == "number" and layout.base_symbol(entry.evdev) or nil
 			return type(symbol) == "table" and symbol.text or nil
 		end,
@@ -244,6 +251,44 @@ end
 
 
 
+--- Validates and publishes a layers.toml text, then applies it: the one save
+--- path of the navigation layer editor window and of the layout editor's
+--- « Apply the navigation layer » (ui/layout_manager/bridge.lua).
+--- @param state table Daemon state.
+--- @param opts table { text, ctx, config_dir, file_adapter, current } where
+---   current() says whether the saved folder is still the configuration folder.
+--- @return table result LayerEditor.save's, with `applied`, or `stale` when the
+---   folder changed after the save.
+local function save_text(state, opts)
+	local result = LayerEditor.save({
+		text = opts.text, ctx = opts.ctx, config_dir = opts.config_dir, toml_decode = TomlCodec.decode,
+		file_adapter = opts.file_adapter,
+	})
+	if not result.saved then
+		for _, err in ipairs(result.errors) do
+			Logger.warn(LOG, "Refused: %s (%s.%s.%s) — %s.", tostring(err.code), tostring(err.layer or ""),
+				tostring(err.section or ""), tostring(err.key or ""), tostring(err.detail))
+		end
+		Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
+		return result
+	end
+	if not opts.current() then
+		result.applied, result.stale = false, true
+		return result
+	end
+	result.applied = apply(state)
+	if result.applied then
+		Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
+	else
+		Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
+	end
+	return result
+end
+
+
+
+
+
 -- ===================================
 -- ===================================
 -- ======= 2/ Message handlers =======
@@ -286,8 +331,8 @@ function M.on_message(payload, state, context)
 			legends = current_legends(state, ctx), layer_keys = layer_keys(state, ctx, shared_root),
 		})
 		owner.data = data
-		local manager = dependency(state, "webview_manager", "ui.webview_manager")
-		local i18n = dependency(state, "i18n", "infra.i18n")
+		local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
+		local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 		if manager and type(manager.set_title) == "function" and i18n and type(i18n.get) == "function" then
 			manager.set_title(APP_NAME, i18n.get("layer_editor.window_title"))
 		end
@@ -313,27 +358,26 @@ function M.on_message(payload, state, context)
 		if owner.saving then return { saved = false, busy = true } end
 		owner.saving = true
 		local function save_and_apply()
-			local result = LayerEditor.save({
-				text = payload.text, ctx = owner.ctx, config_dir = owner.config_dir, toml_decode = TomlCodec.decode,
+			local result = save_text(state, {
+				text = payload.text, ctx = owner.ctx, config_dir = owner.config_dir,
 				file_adapter = opening_files(owner, state, context),
+				current = function() return committed_folder_current(owner, state) end,
 			})
 			if not result.saved then
-				for _, err in ipairs(result.errors) do
-					Logger.warn(LOG, "Refused: %s (%s.%s.%s) — %s.", tostring(err.code), tostring(err.layer or ""),
-						tostring(err.section or ""), tostring(err.key or ""), tostring(err.detail))
-				end
-				Logger.error(LOG, "The navigation layer was not saved to '%s'.", tostring(result.path))
 				if opening_page_current(owner, state, context) then
 					call_page(state, "saveResult", { saved = false, errors = result.errors })
 				end
 				return result
 			end
-			if not committed_folder_current(owner, state) then result.applied = false; return result end
-			result.applied = apply(state)
-			if result.applied then
-				Logger.success(LOG, "Navigation layer saved to '%s' and applied.", result.path)
-			else
-				Logger.error(LOG, "Navigation layer saved to '%s' but not applied.", result.path)
+			if result.stale then
+				-- The folder moved after the write: nothing was applied, but the page
+				-- still waits for its answer and keeps every button disabled until
+				-- it comes, as Windows and macOS answer applied=false (LEH-002).
+				result.stale = nil
+				if opening_page_current(owner, state, context) then
+					call_page(state, "saveResult", { saved = true, applied = false, errors = {} })
+				end
+				return result
 			end
 			if opening_page_current(owner, state, context) then
 				call_page(state, "saveResult", { saved = true, applied = result.applied, errors = {} })
@@ -365,6 +409,34 @@ function M.on_message(payload, state, context)
 	end
 	Logger.warn(LOG, "Ignored the unknown layer editor action '%s'.", tostring(payload.action))
 	return nil
+end
+
+--- Saves and applies a layers.toml the layout editor built from a source's
+--- navigation layer, through the window's own save path. The destination is
+--- the user's layers.toml as read now: it is replaced only while it still holds
+--- those bytes (LayerEditor.save's exact-byte precondition).
+--- @param text any The layers.toml text.
+--- @param state table Daemon state.
+--- @return table result { saved, applied, errors }
+function M.apply_text(text, state)
+	state = type(state) == "table" and state or {}
+	Logger.start(LOG, "Applying the navigation layer from the layout editor…")
+	local ok, shared_root, config_dir = pcall(folders, state)
+	local ok_ctx, ctx = false, shared_root
+	if ok then ok_ctx, ctx = pcall(load_context, shared_root) end
+	if not ok or not ok_ctx then
+		local detail = "the layer data could not be read: " .. tostring(ctx)
+		Logger.error(LOG, "The navigation layer was not applied: %s.", detail)
+		return { saved = false, applied = false, errors = { { code = LayerEditor.WRITE_FAILED, detail = detail } } }
+	end
+	local result = save_text(state, {
+		text = text, ctx = ctx, config_dir = config_dir, file_adapter = nil,
+		current = function()
+			local still, _, dir = pcall(folders, state)
+			return still and dir == config_dir
+		end,
+	})
+	return { saved = result.saved == true, applied = result.applied == true, errors = result.errors or {} }
 end
 
 return M

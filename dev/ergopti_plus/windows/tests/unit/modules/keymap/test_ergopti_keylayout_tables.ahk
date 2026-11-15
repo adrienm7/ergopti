@@ -36,7 +36,7 @@ _EKT_Bundled(Id) => LayoutRegistry_ReadBundled(Id, LayoutRegistry_BundledDir())
 
 _EKT_KeyCodes() => KeylayoutEmulation_KeyCodes(LayoutRegistry_Keycodes(), "iso")
 
-_EKT_WrapPairs() => ErgoptiLayout_ReadWrapPairs(_SharedDir . "\modules\wrap_symbols\wrap_symbols.json")
+_EKT_WrapPairs() => ErgoptiLayout_ReadWrapPairs(_SharedDir . "\keyboard\data\wrap_symbols\wrap_symbols.json")
 
 _EKT_Spec(ErgoptiText := "", PlusText := "") {
 	if (ErgoptiText == "")
@@ -482,8 +482,8 @@ Test("Ergopti+ matrix: every actual legacy plus action preserves wrap, word spac
 _EKT_PlusRollScript() {
 	Code := "#Requires AutoHotkey v2.0`n"
 	Code .= "#SingleInstance Off`n"
-	Code .= '#Include ' . _DriverDir . '\infra\json.ahk' . "`n"
-	Code .= '#Include ' . _DriverDir . '\adapters\file_system.ahk' . "`n"
+	Code .= '#Include ' . _DriverDir . '\core\text\engine\json.ahk' . "`n"
+	Code .= '#Include ' . _DriverDir . '\core\fs\adapters\file_system.ahk' . "`n"
 	AssertEqual(_DriverProductionFileForSymbol("ErgoptiLayout_BuiltinVariant"),
 		_DriverProductionFileForSymbol("ErgoptiLayout_PlusIsActive"), "both source-intent helpers have the same unique production owner")
 	for Name in ["_RollChevronEqualEmit", "AddRollEqual", "_RollEmitCritical", "AltGrLayerShiftHeld",

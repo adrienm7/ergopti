@@ -123,6 +123,18 @@ LLM_ApiToken_Decrypt(stored) {
 }
 
 /**
+ * Whether a loaded token is a key this Windows identity cannot use: the
+ * decryption kept the DPAPI envelope (a backup restored under another user or
+ * machine), so the envelope would be sent as the key. The entry then asks for
+ * its key again, as macOS and Linux do for a key their store lost.
+ * @param {Any} Token - A token as LLM_ApiToken_Decrypt returned it.
+ * @returns {Boolean}
+ */
+LLM_ApiToken_Unusable(Token) {
+	return Token is String && LLM_ApiToken_IsEncrypted(Token)
+}
+
+/**
  * Returns true only for a canonical, nonempty base64 envelope. This structural
  * predicate does not claim that the current Windows identity can decrypt it.
  */

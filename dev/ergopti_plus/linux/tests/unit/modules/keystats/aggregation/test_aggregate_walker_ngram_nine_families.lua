@@ -723,7 +723,7 @@ helpers.describe("native JSON fallback completion", function()
 	end
 	for _, kind in ipairs(cases) do
 		helpers.it("(keystats-json-fallback) retains saved data and pending events on " .. kind, function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			assert(os.remove(folder)); assert(Shell.run("mkdir -m 700 -- " .. Shell.quote(folder)))
 			local okay, detail = xpcall(function()
@@ -749,7 +749,7 @@ end)
 
 helpers.describe("ngram walker: compound application identity", function()
 	it("preserves separator-bearing applications independently of token bytes", function()
-		local shared = require("keystats.aggregator_helpers")
+		local shared = require("metrics.engine.aggregator.helpers")
 		local batch = shared.new_batch()
 		shared.push_ngram(batch, "ngram_chars", "2026-10-17", "App\1Part", "x", 0, false, "none")
 		shared.push_ngram(batch, "ngram_chars", "2026-10-17", "App", "x", 0, false, "none")

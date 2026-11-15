@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local Json = require("json")
-local Share = require("healthcheck.share")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Json = require("core.text.engine.json")
+local Share = require("diagnostics.engine.healthcheck.share")
 
 local HOME = "/Users/jdoe"
 local LOGS = HOME .. "/" .. AppDirs.macos.relative
@@ -36,21 +36,21 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	return {
 		schema     = schema,
-		templates  = shared_json("modules/diagnostics/issue_templates.json"),
-		redaction  = shared_json("modules/diagnostics/redaction.json"),
-		repository = shared_json("modules/updater/defaults.json").github,
+		templates  = shared_json("diagnostics/data/issue_templates.json"),
+		redaction  = shared_json("diagnostics/data/redaction.json"),
+		repository = shared_json("updater/data/defaults.json").github,
 	}
 end
 
 --- Loads the report module with every side effect recorded.
 --- @return table Report, table calls, table overrides
 local function load_report()
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.healthcheck.report"] = nil
 	local Report = require("ui.healthcheck.report")
 	local calls = { copy = {}, save = {}, reveal = {}, open = {}, open_url = {}, make_dir = {} }
@@ -108,8 +108,8 @@ end
 
 -- Direct injections and the timing reader's native path consumer form one fixture.
 local NATIVE_MODULES = {
-	"adapters.shell_runner", "adapters.timer_scheduler", "ui.healthcheck.report",
-	"infra.logger", "infra.timings", "infra.paths",
+	"core.process.adapters.shell_runner", "core.events.timer_scheduler", "ui.healthcheck.report",
+	"core.logger.engine.logger", "core.timing.engine.timings", "core.fs.engine.paths",
 }
 
 --- Keeps the complete asynchronous fixture body under one restoration boundary.
@@ -127,10 +127,10 @@ end
 local function native_opener()
 	local Report, calls, overrides = load_report()
 	local native = { tasks = {}, timers = {}, callbacks = {}, current = true, errors = {} }
-	package.loaded["infra.logger"].error = function(_, message, ...)
+	package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 		native.errors[#native.errors + 1] = string.format(message, ...)
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			if native.timer_throw then error("controlled timer refusal") end
 			local timer = { callback = callback, delay = delay }
@@ -140,7 +140,7 @@ local function native_opener()
 		end,
 		cancel = function(timer) timer.cancelled = true; return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(bin, args, done)
 			if native.construct_throw then error("controlled construction refusal") end
 			if native.construct_refuse then return nil end
@@ -181,10 +181,10 @@ end
 helpers.describe("macOS diagnostics native opener completion (macos-opener-terminal)", function()
 	native_case("refuses a throwing timing reader before constructing a native capability", function()
 		local native, run = native_opener()
-		local previous = package.loaded["infra.timings"]
-		package.loaded["infra.timings"] = { sec = function() error("controlled timing admission refusal") end }
+		local previous = package.loaded["core.timing.engine.timings"]
+		package.loaded["core.timing.engine.timings"] = { sec = function() error("controlled timing admission refusal") end }
 		local ok, detail = pcall(run)
-		package.loaded["infra.timings"] = previous
+		package.loaded["core.timing.engine.timings"] = previous
 		helpers.assert_true(ok, tostring(detail))
 		helpers.assert_eq(#native.callbacks, 1)
 		helpers.assert_eq(native.callbacks[1].ok, false)
@@ -267,7 +267,7 @@ helpers.describe("macOS diagnostics native opener completion (macos-opener-termi
 		local native, run = native_opener()
 		run()
 		helpers.assert_eq(native.tasks[1].deadline_count_at_start, 1)
-		helpers.assert_eq(native.timers[1].delay, require("infra.timings").sec("ui", "desktop_open_timeout_ms"))
+		helpers.assert_eq(native.timers[1].delay, require("core.timing.engine.timings").sec("ui", "desktop_open_timeout_ms"))
 		native.tasks[1].finish(0)
 		helpers.assert_true(native.timers[1].cancelled)
 		helpers.assert_eq(native.callbacks[1].ok, true)
@@ -400,7 +400,7 @@ end
 local function approved_text(long)
 	local config = documents()
 	return Share.document(host_snapshot(long), config.schema,
-		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key)).text
 end
 
 --- Performs one action as the bridge does.
@@ -483,10 +483,10 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	end)
 
 	helpers.it("repeated report saves use the exclusive file owner without replacing the first", function()
-		local previous_fs = package.loaded["adapters.file_system"]
+		local previous_fs = package.loaded["core.fs.adapters.file_system"]
 		local previous_attributes = hs.fs.attributes
 		local files = {}
-		package.loaded["adapters.file_system"] = { create_if_absent = function(path, text)
+		package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(path, text)
 			if files[path] ~= nil then return false, "exists" end
 			files[path] = text
 			return true, "created"
@@ -497,7 +497,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 			hs.fs.attributes = function() return "directory" end
 			overrides.save = nil
 			local config, snapshot = documents(), host_snapshot(false)
-			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			local action = { action = "save", text = document.text, name = document.name }
 			local context = Report.redaction_context(overrides)
 			local one = completed_action(Report, action, paths(), config, context, overrides, snapshot)
@@ -506,7 +506,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 			local two = completed_action(Report, action, paths(), config, context, overrides, snapshot)
 			return one, two, files[one.path]
 		end)
-		package.loaded["adapters.file_system"] = previous_fs
+		package.loaded["core.fs.adapters.file_system"] = previous_fs
 		hs.fs.attributes = previous_attributes
 		helpers.assert_true(ok)
 		helpers.assert_eq(first.ok, true, tostring(first.error))
@@ -519,7 +519,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.it("skips a report name already occupied by a " .. kind, function()
 			local Report, _, overrides = load_report()
 			overrides.save = nil
-			local previous_fs, previous_attributes, previous_link = package.loaded["adapters.file_system"],
+			local previous_fs, previous_attributes, previous_link = package.loaded["core.fs.adapters.file_system"],
 				hs.fs.attributes, hs.fs.symlinkAttributes
 			local attempted = {}
 			hs.fs.attributes = function() return "directory" end
@@ -527,18 +527,18 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 				if path == LOGS .. "/diagnostics/" .. NAME then return { mode = kind } end
 				return nil
 			end
-			package.loaded["adapters.file_system"] = { create_if_absent = function(path)
+			package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(path)
 				attempted[#attempted + 1] = path
 				if path == LOGS .. "/diagnostics/" .. NAME then return false, "error" end
 				return true, "created"
 			end }
 			local ok, result = pcall(function()
 				local config, snapshot = documents(), host_snapshot(false)
-				local doc = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+				local doc = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 				return completed_action(Report, { action = "save", text = doc.text, name = doc.name }, paths(),
 					config, Report.redaction_context(overrides), overrides, snapshot)
 			end)
-			package.loaded["adapters.file_system"] = previous_fs
+			package.loaded["core.fs.adapters.file_system"] = previous_fs
 			hs.fs.attributes, hs.fs.symlinkAttributes = previous_attributes, previous_link
 			helpers.assert_true(ok)
 			helpers.assert_eq(result.ok, true)
@@ -575,7 +575,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
 		local Report, calls, overrides = load_report()
 		local logged = {}
-		local Logger = package.loaded["infra.logger"]
+		local Logger = package.loaded["core.logger.engine.logger"]
 		Logger.error = function(_, message, ...) logged[#logged + 1] = string.format(message, ...) end
 		Logger.warn = Logger.error
 		overrides.exists = function() return false end
@@ -696,7 +696,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 		local config = documents()
 		for _, vector in ipairs(corpus.vectors) do
 			local document = Share.document(vector.snapshot, config.schema,
-				require("infra.i18n").get(config.schema.share_policy.notice_key))
+				require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			for _, canary in ipairs(vector.canaries) do
 				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
 			end
@@ -746,10 +746,10 @@ helpers.describe("default attachment completion", function()
 			local doc = Share.document(snapshot, config.schema, "ignored")
 			local Report, calls, overrides = load_report()
 			overrides.save = nil
-			local previous_fs, previous_attributes = package.loaded["adapters.file_system"], hs.fs.attributes
+			local previous_fs, previous_attributes = package.loaded["core.fs.adapters.file_system"], hs.fs.attributes
 			local writes = 0
 			hs.fs.attributes = function() return "directory" end
-			package.loaded["adapters.file_system"] = { create_if_absent = function(_, text)
+			package.loaded["core.fs.adapters.file_system"] = { create_if_absent = function(_, text)
 				writes = writes + 1
 				assert(text == doc.text, "the complete approved text reaches the exclusive owner")
 				return admitted, admitted and "created" or "error", "refused"
@@ -762,7 +762,7 @@ helpers.describe("default attachment completion", function()
 				helpers.assert_eq(#calls.reveal, admitted and 1 or 0)
 				helpers.assert_eq(#calls.open_url, admitted and 1 or 0)
 			end, debug.traceback)
-			package.loaded["adapters.file_system"] = previous_fs
+			package.loaded["core.fs.adapters.file_system"] = previous_fs
 			hs.fs.attributes = previous_attributes
 			if not ok then error(err, 0) end
 		end
@@ -851,7 +851,7 @@ helpers.describe("redaction context carries the configuration directory (config-
 		local context = Report.redaction_context(overrides)
 		helpers.assert_eq(context.config_dir, dir)
 		helpers.assert_eq(
-			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			require("diagnostics.engine.reports.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
 			"read '<config>/hotstrings/<name>/<name>'")
 	end)
 end)
@@ -862,7 +862,7 @@ local function completed_action_for(Report, action, config, context, overrides, 
 end
 
 helpers.describe("opt-in day log in the report actions (day-log-host)", function()
-	local DayLogHost = require("healthcheck.day_log")
+	local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /Users/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
 	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
 
@@ -870,14 +870,14 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 	local function fixture()
 		local Report, calls, overrides = load_report()
 		local config = documents()
-		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		config.day_log = shared_json("diagnostics/data/day_log.json")
 		local snapshot = host_snapshot(false)
 		local context = Report.redaction_context(overrides)
 		local function run(action)
 			return completed_action_for(Report, action, config, context, overrides, snapshot)
 		end
 		local function text(with_log)
-			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+			return Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key),
 				with_log).text
 		end
 		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
@@ -916,7 +916,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local text = f.text(true)
 		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
 		local document = Share.document(f.snapshot, f.config.schema,
-			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+			require("core.i18n.engine.i18n").get(f.config.schema.share_policy.notice_key), true)
 		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#f.calls.save, 2)

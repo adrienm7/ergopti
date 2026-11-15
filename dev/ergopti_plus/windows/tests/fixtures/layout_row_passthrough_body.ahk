@@ -55,11 +55,15 @@ _LRPS_Run() {
 		_LRPS_Require((Binding["criterion"]).Call(Binding["name"]), "the disabled row must admit " . Name)
 		SendLevel(CallerLevel)
 		_LRPS_Emits := []
-		Failure := ""
+		; The caught state is the verdict: a trap raised with an empty message is
+		; still a call, and a message sentinel alone accepted it.
+		Trapped := false, Failure := ""
 		try (Binding["callback"]).Call(Binding["name"])
-		catch as Err
-			Failure := Err.Message
-		_LRPS_Require(Failure == "", "a native pass-through must never call even the refusing sender trap")
+		catch as Err {
+			Trapped := true
+			Failure := Type(Err) . ": " . Err.Message
+		}
+		_LRPS_Require(!Trapped, "a native pass-through must never call even the refusing sender trap: " . Failure)
 		_LRPS_Require(A_SendLevel == CallerLevel, "the pass-through callback must preserve its caller's send level")
 		_LRPS_Require(_LRPS_Emits.Length == 0, "the original tilde event must not be duplicated by synthetic output")
 		_LRPS_Require(Binding["options"] == (Prefix == "!" ? "I3" : "I2"), "the same five identities must retain their exact input levels")

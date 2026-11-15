@@ -6,9 +6,9 @@ local Fixture = require("tests.support.shortcut_bindings_fixture")
 
 local function scenario(body)
 	return helpers.with_stub_scope({ "modules.shortcuts.tap_keys", "infra.preferences",
-		"infra.config_paths", "adapters.file_system" }, function()
+		"infra.config_paths", "core.fs.adapters.file_system" }, function()
 		helpers.load_with_stubs("infra.preferences")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local paths = require("infra.config_paths")
 		local escaped = 0
 		local native_read = files.read_with_status
@@ -17,7 +17,7 @@ local function scenario(body)
 			error("fixture escaped to external configuration")
 		end
 		local read = function(path)
-			if path == helpers.shared("modules/actions/tap_keys.json") then return native_read(path) end
+			if path == helpers.shared("shortcuts/data/actions/tap_keys.json") then return native_read(path) end
 			return forbidden()
 		end
 		files.read_with_status, files.write_if_unchanged, files.write = read, forbidden, forbidden

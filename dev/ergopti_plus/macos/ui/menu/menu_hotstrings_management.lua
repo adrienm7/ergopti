@@ -13,18 +13,17 @@
 
 local M = {}
 local hs                = hs
-local Logger            = require("infra.logger")
-local dialog            = require("infra.dialog_util")
-local notifications     = require("infra.notifications")
-local i18n              = require("infra.i18n")
-local LabelValue = require("locale.label_value")
+local Logger            = require("core.logger.engine.logger")
+local dialog            = require("core.ui.engine.dialog_util")
+local notifications     = require("core.ui.engine.notifications")
+local i18n              = require("core.i18n.engine.i18n")
+local ValueCheck        = require("settings.engine.value_check")
+local LabelValue = require("core.i18n.engine.label_value")
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
 local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local Terminators     = require("keymap.terminators")
-local HotstringCore   = require("infra.hotstring_engine")
-local TextUtils = require("text_utils")
+local Terminators     = require("layouts.engine.layers.terminators")
 local LOG               = "menu_hotstrings"
 
 
@@ -58,7 +57,7 @@ end
 --- @param ctx table Context.
 --- @return table
 
-local MagicFrame = require("menu.frames.magic_frame")
+local MagicFrame = require("menu.engine.frames.magic_frame")
 
 
 -- The frame snapshot and its currency check are one body shared by both drivers.
@@ -72,7 +71,6 @@ end
 
 function M.build_management(ctx)
 	local state  = ctx.state
-	local paused = ctx.paused
 	local bubble_item = nil
 	local exp_item = nil
 	local delays_item = nil
@@ -82,9 +80,9 @@ function M.build_management(ctx)
 
 	local bubble_sub = {}
 
-	local magic_row = ManifestMenu.check_row("preview_magic_control", require("config_keys").LEAF.PREVIEW_STAR_ENABLED, {
-		[require("config_keys").LEAF.PREVIEW_STAR_ENABLED] = function()
-			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("config_keys").LEAF.PREVIEW_STAR_ENABLED) ~= true then
+	local magic_row = ManifestMenu.check_row("preview_magic_control", require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, {
+		[require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED) ~= true then
 				return false
 			end
 			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_star"), state.preview_star_enabled)
@@ -92,15 +90,15 @@ function M.build_management(ctx)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return state.preview_star_enabled == true end,
-		["preview_magic_ready"] = function() return not ctx.paused end,
+		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return state.preview_star_enabled == true end,
+		["preview_magic_ready"] = function() return true end,
 	})
 	if magic_row then table.insert(bubble_sub, magic_row) end
 
 	local preview_magic_rows = bubble_sub
 	bubble_sub = {}
 	local presence_commands = {}
-	local presence_getters = { preview_presence_ready = function() return not ctx.paused end }
+	local presence_getters = { preview_presence_ready = function() return true end }
 	for key, notify_key in pairs({
 		preview_autocorrect_enabled = "menu.hotstrings.notify_bubble_autocorrect",
 		preview_ai_enabled = "menu.hotstrings.notify_bubble_ai",
@@ -121,9 +119,9 @@ function M.build_management(ctx)
 	local preview_presence_rows = bubble_sub
 	bubble_sub = {}
 
-	local colored_row = ManifestMenu.check_row("preview_colored_control", require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
-		[require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
-			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS) ~= true then
+	local colored_row = ManifestMenu.check_row("preview_colored_control", require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
+		[require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
+			if type(ctx.commit_preview) ~= "function" or ctx.commit_preview(require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS) ~= true then
 				return false
 			end
 			ctx.notify_feature(i18n.get("menu.hotstrings.notify_bubble_colored"), state.preview_colored_tooltips)
@@ -131,8 +129,8 @@ function M.build_management(ctx)
 			return true
 		end,
 	}, {
-		[require("config_keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return state.preview_colored_tooltips == true end,
-		["preview_colored_ready"] = function() return not ctx.paused end,
+		[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return state.preview_colored_tooltips == true end,
+		["preview_colored_ready"] = function() return true end,
 	})
 	if colored_row then table.insert(bubble_sub, colored_row) end
 
@@ -142,8 +140,10 @@ function M.build_management(ctx)
 		["parameter_preview_colored"] = function() return bubble_sub end,
 	})
 	if not preview_rows then return nil end
+	-- The preview and delay rows run while paused: a pause stops typing, not
+	-- configuration (EDD-1). The word expanders follow their shared corpus.
 	local preview_parent = ManifestMenu.template_rows("hotstrings_preview_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_parent_ready"] = function() return true end },
 		{ ["parameter_preview_children"] = preview_rows })
 	if not preview_parent then return nil end
 	bubble_item = preview_parent[1]
@@ -188,7 +188,8 @@ function M.build_management(ctx)
 		return true
 	end
 
-	local function word_expanders_ready() return ctx.paused ~= true end
+	-- The delimiters are configuration: they run while paused (EDD-1).
+	local function word_expanders_ready() return true end
 
 	local function bulk_set_terminators(enabled)
 		if not word_expanders_ready() then return false end
@@ -238,8 +239,7 @@ function M.build_management(ctx)
 				exp_sub[#exp_sub + 1] = {
 					label    = ctx.applyTriggerChar(lbl),
 					checked  = enabled_t or nil,
-					disabled = paused or nil,
-					action       = not paused and (function(k, l) return function()
+					action       = (function(k, l) return function()
 						local nv = true
 						if ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" then
 							nv = not ctx.keymap.is_terminator_enabled(k)
@@ -257,7 +257,7 @@ function M.build_management(ctx)
 						ctx.notify_feature(string.format(i18n.get("notify.word_expander_prefix"), ctx.applyTriggerChar(l)), nv)
 						ctx.updateMenu()
 						return true
-					end end)(def.key, lbl) or nil,
+					end end)(def.key, lbl),
 				}
 			end
 		end
@@ -274,8 +274,7 @@ function M.build_management(ctx)
 			consume_rows[#consume_rows + 1] = {
 				label    = label,
 				checked  = consumed or nil,
-				disabled = paused or nil,
-				action   = not paused and function()
+				action   = function()
 					local next_consume = not consumed
 					local committed = KeymapLifecycle.commit_mutation(ctx, "toggle delimiter consumption", function()
 						if not ctx.keymap or type(ctx.keymap.set_terminators_consume) ~= "function" then return false end
@@ -294,7 +293,7 @@ function M.build_management(ctx)
 						label .. " " .. i18n.get("menu.hotstrings.consumed_suffix")), next_consume)
 					ctx.updateMenu()
 					return true
-				end or nil,
+				end,
 			}
 		end
 	end
@@ -309,8 +308,8 @@ function M.build_management(ctx)
 		local consume_sfx = ct.consume and (" (" .. i18n.get("menu.hotstrings.consumed") .. ")") or ""
 		local ct_lbl = LabelValue.compose(i18n.get, ct.char, i18n.get("menu.hotstrings.custom_label")) .. consume_sfx
 
-		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
-			[require("config_keys").COMMAND.WORD_EXPANDER_DELETE] = (function(k) return function()
+		local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("settings.engine.keys").COMMAND.WORD_EXPANDER_DELETE, {
+			[require("settings.engine.keys").COMMAND.WORD_EXPANDER_DELETE] = (function(k) return function()
 					local res = dialog.block_alert(
 						i18n.get("dialog.hotstrings.delete_title"),
 						i18n.get("dialog.hotstrings.delete_body"),
@@ -343,13 +342,12 @@ function M.build_management(ctx)
 			label    = ct_lbl,
 			checked  = enabled_t or nil,
 			items     = ct_sub,
-			disabled = paused or nil,
 		}
 		::continue_ct::
 	end
 
-	local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
-		[require("config_keys").COMMAND.WORD_EXPANDER_ADD] = function()
+	local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("settings.engine.keys").COMMAND.WORD_EXPANDER_ADD, {
+		[require("settings.engine.keys").COMMAND.WORD_EXPANDER_ADD] = function()
 			local existing_keys = {}
 			for _, d in ipairs(defs) do
 				if d.key then existing_keys[d.key] = true end
@@ -424,9 +422,9 @@ function M.build_management(ctx)
 
 	local exp_ctx = {
 		commands = {
-			[require("config_keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = function() return bulk_set_terminators(true) end,
-			[require("config_keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = function() return bulk_set_terminators(false) end,
-			[require("config_keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
+			[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = function() return bulk_set_terminators(true) end,
+			[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = function() return bulk_set_terminators(false) end,
+			[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
 		},
 		state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 	}
@@ -441,12 +439,22 @@ function M.build_management(ctx)
 	local expander_submenu_rows = ManifestMenu.native_child_rows(rendered_expanders)
 	if not expander_submenu_rows then return nil end
 	local expander_parent = ManifestMenu.template_rows("hotstrings_word_expander_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end },
+		{ ["parameter_parent_ready"] = function() return true end },
 		{ ["parameter_word_expander_children"] = expander_submenu_rows })
 	if not expander_parent then return nil end
 	exp_item = expander_parent[1]
 
 	local delay_menu = {}
+	-- Reads a typed delay through the shared value check: whole milliseconds in
+	-- the declared range; a refusal is notified with the text naming the range.
+	local function typed_delay(raw, key)
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if typed.ok then return typed.value end
+		Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
+		pcall(notifications.notify, i18n.get("dialog.value_check.title"),
+			ValueCheck.refusal_text(key, typed, i18n.get), "error")
+		return nil
+	end
 	local function make_delay_item(title, key, default_val, is_base)
 		if type(default_val) ~= "number" then
 			Logger.error(LOG, "make_delay_item(): default_val nil for '%s' — keymap.DELAYS_DEFAULT may be outdated.", title)
@@ -466,8 +474,7 @@ function M.build_management(ctx)
 			-- menu.settings.default_indicator (" (default)") is the surviving shared
 			-- key — its value already carries the leading space, so we don't add one.
 			label    = LabelValue.compose(i18n.get, title, display_ms) .. (cur_ms == def_ms and i18n.get("menu.settings.default_indicator") or ""),
-			disabled = paused or nil,
-			action       = not paused and function()
+			action       = function()
 				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
@@ -476,13 +483,9 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local val = tonumber(raw)
-				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
-					return
-				end
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY)
+				if new_sec == nil then return end
 
-				local new_sec = val / 1000
 				if is_base then
 					if type(ctx.commit_base_delay) ~= "function" or ctx.commit_base_delay(new_sec) ~= true then
 						return false
@@ -494,7 +497,7 @@ function M.build_management(ctx)
 				if not is_base and ctx.save_prefs() ~= true then return false end
 				ctx.updateMenu()
 				if is_base then return true end
-			end or nil,
+			end,
 		}
 	end
 
@@ -519,8 +522,7 @@ function M.build_management(ctx)
 			-- menu.settings.default_indicator (" (default)") carries its own leading
 			-- space; show it while the user has set no override for this category.
 			label    = LabelValue.compose(i18n.get, title, display_ms) .. ((not has_over) and i18n.get("menu.settings.default_indicator") or ""),
-			disabled = paused or nil,
-			action       = not paused and function()
+			action       = function()
 				local ok_label = i18n.get("button.ok")
 				local ok_p, btn, raw = pcall(dialog.text_prompt,
 					title,
@@ -529,22 +531,18 @@ function M.build_management(ctx)
 				)
 				if not ok_p or btn ~= ok_label then return end
 
-				local val = tonumber(raw)
-				if not val or val < 0 or val ~= math.floor(val) then
-					pcall(notifications.notify, i18n.get("menu.hotstrings.delay_invalid_title"), i18n.get("menu.hotstrings.delay_invalid_body"), "error")
-					return
-				end
+				local new_sec = typed_delay(raw, ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
+				if new_sec == nil then return end
 
 				-- Persist through hotstrings_config (same store + file the config
 				-- window writes to, so the two UIs never desync) then apply to the
 				-- running engine so the new delay takes effect without a restart.
-				local new_sec = val / 1000
 				if hotstrings_config.set_override(category, nil, "delay", new_sec) ~= true then
 					return false
 				end
 				if ctx.keymap and type(ctx.keymap.set_delay) == "function" then pcall(ctx.keymap.set_delay, key, new_sec) end
 				ctx.updateMenu()
-			end or nil,
+			end,
 		}
 	end
 
@@ -566,7 +564,7 @@ function M.build_management(ctx)
 	-- dedicated configuration window where colors can also be tuned. Categories
 	-- that do not have a TOML counterpart (llm_prediction, dynamichotstrings)
 	-- and the global baseline keep their per-prompt menu items as quick access.
-	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
+	local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
 		hotstrings_config_window = function()
 			local ok, win = pcall(require, "ui.hotstrings_config_window")
 			if not ok or not win or type(win.open) ~= "function" then return end
@@ -581,7 +579,7 @@ function M.build_management(ctx)
 			end
 			pcall(win.open)
 		end,
-	}, { hotstrings_config_ready = function() return not paused end })
+	}, { hotstrings_config_ready = function() return true end })
 	local delay_providers = {
 		["parameter_delay_config"] = function() return settings_row and { settings_row } or {} end,
 		["parameter_delay_ai_acceptance"] = function()
@@ -604,13 +602,13 @@ function M.build_management(ctx)
 	delay_menu = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, delay_providers)
 	if not delay_menu then return nil end
 	local delay_parent = ManifestMenu.template_rows("hotstrings_delays_parent", {},
-		{ ["parameter_parent_ready"] = function() return not paused end }, { ["parameter_delays_children"] = delay_menu })
+		{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_delays_children"] = delay_menu })
 	if not delay_parent then return nil end
 	delays_item = delay_parent[1]
 
 	local hs_state  = ctx and ctx.state
 	local hs_paused = ctx and ctx.paused
-	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR))
+	local magic_key_value = (hs_state and hs_state.trigger_char or ManifestReader.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR))
 	local magic_key_action = function()
 			if not hs_state then return end
 			local ok_label = i18n.get("button.ok")
@@ -656,7 +654,7 @@ function M.build_management(ctx)
 	for key, value in pairs(ctx) do params_ctx[key] = value end
 	params_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do params_ctx.commands[key] = value end
-	params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
+	params_ctx.commands[require("settings.engine.keys").COMMAND.REPEAT_KEY] = function()
 		if not ctx.keymap or type(ctx.keymap.set_repeat_feature_enabled) ~= "function" then return false end
 		local wanted = not repeat_enabled
 		local ok, committed = pcall(ctx.keymap.set_repeat_feature_enabled, wanted)
@@ -688,8 +686,8 @@ function M.build_management(ctx)
 		end
 		return ctx.state.idle_reset_seconds
 	end
-	params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
-		return commit_word_reset(require("config_keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
+	params_ctx.commands[require("settings.engine.keys").COMMAND.IDLE_RESET] = function(seconds)
+		return commit_word_reset(require("settings.engine.keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
 	end
 	params_ctx.commands["idle_reset_custom"] = function()
 		local current = current_idle_reset()
@@ -700,15 +698,18 @@ function M.build_management(ctx)
 			type(current) == "number" and string.format("%g", current) or "",
 			ok_label, i18n.get("button.cancel"))
 		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
-		-- A decimal comma is how half the locales write 1,5 s.
-		local seconds = tonumber((TextUtils.trim(raw):gsub(",", ".")))
-		if not HotstringCore.valid_idle_reset_seconds(seconds) then
-			Logger.warn(LOG, "Invalid idle reset '%s' — ignored.", raw)
-			pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-				i18n.get("menu.hotstrings.idle_reset_invalid"), ok_label)
+		-- The shared value check accepts a decimal comma (how half the locales
+		-- write 1,5 s) and names the declared range in its refusal.
+		local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if not typed.ok then
+			Logger.warn(LOG, "Invalid idle reset '%s' — ignored (%s).", raw, typed.reason)
+			pcall(dialog.block_alert, i18n.get("dialog.value_check.title"),
+				ValueCheck.refusal_text(key, typed, i18n.get), ok_label)
 			return false
 		end
-		return commit_word_reset(require("config_keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
+		local seconds = typed.value
+		return commit_word_reset(require("settings.engine.keys").LEAF.IDLE_RESET_SECONDS, "set_idle_reset_seconds", seconds)
 	end
 	-- The cascade's longest chain: a fixed choice, drawn by the renderer from its declaration.
 	local function current_cascade_max_arrows()
@@ -717,36 +718,36 @@ function M.build_management(ctx)
 		end
 		return ctx.state.cascade_max_arrows
 	end
-	local ConfigKeys = require("config_keys")
+	local ConfigKeys = require("settings.engine.keys")
 	params_ctx.commands[ConfigKeys.COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
 		return commit_word_reset(ConfigKeys.LEAF.CASCADE_MAX_ARROWS, "set_cascade_max_arrows", arrows)
 	end
 	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
 		and ctx.keymap.is_click_resets_word_enabled()
-	params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
-		return commit_word_reset(require("config_keys").LEAF.CLICK_RESETS_WORD, "set_click_resets_word", not click_enabled)
+	params_ctx.commands[require("settings.engine.keys").COMMAND.CLICK_RESETS_WORD] = function()
+		return commit_word_reset(require("settings.engine.keys").LEAF.CLICK_RESETS_WORD, "set_click_resets_word", not click_enabled)
 	end
 	-- The arrow, shortcut and tap-hold checkboxes. Karabiner runs the tap-holds
 	-- and marks their output for the keymap (observe_tap_hold_signal).
 	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
 		and ctx.keymap.is_arrow_resets_word_enabled()
-	params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
-		return commit_word_reset(require("config_keys").LEAF.ARROW_RESETS_WORD, "set_arrow_resets_word", not arrow_enabled)
+	params_ctx.commands[require("settings.engine.keys").COMMAND.ARROW_RESETS_WORD] = function()
+		return commit_word_reset(require("settings.engine.keys").LEAF.ARROW_RESETS_WORD, "set_arrow_resets_word", not arrow_enabled)
 	end
 	local shortcut_enabled = ctx.keymap and type(ctx.keymap.is_shortcut_resets_word_enabled) == "function"
 		and ctx.keymap.is_shortcut_resets_word_enabled()
-	params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
-		return commit_word_reset(require("config_keys").LEAF.SHORTCUT_RESETS_WORD, "set_shortcut_resets_word", not shortcut_enabled)
+	params_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
+		return commit_word_reset(require("settings.engine.keys").LEAF.SHORTCUT_RESETS_WORD, "set_shortcut_resets_word", not shortcut_enabled)
 	end
 	local tap_hold_enabled = ctx.keymap and type(ctx.keymap.is_tap_hold_resets_word_enabled) == "function"
 		and ctx.keymap.is_tap_hold_resets_word_enabled()
-	params_ctx.commands[require("config_keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
-		return commit_word_reset(require("config_keys").LEAF.TAP_HOLD_RESETS_WORD, "set_tap_hold_resets_word", not tap_hold_enabled)
+	params_ctx.commands[require("settings.engine.keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
+		return commit_word_reset(require("settings.engine.keys").LEAF.TAP_HOLD_RESETS_WORD, "set_tap_hold_resets_word", not tap_hold_enabled)
 	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
-	params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = current_idle_reset
+	params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = current_idle_reset
 	params_ctx.state_getters[ConfigKeys.KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = current_cascade_max_arrows
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
 	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end

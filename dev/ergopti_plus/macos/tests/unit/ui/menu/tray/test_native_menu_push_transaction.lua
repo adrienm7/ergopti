@@ -25,7 +25,7 @@ local function load_fixture(opts)
 	local destroyed = 0
 	local logs = { info = {}, error = {} }
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 	hs_stub.timer = {
 		new = function(delay, callback)
@@ -67,14 +67,14 @@ local function load_fixture(opts)
 	Logger.error = function(_, message, ...)
 		logs.error[#logs.error + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = Logger
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 
 	local state = {
@@ -155,13 +155,13 @@ local function load_fixture(opts)
 		end,
 		destroy = function() destroyed = destroyed + 1; return true end,
 	}
-	package.loaded["chord"] = { format = function() return "ctrl+x" end }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_exit = function() return true end,
 	}
 
@@ -186,7 +186,7 @@ local function load_fixture(opts)
 	package.loaded["modules.gestures"] = { SINGLE_SLOTS = { "swipe_left" } }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
 	local program_admission

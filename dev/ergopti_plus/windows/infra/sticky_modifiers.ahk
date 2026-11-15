@@ -14,7 +14,9 @@
 ; @param {String} ActionId A sticky_* action id other than sticky_shift.
 ; @returns {Array} TextPressKey's modifier names.
 StickyModifierNames(ActionId) {
-	static Names := Map("cmd", "Win", "option", "Alt", "ctrl", "Ctrl", "shift", "Shift")
+	; altgr is the layout's AltGr level: TextPressKey sends it as the layout's
+	; own AltGr key, Kana on a Kana-style layout (KS_AltGrSendKey).
+	static Names := Map("cmd", "Win", "option", "Alt", "ctrl", "Ctrl", "shift", "Shift", "altgr", "AltGr")
 	if (ActionId == "sticky_hyper")
 		return ["Ctrl", "Alt", "Shift", "Win"]
 	Held := []
@@ -42,15 +44,15 @@ StickyModifierConfigureHook(Hook) {
 
 ; Presses the next key with the sticky action's modifiers, once. The key itself is
 ; withheld until then; intervening modifiers pass through and their captured
-; flags accompany the replay. The one-shot Shift timeout ends the wait.
+; flags accompany the replay. The one-shot timeout ends the wait (0: none).
 ; @param {String} ActionId A sticky_* action id other than sticky_shift.
 ; @returns {Boolean} True when a key was pressed with them.
 StickyModifier(ActionId) {
 	if A_IsSuspended
 		return false
 	Held := StickyModifierNames(ActionId)
-	TimeoutSec := (IsSet(ONE_SHOT_SHIFT_TIMEOUT_SEC) and ONE_SHOT_SHIFT_TIMEOUT_SEC > 0) ? ONE_SHOT_SHIFT_TIMEOUT_SEC : 2
-	Hook := InputHook("L0 T" . TimeoutSec)
+	; 0 is no time limit: the hook then waits until a key spends it.
+	Hook := InputHook("L0" . TapHoldOneShotHookTimeoutOption())
 	StickyModifierConfigureHook(Hook)
 	Custom := 0
 	KeyName := KS_AltGrKeyName(), SendKey := KS_AltGrSendKey()
@@ -84,7 +86,11 @@ StickyModifier(ActionId) {
 			return false
 		; Preserve an original hold still down; only restore an endpoint modifier
 		; that was released before replay. TextPressKey retains its normal ABI.
-		if Restore
+		; sticky_altgr already holds AltGr: only a released endpoint AltGr is added.
+		HoldsAltGr := false
+		for Name in Held
+			HoldsAltGr := HoldsAltGr || (Name == "AltGr")
+		if Restore && !HoldsAltGr
 			Held.Push("AltGr")
 	}
 	Seen := Map()

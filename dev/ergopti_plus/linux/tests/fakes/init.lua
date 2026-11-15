@@ -51,7 +51,7 @@ function M.uinput_writer(opts)
 	-- Only its syscall port is controlled: no device, kernel ACK or origin exists.
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local driver = assert(source:match("^(.*)/tests/fakes/init.lua$"))
-	local fake = assert(loadfile(driver .. "/adapters/uinput_writer.lua"))()
+	local fake = assert(loadfile(driver .. "/platform/input/uinput_writer.lua"))()
 	fake.events, fake.opened, fake.closed, fake.test = {}, false, false, {}
 	local pending
 	local function uint(bytes, at, count)
@@ -250,7 +250,7 @@ function M.shell_runner(opts)
 	-- contact, and a fake that answered differently from the real validator would
 	-- let a test pass on an argv that production refuses -- the exact failure the
 	-- double is supposed to rule out (keystats-worker-timings-must-be-strings).
-	fake.validate_spawn_args = require("adapters.shell_runner").validate_spawn_args
+	fake.validate_spawn_args = require("core.process.adapters.shell_runner").validate_spawn_args
 	function fake.run(command) fake.commands[#fake.commands + 1] = command ; return true end
 	function fake.exec(command)
 		fake.commands[#fake.commands + 1] = command
@@ -331,7 +331,7 @@ function M.storage(opts)
 
 	-- This is an in-memory ownership model, never a native persistence receipt.
 	local gates, aliases, generations, receipts, epoch = {}, {}, {}, setmetatable({}, { __mode = "k" }), 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local function copy(value)
 		if value == nil then return nil end
 		local bytes = assert(json.encode(value))
@@ -458,7 +458,7 @@ function M.storage(opts)
 	end
 
 	-- The store's file, which the configuration backup copies.
-	function fake.path() return opts.path or ("/fake/" .. require("app_dirs").linux.folder_name .. "/storage.json") end
+	function fake.path() return opts.path or ("/fake/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/storage.json") end
 
 	function fake.set(key, value)
 		if opts.writes_fail or aliases[key] ~= nil then return false end
@@ -716,7 +716,7 @@ function M.sqlite_writer(opts)
 	local system_day_paths = {}
 	local fake = {
 		typing = {}, hotstrings = {}, shortcuts = {}, llm = {}, app_switches = {}, window_switches = {},
-		session_events = {}, system_events = {}, network_events = {},
+		session_events = {}, system_events = {}, network_events = {}, clipboard_events = {}, window_topo_events = {}, av_events = {},
 		app_days = {}, ngrams = {}, scancodes = {},
 		chars_class = {}, errors = {}, hourly = {}, hourly_min5 = {},
 		app_buckets = {}, bursts = {}, sessions = {}, switches_to = {}, ergo = {},
@@ -730,6 +730,7 @@ function M.sqlite_writer(opts)
 	function fake.has_private_file_debt() return false end
 	function fake.open_db(path) fake.path = path ; if not available then return false, "sqlite_unavailable" end; return true end
 	function fake.ensure_token_encoding() return true end
+	function fake.ensure_awake_definition() return true end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
 	function fake.get_revision() return fake.revision end
@@ -775,6 +776,9 @@ function M.sqlite_writer(opts)
 	fake.insert_session_events = collect(fake.session_events)
 	fake.insert_system_events = collect(fake.system_events)
 	fake.insert_network_events = collect(fake.network_events)
+	fake.insert_clipboard_events = collect(fake.clipboard_events)
+	fake.insert_window_topo_events = collect(fake.window_topo_events)
+	fake.insert_av_events = collect(fake.av_events)
 	fake.insert_app_switch_events = collect(fake.app_switches)
 
 	function fake.upsert_app_day(device_id, date, app, fields)
@@ -854,9 +858,9 @@ function M.sqlite_writer(opts)
 		if not available or type(fake.path) ~= "string" or fake.path == "" or opts.media_commit == false then return false end
 		if media_policy then return true end
 		local ok, store, policy = pcall(function()
-			local shared = require("keystats.media_store")
-			local json = require("json")
-			local path = require("tests.helpers").driver_root() .. "/../_shared/data/keycodes/metrics_media_keys.json"
+			local shared = require("metrics.engine.media.store")
+			local json = require("core.text.engine.json")
+			local path = require("tests.helpers").driver_root() .. "/../_shared/layouts/data/keycodes/metrics_media_keys.json"
 			local file = assert(io.open(path, "rb"))
 			local read, body = pcall(file.read, file, "*a")
 			local closed, acknowledged = pcall(file.close, file)
@@ -892,7 +896,7 @@ function M.sqlite_writer(opts)
 				assert(type(events[index]) == "table")
 				local row = {}; for key, value in pairs(events[index]) do row[key] = value end
 				rows[index] = row
-				media_store.raw_sql(device_id, index, row, require("json").encode)
+				media_store.raw_sql(device_id, index, row, require("core.text.engine.json").encode)
 			end
 			local aggregate = previous and copy(previous.batch) or { media_ngram = {}, media_hold = {} }
 			media_store.replay(media_policy, aggregate, rows, threshold_ms)

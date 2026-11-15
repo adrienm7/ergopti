@@ -34,28 +34,30 @@
 
 local M = {}
 
+local NetworkTransitions = require("metrics.engine.system.network_transitions")
+local LocalTime = require("metrics.engine.local_time")
 local hs      = hs
 local fs      = require("hs.fs")
-local NativePath = require("native_path")
-local text_utils = require("infra.text_utils")
+local NativePath = require("core.fs.engine.native_path")
+local text_utils = require("core.text.engine.utils")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 local timer   = require("hs.timer")
 
-local Logger  = require("infra.logger")
-local Timings = require("infra.timings")
-local Literal = require("sqlite.literal")
-local Queries = require("keystats.queries")
-local i18n    = require("infra.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
-local FileSystem = require("adapters.file_system")
+local Logger  = require("core.logger.engine.logger")
+local Timings = require("core.timing.engine.timings")
+local Literal = require("core.fs.engine.sqlite.literal")
+local Queries = require("metrics.engine.queries")
+local i18n    = require("core.i18n.engine.i18n")  -- kept for MAC_CATEGORIES_FR still used by export
+local FileSystem = require("core.fs.adapters.file_system")
 local MetadataCommandStats = require("adapters.metadata_command_stats")
-local LedgerAppend = require("adapters.ledger_append")
-local TimerScheduler = require("adapters.timer_scheduler")
-local PowerSource = require("adapters.power_source")
+local LedgerAppend = require("core.fs.adapters.ledger_append")
+local TimerScheduler = require("core.events.timer_scheduler")
+local PowerSource = require("platform.system.power_source")
 local LOG     = "keystats.log_manager"
 
 local TextCipher = require("modules.keystats.text_cipher")
-local TriggerRoi = require("keystats.trigger_roi")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local RebuildSnapshot = require("modules.keystats.rebuild_snapshot")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local Aggregator   = require("modules.keystats.aggregator")
@@ -63,7 +65,8 @@ local Rotation     = require("modules.keystats.rotation")
 local IngestTrace  = require("modules.keystats.ingest_trace")
 local Export       = require("modules.keystats.export")
 local LedgerReplay = require("modules.keystats.ledger_replay")
-local Metrics      = require("keystats.metrics")
+local HostSignature = require("modules.keystats.host_signature")
+local Metrics      = require("metrics.engine.metrics")
 
 
 
@@ -143,7 +146,7 @@ local _state = nil
 local _physical_sink_active, _physical_sink_generation = false, 0
 local PhysicalAccounting = require("modules.keystats.physical_accounting_mode")
 local PhysicalWire = require("modules.keystats.physical_wire")
-local PhysicalRelease = require("keystats.physical_release")
+local PhysicalRelease = require("metrics.engine.capture.physical_release")
 
 --- Device identity, read from / written to device.json.
 local _device_id  = nil
@@ -226,7 +229,7 @@ end
 -- Single-sourced in modules/keystats/timestamp.lua so the seconds and the .mmm
 -- fraction share one wall clock (F-L1).
 local Timestamp = require("modules.keystats.timestamp")
-local Maintenance = require("keystats.metrics_maintenance")
+local Maintenance = require("metrics.engine.maintenance")
 local _now_ts = Timestamp.now_ts
 
 --- Returns today's "YYYY-MM-DD" string.
@@ -263,8 +266,15 @@ local function _uuid_v4()
 		b[9], b[10], b[11], b[12], b[13], b[14], b[15], b[16])
 end
 
---- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1).
+--- Returns the macOS hardware UUID (KEYSTATS_SPEC §16.1). The deferred boot
+--- start prefetches it off the main thread (modules/keystats/host_signature.lua):
+--- this synchronous pipeline held the run loop 151 ms at boot+1 s. It still
+--- runs when nothing prefetched the value, e.g. a later Metrics toggle.
 local function _host_signature()
+	local prefetched = HostSignature.value()
+	if prefetched then return prefetched end
+	Logger.debug(LOG, "Hardware UUID not prefetched (%s); reading it synchronously.",
+		HostSignature.status())
 	local cmd = "ioreg -d2 -c IOPlatformExpertDevice "
 		.. "| grep IOPlatformUUID | awk -F\\\" '{print $4}'"
 	local ok, out = pcall(hs.execute, cmd)
@@ -965,8 +975,8 @@ function M.log_physical_media(action, row)
 		and row.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
 		"Invalid original physical media timestamp")
 	PhysicalWire.decimal(row.device, true)
-	local store = require("keystats.media_store")
-	local batch = require("keystats.aggregator_helpers").new_batch()
+	local store = require("metrics.engine.media.store")
+	local batch = require("metrics.engine.aggregator.helpers").new_batch()
 	local entry = { type = "system_event", action = action }
 	for _, name in ipairs({ "timestamp", "capture", "device", "app", "media_id", "hold_ms", "keycode", "scancode" }) do
 		entry[name] = row[name]
@@ -985,6 +995,24 @@ function M.log_shortcut(shortcut_key, app_name)
 		type = "shortcut", key = shortcut_key,
 		app  = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
 	})
+end
+
+--- Queues one events_clipboard row (modules/keystats/clipboard_telemetry);
+--- only the kind's own metadata keys are kept, never clipboard content.
+--- @param kind string One of keystats.clipboard_events KINDS.
+--- @param app_name string Foreground application name.
+--- @param meta table The kind's metadata.
+--- @return boolean|nil accepted
+function M.log_clipboard_event(kind, app_name, meta)
+	if not _require_state("log_clipboard_event") then return end
+	local fields = require("metrics.engine.capture.clipboard_events").KINDS[kind]
+	assert(fields and type(meta) == "table", "not an events_clipboard row: " .. tostring(kind))
+	local entry = {
+		type = kind,
+		app = (type(app_name) == "string" and app_name ~= "") and app_name or "Unknown",
+	}
+	for _, name in ipairs(fields) do entry[name] = meta[name] end
+	return M.append_log(entry)
 end
 
 function M.log_modifier_press(keycode, app_name)
@@ -1230,7 +1258,7 @@ local LEDGER_REPLAY_PROGRESS_BYTES = 32 * 1024 * 1024
 local RECOVERY_PROGRESS_KEY = "aggregate_recovery_progress"
 
 --- Order of a rebuild's stages inside one device partition.
-local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4 }
+local RECOVERY_STAGE_RANK = { clear = 0, typing = 1, app_switch = 2, window_switch = 3, system = 4, network = 5 }
 
 --- Reads the pending replay state, or nil when no replay is pending.
 ---@param db userdata
@@ -1705,6 +1733,18 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 			return true
 		end
 		local quoted_device = _sq(replay_device_id)
+		-- A row's hour, night wake and day are read in the local time its user
+		-- lived: its UTC ts plus its recorded offset (keystats.local_time,
+		-- maintainer decision KMD-1). A Linux row recorded before the column held
+		-- UTC and is read with this Mac's current offset, which the log notes.
+		local device_os
+		for row in db:nrows("SELECT os FROM devices WHERE device_id=" .. quoted_device) do device_os = row.os end
+		local legacy_utc, current_offset, legacy_rows = device_os == "linux", LocalTime.offset_at(os.time()), 0
+		local function lived(row)
+			local offset = math.tointeger(row.utc_offset_min)
+			if offset == nil and legacy_utc then legacy_rows = legacy_rows + 1 end
+			return LocalTime.local_ts(row.ts, offset, legacy_utc, current_offset)
+		end
 		local ok, replay_err = pcall(function()
 			local cutoffs = boundary_maps[replay_device_id]
 			local first_segment = start ~= nil and start.stage == "typing" and start.segment or 1
@@ -1715,7 +1755,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 					local range = previous ~= nil and (" AND id>" .. tostring(previous)) or ""
 					if upper ~= nil then range = range .. " AND id<=" .. tostring(upper) end
 					range = range .. after_resume_point("typing", segment)
-					for row in db:nrows("SELECT ts, app, title, layout, events_json, id FROM events_typing WHERE device_id="
+					for row in db:nrows("SELECT ts, app, title, layout, events_json, id, utc_offset_min FROM events_typing WHERE device_id="
 						.. quoted_device .. range .. " ORDER BY ts, id") do
 						local decrypt_ok, plaintext = pcall(TextCipher.decrypt, row.events_json)
 						if not decrypt_ok or type(plaintext) ~= "string" then error("typing event decryption failed", 0) end
@@ -1736,7 +1776,7 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 						for index = 1, count do
 							if events[index] == nil then error("typing event shape refused", 0) end
 						end
-						Aggregator.walk_typing({ timestamp=row.ts, app=row.app, title=row.title, layout=row.layout, events=events })
+						Aggregator.walk_typing({ timestamp=lived(row), app=row.app, title=row.title, layout=row.layout, events=events })
 						plaintext = nil
 						reached("typing", segment, row)
 						if not walked() then error("typing aggregate flush failed") end
@@ -1756,31 +1796,51 @@ local function _rebuild_aggregates_from_raw(db, requested_device_ids)
 				end
 			end
 			if due("app_switch") then
-				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
-					Aggregator.walk_app_switch({ timestamp=row.ts, prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
+				for row in db:nrows("SELECT ts, prev_app, next_app, duration_ms, id, utc_offset_min FROM events_app_switch WHERE device_id=" .. quoted_device .. after_resume_point("app_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_app_switch({ timestamp=lived(row), prev_app=row.prev_app, next_app=row.next_app, duration_ms=row.duration_ms })
 					reached("app_switch", 1, row)
 					if not walked() then error("app-switch aggregate flush failed") end
 				end
 			end
 			if due("window_switch") then
-				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
-					Aggregator.walk_window_switch({ timestamp=row.ts, app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
+				for row in db:nrows("SELECT ts, app, prev_title, next_title, duration_ms, id, utc_offset_min FROM events_window_switch WHERE device_id=" .. quoted_device .. after_resume_point("window_switch", 1) .. " ORDER BY ts, id") do
+					Aggregator.walk_window_switch({ timestamp=lived(row), app=row.app, prev_title=row.prev_title, next_title=row.next_title, duration_ms=row.duration_ms })
 					reached("window_switch", 1, row)
 					if not walked() then error("window-switch aggregate flush failed") end
 				end
 			end
-			for row in db:nrows("SELECT ts, action, metadata_json, id FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
-				local entry = {}
-				local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
-				if decoded_ok and type(metadata) == "table" then
-					for key, value in pairs(metadata) do entry[key] = value end
+			if due("system") then
+				for row in db:nrows("SELECT ts, action, metadata_json, id, utc_offset_min FROM events_system WHERE device_id=" .. quoted_device .. after_resume_point("system", 1) .. " ORDER BY ts, id") do
+					local entry = {}
+					local decoded_ok, metadata = pcall(json.decode, row.metadata_json or "{}")
+					if decoded_ok and type(metadata) == "table" then
+						for key, value in pairs(metadata) do entry[key] = value end
+					end
+					entry.timestamp, entry.action = lived(row), row.action
+					Aggregator.walk_system_event(entry)
+					reached("system", 1, row)
+					if not walked() then error("system aggregate flush failed") end
 				end
-				entry.timestamp, entry.action = row.ts, row.action
-				Aggregator.walk_system_event(entry)
-				reached("system", 1, row)
-				if not walked() then error("system aggregate flush failed") end
+			end
+			-- Windows records its Wi-Fi changes as network_change rows; its own
+			-- rebuild counts the transitions among them with the rows above.
+			if due("network") then
+				for row in db:nrows("SELECT ts, kind, meta_json, id, utc_offset_min FROM events_network WHERE device_id=" .. quoted_device .. after_resume_point("network", 1) .. " ORDER BY ts, id") do
+					if row.kind == "network_change" then
+						local decoded_ok, metadata = pcall(json.decode, row.meta_json or "{}")
+						if decoded_ok and NetworkTransitions.is_wifi_change(metadata) then
+							Aggregator.walk_system_event({ timestamp = lived(row), action = "wifi_change" })
+						end
+					end
+					reached("network", 1, row)
+					if not walked() then error("network aggregate flush failed") end
+				end
 			end
 			if not flush_if_needed(true) then error("final aggregate flush failed") end
+			if legacy_rows > 0 then
+				Logger.info(LOG, "%d row(s) of Linux device %s predate the UTC offset column; read with this Mac's offset (%+d min).",
+					legacy_rows, tostring(replay_device_id), current_offset)
+			end
 		end)
 		if not ok then
 			Aggregator.set_device_id(_device_id)
@@ -1933,6 +1993,7 @@ local function _persist_recovery_state(db, cursor)
 		.. " UNION ALL SELECT id FROM events_hotstring WHERE device_id=" .. _sq(_device_id)
 		.. " UNION ALL SELECT id FROM events_llm WHERE device_id=" .. _sq(_device_id)
 		.. " UNION ALL SELECT id FROM events_session WHERE device_id=" .. _sq(_device_id)
+		.. " UNION ALL SELECT id FROM events_clipboard WHERE device_id=" .. _sq(_device_id)
 		.. ")") do
 		max_id = tonumber(row.max_id) or 0
 	end

@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 local Gesture = require("tests.support.gesture_actions_fixture")
 local OWNED = {
-	"native_app_switcher_owner",
+	"core.ui.engine.native_app_switcher_owner",
 	"modules.gestures.action_confirm", "modules.gestures.system_actions",
-	"infra.dialog_util", "adapters.mouse_control", "adapters.window_info",
-	"adapters.window_manager", "adapters.running_application", "adapters.tcc_grant",
-	"adapters.shell_runner", "adapters.task_environment", "infra.launcher_environment",
-	"infra.deferred_work", "diagnostics.runtime_log", "file_selection", "window_titles",
+	"core.ui.engine.dialog_util", "adapters.mouse_control", "platform.focus.window_info",
+	"platform.focus.window_manager", "platform.focus.running_application", "adapters.tcc_grant",
+	"core.process.adapters.shell_runner", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.fs.engine.file_selection", "core.ui.engine.window_titles",
 }
 
 --- Runs real business owners with only their native calls recorded.
@@ -82,8 +82,8 @@ local function with_world(callback)
 
 			-- Replace the central fixture's Aux facade before constructing Actions:
 			-- both the aggregate and SystemActions must share the real same owner.
-			package.loaded["adapters.shell_runner"] = nil
-			package.loaded["infra.dialog_util"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
+			package.loaded["core.ui.engine.dialog_util"] = nil
 			package.loaded["modules.gestures.system_actions"] = nil
 			package.loaded["modules.gestures.action_confirm"] = nil
 			package.loaded["modules.gestures.actions_aux_owner"] = nil
@@ -91,7 +91,7 @@ local function with_world(callback)
 			local Actions = require("modules.gestures.actions")
 			Actions.init({ action_params = {} })
 			local Confirm = require("modules.gestures.action_confirm")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			w.actions, w.confirm_owner = Actions, Confirm
 			function w.ask()
 				helpers.assert_eq(Actions.execute_single("force_quit_frontmost", "tap_3"), true)

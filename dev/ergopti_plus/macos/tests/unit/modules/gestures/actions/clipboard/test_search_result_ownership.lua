@@ -10,11 +10,11 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.gesture_actions_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function it(name, scenario)
 	helpers.it(name, function()
-		helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner", "adapters.clipboard" }, function()
+		helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner", "adapters.clipboard" }, function()
 			Fixture.with_fixture(function(fresh)
 				local actions, calls = fresh()
 				local f = { restores = 0 }
@@ -41,7 +41,7 @@ local function it(name, scenario)
 					return text
 				end
 				calls.hs.pasteboard = native
-				local synthetic = package.loaded["adapters.synthetic_input"]
+				local synthetic = package.loaded["platform.input.synthetic_input"]
 				local emit = synthetic.emit_key_stroke
 				synthetic.emit_key_stroke = function(mods, key, ...)
 					local accepted = emit(mods, key, ...)
@@ -127,7 +127,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 	for _, refusal in ipairs({ "clear-false", "mutating-throw" }) do
 		it("keeps the receipt captured before a reentrant error diagnostic after " .. refusal, function(f)
 			f.restore_mode = refusal
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local log_error = logger.error
 			logger.error = function(...)
 				log_error(...)
@@ -215,7 +215,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 		f.restore_mode = nil
 		f.external("COPY BEFORE REVOCATION LOG")
 		local admitted, business = {}, {}
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local callback = logger.callback
 		logger.callback = function(...)
 			local ok, result = callback(...)
@@ -238,7 +238,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 
 	it("does not queue or publish after the restore-failure diagnostic opens a successor", function(f)
 		f.restore_mode = "false"
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local log_error = logger.error
 		local reentered, dispatched = false, nil
 		logger.error = function(module, message, ...)
@@ -273,7 +273,7 @@ helpers.describe("search result retains only its exact native clipboard generati
 	end)
 	it("uses native-shaped generations for the legacy fixture's private clipboard", function()
 		-- The fixture's own board remains coherent for existing search scenarios.
-		helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner" }, function()
+		helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner" }, function()
 			Fixture.with_fixture(function(fresh)
 				local actions, calls = fresh()
 				local board = calls.hs.pasteboard

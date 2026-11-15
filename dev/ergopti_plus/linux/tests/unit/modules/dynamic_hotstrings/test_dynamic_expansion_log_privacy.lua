@@ -7,7 +7,7 @@
 --- Two lines wrote a user's personal_info value into the driver's own log, in
 --- full, on every expansion:
 ---
----   1. _shared/lua/dynamic_hotstrings/init.lua — "Buffer match: suffix='%s' →
+---   1. _shared/hotstrings/engine/dynamic/core.lua — "Buffer match: suffix='%s' →
 ---      result='%s'", at DEBUG, in code BOTH Lua drivers run.
 ---   2. linux/modules/dynamic_hotstrings/manager.lua — "Dynamic expansion: '%s'
 ---      → '%s'", at INFO.
@@ -57,15 +57,15 @@ local function with_recording_logger(body)
 		set_level = function() end, set_sink = function() end,
 		ring_buffer_snapshot = function() return {} end,
 	}
-	local previous = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = recorder
+	local previous = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = recorder
 	-- Drop the modules under test so they re-require the recorder rather than
 	-- keeping the no-op stub they captured at first load.
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.manager"] = nil
 	local ok, err = pcall(body, lines)
-	package.loaded["logger.shim"] = previous
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["core.logger.engine.shim"] = previous
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.manager"] = nil
 	if not ok then error(err, 0) end
 end
@@ -88,7 +88,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("the shared engine's buffer-match line carries no resolved value", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@i", "personal_info", function() return SECRET end)
 			local match = Engine.match_buffer("@i", "dynamic", nil)
 
@@ -103,7 +103,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("but the length survives, because that is the diagnostic", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@i", "personal_info", function() return SECRET end)
 			Engine.match_buffer("@i", "dynamic", nil)
 
@@ -117,7 +117,7 @@ helpers.describe("dynamic expansion log privacy", function()
 
 	helpers.it("a resolver that returns nothing logs nothing about it", function()
 		with_recording_logger(function(lines)
-			local Engine = require("dynamic_hotstrings")
+			local Engine = require("hotstrings.engine.dynamic.core")
 			Engine.add_rule("@x", "personal_info", function() return "" end)
 			local match = Engine.match_buffer("@x", "dynamic", nil)
 			helpers.assert_true(match == nil,
@@ -194,6 +194,46 @@ helpers.describe("dynamic expansion failure-log privacy", function()
 				"the withheld value length keeps the failed rule diagnosable")
 			helpers.assert_contains(combo_failure, tostring(#SECRET + #second_secret),
 				"the total withheld byte count keeps the failed combo diagnosable")
+		end)
+	end)
+
+end)
+
+
+helpers.describe("personal_info.toml value check (value-validation-contract)", function()
+
+	-- Regression: a number typed without quotes was read as an empty value
+	-- without a word. The load now reports the field by its path, never its
+	-- value, as its shared value schema declaration requires.
+	helpers.it("reports a field that is not text by its path, never its value", function()
+		with_recording_logger(function(lines)
+			local unquoted = "33612345678"
+			local path = os.tmpname()
+			local file = assert(io.open(path, "w"))
+			file:write(table.concat({
+				"[info]",
+				"phone_number_value_check = " .. unquoted,
+				'iban = "' .. SECRET .. '"',
+				"",
+				"[letters]",
+				'i = "iban"',
+				"",
+			}, "\n"))
+			file:close()
+			local ok, err = pcall(function()
+				local Manager = require("modules.dynamic_hotstrings.manager")
+				assert(Manager.init({ trigger_char = "★", personal_info_path = path }))
+			end)
+			os.remove(path)
+			if not ok then error(err, 0) end
+			local report = nil
+			for _, line in ipairs(lines) do
+				if line:find("phone_number_value_check", 1, true) then report = line end
+			end
+			helpers.assert_not_nil(report, "the refused field must be reported")
+			helpers.assert_contains(report, "wrong_type")
+			helpers.assert_true(not joined(lines):find(unquoted, 1, true), "the refused value must never be logged")
+			helpers.assert_true(not joined(lines):find(SECRET, 1, true), "an admitted value must never be logged")
 		end)
 	end)
 

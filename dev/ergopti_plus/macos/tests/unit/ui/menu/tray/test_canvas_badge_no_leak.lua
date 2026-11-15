@@ -258,7 +258,7 @@ end)
 --- @return table
 local function badge_json(relative)
 	local file = assert(io.open(helpers.shared(relative), "rb"))
-	local value = require("json").decode(file:read("*a"))
+	local value = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
 	return value
 end
@@ -266,8 +266,8 @@ end
 --- Exercises the real badge producer with controlled native drawing boundaries.
 --- @param body function Receives actual module, native effects, renderer and i18n.
 local function with_badge_frame(body)
-	return helpers.with_stub_scope({ "ui.menu.canvas_badge", "infra.manifest_menu", "menu.renderer",
-		"infra.i18n", "infra.logger" }, function()
+	return helpers.with_stub_scope({ "ui.menu.canvas_badge", "infra.manifest_menu", "menu.engine.renderer",
+		"core.i18n.engine.i18n", "core.logger.engine.logger" }, function()
 		local canvas, counters = make_canvas_stub()
 		counters.draws, counters.texts, counters.events = 0, {}, {}
 		local new_canvas = canvas.new
@@ -297,7 +297,7 @@ local function with_badge_frame(body)
 			return measure(...)
 		end
 		local module = helpers.load_with_stubs("ui.menu.canvas_badge", { canvas = canvas, drawing = drawing })
-		return body(module, counters, require("infra.manifest_menu"), require("infra.i18n"))
+		return body(module, counters, require("infra.manifest_menu"), require("core.i18n.engine.i18n"))
 	end)
 end
 
@@ -307,7 +307,7 @@ helpers.describe("canvas badge consumes declared captions and boundary before na
 		helpers.it("preserves the independently frozen active and paused canvas captions: " .. locale, function()
 			with_badge_frame(function(module, effects, _, i18n)
 				local prior = badge_json("tests/corpus/menus/macos_canvas_badge_captions.json").captions[locale]
-				local strings = badge_json("data/locales/" .. locale .. ".json")
+				local strings = badge_json("core/i18n/data/locales/" .. locale .. ".json")
 				i18n.get = function(key) return strings[key] or key end
 				for _, state in ipairs({ { paused = false, caption = "active" }, { paused = true, caption = "paused" } }) do
 					local body = { title = "Independent native root row" }

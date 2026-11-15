@@ -15,17 +15,17 @@
 local M = {}
 
 local gestures_mod  = require("modules.gestures")
-local Sensitivity = require("gestures.sensitivity")
+local Sensitivity = require("gestures.engine.sensitivity")
 local MenuUtils = require("ui.menu.menu_utils")
-local dialog        = require("infra.dialog_util")
-local i18n          = require("infra.i18n")
-local LabelValue = require("locale.label_value")
+local dialog        = require("core.ui.engine.dialog_util")
+local i18n          = require("core.i18n.engine.i18n")
+local LabelValue = require("core.i18n.engine.label_value")
 local ManifestMenu  = require("infra.manifest_menu")
 local ActionPicker  = require("ui.action_picker")
 local shortcut_utils = require("ui.menu.shortcut_utils")
-local Logger         = require("infra.logger")
-local DeferredWork   = require("infra.deferred_work")
-local ParameterLabel = require("action_parameter_label")
+local Logger         = require("core.logger.engine.logger")
+local DeferredWork   = require("core.timing.engine.deferred_work")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
 local LOG = "menu.gestures"
 local gesture_toggle_debt = nil
@@ -182,16 +182,27 @@ function M.build(ctx)
 	--- never sends for an item that opens a submenu, so Gestures could not be
 	--- switched on from the menu bar at all.
 	---
-	--- Refused while the script is paused. The gesture engine's only gate is the
-	--- shared CoreState.enabled flag, which pause_all() drives via disable_all().
-	--- Toggling the feature during pause would write that SAME flag: enabling it
-	--- makes gestures fire while « tout est éteint », and disabling it desyncs the
-	--- pre-pause snapshot so resume_all() re-enables against the user's intent.
-	--- Pause owns the gesture state until resume restores it.
+	--- While the script is paused the switch records the user's choice and the
+	--- gesture runtime applies it on resume (EDD-1: a pause stops typing, not
+	--- configuration). The engine fires only when the feature flag is on AND
+	--- ScriptControl suspension is off, so the paused path goes through
+	--- gestures.set_enabled_under_suspension(), which never starts the runtime:
+	--- resume() does, from the flag this switch wrote.
 	--- @return boolean|nil committed
 	local function toggle_gestures()
-		if paused then
-			Logger.warn(LOG, "Gestures switch refused: the script is paused.")
+		local under_pause = paused == true
+			or (type(gestures.is_suspended) == "function" and gestures.is_suspended() == true)
+		if under_pause and type(gestures.set_enabled_under_suspension) ~= "function" then
+			Logger.error(LOG, "Gestures switch refused: the pause contract is incomplete.")
+			return false
+		end
+		local function apply(enabled, label)
+			if not under_pause then return apply_gesture_posture(enabled, label) end
+			local apply_ok, result_or_err = xpcall(
+				gestures.set_enabled_under_suspension, debug.traceback, enabled)
+			if apply_ok and result_or_err == true then return true end
+			Logger.error(LOG, "Gesture switch under pause %s did not commit: %s.",
+				tostring(label), tostring(result_or_err))
 			return false
 		end
 		if settle_gesture_toggle_debt() ~= true then return false end
@@ -203,12 +214,21 @@ function M.build(ctx)
 			local res = dialog.block_alert(i18n.get("dialog.gestures.warning_title"), warnMsg, i18n.get("button.activate"), i18n.get("button.cancel"), "warning")
 			if res ~= i18n.get("button.activate") then return end
 		end
-		if commit_gestures_runtime(desired, previous) ~= true then return false end
+		if under_pause then
+			if apply(desired, "toggle") ~= true then
+				if apply(previous, "rollback") ~= true then
+					Logger.error(LOG, "Gesture switch under pause left its previous posture unrestored.")
+				end
+				return false
+			end
+		elseif commit_gestures_runtime(desired, previous) ~= true then
+			return false
+		end
 		state.gestures = desired
 		local save_ok, save_result = xpcall(ctx.save_prefs, debug.traceback)
 		if not save_ok or save_result ~= true then
 			state.gestures = previous
-			if apply_gesture_posture(previous, "preference rollback") ~= true then
+			if apply(previous, "preference rollback") ~= true and not under_pause then
 				gesture_toggle_debt = { restore_enabled = previous }
 			end
 			Logger.error(LOG, "Gesture preference publication did not commit: %s.",
@@ -286,7 +306,7 @@ function M.build(ctx)
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
 			if spec then
-				return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+				return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 					local click_change
 					local called, committed = xpcall(shortcut_utils.prompt_action_parameter, debug.traceback,
 						gestures, slot, a, spec, picked, {
@@ -346,7 +366,11 @@ function M.build(ctx)
 				and gestures.get_action_parameter_spec(current) or nil, parameter)
 		end
 
-		local names = type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+		-- The picker's names are read when it opens: building them for every slot
+		-- on every rebuild translated the whole catalogue once per slot.
+		local function names()
+			return type(gestures.get_sg_names) == "function" and gestures.get_sg_names() or gestures.SG_NAMES
+		end
 
 		-- A slot whose macOS gesture is on is greyed with a short suffix and the
 		-- engine holds it back (never a double action); the Infos dialog says
@@ -358,7 +382,7 @@ function M.build(ctx)
 			or nil
 		local rowLabel = LabelValue.compose(i18n.get, slotLbl, actionLbl)
 			.. (held_suffix and (" — " .. held_suffix) or "")
-		local rowDisabled = not state.gestures or paused or held_suffix ~= nil or nil
+		local rowDisabled = not state.gestures or held_suffix ~= nil or nil
 
 		-- Provider data from here down: `label` / `action` / `items`, which the
 		-- renderer materialises. These rows used to be built in this driver's own
@@ -367,10 +391,10 @@ function M.build(ctx)
 		local modeSubmenu
 		if slot:match("swipe") then
 			modeSubmenu = ManifestMenu.template_rows("gesture_slot_mode_commands", {
-				[require("config_keys").COMMAND.GESTURE_MODE_SINGLE] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_MODE_SINGLE] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "x1", "mode")
 				end,
-				[require("config_keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_MODE_INCREMENTAL] = function()
 					return commit_gesture_row_value("get_mode", "set_mode", slot, "incremental", "mode")
 				end,
 			}, {
@@ -404,16 +428,16 @@ function M.build(ctx)
 			or  i18n.get("menu.gestures.mode_single")
 
 		local slot_commands = {
-			[require("config_keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
+			[require("settings.engine.keys").COMMAND.GESTURE_SLOT_CHANGE_ACTION] = function()
 				-- A refused schedule is reported; an accepted one only opens the
 				-- picker later, so it is not a publication receipt.
-				if DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"),
-					function() open_action_chooser(slot, names, current) end,
+				if DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"),
+					function() open_action_chooser(slot, names(), current) end,
 					"menu_gestures.action_chooser") ~= true then return false end
 			end,
 		}
 		local slot_getters = {
-			["gesture_slot_choice_ready"] = function() return state.gestures and not paused end,
+			["gesture_slot_choice_ready"] = function() return state.gestures == true end,
 			["gesture_mode_current_label"] = function() return mode_display end,
 			["gesture_sensitivity_current_label"] = function() return string.format("%.1f", currentSens) end,
 			["gesture_mode_incremental_ready"] = function() return currentMode == "incremental" end,
@@ -447,8 +471,9 @@ function M.build(ctx)
 
 	-- `command` since 2026-08-07: the renderer builds the row and its label from
 	-- the declaration, so this supplies only what the click does.
+	--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 	local function apply_scope(mode)
-		if ctx.paused or type(ctx.apply_gesture_scope) ~= "function" then return false end
+		if type(ctx.apply_gesture_scope) ~= "function" then return false end
 		if gesture_toggle_debt ~= nil then
 			Logger.warn(LOG, "Gesture scope refused while the previous toggle rollback remains pending.")
 			return false
@@ -479,7 +504,7 @@ function M.build(ctx)
 	local function cmd_scope_restore()
 		if apply_scope("recommended") ~= true then return false end
 		if not recommended_slot_claimed() then return true end
-		DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+		DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 			local settings = i18n.get("menu.gestures.open_settings")
 			local clicked = dialog.block_alert(i18n.get("menu.gestures.notify_title"),
 				i18n.get("menu.gestures.recommended_reason_macos"), settings, i18n.get("button.ok"), "informational")
@@ -532,10 +557,10 @@ function M.build(ctx)
 			local pinch = gestures.system_pinch_enabled()
 			local open_settings = gestures.open_system_gestures
 			local children = ManifestMenu.template_rows("gesture_system_macos_children", {
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
-				[require("config_keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_ENABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_DISABLED_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_OPEN_UNKNOWN_PINCH] = function(...) return open_settings(...) end,
+				[require("settings.engine.keys").COMMAND.GESTURE_SYSTEM_REFRESH] = function()
 					return gestures.refresh_system_gestures(ctx.updateMenu)
 				end,
 			}, {
@@ -572,8 +597,8 @@ function M.build(ctx)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.state_getters = {
-		-- The switch's tick answers the stored preference. The pause greys the
-		-- whole submenu from its parent row, and the switch refuses while paused.
+		-- The switch's tick answers the stored preference. While paused the
+		-- switch records it and the runtime applies it on resume.
 		gestures_enabled = function() return state.gestures == true end,
 	}
 
@@ -581,15 +606,16 @@ function M.build(ctx)
 	-- renderer builds them from the declaration, right after the switch, and
 	-- this driver registers only the behaviour.
 	render_ctx.commands = {}
-	render_ctx.commands[require("config_keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
-	render_ctx.commands[require("config_keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
-	render_ctx.commands[require("config_keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
-	render_ctx.commands[require("config_keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
+	render_ctx.commands[require("settings.engine.keys").COMMAND.GESTURES_TOGGLE] = toggle_gestures
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = cmd_scope_restore
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = cmd_scope_clear
+	render_ctx.commands[require("settings.engine.keys").COMMAND.SYSTEM_GESTURE_SETTINGS] = gestures.open_system_gestures
+	render_ctx.commands[require("settings.engine.keys").COMMAND.GESTURE_RECOMMENDED_INFO] = cmd_recommended_info
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
 	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })
-	if item then item.disabled = paused or nil end
+	-- A pause does not grey the parent: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	return item
 end
 

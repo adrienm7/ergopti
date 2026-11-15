@@ -28,7 +28,7 @@ local function load_reader()
 			nrows = function() return function() return nil end end,
 		}
 	end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	helpers.provide_timings()
 	return helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite3 }), execs
 end
@@ -42,7 +42,7 @@ helpers.describe("sqlite_reader busy wait (rollback-journal store)", function()
 		helpers.it(call[1] .. " waits for the writer's COMMIT lock before refusing", function()
 			local reader, execs = load_reader()
 			pcall(call[2], reader)
-			local wait = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
+			local wait = require("core.timing.engine.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 			helpers.assert_true(wait > 0, "the registry owns a positive wait")
 			local found = false
 			for _, sql in ipairs(execs) do

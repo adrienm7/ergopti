@@ -41,7 +41,7 @@ local function install_collaborators(effects)
 		set_buffer = function() end,
 		log_hotstring = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -63,7 +63,7 @@ local function install_collaborators(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() return true end,
 	}
 end
@@ -75,7 +75,7 @@ end
 local function fresh_runtime(effects)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap") or name:match("^adapters%.")
+			helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end

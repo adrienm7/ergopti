@@ -25,10 +25,10 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("infra.logger")
-local Timings = require("infra.timings")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger  = require("core.logger.engine.logger")
+local Timings = require("core.timing.engine.timings")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
 local LOG     = "keystats.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
@@ -39,7 +39,7 @@ local _active_tasks = {}
 
 
 -- Timing thresholds come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [keystats]) so the AHK and macOS
+-- (_shared/core/timing/data/constants.toml [keystats]) so the AHK and macOS
 -- keystatss stay in sync; mirrored from keystats/init.lua.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keystats", "micro_idle_timeout_ms")
@@ -53,11 +53,18 @@ local SYSTEM_LOAD_POLL_INTERVAL_MS = Timings.ms("keystats", "system_load_poll_ms
 local CONTEXT_REFRESH_DELAY_SEC = 0.05
 
 -- Injected shared state and the pause predicate, both wired in M.init().
+local PrivacyContext = require("modules.keystats.privacy_context")
 local _state     = nil
 local _is_paused = nil
 
 -- Log manager reference; the engine drains all sensor events through it.
 local LogManager = require("modules.keystats.log_manager")
+
+-- Window topology and capture presence ride the hardware lifecycle and the
+-- maintenance tick: it starts and stops with the hardware watchers.
+local TopologyWatcher = require("modules.keystats.topology_watcher")
+-- Internet and VPN transitions follow the same lifecycle and tick.
+local NetworkWatcher = require("modules.keystats.network_watcher")
 
 -- Hardware watcher handles owned exclusively by this module
 local _wifi_watcher         = nil
@@ -297,7 +304,12 @@ end
 --- When midnight passes, flushes and archives the previous day's data.
 function M.perform_maintenance()
 	if not require_state("perform_maintenance") then return end
-	if _is_paused() then return end
+	-- A paused script polls no sensor, and the first poll after the resume is a
+	-- fresh seed: kept, the last position credited the travel of the pause.
+	if _is_paused() then
+		_state.last_mouse_pos = nil
+		return
+	end
 	local today = os.date("%Y-%m-%d")
 	if _current_day ~= today then
 		-- One START per rotation: a recovery can hold it for many ticks.
@@ -335,6 +347,13 @@ function M.perform_maintenance()
 		end
 	end
 	poll_mouse_distance()
+	-- Paced by the watcher itself; only a live, admitted hardware generation records.
+	if hardware_callback_allowed(_hardware_generation) then
+		local ticked, reason = xpcall(TopologyWatcher.tick, debug.traceback)
+		if not ticked then Logger.error(LOG, "Window topology tick failed: %s.", tostring(reason)) end
+		local sampled, failure = xpcall(NetworkWatcher.tick, debug.traceback)
+		if not sampled then Logger.error(LOG, "Connectivity tick failed: %s.", tostring(failure)) end
+	end
 end
 
 --- Contains a native hardware callback and routes failures to the file logger.
@@ -845,6 +864,25 @@ function M.init_hardware_watchers()
 	end
 
 	_hardware_watchers_enabled = true
+	-- The whole privacy context (private window, secure field, system-auth
+	-- prompt, disabled app, metrics pause), as every other keystats sink.
+	local function logging_refused() return not PrivacyContext.allows_logging(_state) end
+	if not TopologyWatcher.is_running() then
+		TopologyWatcher.start({
+			-- Late-bound: the log manager owns its own initialisation.
+			append = function(entry) return LogManager.append_log(entry) end,
+			app = function() return _state.session_app_name end,
+			private = logging_refused,
+		})
+	end
+	if not NetworkWatcher.is_running() then
+		local started, reason = xpcall(NetworkWatcher.start, debug.traceback, {
+			append = function(entry) return LogManager.append_log(entry) end,
+			app = function() return _state.session_app_name end,
+			private = logging_refused,
+		})
+		if not started then Logger.error(LOG, "Connectivity transitions did not start: %s.", tostring(reason)) end
+	end
 	Logger.debug(LOG, "Hardware watcher transaction committed.")
 	return true
 end
@@ -863,6 +901,9 @@ function M.stop_hardware_watchers()
 	_state.passive_started_at, _state.passive_kind = nil, nil
 	-- Pointer movement while stopped must not be charged to the next run.
 	_state.last_mouse_pos = nil
+	-- An open capture interval ends with the collector, as on Windows.
+	TopologyWatcher.stop()
+	NetworkWatcher.stop()
 	local timers_stopped = cancel_context_refresh_timers()
 	local watchers_stopped = cleanup_hardware_resources()
 	local settled = timers_stopped and watchers_stopped
@@ -875,7 +916,7 @@ function M.stop_hardware_watchers()
 end
 
 --- A bound actor observes existing writers; binding does not activate sensors.
-local PhysicalLifecycle = require("keystats.physical_lifecycle_observation")
+local PhysicalLifecycle = require("metrics.engine.capture.physical_lifecycle_observation")
 local _physical_lifecycle = PhysicalLifecycle.new("system", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)

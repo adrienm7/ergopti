@@ -13,10 +13,10 @@ local NativeFixture = require("tests.support.ui.usercontent_reference_fixture")
 
 local OWNED_MODULES = {
 	"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
-	"infra.dialog_util", "infra.manifest_menu", "ui.menu.shortcut_utils",
-	"infra.deferred_work", "action_parameter_label", "ui.gesture_conflict_notice",
-	"ui.menu.preferences_transaction", "diagnostics.operation_reporter",
-	"menu.renderer", "logger.shim", "compat.utf8", "number_policy", "toml_codec.leaf_rows",
+	"core.ui.engine.dialog_util", "infra.manifest_menu", "ui.menu.shortcut_utils",
+	"core.timing.engine.deferred_work", "shortcuts.engine.action_parameter_label", "ui.gesture_conflict_notice",
+	"ui.menu.preferences_transaction", "diagnostics.engine.operation_reporter",
+	"menu.engine.renderer", "core.logger.engine.shim", "core.lifecycle.engine.compat.utf8", "core.text.engine.number_policy", "core.text.engine.toml_codec.leaf_rows",
 }
 
 --- Opens the actual plain gesture picker over an acknowledged preference owner.
@@ -28,16 +28,16 @@ local function with_gesture(mode, conflict, scenario)
 		NativeFixture(function(picker, native)
 			local result = table.pack(xpcall(function()
 				local controls = { mode = mode, assigned = "none", disk = "none", saves = 0,
-					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {} }
+					commits = 0, rollbacks = 0, updates = 0, conflicts = 0, notices = {}, queue = {}, name_reads = 0 }
 				local state = { gestures = true, action = "none" }
-				local logger = package.loaded["infra.logger"]
-				package.loaded["logger.shim"] = logger
-				package.loaded["infra.dialog_util"] = {}
+				local logger = package.loaded["core.logger.engine.logger"]
+				package.loaded["core.logger.engine.shim"] = logger
+				package.loaded["core.ui.engine.dialog_util"] = {}
 				package.loaded["ui.menu.menu_utils"] = {}
 				package.loaded["ui.menu.shortcut_utils"] = {
 					picker_parameter_fields = function() return {} end,
 				}
-				package.loaded["infra.deferred_work"] = { after = function(_, work)
+				package.loaded["core.timing.engine.deferred_work"] = { after = function(_, work)
 					controls.queue[#controls.queue + 1] = work
 					return true
 				end }
@@ -52,7 +52,7 @@ local function with_gesture(mode, conflict, scenario)
 					-- A changed click binding is held until publication settles.
 					begin_click_binding_change = function(slot) return { slot = slot } end,
 					finish_click_binding_change = function() return true end,
-					get_sg_names = function() return { "none", "lookup" } end,
+					get_sg_names = function() controls.name_reads = controls.name_reads + 1; return { "none", "lookup" } end,
 					get_action_label = function(value) return value end,
 					get_action_parameter_spec = function() return nil end,
 					on_action_changed = function()
@@ -79,11 +79,11 @@ local function with_gesture(mode, conflict, scenario)
 						return true
 					end,
 				})
-				local renderer = assert(require("menu.renderer").new({
-					platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode,
-					i18n = { get = package.loaded["infra.i18n"].get,
-						section = package.loaded["infra.i18n"].get }, logger = logger,
+				local renderer = assert(require("menu.engine.renderer").new({
+					platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.text.engine.json").decode,
+					i18n = { get = package.loaded["core.i18n.engine.i18n"].get,
+						section = package.loaded["core.i18n.engine.i18n"].get }, logger = logger,
 				}))
 				local provider
 				package.loaded["infra.manifest_menu"] = {
@@ -96,11 +96,14 @@ local function with_gesture(mode, conflict, scenario)
 				helpers.assert_type(provider, "function")
 				local rows = provider()
 				helpers.assert_eq(#rows, 1)
+				-- Every rebuild translated the whole action catalogue once per slot.
+				helpers.assert_eq(controls.name_reads, 0, "building a slot row reads no picker names")
 				rows[1].items[1].action()
 				helpers.assert_eq(#native.views, 0, "the menu defers native presentation")
 				helpers.assert_eq(#controls.queue, 1)
 				table.remove(controls.queue, 1)()
 				helpers.assert_eq(#native.views, 1, "the real menu must open the real shared picker")
+				helpers.assert_eq(controls.name_reads, 1, "the picker reads its names once, when it opens")
 				local view, controller = native.views[1], native.controllers[1]
 				local dispatch = native.callback_refs[controller]
 				helpers.assert_type(dispatch, "function")

@@ -14,7 +14,7 @@
  *
  * FEATURES & RATIONALE:
  * 1. One projection: the rows come from the shared model catalogue and the
- *    driver's install scan (_shared/lua/llm/model_catalogue.lua on macOS and
+ *    driver's install scan (_shared/ai/engine/local_servers/model_catalogue.lua on macOS and
  *    Linux, its pinned AHK twin on Windows); the page never reads files.
  * 2. Only what works now is selectable: a backend the driver reports
  *    unavailable greys its rows with the reason, and a model that is not
@@ -295,7 +295,7 @@ function findRow(key) {
  * Whether an identifier typed to add a model is well formed for its backend:
  * an Ollama name ("qwen3:4b", "hf.co/owner/repo:Q4_K_M") or an MLX Hugging Face
  * repository id ("mlx-community/Qwen3-4B-4bit"). The native side checks again
- * with _shared/lua/llm/model_identifier.lua or its AHK twin; all three pass
+ * with _shared/ai/engine/local_servers/model_identifier.lua or its AHK twin; all three pass
  * _shared/tests/corpus/llm/model_identifiers.json.
  */
 // The add-model texts of each backend that can add a model, named literally so

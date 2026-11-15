@@ -98,8 +98,41 @@ _AOPR_WholeIdentifiers() {
 
 Test("OS purity counter: whole native identifiers and captured built-ins (os-purity-token-boundaries)", _AOPR_WholeIdentifiers)
 
+; True for a UI source: a file under a ui\ folder of any feature. The core\ui
+; feature's own name is no such folder: its adapters and engine are not UI
+; sources, its ui\ role folder is. The ratchets partition by this role, so a
+; structure move keeps a file in its tree whichever feature folder it lands in.
+_AOPR_IsUiSource(Path) {
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	if SubStr(Relative, 1, 8) = "core\ui\"
+		Relative := SubStr(Relative, 9)
+	return InStr("\" . Relative, "\ui\") > 0
+}
+
+; The structure plan's platform domains (tools/audit/structure/rules.cjs
+; PLATFORM_DOMAINS, held equal by tools/test/test-ahk-os-purity-platform.cjs):
+; platform\<domain>\ is the home of a driver's OS bindings and has no adapters\
+; role folder, so its files are the isolation layer as adapters\ is (decided by
+; the coordinator on 2026-11-14, to review by the maintainer). Today's
+; platform\remap\ and platform\tray\ are layer folders, not platform domains.
+_AOPR_PLATFORM_DOMAINS := ["desktop_focus", "focus", "input", "native", "system"]
+
+_AOPR_IsPlatformAdapter(Path) {
+	global _AOPR_PLATFORM_DOMAINS
+	Relative := SubStr(Path, StrLen(_AOPR_DriverRoot()) + 2)
+	for Domain in _AOPR_PLATFORM_DOMAINS
+		if SubStr(Relative, 1, StrLen(Domain) + 10) = "platform\" . Domain . "\"
+			return true
+	return false
+}
+
 ; Every .ahk file under the given driver subdirectories, recursively, with
-; adapters/ excluded — OS calls there are the legitimate isolation layer.
+; adapters/ and the platform domains excluded — OS calls there are the
+; legitimate isolation layer. The
+; crypto adapter (S02), the boot clock and timer scheduler (S03) and the
+; driver control adapter (S06), the one adapter of core/lifecycle, live in
+; core/ outside any adapters/ folder: they stay the same isolation layer.
+; The UI sources are left to the ui pair, which counts them wherever they live.
 _AOPR_FilesIn(SubDirs) {
 	Files := []
 	Root := _AOPR_DriverRoot()
@@ -108,11 +141,31 @@ _AOPR_FilesIn(SubDirs) {
 		if !DirExist(Base)
 			throw Error("OS-purity source directory is missing or unavailable: " . Base)
 		Loop Files, Base . "\*.ahk", "R" {
-			if InStr(A_LoopFilePath, "\adapters\")
+			if InStr(A_LoopFilePath, "\adapters\") || _AOPR_IsUiSource(A_LoopFilePath)
+				|| _AOPR_IsPlatformAdapter(A_LoopFilePath)
+				|| RegExMatch(A_LoopFilePath, "\\core\\(?:crypto\\crypto|events\\(?:boot_clock|timer_scheduler)|lifecycle\\driver_control)\.ahk$")
 				continue
 			Files.Push(A_LoopFilePath)
 		}
 	}
+	return Files
+}
+
+; Every UI source of the driver, adapters/ excluded, wherever its feature keeps
+; it; the suite and vendored code are no driver source.
+_AOPR_UiFiles() {
+	Files := []
+	Root := _AOPR_DriverRoot()
+	Loop Files, Root . "\*.ahk", "R" {
+		Relative := SubStr(A_LoopFilePath, StrLen(Root) + 2)
+		if SubStr(Relative, 1, 6) = "tests\" || SubStr(Relative, 1, 7) = "vendor\"
+			continue
+		if InStr(A_LoopFilePath, "\adapters\") || !_AOPR_IsUiSource(A_LoopFilePath)
+			continue
+		Files.Push(A_LoopFilePath)
+	}
+	if Files.Length == 0
+		throw Error("OS-purity UI source inventory is empty under " . Root)
 	return Files
 }
 
@@ -168,15 +221,18 @@ _AOPR_AssertTree(Label, Files, Baseline) {
 ;              window_manager adapter, and tightened to that value.
 ; entry point: 2026-07-31, first measurement (DllCall=3, FileIO=5).
 ; 2026-11-03: the startup smoke's mutex probe, exit and deadline moved into
-; adapters/process_lifecycle.ahk; read from this counter at modules+lib 248
+; core/process/adapters/lifecycle.ahk; read from this counter at modules+lib 248
 ; (DllCall=157 COM=2 FileIO=89) and entry 7 (DllCall=6 FileIO=1), tightened.
-_AOPR_BASELINE_CORE  := 248
+; 2026-11-12: the layout registry watch and the metrics time zone conversions
+; moved into adapters/registry_notify.ahk and platform/system/time_zone.ahk;
+; read from this counter at modules+lib 247, tightened.
+_AOPR_BASELINE_CORE  := 247
 _AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -185,7 +241,7 @@ Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCor
 ; tree the ratchet did not look at.
 _AOPR_RatchetUi() {
 	global _AOPR_BASELINE_UI
-	_AOPR_AssertTree("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_BASELINE_UI)
+	_AOPR_AssertTree("windows/ui", _AOPR_UiFiles(), _AOPR_BASELINE_UI)
 }
 Test("meta: windows/ OS-call purity ratchet — ui", _AOPR_RatchetUi)
 
@@ -311,19 +367,22 @@ _AOPR_AssertFamilies(Label, Files, Baseline) {
 ; entry: 10 (Timer=8 Binding=1 GuiMenu=0 Process=0 Window=0 KeyState=1)
 ; 2026-11-03, read from this counter: core 593 (Timer=226 Binding=230 GuiMenu=32
 ; Process=25 Window=49 KeyState=31), tightened; entry 10 (Timer=9 KeyState=1).
-_AOPR_FAMILY_BASELINE_CORE  := 593
-_AOPR_FAMILY_BASELINE_UI    := 186
+; 2026-11-12: the touchpad, layout registry watch and deferred hotstring
+; timers moved onto the timer adapter; read from this counter at core 592 and
+; ui 182, tightened.
+_AOPR_FAMILY_BASELINE_CORE  := 592
+_AOPR_FAMILY_BASELINE_UI    := 182
 _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 
 _AOPR_FamilyRatchetUi() {
 	global _AOPR_FAMILY_BASELINE_UI
-	_AOPR_AssertFamilies("windows/ui", _AOPR_FilesIn(["ui"]), _AOPR_FAMILY_BASELINE_UI)
+	_AOPR_AssertFamilies("windows/ui", _AOPR_UiFiles(), _AOPR_FAMILY_BASELINE_UI)
 }
 Test("meta: windows/ platform-API family ratchet — ui", _AOPR_FamilyRatchetUi)
 

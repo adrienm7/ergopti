@@ -39,18 +39,18 @@ end
 local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.text_utils",
-	"infra.keycodes",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.text.engine.utils",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.key_state",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"adapters.http_client",
+	"platform.input.synthetic_input",
+	"platform.input.key_state",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.keystats",
@@ -65,7 +65,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -79,7 +79,7 @@ end
 
 local function with_fixture(callback)
 	local saved_hs = _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(OWNED_MODULES, function()
 			package.loaded["tests.stubs.hs"] = nil
@@ -107,12 +107,12 @@ local function with_fixture(callback)
 				shared_system_mode = "dispatch",
 			}
 
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function() return true end,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.text_utils"] = {
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.text.engine.utils"] = {
 				shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 			}
 			package.loaded["modules.llm.ollama_binary"] = {
@@ -122,7 +122,7 @@ local function with_fixture(callback)
 				build = function() return "exec /fixture/ollama serve" end,
 			}
 
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, on_done)
 					local record = {
 						executable = executable,
@@ -165,7 +165,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, executable, on_done, on_chunk_or_args, args)
 					local task = {
 						label = label,
@@ -218,7 +218,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				every = function(delay, timer_callback)
 					return {
 						delay = delay,
@@ -279,7 +279,7 @@ local function with_fixture(callback)
 				end,
 			}
 
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {}, cancel_calls = 0 }
 					function client.post(url, headers, body, on_done)
@@ -342,7 +342,7 @@ local function with_fixture(callback)
 			}
 
 			local admission_fence = nil
-			package.loaded["infra.keycodes"] = {
+			package.loaded["platform.input.keycodes"] = {
 				F13_KARABINER_RETURN = 106,
 				F14_KARABINER_BACKSPACE = 107,
 				F15_KARABINER_ESCAPE = 108,
@@ -352,7 +352,7 @@ local function with_fixture(callback)
 				STATUS_UNREADABLE = "unreadable",
 				classify_with_fence = function() return nil, "physical", nil end,
 			}
-			package.loaded["adapters.synthetic_input"] = {
+			package.loaded["platform.input.synthetic_input"] = {
 				when_idle = function(fn) fn() return true end,
 				acquire_admission_fence = function()
 					if admission_fence then return nil end
@@ -367,7 +367,7 @@ local function with_fixture(callback)
 				admission_open = function() return admission_fence == nil end,
 				defer_after_callback = function(_, fn) return fn() == true end,
 			}
-			package.loaded["adapters.key_state"] = {
+			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
@@ -404,7 +404,7 @@ local function with_fixture(callback)
 				}
 			end
 			package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-			package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 			package.loaded["modules.keystats"] = {
 				resync_context = function() return true end,
 				log_shortcut = function() return true end,
@@ -527,7 +527,7 @@ local function with_fixture(callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 

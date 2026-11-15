@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/nl.msg
-# AUTO-GENERATED from _shared/data/locales/nl.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/nl.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-netwerkmodule uit de broncode gebouwd.
 build_luv.recipe_required=De native luv-build heeft zijn bronrecept nodig.
 install.already_installed={1} — al geïnstalleerd
 install.archive_digest_unavailable=updates met vastgehouden descriptor vereisen een echte OpenSSL3-runtime; de functie blijft niet beschikbaar.
+install.bytecode_skipped=De voorgecompileerde modules konden niet worden gemaakt — Ergopti start vanuit de broncode, iets trager.
 install.capability_verified={1} — functie gecontroleerd
 install.command_still_missing={1} is geïnstalleerd, maar '{2}' is nog steeds niet te vinden.
 install.daemon_manual=Om de daemon handmatig te starten:
 install.daemon_running=De daemon draait op de achtergrond. Om de status te controleren:
+install.focus_integration_enabled={1}-focusintegratie ingeschakeld
+install.focus_integration_failed=De {1}-focusintegratie kon niet worden ingeschakeld — regels per toepassing blijven inactief op deze desktop.
+install.focus_integration_next_login={1}-focusintegratie geïnstalleerd (actief bij de volgende aanmelding)
+install.focus_integration_updated={1}-focusintegratie bijgewerkt
 install.gnome_extension_active=GNOME AppIndicator-extensie — al actief
 install.gnome_extension_enabled=GNOME AppIndicator-extensie ingeschakeld
 install.gnome_extension_failed=Kan de AppIndicator-extensie niet inschakelen — zonder haar toont GNOME het pictogram niet.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — controle van afhankelijkheden
 install.section_deps_skipped=Afhankelijkheden overgeslagen (--no-deps)
 install.section_done=Installatie voltooid
 install.section_files=Bestanden installeren
+install.section_focus=Actieve toepassing onder Wayland (GNOME, KDE)
 install.section_lua_deps=Optionele Lua-afhankelijkheden (gebeurtenislus, timers, webviews, signalen)
 install.section_permissions=Invoerrechten (vereist sudo)
 install.section_services=De systemd-gebruikersservices aanmaken
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ draait al in deze sessie ({1} is bezet); deze start is geweigerd.
 launch.authorization_failed=De autorisatie voor invoertoegang is geannuleerd of mislukt.
 launch.groups_unavailable=De sessie kon haar ingestelde invoergroepen niet verkrijgen.
+launch.restarting=Ergopti+ draait al in deze sessie; het wordt gevraagd af te sluiten en daarna opnieuw gestart.
 launch.session_lock_invalid=De map voor de sessievergrendeling moet een absoluut pad zijn.
 launcher.dependencies_installed=Afhankelijkheden geïnstalleerd.
 launcher.driver_missing=Fout: map van het Linux-stuurprogramma niet gevonden: {1}

@@ -12,11 +12,11 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"modules.keymap.input_sources", "modules.keymap.layout_install",
-	"infra.logger", "infra.timings", "adapters.python_interpreter",
-	"adapters.input_source_selector", "native_path", "adapters.shell_runner",
-	"infra.deferred_work", "adapters.task_environment", "infra.launcher_environment",
-	"diagnostics.runtime_log", "adapters.timer_scheduler", "error_description",
-	"number_policy", "infra.openstep_plist",
+	"core.logger.engine.logger", "core.timing.engine.timings", "adapters.python_interpreter",
+	"adapters.input_source_selector", "core.fs.engine.native_path", "core.process.adapters.shell_runner",
+	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"diagnostics.engine.runtime_log", "core.events.timer_scheduler", "diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy", "core.fs.engine.openstep_plist",
 }
 
 --- Serializes exactly the native defaults array the real reader accepts.
@@ -39,7 +39,7 @@ local function with_sources(scenario)
 		logger.error = function(_, message, ...)
 			w.errors[#w.errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		helpers.provide_timings()
 		package.loaded["modules.keymap.layout_install"] = {
 			highest_installed = function() return nil end,
@@ -85,8 +85,8 @@ local function with_sources(scenario)
 			end },
 		}
 		local sources = require("modules.keymap.input_sources")
-		local runner = require("adapters.shell_runner")
-		local scheduler = require("adapters.timer_scheduler")
+		local runner = require("core.process.adapters.shell_runner")
+		local scheduler = require("core.events.timer_scheduler")
 		function w.read()
 			local done = 0
 			helpers.assert_eq(sources.refresh_active_layouts_async(function() done = done + 1 end), true)

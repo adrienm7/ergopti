@@ -134,7 +134,7 @@ helpers.describe("menu_keyboard_slots: adding a binding", function()
 		local group = physical_groups(shortcuts)[1]
 		local rows = ui.provide_rows(ctx, nil)
 		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
-		local deferred = require("infra.deferred_work")
+		local deferred = require("core.timing.engine.deferred_work")
 		local previous = deferred.after
 		deferred.after = function() return false end
 		local ok, accepted = pcall(picker.opened[1].confirm, group.prefix .. "j")
@@ -296,7 +296,7 @@ it("menu_keyboard_slots: conditional publication refusal keeps the old choice", 
 	local ctx, updates = make_ctx()
 	local group = physical_groups(shortcuts)[1]
 	local slot = group.prefix .. "j"
-	local files = package.loaded["adapters.file_system"]
+	local files = package.loaded["core.fs.adapters.file_system"]
 	local writes = 0
 	files.write_if_unchanged = function()
 		writes = writes + 1
@@ -377,7 +377,7 @@ local function parameter_ctx()
 	-- Keep the retained transaction on the same real keyboard publisher and
 	-- canonical conditional file port installed by fresh().
 	local preferences = require("infra.preferences")
-	local files = package.loaded["adapters.file_system"]
+	local files = package.loaded["core.fs.adapters.file_system"]
 	local path = require("infra.config_paths").get("ConfigTomlPath")
 	preferences.load(path)
 	local state, noop = {}, function() return true end
@@ -421,7 +421,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 		local rows = ui.provide_rows(ctx, nil)
 		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
 		picker.opened[1].confirm(slot)
-		local deferred = require("infra.deferred_work")
+		local deferred = require("core.timing.engine.deferred_work")
 		local previous = deferred.after
 		deferred.after = function() return false end
 		local ok, accepted = pcall(picker.opened[2].confirm, "wrap_selection")
@@ -436,7 +436,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("asks for the parameter under the slot's dispatch binding before binding", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt
@@ -468,7 +468,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("hands the picker its editor and stores the value it collected without a prompt", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		local saved_prompt = dialog.text_prompt
 		dialog.text_prompt = function() error("the value the picker's editor collected must not be asked again") end
 		local group = physical_groups(shortcuts)[1]
@@ -503,7 +503,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 				"the llm_prompt editor offers the AI menu's prompts")
 			helpers.assert_eq(opts.default_count, 3, "and names the AI menu's prediction count")
 			helpers.assert_eq(opts.edit_current_label,
-				package.loaded["infra.i18n"].get("dialog.action_picker.edit_current"))
+				package.loaded["core.i18n.engine.i18n"].get("dialog.action_picker.edit_current"))
 			helpers.assert_eq(opts.parameter_strings.prompts.llm_prompt, "prompt")
 			helpers.assert_eq(opts.parameter_strings.errors.llm_prompt, "refused")
 			helpers.assert_type(opts.parameter_strings.countDefault, "string")
@@ -515,7 +515,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 				"the llm_vision editor offers the vision backends")
 			helpers.assert_eq(opts.parameter_strings.prompts.llm_vision, "prompt")
 			helpers.assert_eq(opts.parameter_strings.errors.llm_vision, "refused")
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			for field, key in pairs({
 				visionProviderLabel = "dialog.action_picker.vision_provider_label",
 				visionModelLabel = "dialog.action_picker.vision_model_label",
@@ -548,7 +548,7 @@ helpers.describe("menu_keyboard_slots: parameterized actions", function()
 	it("leaves the slot unbound when the parameter prompt is cancelled", function()
 		local ui, shortcuts, picker, persisted = fresh()
 		local ctx, stored = parameter_ctx()
-		local dialog = package.loaded["infra.dialog_util"]
+		local dialog = package.loaded["core.ui.engine.dialog_util"]
 		helpers.assert_eq(type(dialog), "table",
 			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
 		local saved_prompt = dialog.text_prompt

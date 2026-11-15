@@ -27,7 +27,7 @@
 local DEVICE, ACTION, DRIVER, SEED = arg[1], arg[2], arg[3], arg[4]
 assert(DEVICE and ACTION and DRIVER, "usage: startup_child.lua <device> <action> <driver folder>")
 arg = { "--device", DEVICE, "--tray" }
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 require("tests.win_compat").install()
 
@@ -44,8 +44,8 @@ end
 -- Control discovery independently with typed ordinary listener refusal while
 -- retaining production policy and native signal ownership.
 -- The real HTTP adapter and errors remain observable for every unrelated owner.
-package.preload["adapters.http_client"] = function()
-	return require("tests.support.owned_http_fixture").local_discovery(dofile("adapters/http_client.lua"))
+package.preload["core.network.adapters.http_client"] = function()
+	return require("tests.support.owned_http_fixture").local_discovery(dofile("core/network/adapters/http_client.lua"))
 end
 
 local system_time = os.time
@@ -60,7 +60,7 @@ end
 local previous_luv, previous_preload = package.loaded.luv, package.preload.luv
 package.loaded.luv = nil
 package.preload.luv = function() error("the scripted clock selects the coarse source") end
-local clock_loaded, coarse_clock = pcall(require, "infra.monotonic")
+local clock_loaded, coarse_clock = pcall(require, "core.logger.engine.monotonic")
 package.loaded.luv, package.preload.luv = previous_luv, previous_preload
 assert(clock_loaded, coarse_clock)
 assert(coarse_clock.backend() == "os.time" and not coarse_clock.has_hires(), "expected real coarse clock")
@@ -127,10 +127,10 @@ local real_execute, real_popen = os.execute, io.popen
 os.execute = function(command, ...) watch_command(command); return real_execute(command, ...) end
 io.popen = function(command, ...) watch_command(command); return real_popen(command, ...) end
 -- A feature switched off is announced at the error level on purpose
--- (_shared/lua/feature_notice.lua); the delimiter steps name the one they cause.
+-- (_shared/menu/engine/feature_notice.lua); the delimiter steps name the one they cause.
 local expected_off_notice = nil
-package.preload["adapters.notifier"] = function()
-	local notifier = dofile("adapters/notifier.lua")
+package.preload["platform.system.notifier"] = function()
+	local notifier = dofile("platform/system/notifier.lua")
 	local send = notifier.send
 	notifier.send = function(message, opts)
 		if type(opts) == "table" and opts.level == "error" then
@@ -159,14 +159,14 @@ package.preload["adapters.keyboard_layout"] = function()
 	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
 	return require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 end
-package.preload["adapters.uinput_writer"] = function()
+package.preload["platform.input.uinput_writer"] = function()
 	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
 	return require("tests.fakes").uinput_writer()
 end
-package.preload["adapters.atspi_focus_watch"] = function()
+package.preload["platform.focus.atspi_focus_watch"] = function()
 	return require("tests.support.focus_watch_fixture")
 end
-package.preload["adapters.secure_field_detector"] = function()
+package.preload["platform.focus.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
 		publishFocus = function() return true end,
@@ -188,7 +188,7 @@ if SEED and SEED ~= "" then
 	source:close()
 	-- Stamped at the oldest version, so the boot climbs the chain as a release file does.
 	if not content:find("schema_version%s*=") then
-		local registry = assert(real_open(DRIVER .. "/../_shared/core/config_schema/migrations.toml", "rb"))
+		local registry = assert(real_open(DRIVER .. "/../_shared/settings/data/config_schema/migrations.toml", "rb"))
 		local text = registry:read("*a")
 		registry:close()
 		content = "[_meta]\nschema_version = " .. assert(text:match("\noldest_version = (%d+)")) .. "\n\n" .. content
@@ -198,7 +198,7 @@ if SEED and SEED ~= "" then
 	fh:close()
 end
 
-local hook = require("adapters.keyboard_hook")
+local hook = require("platform.input.keyboard_hook")
 hook.start = function() end
 hook.isRunning = function() return true end
 hook.get_mode = function() return "scripted" end
@@ -217,6 +217,8 @@ package.preload["platform.tray.appindicator"] = function()
 		set_icon = function() return true end,
 		set_menu = function(items) published_menu = items; return true end,
 		pump = function() return 0 end,
+		-- No GLib context behind this fake: the idle wait polls input alone.
+		wait_companion = function() return nil end,
 		destroy = function() live = false end,
 		is_live = function() return live end,
 	}
@@ -225,8 +227,8 @@ end
 -- WebKit windows open through the manager's native seam: the page is built and
 -- routed as in production, the GTK window is not drawn. The error window is a
 -- user-visible error like a dialog.
-package.preload["ui.webview_manager"] = function()
-	local manager = dofile("ui/webview_manager.lua")
+package.preload["core.ui.ui.webview_manager"] = function()
+	local manager = dofile("core/ui/ui/webview_manager.lua")
 	manager._create_gtk_window = function(app_name)
 		if app_name == "error_dialog" then record("DIALOG", "the error window opened") end
 		record("WINDOW", app_name)
@@ -254,7 +256,7 @@ end
 --- @param label string The custom delimiter's label.
 --- @return table|nil toggle, table|nil delete
 local function delimiter_rows(label)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local section = i18n.get("menu.hotstrings.word_expanders")
 	local delete = i18n.get("menu.hotstrings.delete_delimiter")
 	local function title_of(row)
@@ -280,7 +282,7 @@ end
 --- row of that submenu an off category leaves clickable.
 --- @return table|nil row
 local function hotstrings_switch()
-	local title = require("infra.i18n").get("menu.hotstrings.enable")
+	local title = require("core.i18n.engine.i18n").get("menu.hotstrings.enable")
 	local function search(items)
 		for _, row in ipairs(items or {}) do
 			if type(row) == "table" and row.title == title and type(row.fn) == "function" then return row end
@@ -295,14 +297,14 @@ end
 -- waits 2 s; the error window 0.25 s), short enough to keep the suite fast.
 local SOAK_SECONDS = 30
 
-package.preload["adapters.event_loop"] = function()
+package.preload["core.events.loop"] = function()
 	-- The real deferred queue: start-up schedules work on it.
-	local adapter = dofile("adapters/event_loop.lua")
+	local adapter = dofile("core/events/loop.lua")
 	local function settle_metrics()
 		local uv, collector = require("luv"), require("modules.keystats.keystats")
 		if not collector.has_flush_debt() then return end
 		record("FACT", "metrics_pending_before_pump=" .. tostring(collector.is_flush_pending()))
-		local deadline = uv.hrtime() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1e6
+		local deadline = uv.hrtime() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1e6
 		-- Virtual seconds must not age a real SQLite child before its stdin and
 		-- COMMIT callbacks have had a native loop turn. Its deadline is unchanged.
 		repeat
@@ -385,7 +387,7 @@ package.preload["adapters.event_loop"] = function()
 				end
 			end
 		elseif ACTION == "delimiters_add" or ACTION == "delimiters_verify" then
-			local Terminators = require("keymap.terminators")
+			local Terminators = require("layouts.engine.layers.terminators")
 			local Settings = require("modules.hotstrings.terminator_settings")
 			if ACTION == "delimiters_add" then
 				record("FACT", "delimiter_added=" .. tostring(Terminators.add_custom_terminator("custom_µ", "µ", "µ", false)))
@@ -395,7 +397,7 @@ package.preload["adapters.event_loop"] = function()
 			local source = io.open(path, "rb")
 			local bytes = source and source:read("*a") or ""
 			if source then source:close() end
-			local document = require("toml_codec").decode(bytes)
+			local document = require("core.text.engine.toml_codec").decode(bytes)
 			local hotstrings = type(document) == "table" and document.hotstrings or nil
 			local list = type(hotstrings) == "table" and hotstrings.terminators or nil
 			local first = type(list) == "table" and list[1] or nil
@@ -409,8 +411,8 @@ package.preload["adapters.event_loop"] = function()
 				and Terminators.terminator_is_consumed("¤") and not Terminators.terminator_is_consumed("µ")
 			record("FACT", "custom_list_verified=" .. tostring(verified == true))
 		elseif ACTION == "delimiters_edit" or ACTION == "delimiters_verify_edit" then
-			local Terminators = require("keymap.terminators")
-			local Codec = require("toml_codec")
+			local Terminators = require("layouts.engine.layers.terminators")
+			local Codec = require("core.text.engine.toml_codec")
 			local path = require("infra.config_paths").config("config.toml")
 			local function bytes()
 				local source = real_open(path, "rb")
@@ -435,7 +437,7 @@ package.preload["adapters.event_loop"] = function()
 			local function click_toggle()
 				local toggle = delimiter_rows("¤")
 				if not toggle then return false end
-				expected_off_notice = string.format(require("infra.i18n").get("notify.word_expander_prefix"),
+				expected_off_notice = string.format(require("core.i18n.engine.i18n").get("notify.word_expander_prefix"),
 					(toggle.title:gsub("^%s+", "")))
 				click(toggle)
 				expected_off_notice = nil
@@ -505,7 +507,7 @@ package.preload["adapters.event_loop"] = function()
 		local bindings = 0
 		local ok_nav, layer = pcall(function()
 			return require("platform.remap.nav_layer").load({
-				shared_root = require("infra.paths").shared_root(),
+				shared_root = require("core.fs.engine.paths").shared_root(),
 				config_dir = TapHold.user_path():match("^(.*)[/\\][^/\\]+$"),
 			})
 		end)
@@ -515,7 +517,7 @@ package.preload["adapters.event_loop"] = function()
 		record("FACT", "nav_layer_keys=" .. layer_keys)
 	end
 	adapter.run = function(loop)
-		local uv, signals = require("luv"), require("infra.signal_handlers")
+		local uv, signals = require("luv"), require("core.lifecycle.engine.shutdown.signal_handlers")
 		local active_signals = 0
 		uv.walk(function(handle)
 			if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then

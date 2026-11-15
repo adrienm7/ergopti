@@ -20,26 +20,26 @@ local M = {}
 
 local hs = hs
 
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 -- The shared matcher core. Only M.decide is used: the firing DECISION is shared,
 -- the buffer traversal is not — macOS slices a byte string, the core an array of
 -- codepoints, and neither has to convert for the other.
 local HotstringCore = require("infra.hotstring_engine")
-local Cascade = require("hotstring_engine.cascade")
-local InjectionPlan = require("hotstring_engine.injection_plan")
+local Cascade = require("hotstrings.engine.matcher.cascade")
+local InjectionPlan = require("hotstrings.engine.matcher.injection_plan")
 local km_utils   = require("modules.keymap.utils")
-local Logger     = require("infra.logger")
+local Logger     = require("core.logger.engine.logger")
 local HotPath    = require("infra.hotpath_profiler")
-local Timings    = require("infra.timings")
+local Timings    = require("core.timing.engine.timings")
 local CoreStateM = require("modules.keymap.state")
 local LlmContext = require("modules.keymap.llm_context")
-local TextSender = require("adapters.text_sender")
-local SyntheticInput = require("adapters.synthetic_input")
-local TooltipRenderer  = require("adapters.tooltip_renderer")
+local TextSender = require("platform.input.text_sender")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TooltipRenderer  = require("core.ui.adapters.tooltip_renderer")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local Terminators      = require("modules.keymap.terminators")
 local CapsWordOutput   = require("infra.capsword_output")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local LOG        = "keymap.expander"
 
 -- Optional modules — loaded with pcall because they are not required for core expansion.
@@ -184,7 +184,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 
 	-- The erase + replacement output of every expansion is built here, inside the
 	-- key-down callback, so a slow one is a typing hitch.
-	local inject_started = HotPath.now()
+	local inject_started = HotPath.trace("hotstring.expand")
 	local ok, emit_count, emitted_str, logical_text, order_delay = pcall(function()
 		return SyntheticInput.with_transaction(transaction, function()
 			assert(TextSender.eraseChars(deletes, 0) ~= false,
@@ -192,7 +192,7 @@ function M.perform_text_replacement(deletes, emit_action, buffer_action, is_fina
 			return emit_action()
 		end)
 	end)
-	HotPath.log_if_slow("hotstring.expand", inject_started)
+	HotPath.done("hotstring.expand", inject_started, ok and string.format("%s event(s)", tostring(emit_count)) or "failed")
 	if not ok then
 		-- Nothing in the callback collector has reached Quartz yet. Cancel removes
 		-- every already-built prefix, so a producer that emits one token and then
@@ -392,35 +392,19 @@ end
 -- ===================================
 -- ===================================
 
---- Extracts the one codepoint sitting immediately before a candidate trigger —
---- the only piece of left-hand context the word-boundary rule consults.
----
---- The rule itself is NOT here any more. It moved into the shared matcher core
---- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
---- own version and no two of them ever agreed at once. What stays here is the
---- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
---- buffer, which is an O(1) offset rather than the array index the core uses.
----
---- @param buffer string The current rolling buffer.
---- @param trigger_start_byte number 1-based byte index where the trigger starts
----   inside `buffer`. Must be >= 1.
---- @return string|nil The preceding codepoint; nil when the trigger starts the
----   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
----   string when a character is there but could not be decoded, which the core
----   treats as "does not open a word" exactly as this function always has.
 --- Keeps the expansion that just fired for an immediate Backspace, as Linux
 --- does: that Backspace means « not what I wanted » and brings the trigger back
 --- (M.undo_on_backspace). Only a literal replacement is kept: a token or dynamic
 --- output does not say what it typed. The record holds the buffer the expansion
 --- left, so any edit, reset or focus change in between voids it.
---- @param m table The mapping that fired.
+--- @param is_literal boolean Whether the output is plain text (no key directive).
 --- @param trigger string The text the user typed for it, as it was on screen.
 --- @param typed string What the expansion typed, replayed terminator included.
 --- @param is_private boolean The mapping's privacy.
 --- @param eligible boolean False for an ignored window or a composite event.
-local function remember_undo(m, trigger, typed, is_private, eligible)
+local function remember_undo(is_literal, trigger, typed, is_private, eligible)
 	_state.undoable = nil
-	if not eligible or m.plain_repl ~= m.repl or type(trigger) ~= "string" or trigger == ""
+	if not eligible or not is_literal or type(trigger) ~= "string" or trigger == ""
 		or type(typed) ~= "string" or typed == "" or _state.buffer == "" then return end
 	_state.undoable = { trigger = trigger, typed = typed, is_private = is_private == true, buffer_after = _state.buffer }
 end
@@ -454,6 +438,22 @@ function M.undo_on_backspace(undo)
 	return true
 end
 
+--- Extracts the one codepoint sitting immediately before a candidate trigger —
+--- the only piece of left-hand context the word-boundary rule consults.
+---
+--- The rule itself is NOT here any more. It moved into the shared matcher core
+--- (`HotstringCore.decide`), because macOS, Windows and Linux each carried their
+--- own version and no two of them ever agreed at once. What stays here is the
+--- part that is genuinely macOS's: pulling that codepoint out of a BYTE-string
+--- buffer, which is an O(1) offset rather than the array index the core uses.
+---
+--- @param buffer string The current rolling buffer.
+--- @param trigger_start_byte number 1-based byte index where the trigger starts
+---   inside `buffer`. Must be >= 1.
+--- @return string|nil The preceding codepoint; nil when the trigger starts the
+---   buffer, so the caller falls back to `start_is_word_boundary`; an EMPTY
+---   string when a character is there but could not be decoded, which the core
+---   treats as "does not open a word" exactly as this function always has.
 local function prev_char_before(buffer, trigger_start_byte)
 	if trigger_start_byte <= 1 then return nil end
 	local before            = buffer:sub(1, trigger_start_byte - 1)
@@ -679,6 +679,17 @@ end
 --- @param event_chars string|nil Real physical payload at commit time. Preview
 ---        callers omit it and resolve the configured logical action.
 --- @return table|nil resolution
+--- The uppercase form of a letter magic key, which completes an uppercase
+--- trigger (HSE-004), or nil for a key without one (★, punctuation).
+--- @param magic string The configured magic key.
+--- @return string|nil upper
+function M.cased_magic(magic)
+	if type(magic) ~= "string" or text_utils.utf8_len(magic) ~= 1 then return nil end
+	local upper = text_utils.trig_upper(magic)[1]
+	if upper == nil or upper == magic then return nil end
+	return upper
+end
+
 function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 	if not require_state("resolve_magic_action") then return nil end
 	if type(buffer) ~= "string" then return nil end
@@ -686,8 +697,12 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 
 	local magic = _state.magic_key
 	if type(magic) ~= "string" or magic == "" then return nil end
-	if event_chars ~= nil and not Terminators.matches_magic_event(event_chars, magic) then return nil end
+	local cased = event_chars ~= nil and event_chars == M.cased_magic(magic)
+	if event_chars ~= nil and not cased and not Terminators.matches_magic_event(event_chars, magic) then return nil end
 	local physical_magic = event_chars or magic
+	-- The magic key as the trigger spells it: its uppercase completes an
+	-- uppercase trigger (HSE-004).
+	local typed_magic = cased and event_chars or magic
 	local auto_buffer = nil
 	local star_attempts = {}
 	local literal_attempts = {}
@@ -698,7 +713,7 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 		local tail_char = (ok_tail and tail_offset) and buffer:sub(tail_offset) or nil
 		local star_bucket = tail_char and _registry.mappings_for_star_tail(tail_char) or nil
 		local bare_star_bucket = _registry.mappings_for_star_tail("")
-		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. magic) or nil
+		auto_buffer = (star_bucket or bare_star_bucket) and (buffer .. typed_magic) or nil
 		-- A bare magic-key mapping is globally shortest, so scanning it after the
 		-- tail-specific bucket preserves the registry's longest-first order without
 		-- rebuilding or linearly scanning the full magic-key bucket per preview.
@@ -733,7 +748,9 @@ function M.resolve_magic_action(buffer, ordinary_auto_allowed, event_chars)
 			and tail_char and _registry.mappings_for_literal_magic_tail(tail_char) or nil
 		local literal_bare_bucket = type(_registry.mappings_for_literal_magic_tail) == "function"
 			and _registry.mappings_for_literal_magic_tail("") or nil
-		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. magic) end
+		-- The ordinary auto path reads the magic key as typed, its uppercase
+		-- included (HSE-004), whether or not a star mapping shares the tail.
+		if literal_tail_bucket or literal_bare_bucket then auto_buffer = auto_buffer or (buffer .. typed_magic) end
 		for bucket_index = 1, 2 do
 			local literal_bucket = bucket_index == 1 and literal_tail_bucket or literal_bare_bucket
 			if literal_bucket then
@@ -910,6 +927,29 @@ end
 -- ===============================
 -- ===============================
 
+--- Whether a final end-character entry holds an immediate candidate back: the
+--- immediate one would fire on the last letter, before the end character the
+--- final entry of strictly higher priority is waiting for. The shared engine's
+--- final_end_outranks applies the same rule.
+--- @param m table The immediate mapping.
+--- @param buffer string The buffer it matched against.
+--- @return boolean
+local function final_end_outranks(m, buffer)
+	local ok, off = pcall(utf8.offset, buffer, -1)
+	if not ok or not off then return false end
+	local bucket = _registry.mappings_for_tail(buffer:sub(off):lower())
+	if not bucket then return false end
+	local own_priority = m.priority or 0
+	for _, candidate in ipairs(bucket) do
+		if not candidate.auto and candidate.final_result and mapping_group_active(candidate)
+			and candidate.tlen >= m.tlen and (candidate.priority or 0) > own_priority then
+			local eff_plain, _, _, is_noop = M.would_fire(candidate, buffer)
+			if eff_plain or is_noop then return true end
+		end
+	end
+	return false
+end
+
 --- The identity of a rule for the same-spec guard: the same trigger (case aside,
 --- so the lower, Title and UPPER registrations of one rule are one spec) and the
 --- same completion kind are one spec, whichever source registered it.
@@ -958,52 +998,70 @@ end
 --- auto mapping on the last codepoint, an end-character mapping when a
 --- terminator is still waiting to be replayed, and a STRICTLY longer end-character
 --- trigger beats an auto one (the order keymap/init.lua applies).
+---
+--- The link is that winner or nothing. A winner that cannot be a link (private,
+--- a key output), a final entry that changes nothing and an auto winner a final
+--- end-character entry holds back all end the chain, exactly as Windows
+--- (HSE_FindMatchAtEnd, then _HSE_IsCascadeLink) and the shared engine
+--- (select_match, then its refusals) end it. Filtering the bucket on "is a link"
+--- before matching stepped over such a winner and fired a lower rule that the
+--- same typed text could never reach.
 --- @param vbuf string The buffer the previous step produced.
 --- @param tail string|nil The terminator carried at the end of `vbuf`.
 --- @param stable_bytes number Length of the untouched typed prefix.
 --- @return table|nil step { mapping, start, text, is_end }
 local function pick_cascade_step(vbuf, tail, stable_bytes)
 	local auto_step = nil
+	-- Length of an auto final entry that changed nothing: it wins with no edit,
+	-- so only a strictly longer end-character trigger can still beat it.
+	local auto_noop_len = nil
 	local last = last_cp_start(vbuf)
 	if last then
 		-- The reference character is the one before the expander (0 = none).
 		local reference = last > 1 and last_cp_start(vbuf:sub(1, last - 1)) or 0
 		local bucket = _registry.mappings_for_tail(vbuf:sub(last))
 		for _, m in ipairs(bucket or {}) do
-			if m.auto and is_cascade_link(m) and cascade_step_allowed(m, reference, stable_bytes) then
-				local eff_plain, typed = M.would_fire(m, vbuf)
+			if m.auto and cascade_step_allowed(m, reference, stable_bytes) then
+				local eff_plain, typed, _, is_noop = M.would_fire(m, vbuf)
 				if eff_plain then
 					auto_step = { mapping = m, start = #vbuf - #typed + 1, text = eff_plain }
+					break
+				end
+				if is_noop and m.final_result then
+					auto_noop_len = m.tlen
 					break
 				end
 			end
 		end
 	end
+	if auto_step and final_end_outranks(auto_step.mapping, vbuf) then auto_step = nil end
 
 	local end_step = nil
 	if tail and _registry.is_terminator(tail) then
 		local body = vbuf:sub(1, #vbuf - #tail)
 		local prev = last_cp_start(body)
+		local min_len = auto_step and auto_step.mapping.tlen or auto_noop_len or 0
 		if prev then
 			local bucket = _registry.mappings_for_tail(body:sub(prev))
 			for _, m in ipairs(bucket or {}) do
-				if not m.auto and is_cascade_link(m) and (not auto_step or m.tlen > auto_step.mapping.tlen)
-					and cascade_step_allowed(m, prev, stable_bytes) then
+				if not m.auto and m.tlen > min_len and cascade_step_allowed(m, prev, stable_bytes) then
 					local match = resolve_terminator_match(m, vbuf, tail, false)
 					if match and match.eff_plain then
 						end_step = { mapping = m, start = match.buf_start, text = match.eff_plain,
 							is_end = true }
 						break
 					end
+					-- A final entry that changes nothing masks the lower candidates.
+					if match and match.is_noop and m.final_result then return nil end
 				end
 			end
 		end
 	end
-	if end_step then return end_step end
 	-- A step that would swallow the end character ends the chain: the character
 	-- the user typed always lands after the final text.
-	if tail then return nil end
-	return auto_step
+	local winner = end_step or (not tail and auto_step) or nil
+	if winner and not is_cascade_link(winner.mapping) then return nil end
+	return winner
 end
 
 --- Lets the text an expansion produced complete further hotstrings, until the
@@ -1071,33 +1129,6 @@ local function plan_cascade(buffer, first, start_byte, repl, tail, consume_tail)
 		final_result = net.final_result,
 		steps        = net.steps,
 	}
-end
-
-
-
-
-
---- Whether a final end-character entry holds an immediate candidate back: the
---- immediate one would fire on the last letter, before the end character the
---- final entry of strictly higher priority is waiting for. The shared engine's
---- final_end_outranks applies the same rule.
---- @param m table The immediate mapping.
---- @param buffer string The buffer it matched against.
---- @return boolean
-local function final_end_outranks(m, buffer)
-	local ok, off = pcall(utf8.offset, buffer, -1)
-	if not ok or not off then return false end
-	local bucket = _registry.mappings_for_tail(buffer:sub(off):lower())
-	if not bucket then return false end
-	local own_priority = m.priority or 0
-	for _, candidate in ipairs(bucket) do
-		if not candidate.auto and candidate.final_result and mapping_group_active(candidate)
-			and candidate.tlen >= m.tlen and (candidate.priority or 0) > own_priority then
-			local eff_plain, _, _, is_noop = M.would_fire(candidate, buffer)
-			if eff_plain or is_noop then return true end
-		end
-	end
-	return false
 end
 
 --- Commits one automatic mapping against either the live buffer or an exact
@@ -1208,7 +1239,8 @@ function M.try_auto_expand(m, char_len, is_ignored, match_buffer)
 		is_private
 	)
 	if not replaced then return false end
-	remember_undo(m, typed, injection.text, is_private, event_prefix == "" and is_ignored ~= true)
+	remember_undo(m.plain_repl == m.repl, typed, injection.text, is_private,
+		event_prefix == "" and is_ignored ~= true)
 
 	-- Private mappings carry PII sourced from personal_info.toml (phone, SSN,
 	-- IBAN). keystats.log_hotstring writes trigger + replacement verbatim into
@@ -1359,8 +1391,10 @@ function M.try_terminator_expand(m, chars, char_len, is_ignored, explicit_magic)
 			replay_spec
 		)
 		if not replacement_ok then return false end
-		remember_undo(m, typed_trigger, to_type .. (replay_tail and chars or ""), is_private,
-			is_ignored ~= true and extra_bs_bytes == 0)
+		-- A stripped no-break space is not typed back, as on Windows and Linux:
+		-- the trigger alone returns, before the replayed colon is erased.
+		remember_undo(m.plain_repl == m.repl, typed_trigger, to_type .. (replay_tail and chars or ""),
+			is_private, is_ignored ~= true)
 
 		-- Same privacy contract as try_auto_expand: a private mapping's trigger
 		-- and replacement are both secrets and must reach neither the keystats
@@ -1464,6 +1498,9 @@ function M.try_repeat_feature(chars, is_ignored)
 		end,
 		false, is_ignored, "hotstring", ConfigKeys.COMMAND.REPEAT_KEY, is_private)
 	if replaced ~= true then return false end
+	-- The repeat is an expansion of the magic key: an immediate Backspace gives
+	-- the magic key back, as on Windows and Linux.
+	remember_undo(true, chars, last_char, is_private, is_ignored ~= true)
 
 	if is_private then
 		Logger.debug(LOG, "Repeat feature: repeated a private character (content withheld).")
@@ -1502,7 +1539,7 @@ function M.try_expand(chars, is_ignored)
 
 	local char_len = 1  -- ASCII fallback; accurate enough for the E2E corpus
 	local ok_len, n = pcall(function()
-		local text_u = require("infra.text_utils")
+		local text_u = require("core.text.engine.utils")
 		return text_u.utf8_len(chars)
 	end)
 	if ok_len and type(n) == "number" and n > 0 then char_len = n end

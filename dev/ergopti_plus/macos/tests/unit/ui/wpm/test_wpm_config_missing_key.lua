@@ -22,7 +22,7 @@ helpers.describe("wpm_widget._load_shared_const survives a missing/renamed TOML 
 		-- Point the shared-constants resolver at a non-existent file so read_toml
 		-- yields {} (every key missing) — the exact drift the loader must survive.
 		-- Paths is captured by reference, so mutating the stub's shared() reaches it.
-		package.loaded["infra.paths"].shared = function() return "/__ergopti_nonexistent__/constants.toml" end
+		package.loaded["core.fs.engine.paths"].shared = function() return "/__ergopti_nonexistent__/constants.toml" end
 
 		local ok, cfg = pcall(wpm._load_shared_const)
 		helpers.assert_true(ok, "loader must NOT raise on a missing/renamed TOML key (nil arithmetic)")
@@ -35,6 +35,6 @@ helpers.describe("wpm_widget._load_shared_const survives a missing/renamed TOML 
 		helpers.assert_nil(cfg.compact_width)
 
 		package.loaded["ui.wpm.wpm_widget"] = nil
-		package.loaded["infra.paths"]         = nil
+		package.loaded["core.fs.engine.paths"]         = nil
 	end)
 end)

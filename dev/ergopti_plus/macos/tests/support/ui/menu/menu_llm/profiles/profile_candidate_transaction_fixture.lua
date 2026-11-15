@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.profile_label",
@@ -135,24 +135,24 @@ local function with_fixture(options, body)
 			return builtins[1]
 		end
 
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				delete_dialog_count = delete_dialog_count + 1
 				return options.delete_choice or "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		local renderer = assert(require("menu.renderer").new({
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
-				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
 			json_decode = function(text)
-				local manifest = require("json").decode(text)
+				local manifest = require("core.text.engine.json").decode(text)
 				if options.create_label_key then
 					manifest.llm_profile_commands[1].i18n = options.create_label_key
 				end
@@ -163,15 +163,15 @@ local function with_fixture(options, body)
 				end
 				return manifest
 			end,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function()
 				notification_count = notification_count + 1
 				return true
@@ -398,7 +398,7 @@ local function with_fixture(options, body)
 		deps.set_llm_profile = switcher.set_llm_profile
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
 		local manager = require("ui.menu.menu_llm.profiles_manager").new(deps, models_mgr)
 		runtime_calls = {}

@@ -23,6 +23,7 @@
 //   hotstrings_config_bridge  — _shared/ui/hotstrings_config_window
 //   hsOnboarding              — _shared/ui/onboarding
 //   layer_editor_bridge       — _shared/ui/layer_editor
+//   layout_editor_window_bridge — _shared/ui/layout_editor_window
 //   hsPaths                   — _shared/ui/paths_editor
 //   hsPersonalInfo            — _shared/ui/personal_info_editor
 //   layout_manager_bridge     — _shared/ui/layout_manager
@@ -236,4 +237,32 @@ function createVisibilityPoller(callback, delayMs, runImmediately = true) {
 	window.addEventListener('pageshow', start);
 	start();
 	return { stop };
+}
+
+/**
+ * Whether the native context menu may open on a target: only in a text field,
+ * where it carries the editing items (cut, copy, paste, spelling).
+ * @param {EventTarget|null} target
+ * @returns {boolean}
+ */
+function contextMenuAllowedOn(target) {
+	return (
+		!!target &&
+		typeof target.closest === 'function' &&
+		target.closest('input, textarea, [contenteditable=""], [contenteditable="true"]') !== null
+	);
+}
+
+// The host windows are applications, not browsers: Windows turns WebView2's
+// default context menu off (AreDefaultContextMenusEnabled), while WKWebView and
+// WebKitGTK offered Reload, Back and Forward on every page, and a reload drops
+// an unsaved draft (WVH-003). Outside a text field the menu stays closed.
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+	document.addEventListener(
+		'contextmenu',
+		function (event) {
+			if (!contextMenuAllowedOn(event.target)) event.preventDefault();
+		},
+		true
+	);
 }

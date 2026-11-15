@@ -118,7 +118,7 @@ local function fresh_backend(module_name)
 	package.loaded[module_name] = nil
 	local backend = helpers.load_with_stubs(module_name)
 	if module_name == "modules.llm.api_ollama" then
-		helpers.assert_true(require("adapters.storage").set("llm.ollama_owned_port", OLLAMA_TEST_PORT))
+		helpers.assert_true(require("core.fs.adapters.storage").set("llm.ollama_owned_port", OLLAMA_TEST_PORT))
 	end
 	return backend
 end
@@ -182,7 +182,7 @@ helpers.describe("LLM semantic HTTP ownership", function()
 		configure_remote(api)
 		local state, restore = instrument_client(get_upvalue(api.list_active_models, "_listing_client"))
 		local ok, err = xpcall(function()
-			local plan = require("llm.api_model_listing").plan
+			local plan = require("ai.engine.api.model_listing").plan
 			local view = { model = "new-model", default_model = "fallback", extras = {}, format = "openai" }
 			local calls, reason = 0, nil
 			api.list_active_models(function(_, why)

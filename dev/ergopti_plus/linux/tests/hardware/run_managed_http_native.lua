@@ -13,9 +13,9 @@ local driver = assert(os.getenv("ERGOPTI_HTTP_STAGE"))
 local shared = driver .. "/../_shared"
 local repository = assert(os.getenv("ERGOPTI_HTTP_REPOSITORY"))
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
+	.. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local input = Json.decode(assert(io.stdin:read("*a")))
 local spawn = uv.spawn
 local pids = {}
@@ -56,15 +56,15 @@ local function observe_owner(module, name)
         return unpack_values(values, 1, values.n)
     end
 end
-observe_owner(require("adapters.curl_http_client"), "dispatch_owned")
-observe_owner(require("adapters.system_proxy"), "lookup_owned")
-observe_owner(require("infra.managed_http_deadline"), "start")
-local client = require("adapters.http_client")
+observe_owner(require("core.network.adapters.curl_http_client"), "dispatch_owned")
+observe_owner(require("core.network.adapters.system_proxy"), "lookup_owned")
+observe_owner(require("core.network.engine.managed_http_deadline"), "start")
+local client = require("core.network.adapters.http_client")
 local hop_trace = { lookups = 0, curls = 0, physical_retirements = 0, full_urls_match = true }
 local prior_curls, per_hop_operation = {}, nil
 if input.method == "per_hop" then
     -- Transparent observations only: native callbacks/return values are unchanged.
-    local proxy = require("adapters.system_proxy")
+    local proxy = require("core.network.adapters.system_proxy")
     local lookup = proxy.lookup_owned
     proxy.lookup_owned = function(...)
         hop_trace.lookups = hop_trace.lookups + 1
@@ -86,7 +86,7 @@ if input.method == "per_hop" then
         end
         return unpack_values(values, 1, values.n)
     end
-    local curl = require("adapters.curl_http_client")
+    local curl = require("core.network.adapters.curl_http_client")
     local dispatch = curl.dispatch_owned
     curl.dispatch_owned = function(...)
         hop_trace.curls = hop_trace.curls + 1
@@ -212,9 +212,18 @@ assert(constructed, "Native fixture construction raised; owned cleanup completed
 if input.inspect_argv then assert(argv_observations > 0, "actual native curl argv observation is unavailable") end
 assert(live_native_handles() == native_handles_before, "every native handle must retire, including inactive boolean-request handles")
 assert(not client.isActive("native-public"), "public logical activity must finish")
-for _, pid in ipairs(pids) do
+-- A killed group member whose parent died first is reaped by the session's
+-- subreaper, not by this process: its group vanishes once that reaper has run.
+local function group_absent(pid)
 	local accepted, _, code = uv.kill(-pid, 0)
-	assert(accepted == nil and code == "ESRCH", "every actual managed child group must be absent")
+	return accepted == nil and code == "ESRCH"
+end
+for _, pid in ipairs(pids) do
+	for _ = 1, 200 do
+		if group_absent(pid) then break end
+		uv.sleep(10)
+	end
+	assert(group_absent(pid), "every actual managed child group must be absent")
 end
 if operation then assert(operation:is_settled(), "owned public operation must physically settle") end
 if input.cancel then assert(#replies == 0, "cancelled actual operation cannot publish a stale result")

@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local check = require("test.menu_row_text")
+local check = require("tests.lua.menu.row_text")
 
 local SHARED_ROOT = "../_shared"
 -- The whole tray holds many more; fewer means a builder gave up.
@@ -44,7 +44,7 @@ local function every_category_on()
 			return { CHANNELS = real.CHANNELS, INTERVAL_PRESETS = real.INTERVAL_PRESETS, TIMING = real.TIMING,
 				current_version = function() return "9.9.9" end, get_channel = function() return "stable" end,
 				get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,
-				get_menu_label = function() return require("infra.i18n").get("menu.about.check_for_updates") end,
+				get_menu_label = function() return require("core.i18n.engine.i18n").get("menu.about.check_for_updates") end,
 				get_state = function() return "idle" end, get_cached_release = function() return nil end,
 				releases_page_url = function() return real.releases_page_url() end }
 		end)(),
@@ -55,9 +55,9 @@ end
 --- @param locale string Locale code.
 --- @return table Rendered rows.
 local function tray(locale)
-	local decode = require("json").decode
+	local decode = require("core.text.engine.json").decode
 	local catalogue = check.catalogue(SHARED_ROOT, locale, decode)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local previous = i18n.get
 	i18n.get = function(key)
 		local text = catalogue[key]
@@ -80,7 +80,7 @@ helpers.describe("the real Linux tray reads as text", function()
 			{ title = "LCtrl  :  Copier  /  Ctrl" }, { title = "Hold → lalt" },
 			{ title = "Ctrl gauche  :  Copier  /  Maj" },
 		} } }
-		local defects = check.defects(rows, SHARED_ROOT, require("json").decode)
+		local defects = check.defects(rows, SHARED_ROOT, require("core.text.engine.json").decode)
 		helpers.assert_eq(#defects, 6, "only the plain labels may pass: " .. table.concat(defects, " | "))
 	end)
 
@@ -92,26 +92,25 @@ helpers.describe("the real Linux tray reads as text", function()
 	end)
 
 	helpers.it("reaches every French submenu row joining a label to its value", function()
-		local decode = require("json").decode
+		local decode = require("core.text.engine.json").decode
 		local catalogue = check.catalogue(SHARED_ROOT, "fr", decode)
 		helpers.assert_eq(check.missing_label_value_rows(tray("fr"), SHARED_ROOT, decode, catalogue, "linux"), {})
 	end)
 
 	for _, locale in ipairs({ "fr", "en" }) do
 		helpers.it("shows no raw id in " .. locale, function()
-			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("json").decode, locale)
+			local defects, rows = check.defects(tray(locale), SHARED_ROOT, require("core.text.engine.json").decode, locale)
 			helpers.assert_true(rows >= MIN_ROWS, "the walk stopped early at " .. rows .. " rows")
 			helpers.assert_eq(defects, {}, "a row must read as text")
 		end)
 	end
 
-	-- While no driver can deliver an action bound to a physical key, the
-	-- editor's row says so instead of « Try reopening it » (physical-delivery-unqualified).
-	helpers.it("the physical shortcut editor row names its real cause", function()
-		local catalogue = check.catalogue(SHARED_ROOT, "en", require("json").decode)
+	--- The editor row of the English tray, and the head of the unqualified cause.
+	--- @return table|nil row, string head
+	local function editor_row()
+		local catalogue = check.catalogue(SHARED_ROOT, "en", require("core.text.engine.json").decode)
 		local label = catalogue["physical_shortcuts.window_title"]
-		local reason = catalogue["physical_shortcuts.delivery_unqualified"]
-		local head = reason:match("^(.-):")
+		local head = catalogue["physical_shortcuts.delivery_unqualified"]:match("^(.-):")
 		local found = nil
 		local function walk(rows)
 			for _, row in ipairs(rows or {}) do
@@ -120,9 +119,32 @@ helpers.describe("the real Linux tray reads as text", function()
 			end
 		end
 		walk(tray("en"))
+		return found, head
+	end
+
+	-- Physical delivery answers true since the maintainer's decision of
+	-- 2026-11-11 (LIN-004): the row no longer names an unqualified delivery
+	-- (physical-delivery-available).
+	helpers.it("the physical shortcut editor row no longer names an unqualified delivery", function()
+		local found, head = editor_row()
 		helpers.assert_true(found ~= nil, "the editor row is drawn")
-		helpers.assert_eq(found.disabled, true)
-		helpers.assert_true(found.title:find(head, 1, true) ~= nil, found.title)
-		helpers.assert_true(found.title:find("reopening", 1, true) == nil, found.title)
+		helpers.assert_true(found.title:find(head, 1, true) == nil, found.title)
+	end)
+
+	-- Should the getter answer false (the safety refusal is kept), the row says
+	-- so instead of « Try reopening it ».
+	helpers.it("a getter answering false makes the editor row name its real cause", function()
+		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+		local original = keyboard.physical_delivery_available
+		keyboard.physical_delivery_available = function() return false end
+		local ok, err = pcall(function()
+			local found, head = editor_row()
+			helpers.assert_true(found ~= nil, "the editor row is drawn")
+			helpers.assert_eq(found.disabled, true)
+			helpers.assert_true(found.title:find(head, 1, true) ~= nil, found.title)
+			helpers.assert_true(found.title:find("reopening", 1, true) == nil, found.title)
+		end)
+		keyboard.physical_delivery_available = original
+		if not ok then error(err, 0) end
 	end)
 end)

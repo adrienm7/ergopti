@@ -4,7 +4,7 @@
 --- MODULE: Logger Behaviour Corpus Consumer (Hammerspoon)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/logger/behaviour_vectors.json against the macOS
---- driver logger. The sibling corpus (_shared/modules/logger/test_vectors.json)
+--- driver logger. The sibling corpus (_shared/core/logger/data/test_vectors.json)
 --- pins the LINE FORMAT; this one pins the parts that decide whether a line
 --- exists at all — severity filtering and the ring buffer.
 ---
@@ -30,8 +30,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json    = require("json")
-local Logger  = require("infra.logger")
+local json    = require("core.text.engine.json")
+local Logger  = require("core.logger.engine.logger")
 
 
 
@@ -329,7 +329,7 @@ helpers.describe("Logger behaviour corpus: this driver's default", function()
 		local recorded = CORPUS.driver_defaults.macos_module_default
 		helpers.assert_eq(type(recorded), "string", "the corpus must record this driver's default")
 
-		local fresh = helpers.load_with_stubs("infra.logger")
+		local fresh = helpers.load_with_stubs("core.logger.engine.logger")
 		helpers.assert_eq(fresh.current_level, fresh.LEVELS[recorded:upper()],
 			"the module's starting level must be the corpus's '" .. recorded .. "'")
 	end)

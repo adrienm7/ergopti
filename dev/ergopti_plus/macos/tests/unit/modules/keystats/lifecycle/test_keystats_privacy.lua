@@ -50,7 +50,7 @@ local helpers = require("tests.helpers")
 -- ============================================
 
 -- Timings stub shared by every scenario load: returns fixed values so the
--- harness never depends on the real _shared/modules/timings/constants.toml
+-- harness never depends on the real _shared/core/timing/data/constants.toml
 -- file being reachable from the unit-test cwd (mirrors test_log_manager.lua).
 local _TIMINGS_MS = {
 	keystats = {
@@ -140,8 +140,8 @@ local function start_real_keystats()
 		get_db_rev              = function() return 0 end,
 		sync_foreign_data_sql   = function() end,
 	}
-	package.loaded["infra.i18n"] = { t = function(key) return key end, get = function(key) return key end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.i18n.engine.i18n"] = { t = function(key) return key end, get = function(key) return key end }
+	package.loaded["core.timing.engine.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function(_section, _key) return 1.0 end,
 	}
@@ -170,7 +170,7 @@ local function start_real_keystats()
 			return true
 		end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() end,
 		start = function() return true end,
 		stop = function() return true end,
@@ -182,7 +182,7 @@ local function start_real_keystats()
 	-- The production engine owns the raw event tap through KeyboardHook. Capture
 	-- its onEvent callback at that boundary rather than relying on the retired
 	-- direct hs.eventtap.new() ownership in keystats/init.lua.
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(opts) captured_handle_key = opts and opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
@@ -192,9 +192,9 @@ local function start_real_keystats()
 	-- LogManager. TimerScheduler owns native timer capabilities, so retaining it
 	-- across scenarios would bind later cleanup to an earlier scenario's hs table.
 	package.loaded["modules.keystats.log_manager"] = nil
-	package.loaded["adapters.ledger_append"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["core.fs.adapters.ledger_append"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
 	-- KC file draining and hardware sensor collection are independent of the
@@ -302,8 +302,8 @@ local function start_real_keystats()
 		execute  = function() return "" end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -315,10 +315,10 @@ package.loaded["adapters.file_system"] = {
 	read_with_status = function() return nil, "absent" end,
 }
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local km = helpers.load_with_stubs("modules.keystats.init", hs_overrides)
-	package.loaded["adapters.file_system"] = saved_file_system
-	local synthetic_input = require("adapters.synthetic_input")
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
+	local synthetic_input = require("platform.input.synthetic_input")
 	local is_paused = false
 	local script_control = { is_paused = function() return is_paused end }
 	helpers.assert_eq(km.start(script_control), true,
@@ -439,7 +439,7 @@ local function load_corpus()
 	local raw = fh:read("*a")
 	fh:close()
 	-- Reuse the hs.json.decode stub that the test harness provides
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local ok, decoded = pcall(require("hs").json.decode, raw)
 	if not ok then return nil, "JSON parse error: " .. tostring(decoded) end
 	return decoded, nil
@@ -988,7 +988,7 @@ local function load_session_corpus()
 	local handle = assert(io.open(_SESSION_CORPUS_PATH, "rb"), "cannot open " .. _SESSION_CORPUS_PATH)
 	local raw = handle:read("*a")
 	handle:close()
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	return require("hs").json.decode(raw)
 end
 

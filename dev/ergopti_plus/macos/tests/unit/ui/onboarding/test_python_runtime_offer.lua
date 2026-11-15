@@ -16,24 +16,24 @@ local helpers = require("tests.helpers")
 local function load(answer)
 	local record = { dialogs = {}, spawns = {} }
 	local offer = helpers.load_with_stubs("ui.python_runtime_offer")
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		choose = function(title, message, choices, cancel_label)
 			record.dialogs[#record.dialogs + 1] = { title = title, message = message, choices = choices,
 				cancel = cancel_label }
 			return answer
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args)
 			record.spawns[#record.spawns + 1] = executable .. " " .. table.concat(args, " ")
 			return { start = function() return true end }
 		end,
 	}
 	-- The stub echoes a key; the format arguments are what the text shows.
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		format = function(key, ...)
 			local parts = {}
@@ -47,7 +47,7 @@ end
 
 -- Modules the doubles replace; every test restores them (suite order).
 local OWNED = {
-	"ui.python_runtime_offer", "infra.dialog_util", "infra.deferred_work", "adapters.shell_runner", "infra.i18n",
+	"ui.python_runtime_offer", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "core.process.adapters.shell_runner", "core.i18n.engine.i18n",
 }
 
 --- Runs one case with the doubled modules restored afterwards.

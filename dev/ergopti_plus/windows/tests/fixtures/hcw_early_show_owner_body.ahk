@@ -302,7 +302,7 @@ _HESW_Main() {
 	_VendorDir := A_Args[3], _SharedDir := A_Args[3] . "\shared", _ConfigDir := A_Args[3] . "\"
 	_ExtensionsDir := A_Args[3] . "\extensions", _I18nLocale := "en"
 	ScriptInformation := Map("PersonalHotstringsDir", A_Args[3] . "\personal\")
-	Index := _SharedDir . "\modules\hotstrings\_index.toml"
+	Index := _SharedDir . "\hotstrings\data\catalogue\_index.toml"
 	_HESW_Require(CryptoSha256Bytes(FSReadBytesStrict(Index)) == _HESW_SourceIndexHash,
 		"The genuine category builder must receive exact delivered index bytes.")
 	Primary := 0

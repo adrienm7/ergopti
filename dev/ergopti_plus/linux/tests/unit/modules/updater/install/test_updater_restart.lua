@@ -31,7 +31,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local ran = {}
 		local cancelled = Restarter.cancel("systemd", { run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(cancelled, true)
-		helpers.assert_eq(ran, { "systemctl --user --no-block stop ergopti-hotstrings.service" })
+		helpers.assert_eq(ran, { Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop ergopti-hotstrings.service" })
 		local refused, detail = Restarter.cancel("systemd", { run = function() return false end })
 		helpers.assert_eq(refused, false)
 		helpers.assert_contains(detail, "systemctl")
@@ -41,7 +41,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local ran = {}
 		local run = function(cmd) ran[#ran + 1] = cmd; return true end
 		local path = Restarter.cancel_path(4242, "1337", BOOT_ID)
-		helpers.assert_eq(path, require("adapters.storage").path() .. ".relay-cancel-4242-1337-" .. BOOT_ID)
+		helpers.assert_eq(path, require("core.fs.adapters.storage").path() .. ".relay-cancel-4242-1337-" .. BOOT_ID)
 		helpers.assert_eq(Restarter.cancel("relay", { run = run, pid = 4242, start_tick = "1337", boot_id = BOOT_ID }), true)
 		helpers.assert_eq(ran, { "touch '" .. path .. "'" })
 		local refused, detail = Restarter.cancel("relay", { run = function() return false end, pid = 4242, start_tick = "1337", boot_id = BOOT_ID })
@@ -63,7 +63,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) a stale cancellation does not suppress the new launcher", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local Shell, Storage = require("core.process.adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local original = Storage.path
 		local ok, detail = xpcall(function()
@@ -126,7 +126,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(relay-cancel-identity) quits the actual relay without rereading unavailable proc identity", function()
 		if ON_WINDOWS then return end
-		local Shell, Storage = require("adapters.shell_runner"), require("adapters.storage")
+		local Shell, Storage = require("core.process.adapters.shell_runner"), require("core.fs.adapters.storage")
 		local directory = os.tmpname(); os.remove(directory); assert(Shell.run("mkdir " .. Shell.quote(directory)))
 		local old_path, old_open = Storage.path, io.open
 		local child
@@ -202,7 +202,7 @@ helpers.describe("updater restart: starting the installed version", function()
 
 	helpers.it("(restart-relay-pid-reuse) does not wait on a different process with the same numeric pid", function()
 		if ON_WINDOWS then return end
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname(); os.remove(dir); assert(Shell.run("mkdir " .. Shell.quote(dir)))
 		local marker, launcher = dir .. "/started", dir .. "/launcher"
 		local file = assert(io.open(launcher, "w")); file:write("#!/bin/sh\necho started > " .. Shell.quote(marker) .. "\n"); file:close()
@@ -228,7 +228,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		local how = Restarter.restart({ wrapper = "/home/u/.local/bin/ergopti-hotstrings", args = { "--tray" },
 			cgroup = UNIT_CGROUP, run = function(cmd) ran[#ran + 1] = cmd; return true end })
 		helpers.assert_eq(how, "systemd")
-		helpers.assert_eq(ran[1], "systemctl --user --no-block restart ergopti-hotstrings.service")
+		helpers.assert_eq(ran[1], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart ergopti-hotstrings.service")
 	end)
 
 	helpers.it("otherwise relaunches the installed launcher once this process has exited", function()
@@ -251,7 +251,7 @@ helpers.describe("updater restart: starting the installed version", function()
 		end)
 	else
 		helpers.it("(restart-relay-dispatch-ack) refuses shutdown when native relay dispatch exits unsuccessfully", function()
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local folder = os.tmpname()
 			os.remove(folder)
 			helpers.assert_true(Shell.run("mkdir " .. Shell.quote(folder)))
@@ -322,7 +322,7 @@ helpers.describe("updater restart: starting the installed version", function()
 				run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(how)
 			helpers.assert_eq(calls, 0, "unreadable cgroup must not dispatch a guessed relay")
-			local daemon = helpers.load_module("infra.daemon_restart")
+			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {},
 				installation = function() return { kind = "standalone", wrapper = "/x" } end,
 				run = function() calls = calls + 1; return true end })
@@ -340,7 +340,7 @@ helpers.describe("updater restart: starting the installed version", function()
 			local how = Restarter.restart({ wrapper = "/x", args = {}, cgroup = cgroup, pid = 4242,
 				start_tick = "1337", run = function() calls = calls + 1; return true end })
 			helpers.assert_nil(how)
-			local daemon = helpers.load_module("infra.daemon_restart")
+			local daemon = helpers.load_module("core.lifecycle.engine.reload.daemon_restart")
 			local outer = daemon.restart({ reason = "test", args = {}, cgroup = cgroup,
 				installation = function() return { kind = "standalone", wrapper = "/x" } end,
 				run = function() calls = calls + 1; return true end })
@@ -401,7 +401,7 @@ local function bind_action_owners(items, source_run)
 		if type(item.fn) == "function" then
 			local action = item.fn
 			item.fn = function(...)
-				local Installation = require("infra.installation")
+				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
 				Installation.is_source_run = function() return source_run == true end
@@ -422,13 +422,13 @@ end
 	--- @param source_run boolean|nil What the installed-build owner answers
 	---   (an installed build by default; the suite itself runs from a checkout).
 	local function updates_rows(fake, ctx_extra, source_run)
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return source_run == true end
 		local mb = helpers.load_module("ui.menu.builder")
 		local ctx = { _version = "test", on_quit = function() end, updater = fake }
 		for key, value in pairs(ctx_extra) do ctx[key] = value end
-		local title = require("infra.i18n").get("menu.about.title")
+		local title = require("core.i18n.engine.i18n").get("menu.about.title")
 		local ok, items = pcall(mb.build, ctx)
 		Installation.is_source_run = real_is_source_run
 		if not ok then error(items, 0) end
@@ -461,7 +461,10 @@ end
 
 	helpers.it("hands a manual check's answer to the daemon when no window can show it", function()
 		local fake = fake_updater("idle")
-		fake.check_for_updates = function(_, callback) callback(false, nil, nil); return true end
+		fake.check_for_updates = function(_, callback)
+			callback(false, nil, nil, { state = "up_to_date", channel = "dev", current = "0.0.0-dev.133", others = {} })
+			return true
+		end
 		local told = nil
 		local saved = package.loaded["ui.update_check.bridge"]
 		package.loaded["ui.update_check.bridge"] = { open = function() return false end }
@@ -471,7 +474,7 @@ end
 		end
 		package.loaded["ui.update_check.bridge"] = saved
 		helpers.assert_true(told ~= nil, "the daemon is told, and redraws the menu")
-		helpers.assert_eq(told[1], false)
+		helpers.assert_eq(told[1].state, "up_to_date", "with the check's structured answer (UPL-002)")
 	end)
 
 	helpers.it("installs a downloaded update and hands the result on for the restart", function()
@@ -482,7 +485,7 @@ end
 		fake.install_update = function(path) installed_from = path; return true end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", release.tag)
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", release.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -506,7 +509,7 @@ end
 		end
 		fake.install_update = function() error("nothing to install") end
 		local rows = updates_rows(fake, { on_update_finished = function() end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", shown.tag)
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", shown.tag)
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -522,7 +525,7 @@ end
 		fake.download_update = function() error("a source run must download nothing") end
 		fake.install_update = function() error("a source run must install nothing") end
 		local rows = updates_rows(fake, { on_update_finished = function() end }, true)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local plain = i18n.get("menu.about.update_now"):gsub("{tag}", release.tag)
 		-- The head of the reason, cut as the renderers cut it: before its first
 		-- colon, ASCII or full-width.
@@ -550,7 +553,7 @@ end
 		fake.install_update = function() error("nothing to install") end
 		local finished = nil
 		local rows = updates_rows(fake, { on_update_finished = function(...) finished = { ... } end })
-		local label = require("infra.i18n").get("menu.about.update_now"):gsub("{tag}", "v0.0.0-dev.134")
+		local label = require("core.i18n.engine.i18n").get("menu.about.update_now"):gsub("{tag}", "v0.0.0-dev.134")
 		for _, row in ipairs(rows) do
 			if row.title == label then row.fn() end
 		end
@@ -594,7 +597,7 @@ helpers.describe("Main restart pause wiring", function()
 					installed_root = function() return "/installed" end },
 				shutdown = { request = function() shutdowns = true end },
 				require = function(module)
-					helpers.assert_true(module == "infra.daemon_restart" or module == "modules.updater.restarter")
+					helpers.assert_true(module == "core.lifecycle.engine.reload.daemon_restart" or module == "modules.updater.restarter")
 					return { restart = function(opts) received = opts; return "relay" end }
 				end }, { __index = _G })
 			local chunk

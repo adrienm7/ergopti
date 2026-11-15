@@ -10,7 +10,7 @@
 --- itself, as it always did (the Ergopti+ symbols put ★ on <AB03>, KeyC).
 ---
 --- FEATURES & RATIONALE:
---- 1. The shared rules (_shared/lua/keymap/magic_key_source.lua) decide which
+--- 1. The shared rules (_shared/layouts/engine/layers/magic_key_source.lua) decide which
 ---    values are keys and which evdev code a value names, from the manifest
 ---    entry and the physical-key registry; the value is one canonical
 ---    config.toml leaf (infra/hotstring_preferences.lua), sparse against the
@@ -19,7 +19,7 @@
 ---    application; the magic key is injected in its place and then handed to
 ---    the character path, so the buffer, the metrics and a ★-triggered
 ---    expansion see exactly what the application shows — the order a
----    re-emitted key follows (adapters/keyboard_hook.lua).
+---    re-emitted key follows (platform/input/keyboard_hook.lua).
 --- 3. Fail safe. A paused driver, the replace section off, a modifier held or
 ---    an injection that did not happen lets the key through untouched, so it is
 ---    typed exactly once, as its own character.
@@ -36,17 +36,17 @@
 
 local M = {}
 
-local Logger      = require("logger.shim")
+local Logger      = require("core.logger.engine.shim")
 local Preferences = require("infra.hotstring_preferences")
 local Manifest    = require("infra.manifest_reader")
-local Paths       = require("infra.paths")
-local FileSystem  = require("adapters.file_system")
-local Json        = require("json")
-local EvdevCodes  = require("infra.evdev_codes")
-local Timings     = require("infra.timings")
-local InputEvent  = require("infra.input_event")
-local Shared      = require("keymap.magic_key_source")
-local ConfigKeys = require("config_keys")
+local Paths       = require("core.fs.engine.paths")
+local FileSystem  = require("core.fs.adapters.file_system")
+local Json        = require("core.text.engine.json")
+local EvdevCodes  = require("platform.input.evdev_codes")
+local Timings     = require("core.timing.engine.timings")
+local InputEvent  = require("platform.input.event")
+local Shared      = require("layouts.engine.layers.magic_key_source")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "magic_key_source"
 
@@ -66,7 +66,7 @@ local _editor_generation = 0
 
 local function registry()
 	if _registry then return _registry end
-	local path = Paths.shared("data/keycodes/physical_keys.json")
+	local path = Paths.shared("layouts/data/keycodes/physical_keys.json")
 	local text = path and FileSystem.read(path)
 	if type(text) ~= "string" then error("the physical-key registry is unreadable: " .. tostring(path)) end
 	local decoded = Json.decode(text)
@@ -366,11 +366,13 @@ function M.init(deps)
 	Logger.success(LOG, "Initialized (physical magic key %s).", M.get())
 end
 
---- Whether a key can be captured now: the daemon owns the keyboard and is not
---- paused, as macOS greys the row while paused — a paused driver takes no key.
+--- Whether a key can be captured now: the daemon owns the keyboard. A pause
+--- admits it (EDD-1, decided by the coordinator on 2026-11-14): the chosen key
+--- is saved at once and stays inert until resume, since on_key types nothing
+--- while paused; a pause or resume during the capture cancels it.
 --- @return boolean
 function M.can_capture()
-	return _deps ~= nil and _deps.can_capture() == true and _deps.is_active() == true
+	return _deps ~= nil and _deps.can_capture() == true
 end
 
 --- Fences pending and deferred captured choices at a committed pause boundary.
@@ -567,7 +569,7 @@ end
 
 -- These source observers are captured by the same original replacement owner.
 local CollisionRoutes = require("infra.config_paths")
-local CollisionCodec = require("toml_codec")
+local CollisionCodec = require("core.text.engine.toml_codec")
 local collision_route, collision_read, collision_decode = CollisionRoutes.config, FileSystem.read_with_status, CollisionCodec.decode
 local preference_ports = { get = Preferences.get, generation = Preferences.generation,
 	snapshot = Preferences.snapshot, is_acquired = Preferences.is_acquired }
@@ -638,8 +640,8 @@ collision_factory = function()
 		end end
 		return rawequal(package.loaded["infra.hotstring_preferences"], Preferences)
 			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
-			and rawequal(package.loaded["adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
-			and rawequal(package.loaded["toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
+			and rawequal(package.loaded["core.fs.adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
+			and rawequal(package.loaded["core.text.engine.toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
 	end
 	local function current()
 		if not private_current() or collision_route("config.toml") ~= path then return false end

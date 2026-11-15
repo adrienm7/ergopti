@@ -7,8 +7,8 @@
 
 --- Native public supplied-software source label encoding regression.
 local uv = require("luv")
-require("compat.utf8").install()
-local Json = require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json = require("core.text.engine.json")
 local root = assert(os.getenv("OWN_SOURCE_ESCAPE_ROOT"))
 assert(uv.fs_mkdir(root, 448))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
@@ -20,7 +20,7 @@ local config = assert(io.open(root .. "/config/ergopti/config.toml", "w"))
 assert(config:write("[metrics]\nenabled = true\n") and config:close())
 local K = require("modules.keystats.keystats")
 local W = require("modules.keystats.sqlite_writer")
-local Clock = require("infra.monotonic")
+local Clock = require("core.logger.engine.monotonic")
 assert(Clock.backend() == "luv.hrtime")
 local db = root .. "/metrics.sqlite"
 K.init({ sqlite_path = db, log_dir = root .. "/logs" })

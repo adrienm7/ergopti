@@ -23,12 +23,12 @@ local function with_permissions(states, body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local prompts = {}
 	local ok, err = xpcall(function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		package.loaded["adapters.accessibility_permission"] = {
 			is_trusted = function() return table.unpack(states.accessibility, 1, 2) end,
 			request_prompt = function() prompts[#prompts + 1] = "accessibility" return true end,
 		}
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function() return table.unpack(states.screen_recording, 1, 2) end,
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}
@@ -69,7 +69,7 @@ end
 
 helpers.describe("healthcheck: macOS privacy permissions", function()
 	helpers.it("the collector's ids are the schema's, in its order", function()
-		local schema = require("healthcheck.snapshot").load_schema(helpers.shared("modules/diagnostics/schema.json"))
+		local schema = require("diagnostics.engine.healthcheck.snapshot").load_schema(helpers.shared("diagnostics/data/schema.json"))
 		local declared = {}
 		for id in pairs(schema.permissions.macos) do declared[#declared + 1] = id end
 		table.sort(declared)

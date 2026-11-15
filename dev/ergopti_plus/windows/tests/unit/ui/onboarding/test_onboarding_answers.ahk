@@ -254,7 +254,7 @@ _TOAN_TapHoldKeysGoToTheWriterNeverToConfig() {
 		AssertEqual(1, Entry["value"], "a key imports its recommendation")
 		AssertEqual(0, Entry["default"], "an unchecked key is its neutral value")
 	}
-	AssertEqual(LoadTapHoldToml(_SharedDir . "\tap_hold\defaults.toml")["keys"].Count, Listed,
+	AssertEqual(LoadTapHoldToml(_SharedDir . "\tap_hold\data\defaults.toml")["keys"].Count, Listed,
 		"the page lists every key the shipped preset recommends")
 	Operations := [
 		_TOAN_Op("tap_holds.keys.caps_lock", true),
@@ -348,7 +348,7 @@ Test("onboarding answers: the commit renders one stamped candidate (onboarding-a
 ; The commit publishes this image beside config.toml in its own transition.
 _TOAN_TapHoldImportRendersOnlyTheCheckedKeys() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Path := _TOAN_NewPath()
 	Rendered := _TOAN_NewPath()
 	Source := '[tap_hold]`ninherit_defaults = false`n'
@@ -386,7 +386,7 @@ Test("onboarding answers: the tap-hold import renders only the checked keys' pre
 ; A re-run answered Yes imported over the keys the user had set.
 _TOAN_TapHoldImportKeepsTheUsersKeysAndBacksUp() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\tap_hold.toml"
 	Source := '[tap_hold.keys.left_alt]`ntap_action = "escape"`n'
@@ -445,7 +445,7 @@ _TOAN_NavLayerComesWithItsKey() {
 	LayersPath := Folder . "\layers.toml"
 	try {
 		Preset := TapHoldRecommendedLayer(_SharedDir)
-		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), Preset["text"])
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\layouts\data\layers.recommended.toml"), Preset["text"])
 		AssertEqual("nav", Preset["layer_id"], "the layer the recommended left_alt holds")
 		AssertEqual(LayersPath, _Onboarding_NavLayerPath(Folder, ["caps_lock", "left_alt"]),
 			"the key holding the layer brings the folder's layers.toml into the commit")
@@ -526,7 +526,7 @@ Test("onboarding answers: a re-run reads the values in force (onboarding-answers
 ; the page now shows each key the tap_hold.toml beside config.toml configures.
 _TOAN_TapHoldReportTellsImportedFromCustomised() {
 	global _SharedDir
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Index := OnboardingCatalogue()
 	Folder := _TOAN_NewFolder()
 	Path := Folder . "\tap_hold.toml"

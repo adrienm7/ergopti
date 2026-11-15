@@ -31,18 +31,18 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
 
 local hs      = hs
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
-local Literal = require("sqlite.literal")
-local Queries = require("keystats.queries")
-local KUtils = require("keystats.utils")
+local Logger = require("core.logger.engine.logger")
+local Literal = require("core.fs.engine.sqlite.literal")
+local Queries = require("metrics.engine.queries")
+local KUtils = require("metrics.engine.utils")
 local LOG    = "keystats.sqlite_reader"
-local BUSY_TIMEOUT_MS = require("infra.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
+local BUSY_TIMEOUT_MS = require("core.timing.engine.timings").ms("keystats", "sqlite_read_busy_timeout_ms")
 
 
 
@@ -249,7 +249,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 		return (#clauses > 0) and (" WHERE " .. table.concat(clauses, " AND ")) or ""
 	end
-	-- The SQL is the shared catalogue's (_shared/data/db/queries.sql) in the
+	-- The SQL is the shared catalogue's (_shared/metrics/data/db/queries.sql) in the
 	-- in-process dialect, the same statements the Windows and Linux readers run.
 	local function manifest_sql(name)
 		return Queries.render(name, "native", { where = date_filter() })
@@ -392,12 +392,12 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- Semantic keys have labelled rows, never fabricated numeric positions.
 	query("ngram_media_keys", function()
 		for r in _rows(db, manifest_sql("manifest.media_keys"), pacer) do
-			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("keystats.media_store").project_press(r)
+			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("metrics.engine.media.store").project_press(r)
 		end
 	end, pacer)
 	query("agg_app_day_media_hold", function()
 		for r in _rows(db, manifest_sql("manifest.media_hold"), pacer) do
-			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("keystats.media_store").project_hold(r)
+			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("metrics.engine.media.store").project_hold(r)
 		end
 	end, pacer)
 
@@ -677,7 +677,7 @@ local function _ngram_days(db, start_date, end_date)
 		end)
 		if accepted ~= true then complete = false end
 	end
-	return require("table_util").sorted_keys(found), complete
+	return require("core.text.engine.table_util").sorted_keys(found), complete
 end
 
 --- Adds one date window of every n-gram table into `out`. The row handlers are
@@ -799,6 +799,37 @@ function M.read_ngrams(sqlite_path, start_date, end_date, selected_apps, pacer)
 	return out, complete
 end
 
+--- Reads the all-time character, bigram and trigram families Ergopti Studio
+--- analyses (_shared/metrics/engine/view/studio_ngrams.lua), every device and app
+--- summed. The open is read only; the other families are skipped so a large
+--- store answers quickly.
+--- @param sqlite_path string Absolute path to db.sqlite.
+--- @return table ngrams { c, bg, tg } dictionaries.
+--- @return boolean complete True only when the open and every query succeeded.
+function M.read_studio_ngrams(sqlite_path)
+	local out = { c = {}, bg = {}, tg = {} }
+	local db = _open(sqlite_path)
+	if not db then return out, false end
+	local complete = true
+	for _, family in ipairs(require("metrics.engine.view.studio_ngrams").FAMILIES) do
+		local tbl = NGRAM_TYPE_TABLE[family.code]
+		local ok = _safe_query(tbl, function()
+			for r in _rows(db, Queries.render("ngram.tokens", "native",
+				{ table = tbl, where = "", conjunction = " WHERE " })) do
+				local item = out[family.code][r.token]
+				if not item then
+					item = { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					out[family.code][r.token] = item
+				end
+				_merge_ngram_row(item, r)
+			end
+		end)
+		if ok ~= true then complete = false end
+	end
+	db:close()
+	return out, complete
+end
+
 --- Adds every entry of `from` into `into`, using the same additive fields as
 --- the row handlers. Used to extend a cached historical dict by new days.
 --- An all-time history holds every distinct token, so the merge pauses at each
@@ -810,7 +841,7 @@ end
 --- @return table into
 function M.merge_ngrams(into, from, pacer)
 	if pacer ~= nil and (type(pacer) ~= "table" or type(pacer.pause) ~= "function") then
-		error("sqlite_reader.merge_ngrams: the pacer must come from infra.paced_job", 2)
+		error("sqlite_reader.merge_ngrams: the pacer must come from core.timing.engine.paced_job", 2)
 	end
 	for code, tokens in pairs(from) do
 		local bucket = into[code]

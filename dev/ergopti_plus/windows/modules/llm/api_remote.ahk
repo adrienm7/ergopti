@@ -36,7 +36,7 @@
 ; =======================================
 ; =======================================
 
-; Loaded from _shared/modules/llm/api_providers.json at boot (see _LLMRemote_LoadCatalog).
+; Loaded from _shared/ai/data/api_providers.json at boot (see _LLMRemote_LoadCatalog).
 ; Each provider ID maps to Label / BaseUrl / DefaultModel / Format — same
 ; schema as the HS twin. Adding a provider = one entry in api_providers.json
 ; plus (optionally) a new Format branch in _LLMRemoteBuildPayload /
@@ -1461,9 +1461,11 @@ _LLMRemoteResolveEntry(Entry) {
     if !(BaseUrl is String) || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
         return ""
     Token := _LLMRemoteStoredKey(Entry)
-    if !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
+    ; A key DPAPI could not decrypt here is no key (LLM_ApiToken_Unusable).
+    if LLM_ApiToken_Unusable(Token)
+            || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
         return ""
-    Model := _LLMRemoteEntryGet(Entry, "Model", Provider["DefaultModel"])
+    Model := LLM_RemoteEntryModel(Entry)
     if (Model == "")
         return ""
     for Scalar in [ProviderId, ProvFmt, BaseUrl, Token, Model] {
@@ -1482,6 +1484,19 @@ _LLMRemoteResolveEntry(Entry) {
         Resolved["Token"] := ""
     }
     return Resolved
+}
+
+/**
+ * The model an entry is answered by: its own, else its provider's default.
+ * @param {Map|Object} Entry An API entry record.
+ * @returns {String} The model, "" for an unknown provider.
+ */
+LLM_RemoteEntryModel(Entry) {
+    global LLM_API_PROVIDERS
+    ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
+    if !LLM_API_PROVIDERS.Has(ProviderId)
+        return ""
+    return _LLMRemoteEntryGet(Entry, "Model", LLM_API_PROVIDERS[ProviderId]["DefaultModel"])
 }
 
 ; The key an entry record stores: a resolved record of a token-exchange provider
@@ -1693,6 +1708,7 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     Token    := _LLMRemoteStoredKey(Entry)
     if !_LLMRemote_ConfigScalarIsSafe(BaseUrl) || BaseUrl == ""
             || !RegExMatch(BaseUrl, "i)^https?://[^[:space:]]+$")
+            || LLM_ApiToken_Unusable(Token)
             || !LocalServerAuthEntryTokenAllowed(ProviderId, Token, BaseUrl, LLM_LOCAL_API_SERVERS)
             || !_LLMRemote_ConfigScalarIsSafe(Token) {
         _LLMRemote_CompleteReady(Owner, on_result, false)
@@ -2142,7 +2158,7 @@ _LLMRemoteThinkingRefused() {
 _LLMRemote_LoadThinkingFamilies() {
     global LLM_THINKING_FAMILIES, _SharedDir
     try LLM_THINKING_FAMILIES := LLM_ThinkingOffParseFamilies(
-        FileRead(_SharedDir . "\modules\llm\thinking_off.json", "UTF-8"))
+        FileRead(_SharedDir . "\ai\data\thinking_off.json", "UTF-8"))
     catch as Err {
         LLM_THINKING_FAMILIES := []
         try LoggerError("LLM.remote", "thinking_off.json is unreadable ({1}) — no request turns thinking off.", Err.Message)
@@ -2246,7 +2262,7 @@ _LLMRemoteCapabilitiesDone(ProviderId, Listing, Answer) {
 
 ; Turns the model's reasoning off in a request body: its family's control
 ; (thinking_off.json) through the provider's thinking_dialect
-; (_shared/modules/llm/thinking_off.ahk). A field the body already sets wins.
+; (_shared/ai/data/thinking_off.ahk). A field the body already sets wins.
 ; @param {Map} Resolved _LLMRemoteResolveEntry's record.
 ; @param {String} Body The JSON body.
 ; @param {VarRef} Added Receives the paths added, for _LLMRemoteThinkingRefusal.
@@ -2657,7 +2673,7 @@ _LLMRemote_NormalizeModelExtras(Raw) {
 }
 
 /**
- * Loads provider descriptors + model prices from _shared/modules/llm/api_providers.json.
+ * Loads provider descriptors + model prices from _shared/ai/data/api_providers.json.
  * Fail-fast when the file is missing or malformed — same contract as the HS twin.
  */
 ; Validates the shared Test-API probe section. Soft-degrade like the HS twin:
@@ -2710,7 +2726,7 @@ _LLMRemote_LoadCatalog() {
     global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
     global LLM_LOCAL_API_SERVERS, LLM_LOCAL_SERVER_DISCOVERY, LLM_LOCAL_SERVER_IDENTITIES
     global LLM_REMOTE_DECISIONS_TEST
-    path := _SharedDir . "\modules\llm\api_providers.json"
+    path := _SharedDir . "\ai\data\api_providers.json"
     if !FileExist(path)
         throw Error("api_providers.json not found at " . path)
     try {
@@ -2801,7 +2817,7 @@ _LLMRemote_LoadCatalog() {
     LocalRequestFields := Map()
     LocalDialect := Map()
     try {
-        LocalText := FSReadUtf8Exact(_SharedDir . "\modules\llm\local_servers.json")
+        LocalText := FSReadUtf8Exact(_SharedDir . "\ai\data\local_servers.json")
         LocalRoot := JsonParse(LocalText)
         LocalCatalogue := LocalServerAuthCatalogue(LocalRoot, candidateProviders)
         LocalRequestFields := _LLMRemote_LocalRequestFields(LocalText)
@@ -2901,7 +2917,7 @@ catch as _ApiProvidersLoadError {
 ; =========================================
 ; =========================================
 
-; Bounds of the provider listings, pinned with _shared/lua/llm/api_model_listing.lua
+; Bounds of the provider listings, pinned with _shared/ai/engine/api/model_listing.lua
 ; by _shared/tests/corpus/llm/api_model_listing_vectors.json (max_models,
 ; max_id_length, max_entries): a chosen id is written to the configuration and
 ; sent, and a page open lists at most max_entries entries, one at a time.

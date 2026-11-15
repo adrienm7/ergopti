@@ -38,18 +38,18 @@ global HSE_RepeatEnabled := true
 #Include ..\..\_generated\app_dirs.ahk
 #Include ..\..\infra\app_folders.ahk
 #Include ..\..\infra\legacy_folder_migration.ahk
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\wall_clock.ahk
-#Include ..\..\infra\logger.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
+#Include ..\..\core\logger\engine\wall_clock.ahk
+#Include ..\..\core\logger\engine\logger.ahk
 #Include ..\..\infra\hotpath_profiler.ahk
 #Include ..\..\infra\redact.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\key_state.ahk
-#Include ..\..\infra\toml\toml_helpers.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\platform\input\key_state.ahk
+#Include ..\..\core\text\engine\toml\helpers.ahk
 #Include ..\..\infra\manifest_reader.ahk
 ; The getter consumes the actual configuration-owner binding policy.
-#Include ..\..\infra\toml\toml_config_loader.ahk
+#Include ..\..\core\text\engine\toml\config_loader.ahk
 #Include ..\..\infra\feature_state.ahk
 ; A second ordinary include must not reset the already published data owner.
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
@@ -63,11 +63,11 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\first_boot.ahk
 #Include ..\..\modules\gestures\config.ahk
 ; LoggerInit admits the real shared privacy policy through this native codec.
-#Include ..\..\infra\json.ahk
+#Include ..\..\core\text\engine\json.ahk
 ; Canonical classification also consults the real language/category ownership
 ; registry, even when the authored file contains only script preferences.
-#Include ..\..\infra\toml\toml_loader.ahk
-#Include ..\..\infra\master_gates.ahk
+#Include ..\..\core\text\engine\toml\loader.ahk
+#Include ..\..\core\lifecycle\engine\master_gates.ahk
 #Include ..\..\infra\hotstrings\hotstrings_cache.ahk
 
 try {
@@ -365,12 +365,20 @@ _FeatureStateSmokeInvalidValue(Section, Key, Value) {
 ; case-insensitive enum rule is followed, in the manifest's spelling.
 _FeatureStateSmokeOutdatedSourceKey() {
 	global ScriptInformation
+	; Each refused value is reported once, by its own line (value-validation).
+	Reports := []
+	LoggerSetTestSink((Line) => InStr(Line, "hotstrings.magic_key_source '") ? Reports.Push(Line) : 0)
 	for Value in ["SC03B", "not-a-key", 46, ""] {
 		ReadScriptConfig(Map("hotstrings", Map("magic_key_source", Value)))
 		_FeatureStateSmokeAssert("auto", ScriptInformation["MagicKeySource"], "outdated source key")
 		_FeatureStateSmokeAssert(false, ScriptInformation["MagicKeySourceChosen"], "outdated source key choice")
+		_FeatureStateSmokeAssert(A_Index, Reports.Length, "outdated source key report")
 	}
+	if !InStr(Reports[2], "'not-a-key'")
+		throw Error("the report must name the refused value: " . Reports[2])
 	ReadScriptConfig(Map("hotstrings", Map("magic_key_source", "keyj")))
+	_FeatureStateSmokeAssert(4, Reports.Length, "an accepted source key is not reported")
+	LoggerClearTestSink()
 	; _FeatureStateSmokeAssert compares with the case-insensitive !=.
 	if (ScriptInformation["MagicKeySource"] !== "KeyJ")
 		throw Error("loader-accepted spelling: expected KeyJ, got " . ScriptInformation["MagicKeySource"])

@@ -3,7 +3,7 @@
 --- Parent-only archive output. Children never receive the retained descriptor.
 --- A producer must provide actual stdout EOF and its physical settlement owner.
 --- This module does not authorize pathname reopening, publication or relay policy.
-local Identifiers = require("identifiers")
+local Identifiers = require("core.text.engine.identifiers")
 local Feeder = require("infra.archive_tar_feeder")
 local M = {}
 local retained_leases = {} -- Physical debt outlives dropped factories/callers.
@@ -551,8 +551,8 @@ local function native_ports()
 	assert(ffi.os == "Linux", "archive output requires Linux")
 	ffi.cdef([[int open(const char *path, int flags, ...); int close(int fd);
 		int ftruncate(int fd, long length);]])
-	local Clock = require("infra.monotonic")
-	local Deadline = require("infra.managed_http_deadline")
+	local Clock = require("core.logger.engine.monotonic")
+	local Deadline = require("core.network.engine.managed_http_deadline")
 	local function errno()
 		local code = ffi.errno()
 		-- Canonical names from actual POSIX syscall errno; other errors stay
@@ -586,7 +586,7 @@ local function native_ports()
 			end)
 		end,
 		hash = function(fd, length, current, hash_deadline, callback)
-			return require("infra.fd_sha256").native().start(fd, length, current, hash_deadline, callback)
+			return require("core.network.engine.fd_sha256").native().start(fd, length, current, hash_deadline, callback)
 		end,
 		close = function(fd)
 			if ffi.C.close(fd) ~= 0 then return false, errno() end
@@ -617,7 +617,7 @@ end
 local function native_artifact_backend()
  local loaded, backend = pcall(function()
   local ffi, uv = require("ffi"), require("luv")
-  local Paths, Clock = require("infra.paths"), require("infra.monotonic")
+  local Paths, Clock = require("core.fs.engine.paths"), require("core.logger.engine.monotonic")
   local hrtime = rawget(uv, "hrtime")
   local has_hires, clock_backend = rawget(Clock, "has_hires"), rawget(Clock, "backend")
   if ffi.os ~= "Linux" or type(hrtime) ~= "function" or type(has_hires) ~= "function"
@@ -675,7 +675,7 @@ local function native_artifact(basename, pinned)
  local backend = native_artifact_backend()
  if not backend then return unavailable("native_archive_component_unavailable") end
  local ffi, native, now_ms = backend.ffi, backend.symbols, backend.now_ms
- local Target = require("infra.http_output_target")
+ local Target = require("core.network.engine.http_output_target")
  local create_target, seal_owned = rawget(Target, "create"), rawget(Target, "seal_owned")
  if type(create_target) ~= "function" or type(seal_owned) ~= "function" then return unavailable("owned_archive_sealing_unavailable") end
  local factory, records = {}, {}
@@ -1094,7 +1094,7 @@ local function native_artifact(basename, pinned)
   record.install, installs[work.token] = work, work -- Reserve before any native/source capability probe.
   local prepared, ready = pcall(function()
    if not capture_install then
-    local policy = require("updater.install_budget")
+    local policy = require("updater.engine.install_budget")
     capture_install, admit_install_budget = rawget(policy, "capture"), rawget(policy, "admit")
     install_deadline, retire_install = rawget(policy, "deadline"), rawget(policy, "retire")
     capture_listing = rawget(policy, "capture_listing")

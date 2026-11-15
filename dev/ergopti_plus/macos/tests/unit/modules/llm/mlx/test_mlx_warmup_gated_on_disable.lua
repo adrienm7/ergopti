@@ -98,14 +98,14 @@ end)
 
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.keycodes",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.llm.api_mlx",
@@ -115,7 +115,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -140,9 +140,9 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 
 		local idle_callback = nil
 		local admission_fence = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -151,11 +151,11 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			ESCAPE = 53,
 		}
 		package.loaded["adapters.event_provenance"] = {}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callback = callback
 				return true
@@ -173,7 +173,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function() return { timer = nil }, true end,
 			cancel = function() return true end,
 		}
@@ -219,7 +219,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")
@@ -310,18 +310,18 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		-- Save every module we are about to replace so the suite is left clean
 		local saved = {}
 		for _, name in ipairs({
-			"adapters.http_client", "adapters.timer_scheduler", "modules.llm.api_mlx",
+			"core.network.adapters.http_client", "core.events.timer_scheduler", "modules.llm.api_mlx",
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"ui.tooltip", "modules.keystats", "infra.notifications", "infra.keycodes",
+			"core.ui.ui.tooltip", "modules.keystats", "core.ui.engine.notifications", "platform.input.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
 
 		-- Deferred timer queue: nothing runs until the drain below
 		local timer_queue = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn, cancelled = false }
 				timer_queue[#timer_queue + 1] = handle
@@ -339,7 +339,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 
 		-- Counting HTTP client: always non-200 so warmup always self-reschedules
 		local post_count = 0
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					post = function(_url, _headers, _payload, cb)
@@ -377,7 +377,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		}
 
 		-- Silence the "server ready" notification path
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 
 		-- Load the REAL api_mlx against those adapters
 		package.loaded["modules.llm.api_mlx"] = nil
@@ -412,7 +412,6 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 		package.loaded["modules.llm.streaming_handler"] = {
 			init = function(_) return true end,
 			build_callbacks = function(_) return function() end, function() end, function() end end,
-			arm_watchdog = function(_) return true end, stop_watchdog = function() return true end,
 			reset_failure_count = function() end, cancel_streaming = function() return true end,
 		}
 		package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
@@ -420,8 +419,8 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			MIN_CALL_INTERVAL_SEC = 0.5,
 			get_retry_policy = function() return 2, 0.18, 5 end,
 		}
-		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-		package.loaded["ui.tooltip"] = {
+		package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		package.loaded["core.ui.ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
 			set_chain_start = function(_) return true end, mark_chain_complete = function() return true end,
 			get_current_index = function() return nil end, navigate = function(_) end,

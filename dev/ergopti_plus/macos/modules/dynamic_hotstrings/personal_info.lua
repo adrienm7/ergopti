@@ -14,9 +14,9 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
-local SyntheticInput = require("adapters.synthetic_input")
-local Terminators = require("keymap.terminators")
+local Logger   = require("core.logger.engine.logger")
+local SyntheticInput = require("platform.input.synthetic_input")
+local Terminators = require("layouts.engine.layers.terminators")
 local LOG      = "personal_info"
 
 -- Safely require the UI editor module to prevent crashes
@@ -25,10 +25,11 @@ if not ok_editor then ui_editor = nil end
 
 local ok_kl, keystats = pcall(require, "modules.keystats")
 if not ok_kl then keystats = nil end
-local FileSystem = require("adapters.file_system")
-local BasicString = require("toml_codec.basic_string")
-local TomlCodec = require("toml_codec.codec")
-local UnicodeCase = require("unicode_case")
+local FileSystem = require("core.fs.adapters.file_system")
+local BasicString = require("core.text.engine.toml_codec.basic_string")
+local TomlCodec = require("core.text.engine.toml_codec.codec")
+local UnicodeCase = require("core.text.engine.unicode_case")
+local NamedTags   = require("hotstrings.engine.personal_info.tags")
 
 -- The shared personal-info field classification, used ONLY by the preview
 -- provider below. Optional-require rather than a hard dependency so a driver
@@ -68,8 +69,8 @@ local _refresh_personal_data = nil
 local _active_start_token = nil
 local _starting_token = nil
 local ManifestReader = require("infra.manifest_reader")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 -- The magic key as declared in the shared feature manifest. Named once here so
 -- the three sites below cannot drift apart from each other or from the manifest.
@@ -119,7 +120,7 @@ local function rollback_start(token, reason)
 	return false
 end
 
-local SharedDefaults = require("personal_info.defaults")
+local SharedDefaults = require("hotstrings.engine.personal_info.defaults")
 
 local DEFAULT_CONFIG = {
 	-- Read from the shared manifest rather than restated: a second copy of the
@@ -514,6 +515,13 @@ local function resolve_combo(combo)
 
 	local okay, length = pcall(utf8.len, combo)
 	if not okay or not length then return parts, fields end
+	-- A named tag types its one field, never its letters' aliases (HCD-3).
+	local named = NamedTags.field(combo)
+	if named then
+		local value = _info[named]
+		if type(value) ~= "string" or value == "" then return parts, fields end
+		return { value }, { named }
+	end
 	for _, codepoint in utf8.codes(combo) do
 		local letter = utf8.char(codepoint)
 		if not is_alias(letter) then return {}, {} end
@@ -579,7 +587,7 @@ local function do_expand(combo)
 		if _keymap and type(_keymap.inject_dynamic) == "function" then
 			local injected = _keymap.inject_dynamic(n_back, echoed, function()
 				local c = 0
-				local ok_tu, text_utils = pcall(require, "infra.text_utils")
+				local ok_tu, text_utils = pcall(require, "core.text.engine.utils")
 				for i, value in ipairs(parts) do
 					assert(SyntheticInput.emit_key_strokes(value),
 						"personal-info field could not be dispatched")

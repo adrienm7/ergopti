@@ -28,7 +28,7 @@
 
 local M = {}
 
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 
 local LOG = "menu_llm.mlx_repair_offer"
@@ -46,12 +46,12 @@ local _network_contract = nil
 
 -- Stateful singletons are resolved at call time: tests and reloads replace them.
 local function checker() return require("modules.llm.mlx_deps_checker") end
-local function i18n() return require("infra.i18n") end
+local function i18n() return require("core.i18n.engine.i18n") end
 local function router() return require("ui.menu.menu_llm.runtime_install_offer") end
 local function menu_llm() return require("ui.menu.menu_llm") end
-local function dialogs() return require("infra.dialog_util") end
-local function notifications() return require("infra.notifications") end
-local function deferred() return require("infra.deferred_work") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
+local function notifications() return require("core.ui.engine.notifications") end
+local function deferred() return require("core.timing.engine.deferred_work") end
 
 -- fn() -> boolean: selects the Ollama backend, as its menu row does
 local _alternative = nil
@@ -81,10 +81,10 @@ local _last_repair_failure = nil
 --- Loads shared policy data without a per-driver action or cause fallback.
 local function network_contract()
 	if _network_contract then return _network_contract end
-	local path = require("infra.paths").shared("modules/network/managed_network.json")
+	local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
 	assert(type(path) == "string", "the shared managed network policy path is unavailable")
-	local text = assert(require("adapters.file_system").read(path), "the shared managed network policy is unreadable")
-	_network_contract = require("network.failure").new(require("json").decode(text))
+	local text = assert(require("core.fs.adapters.file_system").read(path), "the shared managed network policy is unreadable")
+	_network_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(text))
 	return _network_contract
 end
 
@@ -105,8 +105,8 @@ end
 
 --- Capabilities describe actual native openers and the current failed intent.
 local function network_capabilities(cause)
-	local shell = require("adapters.shell_runner")
-	local fs = require("adapters.file_system")
+	local shell = require("core.process.adapters.shell_runner")
+	local fs = require("core.fs.adapters.file_system")
 	local function regular_file(path)
 		if type(path) ~= "string" or path:sub(1, 1) ~= "/" then return false end
 		local status, attributes = fs.path_status(path)
@@ -137,7 +137,7 @@ end
 --- @return boolean started
 local function reveal(path)
 	local ok, started = pcall(function()
-		local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { "-R", path }, nil)
+		local handle = require("core.process.adapters.shell_runner").spawn(OPEN_BIN, { "-R", path }, nil)
 		return handle ~= nil and handle.start() == true
 	end)
 	if not ok or started ~= true then
@@ -266,7 +266,7 @@ local function present(cause)
 		elseif action == "proxy_settings" then
 			local opened, started = pcall(function()
 				if not failure_is_current(cause) then return false end
-				local handle = require("adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
+				local handle = require("core.process.adapters.shell_runner").spawn(M.OPEN_BIN, { M.NETWORK_SETTINGS_URL }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then
@@ -276,7 +276,7 @@ local function present(cause)
 			local _, log_path = network_capabilities(cause)
 			if not log_path or not failure_is_current(cause) then return false end
 			local opened, started = pcall(function()
-				local handle = require("adapters.shell_runner").spawn(OPEN_BIN, { log_path }, nil)
+				local handle = require("core.process.adapters.shell_runner").spawn(OPEN_BIN, { log_path }, nil)
 				return handle ~= nil and handle.start() == true
 			end)
 			if not opened or started ~= true then Logger.error(LOG, "The failure log could not be opened.") end

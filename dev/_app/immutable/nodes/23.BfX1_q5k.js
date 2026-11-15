@@ -1,0 +1,1 @@
+import{n as e}from"../chunks/XKyaHtl9.js";import"../chunks/BiIdZTvV.js";import"../chunks/9dAfDHy3.js";import{t}from"../chunks/D_q3LbPw.js";var n=e({trailingSlash:()=>r}),r=`always`;function i(e){t(e,{from:`/informations`})}export{i as component,n as universal};

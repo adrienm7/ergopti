@@ -30,8 +30,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local EvdevCodes = require("infra.evdev_codes")
+local Logger = require("core.logger.engine.shim")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "modules.shortcuts.wrap_on_type"
 

@@ -36,7 +36,7 @@ local function install_collaborators(effects)
 		set_buffer = function() end,
 		log_hotstring = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -58,7 +58,7 @@ local function install_collaborators(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() return true end,
 	}
 end
@@ -71,7 +71,7 @@ end
 local function fresh_runtime(effects, magic_key)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
-			name:match("^modules%.keymap") or name:match("^adapters%.")
+			helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
@@ -133,35 +133,47 @@ helpers.describe("case-folded star-tail preview", function()
 			"the preview replacement must equal the real engine output")
 	end)
 
-	helpers.it("preserves an alphabetic magic suffix while casing only the trigger body", function()
+	helpers.it("(hse-004-magic-key-case) a letter magic key follows the word's case, as on Windows", function()
 		local effects = {}
-		local state, Registry, Bridge, Expander, hs_stub = fresh_runtime(effects, "a")
+		local state, Registry, Bridge, Expander = fresh_runtime(effects, "a")
 		Registry.add("btw" .. STAR, "expanded", { auto_expand = true })
 		Registry.sort_mappings()
 
-		local mapping
-		for _, candidate in ipairs(Registry.mappings_for_tail("a")) do
-			if candidate.trigger == "BTWa" then mapping = candidate; break end
+		local upper, mixed
+		for _, candidate in ipairs(Registry.mappings_for_tail("A")) do
+			if candidate.trigger == "BTWA" then upper = candidate end
 		end
-		helpers.assert_not_nil(mapping,
-			"uppercase registration must keep the configured lowercase magic action")
-		helpers.assert_true(mapping.has_magic,
-			"the reachable variant must retain canonical-magic provenance")
+		for _, candidate in ipairs(Registry.mappings_for_tail("a")) do
+			if candidate.trigger == "BTWa" then mixed = candidate end
+		end
+		helpers.assert_not_nil(upper, "the UPPER variant carries the uppercased magic key")
+		helpers.assert_nil(mixed, "BTWa is no trigger: Windows conforms against BTWA")
+		helpers.assert_true(upper.has_magic, "the variant keeps its canonical-magic provenance")
 
-		state.buffer = "BTWa"
-		local engine_output = Expander.would_fire(mapping, state.buffer)
-		helpers.assert_eq(engine_output, "EXPANDED")
-		local resolution = Expander.resolve_magic_action("BTW")
-		helpers.assert_not_nil(resolution,
-			"the prospective resolver must reach the same body-cased mapping")
+		state.buffer = "BTWA"
+		helpers.assert_eq(Expander.would_fire(upper, state.buffer), "EXPANDED")
+		local resolution = Expander.resolve_magic_action("BTW", nil, "A")
+		helpers.assert_not_nil(resolution, "the Shift+magic press reaches the uppercase mapping")
+		helpers.assert_eq(resolution.winner.mapping, upper)
+		helpers.assert_nil(Expander.resolve_magic_action("BTW", nil, "a"), "a lowercase magic press after BTW fires nothing")
+		helpers.assert_eq(Expander.cased_magic("a"), "A")
+		helpers.assert_nil(Expander.cased_magic(STAR), "a magic key with no case has no cased form")
+		local _ = Bridge
+	end)
+
+	-- The literal-tail path took `buffer .. magic` when no star mapping shared
+	-- the tail, so the uppercase press missed OLDA there and only there.
+	helpers.it("(hse-004-literal-tail-case) a literal tail mapping sees the magic key as typed", function()
+		local effects = {}
+		local _, Registry, _, Expander = fresh_runtime(effects, "a")
+		Registry.add("olda", "promised", { auto_expand = true })
+		Registry.sort_mappings()
+		local mapping = (Registry.mappings_for_literal_magic_tail("d") or {})[1]
+		helpers.assert_not_nil(mapping, "olda ends on the literal magic key")
+		local resolution = Expander.resolve_magic_action("OLD", nil, "A")
+		helpers.assert_not_nil(resolution, "Shift+magic after OLD reaches the literal mapping")
 		helpers.assert_eq(resolution.winner.mapping, mapping)
-
-		effects.rows = nil
-		Bridge.update_preview("BTW")
-		hs_stub.timer.__fire_all()
-		helpers.assert_true(type(effects.rows) == "table" and #effects.rows > 0,
-			"the preview must find the same body-cased mapping before the magic press")
-		helpers.assert_eq(effects.rows[1].text, engine_output)
-		helpers.assert_eq(effects.rows[1].trigger_label, "a")
+		-- The ordinary path reads OLDA, typed: the uppercase word's expansion.
+		helpers.assert_eq(resolution.winner.eff_repl, "PROMISED")
 	end)
 end)

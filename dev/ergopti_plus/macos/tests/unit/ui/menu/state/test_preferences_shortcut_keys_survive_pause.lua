@@ -30,12 +30,12 @@ local DISABLED_ID = "cmd_star"
 --- @return ... Callback results.
 local function with_preferences(callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.logger",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger",
 	}, function()
 		local disk = {}
 		local control = { refuse_write = false }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if disk[path] == nil then return nil, "absent" end
 				return disk[path], "ok"
@@ -154,8 +154,8 @@ end)
 helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)", function()
 	helpers.it("keeps the saved leaf across other changes and failed publication", function()
 		helpers.with_fresh_modules({
-			"ui.menu.menu_state", "ui.menu.keymap_lifecycle", "adapters.storage",
-			"infra.deferred_work", "modules.keystats.text_cipher",
+			"ui.menu.menu_state", "ui.menu.keymap_lifecycle", "core.fs.adapters.storage",
+			"core.timing.engine.deferred_work", "modules.keystats.text_cipher",
 			"ui.menu.session_demotions", "ui.menu.preferences_transaction",
 		}, function()
 			with_preferences(function(preferences, disk, control)
@@ -170,7 +170,7 @@ helpers.describe("preferences: refused shortcut replay (shortcut-replay-refusal)
 					helpers.assert_type(denied_handle, "table", "the refusal must target a live shortcut")
 					local real_delete = denied_handle.delete
 					denied_handle.delete = function() return false end
-					package.loaded["infra.deferred_work"] = { after = function() return true end }
+					package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 					local subject = helpers.load_with_stubs("ui.menu.menu_state")
 					local facade = {
 						pause_bindings = bindings.pause, resume_bindings = bindings.resume_after_pause,

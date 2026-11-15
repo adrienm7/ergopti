@@ -23,14 +23,14 @@ return function(run)
 			if key == "HOME" then return state.home end
 			return original_getenv(key)
 		end
-		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner",
-			"adapters.file_system", "infra.logger", "infra.i18n", "infra.text_utils", "infra.deferred_work" }, function()
-			package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner",
+			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.text.engine.utils", "core.timing.engine.deferred_work" }, function()
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
 				if state.defer_synchronous then callback() end
 				return state.defer_started
 			end }
-			package.loaded["adapters.shell_runner"] = { spawn = function(bin, args, callback)
+			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(bin, args, callback)
 				state.pending[#state.pending + 1] = { bin = bin, args = args, callback = callback }
 				return { start = function()
 					if state.on_start then state.on_start(callback) end
@@ -43,7 +43,7 @@ return function(run)
 				if path == "/System/Applications" then return state.bundled_status, state.bundled_detail end
 				return state.status, state.detail
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				path_status = classify,
 				directory_status = function(path)
 					local status, detail = classify(path)
@@ -58,9 +58,9 @@ return function(run)
 					if state.on_log then state.on_log(level, message) end
 				end
 			end
-			package.loaded["infra.logger"] = logger
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.text_utils"] = { escape_gsub_replacement = function(value) return value end }
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.text.engine.utils"] = { escape_gsub_replacement = function(value) return value end }
 			_G.hs = {
 				timer = { absoluteTime = function() return state.now * 1000000000 end },
 				application = { frontmostApplication = function() return nil end,

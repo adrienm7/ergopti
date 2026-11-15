@@ -3,7 +3,7 @@
 --- Exercises real focus tracker, clipboard owner and deferred synthetic broker.
 local helpers = require("tests.helpers")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function tick(f, delay)
 	for index, timer in ipairs(f.timers) do
@@ -25,7 +25,7 @@ local function emitted(f)
 end
 
 local function with_focus(callback)
-	helpers.with_stub_scope({ "modules.keymap.utils", "adapters.secure_field_detector",
+	helpers.with_stub_scope({ "modules.keymap.utils", "platform.focus.secure_field_detector",
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace" }, function()
 		with_sender(function(f)
@@ -44,7 +44,7 @@ local function with_focus(callback)
 			hs.application = { watcher = { activated = 1, deactivated = 2,
 				new = function(receive) return watcher("app", receive) end } }
 			hs.window = { focusedWindow = function() focus.reads = focus.reads + 1; return window end }
-			package.loaded["adapters.secure_field_detector"] = {
+			package.loaded["platform.focus.secure_field_detector"] = {
 				isSecureApp = function() return false end,
 				inspectFocusedElementWithReceipt = function()
 					focus.reads = focus.reads + 1
@@ -58,8 +58,8 @@ local function with_focus(callback)
 			local utils = require("modules.keymap.utils")
 			utils.start_ignored_win_tracking({}, {})
 			helpers.assert_true(utils.prewarm_ignored_win_watchers({}, {}))
-			package.loaded["infra.paths"] = { shared = function() return nil end }
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			local text = require("modules.shortcuts.actions.text")
 			local ok, err = xpcall(function() callback(f, focus, text) end, debug.traceback)
 			pcall(utils.stop)

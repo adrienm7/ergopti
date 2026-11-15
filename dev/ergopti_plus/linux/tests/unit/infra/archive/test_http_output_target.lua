@@ -10,7 +10,7 @@
 --- controls/test_http_output_target.lua
 --- Independent sink-controls against actual output lease and target modules.
 local Output = require("infra.archive_output")
-local Target = require("infra.http_output_target")
+local Target = require("core.network.engine.http_output_target")
 local helpers = require("tests.helpers")
 local function check(name, fn)
 	helpers.describe("Native Parent Output Target Controls", function()

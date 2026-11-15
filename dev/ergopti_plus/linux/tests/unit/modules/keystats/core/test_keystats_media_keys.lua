@@ -78,7 +78,7 @@ helpers.describe("Linux media key metrics (linux-media-key-metrics)", function()
 			keystats.flush()
 			helpers.assert_eq(#calls.media, 1, "one media batch")
 			local batch = calls.media[1]
-			helpers.assert_eq(batch.threshold_ms, require("infra.timings").ms("keystats", "hold_threshold_ms"))
+			helpers.assert_eq(batch.threshold_ms, require("core.timing.engine.timings").ms("keystats", "hold_threshold_ms"))
 			local press, release = batch.events[1], batch.events[2]
 			helpers.assert_eq({ press.action, press.media_id, press.capture, press.device, press.app },
 				{ "physical_media_press", "media.play_pause", "linux_evdev", DEVICE, "org.gnome.Rhythmbox" })
@@ -89,8 +89,8 @@ helpers.describe("Linux media key metrics (linux-media-key-metrics)", function()
 			helpers.assert_nil(press.keycode)
 			helpers.assert_nil(press.scancode)
 			-- The shared store admits exactly what keystats buffered.
-			local store = require("keystats.media_store")
-			for index, event in ipairs(batch.events) do store.raw_sql("linux-test", index, event, require("json").encode) end
+			local store = require("metrics.engine.media.store")
+			for index, event in ipairs(batch.events) do store.raw_sql("linux-test", index, event, require("core.text.engine.json").encode) end
 			for _, entries in ipairs(calls.scancodes) do
 				helpers.assert_nil(entries[KEY_PLAYPAUSE], "a media key never reaches the numeric heatmap")
 			end

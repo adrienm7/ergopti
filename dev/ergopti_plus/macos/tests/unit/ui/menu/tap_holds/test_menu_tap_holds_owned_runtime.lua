@@ -161,7 +161,7 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		end
 		local expected = {
 			{ "unavailable", "runtime_not_installed", "menu.tapholds.owned_not_installed" },
-			{ "unavailable", "runtime_job_not_loaded", "menu.tapholds.owned_not_installed" },
+			{ "unavailable", "runtime_job_not_loaded", "menu.tapholds.owned_service_stopped" },
 			{ "unavailable", "virtual_hid_absent", "menu.tapholds.owned_not_installed" },
 			{ "unavailable", "other_karabiner_running", "menu.tapholds.owned_other_running" },
 			{ "unavailable", "close_other_unsupported", "menu.tapholds.owned_close_failed" },
@@ -242,7 +242,7 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 			for index, row in ipairs(rows) do if row.title == title then return row, index end end
 			return nil
 		end
-		for _, reason in ipairs({ "runtime_not_installed", "runtime_job_not_loaded", "virtual_hid_absent" }) do
+		for _, reason in ipairs({ "runtime_not_installed", "virtual_hid_absent" }) do
 			local blocked = rows_for({ state = "unavailable", reason = reason }, true)
 			local row, at = find(blocked, INSTALL)
 			helpers.assert_true(row ~= nil, reason .. ": the install offer must follow the explanation")
@@ -253,11 +253,48 @@ helpers.describe("Tap-Holds: Ergopti's own Karabiner runtime", function()
 		helpers.assert_eq(#opened, 0, "drawing the row must not open the confirmation")
 		find(rows_for({ state = "unavailable", reason = "runtime_not_installed" }, true), INSTALL).fn()
 		helpers.assert_eq(#opened, 1, "the row opens the confirmation")
+		-- An already published runtime is refused by the first install by design (MRT-004).
 		for _, status in ipairs({ { state = "ready" }, { state = "unavailable", reason = "virtual_hid_incompatible" },
-			{ state = "unavailable", reason = "other_karabiner_running" } }) do
+			{ state = "unavailable", reason = "other_karabiner_running" }, { state = "unavailable", reason = "runtime_job_not_loaded" } }) do
 			helpers.assert_nil(find(rows_for(status, true), INSTALL), tostring(status.reason))
 		end
 		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "runtime_not_installed" }, false), INSTALL),
+			"no offer without the facade that performs it")
+		package.loaded["ui.owned_runtime_install"] = nil
+	end)
+
+	helpers.it("offers « Réparer le service » under a stopped service of an installed runtime and only there (MRT-004)", function()
+		-- The advertised retry ran the first install, which always refuses an already published runtime.
+		local REPAIR = "menu.tapholds.owned_repair"
+		local opened = {}
+		package.loaded["ui.owned_runtime_install"] = {
+			open = function() error("the repair row must never open the first install") end,
+			open_repair = function(remap) opened[#opened + 1] = remap; return true end,
+		}
+		local function rows_for(status, with_facade)
+			local extra = { owned_runtime_status = function() return status end,
+				install_owned_runtime = function() return true end }
+			if with_facade then extra.repair_owned_runtime = function() return true end end
+			return tap_hold_rows(true, extra)
+		end
+		local function find(rows, title)
+			for index, row in ipairs(rows) do if row.title == title then return row, index end end
+			return nil
+		end
+		local stopped = rows_for({ state = "unavailable", reason = "runtime_job_not_loaded" }, true)
+		local row, at = find(stopped, REPAIR)
+		helpers.assert_true(row ~= nil, "the repair offer must follow the explanation")
+		local _, explanation_at = find(stopped, "menu.tapholds.owned_service_stopped")
+		helpers.assert_eq(at, explanation_at + 1)
+		helpers.assert_nil(find(stopped, "menu.tapholds.owned_install"), "no first install for a published runtime")
+		helpers.assert_eq(#opened, 0, "drawing the row must not open the confirmation")
+		row.fn()
+		helpers.assert_eq(#opened, 1, "the row opens the repair confirmation")
+		for _, status in ipairs({ { state = "ready" }, { state = "unavailable", reason = "runtime_not_installed" },
+			{ state = "unavailable", reason = "virtual_hid_absent" }, { state = "unavailable", reason = "virtual_hid_incompatible" } }) do
+			helpers.assert_nil(find(rows_for(status, true), REPAIR), tostring(status.reason))
+		end
+		helpers.assert_nil(find(rows_for({ state = "unavailable", reason = "runtime_job_not_loaded" }, false), REPAIR),
 			"no offer without the facade that performs it")
 		package.loaded["ui.owned_runtime_install"] = nil
 	end)

@@ -4,7 +4,7 @@
 --- MODULE: API Token Exchange Corpus (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/api_token_exchange_vectors.json through
---- _shared/lua/llm/api_token_exchange.lua: the auth blocks a provider may
+--- _shared/ai/engine/api/token_exchange.lua: the auth blocks a provider may
 --- declare, the exchange form of a stored key (IBM API key, Google
 --- authorized_user credentials, a Google service-account key's signed
 --- assertion), the answer read and the refresh decision.
@@ -17,11 +17,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 
-local Exchange = require("llm.api_token_exchange")
+local Exchange = require("ai.engine.api.token_exchange")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -127,7 +127,7 @@ helpers.describe("api_token_exchange replays the shared corpus", function()
 	end
 
 	helpers.it("the catalogue's Vertex AI block is the corpus's Google block", function()
-		local providers = read_json("modules/llm/api_providers.json").providers
+		local providers = read_json("ai/data/api_providers.json").providers
 		local catalogue = assert(Exchange.parse(providers.vertex.auth))
 		helpers.assert_true(helpers.deep_equal(catalogue, assert(Exchange.parse(block(corpus, "google")))))
 	end)
@@ -185,4 +185,18 @@ helpers.describe("api_token_exchange replays the shared corpus", function()
 			helpers.assert_eq(refresh, v.refresh)
 		end)
 	end
+
+	-- AID-2: a refusal carries the service's message, bounded so an error page
+	-- never fills a log line, and cut between characters.
+	helpers.it("answer: a long service message is cut on a character boundary", function()
+		local auth = assert(Exchange.parse(block(corpus, "ibm")))
+		local message = string.rep("\u{E9}", Exchange.MAX_SERVICE_MESSAGE_BYTES)
+		local _, reason = Exchange.read(auth, 400, { errorMessage = message }, 1000)
+		local prefix = "the token exchange answered HTTP 400: "
+		helpers.assert_eq(reason:sub(1, #prefix), prefix)
+		local kept = reason:sub(#prefix + 1)
+		helpers.assert_eq(#kept, Exchange.MAX_SERVICE_MESSAGE_BYTES, "two-byte characters fill the bound exactly")
+		local _, odd = Exchange.read(auth, 400, { errorMessage = "a" .. message }, 1000)
+		helpers.assert_eq(#odd - #prefix, Exchange.MAX_SERVICE_MESSAGE_BYTES - 1, "a split character is left out")
+	end)
 end)

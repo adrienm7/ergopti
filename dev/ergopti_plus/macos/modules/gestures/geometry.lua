@@ -18,15 +18,16 @@
 ---    live here and the engine reads them back through this module, so the
 ---    direction classifier and the commit-time threshold check can never drift.
 --- 3. One classifier on every driver — computeDir and slotForDir delegate to
----    _shared/lua/gestures/direction.lua, which the Linux evdev decoder uses too:
+---    _shared/gestures/engine/direction.lua, which the Linux evdev decoder uses too:
 ---    25/65 degree sectors, a Manhattan-total diagonal gate (adx + ady), and the
 ---    dominant axis below the diagonal minimum. This module keeps the macOS
 ---    units and the two-finger tuning only.
 --- ==============================================================================
 
 local M = {}
-local Direction = require("gestures.direction")
-local Incremental = require("gestures.incremental")
+local Direction = require("gestures.engine.direction")
+local Incremental = require("gestures.engine.incremental")
+local ContactJoin = require("gestures.engine.contact_join")
 
 
 
@@ -38,15 +39,20 @@ local Incremental = require("gestures.incremental")
 -- =========================================
 -- =========================================
 
--- Minimum centroid displacement (Manhattan distance) thresholds. These are
--- driver-specific spatial tuning values (not shared cross-driver timings), kept
--- here as the single source of truth so the engine reads them back from this
--- module rather than re-declaring them.
-M.SWIPE_MIN   = 1.5    -- 3/4/5 fingers: minimum distance to validate a swipe
-M.SWIPE_MIN_2 = 3.0    -- 2 fingers horiz/vert (left to macOS, diagonal only)
-M.DIAG_MIN_2  = 5.0    -- 2 fingers: minimum total distance to validate a diagonal
+-- Minimum centroid displacement (Manhattan distance) thresholds, from the
+-- shared timings registry the Linux tracker reads too ([gestures] *_minimum_mm,
+-- GSD-3); the engine reads them back from this module rather than re-declaring them.
+local Timings = require("core.timing.engine.timings")
+local MINIMUMS = {
+	swipe_minimum_mm = Timings.count("gestures", "swipe_minimum_mm"),
+	pair_swipe_minimum_mm = Timings.count("gestures", "pair_swipe_minimum_mm"),
+	pair_diagonal_minimum_mm = Timings.count("gestures", "pair_diagonal_minimum_mm"),
+}
+M.SWIPE_MIN, M.SWIPE_DIAG_MIN = Direction.minimums_mm(3, MINIMUMS) -- 3/4/5 fingers: minimum distance to validate a swipe
+-- 2 fingers: horiz/vert (left to macOS, diagonal only), and the total distance of a diagonal
+M.SWIPE_MIN_2, M.DIAG_MIN_2 = Direction.minimums_mm(2, MINIMUMS)
 
--- Incremental mode: the shared step rule (_shared/lua/gestures/incremental.lua),
+-- Incremental mode: the shared step rule (_shared/gestures/engine/incremental.lua),
 -- the same one the Linux gesture manager counts with.
 M.INCREMENTAL_FIRST_STEP = Incremental.FIRST_STEP
 M.MAX_INCREMENTAL_ACTIONS_PER_FRAME = Incremental.MAX_ACTIONS_PER_FRAME
@@ -123,6 +129,25 @@ function M.contactsAcross(touches, axis)
 	return contacts
 end
 
+--- Tells why the contacts of one frame cannot be three fingers of one hand:
+--- a far or oversized third contact, a resting thumb beside a pair (shared
+--- rule, _shared/gestures/engine/contact_join.lua; the trackpad reports
+--- millimetres). Any other count is not judged.
+--- @param touches table Trackpad touch arrays.
+--- @return string|nil reason "far" or "oversized", nil when admitted.
+--- @return string|nil detail The measured value, for the log.
+function M.joinRefusal(touches)
+	local contacts = {}
+	for _, t in ipairs(type(touches) == "table" and touches or {}) do
+		local p = type(t) == "table" and type(t.absoluteVector) == "table"
+			and t.absoluteVector.position or nil
+		if type(p) ~= "table" then return nil end
+		contacts[#contacts + 1] = { x = tonumber(p.x) or 0, y = tonumber(p.y) or 0,
+			major = tonumber(t.majorAxis) }
+	end
+	return ContactJoin.refusal(contacts)
+end
+
 --- Describes each contact of one frame for the log: its position and its
 --- major axis, the two values a far or oversized contact (a resting thumb
 --- joining a pair) can be told apart by. Ordered left to right.
@@ -195,8 +220,22 @@ end
 --- @return string|nil Direction string.
 function M.computeDir(dx, dy, mf)
 	local min = (mf == 2) and M.SWIPE_MIN_2 or M.SWIPE_MIN
-	local diag_min = (mf == 2) and M.DIAG_MIN_2 or (min * Direction.DIAGONAL_MINIMUM_FACTOR)
+	local diag_min = (mf == 2) and M.DIAG_MIN_2 or M.SWIPE_DIAG_MIN
 	return Direction.axis(dx, dy, min, diag_min)
+end
+
+--- The direction a moving swipe locks on. A swipe of three fingers or more in
+--- the diagonal sector waits for the diagonal minimum (Direction.decided_axis)
+--- instead of locking the dominant straight axis computeDir names there, which
+--- dropped a slow diagonal at its end as « not the locked direction ». A pair
+--- keeps computeDir: its lock is what makes it a scroll at once.
+--- @param dx number X delta.
+--- @param dy number Y delta.
+--- @param mf number Amount of fingers.
+--- @return string|nil Direction string, nil while undecided.
+function M.lockDir(dx, dy, mf)
+	if mf == 2 then return M.computeDir(dx, dy, mf) end
+	return Direction.decided_axis(dx, dy, M.SWIPE_MIN, M.SWIPE_DIAG_MIN)
 end
 
 return M

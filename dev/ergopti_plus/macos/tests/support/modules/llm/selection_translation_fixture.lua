@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 -- The shared logger is a process singleton; Scope preserves its exact identity.
-require("logger")
+require("core.logger.engine")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Translate = require("llm.translate")
+local Translate = require("ai.engine.prediction.translate")
 
 local ENTRY_ID = "translate-cerebras"
 local MODEL = "qwen-3.8-27b"
@@ -34,8 +34,8 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-local CONFIG = read_json("modules/llm/translate.json")
-local NAMES = read_json("data/locale_names.json")
+local CONFIG = read_json("ai/data/translate.json")
+local NAMES = read_json("core/i18n/data/locale_names.json")
 
 --- Returns one named closure upvalue, or nil when the closure does not own it.
 --- @param fn function Closure to inspect.
@@ -139,15 +139,14 @@ local function build_world(selection, ui_locale, options)
 	}
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
 	local _gestures = helpers.load_with_stubs("modules.gestures")
 	world.actions = require("modules.gestures.actions")
 	world.actions.init({ action_params = {} })
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local hs_stub = _G.hs
 	world.clock_ns = 0
@@ -201,8 +200,8 @@ local function build_world(selection, ui_locale, options)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.synthetic_input"] = make_synthetic(world)
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.input.synthetic_input"] = make_synthetic(world)
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return world.focus end,
 		getFocused = function()
 			return { appId = "TranslateApp", windowTitle = "Draft", bundleId = "test.translate", executablePath = "" }
@@ -218,7 +217,7 @@ local function build_world(selection, ui_locale, options)
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -254,7 +253,7 @@ local function build_world(selection, ui_locale, options)
 
 	-- The i18n stub of load_with_stubs, fresh for every world: its locale is
 	-- the interface language "ui" follows
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get_locale = function() return ui_locale or "fr" end
 	world.i18n = i18n
 

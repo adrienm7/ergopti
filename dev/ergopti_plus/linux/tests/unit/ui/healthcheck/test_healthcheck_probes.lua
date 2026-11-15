@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 -- Two samples of the /proc files the processor probe reads, 1500 ticks apart:
 -- 700 of them idle, 75 spent by the daemon, whose command name holds a space
@@ -37,13 +37,13 @@ local PROC_AFTER = {
 --- @param body function(Probes, world)
 --- @param absent table|nil Programs the probe of has_command answers absent for.
 local function with_probes(async, body, absent)
-	local names = { "ui.healthcheck.probes", "adapters.http_client", "adapters.shell_runner",
-		"adapters.timer_scheduler" }
+	local names = { "ui.healthcheck.probes", "core.network.adapters.http_client", "core.process.adapters.shell_runner",
+		"core.events.timer_scheduler" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local world = { requests = {}, children = {}, cancelled_owners = {}, cancelled_children = 0, timers = {},
 		cancelled_timers = 0, proc = PROC_BEFORE }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		HAS_ASYNC = async,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn, armed = true }
@@ -55,14 +55,14 @@ local function with_probes(async, body, absent)
 			world.cancelled_timers = world.cancelled_timers + 1
 		end,
 	}
-	local reader = require("infra.regular_file_reader")
+	local reader = require("core.fs.engine.regular_file_reader")
 	local real_read = reader.read_source
 	reader.read_source = function(path)
 		local content = world.proc and world.proc[path]
 		if content ~= nil then return content end
 		return real_read(path)
 	end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		HAS_ASYNC = async,
 		get = function(url, headers, options, callback)
 			world.requests[#world.requests + 1] = { url = url, headers = headers, options = options, callback = callback }
@@ -70,7 +70,7 @@ local function with_probes(async, body, absent)
 		end,
 		cancel = function(owner) world.cancelled_owners[#world.cancelled_owners + 1] = owner; return true end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		HAS_ASYNC = async,
 		has_command = function(binary)
 			world.probed = world.probed or {}
@@ -136,7 +136,7 @@ end
 helpers.describe("diagnostics probes (linux)", function()
 	helpers.it("(healthcheck-timer-refusal) reports failed starts and retains cancellation owners", function()
 		with_probes(true, function(Probes, world)
-			package.loaded["adapters.timer_scheduler"].after = function()
+			package.loaded["core.events.timer_scheduler"].after = function()
 				local handle = { armed = false, fired = true, timer = {} }
 				world.timers[#world.timers + 1] = handle
 				return handle
@@ -151,7 +151,7 @@ helpers.describe("diagnostics probes (linux)", function()
 
 	helpers.it("(healthcheck-http-refusal) preserves an inline completion despite a false dispatch receipt", function()
 		with_probes(true, function(Probes)
-			package.loaded["adapters.http_client"].get = function(_, _, _, done)
+			package.loaded["core.network.adapters.http_client"].get = function(_, _, _, done)
 				done({ status = 200, body = "{}" }); return false
 			end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
@@ -165,7 +165,7 @@ helpers.describe("diagnostics probes (linux)", function()
 
 	helpers.it("(healthcheck-http-refusal) completes probes when HTTP admission refuses without callback", function()
 		with_probes(true, function(Probes, world)
-			package.loaded["adapters.http_client"].get = function() return false end
+			package.loaded["core.network.adapters.http_client"].get = function() return false end
 			local run, answers = start(Probes, { llm = { is_enabled = function() return true end,
 				get_backend = function() return "ollama" end,
 				get_base_url = function() return "http://127.0.0.1:11434" end } })
@@ -292,7 +292,7 @@ helpers.describe("diagnostics probes (linux)", function()
 			local schema = helpers.load_module("ui.healthcheck.bridge").config().schema
 			local declared = 0
 			for id, probe in pairs(schema.probes) do
-				if require("healthcheck.snapshot").applies(probe, "linux") then
+				if require("diagnostics.engine.healthcheck.snapshot").applies(probe, "linux") then
 					declared = declared + 1
 					helpers.assert_true(answers[id] ~= nil, "the " .. id .. " probe never answered")
 				end
@@ -429,9 +429,9 @@ helpers.describe("healthcheck native source admission", function()
 	end
 
 	helpers.it("(healthcheck-source-fifo) reads regular sources and rejects special files without blocking", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"))
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_healthcheck_sources.py"

@@ -23,13 +23,13 @@ helpers.describe("native per-key delay acknowledgement", function()
 		{ name = "truthy", value = "accepted" }, { name = "throw", throws = true } }) do
 		helpers.it("refuses " .. receipt.name .. " and retries the retained native owner (tap-hold-key-delay)", function()
 			local section, Manager = build({}, {})
-			local TextPrompt = require("ui.text_prompt")
+			local TextPrompt = require("core.ui.ui.text_prompt")
 			local original_ask, original_execute = TextPrompt.ask, os.execute
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local calls, notices = {}, 0
 			local current = receipt
 			local ok, err = pcall(function()
-				TextPrompt.ask = function() return "375.5" end
+				TextPrompt.ask = function() return "376" end
 				os.execute = function(command)
 					if command:find("dialog_host.lua' --error", 1, true) then notices = notices + 1; return 1 end
 					return original_execute(command)
@@ -54,18 +54,21 @@ helpers.describe("native per-key delay acknowledgement", function()
 			if not ok then error(err, 0) end
 		end)
 	end
-	helpers.it("(tap-hold-invalid-markup) escapes invalid text before showing the error", function()
+	helpers.it("(tap-hold-invalid-markup) refuses invalid text with the accepted range, never its markup", function()
 		local calls = {}
 		local section, Manager = build(calls, {})
-		local TextPrompt = require("ui.text_prompt")
+		local TextPrompt = require("core.ui.ui.text_prompt")
 		local original_ask, original_execute = TextPrompt.ask, os.execute
 		local command
 		local ok, err = pcall(function()
 			TextPrompt.ask = function() return "<invalid & value>" end
 			os.execute = function(value) command = value; return 0 end
-			local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
+			local key = assert(find(key_rows(section), require("core.i18n.engine.i18n").get("key_name.left_shift")))
 			helpers.assert_eq(key.menu[6].fn(), false)
-			helpers.assert_contains(command, "&lt;invalid &amp; value&gt;")
+			-- The refusal names the accepted range (1 to 10000 ms) and never echoes
+			-- the typed markup into the dialog.
+			helpers.assert_contains(command, "10000")
+			helpers.assert_true(not command:find("<invalid", 1, true), "typed markup never reaches the dialog")
 			helpers.assert_eq(#calls, 0)
 		end)
 		TextPrompt.ask, os.execute = original_ask, original_execute
@@ -73,11 +76,11 @@ helpers.describe("native per-key delay acknowledgement", function()
 		if not ok then error(err, 0) end
 	end)
 
-	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan" }) do
+	for _, value in ipairs({ "0.49", "0", "-1", "1e309", "nan", "375.5", "10001", "0x10" }) do
 		helpers.it("refuses invalid " .. value .. " before the native threshold writer (tap-hold-key-delay)", function()
 			local calls = {}
 			local section, Manager = build(calls, {})
-			local TextPrompt = require("ui.text_prompt")
+			local TextPrompt = require("core.ui.ui.text_prompt")
 			local original_ask, original_execute = TextPrompt.ask, os.execute
 			local ok, err = pcall(function()
 				TextPrompt.ask = function() return value end
@@ -85,7 +88,7 @@ helpers.describe("native per-key delay acknowledgement", function()
 					if command:find("dialog_host.lua' --error", 1, true) then return 1 end
 					return original_execute(command)
 				end
-				local key = assert(find(key_rows(section), require("infra.i18n").get("key_name.left_shift")))
+				local key = assert(find(key_rows(section), require("core.i18n.engine.i18n").get("key_name.left_shift")))
 				helpers.assert_eq(key.menu[6].fn(), false)
 				helpers.assert_eq(#calls, 0, "invalid input reaches no mutation owner")
 			end)
@@ -120,9 +123,9 @@ helpers.describe("inert existing-provider status data", function()
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
-			local tr = require("infra.i18n").get
+			local tr = require("core.i18n.engine.i18n").get
 			-- The local servers heading is a section header, framed by the shared format.
-			local section = require("menu.labels").decorate_section
+			local section = require("menu.engine.labels").decorate_section
 			helpers.assert_eq(rows[2].label, Mutate and tr("menu.llm.local_servers.rescan") or section(tr("menu.llm.local_servers.header")))
 			helpers.assert_eq(rows[3].label, Mutate and section(tr("menu.llm.local_servers.header")) or tr("menu.llm.unavailable"))
 			for index = 2, 3 do

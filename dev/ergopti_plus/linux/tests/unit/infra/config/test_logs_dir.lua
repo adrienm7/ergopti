@@ -29,7 +29,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 --- Runs `body` with controlled environment variables and bootstrap storage.
 --- @param env table Variables returned by os.getenv (others fall through).
@@ -37,15 +37,15 @@ local FOLDER = require("app_dirs").linux.folder_name
 --- @param body function Receives (ConfigPaths, LoggerSink, storage values).
 local function with_paths(env, stored, body)
 	local real_getenv = os.getenv
-	local saved_storage = package.loaded["adapters.storage"]
+	local saved_storage = package.loaded["core.fs.adapters.storage"]
 	local saved_paths = package.loaded["infra.config_paths"]
-	local saved_sink = package.loaded["infra.logger_sink"]
+	local saved_sink = package.loaded["core.logger.engine.sink"]
 	local values = stored
 	os.getenv = function(name)
 		if env[name] ~= nil then return env[name] or nil end
 		return real_getenv(name)
 	end
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, fallback)
 			if values[key] == nil then return fallback end
 			return values[key]
@@ -54,14 +54,14 @@ local function with_paths(env, stored, body)
 		delete = function(key) values[key] = nil; return true end,
 	}
 	package.loaded["infra.config_paths"] = nil
-	package.loaded["infra.logger_sink"] = nil
+	package.loaded["core.logger.engine.sink"] = nil
 	local ok, err = pcall(function()
-		body(require("infra.config_paths"), require("infra.logger_sink"), values)
+		body(require("infra.config_paths"), require("core.logger.engine.sink"), values)
 	end)
 	os.getenv = real_getenv
-	package.loaded["adapters.storage"] = saved_storage
+	package.loaded["core.fs.adapters.storage"] = saved_storage
 	package.loaded["infra.config_paths"] = saved_paths
-	package.loaded["infra.logger_sink"] = saved_sink
+	package.loaded["core.logger.engine.sink"] = saved_sink
 	if not ok then error(err, 0) end
 end
 

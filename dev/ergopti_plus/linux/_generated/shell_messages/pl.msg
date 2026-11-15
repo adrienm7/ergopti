@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/pl.msg
-# AUTO-GENERATED from _shared/data/locales/pl.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/pl.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Moduł sieciowy LuaJIT zbudowany ze źródeł.
 build_luv.recipe_required=Natywna kompilacja luv wymaga przepisu źródłowego.
 install.already_installed={1} — już zainstalowane
 install.archive_digest_unavailable=aktualizacje z zachowanym deskryptorem wymagają rzeczywistego środowiska OpenSSL3; ta możliwość pozostaje niedostępna.
+install.bytecode_skipped=Nie udało się utworzyć prekompilowanych modułów — Ergopti uruchamia się z kodu źródłowego, nieco wolniej.
 install.capability_verified={1} — możliwość potwierdzona
 install.command_still_missing=Zainstalowano {1}, ale nadal nie znaleziono '{2}'.
 install.daemon_manual=Aby uruchomić usługę ręcznie:
 install.daemon_running=Usługa działa w tle. Aby sprawdzić jej stan:
+install.focus_integration_enabled=integracja fokusu {1} włączona
+install.focus_integration_failed=Nie udało się włączyć integracji fokusu {1} — reguły dla poszczególnych aplikacji pozostają nieaktywne na tym pulpicie.
+install.focus_integration_next_login=integracja fokusu {1} zainstalowana (aktywna od następnego logowania)
+install.focus_integration_updated=integracja fokusu {1} zaktualizowana
 install.gnome_extension_active=rozszerzenie GNOME AppIndicator — już aktywne
 install.gnome_extension_enabled=rozszerzenie GNOME AppIndicator włączone
 install.gnome_extension_failed=Nie można włączyć rozszerzenia AppIndicator — bez niego GNOME nie pokazuje ikony.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — sprawdzanie zależności
 install.section_deps_skipped=Pominięto zależności (--no-deps)
 install.section_done=Instalacja zakończona
 install.section_files=Instalowanie plików
+install.section_focus=Aktywna aplikacja w Wayland (GNOME, KDE)
 install.section_lua_deps=Opcjonalne zależności Lua (pętla zdarzeń, liczniki czasu, webview, sygnały)
 install.section_permissions=Uprawnienia wejścia (wymaga sudo)
 install.section_services=Tworzenie usług użytkownika systemd
@@ -79,6 +85,7 @@ install.xdg_autostart=autostart XDG: {1}
 launch.already_running=Ergopti+ już działa w tej sesji ({1} jest zajęty); to uruchomienie zostało odrzucone.
 launch.authorization_failed=Autoryzacja dostępu do wejścia została anulowana lub nie powiodła się.
 launch.groups_unavailable=Sesja nie mogła uzyskać skonfigurowanych grup wejścia.
+launch.restarting=Ergopti+ działa już w tej sesji; zostanie poproszony o zamknięcie, a następnie uruchomiony ponownie.
 launch.session_lock_invalid=Katalog blokady sesji musi być ścieżką bezwzględną.
 launcher.dependencies_installed=Zależności zainstalowane.
 launcher.driver_missing=Błąd: nie znaleziono katalogu sterownika Linux: {1}

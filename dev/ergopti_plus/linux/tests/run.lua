@@ -23,9 +23,9 @@ local tests_dir = assert(self_path:match("^(.*)[/\\]run%.lua$"), "the unit runne
 local driver_root = assert(loadfile(tests_dir .. "/runner_root.lua"))()
 
 -- The _shared/ Lua libraries live one level above the linux driver root
--- (i.e. in static/ergopti_plus/_shared/lua/).
+-- (i.e. in static/ergopti_plus/_shared/).
 local drivers_root = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua   = drivers_root .. "/_shared/lua"
+local shared_lua   = drivers_root .. "/_shared"
 
 -- Build the package search path: driver root first, then shared libs, then tests/.
 package.path = table.concat({
@@ -57,8 +57,8 @@ end
 
 -- Never let a suite touch the developer's own config.toml, logs or caches: a
 -- real HOME is replaced by a scratch directory for this process (see
--- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
-require("test.runner_home").isolate()
+-- _shared/tests/lua/core/runner_home.lua). Done before any module resolves a path.
+require("tests.lua.core.runner_home").isolate()
 -- Nor the developer's keyring: the API key store gets an in-memory secret
 -- service on every load (tests/support/secret_service_fake.lua).
 require("tests.support.secret_service_fake").isolate()
@@ -68,12 +68,12 @@ require("tests.support.menu_part_reload").install()
 
 -- Install the pure-Lua UTF-8 compatibility shim BEFORE any test module is
 -- loaded. LuaJIT 2.x does not bundle Lua 5.3's built-in utf8 library, and
--- several shared modules (keystats/utils.lua, toml_codec, terminators) use
+-- several shared modules (metrics/engine/utils.lua, toml_codec, terminators) use
 -- utf8.len / utf8.offset / utf8.codes as globals. Without this early install,
--- require("keystats.utils") crashes with "attempt to index global 'utf8' (a
+-- require("metrics.engine.utils") crashes with "attempt to index global 'utf8' (a
 -- nil value)" and every dependent test (pop_utf8, compat.utf8, device_finder)
 -- fails before the daemon_smoke test even reaches its compat.utf8 check.
-local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
+local ok_utf8, compat_utf8 = pcall(require, "core.lifecycle.engine.compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
@@ -81,8 +81,8 @@ local helpers = require("tests.helpers")
 -- up when it opens a file. Load the timings registry while the genuine backend
 -- is installed: fixtures swap package.loaded.luv for a double while requiring
 -- the HTTP engine, and a first registry read inside that window read nothing.
-require("infra.timings")
-local shell_quote = require("text_utils").shell_quote
+require("core.timing.engine.timings")
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")
 local TEST_MANIFEST = require("tests.test_manifest")
@@ -145,7 +145,7 @@ local TEST_DIRS = {
 --- @return string|nil Discovery error.
 local function discover_tests(dir)
 	local results = {}
-	local Directory = require("infra.native_directory")
+	local Directory = require("core.fs.engine.native_directory")
 	local ok, failure = pcall(Directory.walk, driver_root .. "/" .. dir, nil, function(path, kind)
 		if kind ~= "file" or not path:match("/test_[^/]+%.lua$") then return end
 		local relative = path:sub(#driver_root + 2):gsub("%.lua$", "")
@@ -234,6 +234,14 @@ if not execution_ok then
 	os.exit(1)
 end
 
+-- No test reached a real notify-send: the sentinel shadows it on PATH
+-- (tests/support/notify_send_guard.lua, pinned by its meta test). A notice that
+-- reaches the sentinel means a fixture bypassed the notifier seams
+-- (tests/support/notice_recorder.lua): the run fails and names each case.
+local notices_escaped = require("tests.support.notify_send_guard").report(function(line)
+	io.stderr:write("tests/run.lua: " .. line)
+end)
+
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
 		local replay = "luajit tests/run.lua"
@@ -244,6 +252,7 @@ if r.failed > 0 then
 	end
 	os.exit(1)
 end
+if notices_escaped then os.exit(1) end
 if helpers.timing_failed() then
 	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)

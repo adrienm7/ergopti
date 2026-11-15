@@ -12,10 +12,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local KeyPath = require("toml_codec.key_path")
-local Scanner = require("toml_codec.record_scanner")
-local Metadata = require("hotstrings.personal_metadata")
-local PersonalFiles = require("hotstrings.personal_files")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Scanner = require("core.text.engine.toml_codec.record_scanner")
+local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 
 --- The shipped row-by-row check, kept as the semantic oracle.
 local function reference(content, rows)
@@ -60,7 +60,7 @@ local function personal_config(groups, sections, spell)
 	return table.concat(lines, "\n"), rows
 end
 
-helpers.describe("hotstrings.personal_metadata: exact personal rows preflight cost", function()
+helpers.describe("hotstrings.engine.catalogue.personal_metadata: exact personal rows preflight cost", function()
 	helpers.it("accepts exact spellings and refuses header and key case aliases like the old loop", function()
 		local exact, rows = personal_config(3, 4)
 		helpers.assert_eq(Metadata.exact_rows_available(exact, rows), true)

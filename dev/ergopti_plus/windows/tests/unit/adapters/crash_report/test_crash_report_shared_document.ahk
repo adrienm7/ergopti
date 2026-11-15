@@ -4,7 +4,7 @@
 ; MODULE: Crash Report Shared Document Tests
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/diagnostics/crash_report_vectors.json, the vectors
-; of _shared/lua/crash_report.lua, against the Windows reporter. Windows used to
+; of _shared/diagnostics/engine/reports/crash_report.lua, against the Windows reporter. Windows used to
 ; write its own field names, a local timestamp and a GUID in the file name, and
 ; kept every report forever, so a reader had to branch on the driver and the crash
 ; folder grew without bound.

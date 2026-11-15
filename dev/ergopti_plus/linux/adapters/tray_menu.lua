@@ -40,10 +40,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Indicator = require("platform.tray.appindicator")
 local Protocol = require("tray.protocol")
-local Perf = require("infra.perf_counters")
+local Perf = require("core.logger.engine.perf_counters")
 
 local LOG = "adapters.tray_menu"
 
@@ -97,7 +97,7 @@ local _paused = false
 --- @param paused boolean|nil True for the greyed logo.
 --- @return string
 local function resolve_icon(paused)
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths and type(Paths.shared_root) == "function" then
 		local ok, icon = pcall(Protocol.resolve_tray_icon, Paths.shared_root(), paused)
 		if ok and type(icon) == "string" and icon ~= "" then return icon end
@@ -237,6 +237,15 @@ end
 function M.pump()
 	if not _started then return end
 	Indicator.pump()
+end
+
+--- The tray's half of the daemon's idle wait while an icon is live, or nil: a
+--- panel's request then wakes the wait at once instead of waiting out its
+--- timeout (each dbusmenu call cost up to 8 ms before, 26 ms per submenu).
+--- @return table|nil { begin, finish } for keyboard_hook.idle_wait.
+function M.wait_companion()
+	if not _started then return nil end
+	return Indicator.wait_companion()
 end
 
 --- The backend in use, or nil when there is none.

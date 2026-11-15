@@ -11,8 +11,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Timings = require("infra.timings")
-local LocalModelPolicy = require("llm.local_model_policy")
+local Timings = require("core.timing.engine.timings")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local INITIAL_SEC = Timings.ms("llm", "warmup_initial_delay_ms") / 1000
 local BASE_SEC = Timings.ms("llm", "warmup_retry_base_ms") / 1000
@@ -87,9 +87,9 @@ helpers.describe("Ollama model warmup chain", function()
 	end)
 	helpers.it("linux-warmup-refusal-debt: retains a real rejected native deadline until its close callback", function()
 		local native = require("luv")
-		local Deadline = require("infra.managed_http_deadline")
-		local Monotonic = require("infra.monotonic")
-		local NumberPolicy = require("number_policy")
+		local Deadline = require("core.network.engine.managed_http_deadline")
+		local Monotonic = require("core.logger.engine.monotonic")
+		local NumberPolicy = require("core.text.engine.number_policy")
 		local ok, err = xpcall(function()
 			run(function(Warmup, world)
 				world.native_request = function()
@@ -273,7 +273,7 @@ end)
 
 helpers.describe("Ollama model warmup request", function()
 	helpers.it("linux-model-warmup: asks Ollama to load the model with no message and its keep-alive", function()
-		local names = { "adapters.http_client", "modules.llm.api_ollama", "modules.llm.prediction_engine" }
+		local names = { "core.network.adapters.http_client", "modules.llm.api_ollama", "modules.llm.prediction_engine" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ok, err = xpcall(function()
@@ -282,7 +282,7 @@ helpers.describe("Ollama model warmup request", function()
 				capture_runtime_response = function() return {} end,
 				runtime_response_current = function() return current end,
 			}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				post_stream_owned = function(url, headers, body, options, _, on_done)
 					sent[#sent + 1] = { url = url, headers = headers, body = body, options = options, on_done = on_done }
 					return { started = true }
@@ -294,7 +294,7 @@ helpers.describe("Ollama model warmup request", function()
 			helpers.assert_true(Api.warmup("http://127.0.0.1:11434", "qwen:2b", {},
 				function(...) outcomes[#outcomes + 1] = { ... } end).started)
 			helpers.assert_eq(sent[1].url, "http://127.0.0.1:11434/api/chat")
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local payload = Json.decode(sent[1].body)
 			helpers.assert_eq(payload.model, "qwen:2b")
 			helpers.assert_eq(payload.stream, false)

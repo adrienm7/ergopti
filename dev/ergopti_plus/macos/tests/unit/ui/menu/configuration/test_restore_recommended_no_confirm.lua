@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 	.. 'action_parameters = { tap_4__open_url = "https://apple.com" }\n[future]\nkeep = 42\n'
@@ -25,7 +25,7 @@ local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_4 = "open_url"\n'
 --- double records each question and answers No.
 --- @return table fixture owner, gestures, files, state, asked, writes().
 local function gesture_fixture()
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	helpers.load_with_stubs("modules.gestures.actions")
@@ -48,7 +48,7 @@ local function gesture_fixture()
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local modules = { gestures = gestures }
@@ -77,13 +77,13 @@ end
 local function gesture_commands(fixture)
 	local original_renderer = package.loaded["infra.manifest_menu"]
 	local original_menu = package.loaded["ui.menu.menu_gestures"]
-	local original_dialog = package.loaded["infra.dialog_util"]
+	local original_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local commands
 	package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(_, _, _, _, context)
 		commands = context.commands
 		return {}
 	end)
-	package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
 		fixture.asked[#fixture.asked + 1] = message
 		return no
 	end }
@@ -97,11 +97,11 @@ local function gesture_commands(fixture)
 	package.loaded["infra.manifest_menu"] = original_renderer
 	package.loaded["ui.menu.menu_gestures"] = original_menu
 	if not ok then
-		package.loaded["infra.dialog_util"] = original_dialog
+		package.loaded["core.ui.engine.dialog_util"] = original_dialog
 		error(detail, 0)
 	end
 	-- The dialog double stays for the click; the caller's run restores it.
-	fixture.restore_dialog = function() package.loaded["infra.dialog_util"] = original_dialog end
+	fixture.restore_dialog = function() package.loaded["core.ui.engine.dialog_util"] = original_dialog end
 	return commands
 end
 
@@ -137,7 +137,7 @@ helpers.describe("restore-recommended-no-confirm: Gestures (macOS)", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 --- A remap facade double recording each scope request; its terminal is true.
@@ -162,14 +162,14 @@ end
 --- @return table asked Dialog messages shown.
 --- @return number refreshes Menu refreshes.
 local function run_tap_hold_row(id)
-	local names = { "infra.dialog_util", "infra.config_paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
+	local names = { "core.ui.engine.dialog_util", "infra.config_paths", "infra.manifest_menu", "ui.menu.menu_tap_holds" }
 	return helpers.with_fresh_modules(names, function()
 		local asked, requests, refreshes, commands = {}, {}, 0, nil
-		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, no)
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, no)
 			asked[#asked + 1] = message
 			return no
 		end }
-		package.loaded["infra.config_paths"] = { get = function() return "/remap/config_karabiner.toml" end }
+		package.loaded["infra.config_paths"] = { get = function() return "/remap/tap_hold.toml" end }
 		package.loaded["infra.manifest_menu"] = require("tests.support.declared_menu_parent_fixture").stub(function(menu_key, _, _, _, context)
 			if menu_key == "tap_holds_menu" then commands = context.commands end
 			return {}
@@ -189,7 +189,7 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(#requests, 1)
 		helpers.assert_eq(requests[1].scope, "tap_holds")
 		helpers.assert_eq(requests[1].mode, "recommended")
-		helpers.assert_true(requests[1].backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+		helpers.assert_true(requests[1].backup_path:find("^/remap/tap_hold%.toml%.tap_holds%-") ~= nil,
 			"the remap file is backed up first: " .. tostring(requests[1].backup_path))
 		helpers.assert_eq(refreshes, 1, "the menu refreshes once the terminal commits")
 	end)
@@ -201,7 +201,7 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(#requests, 1)
 		helpers.assert_eq(requests[1].scope, "tap_holds")
 		helpers.assert_eq(requests[1].mode, "clear")
-		helpers.assert_true(requests[1].backup_path:find("^/remap/config_karabiner%.toml%.tap_holds%-") ~= nil,
+		helpers.assert_true(requests[1].backup_path:find("^/remap/tap_hold%.toml%.tap_holds%-") ~= nil,
 			"the remap file is backed up first: " .. tostring(requests[1].backup_path))
 		helpers.assert_eq(refreshes, 1)
 	end)
@@ -262,11 +262,11 @@ helpers.describe("restore-recommended-no-confirm: the menu's scope wiring (macOS
 		local owners = { "ui.menu.gesture_scope", "ui.menu.shortcuts_scope", "ui.menu.llm_scope",
 			"ui.menu.metrics_scope", "ui.menu.hotstrings_scope", "ui.menu.scoped_preferences",
 			"ui.menu.global_scope" }
-		local names = { "infra.dialog_util", "modules.hotstrings.hotstrings_config" }
+		local names = { "core.ui.engine.dialog_util", "modules.hotstrings.hotstrings_config" }
 		for _, name in ipairs(owners) do names[#names + 1] = name end
 		helpers.with_fresh_modules(names, function()
 			local asked, captured, applied = {}, {}, {}
-			package.loaded["infra.dialog_util"] = { block_alert = function(title, message, no, yes)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(title, message, no, yes)
 				asked[#asked + 1] = { title, message, no, yes }
 				return no
 			end }

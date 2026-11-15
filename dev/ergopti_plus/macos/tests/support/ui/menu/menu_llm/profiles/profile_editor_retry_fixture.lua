@@ -12,7 +12,7 @@ local receipts = {}
 
 local OWNED_MODULES = {}
 for _, name in ipairs(Base.MODULES) do OWNED_MODULES[#OWNED_MODULES + 1] = name end
-for _, name in ipairs({ "ui.ui_builder", "infra.paths", "adapters.webview_result" }) do
+for _, name in ipairs({ "core.ui.ui.builder", "core.fs.engine.paths", "core.ui.adapters.webview_result" }) do
 	OWNED_MODULES[#OWNED_MODULES + 1] = name
 end
 
@@ -25,10 +25,10 @@ local function with_fixture(options, callback)
 	for _, name in ipairs(OWNED_MODULES) do previous_modules[name] = package.loaded[name] end
 	local receipt = { native_cleanup_attempted = false }
 	local base_ok, base_err = xpcall(function() Base.with_fixture(options, function(fixture)
-		helpers.with_stub_scope({ "ui.ui_builder", "infra.paths", "adapters.webview_result" }, function()
+		helpers.with_stub_scope({ "core.ui.ui.builder", "core.fs.engine.paths", "core.ui.adapters.webview_result" }, function()
 			local native = _G.hs
 			local saved_json, saved_webview = native.json, native.webview
-			local json = require("json")
+			local json = require("core.text.engine.json")
 			local state = { views = {}, bridges = {}, deletes = 0, save_callbacks = {} }
 			local editor_port = package.loaded["ui.prompt_editor"]
 			local saved_open, saved_idle = editor_port.open, editor_port.scope_idle
@@ -41,8 +41,8 @@ local function with_fixture(options, callback)
 					state.bridges[#state.bridges + 1] = bridge
 					return bridge
 				end } }
-				package.loaded["infra.paths"] = { shared = function() return "/fixture/prompt_editor" end }
-				package.loaded["ui.ui_builder"] = {
+				package.loaded["core.fs.engine.paths"] = { shared = function() return "/fixture/prompt_editor" end }
+				package.loaded["core.ui.ui.builder"] = {
 					get_app_geometry = function() return { width = 640, height = 480 } end,
 					get_centered_frame = function() return {} end,
 					force_focus = function() return true end,

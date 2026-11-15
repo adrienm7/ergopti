@@ -88,12 +88,19 @@ _REQUIRE_STATE_ALLOWLIST := Map(
 	; _ProxyOverrideDeclaration is a lazy cache of a shipped file and _ProxyOverrideStored
 	; is written with the published value; a reader before boot sees "automatic", the
 	; declared empty value, by design. There is no injected state for a guard to wait on.
-	"adapters/proxy_override.ahk", true
+	"core/network/adapters/proxy_override.ahk", true,
+	; _LayEdWin_StudioCache — a lazy cache of the last Ergopti Studio keystats
+	; projection, keyed by the keystats folder stamp. It starts empty at its
+	; declaration and the editor window fills it after a complete worker read;
+	; an empty cache only means the next read starts a worker.
+	"ui/layout_manager/editor_window.ahk", true
 )
 
 ; Captured 2026-07-21 after excluding UPPER_SNAKE constants from the state
 ; predicate. See the module header: this is a drift baseline, not a defect count.
-_REQUIRE_STATE_BASELINE := 27
+; Lowered to 25 on 2026-11-12 once a duplicate-start rejection counted as a
+; guard (infra/field_run.ahk already rejected one).
+_REQUIRE_STATE_BASELINE := 25
 
 _MetaListAhkFilesGuardV2(Dir) {
 	Files := []
@@ -122,6 +129,16 @@ _MetaListAhkFilesGuardV2(Dir) {
 }
 
 ; Runs inside its test: scanning the tree at registration taxed every runner boot.
+; Whether a stateful file guards its state: a lazy check on a private global
+; (if !_X), or an owner start that rejects a duplicate initialization
+; (if IsObject(_X) followed by a throw), as AGENTS.md asks of a stateful module.
+; @param Body {String} The file's source.
+; @returns {Boolean}
+_MetaRequireStateHasGuard(Body) {
+	return (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
+		or (Body ~= "im)^\s*if\s*\(?\s*IsObject\(_\w+\)\s*\)?[ \t]*\r?\n\s*throw\b")
+}
+
 _MetaGuardRatchet() {
 	global _REQUIRE_STATE_ALLOWLIST, _REQUIRE_STATE_BASELINE
 	SplitPath(A_ScriptDir, , &_DriverRootRaw)
@@ -131,7 +148,7 @@ _MetaGuardRatchet() {
 
 	; All four trees that hold production code. modules/ alone was the original
 	; blind spot: the stateful code largely lives elsewhere now.
-	for SubDir in ["modules", "infra", "platform", "adapters", "ui"] {
+	for SubDir in ["modules", "infra", "platform", "adapters", "ui", "core"] {
 		for AbsPath in _MetaListAhkFilesGuardV2(StrReplace(DriverRoot . SubDir, "/", "\")) {
 			try {
 				Body := FileRead(StrReplace(AbsPath, "/", "\"))
@@ -156,8 +173,7 @@ _MetaGuardRatchet() {
 			ScannedCount++
 
 			; A_IsSuspended is deliberately NOT accepted as a guard.
-			HasGuard := (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
-			if (!HasGuard)
+			if (!_MetaRequireStateHasGuard(Body))
 				Violations.Push(Rel)
 		}
 	}
@@ -176,3 +192,12 @@ _MetaGuardRatchet() {
 		"files with unguarded module-level state rose to " . Violations.Length . " (baseline " . _REQUIRE_STATE_BASELINE . "). This is a DRIFT signal, not a proven defect: check whether the new entry holds genuinely injected state (guard it) or is another lazy cache or flag (then it belongs in the allowlist WITH a reason). Do not raise the baseline. Offenders: " . Offenders)
 }
 Test("meta require_state: module-level state without an init guard does not increase", _MetaGuardRatchet)
+
+; A duplicate-start rejection is a guard; an IsObject check that only branches is not.
+_MetaRequireStateGuardShapes() {
+	AssertTrue(_MetaRequireStateHasGuard('Start() {`n`tif IsObject(_Owner)`n`t`tthrow Error("started")`n}'))
+	AssertTrue(_MetaRequireStateHasGuard("Get() {`n`tif (!_Cache)`n`t`t_Cache := Map()`n}"))
+	AssertFalse(_MetaRequireStateHasGuard('Stop() {`n`tif IsObject(_Owner)`n`t`t_Owner := ""`n}'))
+	AssertFalse(_MetaRequireStateHasGuard("Read() {`n`treturn _Owner`n}"))
+}
+Test("meta require_state: a duplicate-start rejection counts as an init guard", _MetaRequireStateGuardShapes)

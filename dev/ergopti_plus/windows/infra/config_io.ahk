@@ -12,7 +12,7 @@
 ; ==============================================================================
 
 #Include config_write_lease.ahk
-#Include toml/toml_refusals.ahk
+#Include ../core/text/engine/toml/refusals.ahk
 #Include config_unused_keys.ahk
 #Include %A_LineFile%\..\slot_roles.ahk
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
@@ -2324,6 +2324,170 @@ global SCRIPT_SHORTCUT_SUSPEND_ALLOWED := Map(
 		"open_personal_shortcuts", true,
 )
 
+; The script chords live when the pause began (the maintainer's decision of
+; 2026-11-14): a chord changed while paused is saved at once and takes effect
+; only on resume, so the chord that resumes stays the one active at pause time.
+; Every Windows chord change reloads, and a reload while paused is born
+; suspended with the new configuration, so the chords of pause time travel in a
+; file beside the suspend marker. Map("assignments", Map, "on", Boolean) while
+; paused, 0 otherwise.
+global ScriptShortcutPausedChords := 0
+; Set by the boot's marker restore: the pause it replays takes its chords from
+; the file the reload wrote, not from the configuration just loaded.
+global _ScriptShortcutPausedChordsFromReload := false
+
+; The chords a press is judged by: those of pause time while paused, the
+; configured ones otherwise.
+; @param Suspended {Boolean} The pause state to judge by.
+; @return {Map} "assignments" (slot -> action) and "on" (the switch).
+ScriptShortcutLiveChords(Suspended := A_IsSuspended) {
+		global ScriptShortcutPausedChords, ScriptShortcutAssignments, ScriptShortcutChordsOn
+		if Suspended && (ScriptShortcutPausedChords is Map)
+				return ScriptShortcutPausedChords
+		return Map("assignments", ScriptShortcutAssignments, "on", ScriptShortcutChordsOn ? true : false)
+}
+
+; Serializes chords as "chords_enabled=<0|1>" then one "<slot>=<action>" line
+; per slot, in slot order.
+; @param Chords {Map} As ScriptShortcutLiveChords returns.
+; @return {String}
+ScriptShortcutPausedChordsText(Chords) {
+		global SCRIPT_SHORTCUT_SLOTS
+		Text := "chords_enabled=" . (Chords["on"] ? "1" : "0") . "`n"
+		for Slot in SCRIPT_SHORTCUT_SLOTS
+				Text .= Slot . "=" . Chords["assignments"][Slot] . "`n"
+		return Text
+}
+
+; Reads the file ScriptShortcutPausedChordsText wrote. Every slot and the
+; switch must be present, each action a catalogue one or "none".
+; @param Text {String}
+; @return {Map} As ScriptShortcutLiveChords returns.
+; @throws {ValueError} On any other content.
+ScriptShortcutPausedChordsParse(Text) {
+		global SCRIPT_SHORTCUT_SLOTS, GESTURE_ACTIONS
+		if !(Text is String)
+				throw ValueError("The paused script chords are not text.")
+		Values := Map()
+		for Line in StrSplit(Text, "`n") {
+				if (Line == "")
+						continue
+				Eq := InStr(Line, "=")
+				if (Eq < 2)
+						throw ValueError("Malformed paused script chord line.", -1, Line)
+				Values[SubStr(Line, 1, Eq - 1)] := SubStr(Line, Eq + 1)
+		}
+		if !Values.Has("chords_enabled") || !(Values["chords_enabled"] == "0" || Values["chords_enabled"] == "1")
+				throw ValueError("The paused script chords lack their switch.")
+		Assignments := Map()
+		for Slot in SCRIPT_SHORTCUT_SLOTS {
+				if !Values.Has(Slot)
+						throw ValueError("The paused script chords lack a slot.", -1, Slot)
+				Action := Values[Slot]
+				if !(Action == "none" || GESTURE_ACTIONS.Has(Action))
+						throw ValueError("The paused script chords hold an unknown action.", -1, Action)
+				Assignments[Slot] := Action
+		}
+		if (Values.Count != SCRIPT_SHORTCUT_SLOTS.Length + 1)
+				throw ValueError("The paused script chords hold an unknown key.")
+		return Map("assignments", Assignments, "on", Values["chords_enabled"] == "1")
+}
+
+; The file that carries the chords of pause time across a reload, beside the
+; suspend marker (its only reader and writer are the functions below).
+; @return {String} Empty before the paths locator is known.
+ScriptShortcutPausedChordsPath() {
+		global _PathsFile
+		if !IsSet(_PathsFile) || (_PathsFile == "")
+				return ""
+		return SuspendHandoffMarkerPath(_PathsFile, "suspend_restore.chords")
+}
+
+; Takes the chords of pause time as the driver pauses. A pause a reload
+; carried reads them from the file that reload wrote; any other pause takes
+; the configured ones and removes a stale file. A file that cannot be read is
+; an error, told in the log, and the configured chords answer instead.
+; @param Path {String} The chords file.
+; @param ExistsFn, ReadFn, DeleteFn {Func} File system ports.
+ScriptShortcutPausedChordsBegin(Path, ExistsFn, ReadFn, DeleteFn) {
+		global ScriptShortcutPausedChords, _ScriptShortcutPausedChordsFromReload
+		FromReload := _ScriptShortcutPausedChordsFromReload
+		_ScriptShortcutPausedChordsFromReload := false
+		ScriptShortcutPausedChords := ScriptShortcutLiveChords(false)
+		if (Path == "")
+				return
+		try {
+				if !ExistsFn.Call(Path)
+						return
+				if FromReload {
+						ScriptShortcutPausedChords := ScriptShortcutPausedChordsParse(ReadFn.Call(Path))
+						LoggerInfo("Shortcuts", "Script chords of pause time restored after a reload while paused.")
+						return
+				}
+				if !DeleteFn.Call(Path)
+						LoggerError("Shortcuts", "A stale paused script chords file could not be removed: {1}.", Path)
+		} catch as Err {
+				LoggerError("Shortcuts", "The script chords of pause time could not be restored ({1}); the configured chords answer.", Err.Message)
+		}
+}
+
+; Ends the chords of pause time on resume: the configured chords answer again.
+; @param Path {String} The chords file.
+; @param ExistsFn, DeleteFn {Func} File system ports.
+ScriptShortcutPausedChordsEnd(Path, ExistsFn, DeleteFn) {
+		global ScriptShortcutPausedChords
+		ScriptShortcutPausedChords := 0
+		if (Path == "")
+				return
+		try {
+				if ExistsFn.Call(Path) && !DeleteFn.Call(Path)
+						LoggerError("Shortcuts", "The paused script chords file could not be removed on resume: {1}.", Path)
+		} catch as Err {
+				LoggerError("Shortcuts", "The paused script chords file could not be removed on resume: {1}.", Err.Message)
+		}
+}
+
+; Writes the chords of pause time before a reload while paused, so the
+; successor's restored pause answers with them.
+; @param Path {String} The chords file.
+; @param WriteFn, ReadFn {Func} File system ports.
+; @return {Boolean} False when nothing was written or the read-back differs.
+ScriptShortcutPausedChordsPersist(Path, WriteFn, ReadFn) {
+		global ScriptShortcutPausedChords
+		if (Path == "") || !(ScriptShortcutPausedChords is Map) {
+				LoggerError("Shortcuts", "A reload while paused has no chords of pause time to carry.")
+				return false
+		}
+		Text := ScriptShortcutPausedChordsText(ScriptShortcutPausedChords)
+		try {
+				if !WriteFn.Call(Path, Text) || ReadFn.Call(Path) != Text {
+						LoggerError("Shortcuts", "The script chords of pause time could not be written: {1}.", Path)
+						return false
+				}
+		} catch as Err {
+				LoggerError("Shortcuts", "The script chords of pause time could not be written: {1}.", Err.Message)
+				return false
+		}
+		return true
+}
+
+; The suspend reactors' entry: takes the chords of pause time as the driver
+; pauses, drops them on resume, on the real chords file.
+; @param Entering {Boolean} True as the driver pauses, false as it resumes.
+ScriptShortcutPausedChordsOnSuspend(Entering) {
+		Path := ScriptShortcutPausedChordsPath()
+		if Entering
+				ScriptShortcutPausedChordsBegin(Path, FSStrictExists, FSRead, FSDeleteStrict)
+		else
+				ScriptShortcutPausedChordsEnd(Path, FSStrictExists, FSDeleteStrict)
+}
+
+; The reload's entry: writes the chords of pause time to the real chords file.
+; @return {Boolean} False when they could not be written.
+ScriptShortcutPausedChordsCarry() {
+		return ScriptShortcutPausedChordsPersist(ScriptShortcutPausedChordsPath(), FSWriteDurable, FSRead)
+}
+
 ; Whether the chords of a script slot belong to the driver right now: the slot
 ; runs a catalogue action and, while the driver is paused, only a script-management
 ; one. Every chord hotkey asks this in its #HotIf (ScriptAltGrChordPlan), so an
@@ -2342,10 +2506,12 @@ ScriptShortcutSlotRunsAction(Slot, Suspended := A_IsSuspended) {
 		; here: the resident driver keeps its pause, reload and quit.
 		if Suspended && IsSet(_DriverSmokeInputQuarantined) && _DriverSmokeInputQuarantined
 				return false
+		; While paused, the chords of pause time answer (ScriptShortcutPausedChords).
+		Live := ScriptShortcutLiveChords(Suspended)
 		; The submenu's switch: off leaves every chord native and keeps the actions.
-		if !ScriptShortcutChordsAreOn()
+		if !Live["on"]
 				return false
-		Action := ScriptShortcutAssignments[Slot]
+		Action := Live["assignments"][Slot]
 		if (Action == "none" or !GESTURE_ACTIONS.Has(Action))
 				return false
 		; An AI action is unarmed while the AI is off: the chord stays the system's.
@@ -2364,11 +2530,11 @@ RunScriptShortcutAction(Slot) {
 				; or an AI switch-off that began before this thread ran gets here: the chord
 				; was already taken, and its key is the one thing left to give back.
 				LoggerWarn("Shortcuts", "Script slot '{1}' no longer runs '{2}' (paused or AI off since the press); sending its key instead.",
-						Slot, ScriptShortcutAssignments[Slot])
+						Slot, ScriptShortcutLiveChords()["assignments"][Slot])
 				SendInput(SCRIPT_SHORTCUT_FALLBACKS[Slot])
 				return
 		}
-		GestureInvokeAction(ScriptShortcutAssignments[Slot], GestureBindingId("script", Slot))
+		GestureInvokeAction(ScriptShortcutLiveChords()["assignments"][Slot], GestureBindingId("script", Slot))
 }
 
 SetScriptShortcutAction(Slot, ActionName) {
@@ -2708,6 +2874,9 @@ KeyboardShortcutsBindAll() {
 						continue
 				if Action == "none"
 						continue
+				; A physical slot is the delivery owner's (ui/physical_shortcuts/delivery.ahk).
+				if PhysicalSlots.IsNamespace(Slot)
+						continue
 				IsWinSlot := SubStr(Slot, 1, 5) == "meta_"
 				Scan := IsWinSlot ? KeyboardSlotWinScan(Slot) : KeyboardSlotLayoutScan(Slot)
 				if Scan != "" && IsWinSlot && KeyboardSlotPhysicalScan("meta_" . Scan) != "" {
@@ -2742,6 +2911,7 @@ KeyboardShortcutsBindAll() {
 				Bound++
 		}
 		LoggerSuccess("KeyboardShortcuts", "Configurable hotkeys registered ({1} active).", Bound)
+		Bound += PhysicalShortcutDelivery.BindAll()
 		return Bound
 }
 

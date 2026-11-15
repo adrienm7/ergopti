@@ -13,10 +13,12 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 local PreferencesFixture = require("tests.support.metrics_preferences_fixture")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local ENTER = {
 	pause = function(k) k.suspend_collection() end,
+	-- The driver's own pause (EDD-1, paused-records-no-keys).
+	driver_pause = function(k) k.set_script_paused(true) end,
 	private = function(k) k.set_private_window(true) end,
 	secure = function(k) k.set_secure_field(true) end,
 	suppressed = function(k) k.suppress() end,
@@ -24,6 +26,7 @@ local ENTER = {
 }
 local LEAVE = {
 	pause = function(k) k.resume_collection() end,
+	driver_pause = function(k) k.set_script_paused(false) end,
 	private = function(k) k.set_private_window(false) end,
 	secure = function(k) k.set_secure_field(false) end,
 	suppressed = function(k) k.unsuppress() end,
@@ -44,7 +47,7 @@ end
 
 helpers.describe("Linux metrics excluded span boundary", function()
 	for _, mode in ipairs({ "same_snapshot", "across_commit" }) do
-		for _, boundary in ipairs({ "pause", "private", "secure", "suppressed", "disabled" }) do
+		for _, boundary in ipairs({ "pause", "driver_pause", "private", "secure", "suppressed", "disabled" }) do
 			helpers.it("(lm-001) " .. boundary .. " " .. mode .. " is not bridged by sequences or timing", function()
 				local previous_now = Monotonic.now_ms
 				local previous_writer = package.loaded["modules.keystats.sqlite_writer"]

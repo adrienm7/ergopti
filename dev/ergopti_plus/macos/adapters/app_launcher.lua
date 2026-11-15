@@ -19,9 +19,9 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
-local ShellRunner = require("adapters.shell_runner")
-local RunningApplication = require("adapters.running_application")
+local Logger = require("core.logger.engine.logger")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local RunningApplication = require("platform.focus.running_application")
 
 local LOG = "adapters.app_launcher"
 

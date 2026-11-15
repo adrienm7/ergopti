@@ -39,10 +39,10 @@ local Indicator = require("platform.tray.appindicator")
 if not Surface.is_available() then abort("the widget surface cannot bind GTK.") end
 if not Indicator.is_available() then abort("the tray library cannot bind.") end
 
-local Model = require("wpm_widget.model")
-local Activity = require("keystats.wpm_activity")
+local Model = require("metrics.engine.wpm_widget_model")
+local Activity = require("metrics.engine.wpm.activity")
 local Constants = require("infra.wpm_constants")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local Widget = require("ui.wpm.widget")
 local Readout = require("ui.wpm.tray_readout")
 local canon = assert(Constants.load(), "the shared canon must load")
@@ -156,7 +156,7 @@ if has_xdotool == true or has_xdotool == 0 then
 	local nx, ny = Surface.position()
 	print(string.format("  dragged from %d,%d to %d,%d", px, py, nx, ny))
 	expect(nx == px - 150 and ny == py - 120, "a pointer drag moves the pill")
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	expect(Storage.get("wpm_widget.pos_x", nil) == nx and Storage.get("wpm_widget.pos_y", nil) == ny,
 		"and its new place is kept for the next start")
 else

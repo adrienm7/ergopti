@@ -19,7 +19,7 @@ OWNER = load(
 ImageRefusal = OWNER.ImageRefusal
 POLICY = load(
     "ergopti_shared_network_bootstrap",
-    Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_bootstrap.py",
+    Path(__file__).absolute().parents[2] / "_shared/ai/adapters/python/managed_ollama_bootstrap.py",
 )
 
 

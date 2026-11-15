@@ -10,13 +10,13 @@ local h = require("tests.helpers")
 --- @param body function Receives the controlled consumer session.
 function M.with_session(options, body)
 	options = options or {}
-	local names = { "ffi", "infra.monotonic", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
+	local names = { "ffi", "core.logger.engine.monotonic", "platform.input.evdev_reader", "platform.input.uinput_writer", "platform.input.keyboard_hook",
 		"adapters.xkb_capture", "modules.hotstrings.device_finder", "platform.remap.tap_hold_engine",
 		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "infra.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
 	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 	local previous_preload = package.preload.ffi
-	local Input = require("infra.input_event")
+	local Input = require("platform.input.event")
 	local queues, paths, descriptors, serial, released_fds = {}, {}, {}, 100, {}
 	-- Explicit controlled path names can share a prefix and contain a colon;
 	-- native descriptor/open lifetime issuance remains the original Reader's.
@@ -35,7 +35,7 @@ function M.with_session(options, body)
 	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0, held = {}, clock_ms = 0 }
 	-- Event stamps and idle ticks belong to this controlled transport, not real
 	-- source-reader wall time spent parsing or writing the fixture config.
-	package.loaded["infra.monotonic"] = {
+	package.loaded["core.logger.engine.monotonic"] = {
 		now_ms = function() return s.clock_ms end,
 		now_sec = function() return s.clock_ms / 1000 end,
 		resolution_ms = function() return 0 end,
@@ -123,7 +123,7 @@ function M.with_session(options, body)
 			if options.on_capture_reset then options.on_capture_reset(s) end
 			return true
 		end,
-		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
+		modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code] end,
 		caps_locked = function() return false end, restore_compose = function() return true end,
 		peek_text = function(code)
 			if options.on_text then options.on_text(s) end
@@ -158,13 +158,13 @@ function M.with_session(options, body)
 		local Owner = h.load_module("modules.shortcuts.key_combinations")
 		local Native = h.load_module("platform.remap.key_combination_engine")
 		if options.late_reader then
-			s.reader = h.load_module("adapters.evdev_reader")
+			s.reader = h.load_module("platform.input.evdev_reader")
 		else
 			-- The actual daemon cold-loads Hook/Reader before backend callbacks.
 			-- before_hook is the legacy option name for a callback before install/start.
-			package.loaded["adapters.evdev_reader"] = nil
-			s.hook = h.load_module("adapters.keyboard_hook")
-			s.reader = require("adapters.evdev_reader")
+			package.loaded["platform.input.evdev_reader"] = nil
+			s.hook = h.load_module("platform.input.keyboard_hook")
+			s.reader = require("platform.input.evdev_reader")
 		end
 		s.bootstrap = options.late_reader and "late-reader" or "cold-hook-before-backend"
 		if options.custom_reader then
@@ -174,7 +174,7 @@ function M.with_session(options, body)
 				read = function(fd) local queue = queues[descriptors[fd]]; return queue and table.remove(queue, 1) end,
 				poll = function(fd) return #(queues[descriptors[fd]] or {}) > 0 end })
 		else assert(s.reader.use_ffi_backend()) end
-		s.writer = h.load_module("adapters.uinput_writer")
+		s.writer = h.load_module("platform.input.uinput_writer")
 		local last
 		s.writer._set_backend({ open = function() return 7 end, close = function()
 				s.output_closes = (s.output_closes or 0) + 1
@@ -208,7 +208,7 @@ function M.with_session(options, body)
 			s.acquisitions = s.acquisitions + 1; return acquire(...)
 		end
 		if options.before_hook then options.before_hook(s) end
-		if not s.hook then s.hook = h.load_module("adapters.keyboard_hook") end
+		if not s.hook then s.hook = h.load_module("platform.input.keyboard_hook") end
 		s.base = Engine.new({ keys = options.keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
 			tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 1000,
 			key_text = function(code) return s.hook.key_text(code) end,
@@ -245,7 +245,7 @@ function M.with_session(options, body)
 			onCaptureReacquired = options.on_capture_reacquired }
 		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())
-		s.broker = require("adapters.modifier_broker").for_channel(s.writer)
+		s.broker = require("platform.input.modifier_broker").for_channel(s.writer)
 		function s.edge(id, code, value, at_ms)
 			s.clock_ms = math.max(s.clock_ms, at_ms)
 			queues[paths[id]][#queues[paths[id]] + 1] = Input.encode(Input.EV_KEY, code, value, nil, at_ms * 1000)
@@ -286,7 +286,7 @@ function M.with_manager_session(options, body)
 	options = options or {}
 	M.with_session(options, function(s)
 		local ConfigPaths = require("infra.config_paths")
-		local Files = require("adapters.file_system")
+		local Files = require("core.fs.adapters.file_system")
 		local original_route, original_read = ConfigPaths.config, Files.read_with_status
 		local names = { "platform.remap.tap_hold_manager", "adapters.keyboard_layout", "platform.remap.nav_layer", "adapters.clipboard" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -299,7 +299,7 @@ function M.with_manager_session(options, body)
 			local file = assert(io.open(path, "w")); assert(file:write(text)); assert(file:close())
 		end
 		write(source_path, s.bytes)
-		write(tap_path, require("tests.support.tap_hold_fixture").with_preset(options.tap_hold_text or ""))
+		require("tests.support.tap_hold_fixture").write(tap_path, options.tap_hold_text or "")
 		ConfigPaths.config = function(name) return name == "config.toml" and source_path or original_route(name) end
 		Files.read_with_status = function(path)
 			if path == source_path then
@@ -322,7 +322,7 @@ function M.with_manager_session(options, body)
 					if options.on_generic_action then return options.on_generic_action(s, action, binding) end
 					return true
 				end, action_names = function() return options.action_names or { "copy" } end, on_text_injected = function() end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }) == true)
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }) == true)
 			s.manager, s.engine, s.owner = manager, manager.configuration_snapshot().engine, manager.configuration_snapshot().combinations
 			s.arm_deadline = function() return s.engine.one_shot_until end
 			body(s)
@@ -331,6 +331,7 @@ function M.with_manager_session(options, body)
 		ConfigPaths.config, Files.read_with_status = original_route, original_read
 		for _, name in ipairs(names) do package.loaded[name] = saved[name][1] end
 		os.remove(source_path); os.remove(tap_path); os.remove(folder .. "/layers.toml")
+		os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path))
 		os.execute("rmdir '" .. folder:gsub("'", "'\\''") .. "'")
 		if not called then error(failure, 0) end
 	end)

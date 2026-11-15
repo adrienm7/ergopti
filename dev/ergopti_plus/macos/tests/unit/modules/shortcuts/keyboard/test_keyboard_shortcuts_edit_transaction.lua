@@ -12,13 +12,13 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
-	"adapters.file_system",
-	"infra.paths",
-	"infra.logger",
+	"platform.input.hotkey_registrar",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.paths",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
@@ -83,11 +83,11 @@ local function with_subject(initial_action, scenario)
 		return true
 	end
 
-	package.loaded["adapters.hotkey_registrar"] = registrar
-	package.loaded["adapters.file_system"] = {
+	package.loaded["platform.input.hotkey_registrar"] = registrar
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
 	}
-	package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
+	package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
 	-- Neutral manifest defaults acquire no extra native handles in this fixture.
 	package.loaded["infra.manifest_reader"] = nil
 	local logger = helpers.make_logger_stub()
@@ -95,7 +95,7 @@ local function with_subject(initial_action, scenario)
 		local ok, result = xpcall(fn, debug.traceback, ...)
 		return ok, result
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.gestures.actions"] = {
 		-- The transaction under test is independent of which ids exist; the
 		-- catalogue refusal has its own test (test_action_catalogue_parity.lua).
@@ -105,7 +105,7 @@ local function with_subject(initial_action, scenario)
 			return true
 		end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	require("tests.support.keyboard_config_fixture").install(store, function()

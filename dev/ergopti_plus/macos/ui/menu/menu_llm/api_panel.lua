@@ -13,25 +13,25 @@
 ---    refreshes immediately, and the entry is only persisted to Keychain if the
 ---    availability probe succeeds — on failure the in-memory state is rolled back.
 --- 3. Automatic names: every entry reads <provider>/<model>, told apart by host
----    then order when two share it (_shared/lua/llm/api_entry_names.lua). Adding
+---    then order when two share it (_shared/ai/engine/api/entry_names.lua). Adding
 ---    an entry asks no name, and a `label` an earlier build stored is not read.
 --- ==============================================================================
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
+local SaveFailure = require("settings.engine.publication.save_failure")
 local llm_mod       = require("modules.llm")
-local i18n          = require("infra.i18n")
-local Logger        = require("infra.logger")
-local dialog        = require("infra.dialog_util")
-local notifications = require("infra.notifications")
+local i18n          = require("core.i18n.engine.i18n")
+local Logger        = require("core.logger.engine.logger")
+local dialog        = require("core.ui.engine.dialog_util")
+local notifications = require("core.ui.engine.notifications")
 local ManifestMenu   = require("infra.manifest_menu")
 local ProviderUses   = require("modules.llm.provider_uses")
-local EntryNames     = require("llm.api_entry_names")
-local EntryIdentity  = require("llm.api_entry_identity")
-local LocalAuth      = require("llm.local_server_auth")
-local UrlTemplate    = require("llm.api_url_template")
-local TextUtils = require("text_utils")
+local EntryNames     = require("ai.engine.api.entry_names")
+local EntryIdentity  = require("ai.engine.api.entry_identity")
+local LocalAuth      = require("ai.engine.local_servers.auth")
+local UrlTemplate    = require("ai.engine.api.url_template")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "api_panel"
 
@@ -431,6 +431,13 @@ function M.build(ctx)
 		local ok, current_paused = pcall(ctx.is_paused)
 		return ok and type(current_paused) == "boolean" and current_paused == false
 	end
+	-- A key test contacts the provider: it waits for resume, through the real
+	-- pause the page hands over (EDD-1 keeps only configuration live).
+	local function runtime_unpaused()
+		if type(ctx.runtime_is_paused) ~= "function" then return false end
+		local ok, current_paused = pcall(ctx.runtime_is_paused)
+		return ok and current_paused == false
+	end
 	local function add_commands_ready()
 		return native_unpaused() and state.llm_backend == "api" and _mutation_owner == nil
 	end
@@ -484,6 +491,7 @@ function M.build(ctx)
 				collect.entries[#collect.entries + 1] = {
 					id = e.id, name = names[e.id], provider = e.provider, model = tostring(e.model or ""),
 					active = e.id == active_id, key_missing = api_remote.entry_key_missing(e),
+					key_absent = type(api_remote.entry_key_absent) == "function" and api_remote.entry_key_absent(e) or false,
 				}
 			end
 		end
@@ -786,8 +794,9 @@ function M.build(ctx)
 		if not boundary_rows then return "", {} end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	end
-	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_TEST_ACTIVE, {
+	local test_row = ManifestMenu.command_row("llm_api_active_commands", require("settings.engine.keys").COMMAND.API_TEST_ACTIVE, {
 		api_test_active = function()
+			if not runtime_unpaused() then return false end
 			local probed_id = active_entry.id
 			local probed_label = active_label
 			local probed_entry = {
@@ -843,7 +852,7 @@ function M.build(ctx)
 	-- the AHK tray's "remove active" semantics. Disabled when nothing is
 	-- configured so the user does not chase a no-op click. Test sits above
 	-- it: the destructive action stays last.
-	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("config_keys").COMMAND.API_REMOVE_ACTIVE, {
+	local remove_row = ManifestMenu.command_row("llm_api_active_commands", require("settings.engine.keys").COMMAND.API_REMOVE_ACTIVE, {
 		api_remove_active = function()
 			if _mutation_owner ~= nil then return false end
 			-- Confirm before destroying — the saved token is gone for good once
@@ -1042,6 +1051,62 @@ function M.set_entry_model(ctx, entry_id, model)
 		state.llm_model = previous_model
 		notify_persistence_failure("Remote API model change")
 		pcall_log("update_menu(set_model rollback)", update_menu)
+	end)
+	return true
+end
+
+--- Gives an entry a new key: the entry restored from a backup without its
+--- Keychain item asks for it (model selector page, « API key… »). The key
+--- goes to the Keychain through persist_api_entries, never to settings.
+--- @param ctx table Menu context.
+--- @param entry_id string
+--- @param token string The new key, non-empty.
+--- @return boolean staged Whether the change was staged for persistence.
+function M.set_entry_token(ctx, entry_id, token)
+	local update_menu, WarmupCtrl = ctx.update_menu, ctx.WarmupCtrl
+	if type(token) ~= "string" or token == "" then
+		Logger.warn(LOG, "API entry key change refused: the key is empty.")
+		return false
+	end
+	if type(ctx.is_paused) ~= "function" then return false end
+	local ok_pause, paused = pcall(ctx.is_paused)
+	if not ok_pause or paused ~= false or _mutation_owner ~= nil then return false end
+	local api_remote = llm_mod.api_remote
+	local previous_entries = api_remote.get_entries() or {}
+	local changed, found = {}, false
+	for _, e in ipairs(previous_entries) do
+		if e.id == entry_id then
+			local copy = {}
+			for k, v in pairs(e) do copy[k] = v end
+			copy.token = token
+			changed[#changed + 1] = copy
+			found = true
+		else
+			changed[#changed + 1] = e
+		end
+	end
+	if not found then
+		Logger.warn(LOG, "API entry key change refused: entry '%s' is gone.", tostring(entry_id))
+		return false
+	end
+	local my_generation = begin_mutation()
+	if not my_generation then return false end
+	api_remote.set_entries(changed)
+	Logger.info(LOG, "API entry key change staged (entry=%s).", tostring(entry_id))
+	persist_entries("persist_api_entries(set_token)", function(persisted, reason, durable)
+		if not mutation_is_current(my_generation) then return end
+		finish_mutation(my_generation)
+		if persisted == true or durable == true then
+			if persisted ~= true then
+				Logger.error(LOG, "Remote API key change committed with cleanup debt: %s", tostring(reason))
+			end
+			WarmupCtrl.warmup("api_set_token")
+			pcall_log("update_menu(set_token)", update_menu)
+			return
+		end
+		api_remote.set_entries(previous_entries)
+		notify_persistence_failure("Remote API key change")
+		pcall_log("update_menu(set_token rollback)", update_menu)
 	end)
 	return true
 end

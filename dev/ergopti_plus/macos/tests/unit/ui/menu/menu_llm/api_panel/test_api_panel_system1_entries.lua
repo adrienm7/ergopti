@@ -19,18 +19,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CATALOGUE = (function()
-	local fh = assert(io.open(helpers.shared("modules/llm/api_providers.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/api_providers.json"), "r"))
 	local raw = fh:read("*a")
 	fh:close()
 	return assert(json.decode(raw))
 end)()
 
 local FRESH = {
-	"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
-	"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+	"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 }
 
 --- Installs the panel's doubles around the real catalogue.
@@ -78,32 +78,32 @@ local function install(args)
 			callback(args.persist_ok ~= false, nil, args.persist_ok ~= false)
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if key == "menu.llm.api_unreachable_body" then return '"%s" did not respond' end
 		if key == "menu.llm.api_remove_confirm_title" then return "Remove %s?" end
 		return key
 	end }
-	package.loaded["infra.logger"] = { debug = function() end, info = function() end, warn = function() end,
+	package.loaded["core.logger.engine.logger"] = { debug = function() end, info = function() end, warn = function() end,
 		error = function() end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function()
 			world.prompt_index = world.prompt_index + 1
 			return "button.ok", world.prompts[world.prompt_index]
 		end,
 		block_alert = function(_, _, first) return first end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, level)
 			world.notifications[#world.notifications + 1] = { title = title, body = body, level = level }
 			return true
 		end,
 	}
-	local command_renderer = assert(require("menu.renderer").new({
+	local command_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-		json_decode = require("adapters.json_codec").decode,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},

@@ -4,8 +4,8 @@
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver, shared = root .. '/static/ergopti_plus/macos', root .. '/static/ergopti_plus/_shared'
- package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
- local json = require('json')
+ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.lua;' .. shared .. '/?/init.lua;' .. package.path
+ local json = require('core.text.engine.json')
  local function request(message)
   message.kind = 'request'
   assert(io.stdout:write(json.encode(message) .. '\n')); assert(io.stdout:flush())
@@ -14,11 +14,11 @@ local function child()
  local sqlite = require('tests.support.keystats.rebuild_sqlite_bridge').new(request)
  local path = temporary .. '/db.sqlite'; local db = sqlite.open(path)
  for _, name in ipairs({ 'schema.sql', 'media_schema.sql' }) do
-  local f = assert(io.open(shared .. '/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
+  local f = assert(io.open(shared .. '/metrics/data/db/' .. name, 'rb')); local schema = assert(f:read('*a')); assert(f:close()); assert(db:exec(schema) == sqlite.OK)
  end
  local helpers = require('tests.helpers'); local logger = helpers.make_logger_stub()
- package.loaded['infra.logger'] = logger
- package.loaded['modules.keystats.text_cipher'] = { encrypt = function(_, _, value) return value end }
+ package.loaded['core.logger.engine.logger'] = logger
+ package.loaded['modules.keystats.text_cipher'] = { is_enabled = function() return false end, encrypt = function(_, _, value) return value end }
  local entry = { type='typing', timestamp='2026-10-17 12:00:00', app='Editor', text='x', events={ {'x',100,{}} } }
  local good = { type='typing', timestamp='2026-10-17 11:59:00', app='Editor', text='a', events={ {'a',100,{}} } }
  local fail = true
@@ -58,7 +58,7 @@ local function child()
 end
 if arg and arg[0] and arg[0]:match('test_ingest_raw_json_failure%.lua$') then child(); return end
 local helpers = require('tests.helpers')
-local quote = require('text_utils').shell_quote
+local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('raw event JSON failure', function()
  for _,case in ipairs({'throw','empty','nil'}) do

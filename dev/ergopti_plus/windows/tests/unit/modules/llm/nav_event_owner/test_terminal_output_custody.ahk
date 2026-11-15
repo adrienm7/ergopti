@@ -1255,7 +1255,7 @@ for _LNTOC_AuthorityRefusalPhase in ["ack", "consume", "cancel"]
 
 
 ; The explicit primitive is feature-local; no production initializer chooses it.
-#Include %A_LineFile%\..\..\..\..\..\..\adapters\terminal_output_sendinput.ahk
+#Include %A_LineFile%\..\..\..\..\..\..\core\ui\adapters\terminal_output_sendinput.ahk
 /** Actual production callback vectors with injected sender; Windows execution UNRUN. */
 _LNTOC_SendInputVector(Mode) {
 	global _LLM_TerminalOutputRecords, _LLM_TerminalOutputUnknown

@@ -17,8 +17,8 @@ local M = {}
 local hs        = hs
 local keystats = require("modules.keystats")
 local WPMShared = require("ui.wpm.shared")
-local Logger    = require("infra.logger")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Logger    = require("core.logger.engine.logger")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 local LOG = "wpm_menubar"
 
@@ -52,7 +52,7 @@ end
 -- The colour hold and the refresh, from the shared timings registry — the
 -- same hold the floating widget reads, so the two agree on how long a source
 -- colour lingers. The registry fails fast on a missing key: no literal copy.
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local COLOR_HOLD_S = Timings.sec("ui", "wpm_color_hold_ms")
 local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
 
@@ -99,7 +99,7 @@ update_menubar_body = function(generation)
 	local active_source = WPMShared.get_active_source(stats, COLOR_HOLD_S, now)
 	if not is_current(generation) then return false end
 	
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()

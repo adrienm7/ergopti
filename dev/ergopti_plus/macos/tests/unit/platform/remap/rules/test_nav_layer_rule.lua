@@ -31,12 +31,12 @@
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local Layers    = require("keymap.layers")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Layers    = require("layouts.engine.layers.layers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local NavLayer = helpers.load_with_stubs("platform.remap.nav_layer")
 
 local LEGACY_PATH = helpers.driver_root() .. "/platform/remap/data/legacy_layer_keys.json"
@@ -90,7 +90,7 @@ local ctx = Layers.load_context({
 	toml_decode = TomlCodec.decode,
 	read_file   = read_file,
 })
-local recommended = read_file(helpers.shared("keymap/layers.recommended.toml"))
+local recommended = read_file(helpers.shared("layouts/data/layers.recommended.toml"))
 
 --- The navigation bindings a layer file resolves to on macOS; the file must load cleanly.
 local function bindings_of(text)
@@ -295,6 +295,58 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		helpers.assert_eq(sent(home[1]), "home nav_repeat_count=1", "but its send spends the count")
 	end)
 
+	helpers.it("(layer-repeat-count-macos) replays 3 then arrow_up as three moves, then one, then none kept", function()
+		-- The Mac check « Navigation layer repeat count » (TODO, To confirm on the
+		-- Mac) replayed with Karabiner's matching: the first manipulator of the key
+		-- whose variable conditions hold fires, and its set_variable events apply in
+		-- order. Entering the layer resets the count to 1 (generator test
+		-- « entering the layer resets the count only when the layer binds one »),
+		-- which is what makes a release after `3` forget the count.
+		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
+			.. '"Digit3" = "repeat_count:3"\n"KeyI" = "arrow_up"\n'), ctx.registry, "ansi")
+		local arrows = on_key(rule, "i")
+		local plain = arrows[#arrows]
+		helpers.assert_nil(required(plain, "nav_repeat_count"), "the last arrow manipulator is the plain send")
+		local entered = {}
+		for _, condition in ipairs(plain.conditions) do
+			if condition.type == "variable_if" then entered[condition.name] = condition.value end
+		end
+		local vars
+		local function enter_layer()
+			vars = {}
+			for name, value in pairs(entered) do vars[name] = value end
+			vars.nav_repeat_count = 1
+		end
+		local function matches(manipulator)
+			for _, condition in ipairs(manipulator.conditions or {}) do
+				local value = vars[condition.name] or 0
+				if condition.type == "variable_if" and value ~= condition.value then return false end
+				if condition.type == "variable_unless" and value == condition.value then return false end
+			end
+			return true
+		end
+		local function press(key_code)
+			for _, manipulator in ipairs(on_key(rule, key_code)) do
+				if matches(manipulator) then
+					local keys = {}
+					for _, event in ipairs(manipulator.to) do
+						if event.key_code then keys[#keys + 1] = event.key_code end
+						if event.set_variable then vars[event.set_variable.name] = event.set_variable.value end
+					end
+					return table.concat(keys, " ")
+				end
+			end
+			return nil
+		end
+		enter_layer()
+		helpers.assert_eq(press("3"), "", "the count key types nothing")
+		helpers.assert_eq(press("i"), "up_arrow up_arrow up_arrow", "3 then arrow_up moves up three lines")
+		helpers.assert_eq(press("i"), "up_arrow", "the next arrow_up moves one line")
+		helpers.assert_eq(press("3"), "")
+		enter_layer()
+		helpers.assert_eq(press("i"), "up_arrow", "a count typed before the layer was released is forgotten")
+	end)
+
 	helpers.it("(layer-repeat-count-macos) a layer without a count generates exactly what it did before", function()
 		local rule = NavLayer.build_rule(bindings_of('[_meta]\nschema_version = 1\n\n[layers.nav.all]\n'
 			.. '"KeyK" = "arrow_left"\n'), ctx.registry, "ansi")
@@ -373,8 +425,8 @@ helpers.describe("Karabiner navigation layer contracts", function()
 		for _, level in ipairs({ "trace", "debug", "done", "info", "start", "success", "warn", "error" }) do
 			capture[level] = function() levels[#levels + 1] = level end
 		end
-		local saved_logger = package.loaded["infra.logger"]
-		package.loaded["infra.logger"] = capture
+		local saved_logger = package.loaded["core.logger.engine.logger"]
+		package.loaded["core.logger.engine.logger"] = capture
 		local ok, err = pcall(function()
 			local Fresh = helpers.load_with_stubs("platform.remap.nav_layer")
 			local layer = Fresh.load({ shared_root = helpers.shared(), config_dir = dir })
@@ -383,7 +435,7 @@ helpers.describe("Karabiner navigation layer contracts", function()
 			-- so no SUCCESS may follow it.
 			helpers.assert_eq(table.concat(levels, " "), "start warn error")
 		end)
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["platform.remap.nav_layer"] = nil
 		os.remove(dir .. "/layers.toml")
 		os.execute('rmdir "' .. dir .. '"')
@@ -574,7 +626,7 @@ helpers.describe("navigation source close acknowledgement", function()
 			return record.closed
 		end
 		local called, outcome = pcall(function()
-			quote = require("text_utils").shell_quote
+			quote = require("core.text.engine.utils_core").shell_quote
 			fixture_sequence = fixture_sequence + 1
 			directory = helpers.temp_dir() .. "/ergopti_mac_nav_close_" .. tostring(os.time()) .. "_"
 				.. tostring(math.random(100000, 999999)) .. "_" .. tostring(fixture_sequence)
@@ -592,10 +644,10 @@ helpers.describe("navigation source close acknowledgement", function()
 			for _, level in ipairs({ "start", "success", "warn", "error" }) do
 				capture[level] = function() levels[#levels + 1] = level end
 			end
-			package.loaded["infra.logger"] = capture
+			package.loaded["core.logger.engine.logger"] = capture
 			package.loaded["platform.remap.nav_layer"] = nil
 			local Fresh = require("platform.remap.nav_layer")
-			local target = source == "user" and user_path or helpers.shared("data/keycodes/physical_keys.json")
+			local target = source == "user" and user_path or helpers.shared("layouts/data/keycodes/physical_keys.json")
 			io.open = function(path, mode)
 				if path ~= target or mode ~= "r" and mode ~= "rb" then return original_open(path, mode) end
 				local handle, detail, code = original_open(path, mode)
@@ -713,8 +765,8 @@ helpers.describe("navigation configured input observations", function()
 		end
 		write(text)
 		local called, detail = xpcall(function()
-			helpers.with_stub_scope({ "platform.remap.nav_layer", "infra.logger" }, function()
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
+			helpers.with_stub_scope({ "platform.remap.nav_layer", "core.logger.engine.logger" }, function()
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 				package.loaded["platform.remap.nav_layer"] = nil
 				local subject = require("platform.remap.nav_layer")
 				callback(subject, { shared_root = helpers.shared(), config_dir = directory }, write, path)
@@ -777,7 +829,7 @@ helpers.describe("navigation configured input observations", function()
 	helpers.it("nav-configured source exports cannot supply replacement observations", function()
 		with_source(function(subject, options)
 			local layer, observation = subject.load(options)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original, reads = writer.read_classified, 0
 			writer.read_classified = function(...) reads = reads + 1; return original(...) end
 			local called, capture = pcall(subject.capture_configured_inputs, layer, observation)
@@ -790,7 +842,7 @@ helpers.describe("navigation configured input observations", function()
 
 	helpers.it("nav-configured rejoins original source bytes after the load logger callback", function()
 		with_source(function(subject, options, write)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.success = function() write(text .. "# logger successor\n") end
 			local layer, observation = subject.load(options)
 			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))

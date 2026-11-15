@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.remap_transaction_fixture")
 
 local KEY, COMBO = "left_shift", "left_shift+right_shift"
-local SOURCE = '[tap_holds]\nenabled = false\n[future]\nkeep = true\n'
+local SOURCE = '[tap_hold]\nenabled = false\n[future]\nkeep = true\n'
 -- The configuration folder of this fixture's private disk, without layers.toml.
 local CONFIG_DIR = "/remap"
 local LAYERS = CONFIG_DIR .. "/layers.toml"
@@ -23,7 +23,7 @@ local LAYERS = CONFIG_DIR .. "/layers.toml"
 local function scoped_remap(fixture)
 	local remap, calls = fixture.load_enabled_remap()
 	local Config = package.loaded["platform.remap.config"]
-	local disk = { files = { ["/remap/config_karabiner.toml"] = SOURCE }, expected = {}, regenerations = 0 }
+	local disk = { files = { ["/remap/tap_hold.toml"] = SOURCE }, expected = {}, regenerations = 0 }
 	local neutral_combo = { tap = "none", hold = "none", combo = "none" }
 	Config.build_default_state = function()
 		return { tap_holds_enabled = false, tap_hold_config = { [KEY] = { tap = "none", hold = "none" } },
@@ -41,11 +41,11 @@ local function scoped_remap(fixture)
 		return save(state, path, overwrite, expected)
 	end
 	package.loaded["infra.config_paths"].get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-		return "/remap/config_karabiner.toml"
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/tap_hold.toml"
 	end
 	package.loaded["infra.config_paths"].get_config_dir = function() return CONFIG_DIR end
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	files.remove_exact = function(path)
 		disk.files[path] = nil
 		return true
@@ -90,14 +90,14 @@ end
 
 
 local function preset()
-	local fh = assert(io.open(helpers.shared("keymap/layers.recommended.toml"), "rb"))
+	local fh = assert(io.open(helpers.shared("layouts/data/layers.recommended.toml"), "rb"))
 	local text = fh:read("*a")
 	fh:close()
 	return text
 end
 
 local function removable(disk)
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	disk.removal_calls = {}
 	disk.removals = {}
 	files.remove_exact = function() error("layer compensation must use conditional removal") end
@@ -136,7 +136,7 @@ end
 local function cohort_remap(fixture)
 	local remap, calls, disk = scoped_remap(fixture)
 	disk.layer_reads, disk.layer_writes, disk.removals, disk.layer_at_regeneration = 0, 0, 0, {}
-	local files, read = require("adapters.file_system"), require("adapters.file_system").read_with_status
+	local files, read = require("core.fs.adapters.file_system"), require("core.fs.adapters.file_system").read_with_status
 	files.read_with_status = function(path)
 		if path == LAYERS then
 			disk.layer_reads = disk.layer_reads + 1

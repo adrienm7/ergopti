@@ -28,10 +28,10 @@ local function copy_map(source)
 end
 
 local function load_fixture()
-	package.loaded["dynamic_hotstrings"] = nil
+	package.loaded["hotstrings.engine.dynamic.core"] = nil
 	package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 
-	local SharedEngine = helpers.load_with_stubs("dynamic_hotstrings")
+	local SharedEngine = helpers.load_with_stubs("hotstrings.engine.dynamic.core")
 	SharedEngine.reset_rules()
 	local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 
@@ -88,6 +88,9 @@ local function load_fixture()
 	end
 	function keymap.sort_mappings()
 		return controls.sort_result
+	end
+	function keymap.dynamic_rule_within_delay()
+		return true
 	end
 	function keymap.register_interceptor(callback)
 		state.interceptors[#state.interceptors + 1] = callback
@@ -274,7 +277,7 @@ end)
 
 helpers.describe("dynamic menu shared family order", function()
 	local file = assert(io.open(helpers.shared("tests/corpus/dynamic_hotstrings/menu_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode(file:read("*a")))
+	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	helpers.it("keeps the independent published family metadata and returns detached records", function()
 		local menu = require("infra.manifest_menu")

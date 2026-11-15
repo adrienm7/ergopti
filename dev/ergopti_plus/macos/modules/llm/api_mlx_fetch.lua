@@ -20,16 +20,16 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local ApiCommon      = require("modules.llm.api_common")
 local Profiles       = require("modules.llm.profiles")
-local TokenBudget = require("llm.request_plan.token_budget")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TokenBudget = require("ai.engine.request_plan.token_budget")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
--- Retry policy comes from _shared/modules/llm/inference.json (see api_common.lua),
+-- Retry policy comes from _shared/ai/data/inference.json (see api_common.lua),
 -- read from the canonical source so the fan-out retry budget is never hardcoded
 -- or duplicated.
 local _RETRY_MAX_MULT, _RETRY_TEMP_STEP, _RETRY_EXTRA_TOKENS = ApiCommon.get_retry_policy()
@@ -248,6 +248,11 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					do_next()
 				end,
 				function(failure)
+					-- The handler shows a stream's rows until told otherwise: withdraw
+					-- the failed one, or Tab types it while the retry runs (AIM-001).
+					if variant_partial then
+						ApiCommon.protected_call(on_partial, "on_partial", false, stream_identity)
+					end
 					-- A refused key is refused again: neither a retry nor another variant.
 					if ApiCommon.is_authentication_failure(failure) then
 						Logger.warn(LOG, "[%s] Variant %d/%d stopped: the credential was refused (no retry).",
@@ -256,7 +261,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						do_next()
 						return
 					end
-					if attempt < 2 then
+					-- The quick retry is an attempt of the budget, as on Windows and Linux:
+					-- outside it one prediction at multiplier 2 sent four requests, not two.
+					if attempt < 2 and attempt_index <= max_attempts then
+						attempt_index = attempt_index + 1
 						-- Same retry policy as api_ollama and api_remote: the step and the
 						-- extra-token budget come from the shared inference manifest rather
 						-- than from literals here, and the ceiling matches theirs. The old

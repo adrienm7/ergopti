@@ -24,7 +24,7 @@ local function fresh_aggregator()
 	end
 	package.loaded["modules.keystats.sqlite_writer"] = { get_db = function() return nil end, init = function() end }
 	package.loaded["modules.keystats.export"] = { get_native_app_category = function() return "Development" end, init = function() end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			if key == "think_pause_ms" then return 2000 end
 			if key == "max_keystroke_delay_ms" then return 5000 end
@@ -43,7 +43,7 @@ local function fresh_aggregator()
 	return agg
 end
 
-require("test.keystats_correction_erased_contract")(helpers, data, function(vec)
+require("tests.lua.metrics.correction_erased_contract")(helpers, data, function(vec)
 	local agg = fresh_aggregator()
 	for index, flush in ipairs(vec.flushes) do
 		local events = {}

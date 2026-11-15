@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("test.caps_word_auto_off_contract").run(helpers,
+require("tests.lua.keyboard.caps_word_auto_off_contract").run(helpers,
 	helpers.shared("tests/corpus/caps_word/auto_off_vectors.json"))
 
 return true

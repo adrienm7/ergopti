@@ -10,12 +10,12 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
-local ShellRunner = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
+local Logger = require("core.logger.engine.logger")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local LauncherHelper = require("platform.remap.lease_helper")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "adapters.keyboard_source_probe"
 local PROBE_FLAG = "--keyboard-source-probe"
@@ -23,7 +23,7 @@ local PROTOCOL_VERSION = 1
 local MAX_SOURCE_BYTES = Timings.count("limits", "input_source_id_bytes")
 local MAX_CODES = 128
 local MAX_CODE = 127
-local MAX_RECEIPT_BYTES = require("llm.process_limits").defaults().max_output_bytes
+local MAX_RECEIPT_BYTES = require("ai.engine.policy.process_limits").defaults().max_output_bytes
 local MAX_KEYBOARD_TYPE = 4294967295
 local TIMEOUT_SEC = Timings.sec("ui", "input_source_operation_timeout_ms")
 local active_operations = {}

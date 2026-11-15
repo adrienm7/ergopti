@@ -9,41 +9,41 @@
 
 local helpers = require("tests.helpers")
 -- Pure shared owners are captured before native fixture dependencies are replaced.
-local ManifestRenderer = require("menu.renderer")
-local json = require("json")
+local ManifestRenderer = require("menu.engine.renderer")
+local json = require("core.text.engine.json")
 
 local MODULES = {
-	"diagnostics.operation_reporter",
-	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"diagnostics.engine.operation_reporter",
+	"platform.input.hotkey_registrar",
+	"core.events.timer_scheduler",
 	-- The real timer scheduler describes callback failures through this pure owner.
-	"error_description",
+	"diagnostics.engine.reports.error_description",
 	-- The timer scheduler admits delays through this pure owner.
-	"number_policy",
-	"chord",
+	"core.text.engine.number_policy",
+	"keyboard.engine.chord",
 	"infra.app_picker",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
-	"json",
-	"logger.shim",
-	"menu.renderer",
-	"llm.tone",
+	"core.ui.engine.notifications",
+	"core.text.engine.json",
+	"core.logger.engine.shim",
+	"menu.engine.renderer",
+	"ai.engine.prediction.tone",
 	-- The real profiles manager keeps per-application overrides through these
 	-- shared owners (56e8569a); the codec encodes them through compat.base64.
-	"llm.app_identity",
-	"llm.app_profile_overrides",
-	"compat.base64",
+	"ai.engine.policy.app_identity",
+	"ai.engine.policy.app_profile_overrides",
+	"core.lifecycle.engine.compat.base64",
 	-- The overrides owner copies tables through this shared owner.
-	"table_util",
+	"core.text.engine.table_util",
 	-- The trigger orchestrator trims shortcut modifiers through this re-export (ea1da6c3).
-	"infra.text_utils",
+	"core.text.engine.utils",
 	-- The real JSON codec and text helpers decode UTF-8 through this owner.
-	"compat.utf8",
+	"core.lifecycle.engine.compat.utf8",
 	-- The application identity owner normalizes names through these helpers.
-	"text_utils",
+	"core.text.engine.utils_core",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -235,18 +235,18 @@ local function with_trigger_fixture(options, body)
 		local set_profiles_calls = {}
 
 		if options.real_registrar then
-			package.loaded["adapters.hotkey_registrar"] = nil
-			package.loaded["chord"] = nil
+			package.loaded["platform.input.hotkey_registrar"] = nil
+			package.loaded["keyboard.engine.chord"] = nil
 		else
-			package.loaded["adapters.hotkey_registrar"] = backend.registrar
-			package.loaded["chord"] = {
+			package.loaded["platform.input.hotkey_registrar"] = backend.registrar
+			package.loaded["keyboard.engine.chord"] = {
 				format = function(mods, key)
 					if type(mods) ~= "table" or type(key) ~= "string" then return nil, "invalid" end
 					return table.concat(mods, "+") .. "+" .. key
 				end,
 			}
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.llm"] = {
 			DEFAULT_STATE = {llm_num_predictions = 1},
 			BUILTIN_PROFILES = {
@@ -424,23 +424,23 @@ local function with_delete_fixture(options, body)
 		profile_shortcuts = {user_p = {mods = {"ctrl"}, key = "p"}},
 	}, function(fixture)
 		local recommendation_dialog_count = 0
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function(_, _, confirm_label)
 				if confirm_label == "button.delete" then return "button.delete" end
 				recommendation_dialog_count = recommendation_dialog_count + 1
 				return "button.cancel"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
 		local renderer = assert(ManifestRenderer.new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
@@ -448,7 +448,7 @@ local function with_delete_fixture(options, body)
 			template_rows = renderer.template_rows,
 			get_array = renderer.get_array,
 		}
-		package.loaded["infra.notifications"] = {notify = function() return true end}
+		package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
 		package.loaded["ui.menu.menu_llm.profile_label"] = {
 			format = function(label) return label end,
 		}

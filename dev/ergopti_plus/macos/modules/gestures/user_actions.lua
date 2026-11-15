@@ -7,7 +7,7 @@
 --- command line the user typed, run hidden or in a new Terminal window, and a
 --- file or folder opened with its default application.
 --- modules/gestures/actions.lua registers both and decodes their parameter
---- through _shared/lua/user_action_parameter.lua.
+--- through _shared/shortcuts/engine/user_action_parameter.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Never blocks the runloop that feeds the keyboard tap: every process is an
@@ -26,17 +26,17 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local i18n = require("infra.i18n")
-local notifications = require("infra.notifications")
-local Timings = require("infra.timings")
-local text_utils = require("infra.text_utils")
+local Logger = require("core.logger.engine.logger")
+local i18n = require("core.i18n.engine.i18n")
+local notifications = require("core.ui.engine.notifications")
+local Timings = require("core.timing.engine.timings")
+local text_utils = require("core.text.engine.utils")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Clipboard = require("adapters.clipboard")
-local SyntheticInput = require("adapters.synthetic_input")
-local Unicode = require("compat.utf8")
-local Parameter = require("user_action_parameter")
+local SyntheticInput = require("platform.input.synthetic_input")
+local Unicode = require("core.lifecycle.engine.compat.utf8")
+local Parameter = require("shortcuts.engine.user_action_parameter")
 
 local LOG = "gestures.user_actions"
 

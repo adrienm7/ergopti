@@ -11,13 +11,13 @@ local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
-	"llm.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "llm.translate",
-	"adapters.event_provenance", "compat.utf8", "locale.core", "modules.shortcuts.script_control",
+	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
+	"core.ui.engine.dialog_util", "modules.llm.local_model_offer", "ai.engine.prediction.translate",
+	"adapters.event_provenance", "core.lifecycle.engine.compat.utf8", "core.i18n.engine.core", "modules.shortcuts.script_control",
 }
 
 local function with_agent(options, scenario)
@@ -37,7 +37,7 @@ local function with_agent(options, scenario)
 				{ id = "board", provider = "backboard", token = "keychain:board" },
 				{ id = "decision", provider = "typesafe", token = "keychain:decision" },
 			})
-			local codec = require("adapters.json_codec")
+			local codec = require("core.fs.adapters.json_codec")
 			local encode = codec.encode
 			codec.encode = function(body)
 				if world.on_encode then world.on_encode(body) end

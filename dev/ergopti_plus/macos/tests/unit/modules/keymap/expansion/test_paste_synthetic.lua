@@ -14,9 +14,9 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.clipboard", "adapters.synthetic_input",
-		"adapters.event_provenance", "adapters.timer_scheduler",
-		"infra.logger", "infra.timings",
+		"modules.keymap.utils", "adapters.clipboard", "platform.input.synthetic_input",
+		"adapters.event_provenance", "core.events.timer_scheduler",
+		"core.logger.engine.logger", "core.timing.engine.timings",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -25,8 +25,8 @@ local function load_fixture()
 	hs_stub.__reset()
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
@@ -34,7 +34,7 @@ local function load_fixture()
 
 	return {
 		hs = hs_stub,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
 end

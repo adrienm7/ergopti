@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Paths = require("infra.paths")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
+local Logger = require("core.logger.engine.shim")
 
 local CLOUD = [[{"provider_order":["cerebras"],"providers":{"cerebras":{"label":"Cerebras","base_url":"https://example.invalid/v1","default_model":"fixture","format":"openai"}}}]]
 local LOCAL = [[{"server_order":["lmstudio"],"servers":{"lmstudio":{"label":"LM Studio","base_url":"http://127.0.0.1:1234/v1","auth":"optional","discovery":{"process_names":["lm-studio"]}}}}]]
@@ -70,18 +70,18 @@ local function with_case(options, body)
 	if options.cloud ~= false then write(cloud, options.cloud or CLOUD) end
 	if options.local_source ~= false then write(local_path, options.local_source or LOCAL) end
 	local original_shared, original_open = Paths.shared, io.open
-	local Reader = require("infra.regular_file_reader")
+	local Reader = require("core.fs.engine.regular_file_reader")
 	local original_source_open = Reader.open_source
 	local original_warn, original_error = Logger.warn, Logger.error
 	local warnings, errors = {}, {}
 	Paths.shared = function(name)
-		if name == "modules/llm/api_providers.json" then return cloud end
-		if name == "modules/llm/local_servers.json" then return local_path end
+		if name == "ai/data/api_providers.json" then return cloud end
+		if name == "ai/data/local_servers.json" then return local_path end
 		return original_shared(name)
 	end
 	Logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
 	Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-	require("config_outdated").reset_for_tests()
+	require("settings.engine.migration.outdated").reset_for_tests()
 	local fault = options.fault
 	if fault then
 		fault.reads, fault.closes = 0, 0

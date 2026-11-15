@@ -7,37 +7,37 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local Logger  = require("infra.logger")
-local text_utils = require("infra.text_utils")
-local Notifications = require("infra.notifications")
-local i18n    = require("infra.i18n")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger  = require("core.logger.engine.logger")
+local text_utils = require("core.text.engine.utils")
+local Notifications = require("core.ui.engine.notifications")
+local i18n    = require("core.i18n.engine.i18n")
 local Parser         = require("modules.llm.parser")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
-local Ports = require("llm.request_plan.ports")
-local TokenBudget = require("llm.request_plan.token_budget")
+local Ports = require("ai.engine.request_plan.ports")
+local TokenBudget = require("ai.engine.request_plan.token_budget")
 -- Independent inference, availability, and warmup owners prevent one semantic
 -- operation from superseding another merely because both use HTTP
-local _infer_client  = require("adapters.http_client").new()
-local _check_client  = require("adapters.http_client").new()
-local _warmup_client = require("adapters.http_client").new()
+local _infer_client  = require("core.network.adapters.http_client").new()
+local _check_client  = require("core.network.adapters.http_client").new()
+local _warmup_client = require("core.network.adapters.http_client").new()
 -- Screen reading (modules/llm/screen_answer.lua) never shares the prediction owner
-local _vision_client = require("adapters.http_client").new()
+local _vision_client = require("core.network.adapters.http_client").new()
 -- The AI agent menu's model listing never supersedes a request in flight
-local _listing_client = require("adapters.http_client").new()
-local JsonCodec      = require("adapters.json_codec")
-local FileSystem     = require("adapters.file_system")
-local TimerScheduler = require("adapters.timer_scheduler")
+local _listing_client = require("core.network.adapters.http_client").new()
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local FileSystem     = require("core.fs.adapters.file_system")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
-local ShellRunner    = require("adapters.shell_runner")
+local ShellRunner    = require("core.process.adapters.shell_runner")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local ManagedDaemon = require("adapters.managed_ollama_daemon")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local LOG            = "llm.api_ollama"
-local LocalModelPolicy = require("llm.local_model_policy")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 --- The think field of an Ollama chat body: false, or the effort level of a
 --- family that ignores false (thinking_off.json through thinking_families,
@@ -49,7 +49,7 @@ local function ollama_think(model_name)
 end
 
 -- Ollama bind address. The default port is the single source in
--- _shared/modules/llm/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
+-- _shared/ai/data/defaults.json (llm_ollama_owned_port, surfaced via DEFAULT_STATE); a user
 -- override owned by OllamaEndpoint wins so a port collision can be resolved
 -- without editing any file. Host stays loopback.
 --- Reads a valid user port override from persistent storage, or nil when unset.
@@ -59,7 +59,7 @@ local function read_ollama_port_override()
 end
 
 --- Resolves the Ollama port: a valid user override wins, otherwise the canonical
---- default from _shared/modules/llm/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
+--- default from _shared/ai/data/defaults.json (DEFAULT_STATE.llm_ollama_owned_port). init is
 --- required lazily to avoid the init <-> api_ollama require cycle.
 --- @return integer
 local function resolve_ollama_port()
@@ -102,7 +102,7 @@ local _ollama_start_acquisition_depth = 0
 local _ollama_server_retirement_depth = 0
 local _ollama_launch_cleanup_observers = {}
 local DEDUPLICATION_ENABLED = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy lives in _shared/modules/llm/inference.json so the AHK twin can read
+-- Retry policy lives in _shared/ai/data/inference.json so the AHK twin can read
 -- the same numbers. ``max_mult`` is the upper bound on attempts as a
 -- multiple of requested_predictions; ``retry_temp_step`` is added on top of
 -- the diversity step for the 2nd attempt; ``retry_extra_tokens`` gives the
@@ -734,12 +734,14 @@ function M.pause_warmup()
 	return daemon_settled and warmup_settled
 end
 
--- curl --max-time ceiling for streaming requests (seconds).
--- STREAM_TMPFILE_CLEANUP_SEC is the safety-net delay before removing the
--- payload temp file; it must be strictly greater than STREAM_MAX_TIME_SEC so
--- the file is never deleted while curl is still reading it.
-local STREAM_MAX_TIME_SEC      = 60
-local STREAM_TMPFILE_CLEANUP_SEC = 70
+-- curl --max-time ceiling for streaming requests, the shared local Ollama
+-- budget (NET-003). The payload temp file's safety-net removal waits past it,
+-- so the file is never deleted while curl is still reading it. Read when a
+-- request starts, so loading this module reads no timing.
+local STREAM_TMPFILE_CLEANUP_MARGIN_SEC = 10
+
+--- @return number seconds
+local function stream_max_time_sec() return require("core.timing.engine.timings").sec("llm", "ollama_request_timeout_ms") end
 
 -- Ensure Ollama daemon is running — fully async to avoid blocking the Cocoa
 -- run loop. Previous implementation used synchronous hs.execute + usleep which
@@ -1963,8 +1965,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		return ShellRunner.spawn("/usr/bin/curl", {
 			"-s", "-N", "-X", "POST",
 			"-H", "Content-Type: application/json",
-			"--connect-timeout", "5",   -- abort if TCP handshake exceeds 5 s (Ollama dead)
-			"--max-time", tostring(STREAM_MAX_TIME_SEC),  -- hard ceiling; also drives cleanup delay
+			-- Abort a TCP handshake that never completes (Ollama dead).
+			"--connect-timeout", tostring(require("core.timing.engine.timings").sec("llm", "stream_connect_timeout_ms")),
+			"--max-time", tostring(stream_max_time_sec()),  -- hard ceiling; also drives cleanup delay
 			"--data-binary", "@" .. tmp_path,
 			M.get_base_url() .. "/api/chat",
 		}, on_done, on_chunk)
@@ -2012,9 +2015,9 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	Logger.debug(LOG, "[%s] #%d STREAM task started (payload: %s).", model_name, req_id, tmp_path)
 
 	-- Safety-net: remove the payload temp file even if on_done fires late or not
-	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
+	-- at all. The delay passes the --max-time ceiling so curl has finished reading.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
-		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
+		return TimerScheduler.after(stream_max_time_sec() + STREAM_TMPFILE_CLEANUP_MARGIN_SEC, function()
 			retire_payload()
 		end)
 	end, debug.traceback)
@@ -2108,7 +2111,7 @@ function M.request_raw(model_name, system_prompt, full_text, tail_text, temperat
 		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw, force_chat)
 end
 
---- Posts one prebuilt request body (llm/vision.lua build_request, format
+--- Posts one prebuilt request body (ai/engine/prediction/vision.lua build_request, format
 --- "ollama") to the local server's /api/chat, whatever backend the AI menu uses
 --- for text. The body carries private text or a screenshot: neither it nor the
 --- answer is logged, only the server's own error.
@@ -2228,8 +2231,8 @@ local function request_prebuilt(client, label, body, on_text, on_fail, continuat
 						return
 					end
 					Logger.info(LOG, "%s answer of the local server received in %dms (%d char(s)).", label, ms, #text)
-					require("perf_budget").judge(Logger, LOG, "llm.local", ms,
-						function() return require("infra.timings").ms("budgets", "llm_local_request_ms") end)
+					require("core.logger.engine.perf_budget").judge(Logger, LOG, "llm.local", ms,
+						function() return require("core.timing.engine.timings").ms("budgets", "llm_local_request_ms") end)
 					if not request_current() then
 						return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
 					end
@@ -2377,6 +2380,11 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 					do_next()
 				end,
 				function(failure)
+					-- The handler shows a stream's rows until told otherwise: withdraw
+					-- the failed one, or Tab types it while the retry runs (AIM-001).
+					if variant_partial then
+						ApiCommon.protected_call(on_partial, "on_partial", false, stream_identity)
+					end
 					-- A refused key is refused again: neither a retry nor another variant.
 					if ApiCommon.is_authentication_failure(failure) then
 						Logger.warn(LOG, "[%s] Variant %d/%d stopped: the credential was refused (no retry).",
@@ -2385,7 +2393,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						do_next()
 						return
 					end
-					if attempt < 2 then
+					-- The quick retry is an attempt of the budget, as on Windows and Linux:
+					-- outside it one prediction at multiplier 2 sent four requests, not two.
+					if attempt < 2 and attempt_index <= max_attempts then
+						attempt_index = attempt_index + 1
 						local retry_tokens = tokens + _RETRY_EXTRA_TOKENS
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _RETRY_TEMP_STEP)
 						Logger.debug(LOG, "[%s] Variant %d/%d quick retry: tokens=%d temp=%.2f",

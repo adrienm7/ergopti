@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The Linux Encryptor's conversion and its per-file flow, the port of the macOS
 --- Encryptor.app (Scripts/main.applescript and encryptor_convert.sh). The file
---- container is _shared/data/encryptor/format.json, so a file encrypted here
+--- container is _shared/apps/data/encryptor/format.json, so a file encrypted here
 --- opens on macOS and Windows and the other way round.
 ---
 --- FEATURES & RATIONALE:
@@ -24,8 +24,8 @@
 
 local M = {}
 
-local Json = require("json")
-local TextUtils = require("text_utils")
+local Json = require("core.text.engine.json")
+local TextUtils = require("core.text.engine.utils_core")
 
 local quote = TextUtils.shell_quote
 
@@ -42,7 +42,7 @@ local quote = TextUtils.shell_quote
 --- @param path string|nil Absolute path of format.json; the shared tree's by default.
 --- @return table format
 function M.load_format(path)
-	path = path or require("infra.paths").shared("data/encryptor/format.json")
+	path = path or require("core.fs.engine.paths").shared("apps/data/encryptor/format.json")
 	assert(type(path) == "string", "the shared Encryptor format is unavailable")
 	local file = assert(io.open(path, "rb"), "cannot read " .. path)
 	local raw = file:read("*a")
@@ -50,7 +50,8 @@ function M.load_format(path)
 	local format = Json.decode(raw)
 	assert(type(format) == "table" and format.magic == "Salted__" and type(format.iterations) == "number"
 		and type(format.cipher) == "string" and type(format.kdf_digest) == "string"
-		and type(format.encrypted_extension) == "string" and type(format.decrypted_fallback_suffix) == "string",
+		and type(format.encrypted_extension) == "string" and type(format.decrypted_fallback_suffix) == "string"
+		and type(format.mime_type) == "string" and format.mime_type:match("^application/[%w.+-]+$") ~= nil,
 		"the shared Encryptor format is malformed")
 	return format
 end
@@ -97,7 +98,7 @@ end
 
 --- The exit code of an os.execute result on LuaJIT and Lua 5.2+.
 local function exit_code(status, how, code)
-	return require("ui.native_dialog").exit_code(status, how, code)
+	return require("core.ui.ui.native_dialog").exit_code(status, how, code)
 end
 
 --- Runs a command and returns whether it exited 0.
@@ -140,6 +141,10 @@ function M.convert(format, mode, input, output, password, openssl)
 		local file = assert(io.open(password_file, "wb"), "cannot write the password file")
 		file:write(password)
 		file:close()
+		-- mv -f moves the stage into a folder named like the output and returns 0,
+		-- so a folder destination would be reported as converted; Windows'
+		-- MoveFileExW refuses to replace one (BAP-001).
+		if succeeded("test -d " .. quote(output)) then reason = "destination_is_folder" return end
 		local folder = output:match("^(.*)/[^/]*$") or "."
 		local base = output:match("([^/]*)$")
 		stage = read_line("mktemp " .. quote((folder == "" and "/" or folder) .. "/." .. base .. ".XXXXXX") .. " 2>/dev/null")
@@ -179,6 +184,14 @@ end
 -- ======= 3/ Flow ==============
 -- ==============================
 -- ==============================
+
+-- The failure dialog's reason for each convert refusal the system caused.
+local FAILURE_REASONS = {
+	destination_is_folder = "apps.encryptor.reason_destination_folder",
+	open_failed           = "apps.encryptor.reason_cannot_write",
+	rename_failed         = "apps.encryptor.reason_cannot_write",
+	unreadable            = "apps.encryptor.reason_cannot_write",
+}
 
 --- Whether a path names an existing regular file.
 local function is_file(path)
@@ -225,10 +238,16 @@ function M.process_file(path, ports)
 			break
 		end
 	end
-	local ok = M.convert(format, mode, path, destination, password, ports.openssl)
+	local ok, reason = M.convert(format, mode, path, destination, password, ports.openssl)
 	if not ok then
-		dialogs.message("error", title,
-			t(encrypting and "apps.encryptor.err_encrypt_failed" or "apps.encryptor.err_decrypt_failed"))
+		local failure = t(encrypting and "apps.encryptor.err_encrypt_failed" or "apps.encryptor.err_decrypt_failed")
+		-- A refused write carries its reason, as Windows appends the system's
+		-- (BAP-007); OpenSSL's own refusal is the wrong password or a corrupted
+		-- file the message already names.
+		local reason_key = FAILURE_REASONS[reason]
+		if reason_key == nil and reason ~= "command_exited_nonzero" then reason_key = "apps.encryptor.reason_cannot_write" end
+		if reason_key then failure = failure .. "\n\n" .. t(reason_key) end
+		dialogs.message("error", title, failure)
 		return "failed"
 	end
 	local summary = t(encrypting and "apps.encryptor.success_encrypted" or "apps.encryptor.success_decrypted")

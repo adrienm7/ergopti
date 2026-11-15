@@ -4,7 +4,7 @@
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
 local Fixture = require("tests.support.shortcuts_scope_fixture")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("terminal macOS shortcut scopes", function()
 	helpers.it("keeps raw physical claims through an unrelated script scope without synthesizing defaults", function()
@@ -156,7 +156,17 @@ helpers.describe("terminal macOS shortcut scopes", function()
 		end)
 	end)
 
-	for _, field in ipairs({ "paused", "idle", "stale_source", "native_mismatch" }) do
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("clears while paused (edd1-paused-writes)", function()
+		Fixture.run(function(f)
+			f.controls.paused = true
+			local before = f.files.config
+			helpers.assert_eq(f.owner.apply("clear"), true)
+			helpers.assert_true(f.files.config ~= before, "the paused clear writes its category")
+		end)
+	end)
+
+	for _, field in ipairs({ "idle", "stale_source", "native_mismatch" }) do
 		helpers.it("refuses " .. field .. " before backup or native publication", function()
 			Fixture.run(function(f)
 				if field == "idle" then f.controls[field] = false
@@ -431,7 +441,7 @@ helpers.describe("macOS ordinary obsolete shortcut parent policy", function()
 	end)
 end)
 
-require("test.config_obsolete_parents_contract").register(helpers)
+require("tests.lua.settings.obsolete_parents_contract").register(helpers)
 
 helpers.describe("shortcut fixture final script publication admission", function()
 	helpers.it("refuses a withdrawn genuine accessor and retries with the original native owner", function()
@@ -458,7 +468,7 @@ helpers.describe("shortcut fixture final script publication admission", function
 	end)
 	helpers.it("retains a real callback's external source instead of accepting its caller alias", function()
 		Fixture.run(function(f)
-			local port = package.loaded["adapters.file_system"]
+			local port = package.loaded["core.fs.adapters.file_system"]
 			local expected = { status = "ok", content = f.files.config }
 			local writes, calls = f.controls.writes, 0
 			f.controls.during_write = function()

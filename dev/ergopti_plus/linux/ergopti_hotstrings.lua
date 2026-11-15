@@ -61,7 +61,7 @@ local SCRIPT_DIR = (function()
 end)()
 
 -- Prepend the script directory and the shared Lua library to the search path.
-local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
+local SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
 local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
 local literal_direct = false
 if literal_driver and literal_driver ~= "" then
@@ -102,9 +102,9 @@ if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
 		SCRIPT_DIR = ffi.string(cwd) .. "/" .. SCRIPT_DIR
 		ffi.C.free(cwd)
 	end
-	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared/lua"
-	local probe = io.open(SHARED_LUA_DIR .. "/toml_codec/source_open.lua", "rb")
-	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared/lua" end
+	SHARED_LUA_DIR = SCRIPT_DIR .. "/../_shared"
+	local probe = io.open(SHARED_LUA_DIR .. "/core/text/engine/toml_codec/source_open.lua", "rb")
+	if probe then probe:close() else SHARED_LUA_DIR = SCRIPT_DIR .. "/_shared" end
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DRIVER_ROOT", SCRIPT_DIR, 1) == 0, "cannot export driver root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_SHARED_ROOT", SHARED_LUA_DIR, 1) == 0, "cannot export shared root")
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DIRECT", "1", 1) == 0, "cannot export source mode")
@@ -113,7 +113,7 @@ if (not literal_driver or literal_driver == "") and SCRIPT_DIR:find("[;?]") then
 end
 if literal_driver and literal_driver ~= "" then
 	local shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
-	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
+	assert(loadfile(literal_driver .. "/core/lifecycle/engine/literal_module_loader.lua"))().install(literal_driver, shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), literal_direct and "direct" or "daemon")
 	local ffi = require("ffi")
 	ffi.cdef[[int setenv(const char *, const char *, int);]]
 	assert(ffi.C.setenv("ERGOPTI_LITERAL_DAEMON", "1", 1) == 0, "cannot export daemon search order")
@@ -123,6 +123,19 @@ else
 	               SHARED_LUA_DIR .. "/?.lua;" ..
 	               SHARED_LUA_DIR .. "/?/init.lua;" ..
 	               package.path
+	-- An installed tree's modules load from the bytecode its installer compiled
+	-- (compile time was most of the boot's first 200 ms); a checkout never
+	-- reads one. Decided here, before the first application module loads.
+	local BytecodePackage = assert(loadfile(SCRIPT_DIR .. "/core/lifecycle/engine/bytecode_package.lua"))()
+	package.loaded["core.lifecycle.engine.bytecode_package"] = BytecodePackage
+	BytecodePackage.install(SCRIPT_DIR)
+end
+
+-- Before anything can load WebKit: its collector would otherwise take SIGUSR1,
+-- the reload request's signal, and a reload with a WebView open crashed us.
+do
+	local reserved, reserve_error = require("core.lifecycle.engine.shutdown.signal_handlers").reserve_webkit_gc_signal()
+	if not reserved then error(reserve_error, 0) end
 end
 
 --- Prints the CLI usage. Deliberately ENGLISH, not translated.
@@ -156,8 +169,8 @@ end
 -- from holding it after this daemon stops or crashes.
 -- The fatal outcomes that precede the logger sink leave one closed-vocabulary
 -- record in bootstrap.log (the Windows file of the same name), besides stderr.
-local BootstrapLog = require("infra.bootstrap_log")
-local lock_protected, lock_error = require("infra.session_lock").protect()
+local BootstrapLog = require("core.logger.engine.bootstrap_log")
+local lock_protected, lock_error = require("core.lifecycle.engine.shutdown.session_lock").protect()
 if not lock_protected then
 	io.stderr:write("[session_lock] " .. lock_error .. "\n")
 	BootstrapLog.append("session_lock_refused")
@@ -191,18 +204,18 @@ local legacy_folder_report = LegacyFolderMigration.run()
 
 -- Install the pure-Lua utf8 compatibility shim BEFORE any shared module require.
 -- LuaJIT 2.x does not bundle Lua 5.3's utf8 library.
-local utf8_compat = require("compat.utf8")
+local utf8_compat = require("core.lifecycle.engine.compat.utf8")
 if utf8_compat.install() then
 	-- Installed — shared modules will now get real utf8 support.
 end
 
-local Logger = require("logger.shim")
-local RuntimeGuard = require("infra.runtime_guard")
+local Logger = require("core.logger.engine.shim")
+local RuntimeGuard = require("core.lifecycle.engine.runtime_guard")
 
 -- The shared logger core only writes to an injected sink, so install ours before
 -- the first Logger.* call. Without this every log line on Linux — including the
 -- two fatal errors below — went to a ring buffer and nowhere else.
-local LoggerSink = require("infra.logger_sink")
+local LoggerSink = require("core.logger.engine.sink")
 -- A privacy admission failure must not let Lua print the unredacted exception.
 -- A false durability result remains a successfully admitted stdout-only sink.
 local privacy_admitted, privacy_failure, privacy_refusal = pcall(function() return LoggerSink.install(Logger) end)
@@ -251,33 +264,33 @@ local wpm_tray_readout = RuntimeGuard.optional_require("ui.wpm.tray_readout")
 -- Desktop notifications (optional — needs notify-send and a session bus). The
 -- adapter degrades to a log line on a headless machine, so a missing one is not
 -- a reason to refuse to start.
-local notifier = RuntimeGuard.optional_require("adapters.application_notifier")
+local notifier = RuntimeGuard.optional_require("platform.focus.application_notifier")
 
 -- Preview tooltip (optional — needs lgi and a display; the daemon expands
 -- hotstrings perfectly well without one, and a driver whose expansions work
 -- must not stop working because it cannot draw a hint about them).
-local tooltip_preview = RuntimeGuard.optional_require("ui.tooltip.preview")
-local llm_overlay = RuntimeGuard.optional_require("ui.tooltip.llm")
+local tooltip_preview = RuntimeGuard.optional_require("core.ui.ui.tooltip.preview")
+local llm_overlay = RuntimeGuard.optional_require("core.ui.ui.tooltip.llm")
 local dev_finder        = require("modules.hotstrings.device_finder")
 local keystats         = require("modules.keystats.keystats")
-local keyboard_hook     = require("adapters.keyboard_hook")
-local InputEvent        = require("infra.input_event")
-local Monotonic         = require("infra.monotonic")
+local keyboard_hook     = require("platform.input.keyboard_hook")
+local InputEvent        = require("platform.input.event")
+local Monotonic         = require("core.logger.engine.monotonic")
 local ManifestReader    = require("infra.manifest_reader")
 local ScriptSettings    = require("infra.script_settings")
-local Timings           = require("infra.timings")
+local Timings           = require("core.timing.engine.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keystats.focus_guard")
 local privacy_owners = {}
-local BootProfiler      = require("infra.boot_profiler")
+local BootProfiler      = require("core.logger.engine.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
 
 -- Optional adapters (may fail to load if deps missing — daemon still runs).
 local tray_menu = RuntimeGuard.optional_require("adapters.tray_menu")
 
 -- Event loop adapter (luv when available, pump fallback otherwise).
-local event_loop = require("adapters.event_loop")
+local event_loop = require("core.events.loop")
 
 -- Menu builder (builds rich submenus from daemon state).
 local menu_builder = RuntimeGuard.optional_require("ui.menu.builder")
@@ -299,18 +312,18 @@ local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
 
 -- Window info tracker (optional — provides app_id for keystats per-app stats).
-local window_info = RuntimeGuard.optional_require("adapters.window_info")
+local window_info = RuntimeGuard.optional_require("platform.focus.window_info")
 
 -- Process lifecycle tracker (optional — drives focus-change events on Linux).
-local process_lifecycle = RuntimeGuard.optional_require("adapters.process_lifecycle")
+local process_lifecycle = RuntimeGuard.optional_require("core.process.adapters.lifecycle")
 
 -- Optional probe, mandatory posture: when AT-SPI cannot load, FocusGuard keeps
 -- metrics and text automation closed instead of treating absence as permission.
-local secure_field_detector = RuntimeGuard.optional_require("adapters.secure_field_detector")
+local secure_field_detector = RuntimeGuard.optional_require("platform.focus.secure_field_detector")
 
 -- WebView manager (optional — GTK/WebKit2GTK window creation for UI apps).
 -- Auto-inits on load (probes lgi); windows are created on demand via show().
-local webview_manager = RuntimeGuard.optional_require("ui.webview_manager")
+local webview_manager = RuntimeGuard.optional_require("core.ui.ui.webview_manager")
 local input_capture_gate = nil
 
 -- The error window: a logged ERROR can open it (the shared policy decides); a
@@ -325,13 +338,13 @@ if ErrorDialog and ErrorDialog.init() then Logger.set_error_observer(ErrorDialog
 -- File watchers (optional — inotify-based TOML/.lua hot reload).
 -- When luv is present, uses native inotify via luv.new_fs_event();
 -- otherwise falls back to mtime polling driven by the event loop.
-local file_watchers = RuntimeGuard.optional_require("infra.file_watchers")
+local file_watchers = RuntimeGuard.optional_require("core.fs.engine.file_watchers")
 
 -- Every owner below may keep a luv handle referenced. They must stop BEFORE
 -- event_loop.stop(), otherwise luv.run() waits for the very cleanup that the
 -- daemon used to perform only after run() returned.
-local TimerScheduler = require("adapters.timer_scheduler")
-local ShutdownCoordinator = require("infra.shutdown_coordinator")
+local TimerScheduler = require("core.events.timer_scheduler")
+local ShutdownCoordinator = require("core.lifecycle.engine.shutdown.coordinator")
 local shutdown_runtime = prediction_engine and prediction_engine.shutdown_runtime
 local shutdown_webviews = webview_manager and webview_manager.shutdown
 local runtime_shutdown_ack = not prediction_engine
@@ -428,7 +441,7 @@ local shutdown = ShutdownCoordinator.new({
 			name = "screen capture cleanup",
 			wait_for_ack = true,
 			stop = function()
-				local owner = package.loaded["adapters.screen_capture"]
+				local owner = package.loaded["platform.system.screen_capture"]
 				return not owner or owner.shutdown() == true
 			end,
 		},
@@ -503,6 +516,13 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "API key migration",
+			stop = function()
+				local migration = package.loaded["modules.llm.api_key_migration"]
+				return not migration or migration.shutdown() == true
+			end,
+		},
+		{
 			-- The runtime stop above already ended the chain; this releases its ports.
 			name = "LLM model warmup",
 			stop = function() return require("modules.llm.warmup").shutdown() end,
@@ -512,6 +532,14 @@ local shutdown = ShutdownCoordinator.new({
 			wait_for_ack = true,
 			stop = function()
 				return not privacy_owners.selection or privacy_owners.selection.stop() == true
+			end,
+		},
+		{
+			-- Before the final flush, so an open capture interval ends in it, as on Windows.
+			name = "capture presence interval",
+			stop = function()
+				require("modules.keystats.topology_metrics").daemon_stop()
+				return true
 			end,
 		},
 		{
@@ -539,6 +567,17 @@ local shutdown = ShutdownCoordinator.new({
 			wait_for_ack = true,
 			stop = function()
 				if file_watchers and type(file_watchers.stop) == "function" then return file_watchers.stop() == true end
+				return true
+			end,
+		},
+		{
+			-- Started at boot on GNOME and KDE Wayland only; a no-op elsewhere.
+			name = "compositor focus source",
+			wait_for_ack = true,
+			stop = function()
+				if window_info and type(window_info.stop_compositor_focus) == "function" then
+					return window_info.stop_compositor_focus() == true
+				end
 				return true
 			end,
 		},
@@ -595,7 +634,7 @@ local shutdown = ShutdownCoordinator.new({
 				return function()
 					if not resolved then
 						resolved = true
-						client = package.loaded["adapters.http_client"]
+						client = package.loaded["core.network.adapters.http_client"]
 						stop = client and client.shutdown
 					end
 					return not client or stop() == true
@@ -635,7 +674,7 @@ local shutdown = ShutdownCoordinator.new({
 -- Default hotstring data location (XDG-compliant user config).
 -- How many periodic ticks between metric flushes. The periodic callback runs
 -- four times a second (periodSec = 0.25 below), and the cross-driver ingest
--- cadence is _shared/modules/timings/constants.toml [keystats] ingest_tick_ms —
+-- cadence is _shared/core/timing/data/constants.toml [keystats] ingest_tick_ms —
 -- what Windows uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. Derived
 -- rather than written as a literal so a change to the canon moves all three.
 local PERIODIC_TICK_MS   = 250
@@ -646,10 +685,10 @@ local DEFAULT_CONFIG_DIR = require("infra.config_paths").config("hotstrings")
 
 -- Terminator catalogue: shared between Linux and macOS.
 local terminators_mod = (function()
-	local ok, mod = pcall(require, "keymap.terminators")
+	local ok, mod = pcall(require, "layouts.engine.layers.terminators")
 	if ok and mod then return mod end
-	Logger.error(LOG, "shared keymap.terminators failed to load (%s).", tostring(mod))
-	error("ergopti_plus: shared keymap.terminators is required but failed to load")
+	Logger.error(LOG, "shared layouts.engine.layers.terminators failed to load (%s).", tostring(mod))
+	error("ergopti_plus: shared layouts.engine.layers.terminators is required but failed to load")
 end)()
 
 
@@ -744,7 +783,7 @@ local function reload_hotstrings(trigger)
 	end
 	if gestures then gestures.set_program_paused(false); gestures.set_window_switch_paused(false) end
 	Logger.info(LOG, "Catalogue reload requested by %s — reloading hotstring config…", trigger)
-	local reloaded, why = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+	local reloaded, why = require("core.lifecycle.engine.reload.outcome").run(function() return hotstrings_config.reload() end)
 	if reloaded then
 		-- A Reload click on an older tray tree now joins this reload.
 		local rebuild = privacy_owners.menu_rebuild
@@ -781,20 +820,20 @@ end
 local function restart_daemon(reason, paused)
 	local launch_args = {}
 	for index = 1, #arg do launch_args[index] = arg[index] end
-	local how = require("infra.daemon_restart").restart({ reason = reason, args = launch_args, paused = paused })
+	local how = require("core.lifecycle.engine.reload.daemon_restart").restart({ reason = reason, args = launch_args, paused = paused })
 	if how == "relay" then shutdown.request(reason) end
 	return how ~= nil
 end
 
 --- The Reload command, as on the other drivers: the daemon restarts, so every
---- module reads config.toml again (infra/reload_restart.lua). The restart
+--- module reads config.toml again (core/lifecycle/engine/reload/restart.lua). The restart
 --- cannot name its successor, so the local control writes a pending record
---- that the successor claims (infra/driver_control.lua). The successor also
---- inherits the live pause (infra/restart_pause.lua): main() installs its
+--- that the successor claims (core/lifecycle/engine/driver_control.lua). The successor also
+--- inherits the live pause (core/lifecycle/engine/reload/restart_pause.lua): main() installs its
 --- script controller before any Reload trigger can fire.
-local perform_reload, reload_in_flight, abandon_reload = require("infra.reload_restart").new({ gestures = gestures,
+local perform_reload, reload_in_flight, abandon_reload = require("core.lifecycle.engine.reload.restart").new({ gestures = gestures,
 	restart = function(reason) return restart_daemon(reason, privacy_owners.script_actions.is_paused()) end,
-	cancel = function() return require("infra.daemon_restart").cancel() end })
+	cancel = function() return require("core.lifecycle.engine.reload.daemon_restart").cancel() end })
 privacy_owners.reload_in_flight = reload_in_flight
 
 
@@ -829,23 +868,32 @@ local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
 end
 
 
---- The tray's Quit: refused for the same causes as on macOS (infra/quit_request.lua).
+--- The user's Quit (tray row, shortcut, gesture): refused for the same causes as on
+--- macOS (core/lifecycle/engine/shutdown/quit_request.lua).
 --- Held in privacy_owners: main() already sits at LuaJIT's 60-upvalue limit.
-privacy_owners.tray_quit = require("infra.quit_request").new({
+privacy_owners.tray_quit = require("core.lifecycle.engine.shutdown.quit_request").new({
 	shutdown = shutdown,
 	reload_in_flight = reload_in_flight,
 	abandon_reload = abandon_reload,
 	writer_active = function() return require("infra.scope_registry").pending() end,
 	publication_pending = function() return hotstrings_config.publication_pending() end,
 	apply_pause_layout = function() require("modules.keymap.pause_layout_switch").quit_safely() end,
+	report_update_quit = function(reason) require("infra.updater_boot_ready").report_quit(reason) end,
 	schedule = function(seconds, callback)
 		return TimerScheduler.after(seconds, callback).armed == true
 	end,
 	now = function() return require("luv").hrtime() / 1e9 end,
 	timeout = Timings.ms("ui", "user_quit_deadline_ms") / 1000,
 	poll = 0.25,
-	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("infra.i18n").get) end,
+	notify_refused = function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end,
 })
+
+--- A Quit from a shortcut, a gesture or the degraded tray row: the owner tells
+--- the user of a refusal that comes after the call returned, this of one that
+--- comes at once, as the tray row (ui/menu/menu_quit.lua) and Windows' quit
+--- admission do (NUI-001).
+privacy_owners.user_quit = require("core.lifecycle.engine.shutdown.quit_request").notifying(privacy_owners.tray_quit,
+	function() require("ui.menu.feature_notice").quit_refused(require("core.i18n.engine.i18n").get) end)
 
 
 -- =========================================
@@ -855,10 +903,18 @@ privacy_owners.tray_quit = require("infra.quit_request").new({
 -- =========================================
 
 local function install_signal_handlers()
-	local signals = require("infra.signal_handlers")
+	local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
 		pcall(Logger.info, LOG, "Signal %d received — shutting down…", sig)
+		-- A logout, a second launch's restart or a service stop during an update's
+		-- ready wait or probation is no failed start: the watcher keeps the update
+		-- instead of starting the previous daemon, as the macOS shutdown callback
+		-- reports a quit for any termination that is not a reload.
+		if not shutdown.is_requested() then
+			local reported, report_err = pcall(require("infra.updater_boot_ready").report_quit, "signal " .. tostring(sig))
+			if not reported then pcall(Logger.error, LOG, "The update watcher could not be told of the signal: %s.", tostring(report_err)) end
+		end
 		shutdown.request("signal " .. tostring(sig))
 		-- Native retirement may still be pending after request() returns.
 		-- Output closes only in the normal clean-exit path after all ACKs.
@@ -892,7 +948,7 @@ local function main()
 	local UserHotstringRuntime = require("infra.user_hotstring_runtime")
 	local PreviewSettings = require("modules.hotstrings.preview_settings")
 	local ExpansionDelay = require("modules.hotstrings.expansion_delay")
-	local InputCaptureGate = require("infra.input_capture_gate")
+	local InputCaptureGate = require("platform.input.capture_gate")
 	-- How many candidates the preview asks the engine for. The panel itself caps
 	-- the rows it draws; this cap is about the WORK — the enumeration runs on
 	-- every keystroke, and a bucket for a common tail character holds hundreds of
@@ -903,7 +959,7 @@ local function main()
 
 	-- A start outside launch.sh (AppRun, Nix wrapper, manual luajit) holds no lock
 	-- yet; a second keyboard grab next to a running daemon is refused here.
-	local lock_acquired, lock_refusal, lock_contended = require("infra.session_lock").acquire()
+	local lock_acquired, lock_refusal, lock_contended = require("core.lifecycle.engine.shutdown.session_lock").acquire()
 	if not lock_acquired then
 		io.stderr:write("[session_lock] " .. lock_refusal .. "\n")
 		BootstrapLog.append(lock_contended and "second_instance_yielded" or "session_lock_refused")
@@ -917,6 +973,8 @@ local function main()
 	Logger.start(LOG, "Ergopti hotstrings daemon starting (version %s, pid %s)…",
 		Version.VERSION, DiagnosticSnapshot.pid() or "unknown")
 	BootProfiler.begin()
+	require("core.lifecycle.engine.bytecode_package").report(function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+		function(fmt, ...) Logger.warn(LOG, fmt, ...) end)
 	-- The options decide half of what follows (grab, tray, device pinning), and a
 	-- user log has no other record of how the unit was launched.
 	Logger.info(LOG, "Launch options: grab=%s tray=%s dry_run=%s verbose=%s device=%s layout=%s keymap=%s config=%s.",
@@ -924,9 +982,9 @@ local function main()
 		opts.device and "pinned" or "auto", tostring(opts.layout),
 		opts.keymap and "override" or "server", opts.config and "custom" or "default")
 	-- Resolved here so a launcher root naming another clone stops the boot
-	-- (infra/dev_source.lua) before any watcher or restart relies on it.
+	-- (core/lifecycle/engine/dev_source.lua) before any watcher or restart relies on it.
 	do
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		local dev_root = DevSource.root()
 		if dev_root then
 			Logger.info(LOG, "Developer source mode; Lua runs from %s%s.", dev_root, DevSource.DRIVER_SUBPATH)
@@ -938,33 +996,41 @@ local function main()
 	end
 
 	BootProfiler.stage("config")
-	require("toml_codec.writer").set_sparse_defaults(
+	require("core.text.engine.toml_codec.writer").set_sparse_defaults(
 		require("infra.config_paths").config("config.toml"), require("infra.manifest_reader"))
-	require("toml_codec.writer").set_case_twin_reporter(function(message, admission)
-		local notifier = require("adapters.notifier")
+	require("core.text.engine.toml_codec.writer").set_case_twin_reporter(function(message, admission)
+		local notifier = require("platform.system.notifier")
 		if admission ~= nil then
 			local called, current = pcall(admission)
 			if not called or current ~= true then return false end
 		end
 		return notifier.send(message, { level = "error" })
 	end)
+	-- 7.9) Stages a killed or crashed Ergopti process left beside the settings
+	-- (storage.json and the TOML files) are removed before anything writes
+	-- there; a foreign file is never touched (CFD-1, core/lifecycle/engine/stage_owner.lua).
+	require("core.lifecycle.engine.stage_owner").reap_settings()
 	-- 8.0) Version config.toml before anything reads or writes it: the gesture
 	-- and shortcut managers below load the migrated file, and a file the wizard
 	-- creates carries this build's version. A file this build cannot version (a
 	-- newer schema, a failed migration) stays untouched and every write to it is
-	-- refused for the session (_shared/lua/config_migrate.lua,
+	-- refused for the session (_shared/settings/engine/migration/migrate.lua,
 	-- docs/adr/009-config-versioning.md). Required here, not at the top: main()
 	-- sits near LuaJIT's upvalue limit.
 	do
-		local migration = require("config_migrate").boot({
+		local migration = require("settings.engine.migration.migrate").boot({
 			path          = require("infra.config_paths").config("config.toml"),
 			driver        = "linux",
-			registry_path = require("infra.paths").shared(require("config_migrate").REGISTRY_PATH),
+			registry_path = require("core.fs.engine.paths").shared(require("settings.engine.migration.migrate").REGISTRY_PATH),
+			-- The v22 step moves the switch, the timings and [mod_combos] out of the
+			-- tap_hold.toml beside config.toml, once (maintainer decision 2026-11-11).
+			companions    = { [require("tap_hold.engine.shared_file").FILE_NAME] =
+				require("infra.config_paths").config(require("tap_hold.engine.shared_file").FILE_NAME) },
 		})
 		-- A newer file stays read-only for the session: tell the user why their
 		-- changes do not stick. Block-local, as main() is near the upvalue limit.
-		local notice = require("config_migrate").read_only_notice_key(migration)
-		local notice_i18n = notice and RuntimeGuard.optional_require("infra.i18n")
+		local notice = require("settings.engine.migration.migrate").read_only_notice_key(migration)
+		local notice_i18n = notice and RuntimeGuard.optional_require("core.i18n.engine.i18n")
 		if notice and notifier and notice_i18n then
 			notifier.send(notice_i18n.get(notice), { level = "warning" })
 		elseif notice then
@@ -976,9 +1042,12 @@ local function main()
 	-- resolve absence to off, which would silence an updated install.
 	require("infra.legacy_hotstring_storage").import({
 		path     = require("infra.config_paths").config("config.toml"),
-		storage  = require("adapters.storage"),
+		storage  = require("core.fs.adapters.storage"),
 		families = dyn_hotstrings and dyn_hotstrings.RULE_FAMILIES or {},
 	})
+	-- The exclusion lists name applications by WM class now, not by the X11
+	-- process name (ADD-3): converted once, before any list owner reads them.
+	require("core.lifecycle.engine.app_identity_migration").run()
 
 	-- 8.1) Initialise the hotstring engine.
 	local engine = engine_mod.new()
@@ -1060,9 +1129,10 @@ local function main()
 
 	-- 8.3) Initialise the full keystats.
 	BootProfiler.stage("keystats")
-	local metrics_initialized = keystats.init({})
+	-- Its background tasks (ledger export, text migration) wait for the loop.
+	local metrics_initialized = keystats.init({ defer = event_loop.defer })
 	if metrics_initialized == false and notifier then
-		local notice_i18n = RuntimeGuard.optional_require("infra.i18n")
+		local notice_i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n")
 		if notice_i18n then
 			pcall(function() notifier.send(notice_i18n.get("dialog.metrics.storage_unavailable"), { level = "warning" }) end)
 		end
@@ -1075,13 +1145,13 @@ local function main()
 	if not device then
 		device = dev_finder.find_keyboard()
 	end
-	local InputAccess = require("infra.input_access")
+	local InputAccess = require("platform.input.access")
 	-- The launcher could not set up the input groups because a program is
 	-- missing: say which one before the device error that follows from it.
 	local missing_program = InputAccess.missing_program()
 	if missing_program then
 		Logger.error(LOG, "Input permission setup needs %s, which is not installed.", missing_program)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil, program = missing_program,
 			body_key = InputAccess.MISSING_PROGRAM_BODY_KEY },
 			"missing program " .. missing_program))
@@ -1092,7 +1162,7 @@ local function main()
 		-- A sandbox that hides /dev/input looks like this: with --tray the icon
 		-- still names the problem instead of the app vanishing.
 		if opts.tray and tray_menu then
-			InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+			InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"), notifier = notifier,
 				tray = tray_menu, body_key = InputAccess.NO_DEVICE_BODY_KEY }, "no keyboard device detected")
 		end
 		os.exit(1)
@@ -1103,12 +1173,15 @@ local function main()
 	-- the unit does not retry, since only a new session can fix it.
 	if InputAccess.is_denied(device) then
 		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"), notifier = notifier,
 			tray = opts.tray and tray_menu or nil },
 			device .. " is not readable (the input group applies from the next session)"))
 	end
 	Logger.info(LOG, "Using device: %s.", device)
 	BootProfiler.stage_done("input device", opts.device and "pinned by --device" or "auto-detected")
+	-- 8.5 to 8.8 had no stage: the boot summary left their time between two
+	-- stages, unattributed (about 170 ms in a measured X11 session).
+	BootProfiler.stage("callbacks")
 
 	-- Focused app id, cached off the input path by the process_lifecycle
 	-- onFocusChange callback (see 8.12). Declared BEFORE on_char so on_char
@@ -1142,6 +1215,11 @@ local function main()
 	-- When the buffer forgets the current word: after a pause and on a click.
 	-- Required here for the same upvalue budget as TapHold.
 	local WordReset = require("modules.hotstrings.word_reset")
+	-- The erase-to-text pause only where Windows and macOS pace it: a terminal,
+	-- or an application nobody could name (the focus is unknown).
+	injector.set_erase_pacing(function()
+		return _cached_app_id == nil or WordReset.is_terminal_app(_cached_app_id)
+	end)
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
@@ -1180,8 +1258,10 @@ local function main()
 			_undoable = nil
 			engine:reset(false)
 		end,
-		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
+		-- The switch and the timings are config.toml rows on every OS.
+		config_path = require("infra.config_paths").config("config.toml"),
 	})
 	end)
 	if not privacy_owners.tap_hold_called or privacy_owners.tap_hold_initialized ~= true then
@@ -1214,11 +1294,12 @@ local function main()
 	-- configuration folder's layers.toml when it has none.
 	require("platform.remap.tap_hold_writer").init({
 		path = TapHold.user_path(),
+		config_path = TapHold.config_path(),
 		reload = TapHold.reload,
 		is_tap_action = TapHold.is_tap_action,
 		canonical_hold = TapHold.canonical_hold,
 		layers = {
-			shared_root = require("infra.paths").shared_root(),
+			shared_root = require("core.fs.engine.paths").shared_root(),
 			config_dir = require("infra.config_paths").get_config_dir(),
 		},
 	})
@@ -1243,24 +1324,37 @@ local function main()
 			engine:reset(false)
 		end,
 		reload = perform_reload,
-		quit = function(reason)
-			if not shutdown.is_requested() then require("modules.keymap.pause_layout_switch").quit_safely() end
-			shutdown.request(reason)
-		end,
+		-- A shortcut or gesture Quit is the same user Quit as the tray row: it
+		-- cancels a reload in flight, waits for writes and tells a waiting update
+		-- watcher, so the update is not rolled back (LCY-003).
+		quit = function(reason) return privacy_owners.user_quit(reason) end,
 		hide_preview = tooltip_preview and function() tooltip_preview.hide() end or nil,
 		hide_prediction = llm_overlay and function() llm_overlay.hide() end or nil,
 		cancel_prediction = prediction_engine and type(prediction_engine.cancel) == "function"
 			and function() prediction_engine.cancel() end or nil,
+		-- A pause and a resume are announced, as on macOS (shared keys and levels).
+		notify = notifier and function(key, level)
+			return notifier.send(require("core.i18n.engine.i18n").get(key), { level = level })
+		end or nil,
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keystats.cancel_hold_intervals() end
 			keystats.discard_roi()
+			-- A pause stops every metric, as on macOS and Windows; the focused
+			-- application's time starts again with the resume.
+			keystats.set_script_paused(paused == true)
+			if not paused and _cached_app_id then keystats.on_app_focus(_cached_app_id) end
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
-			if paused then MagicKeySource.cancel_capture() end
+			-- A capture never crosses a pause boundary, either way.
+			MagicKeySource.cancel_capture()
+			-- A dead key pending in the emulation must not compose after the resume.
+			if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end
+			-- The spotlight ring is an overlay of its own timer: a pause ends it.
+			if paused then require("modules.gestures.pointer_spotlight").dismiss() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
@@ -1281,7 +1375,7 @@ local function main()
 	-- Every Reload trigger restarts with this live pause (perform_reload).
 	privacy_owners.script_actions = script_actions
 
-	local pause_restored, pause_detail = require("infra.restart_pause").restore(script_actions)
+	local pause_restored, pause_detail = require("core.lifecycle.engine.reload.restart_pause").restore(script_actions)
 	if not pause_restored then
 		Logger.error(LOG, "Startup refused: %s.", tostring(pause_detail))
 		return
@@ -1292,7 +1386,7 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
-	privacy_owners.watch = require("adapters.atspi_focus_watch").new()
+	privacy_owners.watch = require("platform.focus.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
 		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,
@@ -1390,10 +1484,10 @@ local function main()
 		end
 		local user_preferences = require("infra.hotstring_preferences")
 		if dyn_hotstrings.set_user_code_time_activation(
-			user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
+			user_preferences.get(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS)) ~= true then
 			error("canonical programmable-hotstring interval did not commit before hook startup")
 		end
-		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
+		if dyn_hotstrings.set_user_code_enabled(user_preferences.get(require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED)) ~= true then
 			Logger.error(LOG, "Programmable hotstrings remain closed after source admission refusal.")
 		end
 	end
@@ -1573,9 +1667,10 @@ local function main()
 			if repeated then
 				result = {
 					trigger         = MagicKey.get(),
+					typed_trigger   = MagicKey.get(),
 					replacement     = repeated.replacement,
 					backspace_count = repeated.backspace_count,
-					group           = require("config_keys").COMMAND.REPEAT_KEY,
+					group           = require("settings.engine.keys").COMMAND.REPEAT_KEY,
 					-- The repeated word stays in the matcher (a second repeat, a
 					-- shipped correction), as on Windows and macOS.
 					final_result    = false,
@@ -1640,7 +1735,8 @@ local function main()
 					-- Undo erases what it typed, counted back from the caret: a pressed
 					-- key has moved the caret, so that count would delete the wrong text.
 					_undoable = not parsed_output and {
-						trigger     = result.trigger,
+						-- What the user typed, casing included, not the stored trigger.
+						trigger     = result.typed_trigger,
 						replacement = result.replacement,
 						is_private  = result.is_private,
 						destination = destination,
@@ -1654,7 +1750,7 @@ local function main()
 					_undoable = nil
 					engine:reset(false)
 					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
-						and delivery_error == require("adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
+						and delivery_error == require("diagnostics.engine.adapter_errors").PROGRAMMABLE_PUBLICATION_STALE and Logger.warn or Logger.error
 					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
@@ -1682,7 +1778,7 @@ local function main()
 
 		-- The preview bubble, which nothing drew until 2026-08-05.
 		--
-		-- ui/tooltip/preview.lua was complete — it gates on the four toggles,
+		-- core/ui/ui/tooltip/preview.lua was complete — it gates on the four toggles,
 		-- resolves the accent, builds the rows and calls the renderer — and
 		-- `M.show` had no caller anywhere in the driver. So the whole preview
 		-- surface was inert on every desktop and in every configuration, even with
@@ -1838,7 +1934,7 @@ local function main()
 	-- than to the whole input.dispatch span that also contains the tap-hold path.
 	do
 		-- Required here, not at file level: main() sits at LuaJIT's 60-upvalue limit.
-		local Perf = require("infra.perf_counters")
+		local Perf = require("core.logger.engine.perf_counters")
 		local guarded_char = on_char
 		on_char = function(ch, scancode)
 			local started = Perf.clock()
@@ -1857,11 +1953,15 @@ local function main()
 	local function handle_physical(scancode, _key_name, _char, value, source)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		TapHold.observe_copy_activity()
+		-- Any key press ends a gesture's click hold, as on Windows.
+		if gestures then gestures.release_clicks_on_activity() end
 		capture_owned_scancodes[scancode] = nil
 		local allowed = not secure_focus_guard.blocks_text()
 		physical_privacy_admission = { code = scancode, allowed = allowed }
 		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
+		-- A paused driver feeds neither the heatmap nor the live WPM (EDD-1).
+		if script_actions.is_paused() then return end
 		local app_id = _cached_app_id or "Unknown"
 		if keystats.is_unrecorded_app(app_id) then
 			keystats.suppress()
@@ -1959,17 +2059,21 @@ local function main()
 			-- llm_agent_command asks for the command in a native entry.
 			ask_text = function(title, prompt)
 				if opts.dry_run then return nil end
-				return require("ui.text_prompt").ask(title, prompt, "")
+				return require("core.ui.ui.text_prompt").ask(title, prompt, "")
 			end,
 			-- The screen actions capture to a private file with the screenshot
 			-- actions' tools; the engine reads and deletes it.
 			capture_screen = function(mode, max_edge, on_done)
 				if opts.dry_run then return nil, "dry run" end
-				return require("adapters.screen_capture").capture(mode, max_edge, on_done)
+				return require("platform.system.screen_capture").capture(mode, max_edge, on_done)
 			end,
 			-- The tray's live submenu checks the live prompt: redrawn when a
 			-- binding turns live mode on or off.
 			on_live_change = function()
+				if rebuild_tray_menu then rebuild_tray_menu() end
+			end,
+			-- The tray's agent rows check the mode: redrawn when a binding switches it.
+			on_agent_mode_change = function()
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
 			on_models_changed = function()
@@ -2009,7 +2113,7 @@ local function main()
 		-- as on Windows and macOS. The engine schedules the chain when the AI starts,
 		-- resumes or changes model, and stops it with its runtime.
 		if require("modules.llm.warmup").init({
-			scheduler = require("adapters.timer_scheduler"),
+			scheduler = require("core.events.timer_scheduler"),
 			target = prediction_engine.warmup_target,
 			request = prediction_engine.warmup_request,
 			busy = prediction_engine.is_predicting,
@@ -2020,14 +2124,18 @@ local function main()
 			require("modules.llm.warmup").schedule("startup")
 		end
 		-- API keys an earlier build wrote in plaintext move to the desktop secret
-		-- service once, here: a load never rewrites the file, and waiting for the
-		-- next save would keep them in plaintext while nothing changes.
-		-- A failure here costs the migration, never the boot.
-		local entries_loaded, entries = pcall(require, "modules.llm.api_entries")
-		local migration_ran, failure = entries_loaded, entries
-		if entries_loaded then migration_ran, failure = pcall(entries.migrate_plaintext) end
-		if not migration_ran then
-			Logger.error(LOG, "Plaintext API keys were not migrated: %s", tostring(failure))
+		-- service in the background: a load never rewrites the file, and waiting
+		-- for the next save would keep them in plaintext while nothing changes.
+		-- The boot only arms the move; a locked keyring never delays input
+		-- readiness (decided by the maintainer on 2026-11-11), and a failure
+		-- here costs the migration, never the boot.
+		local migration_loaded, migration = pcall(require, "modules.llm.api_key_migration")
+		local migration_armed, failure = migration_loaded, migration
+		if migration_loaded then
+			migration_armed, failure = pcall(function() return migration.init() and migration.start() end)
+		end
+		if not migration_armed or failure ~= true then
+			Logger.error(LOG, "The background move of plaintext API keys was not armed: %s", tostring(failure))
 		end
 	end
 
@@ -2079,7 +2187,9 @@ local function main()
 				edits_text = true
 			end
 			secure_focus_guard.blocks_text()
-			local chord = keyboard_shortcuts.chord_name(detail)
+			-- A paused driver records no typing metrics (EDD-1), as macOS and
+			-- Windows drop them while paused.
+			local chord = not script_actions.is_paused() and keyboard_shortcuts.chord_name(detail) or nil
 			if chord then
 				keystats.record_shortcut(_cached_app_id or "Unknown", chord,
 					math.floor(Monotonic.now_ms()))
@@ -2087,9 +2197,9 @@ local function main()
 			-- The same master switch gates CapsWord and every menu operation. It must
 			-- also gate modifier chords; otherwise "Shortcuts off" still opens ChatGPT
 			-- and runs the user's assignments while claiming the feature is disabled.
-			-- A pause gates them the same way. The script-control actions pass
-			-- both gates: they are how the user resumes, including after « Disable
-			-- all », which switches the shortcuts feature off.
+			-- A pause and dry-run gate them the same way, a slot bound to a script
+			-- action included (SCD-1): only the AltGr script chords stay live, they
+			-- are how the user resumes, including after « Disable all ».
 			local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
 			pcall(keyboard_shortcuts.dispatch, detail, {
 				only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
@@ -2128,7 +2238,7 @@ local function main()
 			local admission = physical_privacy_admission
 			physical_privacy_admission = nil
 			local admitted
-			if admission and admission.code == require("infra.evdev_codes").KEY_BACKSPACE then
+			if admission and admission.code == require("platform.input.evdev_codes").KEY_BACKSPACE then
 				admitted = admission.allowed
 			else
 				admitted = not secure_focus_guard.blocks_text()
@@ -2177,13 +2287,24 @@ local function main()
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
-				-- The trigger is typed text: its length is the diagnostic, not its content.
-				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
-					utf8.len(undo.trigger) or #undo.trigger)
-				injector.inject(remaining - 1, undo.trigger, undo.is_private, nil, undo.destination)
+				-- The trigger is typed text: its length is the diagnostic, not its
+				-- content, and a private one gives not even that (Windows, macOS).
+				if undo.is_private then
+					Logger.info(LOG, "Undo: restoring a private trigger (content withheld).")
+				else
+					Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
+						utf8.len(undo.trigger) or #undo.trigger)
+				end
+				local ok_delivery, delivery = pcall(injector.inject, remaining - 1, undo.trigger,
+					undo.is_private, nil, undo.destination)
 				-- The restored trigger ends the line and is not in the buffer: a
-				-- word-start rule typed next would otherwise fire inside it.
+				-- word-start rule typed next would otherwise fire inside it. A
+				-- refused restore leaves the line unknown, which the same reset says.
 				engine:reset(false)
+				if not (ok_delivery and type(delivery) == "table" and delivery.ok == true) then
+					Logger.error(LOG, "Undo: the trigger was not restored: %s.",
+						tostring(ok_delivery and type(delivery) == "table" and delivery.error or delivery))
+				end
 				return
 			end
 		end
@@ -2205,6 +2326,31 @@ local function main()
 		Logger.debug(LOG, "Control key '%s' — buffer %s.", key_name, effect)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
+	-- Copy and paste chords the application receives, for events_clipboard
+	-- (keystats.clipboard_events). The driver's own injected chords come from
+	-- its virtual device, which the hook never reads, so only the user's count.
+	local function observe_clipboard_chord(key_name, detail)
+		local mods = type(detail) == "table" and type(detail.mods) == "table" and detail.mods or {}
+		local key = key_name
+		if key_name == "shortcut" then key = keyboard_shortcuts.collision_identity(detail.key) end
+		-- Required here, not at the top: main() is at LuaJIT's 60-upvalue limit.
+		local action = require("metrics.engine.capture.clipboard_events").classify_chord(key, {
+			primary = mods.ctrl == true, shift = mods.shift == true, alt = mods.alt == true,
+			other = mods.meta == true or mods.altgr == true,
+		})
+		if not action then return end
+		local excluded = script_actions.is_paused()
+			or (physical_privacy_admission ~= nil and not physical_privacy_admission.allowed)
+			or secure_focus_guard.blocks_text() == true or input_capture_gate.blocks_text() == true
+		keystats.record_clipboard_chord(_cached_app_id or "Unknown", action, math.floor(Monotonic.now_ms()), excluded)
+	end
+	do
+		local guarded_control = on_control
+		on_control = function(key_name, detail)
+			observe_clipboard_chord(key_name, detail)
+			return guarded_control(key_name, detail)
+		end
+	end
 
 	-- 8.7b) A pointer click moves the caret.
 	--
@@ -2281,7 +2427,7 @@ local function main()
 		pause_epoch = script_actions.pause_epoch,
 		is_active = function(action)
 			return shortcuts ~= nil and shortcuts.is_enabled() and not script_actions.is_paused()
-				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").is_script_action(action))
+				and (action == nil or not opts.dry_run or require("modules.shortcuts.script_actions").runs_while_paused(action))
 		end,
 		defer = function(fn) return event_loop.defer(fn) end,
 	})
@@ -2348,7 +2494,11 @@ local function main()
 		dry_run = opts.dry_run == true,
 	})
 
-	local function on_click()
+	local function on_click(code)
+		-- A physical button press ends a gesture's click hold, as Windows' mouse
+		-- down subscribers do (GSX-001). A finger landing on the touchpad is no
+		-- button: it is how the held button drags.
+		if gestures and InputEvent.is_pointer_button(code) then gestures.release_clicks_on_activity() end
 		keystats.discard_roi()
 		TapHold.observe_copy_activity()
 		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
@@ -2374,10 +2524,13 @@ local function main()
 	-- The metrics count clicks, wheel turns and distance from the same stream.
 	-- The manager names the event's pointer kind: main() is at LuaJIT's
 	-- 60-upvalue limit.
-	local function on_pointer_event(kind_of_event, code, value, source)
+	local function on_pointer_event(kind_of_event, code, value, source, at_us)
+		-- A touch report only feeds the tap-to-click count; its coordinate
+		-- change also arrives as absolute_motion.
+		if kind_of_event == "contact" then keystats.record_pointer(kind_of_event, code, value, source); return end
 		if wpm_widget then wpm_widget.observe_pointer(kind_of_event, value, Monotonic.now_ms() / 1000) end
 		-- An absolute coordinate is no distance in the relative units the metrics count.
-		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source) end
+		if kind_of_event ~= "absolute_motion" then keystats.record_pointer(kind_of_event, code, value, source, at_us) end
 		if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end
 		-- Motion, a wheel turn or a touchpad coordinate is user activity: a
 		-- pending prediction stops (a zero-distance report is none). Presses
@@ -2495,7 +2648,7 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+		require("platform.input.access").report({ i18n = RuntimeGuard.optional_require("core.i18n.engine.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)")
 		error("Fast output unavailable; refusing input capture", 0)
@@ -2512,15 +2665,27 @@ local function main()
 	end
 	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
-	-- it, so the application never sees a chord Ergopti runs. It comes last: an
-	-- offered prediction's own digit chord is contextual and outranks a binding.
+	-- it, so the application never sees a chord Ergopti runs. An offered
+	-- prediction's own digit chord is contextual and outranks a binding; both run
+	-- before the layout emulation, as Windows runs a slot before its layout chord
+	-- and macOS lets the digit accept (ILL-001, ILL-002).
 	-- The press is recorded for the metrics exactly as the control callback
 	-- records a forwarded chord, and the typing buffer is left alone because the
 	-- key never reached the application (the gesture path runs actions the same way).
 	-- Dry-run refuses before the hook claims a chord, and again at deferred
-	-- delivery through the live master gate. Script lifecycle actions stay live.
+	-- delivery through the live master gate. No slot runs through it, a script
+	-- action included (SCD-1); the AltGr script chords are their own consumer.
 	local function consume_bound_chord(detail)
 		local shortcuts_on = shortcuts ~= nil and shortcuts.is_enabled()
+		-- Under an emulated layout a slot follows the emulated letter, as on
+		-- Windows: Ctrl on the key typing « a » is the ctrl+a slot (ILX-001).
+		local emulated_key = require("modules.keymap.layout_emulation").chord_key(detail)
+		if emulated_key then
+			local offered = {}
+			for field, value in pairs(detail) do offered[field] = value end
+			offered.key = emulated_key
+			detail = offered
+		end
 		local consumed = keyboard_shortcuts.consume(detail, {
 			pause_epoch = script_actions.pause_epoch,
 			only_script = opts.dry_run or script_actions.is_paused() or not shortcuts_on,
@@ -2531,7 +2696,8 @@ local function main()
 			end,
 		})
 		if not consumed then return false end
-		local chord = keyboard_shortcuts.chord_name(detail)
+		-- A paused driver records no typing metrics (EDD-1).
+		local chord = not script_actions.is_paused() and keyboard_shortcuts.chord_name(detail) or nil
 		if chord then
 			keystats.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
 		end
@@ -2547,30 +2713,26 @@ local function main()
 		end
 		if script_chords.on_key(detail) then return true end
 		-- Ctrl+é as Ctrl+C on a layout whose accents are not shortcut letters,
-		-- under the Shortcuts master like the keyboard slots.
-		if require("modules.shortcuts.accented_shortcuts").on_key(detail, {
+		-- under the Shortcuts master like the keyboard slots, and only while no
+		-- layout is emulated, as on Windows.
+		local accented, accented_repeat = require("modules.shortcuts.accented_shortcuts").on_key(detail, {
 			active = function()
 				return not opts.dry_run and not script_actions.is_paused() and shortcuts ~= nil
 					and shortcuts.is_enabled() == true and input_capture_gate.blocks_text() ~= true
 			end,
+			emulating = function() return require("modules.keymap.layout_emulation").status().active == true end,
 			defer = function(fn) return event_loop.defer(fn) end,
 			press = function(combo) return (require("modules.gestures.combo_emitter").press(combo)) end,
-		}) then return true end
+		})
+		if accented then
+			return { consume = true, repeat_callback = input_capture_gate.guard(accented_repeat) }
+		end
 		if tap_keys.on_key(detail) then
 			-- This consumed press never reaches the ordinary selection consumer.
 			-- Retire its old PRIMARY window before the deferred action can run.
 			wrap_on_type.end_selection_window()
 			return true
 		end
-		-- The layout emulation, after the actions the user bound on a key.
-		local emulated, emulated_repeat = require("modules.keymap.layout_emulation").on_key(detail)
-		if emulated then
-			-- Typed in the key's place: like a re-emitted key, it ends a selection.
-			wrap_on_type.end_selection_window()
-			if emulated_repeat == nil then return true end
-			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat) }
-		end
-		if wrap_on_type.on_key(detail) then return true end
 		if prediction_engine
 			and type(prediction_engine.handle_shortcut) == "function"
 			and prediction_engine.handle_shortcut(detail) == true then
@@ -2579,7 +2741,19 @@ local function main()
 		-- A key the tooltip did not own is user activity: a pending prediction
 		-- stops before the typing path arms the next pause.
 		if prediction_engine then prediction_engine.note_user_activity("keystroke") end
-		return consume_bound_chord(detail)
+		if consume_bound_chord(detail) then return true end
+		-- The layout emulation, after the actions the user bound on a key.
+		local emulated, emulated_repeat, emulated_release = require("modules.keymap.layout_emulation").on_key(detail)
+		if emulated then
+			-- Typed in the key's place: like a re-emitted key, it ends a selection.
+			wrap_on_type.end_selection_window()
+			if emulated_repeat == nil then return true end
+			-- A held key of the layout source emulation (a custom modifier, a tap-hold)
+			-- owns its release, unguarded: a lost release would leave it held.
+			return { consume = true, repeat_callback = input_capture_gate.guard(emulated_repeat),
+				release_callback = emulated_release }
+		end
+		return wrap_on_type.on_key(detail) == true
 	end)
 	-- Bind the same privacy owner for both ends of a physical measurement.
 	local hold_token = keystats.hold_accounting_token
@@ -2611,7 +2785,7 @@ local function main()
 	-- is French. Running it after section 8.9 meant the first tray a non-French
 	-- user ever saw was drawn entirely in French, and stayed that way until
 	-- something happened to rebuild the menu.
-	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and i18n_mod then
 		i18n_mod.init()
 		-- From the manifest, like every other reader of this value. This was the
@@ -2627,6 +2801,7 @@ local function main()
 	end
 
 
+	BootProfiler.stage_done("callbacks")
 	-- 8.9) Start the tray menu if requested.
 	BootProfiler.stage("tray")
 	if opts.tray and tray_menu then
@@ -2634,7 +2809,7 @@ local function main()
 		-- GTK, libayatana-appindicator, lgi and WebKitGTK are the host's (owned
 		-- runtimes, SYS): a missing one is named here rather than leaving an
 		-- invisible daemon or windows that never open.
-		local refusal = require("infra.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
+		local refusal = require("core.ui.engine.gui_stack").check_at_start({ i18n = ok_i18n and i18n_mod or nil, notifier = notifier })
 		if refusal then os.exit(refusal) end
 		tray_menu.setIcon({ title = "Ergopti" })
 		if not privacy_owners.startup_checkpoint() then return end
@@ -2653,7 +2828,7 @@ local function main()
 			local function xdg_open_log_target(target)
 				Logger.info(LOG, "Opening %s", target)
 				local started = os.execute(string.format("xdg-open %s 2>/dev/null &",
-					require("text_utils").shell_quote(target)))
+					require("core.text.engine.utils_core").shell_quote(target)))
 				return started == true or started == 0
 			end
 			return {
@@ -2688,6 +2863,7 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
+					local switch_started = require("core.logger.engine.perf_counters").trace("layout.switch")
 					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
 					local function selected_map_current()
 						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
@@ -2699,6 +2875,7 @@ local function main()
 						return selected_map_current() and set_layout(new_layout) == true
 							and selected_map_current() and refresh(selected_keymap) == true
 					end, selected_map_current) then
+						require("core.logger.engine.perf_counters").done("layout.switch", switch_started, "refused")
 						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
 						return
 					end
@@ -2714,7 +2891,8 @@ local function main()
 					-- So the tick moves to the row the user just chose. Without it the
 					-- menu still marks the old layout and the change reads as ignored.
 					if rebuild_tray_menu then rebuild_tray_menu() end
-					Logger.success(LOG, "Layout '%s' applied.", tostring(new_layout))
+					Logger.success(LOG, "Layout '%s' applied in %.0f ms.", tostring(new_layout),
+						require("core.logger.engine.perf_counters").done("layout.switch", switch_started))
 				end,
 		keystats     = keystats,
 		llm           = prediction_engine,
@@ -2747,19 +2925,14 @@ local function main()
 			end,
 			-- A check asked from the tray: its answer is told, and the menu redrawn
 			-- so an install row appears for a found release.
-			on_update_checked = function(available, release, err)
+			on_update_checked = function(result)
 				if notifier and ok_i18n and i18n_mod then
-					local body
-					if available and release then
-						body = i18n_mod.get("updater.tray_new_version_body")
-							:gsub("{1}", (tostring(release.tag):gsub("%%", "%%%%")))
-					elseif err then
-						body = i18n_mod.get("updater.no_connection")
-					else
-						body = i18n_mod.get("updater.up_to_date")
-							:gsub("{1}", (tostring(updater.current_version()):gsub("%%", "%%%%")))
-					end
-					notifier.send(body, { title = i18n_mod.get("updater.window_title"), level = "info" })
+					local body = require("updater.engine.check_notice").body(result, i18n_mod.get, function(id)
+						local channel = updater.CHANNELS.channel(id)
+						return channel and i18n_mod.get(channel.label_key) or tostring(id)
+					end)
+					notifier.send(body, { title = i18n_mod.get("updater.window_title"),
+						level = result.state == "error" and "warning" or "info" })
 				end
 				if rebuild_tray_menu then rebuild_tray_menu() end
 			end,
@@ -2790,7 +2963,7 @@ local function main()
 					-- "hotstrings_config": that name has a bridge in BRIDGE_MODULES but
 					-- no page on disk, so the window opened and rendered
 					-- "Error: app 'hotstrings_config' not found".
-					webview_manager.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
+					webview_manager.show(require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				else
 					Logger.warn(LOG, "No settings window available — a custom delimiter cannot be added.")
 				end
@@ -2801,7 +2974,7 @@ local function main()
 				-- The shared quote closes, escapes and reopens an apostrophe: a pack
 				-- under "/home/me/l'ergopti" once reached xdg-open as two broken
 				-- words and silently opened nothing.
-				os.execute(string.format("xdg-open %s 2>/dev/null &", require("text_utils").shell_quote(path)))
+				os.execute(string.format("xdg-open %s 2>/dev/null &", require("core.text.engine.utils_core").shell_quote(path)))
 			end,
 			-- The three log rows open through ui/log_openers, shared with the
 			-- gesture actions: every path comes from the sink that writes it, and
@@ -2884,7 +3057,16 @@ local function main()
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
 			end
 			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
-				function() shutdown.request("degraded tray quit") end)
+				function()
+					-- The same user Quit owner as every other Quit (LCY-003). This
+					-- row is the last way out of a daemon whose tray failed, so an
+					-- owner that raises still ends the daemon, after saying so.
+					local called, err = pcall(privacy_owners.user_quit, "degraded tray quit")
+					if not called then
+						Logger.error(LOG, "The user Quit owner raised (%s); quitting through the shutdown alone.", tostring(err))
+						shutdown.request("degraded tray quit")
+					end
+				end)
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")
@@ -2905,15 +3087,15 @@ local function main()
 	-- is an ordinary machine that simply gets no preview.
 	if tooltip_preview then
 		local ok_style, style = pcall(function()
-			return require("ui.tooltip.config").load()
+			return require("core.ui.ui.tooltip.config").load()
 		end)
 		if ok_style then
 			tooltip_preview.init({
 				style = style,
 				config = hotstrings_config,
 				on_render_failed = function()
-					if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
-						and rawequal(package.loaded["ui.tooltip.llm"], llm_overlay)
+					if rawequal(package.loaded["core.ui.ui.tooltip.preview"], tooltip_preview)
+						and rawequal(package.loaded["core.ui.ui.tooltip.llm"], llm_overlay)
 						and llm_overlay and type(llm_overlay.revoke_presentation) == "function" then
 						llm_overlay.revoke_presentation()
 					end
@@ -2930,7 +3112,7 @@ local function main()
 				-- suggestion in the same turn.
 				on_hidden = function()
 					TimerScheduler.after(0, function()
-						if rawequal(package.loaded["ui.tooltip.preview"], tooltip_preview)
+						if rawequal(package.loaded["core.ui.ui.tooltip.preview"], tooltip_preview)
 							and llm_overlay and type(llm_overlay.redraw_if_preview_hidden) == "function" then
 							llm_overlay.redraw_if_preview_hidden()
 						end
@@ -2957,9 +3139,13 @@ local function main()
 					covered = tooltip_preview.note_covered,
 					redraw = tooltip_preview.redraw,
 				},
+				-- An offer left alone runs out, as on Windows and macOS.
+				on_expire = function()
+					if prediction_engine then prediction_engine.dismiss() end
+				end,
 			}) then llm_overlay = nil end
 			Logger.info(LOG, "Preview tooltip initialised (renderer available: %s).",
-				tostring(require("adapters.graphics_renderer").is_available()))
+				tostring(require("core.ui.adapters.graphics_renderer").is_available()))
 		else
 			Logger.error(LOG, "Tooltip style unreadable — no preview. %s", tostring(style))
 			tooltip_preview = nil
@@ -3079,10 +3265,15 @@ local function main()
 					})
 				end
 			end,
-			notify_error = function(key)
+			-- A refusal may carry its own localized text (a value check naming the
+			-- range), and a host may pass its own translator instead: the onboarding
+			-- wizard speaks the language chosen on its first step.
+			notify_error = function(key, detail)
 				if notifier and ok_i18n and i18n_mod then
-					notifier.send(i18n_mod.get(key), {
-						title = i18n_mod.get("common.error_title"), level = "error",
+					local get = type(detail) == "function" and detail or i18n_mod.get
+					local message = type(detail) == "string" and detail or get(key)
+					notifier.send(message, {
+						title = get("common.error_title"), level = "error",
 					})
 				end
 			end,
@@ -3116,14 +3307,10 @@ local function main()
 			-- notified here since the updater existed and the strings are already
 			-- translated into all twenty-one locales; this driver wrote a log line
 			-- nobody reads and left the news in the tray label.
-			--
-			-- The tag lands on the REPLACEMENT side of gsub, where "%" is special:
-			-- a release tagged "v2.1%-rc1" would raise inside the notification and
-			-- take the menu rebuild below with it.
+			-- A release read from the public feed says it cannot be installed yet.
 			local accepted = false
 			if notifier and ok_i18n and i18n_mod then
-				local safe_tag = tostring(release.tag):gsub("%%", "%%%%")
-				local body = i18n_mod.get("updater.tray_new_version_body"):gsub("{1}", safe_tag)
+				local body = require("updater.engine.check_notice").release_body(release, i18n_mod.get)
 				accepted = notifier.send(body, {
 					title = i18n_mod.get("updater.tray_new_version_label"),
 					level = "info",
@@ -3146,6 +3333,8 @@ local function main()
 	if not opts.dry_run then require("infra.personal_shortcuts").load() end
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
+	-- The snapshot, the watchers and the loop's setup, unattributed before.
+	BootProfiler.stage("watchers")
 
 	-- Discover environment facts while the desktop still owns the keyboard.
 	-- Only cached metadata formatting/logging may follow the ready announcement.
@@ -3163,14 +3352,14 @@ local function main()
 	if file_watchers then
 		-- A developer run (tools/dev/run-linux-dev.sh) also restarts on a saved
 		-- .lua of the clone, as the macOS developer app reloads on one.
-		local DevSource = require("infra.dev_source")
+		local DevSource = require("core.lifecycle.engine.dev_source")
 		file_watchers.start({
 			hotstrings_dir = config_path,
 			base_dir       = SCRIPT_DIR,
 			personal_dir   = config_path,  -- personal TOMLs live alongside bundled ones
 			on_reload      = function()
 				Logger.info(LOG, "Config change detected — reloading hotstrings…")
-				local reloaded = require("infra.reload_outcome").run(function() return hotstrings_config.reload() end)
+				local reloaded = require("core.lifecycle.engine.reload.outcome").run(function() return hotstrings_config.reload() end)
 				if reloaded and privacy_owners.menu_rebuild then privacy_owners.menu_rebuild.note_reload() end
 			end,
 			source_dirs      = DevSource.source_dirs(),
@@ -3192,23 +3381,45 @@ local function main()
 	-- The focus poll runs four times a second: on X11 it asks the server inside
 	-- this process (libxcb) instead of forking xdotool twice per poll.
 	if window_info and type(window_info.use_native_x11) == "function" then window_info.use_native_x11() end
+	-- On GNOME and KDE Wayland the Shell extension and KWin script push focus
+	-- changes to a resident worker; the poll then reads them from memory.
+	if window_info and type(window_info.start_compositor_focus) == "function" then window_info.start_compositor_focus() end
 	-- Pointer distance and virtual-desktop changes are read from the X server:
 	-- the cursor's screen position (the pixels Windows and macOS store) and the
-	-- EWMH current desktop. Wayland grants neither to a client; the metrics then
-	-- say so instead of storing another unit or a zero that looks measured.
+	-- EWMH current desktop. Wayland grants no cursor position to a client; its
+	-- current workspace comes from sway, Hyprland or KWin when one runs. What
+	-- no source answers is said instead of a zero that looks measured.
 	do
 		local sources = window_info and window_info.metrics_sources() or {}
 		keystats.bind_pointer_position(sources.pointer, sources.pointer and Monotonic.now_ms or nil,
 			not sources.pointer and "platform_reason.pointer_distance_needs_cursor_position" or nil)
+		local desktop, desktop_reason = sources.desktop, nil
+		if not desktop then
+			desktop, desktop_reason = require("modules.gestures.workspace_switcher")
+				.current_workspace_source(Monotonic.now_ms)
+		end
 		if system_metrics then
-			system_metrics.bind_desktop_source(sources.desktop,
-				not sources.desktop and "platform_reason.desktop_changes_need_x11" or nil)
+			system_metrics.bind_desktop_source(desktop,
+				not desktop and "platform_reason.desktop_changes_need_workspace_interface" or nil)
 		end
+		-- The diagnostics trail of the menu's « not measured » rows.
 		if not sources.pointer then
-			-- The diagnostics trail of the menu's « not measured » rows.
-			Logger.warn(LOG, "Metrics: pointer distance and desktop changes are not measured in this session "
-				.. "(no X11 cursor position or current desktop; Wayland exposes neither to a client).")
+			Logger.warn(LOG, "Metrics: pointer distance is not measured in this session "
+				.. "(no X11 cursor position; Wayland exposes none to a client).")
 		end
+		if not desktop then
+			Logger.warn(LOG, "Metrics: desktop changes are not measured in this session "
+				.. "(no X11 desktop and no workspace interface: %s).", tostring(desktop_reason))
+		end
+		require("modules.keystats.topology_metrics").bind_topology_source(sources.topology,
+			not sources.topology and "platform_reason.window_topology_needs_x11" or nil)
+		if not sources.topology then
+			Logger.warn(LOG, "Metrics: window topology is not measured in this session "
+				.. "(no X11 window geometry; Wayland exposes none to a client).")
+		end
+		-- A touchpad tap-to-click never reaches evdev as a button: the metrics
+		-- count the touches libinput turns into one, under the desktop's setting.
+		require("modules.keystats.tap_click_sources").bind(keystats, Monotonic.now_ms)
 	end
 
 	if process_lifecycle then
@@ -3264,7 +3475,7 @@ local function main()
 	-- file_watchers.pump() (deadline check + mtime polling) and one batch of the
 	-- at-rest migration.
 	local function stop_input_loop()
-		shutdown.request("runtime callback failure", "runtime callback failure")
+		shutdown.request_failure("runtime callback failure", "runtime callback failure")
 	end
 
 	-- Summarises the repeat streaks that are due, so a source that fell silent
@@ -3315,6 +3526,8 @@ local function main()
 		-- Deliberately NOT on the idle callback: that one runs between keystrokes,
 		-- and a batch costs one openssl spawn per value.
 		RuntimeGuard.call("keystats migration pump", keystats.pump_migration)
+		-- Off the input path: the tap-to-click setting of a pad in use, when due.
+		RuntimeGuard.call("tap-to-click setting refresh", keystats.refresh_tap_settings)
 		-- The per-device ledger follows the committed store one bounded slice
 		-- at a time, so the other drivers can import this device's metrics.
 		RuntimeGuard.call("keystats ledger pump", keystats.pump_ledger)
@@ -3337,7 +3550,8 @@ local function main()
 		-- The machine's own state. The sampler decides for itself whether enough
 		-- time has passed, so calling it every tick costs a comparison — putting
 		-- the interval here as well would be a second place to change it.
-		if system_metrics then
+		-- A paused driver counts no system day state either (EDD-1).
+		if system_metrics and not script_actions.is_paused() then
 			local owner = system_metrics
 			RuntimeGuard.call("system metrics sampler", function()
 				owner.sample()
@@ -3352,6 +3566,11 @@ local function main()
 		RuntimeGuard.call("network metrics sampler", function()
 			require("modules.keystats.network_metrics").daemon_tick(keystats.record_network_event)
 		end)
+		-- Window moves, resizes and monitor changes (X11, in process) and the
+		-- capture-program presence (procfs); the module paces both readings.
+		RuntimeGuard.call("topology metrics sampler", function()
+			require("modules.keystats.topology_metrics").daemon_tick(keystats.record_topology_event)
+		end)
 
 		-- The WPM readouts' clock: the floating widget and the tray readout each
 		-- redraw at their shared rate however often this runs, from the live
@@ -3359,10 +3578,12 @@ local function main()
 		if wpm_widget or wpm_tray_readout then
 			local now_ms = Monotonic.now_ms()
 			local live = keystats.get_live_stats(now_ms)
+			-- A paused script shows no speed, as on Windows and macOS.
+			local paused = script_actions.is_paused() == true
 			if wpm_widget then
 				local owner = wpm_widget
 				RuntimeGuard.call("WPM widget tick", function()
-					owner.tick(live, now_ms / 1000)
+					owner.tick(live, now_ms / 1000, paused)
 				end, function()
 					if type(owner.stop) == "function" then owner.stop() end
 					wpm_widget = nil
@@ -3371,7 +3592,7 @@ local function main()
 			if wpm_tray_readout then
 				local owner = wpm_tray_readout
 				RuntimeGuard.call("WPM tray readout tick", function()
-					owner.tick(live, now_ms / 1000)
+					owner.tick(live, now_ms / 1000, paused)
 				end, function()
 					wpm_tray_readout = nil
 				end)
@@ -3382,10 +3603,12 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	CrashReporter.remove_legacy_dumps()
 	if not privacy_owners.startup_checkpoint() then return end
-	-- UI preparation can outlive an XKB change; resolve again before grabbing.
-	if not keyboard_layout.refresh(opts.keymap) then
+	-- UI preparation can outlive an XKB change; resolve again before grabbing,
+	-- unless the desktop source proves the published layout still current.
+	if not keyboard_layout.refresh_unless_current(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	BootProfiler.stage_done("watchers")
 	if not privacy_owners.startup_checkpoint() then return end
 	-- Retain the selected inverse publisher before any source-acquisition callback.
 	local capture_layout = keyboard_layout
@@ -3480,12 +3703,12 @@ local function main()
 	-- An update watcher that started this daemon keeps it only once it reports ready.
 	require("infra.updater_boot_ready").report("daemon ready")
 	-- The Reload this boot completes, if any, from its request in the previous daemon.
-	local reload_ms = require("infra.reload_timing").complete()
+	local reload_ms = require("core.timing.engine.reload_timing").complete()
 	if not privacy_owners.startup_checkpoint() then return end
 	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
 	privacy_owners.startup.snapshot = nil
 	-- Optional: a control that cannot start is logged and the daemon runs on.
-	privacy_owners.driver_control = require("infra.driver_control").start({
+	privacy_owners.driver_control = require("core.lifecycle.engine.driver_control").start({
 		pid = require("luv").os_getpid(), reload = perform_reload,
 		boot_outcome = function()
 			if boot_catalogue_complete then return true end
@@ -3500,12 +3723,23 @@ local function main()
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
+	-- The first key used to load the shortcut assignments (a config read and a
+	-- TOML decode, about 8 ms in a measured X11 session) inside its own
+	-- dispatch. They load once per process either way; the loop's first idle
+	-- tick takes them now, after the ready announcement.
+	event_loop.defer(function()
+		local loaded, failure = pcall(require("modules.shortcuts.keyboard_shortcuts").get_assignments)
+		if not loaded then
+			Logger.error(LOG, "Shortcut assignments could not be loaded before the first key: %s.", tostring(failure))
+		end
+	end)
 
 	event_loop.run({
 		onIdle = function()
 			if shutdown.is_requested() then shutdown.poll(); return end
 			if not keyboard_hook.isRunning() and not keyboard_hook.isRecovering() then
-				shutdown.request("keyboard hook stopped")
+				-- Only an emergency stops the hook before a shutdown was requested.
+				shutdown.request_failure("keyboard hook stopped")
 				return
 			end
 			if tray_menu then
@@ -3543,8 +3777,11 @@ local function main()
 		end,
 		onPeriodic = on_periodic,
 		periodSec = 0.25,
-		-- Sleep on the input descriptors between ticks instead of spinning a core.
-		idleWait = keyboard_hook.idle_wait,
+		-- Sleep on the input descriptors between ticks instead of spinning a core,
+		-- and on the tray's GLib descriptors, so a panel's request wakes it too.
+		idleWait = function(timeout_ms)
+			return keyboard_hook.idle_wait(timeout_ms, tray_menu and tray_menu.wait_companion() or nil)
+		end,
 	})
 
 	-- 8.14) Clean exit.
@@ -3566,6 +3803,8 @@ local function main()
 	Logger.info(LOG, "%s", require("infra.typed_input_withheld").summary())
 	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
+	-- The interval since the last summary, which a short session never reached.
+	require("core.logger.engine.perf_counters").flush_now()
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
 end
@@ -3599,4 +3838,10 @@ if not ok_main then
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
 	os.exit(1)
+end
+-- Input that stopped at run time is a failure for the supervisor too (LCY-001);
+-- the teardown above already ran, so only the status remains to report.
+if shutdown.failure() then
+	pcall(Logger.error, LOG, "Daemon exiting after a run-time failure: %s.", shutdown.failure())
+	os.exit(ShutdownCoordinator.RUNTIME_FAILURE_EXIT_CODE)
 end

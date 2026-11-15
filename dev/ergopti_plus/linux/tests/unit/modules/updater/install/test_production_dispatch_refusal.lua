@@ -7,7 +7,7 @@ local function test(name, body) tests[#tests + 1] = { name, body } end
 local function scenario(options, body)
  options = options or {}
  local names = { "modules.updater.manager", "modules.updater.archive_transfer", "infra.archive_output",
-  "infra.monotonic", "infra.installation", "modules.updater.installer", "toml_codec.writer", "adapters.storage" }
+  "core.logger.engine.monotonic", "core.lifecycle.engine.installation", "modules.updater.installer", "core.text.engine.toml_codec.writer", "core.fs.adapters.storage" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
  local h = { paused = false, persistence = 0, dispatches = 0, callbacks = {}, flow_physical = false, observers = {},
   cancellation = 0, artifact_closed = false, artifact_listeners = {}, reads = 0, installs = 0, install_physical = false }
@@ -19,7 +19,7 @@ local function scenario(options, body)
  if not drivers_root or type(package.searchpath) ~= "function" then
   error("updater fixture repository source roots unavailable", 0)
  end
- local shared_root = drivers_root .. "/_shared/lua"
+ local shared_root = drivers_root .. "/_shared"
  local original_require, original_searchpath, original_path = require, package.searchpath, package.path
  _G.require = function(name, ...)
   if type(name) == "string" and saved[name] == nil and package.preload[name] == nil
@@ -39,7 +39,7 @@ local function scenario(options, body)
   -- Runtime check state belongs to this model. A warmed real Storage would
   -- otherwise retain this scenario's fake Writer after the cache is restored.
   local stored = {}
-  package.loaded["adapters.storage"] = {
+  package.loaded["core.fs.adapters.storage"] = {
    get = function(key, default) local value = stored[key]; if value == nil then return default end; return value end,
    set = function(key, value) stored[key] = value; return true end,
   }
@@ -76,9 +76,9 @@ local function scenario(options, body)
    if options.component_missing then return nil end
    return artifact
   end }
-  package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+  package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
    backend = function() return "luv.hrtime" end, now_ms = function() return 1.25 end }
-  package.loaded["infra.installation"] = { is_source_run = function() return true end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
   package.loaded["modules.updater.archive_transfer"] = { new = function(ports)
    h.source = function() return ports.current(transaction) end
    local flow = {}
@@ -110,7 +110,7 @@ local function scenario(options, body)
   if actual_installer then
    package.loaded["modules.updater.installer"].install_owned = actual_installer.install_owned
   end
-  package.loaded["toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
+  package.loaded["core.text.engine.toml_codec.writer"] = { batch_write = function() h.persistence = h.persistence + 1; return true end }
   package.loaded["modules.updater.manager"] = nil
   h.manager = require("modules.updater.manager")
   h.manager.init({ is_paused = function() return h.paused end })

@@ -22,13 +22,13 @@
 --- ==============================================================================
 
 local hs      = hs
-local Logger  = require("infra.logger")
-local NativePath = require("native_path")
-local Timings = require("infra.timings")
+local Logger  = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
+local Timings = require("core.timing.engine.timings")
 local install = require("modules.keymap.layout_install")
-local ShellRunner = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
-local OpenStepPlist = require("infra.openstep_plist")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
+local OpenStepPlist = require("core.fs.engine.openstep_plist")
 local PythonInterpreter = require("adapters.python_interpreter")
 local InputSourceSelector = require("adapters.input_source_selector")
 local LOG     = "menu.keyboard_layout"
@@ -1091,7 +1091,7 @@ local function confirm_source_async(keyboard_name, options, on_done)
 		{ "-c", CONFIRM_SOURCE_SCRIPT, keyboard_name, register_path, table.concat(flags, ","),
 			tostring(Timings.sec("ui", "input_source_reselect_settle_ms")) },
 		function(process_ok, out, reason)
-			local decoded_ok, state = pcall(require("json").decode, tostring(out or ""))
+			local decoded_ok, state = pcall(require("core.text.engine.json").decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" or type(state.listed) ~= "boolean" then
 				local failure_reason = reason or "invalid_output"
 				Logger.warn(LOG, "The state of '%s' could not be read from a fresh process (reason=%s, output=%s).",
@@ -1205,7 +1205,7 @@ local function read_sources_state_async(on_done)
 	return run_bounded_process("Read keyboard input sources", python_bin,
 		{ "-c", SOURCES_STATE_SCRIPT, tostring(child_timeout) },
 		function(process_ok, out, reason)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local decoded_ok, state = pcall(Json.decode, tostring(out or ""))
 			if process_ok ~= true or not decoded_ok or type(state) ~= "table" then
 				Logger.warn(LOG, "The input sources could not be read from a fresh process (reason=%s).",

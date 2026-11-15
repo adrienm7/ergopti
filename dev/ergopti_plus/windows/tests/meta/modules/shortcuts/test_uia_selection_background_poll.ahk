@@ -76,7 +76,7 @@ _USBP_SelectionIsPolledInBackground() {
 		"source mode must launch the minimal UIA worker entry instead of reparsing the full driver on first use")
 	Entry := _USBP_ReadSource("modules/keymap/uia_selection_worker_entry.ahk")
 	Assert(InStr(Entry, "vendor\UIA.ahk") > 0
-		&& InStr(Entry, "adapters\uia_worker.ahk") > 0
+		&& InStr(Entry, "core\process\adapters\uia_worker.ahk") > 0
 		&& InStr(Entry, "#Include %A_ScriptDir%\uia_selection_worker.ahk") = 0
 		&& InStr(Entry, "ErgoptiPlus.ahk") = 0,
 		"the source worker entry must contain only its UIA/protocol dependencies, never the resident controller or normal driver boot")

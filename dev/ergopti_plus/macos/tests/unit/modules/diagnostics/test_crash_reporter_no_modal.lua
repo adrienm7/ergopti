@@ -6,7 +6,7 @@
 --- crash_reporter.prompt_user ended in dialog_util.block_alert, i.e.
 --- hs.dialog.blockAlert. A modal alert runs a NESTED RUN LOOP: the main thread
 --- stops dead — every event tap, timer and hotkey in the driver with it — until a
---- human clicks the button. infra/dialog_util.lua:57-58 documents exactly this
+--- human clicks the button. core/ui/engine/dialog_util.lua:57-58 documents exactly this
 --- ("Modal dialogs block the main thread and its default runloop, meaning
 --- hs.timer.doAfter will NOT fire until AFTER the dialog is dismissed").
 ---
@@ -65,14 +65,14 @@ local function load_with_tripwires(config_dir)
 
 	-- dialog_util is the only route the module ever used to reach blockAlert; a
 	-- raising stub makes a lingering modal call impossible to miss.
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function()
 			modal.opened = true
 			error("lib.dialog_util.block_alert must never be reached from the crash reporter")
 		end,
 	}
 
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			notifications[#notifications + 1] = { title = title, body = body, kind = kind }
 		end,
@@ -81,7 +81,7 @@ local function load_with_tripwires(config_dir)
 	-- This module verifies notification/modal behavior, not the FileSystem
 	-- adapter's separately tested hard-link publication. Preserve real file I/O
 	-- while providing the exact create-if-absent result contract needed by save().
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_if_absent = function(path, content)
 			local existing = io.open(path, "r")
 			if existing then
@@ -101,7 +101,7 @@ local function load_with_tripwires(config_dir)
 
 	if config_dir then
 		-- The logger is the one resolver of the crash-reports folder.
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		Logger.crash_reports_dir = function() return config_dir .. "crash_reports/" end
 		-- save() refuses a report its privacy redactor cannot answer for (52525d33);
 		-- this test is about the notification, so the real logger gets its policy.
@@ -141,7 +141,7 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 			"the notification must name the saved report path — it is the only actionable detail")
 
 		package.loaded["infra.config_paths"] = nil
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 	end)
 
 	helpers.it("still notifies without a modal when the report cannot be saved", function()
@@ -160,6 +160,6 @@ helpers.describe("crash_reporter — the outcome is announced without a blocking
 			"a failed save must still be surfaced to the user")
 
 		package.loaded["infra.config_paths"] = nil
-		package.loaded["adapters.file_system"] = nil
+		package.loaded["core.fs.adapters.file_system"] = nil
 	end)
 end)

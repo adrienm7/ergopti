@@ -12,11 +12,11 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 
 local function with_sender(callback)
 	helpers.with_stub_scope({
-		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
-		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
-		"infra.toml.reader", "json", "toml_codec.basic_string", "toml_codec.bom",
-		"toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+		"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
+		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
+		"core.text.engine.toml.reader", "core.text.engine.json", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
+		"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })
 		local initial = {
@@ -69,10 +69,10 @@ local function with_sender(callback)
 				return observer(finished, status, ...)
 			end)
 		end
-		f.sender = require("adapters.text_sender")
+		f.sender = require("platform.input.text_sender")
 		f.clipboard = function() return clipboard end
 		f.initial = initial
-		f.restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		f.restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		f.expire_restore = function()
 			local snapshot = {}
 			for _, timer in ipairs(f.timers) do snapshot[#snapshot + 1] = timer end

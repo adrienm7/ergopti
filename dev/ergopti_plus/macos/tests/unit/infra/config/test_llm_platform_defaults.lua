@@ -2,7 +2,7 @@
 
 --- Exercises hardware defaults through the real reader and preference writer.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 helpers.describe("LLM hardware defaults", function()
 	helpers.it("does not probe hardware for metadata or unrelated configuration values", function()
@@ -80,7 +80,7 @@ helpers.describe("LLM hardware defaults", function()
 				helpers.assert_eq(found, true)
 			end
 			local content = '[llm.models]\nselected = "api:old"\nfuture = 7\n'
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return content, "ok" end,
 				write_if_unchanged = function(_, value, expected)
 					if expected.content ~= content then return false end

@@ -31,11 +31,11 @@ end
 --- @return table fixture
 local function run_action(mode, outcome, language)
 	local module_names = {
-		"infra.dialog_util",
-		"infra.i18n",
+		"core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
 		"infra.manifest_reader",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
@@ -66,15 +66,15 @@ local function run_action(mode, outcome, language)
 
 	-- The actual command affix reader requires real translated prefix data.
 	-- Other old literal fixture captions remain unchanged.
-	local Paths = require("infra.paths")
-	local JsonCodec = require("adapters.json_codec")
-	local Locale = assert(loadfile(Paths.shared("lua/locale/core.lua")))()
+	local Paths = require("core.fs.engine.paths")
+	local JsonCodec = require("core.fs.adapters.json_codec")
+	local Locale = assert(loadfile(Paths.shared("core/i18n/engine/core.lua")))()
 	Locale.init({ json_decode = JsonCodec.decode,
-		resolve_locale_path = function(code) return Paths.shared("data/locales/" .. code .. ".json") end })
+		resolve_locale_path = function(code) return Paths.shared("core/i18n/data/locales/" .. code .. ".json") end })
 	Locale.set_locale(language or "en")
 	local magic_prefix = Locale.get("menu.hotstrings.magic_key_prefix")
 
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "editor.hotstrings.err_id_exists" then return "DUPLICATE:%s" end
 			if key == "menu.hotstrings.magic_key_prefix" or key == "menu.hotstrings.magic_key" then return Locale.get(key) end
@@ -82,7 +82,7 @@ local function run_action(mode, outcome, language)
 		end,
 		section = function(key) return key end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(_, _, _, accept_label)
 			prompt_calls = prompt_calls + 1
 			if mode == "duplicate" then
@@ -139,7 +139,7 @@ local function run_action(mode, outcome, language)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() effects.notifications = effects.notifications + 1 end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
@@ -149,7 +149,7 @@ local function run_action(mode, outcome, language)
 	package.loaded["ui.menu.menu_hotstrings_management"] = nil
 
 	local ok, fixture_or_err = xpcall(function()
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local keymap = {
 			DELAYS_DEFAULT = {
 				STAR_TRIGGER = 0.1,

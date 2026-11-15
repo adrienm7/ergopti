@@ -23,8 +23,8 @@
 
 local helpers = require("tests.helpers")
 local Scenario = require("tests.support.agent_scenario")
-local Agent = require("llm.agent")
-local Json = require("json")
+local Agent = require("ai.engine.agent.agent")
+local Json = require("core.text.engine.json")
 
 local SENTENCE = "On se voit jeudi 14h avec Paul"
 local ANSWER = 'ACTIONS: [{"type":"calendar","title":"Paul","start":"2026-10-01T14:00"}]'
@@ -300,6 +300,9 @@ helpers.describe("AI agent automatic mode: the toggle", function()
 			helpers.assert_eq(world.handlers.llm_agent_auto_toggle("tap_3"), true)
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action")
 			helpers.assert_eq(world.notices[2], Scenario.text("llm.agent.auto_off"))
+			-- A binding switches the mode outside the menu: the tray is redrawn,
+			-- as Windows rebuilds after the commit (agent-mode-tray-redraw).
+			helpers.assert_eq(world.mode_redraws, { "auto", "action" })
 		end)
 	end)
 
@@ -308,6 +311,7 @@ helpers.describe("AI agent automatic mode: the toggle", function()
 			helpers.assert_eq(world.handlers.llm_agent_auto_toggle("tap_3"), false)
 			helpers.assert_eq(world.notices[1], Scenario.text("llm.agent.no_system1"))
 			helpers.assert_eq(world.preferences.get("llm.agent_mode"), "action", "unchanged")
+			helpers.assert_nil(world.mode_redraws, "a refused switch redraws nothing")
 		end)
 	end)
 end)
@@ -560,7 +564,7 @@ local JEV_ANSWERS = { intent = { choice = "calendar", probabilities = { none = 0
 --- The providers' base URLs.
 --- @return table
 local function base_urls()
-	local fh = assert(io.open(require("tests.helpers").driver_root() .. "/../_shared/modules/llm/api_providers.json"))
+	local fh = assert(io.open(require("tests.helpers").driver_root() .. "/../_shared/ai/data/api_providers.json"))
 	local root = Json.decode(fh:read("*a"))
 	fh:close()
 	return { typesafe = root.providers.typesafe.base_url, backboard = root.providers.backboard.base_url }
@@ -568,7 +572,7 @@ end
 
 helpers.describe("AI agent automatic mode: Jev as System 1", function()
 	local urls = base_urls()
-	local Formats = require("llm.remote_formats")
+	local Formats = require("ai.engine.api.remote_formats")
 
 	helpers.it("through TypeSafe: the jev question to the full endpoint, then System 2", function()
 		Scenario.run({ stored = auto({ ["llm.agent_system1"] = "typesafe" }),

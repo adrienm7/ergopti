@@ -40,7 +40,7 @@ local function load_fixture()
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name:match("^modules%.llm")
-			or name == "adapters.synthetic_input"
+			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
 		) then
 			package.loaded[name] = nil
@@ -109,7 +109,7 @@ local function load_fixture()
 	helpers.assert_not_nil(keydown, "production keyDown tap must be created")
 	return {
 		handle = keydown,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		hs = hs_stub,
 		accept_calls = function() return accept_calls end,
 		cleanup = function()

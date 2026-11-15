@@ -10,7 +10,7 @@
 --- tests cover the backend choice; only a real server proves the protocol.
 ---
 --- Run from the Linux driver root:
----     LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" \
+---     LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;" \
 ---         luajit tests/hardware/run_x11_selection_stamp.lua
 --- ==============================================================================
 

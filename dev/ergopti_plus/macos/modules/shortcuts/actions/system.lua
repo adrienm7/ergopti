@@ -29,17 +29,17 @@ local M = {}
 local hs            = hs
 local eventtap      = hs.eventtap
 local pasteboard    = hs.pasteboard
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local EventProvenance = require("adapters.event_provenance")
-local KeyState      = require("adapters.key_state")
-local KeyEventHealth = require("infra.key_event_health")
-local KeyboardGeometry = require("adapters.keyboard_geometry")
-local Logger        = require("infra.logger")
-local text_utils = require("infra.text_utils")
-local Timings       = require("infra.timings")
-local i18n          = require("infra.i18n")
-local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local KeyState      = require("platform.input.key_state")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
+local KeyboardGeometry = require("platform.input.keyboard_geometry")
+local Logger        = require("core.logger.engine.logger")
+local text_utils = require("core.text.engine.utils")
+local Timings       = require("core.timing.engine.timings")
+local i18n          = require("core.i18n.engine.i18n")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
 
 local LOG = "shortcuts.actions.system"
@@ -66,9 +66,9 @@ local text_acts = require("modules.shortcuts.actions.text")
 -- ====================================
 -- ====================================
 
-local Keycodes               = require("infra.keycodes")
+local Keycodes               = require("platform.input.keycodes")
 local ControlSentinels       = require("modules.keymap.control_sentinels")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 -- The control-sentinel listener slot the wheel bindings track the layer with.
 local LAYER_WHEEL_LISTENER = "shortcuts.layer_wheel"
@@ -88,7 +88,7 @@ local AWAKE_RETURN_DELAY_SEC = Timings.sec("keep_awake", "return_delay_ms") -- S
 -- Teams went "absent" despite the visible jiggle. A real F18 key event resets
 -- that counter; F18 types nothing, fires no shortcut, and the keymap engine
 -- fast-exits it (FAST_EXIT_KEYCODES). This is the macOS analog of the AHK
--- driver's {VKFF} empty keystroke. Single source of truth: _shared/lua/keycodes
+-- driver's {VKFF} empty keystroke. Single source of truth: _shared/platform/input/keycodes
 -- (F18_WAKE_OS), the same code the keymap reserves.
 local KEEP_AWAKE_WAKE_KEY    = Keycodes.F18_WAKE_OS
 
@@ -208,7 +208,7 @@ local stop_awake_input_watcher
 -- AX selection cache for the wrap-text eventtap: read_ax_selection() is two
 -- synchronous cross-process Accessibility calls, and the eventtap fires on
 -- EVERY keystroke matching a wrap symbol with no caching at all — a slow AX
--- call here risks kCGEventTapDisabledByTimeout. Mirrors infra/vscode_bridge.lua's
+-- call here risks kCGEventTapDisabledByTimeout. Mirrors core/network/engine/vscode_bridge.lua's
 -- get_editor_ax_frame() TTL-cache pattern (shortcuts-wrap-ax-uncached).
 local _wrap_ax_selection_cache = nil
 local _wrap_ax_selection_ts    = 0
@@ -1216,7 +1216,7 @@ function M.wrap_event_decision(flags, ch, pairs_tbl, has_selection)
 end
 
 --- Reads the current AX selection with a short-lived cache, mirroring
---- infra/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
+--- core/network/engine/vscode_bridge.lua's get_editor_ax_frame(). read_ax_selection() performs
 --- two synchronous cross-process Accessibility calls; without caching, a run of
 --- rapid wrap-symbol keystrokes (e.g. a held key, or fast typing that repeats a
 --- wrap char) would each pay that cost inline on the CGEventTap thread, risking
@@ -1230,7 +1230,7 @@ local function read_wrap_ax_selection_cached()
 	-- (VS Code / Electron, where it is nil every time). Every wrap-symbol keystroke
 	-- therefore paid both synchronous cross-process AX calls inline on the
 	-- CGEventTap thread — precisely the cost this cache exists to avoid. Same defect
-	-- and same fix as infra/vscode_bridge.lua's _ax_frame_valid (3e403b254).
+	-- and same fix as core/network/engine/vscode_bridge.lua's _ax_frame_valid (3e403b254).
 	if _wrap_ax_selection_valid and (now - _wrap_ax_selection_ts) < WRAP_AX_SELECTION_TTL_SEC then
 		return _wrap_ax_selection_cache
 	end

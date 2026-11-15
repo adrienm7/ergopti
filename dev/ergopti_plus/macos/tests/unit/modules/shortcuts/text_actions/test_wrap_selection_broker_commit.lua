@@ -18,9 +18,9 @@ local Fixture = require("tests.support.synthetic_input_fixture")
 local function with_broker(callback)
 	helpers.with_stub_scope({
 		"modules.keymap.utils",
-		"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
-		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
+		"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
+		"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })
 		local initial = {

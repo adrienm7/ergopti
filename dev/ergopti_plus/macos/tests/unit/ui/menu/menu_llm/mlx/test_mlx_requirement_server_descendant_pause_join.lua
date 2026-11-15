@@ -1,17 +1,17 @@
 --- tests/unit/ui/menu/menu_llm/mlx/test_mlx_requirement_server_descendant_pause_join.lua
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -36,9 +36,9 @@ local function with_fixture(callback)
 		}
 		local logger_stub = helpers.make_logger_stub()
 		logger_stub.today_log_path = function() return "/tmp/ergopti-test.log" end
-		package.loaded["infra.logger"] = logger_stub
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = logger_stub
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = {
 			get = function(key)
 				helpers.assert_eq(key, "MlxActiveModelPath")
@@ -56,7 +56,7 @@ local function with_fixture(callback)
 			reset_endpoints = function() return true end,
 			set_active_server_pgid = function() return true end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback_fn)
 				local handle = {
 					delay = delay,
@@ -132,7 +132,7 @@ local function with_fixture(callback)
 			return helpers.attach_native_task_environment(task)
 		end
 
-		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["core.process.adapters.task_lifecycle"] = nil
 		os.execute = function() return true, "exit", 0 end
 		local obj = {
 			get_mlx_repo = function() return "fixture/repo" end,

@@ -17,13 +17,13 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
-	"adapters.file_system",
-	"infra.paths",
-	"infra.logger",
+	"platform.input.hotkey_registrar",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.paths",
+	"core.logger.engine.logger",
 	"modules.gestures.actions",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -41,7 +41,7 @@ local function with_subject(store, scenario)
 	for _, name in ipairs(MODULES) do prior[name] = package.loaded[name] end
 
 	local observed = { bound = {} }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			observed.bound[#observed.bound + 1] = chord
 			return { id = #observed.bound }
@@ -49,16 +49,16 @@ local function with_subject(store, scenario)
 		unbind = function() return true end,
 		setEnabled = function() return true end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"space","label":"Space"}]}' end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.gestures.actions"] = {
 		is_assignable = function(action_id) return OFFERED[action_id] == true end,
 		execute_single = function() return true end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 
 	require("tests.support.keyboard_config_fixture").install(store)
@@ -75,7 +75,7 @@ local function with_subject(store, scenario)
 	return observed
 end
 
-local ConfigOutdated = require("config_outdated")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 
 helpers.describe("keyboard shortcuts: unknown slot ids (unknown-slot-report)", function()
 	helpers.it("(unknown-slot-report) names an unowned id and keeps an owned id quiet", function()

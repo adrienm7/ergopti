@@ -1,7 +1,7 @@
 --- tests/unit/modules/keystats/privacy/test_cipher_posture.lua
 --- Saved encryption consent must never become a plaintext persistence fallback.
 local helpers = require("tests.helpers")
-require("infra.monotonic") -- Capture the genuine clock before temporary ports.
+require("core.logger.engine.monotonic") -- Capture the genuine clock before temporary ports.
 
 local function with_unavailable_cipher(saved, body)
 	local names = { "infra.metrics_preferences", "modules.keystats.sqlite_writer",
@@ -47,7 +47,7 @@ helpers.describe("saved encryption capability refusal", function()
 			helpers.assert_true(k.get_privacy_state().encrypt)
 			helpers.assert_true(cipher.is_enabled())
 			helpers.assert_true(preferences.snapshot()["metrics.encrypt"])
-			helpers.assert_eq(direction, require("keystats.text_migration").MODE_ENCRYPT,
+			helpers.assert_eq(direction, require("metrics.engine.privacy.text_migration_core").MODE_ENCRYPT,
 				"capability refusal must not resume a decryption migration")
 			helpers.assert_eq(k._pending_buffer_count_for_test(), 1)
 		end)

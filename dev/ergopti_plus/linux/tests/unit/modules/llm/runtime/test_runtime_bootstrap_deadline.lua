@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Budget = helpers.load_module("llm.bootstrap_budget")
+local Budget = helpers.load_module("ai.engine.bootstrap.budget")
 
 local function fixture()
 	local clock = { now = 100, constructed = 0, closed = false }

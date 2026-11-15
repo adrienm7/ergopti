@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local _     = helpers.load_with_stubs("infra.logger")
+local _     = helpers.load_with_stubs("core.logger.engine.logger")
 local State = helpers.load_with_stubs("modules.keymap.state")
 
 --- Reads the shared corpus.
@@ -23,7 +23,7 @@ local function load_corpus()
 	local file = assert(io.open(path, "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw), "final_result_vectors.json must be valid JSON")
+	return assert(require("core.text.engine.json").decode(raw), "final_result_vectors.json must be valid JSON")
 end
 
 --- Builds a live registry and expander with the OS-facing collaborators stubbed.
@@ -31,7 +31,7 @@ end
 --- @param max_arrows number hotstrings.cascade_max_arrows.
 --- @return table state, table expander, table registry, table view
 local function fresh_engine(rules, max_arrows)
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,
@@ -43,8 +43,8 @@ local function fresh_engine(rules, max_arrows)
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["infra.text_utils"] = nil
-	package.loaded["text_utils"]       = nil
+	package.loaded["core.text.engine.utils"] = nil
+	package.loaded["core.text.engine.utils_core"]       = nil
 
 	local Registry = require("modules.keymap.registry")
 	local Expander = require("modules.keymap.expander")
@@ -75,7 +75,7 @@ local function fresh_engine(rules, max_arrows)
 	local typed
 	require("modules.keymap.utils").emit_text = function(text)
 		typed = text
-		return require("infra.text_utils").utf8_len(text), text, text
+		return require("core.text.engine.utils").utf8_len(text), text, text
 	end
 	Expander.perform_text_replacement = function(deletes, emit_action, buffer_action, is_final,
 		_ignored, _source, _variant, _is_private, terminator_spec)

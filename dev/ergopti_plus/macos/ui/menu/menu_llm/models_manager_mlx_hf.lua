@@ -21,18 +21,18 @@
 
 local M = {}
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local Identifiers = require("identifiers")
-local RunningApplication = require("adapters.running_application")
+local Identifiers = require("core.text.engine.identifiers")
+local RunningApplication = require("platform.focus.running_application")
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local ui_builder    = require("ui.ui_builder")
-local i18n          = require("infra.i18n")
-local Paths         = require("infra.paths")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Logger        = require("infra.logger")
-local TextUtils = require("text_utils")
+local notifications = require("core.ui.engine.notifications")
+local ui_builder    = require("core.ui.ui.builder")
+local i18n          = require("core.i18n.engine.i18n")
+local Paths         = require("core.fs.engine.paths")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Logger        = require("core.logger.engine.logger")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "menu_llm.models.mlx_hf"
 
@@ -999,7 +999,7 @@ function M.install(ctx)
 		end
 
 		local schedule_ok, handle_or_error, committed = xpcall(function()
-			local handle, started = TimerScheduler.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+			local handle, started = TimerScheduler.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 				if owner.callback_consumed == true then return end
 				owner.callback_pending = true
 				deliver_prompt()

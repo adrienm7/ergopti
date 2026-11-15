@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-filesystem-paths-XXXXXX"))
 local initial_cwd = assert(uv.cwd())
 package.path = initial_cwd .. "/?.lua;" .. initial_cwd .. "/?/init.lua;"
-	.. initial_cwd .. "/../_shared/lua/?.lua;" .. initial_cwd .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. initial_cwd .. "/../_shared/?.lua;" .. initial_cwd .. "/../_shared/?/init.lua;" .. package.path
 local original_xdg = {}
 local checks, failures = 0, 0
 
@@ -41,7 +41,7 @@ write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 local Writer = require("modules.keystats.sqlite_writer")
 local Reader = require("modules.keystats.sqlite_reader")
 -- Resolve and load production owners before entering the owned database cwd.
-require("infra.paths")
+require("core.fs.engine.paths")
 require("modules.keystats.keystats")
 
 local function check(name, fn)
@@ -158,7 +158,7 @@ check("public software keystats events flush into the selected literal database"
 	local Keystats = require("modules.keystats.keystats")
 	Keystats.init({ sqlite_path = "file:public.sqlite", log_dir = root .. "/logs" })
 	assert(Writer.is_available())
-	local now = require("infra.monotonic").now_ms()
+	local now = require("core.logger.engine.monotonic").now_ms()
 	Keystats.on_keydown("a", now, "public-owned-app")
 	Keystats.on_keydown("b", now + 100, "public-owned-app")
 	require("tests.support.sqlite_flush_native").flush(Keystats)

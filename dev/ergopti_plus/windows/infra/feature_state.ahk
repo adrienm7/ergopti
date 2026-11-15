@@ -13,7 +13,7 @@
 ; ==============================================================================
 
 ; feature_state.ahk is syntax-validated on its own as well as included after
-; boot.ahk.  Do not dereference boot-owned path globals while constructing the
+; ../core/lifecycle/engine/boot.ahk.  Do not dereference boot-owned path globals while constructing the
 ; declaration: their empty standalone values are harmless and the real driver
 ; has assigned both before this file executes.
 ; The preview-switch readers the loader publishes to. The engine includes the same
@@ -21,6 +21,7 @@
 #Include hotstrings/preview_switches.ahk
 ; The generated key vocabulary (a dedupe-safe include: menu_manifest.ahk names it too).
 #Include %A_LineFile%\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\core\lifecycle\engine\value_check.ahk
 
 global _FeatureStateConfigDir := IsSet(_ConfigDir) ? _ConfigDir : ""
 global _FeatureStateAhkSubDir := IsSet(_AhkSubDir) ? _AhkSubDir : ""
@@ -90,7 +91,7 @@ _FeatureStateDefaultsForSection(Section) {
 ; began between the press and its thread; ``SCAN_CODES`` is the key AltGr
 ; modifies, which names the chord hotkeys and the GetKeyState double-check
 ; guarding against AltGr+Enter pause-bug-style misfires.
-#Include ../../_shared/ahk/config_binding_identity.ahk
+#Include ../../_shared/settings/engine/publication/binding_identity.ahk
 ; Bring the compiled data owner forward, without running its later config read.
 #Include %A_LineFile%\..\tap_keys.ahk
 global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
@@ -138,7 +139,7 @@ global KEYBOARD_SHORTCUT_DEFAULTS := _FeatureStateDefaultsForSection(ConfigKey.S
 global KeyboardShortcutAssignments := Map()
 
 ; ParseTomlFile / IniCacheGet / ResolveConfigPath are defined in
-; infra/toml/toml_helpers.ahk
+; core/text/engine/toml/helpers.ahk
 ; (included above) so the test runner can exercise them in isolation.
 
 ; Category-level gating state (master-toggle refactor).
@@ -149,7 +150,7 @@ global KeyboardShortcutAssignments := Map()
 ; user's per-feature choices on every master click. The new design
 ; separates the master gate (this Map) from the per-feature .Enabled
 ; flags: toggling the master flips ``CategoryEnabled[Category]`` only,
-; and ``ApplyMasterGatesToFeatures`` in infra/master_gates.ahk forces
+; and ``ApplyMasterGatesToFeatures`` in core/lifecycle/engine/master_gates.ahk forces
 ; the corresponding Features entries to false at boot — a disabled
 ; category propagates as all Features entries reading false at the HotIf
 ; level, but the underlying per-feature choices persisted on disk are
@@ -338,13 +339,14 @@ _FeatureStateIdleResetSeconds(Raw) {
 	Default := ManifestDefaultFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS)
 	if Raw == "_"
 		return Default
-	; HSE_ValidIdleResetSeconds's rule, restated because this reader also boots
-	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
-	; NaN compares unequal to itself; an infinity survives no subtraction.
-	if ((Raw is Integer) or (Raw is Float)) and Raw == Raw and Raw >= 0 and (Raw - Raw) == 0
+	; The shared value schema's declaration (a number of seconds within its
+	; range); the value check needs no hotstring engine, so this reader still
+	; boots without it (tests/support/feature_state_boot_smoke.ahk).
+	Checked := ValueCheckValue(ValueCheckEntryFor(ConfigKey.HOTSTRINGS_IDLE_RESET_SECONDS), Raw)
+	if Checked["ok"]
 		return Raw
-	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
-		Raw is Object ? Type(Raw) : String(Raw), Default)
+	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is refused ({2}, {3} to {4} s) — using {5} s.",
+		Raw is Object ? Type(Raw) : String(Raw), Checked["reason"], Checked["min"], Checked["max"], Default)
 	return Default
 }
 
@@ -389,15 +391,20 @@ _FeatureStateValidateKanaOverride(Value) {
 ; so a value the loader applies is never read here as another key.
 _FeatureStateMagicKeySource(Raw) {
 	Default := _FeatureStateRequireManifestDefault(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
-	if Raw == "_" || !(Raw is String)
+	if Raw == "_"
 		return Default
 	Entry := ManifestFindEntryByPath(ConfigKey.HOTSTRINGS_MAGIC_KEY_SOURCE)
 	if !(Entry is Map) || !Entry.Has("enum_values")
 		throw Error("Missing required feature manifest candidates: hotstrings.magic_key_source")
-	for Allowed in Entry["enum_values"] {
-		if Allowed = Raw
-			return Allowed
+	if Raw is String {
+		for Allowed in Entry["enum_values"] {
+			if Allowed = Raw
+				return Allowed
+		}
 	}
+	; An outdated or mistyped stored value is reported, never dropped silently.
+	try LoggerWarn("Config", "hotstrings.magic_key_source '{1}' is not one of its manifest values — using {2}.",
+		IsObject(Raw) ? Type(Raw) : String(Raw), Default)
 	return Default
 }
 

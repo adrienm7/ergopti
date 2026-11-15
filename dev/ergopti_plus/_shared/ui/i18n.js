@@ -6,14 +6,14 @@
 // Minimal browser-side i18n system for all Ergopti webviews. Reads the active
 // locale from window._i18n_locale (injected by ui_builder before this script
 // runs, or "fr" as fallback), fetches the matching JSON file from the shared
-// _shared/data/locales/ directory, then applies translations to every DOM
+// _shared/core/i18n/data/locales/ directory, then applies translations to every DOM
 // element that carries a data-i18n="key" attribute. Also handles
 // data-i18n-title and data-i18n-placeholder for non-text-content attributes.
 //
 // FEATURES & RATIONALE:
 // 1. Zero dependencies — plain fetch + DOM traversal, no library needed.
 // 2. Dual path — ui_builder injects window.__i18n_base (file:// URL to
-//    _shared/data/locales/) and window._i18n_locale into every webview as a
+//    _shared/core/i18n/data/locales/) and window._i18n_locale into every webview as a
 //    <script> prefix, so fetch() resolves correctly even when the HTML is
 //    loaded inline with no base URL.
 // 3. Fallback cascade — active → en → fr, consulted lazily. A locale file that
@@ -56,23 +56,23 @@
 	// DOMContentLoaded fires and resolve_locale_url() is called from load().
 	var _script_src = document.currentScript ? document.currentScript.src : null;
 
-	// Resolve the path to _shared/data/locales/<code>.json relative to this
+	// Resolve the path to _shared/core/i18n/data/locales/<code>.json relative to this
 	// script's own URL. Works regardless of how many levels deep the calling
 	// page sits — and therefore also when the webview is opened bridge-less in
 	// a plain browser (Edge --app mode, or embedded on the website).
 	function resolve_locale_url(code) {
 		if (window.__i18n_base) return window.__i18n_base + code + '.json';
 		// i18n.js lives at _shared/ui/i18n.js; the locale JSONs live at
-		// _shared/data/locales/ — one dir up from ui/, then into data/locales/
+		// _shared/core/i18n/data/locales/ — one dir up from ui/, then into core/i18n/data/locales/
 		if (_script_src) {
-			var base = _script_src.replace(/[^/]+$/, '../data/locales/');
+			var base = _script_src.replace(/[^/]+$/, '../core/i18n/data/locales/');
 			return base + code + '.json';
 		}
 		// Fallback: page is at _shared/ui/<app>/index.html — go up 2 levels to
-		// reach _shared/, then into data/locales/
+		// reach _shared/, then into core/i18n/data/locales/
 		var parts = location.href.split('/');
 		var base_parts = parts.slice(0, parts.length - 3);
-		return base_parts.join('/') + '/data/locales/' + code + '.json';
+		return base_parts.join('/') + '/core/i18n/data/locales/' + code + '.json';
 	}
 
 	// Locales consulted, in order, for keys the active locale did not resolve.

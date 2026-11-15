@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Walker Pure Functions vs The Shared Lua Core
 ; DESCRIPTION:
-; macOS aggregation runs on _shared/lua/keystats — thirteen of the twenty-one
+; macOS aggregation runs on _shared/metrics/engine — thirteen of the twenty-one
 ; functions in its core are pure delegations to aggregator_helpers.lua and
 ; utils.lua. AutoHotkey cannot require a Lua module, so its walker re-implements
 ; the same functions by hand. Nothing holds the hand-port to the original except

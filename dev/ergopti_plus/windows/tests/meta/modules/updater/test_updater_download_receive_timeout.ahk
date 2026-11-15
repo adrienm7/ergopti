@@ -25,12 +25,8 @@ _UDRT_AssertDownloadReceiveBudget() {
 	Assert(Body != "", "_Updater_StartStagingWorker must exist")
 	Assert(InStr(Body, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS") > 0,
 		"_Updater_StartStagingWorker must pass the dedicated download timeout to the worker, not the 30 s API budget (updater-download-receive-timeout)")
-	SplitPath(A_ScriptDir, , &Root)
-	Core := FileRead(StrReplace(Root, "\", "/") . "/modules/updater/core.ahk")
-	m := ""
-	Assert(RegExMatch(Core, "UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS\s*:=\s*(\d+)", &m) > 0,
-		"core.ahk must define UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS (updater-download-receive-timeout)")
-	Assert(Integer(m[1]) >= 600000,
+	global UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS
+	Assert(IsInteger(UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS) && UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS >= 600000,
 		"UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS must be >= the 600 s poll ceiling so the download is not aborted before the poll deadline (updater-download-receive-timeout)")
 	Worker := FileRead(_Updater_StagingWorkerPath(), "UTF-8")
 	Assert(InStr(Worker, "$Request.ReadWriteTimeout = $TimeoutMs") > 0,

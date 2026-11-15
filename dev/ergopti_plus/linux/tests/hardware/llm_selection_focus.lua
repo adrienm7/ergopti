@@ -10,13 +10,13 @@
 --- This does not claim evdev/uinput or physical keyboard input.
 --- ==============================================================================
 
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 -- A refused AI action reports its reason only in the log. The receipts go to
 -- stdout, so the log goes to stderr (worker.log), which the harness prints
 -- when an assertion fails.
-require("logger").set_sink(function(line) io.stderr:write(line, "\n") end)
-local Json = require("json")
-local Shell = require("adapters.shell_runner")
+require("core.logger.engine").set_sink(function(line) io.stderr:write(line, "\n") end)
+local Json = require("core.text.engine.json")
+local Shell = require("core.process.adapters.shell_runner")
 local source_path = os.getenv("ERGOPTI_AI_DAEMON_SOURCE") or "ergopti_hotstrings.lua"
 local file = assert(io.open(source_path, "r"))
 local source = file:read("*a")
@@ -24,12 +24,12 @@ file:close()
 local seam = assert(source:match("focus_id = (.-),\n%s*%-%-"), "the daemon focus callback must be present")
 local compile = loadstring or load
 local focus_factory = assert(compile("return function(window_info, secure_focus_guard) return " .. seam .. " end"))()
-local Window = require("adapters.window_info")
-local Detector = require("adapters.secure_field_detector")
-local Atspi = require("adapters.atspi_focus")
+local Window = require("platform.focus.window_info")
+local Detector = require("platform.focus.secure_field_detector")
+local Atspi = require("platform.focus.atspi_focus")
 local uv = require("luv")
-local Clock = require("infra.monotonic")
-local Timings = require("infra.timings")
+local Clock = require("core.logger.engine.monotonic")
+local Timings = require("core.timing.engine.timings")
 local ffi = require("ffi")
 ffi.cdef([[typedef struct _XDisplay Display;
 	Display *XOpenDisplay(const char *name); int XCloseDisplay(Display *display);
@@ -51,7 +51,7 @@ local CLIPBOARD_SEED = "ERGOPTI-NATIVE-SELECTION-CLIPBOARD"
 assert(Clipboard.write(CLIPBOARD_SEED), "native clipboard control must be seeded")
 local clipboard_read_ok, clipboard_content = Clipboard.read_checked()
 assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native clipboard control must be readable")
-local Watch = require("adapters.atspi_focus_watch").new()
+local Watch = require("platform.focus.atspi_focus_watch").new()
 package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
@@ -73,7 +73,7 @@ package.loaded["modules.llm.api_remote"] = {
 	cancel = function() return true end,
 }
 local Engine = require("modules.llm.prediction_engine")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 local Keystats = require("modules.keystats.keystats")
 local Guard = require("modules.keystats.focus_guard").new({
 	watch = Watch, detector = Detector, keystats = Keystats, prediction = Engine,
@@ -142,7 +142,7 @@ local function snapshot(fields)
 	fields.target = focus_id()
 	fields.cached_verdict = Detector.getVerdict()
 	fields.url_filter = require("modules.llm.trigger_settings").get("url_bar_filter_enabled")
-	fields.foreground_type = type(require("adapters.process_lifecycle").getForegroundApp())
+	fields.foreground_type = type(require("core.process.adapters.lifecycle").getForegroundApp())
 	fields.window = Window.focused_identity()
 	fields.applied, fields.requests, fields.reads = applied, request, reads
 	fields.offered = Engine.has_suggestions()
@@ -228,7 +228,7 @@ for command in io.lines() do
 		assert(called, detail)
 	elseif command == "benchmark" or command == "deadline" then
 		if command == "benchmark" then await_join() end
-		local clock = require("infra.monotonic")
+		local clock = require("core.logger.engine.monotonic")
 		result.probe_ms = {}
 		for _ = 1, command == "benchmark" and 20 or 1 do
 			local started = clock.now_ms()

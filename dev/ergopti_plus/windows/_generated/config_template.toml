@@ -1,5 +1,5 @@
 # _generated/config_template.toml
-# AUTO-GENERATED from _shared/modules/features/manifest.toml.
+# AUTO-GENERATED from _shared/settings/data/features/manifest.toml.
 # DO NOT EDIT BY HAND — run `npm run build:manifest` to refresh.
 # This is the default v2 config copied into config/ergopti_plus/ahk/
 # on first boot. After that, the user owns the copy.
@@ -633,6 +633,30 @@ tap_4 = "none"
 
 
 
+[gestures.modes]
+swipe_3_left = "incremental"
+swipe_3_right = "incremental"
+swipe_3_up = "x1"
+swipe_3_down = "x1"
+swipe_4_left = "x1"
+swipe_4_right = "x1"
+swipe_4_up = "x1"
+swipe_4_down = "x1"
+
+
+
+[gestures.sensitivities]
+swipe_3_left = 3.5
+swipe_3_right = 3.5
+swipe_3_up = 25
+swipe_3_down = 25
+swipe_4_left = 3.5
+swipe_4_right = 3.5
+swipe_4_up = 3.5
+swipe_4_down = 3.5
+
+
+
 
 
 [layout]
@@ -680,3 +704,4 @@ proxy_override = ""
 
 [tap_holds]
 lone_modifier_tap_max_ms = 1000
+sticky_timeout_ms = 2000

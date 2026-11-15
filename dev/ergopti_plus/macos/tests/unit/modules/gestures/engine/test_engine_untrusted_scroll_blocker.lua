@@ -23,8 +23,8 @@ local helpers = require("tests.helpers")
 local function load_engine(trusted)
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["adapters.accessibility_permission"] = nil
-	package.loaded["infra.logger"] = nil
-	local Logger = helpers.load_with_stubs("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 	local logged = { error = {}, warn = {} }
 	Logger.error = function(_, fmt, ...) table.insert(logged.error, string.format(fmt, ...)) end
 	Logger.warn = function(_, fmt, ...) table.insert(logged.warn, string.format(fmt, ...)) end

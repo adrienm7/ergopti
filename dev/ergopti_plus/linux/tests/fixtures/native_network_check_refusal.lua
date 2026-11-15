@@ -12,11 +12,11 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_network_check_refusal%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
-local Http = require("adapters.http_client")
-local Proxy = require("adapters.system_proxy")
-local Ports = require("adapters.network_check_ports")
+local Http = require("core.network.adapters.http_client")
+local Proxy = require("core.network.adapters.system_proxy")
+local Ports = require("core.network.adapters.check_ports")
 local callbacks, failures, checks = 0, 0, 0
 local sockets, requests = {}, 0
 local server = assert(uv.new_tcp())

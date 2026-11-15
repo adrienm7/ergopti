@@ -21,14 +21,14 @@
 local M = {}
 
 local llm_mod       = require("modules.llm")
-local i18n          = require("infra.i18n")
-local Logger        = require("infra.logger")
-local dialog        = require("infra.dialog_util")
-local notifications = require("infra.notifications")
+local i18n          = require("core.i18n.engine.i18n")
+local Logger        = require("core.logger.engine.logger")
+local dialog        = require("core.ui.engine.dialog_util")
+local notifications = require("core.ui.engine.notifications")
 local ProfileLabel  = require("ui.menu.menu_llm.profile_label")
 local PredictionLockRegistry = require("ui.menu.menu_llm.prediction_lock_registry")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Tone          = require("llm.tone")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Tone          = require("ai.engine.prediction.tone")
 
 local LOG = "model_switcher"
 

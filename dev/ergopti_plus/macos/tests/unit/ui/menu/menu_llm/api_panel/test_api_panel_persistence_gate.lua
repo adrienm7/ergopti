@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 helpers.describe("API panel durable persistence gate", function()
 	helpers.it("rolls back a validated Add when Keychain persistence fails", function()
 		local module_names = {
-			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
-			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
 		}
 		local saved = {}
 		for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -59,28 +59,28 @@ helpers.describe("API panel durable persistence gate", function()
 				persist_callback = callback
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1
 				return "button.ok", prompt_values[prompt_index]
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, level)
 				notifications[#notifications + 1] = { title = title, body = body, level = level }
 				return true
 			end,
 		}
-		local command_renderer = assert(require("menu.renderer").new({
+		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-			json_decode = require("adapters.json_codec").decode,
+			manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = {
-			get = package.loaded["infra.i18n"].get,
+			get = package.loaded["core.i18n.engine.i18n"].get,
 			-- These command rows never request a translated section.
 			section = function() return {} end,
 		},

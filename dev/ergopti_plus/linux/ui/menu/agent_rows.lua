@@ -17,16 +17,16 @@
 --- 3. The mode goes through the prediction engine, which refuses the automatic
 ---    mode without System 1 and System 2 and tells the user why.
 --- 4. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local AgentSettings = require("modules.llm.agent_settings")
-local AppIdentity = require("llm.app_identity")
-local COMMAND = require("config_keys").COMMAND
+local AppIdentity = require("ai.engine.policy.app_identity")
+local COMMAND = require("settings.engine.keys").COMMAND
 
 local LOG = "ui.menu.agent_rows"
 
@@ -34,7 +34,7 @@ local LOG = "ui.menu.agent_rows"
 --- @param key string
 --- @return string
 local function tr(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	local value = ok and type(i18n.get) == "function" and i18n.get(key) or nil
 	return type(value) == "string" and value ~= "" and value or key
 end
@@ -65,7 +65,7 @@ end
 local function system_rows(system, dialogs, changed)
 	local ManifestMenu = require("infra.manifest_menu")
 	local spec = AgentSettings.get_spec(system)
-	local parsed = spec ~= "" and require("llm.vision").parse(spec) or nil
+	local parsed = spec ~= "" and require("ai.engine.prediction.vision").parse(spec) or nil
 	local choices = AgentSettings.backend_choices(system)
 	local current_label = tr("menu.agent.off")
 	local current_choice = nil
@@ -79,7 +79,7 @@ local function system_rows(system, dialogs, changed)
 	local function store(value)
 		if AgentSettings.set_spec(system, value) then changed() end
 	end
-	local off = require("infra.manifest_menu").check_row("agent_system_controls", require("config_keys").COMMAND.AGENT_SYSTEM_OFF, {
+	local off = require("infra.manifest_menu").check_row("agent_system_controls", require("settings.engine.keys").COMMAND.AGENT_SYSTEM_OFF, {
 		agent_system_off = function()
 			if AgentSettings.set_spec(system, "") ~= true then return false end
 			changed()
@@ -95,7 +95,7 @@ local function system_rows(system, dialogs, changed)
 		local value, label = choice.value, choice.label
 		local record = ManifestMenu.template_rows("agent_linux_system_backend_record", {
 			-- A new backend starts on its default model.
-			[require("config_keys").COMMAND.AGENT_SYSTEM_BACKEND] = function() store(value) end,
+			[require("settings.engine.keys").COMMAND.AGENT_SYSTEM_BACKEND] = function() store(value) end,
 		}, {
 			agent_system_backend_label = function() return label end,
 			agent_system_backend_selected = function() return parsed ~= nil and parsed.backend == value end,
@@ -106,7 +106,7 @@ local function system_rows(system, dialogs, changed)
 	local resolved = AgentSettings.resolve(system)
 	local model = resolved and resolved.model or (parsed and parsed.model) or ""
 	local model_rows = ManifestMenu.template_rows("agent_system_model_controls", {
-		[require("config_keys").COMMAND.AGENT_SYSTEM_MODEL] = function()
+		[require("settings.engine.keys").COMMAND.AGENT_SYSTEM_MODEL] = function()
 			if not parsed then return end
 			local backend = parsed.backend
 			local answer = dialogs.prompt(tr("menu.agent.title"),
@@ -148,7 +148,7 @@ end
 --- @param excluded table Set of excluded identifiers.
 --- @return table Array of identifiers.
 local function running_apps(excluded)
-	local ok, WindowInfo = pcall(require, "adapters.window_info")
+	local ok, WindowInfo = pcall(require, "platform.focus.window_info")
 	if not ok then return {} end
 	local list, seen = {}, {}
 	for _, info in ipairs(WindowInfo.getAll()) do
@@ -192,7 +192,7 @@ local function disabled_app_rows(llm, dialogs, changed)
 	local removed = {}
 	for _, app in ipairs(apps) do
 		local rows = ManifestMenu.template_rows("agent_linux_disabled_app_remove", {
-			[require("config_keys").COMMAND.AGENT_DISABLED_APP_REMOVE] = function()
+			[require("settings.engine.keys").COMMAND.AGENT_DISABLED_APP_REMOVE] = function()
 				local list = {}
 				for _, existing in ipairs(AgentSettings.get_disabled_apps()) do
 					if existing ~= app then list[#list + 1] = existing end
@@ -205,8 +205,8 @@ local function disabled_app_rows(llm, dialogs, changed)
 	end
 	local last = llm and type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
 	local rows = ManifestMenu.template_rows("agent_linux_disabled_apps_children", {
-		[require("config_keys").COMMAND.AGENT_DISABLED_APP_CURRENT] = function() add(last) end,
-		[require("config_keys").COMMAND.AGENT_DISABLED_APP_ADD] = function()
+		[require("settings.engine.keys").COMMAND.AGENT_DISABLED_APP_CURRENT] = function() add(last) end,
+		[require("settings.engine.keys").COMMAND.AGENT_DISABLED_APP_ADD] = function()
 			local answer = dialogs.prompt(tr("menu.agent.title"), tr("app_picker.search_placeholder"), "", false,
 				running_apps(excluded))
 			if answer == nil then return end
@@ -261,25 +261,25 @@ function M.build(ctx, dialogs)
 				frame = ManifestMenu.template_rows("agent_linux_system1_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					[require("config_keys").LEAF.AGENT_SYSTEM1] = function() return rows end,
+					[require("settings.engine.keys").LEAF.AGENT_SYSTEM1] = function() return rows end,
 				})
 			else
 				frame = ManifestMenu.template_rows("agent_linux_system2_frame", {}, {
 					agent_system_backend_current_caption = function() return current end,
 				}, {
-					[require("config_keys").LEAF.AGENT_SYSTEM2] = function() return rows end,
+					[require("settings.engine.keys").LEAF.AGENT_SYSTEM2] = function() return rows end,
 				})
 			end
 			return frame or {}
 		end
 	end
-	providers[require("config_keys").COMMAND.AGENT_DISABLED_APPS] = function()
+	providers[require("settings.engine.keys").COMMAND.AGENT_DISABLED_APPS] = function()
 		local count, rows = disabled_app_rows(llm, dialogs, changed)
 		if not rows then return {} end
 		local frame = ManifestMenu.template_rows("agent_linux_disabled_apps_frame", {}, {
 			agent_disabled_apps_count = function() return tostring(count) end,
 		}, {
-			[require("config_keys").LEAF.AGENT_DISABLED_APPS] = function() return rows end,
+			[require("settings.engine.keys").LEAF.AGENT_DISABLED_APPS] = function() return rows end,
 		})
 		return frame or {}
 	end
@@ -293,7 +293,7 @@ function M.build(ctx, dialogs)
 			end,
 		},
 		state_getters = {
-			[require("config_keys").KEY.LLM_AGENT_MODE] = AgentSettings.get_mode,
+			[require("settings.engine.keys").KEY.LLM_AGENT_MODE] = AgentSettings.get_mode,
 			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
 		},
 	}

@@ -24,15 +24,15 @@
 local M = {}
 
 local hs               = hs
-local JsonCodec        = require("adapters.json_codec")
-local NativePath = require("native_path")
-local Logger           = require("infra.logger")
-local fs_dir           = require("infra.fs_dir")
+local JsonCodec        = require("core.fs.adapters.json_codec")
+local NativePath = require("core.fs.engine.native_path")
+local Logger           = require("core.logger.engine.logger")
+local fs_dir           = require("core.fs.engine.dir")
 local menu_paths       = require("infra.config_paths")
 local keymap           = require("modules.keymap")
 local hotstring_editor = require("ui.hotstring_editor")
 
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local Adoption = require("infra.personal_file_adoption")
 local LOG = "personal_hotstrings"
 local _inventory = {}
@@ -72,7 +72,7 @@ function M.load(ctx)
 
 	local personal_path = menu_paths.get("PersonalTomlPath")
 	-- Personal source-default priority, read from the shared single source
-	-- (_shared/modules/hotstrings/priority.json, copied into the bundle) so the editor
+	-- (_shared/hotstrings/data/catalogue/priority.json, copied into the bundle) so the editor
 	-- shows it as the priority field placeholder without hardcoding it. Falls back
 	-- to the engine value (kept identical to that file by the parity gate).
 	local personal_default_priority = keymap.source_priority and keymap.source_priority("personal") or nil
@@ -108,7 +108,7 @@ function M.load(ctx)
 			return
 		end
 
-		local observed, status, attr = pcall(require("adapters.file_system").path_status, dir)
+		local observed, status, attr = pcall(require("core.fs.adapters.file_system").path_status, dir)
 		if observed and status == "present" and type(attr) == "table" and attr.mode == "link" then
 			blocked[#blocked + 1] = { path = dir, label = #components > 0 and table.concat(components, "/") or NativePath.basename(dir), reason = "linked-directory" }
 			return
@@ -128,7 +128,7 @@ function M.load(ctx)
 		for _, fname in ipairs(fs_dir.entries(dir)) do
 			if fname ~= "." and fname ~= ".." and not fname:match("^_") then
 				local fpath = dir .. "/" .. fname
-				local observed, status, a = pcall(require("adapters.file_system").path_status, fpath)
+				local observed, status, a = pcall(require("core.fs.adapters.file_system").path_status, fpath)
 				if observed and status == "present" and type(a) == "table" then
 					if a.mode == "link" and not fname:match("%.toml$") then
 						local relative = {}; for index, component in ipairs(components) do relative[index] = component end

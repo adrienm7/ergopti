@@ -12,7 +12,7 @@
 local helpers = require("tests.helpers")
 local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function emitted(f)
 	local total = f.key_posts
@@ -45,15 +45,15 @@ local function with_text(kind, callback)
 	helpers.with_stub_scope({
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace",
-		"unicode_case", "unicode_case.data", "modules.keymap.utils",
+		"core.text.engine.unicode_case", "core.text.engine.unicode_case.data", "modules.keymap.utils",
 	}, function()
 		with_sender(function(f)
 			Destination.install()
 			local board = f.hs_overrides.pasteboard
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
-			package.loaded["infra.paths"] = { shared = function() return nil end }
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			f.text = require("modules.shortcuts.actions.text")
 			f.payload = kind == "wrap" and "(hello)" or "HELLO"
 			function f.stage()

@@ -9,6 +9,7 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 
 
@@ -21,11 +22,11 @@
 ; ============================
 
 ; The tap-hold timing constants below are sourced from the shared cross-driver
-; registry (_shared/modules/timings/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
-; called once at boot from infra/boot.ahk. They start at the sentinel 0 only as a
+; registry (_shared/core/timing/data/constants.toml [tap_hold]) by TapHoldsLoadTimings(),
+; called once at boot from core/lifecycle/engine/boot.ahk. They start at the sentinel 0 only as a
 ; declaration placeholder. IMPORTANT: AHK v2 executes a file's top-level
 ; `global X := ...` assignments at its #Include POSITION in the auto-execute flow,
-; NOT before it -- so this file MUST be included before infra/boot.ahk (ErgoptiPlus.ahk
+; NOT before it -- so this file MUST be included before core/lifecycle/engine/boot.ahk (ErgoptiPlus.ahk
 ; does this explicitly in the early include manifest), otherwise these sentinel 0s
 ; would run AFTER TapHoldsLoadTimings() and re-zero the loaded values on every boot.
 
@@ -46,8 +47,8 @@ global KEY_REPEAT_INITIAL_DELAY_MS := 0
 ; Interval (ms) between successive BackSpace repeats while the key stays held.
 global KEY_REPEAT_INTERVAL_MS := 0
 
-; Timeout (s) for the OneShotShift InputHook: how long to wait for the next
-; character before giving up and leaving the shift state active.
+; Timeout (s) for the one-shot InputHooks (one-shot Shift and the sticky_*
+; actions): how long to wait for the next key; 0 is no time limit.
 global ONE_SHOT_SHIFT_TIMEOUT_SEC := 0
 
 ; The GLOBAL tap-hold delay (s): what every key waits before its hold fires until
@@ -60,7 +61,7 @@ global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0
 ; How long (ms) a key whose hold is a modifier, pressed alone, still types its
 ; tap (tap_holds.lone_modifier_tap_max_ms; 0 = the strict tap-hold). The
 ; manifest default until the configuration sets it (TapHoldSetLoneTapMaxMs);
-; "" means not set yet. Same rule as _shared/lua/tap_hold/lone_tap.lua on
+; "" means not set yet. Same rule as _shared/tap_hold/engine/lone_tap.lua on
 ; macOS and Linux.
 global TAP_HOLD_LONE_TAP_MAX_MS := ""
 
@@ -82,13 +83,12 @@ global STUCK_MODIFIER_RELEASE_TIMEOUT_SEC := 5
 ; still absorbing a transient injection failure before lifecycle cleanup runs.
 global TAPHOLD_SYNTHETIC_RELEASE_MAX_ATTEMPTS := 3
 
-; Refuses a lone tap window that is neither 0 nor a positive whole number.
+; Refuses a lone tap window its shared value schema declaration refuses: 0 or
+; a whole number of milliseconds up to the declared maximum.
 ; @param Ms {Number} Milliseconds.
 ; @returns {Integer}
 TapHoldValidLoneTapMaxMs(Ms) {
-	if !(Ms is Integer) || Ms < 0
-		throw ValueError("tap_holds.lone_modifier_tap_max_ms must be 0 or a positive whole number of milliseconds.", -1, String(Ms))
-	return Ms
+	return Integer(ValueCheckRequire(ConfigKey.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS, Ms))
 }
 
 ; Sets the lone tap window from the configuration.
@@ -125,20 +125,31 @@ TapHoldLoneTapReadConfig(Cache) {
 	LoggerInfo("TapHold", "Lone modifier tap window read: {1} ms.", TapHoldLoneTapMaxMs())
 }
 
-; Refuses a one-shot timeout that is not a positive whole number of
-; milliseconds (tap_holds.sticky_timeout_ms, the leaf macOS reads). No zero
-; or unlimited value: macOS refuses them too (decision of 2026-11-06).
+; Refuses a one-shot timeout that is neither 0 (no time limit, decision of
+; 2026-11-13) nor a positive whole number of milliseconds within its shared
+; value schema declaration (tap_holds.sticky_timeout_ms, the leaf macOS reads).
+; The one rule on Windows, as _shared/tap_hold/engine/one_shot_timeout.lua.
 ; @param Ms {Number} Milliseconds.
 ; @returns {Integer}
 TapHoldValidOneShotTimeoutMs(Ms) {
-	if !(Ms is Integer) || Ms <= 0
-		throw ValueError("tap_holds.sticky_timeout_ms must be a positive whole number of milliseconds.", -1, String(Ms))
+	if !(Ms is Integer) || !ValueCheckValue(ValueCheckEntryFor(ConfigKey.TAP_HOLDS_STICKY_TIMEOUT_MS), Ms)["ok"]
+		throw ValueError("tap_holds.sticky_timeout_ms must be 0 (no time limit) or a positive whole number of milliseconds.",
+			-1, (Ms is Object) ? Type(Ms) : String(Ms))
 	return Ms
+}
+
+; The InputHook timeout option of a one-shot wait: " T<seconds>", or nothing
+; when the timeout is 0 (no time limit). Fails fast on a value altered after
+; load, at the boundary where it reaches InputHook.
+; @returns {String}
+TapHoldOneShotHookTimeoutOption() {
+	Ms := TapHoldValidOneShotTimeoutMs(TapHoldOneShotTimeoutMs())
+	return Ms == 0 ? "" : " T" . (Ms / 1000)
 }
 
 ; Reads the one-shot Shift timeout from config.toml at boot, after
 ; TapHoldsLoadTimings(): absent, the timing registry's default stays; a value
-; that is not a positive whole number is reported and the default stays.
+; that is neither 0 nor a positive whole number is reported and the default stays.
 ; @param Cache {Map} The parsed config (IniCacheGet's source).
 TapHoldOneShotTimeoutReadConfig(Cache) {
 	global ONE_SHOT_SHIFT_TIMEOUT_SEC
@@ -167,6 +178,8 @@ TapHoldOneShotTimeoutReadConfig(Cache) {
 ; @returns {Integer}
 TapHoldOneShotTimeoutMs() {
 	global ONE_SHOT_SHIFT_TIMEOUT_SEC
+	if !(ONE_SHOT_SHIFT_TIMEOUT_SEC is Number)
+		throw TypeError("The one-shot timeout in force is not a number.", -1, Type(ONE_SHOT_SHIFT_TIMEOUT_SEC))
 	return Round(ONE_SHOT_SHIFT_TIMEOUT_SEC * 1000)
 }
 
@@ -205,13 +218,16 @@ TapHoldLoneTapMaxMs() {
 TapHoldsLoadTimings() {
 	global TAP_MIN_DURATION_MS, KEY_REPEAT_INITIAL_DELAY_MS
 	global KEY_REPEAT_INTERVAL_MS, ONE_SHOT_SHIFT_TIMEOUT_SEC, TAPHOLD_DEFAULT_ACTIVATION_SECONDS
-	global TAP_COPY_VERIFY_MS
+	global TAP_COPY_VERIFY_MS, TAPHOLD_MAX_ACTIVATION_SECONDS
 	TAP_COPY_VERIFY_MS          := TimingsGet("tap_hold", "copy_verify_ms")
 	TAP_MIN_DURATION_MS         := TimingsGet("tap_hold", "tap_min_duration_ms")
 	KEY_REPEAT_INITIAL_DELAY_MS := TimingsGet("tap_hold", "key_repeat_initial_delay_ms")
 	KEY_REPEAT_INTERVAL_MS      := TimingsGet("tap_hold", "key_repeat_interval_ms")
 	ONE_SHOT_SHIFT_TIMEOUT_SEC  := TimingsGetSec("tap_hold", "one_shot_shift_timeout_ms")
 	TAPHOLD_DEFAULT_ACTIVATION_SECONDS := TimingsGetSec("tap_hold", "default_activation_ms")
+	; The bound of every delay, the registry's as on macOS and Linux (TCL-005);
+	; tap_hold_loader.ahk declares it for the headless suites that load no registry.
+	TAPHOLD_MAX_ACTIVATION_SECONDS := TimingsGetSec("tap_hold", "max_activation_ms")
 }
 
 
@@ -1707,7 +1723,7 @@ _TapHoldFireAction(KeyId) {
 ; before Ctrl+C is sent, read again by a one-shot timer (never a Sleep on the
 ; hook thread), Ctrl+C is sent once more when it did not move, and the user is
 ; warned when it still did not. The states and outcomes are those of
-; _shared/lua/tap_hold/copy_check.lua, which the macOS and Linux drivers run.
+; _shared/tap_hold/engine/copy_check.lua, which the macOS and Linux drivers run.
 
 ; How many times a copy is sent again when the clipboard did not move.
 global TAP_COPY_RETRIES := 1

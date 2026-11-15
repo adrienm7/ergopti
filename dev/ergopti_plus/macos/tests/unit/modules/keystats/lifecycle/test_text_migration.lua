@@ -30,8 +30,8 @@
 
 local helpers = require("tests.helpers")
 
-local Plan       = require("keystats.text_migration")
-local TextCrypto = require("keystats.text_crypto")
+local Plan       = require("metrics.engine.privacy.text_migration_core")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local CipherDouble = require("tests.support.keystats.cipher_shell_double")
 
@@ -86,7 +86,7 @@ end
 -- first. Own the writer too: it captures the cipher reloaded by each scenario.
 local OWNED_MODULES = {
 	"hs.fs", "hs.json", "hs.sqlite3",
-	"adapters.crypto", "adapters.shell_runner",
+	"core.crypto.crypto", "core.process.adapters.shell_runner",
 	"modules.keystats.text_cipher", "modules.keystats.text_migration",
 	"modules.keystats.sqlite_writer",
 }
@@ -163,6 +163,7 @@ local function make_store(rows)
 			end
 			return true
 		end,
+		clear_rich_text = function() return true end,
 		get_cursor = function() return store.cursor end,
 		set_cursor = function(value) store.cursor = value; return true end,
 	}
@@ -174,12 +175,12 @@ end
 --- @return table cipher, table migration.
 local function load_runner(store)
 	-- Both adapters capture the global hs at load: reload them under the doubles.
-	package.loaded["adapters.crypto"] = nil
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.crypto.crypto"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	package.loaded["modules.keystats.text_cipher"] = nil
 	package.loaded["modules.keystats.text_migration"] = nil
 	-- Secret input is written to a popen(3) pipe, never to hs.execute.
-	require("adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
+	require("core.process.adapters.shell_runner")._set_private_stdin_native(_private_stdin_native)
 	local cipher = require("modules.keystats.text_cipher")
 	cipher._set_machine_id_command("echo ioreg-stub")
 	local migration = require("modules.keystats.text_migration")
@@ -209,7 +210,7 @@ end
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: enabling encrypts the rows already stored", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: enabling encrypts the rows already stored", function()
 	helpers.it("wraps every pre-existing row and round-trips it byte for byte", migration_case(function()
 		local originals = {
 			{ id = 1, text = "hello world",            events_json = "[1,2]" },
@@ -303,7 +304,7 @@ end)
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: disabling decrypts the rows in place", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: disabling decrypts the rows in place", function()
 	helpers.it("returns every row to the exact bytes it started from", migration_case(function()
 		local originals = {
 			{ id = 1, text = "secret sentence",       events_json = "[1]" },
@@ -342,7 +343,7 @@ end)
 -- ==========================================
 -- ==========================================
 
-helpers.describe("keystats.text_migration: an interrupted pass converges", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: an interrupted pass converges", function()
 	helpers.it("finishes a half-migrated table without double-wrapping", migration_case(function()
 		local store = make_store({
 			{ id = 1, text = "one",   events_json = "[1]" },
@@ -446,7 +447,7 @@ end)
 -- =========================================
 -- =========================================
 
-helpers.describe("keystats.text_migration: the pass is sliced, not looped", function()
+helpers.describe("metrics.engine.privacy.text_migration_core: the pass is sliced, not looped", function()
 	helpers.it("schedules the next batch instead of converting the table in one go", migration_case(function()
 		local rows = {}
 		for id = 1, 6 do rows[id] = { id = id, text = "row " .. id, events_json = "[]" } end
@@ -485,7 +486,7 @@ local function assert_scope_restoration(should_throw)
 		local prior = {
 			["hs.json"] = false,
 			["hs.sqlite3"] = { foreign_native = true },
-			["adapters.shell_runner"] = borrowed_runner,
+			["core.process.adapters.shell_runner"] = borrowed_runner,
 			["modules.keystats.text_cipher"] = false,
 			["modules.keystats.sqlite_writer"] = { foreign_writer = true },
 		}
@@ -539,10 +540,10 @@ helpers.describe("Migration fixture native identity ownership", function()
 	end)
 end)
 
-require("test.text_migration_durability").register(helpers, {
+require("tests.lua.core.text_migration_durability").register(helpers, {
 	make_store = make_store, load = load_runner, install = install_shell,
 	restore = restore_shell, drain = drain,
-	logger = function() return require("infra.logger") end,
-	log_tag = "keystats.text_migration", device = DEVICE,
+	logger = function() return require("core.logger.engine.logger") end,
+	log_tag = "metrics.engine.privacy.text_migration_core", device = DEVICE,
 	resume = function(migration, mode) return migration.resume_for_posture(mode == Plan.MODE_ENCRYPT, DEVICE) end,
 })

@@ -12,14 +12,14 @@
 
 local helpers = require("tests.helpers")
 
-local OWNED = { "ui.menu.menu_llm.custom_models", "infra.dialog_util" }
+local OWNED = { "ui.menu.menu_llm.custom_models", "core.ui.engine.dialog_util" }
 
 --- Runs one case with the real module and a scripted confirmation.
 local function with_models(opts, body)
 	helpers.with_fresh_modules(OWNED, function()
-		package.loaded["infra.dialog_util"] = { block_alert = function()
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function()
 			if opts.confirm == "throw" then error("dialog", 0) end
-			return opts.confirm == "cancel" and "Cancel" or require("infra.i18n").get("button.remove")
+			return opts.confirm == "cancel" and "Cancel" or require("core.i18n.engine.i18n").get("button.remove")
 		end }
 		local Custom = require("ui.menu.menu_llm.custom_models")
 		local state = { llm_backend = opts.backend or "ollama", llm_model = opts.model or "", llm_user_models = opts.list }
@@ -105,7 +105,7 @@ helpers.describe("custom model list transactions", function()
 	end
 
 	helpers.it("keeps the active Ollama model when removing the same MLX identifier", function()
-		local identifiers = require("llm.model_identifier")
+		local identifiers = require("ai.engine.local_servers.model_identifier")
 		helpers.assert_true(identifiers.valid("ollama", "owner/model"))
 		helpers.assert_true(identifiers.valid("mlx", "owner/model"))
 		local list = { { backend = "mlx", name = "owner/model" } }

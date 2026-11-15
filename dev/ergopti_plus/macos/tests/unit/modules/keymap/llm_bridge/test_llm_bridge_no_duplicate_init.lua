@@ -31,16 +31,16 @@ local helpers = require("tests.helpers")
 -- load_with_stubs() call below gets a truly fresh module graph.
 local STUB_MODULES = {
 	"modules.keymap.utils",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.llm",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.keystats",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
 	"modules.keymap.registry",
 	"modules.hotstrings.hotstrings_config",
 	"modules.keymap.llm_bridge",
-	"infra.logger",
+	"core.logger.engine.logger",
 }
 for _, mod in ipairs(STUB_MODULES) do
 	package.loaded[mod] = nil
@@ -48,11 +48,11 @@ end
 
 -- Install hs stub first so that modules which reference `hs` at load time
 -- find a valid global. load_with_stubs() sets _G.hs internally.
-local _ = helpers.load_with_stubs("infra.logger")
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Load a fresh Logger instance that we can attach a capture sink to.
-package.loaded["infra.logger"] = nil
-local Logger = require("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
 Logger.set_level(Logger.LEVELS.DEBUG)
 
@@ -66,7 +66,7 @@ package.loaded["modules.keymap.utils"] = {
 }
 
 -- Minimal stub for lib.text_utils.
-package.loaded["infra.text_utils"] = {
+package.loaded["core.text.engine.utils"] = {
 	is_letter_char  = function(_) return false end,
 	trig_lower      = function(s) return s end,
 	conform_replacement = function(r, _, _) return r end,
@@ -87,7 +87,7 @@ package.loaded["modules.llm"] = {
 }
 
 -- lib.keycodes: only the constants accessed at load time matter.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	ESCAPE             = 53,
 	RETURN             = 36,
 	F16_LLM_CHAIN_SIGNAL = 106,
@@ -104,7 +104,7 @@ package.loaded["modules.keystats"] = {
 }
 
 -- ui.tooltip: no-op stub; the bridge wires callbacks at load time.
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	show_stacked          = function() end,
 	hide                  = function() end,
 	set_timeout           = function() end,

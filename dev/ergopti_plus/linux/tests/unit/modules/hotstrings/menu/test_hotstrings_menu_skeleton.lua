@@ -159,7 +159,7 @@ helpers.describe("hotstrings submenu: the personal-hotstring editor", function()
 		})
 		helpers.assert_true(rows ~= nil, "the Hotstrings submenu must exist at all")
 
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local wanted = {}
 		for _, key in ipairs(labels) do wanted[i18n.get(key)] = true end
 
@@ -214,7 +214,7 @@ helpers.describe("shared personal editor command", function()
 				is_paused = function() return false end,
 				webview = { show = function() calls = calls + 1 end },
 			})
-			local expected = require("infra.i18n").get("menu.hotstrings.shortcut_none")
+			local expected = require("core.i18n.engine.i18n").get("menu.hotstrings.shortcut_none")
 			local function find(list)
 				for _, row in ipairs(list or {}) do
 					if row.title == expected and not row.menu then found = row end
@@ -230,8 +230,8 @@ helpers.describe("shared personal editor command", function()
 		helpers.assert_eq(calls, 1)
 	end)
 
-	local Json = require("json")
-	local Paths = require("infra.paths")
+	local Json = require("core.text.engine.json")
+	local Paths = require("core.fs.engine.paths")
 	local file = assert(io.open(Paths.shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
@@ -252,7 +252,7 @@ helpers.describe("shared personal editor command", function()
 				return current
 			end end
 			local rows = hotstrings_rows(config, ctx)
-			local label = require("infra.i18n").get("menu.hotstrings.open_editor")
+			local label = require("core.i18n.engine.i18n").get("menu.hotstrings.open_editor")
 			local found
 			local function find(list)
 				for _, row in ipairs(list or {}) do

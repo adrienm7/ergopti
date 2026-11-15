@@ -38,8 +38,9 @@
 
 local M = {}
 
-local Json = require("json")
-local Queries = require("keystats.queries")
+local Json = require("core.text.engine.json")
+local Queries = require("metrics.engine.queries")
+local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 
 local LOG = "keystats.metrics_ledger"
@@ -66,6 +67,13 @@ M.ROWS_PER_STEP = 500
 M.RAW_STATEMENTS = {
 	"events.typing", "events.app_switch", "events.window_switch", "events.shortcut",
 	"events.system", "events.hotstring", "events.session", "events.llm", "events.network", "events.roi",
+	"events.window_topo", "events.av",
+}
+
+--- Raw tables both Lua drivers render outside the catalogue, with their columns
+--- in schema order (keystats.clipboard_events says why it is not catalogued).
+M.RAW_TABLES = {
+	{ table = "events_clipboard", columns = ClipboardEvents.COLUMNS },
 }
 
 --- Meta keys holding the export state, committed together.
@@ -75,6 +83,40 @@ M.META = {
 	date = "linux_ledger_date",
 	size = "linux_ledger_size",
 }
+
+--- The one query that reads every ledger meta key: one line per stored key,
+--- its key and value JSON-quoted around a tab, so a value holding a NUL or a
+--- line break survives the CLI's line framing. Each sqlite3 query is a process
+--- of its own (about 4 ms at boot); the four keys used to be four of them.
+--- @return string
+function M.meta_query()
+	local keys = {}
+	for _, meta_key in pairs(M.META) do keys[#keys + 1] = "'" .. SqliteCommand.escape_literal(meta_key) .. "'" end
+	table.sort(keys)
+	return "SELECT json_quote(key) || char(9) || json_quote(value) FROM meta WHERE key IN ("
+		.. table.concat(keys, ", ") .. ");"
+end
+
+--- Decodes meta_query()'s lines into { field = value } by M.META's fields.
+--- @param lines table|nil Output lines; nil when the query was refused, any
+---   other value counted as one malformed answer.
+--- @return table recorded Absent and undecodable keys are left nil.
+--- @return number malformed Lines that did not decode.
+function M.decode_meta(lines)
+	-- Not a list of lines (a store breaking the query_rows contract) is malformed.
+	if lines ~= nil and type(lines) ~= "table" then return {}, 1 end
+	local field_of, recorded, malformed = {}, {}, 0
+	for field, meta_key in pairs(M.META) do field_of[meta_key] = field end
+	for _, line in ipairs(lines or {}) do
+		local quoted_key, quoted_value = line:match("^(\"[^\t]*\")\t(\".*\")$")
+		local ok_key, key = pcall(Json.decode, quoted_key or "")
+		local ok_value, value = pcall(Json.decode, quoted_value or "")
+		local field = ok_key and field_of[key] or nil
+		if field and ok_value and type(value) == "string" then recorded[field] = value
+		elseif line ~= "" then malformed = malformed + 1 end
+	end
+	return recorded, malformed
+end
 
 local LEGACY_PREFIX = "linux-"
 local DATE_PATTERN = "^%d%d%d%d%-%d%d%-%d%d$"
@@ -152,16 +194,19 @@ function M.export_query(device_id, cursor, limit)
 	assert(type(cursor) == "number" and cursor >= 0 and cursor % 1 == 0, "invalid ledger cursor")
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "invalid ledger limit")
 	local device = "'" .. SqliteCommand.escape_literal(device_id) .. "'"
+	local raw = {}
+	for _, name in ipairs(M.RAW_STATEMENTS) do raw[#raw + 1] = { table = table_of(name), columns = Queries.params(name) } end
+	for _, entry in ipairs(M.RAW_TABLES) do raw[#raw + 1] = entry end
 	local parts = {}
-	for _, name in ipairs(M.RAW_STATEMENTS) do
-		local columns = Queries.params(name)
+	for _, entry in ipairs(raw) do
+		local columns = entry.columns
 		assert(columns[1] == "device_id" and columns[2] == "id", "a ledger statement starts with device_id, id")
 		local values = {}
 		for index, column in ipairs(columns) do values[index] = literal_expression(column) end
 		parts[#parts + 1] = string.format(
 			"SELECT id, date, 'INSERT OR IGNORE INTO %s (%s) VALUES (' || %s || ');' AS stmt FROM %s WHERE device_id=%s AND id>%.0f",
-			table_of(name), table.concat(columns, ", "), table.concat(values, " || ', ' || "),
-			table_of(name), device, cursor)
+			entry.table, table.concat(columns, ", "), table.concat(values, " || ', ' || "),
+			entry.table, device, cursor)
 	end
 	return "SELECT id || ' ' || hex(coalesce(date,'')) || ' ' || hex(stmt) FROM ("
 		.. table.concat(parts, " UNION ALL ") .. string.format(") ORDER BY id LIMIT %d;", limit)
@@ -350,8 +395,9 @@ function M.new(opts)
 		elseif json_status ~= "ok" then
 			return false, "device.json is unreadable"
 		end
-		local recorded = {}
-		for key, meta_key in pairs(M.META) do recorded[key] = store.get_meta(meta_key) end
+		-- An unreadable or malformed record regenerates the file, as an absent one does.
+		local recorded, malformed = M.decode_meta(store.query_rows(M.meta_query()))
+		if malformed > 0 then logger.warn(LOG, "The ledger's recorded position is malformed; data.sql is regenerated.") end
 		local size = fs.size(self.path)
 		local cursor, recorded_size = tonumber(recorded.cursor), tonumber(recorded.size)
 		prepared = true
@@ -458,10 +504,10 @@ end
 --- The file ports the daemon gives the exporter and the identity resolver.
 --- @return table ports { read_with_status, write, write_new, append, mkdir, size, rename, list, read }
 function M.native_ports()
-	local FileSystem = require("adapters.file_system")
-	local NativeDirectory = require("infra.native_directory")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local NativeDirectory = require("core.fs.engine.native_directory")
 	local uv = require("luv")
-	local shell_quote = require("text_utils").shell_quote
+	local shell_quote = require("core.text.engine.utils_core").shell_quote
 	local ports = { write = FileSystem.write, write_new = FileSystem.write_new, append = FileSystem.append }
 	local function lstat(path)
 		local called, stat, _, code = pcall(uv.fs_lstat, path)

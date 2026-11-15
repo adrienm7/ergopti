@@ -22,9 +22,9 @@
 
 local helpers = require("tests.helpers")
 -- The shared logger is a process singleton; Scope preserves its exact identity.
-require("logger")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
+require("core.logger.engine")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
 local ENTRY_ID = "tone-cerebras"
@@ -132,15 +132,14 @@ local function build_world(selection)
 	}
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
 	local _gestures = helpers.load_with_stubs("modules.gestures")
 	world.actions = require("modules.gestures.actions")
 	world.actions.init({ action_params = {} })
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	-- The pasteboard of the document model, on the hs stub every module shares
 	local hs_stub = _G.hs
@@ -196,8 +195,8 @@ local function build_world(selection)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.synthetic_input"] = make_synthetic(world)
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.input.synthetic_input"] = make_synthetic(world)
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return world.focus end,
 		getFocused = function()
 			return { appId = "ToneApp", windowTitle = "Draft", bundleId = "test.tone", executablePath = "" }
@@ -215,7 +214,7 @@ local function build_world(selection)
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -375,7 +374,7 @@ end
 local function case(name, scenario)
 	helpers.it(name, function()
 		return helpers.with_fresh_modules({
-			"modules.llm.tone_rewrite", "adapters.event_provenance", "llm.translate",
+			"modules.llm.tone_rewrite", "adapters.event_provenance", "ai.engine.prediction.translate",
 			"tests.support.modules.llm.selection_translation_destination",
 		}, function()
 			return Scope.run(scenario)
@@ -414,7 +413,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(swipe(world, "llm_tone_more_formal"), true)
 		helpers.assert_eq(#world.posts, 2, "the top of the ladder sends nothing")
 		helpers.assert_eq(#world.notices, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_formal"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_formal"))
 		helpers.assert_eq(world.clipboard, USER_CLIPBOARD)
 
 		helpers.assert_eq(swipe(world, "llm_tone_more_formal_cycle"), true)
@@ -429,7 +428,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		answer(world, world.posts[1], "REWRITE: Merci pour ton aide !")
 		swipe(world, "llm_tone_more_familiar")
 		helpers.assert_eq(#world.posts, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_familiar"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_familiar"))
 		swipe(world, "llm_tone_more_familiar_cycle")
 		assert_request(world, world.posts[2], "tone_very_formal", "Merci pour votre aide.")
 	end)
@@ -459,7 +458,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		swipe(world, "llm_tone_more_formal")
 		helpers.assert_eq(#world.posts, 0, "no request")
 		helpers.assert_eq(#world.notices, 1)
-		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+		helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 	end)
 
 	case("types nothing when the focus moved before the answer", function()

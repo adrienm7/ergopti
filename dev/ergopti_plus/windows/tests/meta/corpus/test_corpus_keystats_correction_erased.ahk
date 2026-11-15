@@ -7,7 +7,7 @@
 ; the production KLW_WalkTypingEntry: which n-grams a Backspace flags as erased,
 ; that a Backspace never flags another Backspace, and that a synthetic
 ; correction carries its source (esrc) instead of counting as the user's
-; mistake. Same exact comparison as _shared/lua/test/keystats_correction_erased_contract.lua.
+; mistake. Same exact comparison as _shared/tests/lua/metrics/correction_erased_contract.lua.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

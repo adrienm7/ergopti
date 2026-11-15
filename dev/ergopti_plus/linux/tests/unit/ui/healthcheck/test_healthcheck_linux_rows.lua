@@ -65,11 +65,11 @@ helpers.describe("healthcheck (linux): the window title", function()
 	-- hardcoded "Diagnostic", in English, whatever the user's language
 	-- (diagnostics-window-name).
 	helpers.it("uses the menu row's translated name (diagnostics-window-name)", function()
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		I18n.init()
 		local expected = I18n.get("menu.debug.healthcheck")
 		helpers.assert_true(expected ~= "menu.debug.healthcheck", "the locale must be loaded")
-		helpers.assert_eq(helpers.load_module("ui.webview_manager")._app_title("healthcheck"), expected)
+		helpers.assert_eq(helpers.load_module("core.ui.ui.webview_manager")._app_title("healthcheck"), expected)
 	end)
 end)
 
@@ -146,7 +146,7 @@ helpers.describe("healthcheck (linux): the daemon's own load", function()
 	-- The resident memory of the daemon, which a report of a slow or leaking
 	-- driver is read for (system-load)
 	helpers.it("reports the daemon's resident memory from /proc/self/status (system-load)", function()
-		local reader = require("infra.regular_file_reader")
+		local reader = require("core.fs.engine.regular_file_reader")
 		local real_read = reader.read_source
 		reader.read_source = function(path)
 			if path ~= "/proc/self/status" then return real_read(path) end

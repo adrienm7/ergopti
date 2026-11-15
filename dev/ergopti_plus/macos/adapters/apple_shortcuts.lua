@@ -8,10 +8,10 @@
 --- explicit port; neither a CLI pathname nor a successful mock grants capability.
 --- ==============================================================================
 
-local Json = require("json")
-local Unicode = require("compat.utf8")
-local Parameter = require("program_parameter")
-local Timings = require("infra.timings")
+local Json = require("core.text.engine.json")
+local Unicode = require("core.lifecycle.engine.compat.utf8")
+local Parameter = require("settings.engine.program_parameter")
+local Timings = require("core.timing.engine.timings")
 local M = { MAX_BYTES = Timings.count("limits", "shortcuts_reply_bytes"), MAX_CHOICES = 64, MAX_NAME_BYTES = 4096,
 	-- Seconds a query transport lets one discovery or revalidation run.
 	QUERY_TIMEOUT_SEC = 20 }

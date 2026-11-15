@@ -11,12 +11,12 @@ local support = require("tests.support.system_actions_fixture")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-	"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
-	"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
-	"adapters.shell_runner", "adapters.synthetic_input", "adapters.timer_scheduler",
-	"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
-	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
+	"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+	"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+	"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
+	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
+	"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
+	"modules.keymap.terminator_replay", "platform.input.text_sender", "adapters.clipboard",
 }
 
 local function with_observer(callback)
@@ -95,29 +95,29 @@ helpers.describe("System action fixture isolation", function()
 					end
 					local first = mount()
 					configure(first.hs, 11)
-					local previous_key_state = require("adapters.key_state")
-					local previous_notifications = require("infra.notifications")
+					local previous_key_state = require("platform.input.key_state")
+					local previous_notifications = require("core.ui.engine.notifications")
 					local second = mount()
 					configure(second.hs, 22)
 					calls[11], calls[22] = 0, 0
 					if consumer == "storage" then
-						helpers.assert_eq(require("adapters.storage").get("fixture_probe"), 22)
+						helpers.assert_eq(require("core.fs.adapters.storage").get("fixture_probe"), 22)
 					elseif consumer == "mouse" then
 						helpers.assert_eq(require("adapters.mouse_control").getPos().x, 22)
 					elseif consumer == "directory" then
-						local entries, listed = require("infra.fs_dir").try_entries("system-fixture-directory")
+						local entries, listed = require("core.fs.engine.dir").try_entries("system-fixture-directory")
 						helpers.assert_eq(listed, true)
 						helpers.assert_eq(#entries, 1)
 						helpers.assert_eq(entries[1], "22")
 					elseif consumer == "task" then
-						local task = require("adapters.task_lifecycle").native(
+						local task = require("core.process.adapters.task_lifecycle").native(
 							"fixture_probe", "/fixture-task", function() end, {})
 						helpers.assert_not_nil(task)
 						helpers.assert_eq(calls[11], 0, "retired native constructor must not run")
 						helpers.assert_eq(calls[22], 1)
 					else
 						local delivered = 0
-						helpers.assert_eq(require("infra.deferred_work").after(0, function()
+						helpers.assert_eq(require("core.timing.engine.deferred_work").after(0, function()
 							delivered = delivered + 1
 						end, "fixture_probe"), true)
 						helpers.assert_eq(calls[11], 0, "retired native timer must not run")
@@ -125,8 +125,8 @@ helpers.describe("System action fixture isolation", function()
 						support.fire_latest_timer(second.hs)
 						helpers.assert_eq(delivered, 1)
 					end
-					helpers.assert_true(require("adapters.key_state") ~= previous_key_state)
-					helpers.assert_true(require("infra.notifications") ~= previous_notifications)
+					helpers.assert_true(require("platform.input.key_state") ~= previous_key_state)
+					helpers.assert_true(require("core.ui.engine.notifications") ~= previous_notifications)
 				end)
 				for _, name in ipairs(OWNERS) do helpers.assert_nil(package.loaded[name], name) end
 			end)

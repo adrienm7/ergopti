@@ -10,7 +10,7 @@
 ---
 --- WHAT IS HERE AND WHAT IS SHARED:
 --- The state machine — cursor discipline, the fail-closed rule, idempotence —
---- lives in _shared/lua/keystats/text_migration_runner.lua and the public
+--- lives in _shared/metrics/engine/privacy/text_migration_runner.lua and the public
 --- surface in text_migration_driver.lua, because macOS runs the identical
 --- algorithm and a second copy would be a second place for the rule that
 --- protects the user's data to rot. What is here is the Linux half: reading and
@@ -37,12 +37,12 @@
 ---    here either — that would lock its owner out of its own data.
 --- ==============================================================================
 
-local Logger       = require("logger.shim")
+local Logger       = require("core.logger.engine.shim")
 local SqliteWriter = require("modules.keystats.sqlite_writer")
 local TextCipher   = require("modules.keystats.text_cipher")
-local Plan         = require("keystats.text_migration")
-local Driver       = require("keystats.text_migration_driver")
-local Runner       = require("keystats.text_migration_runner")
+local Plan         = require("metrics.engine.privacy.text_migration_core")
+local Driver       = require("metrics.engine.privacy.text_migration_driver")
+local Runner       = require("metrics.engine.privacy.text_migration_runner")
 
 local LOG = "modules.keystats.text_migration"
 
@@ -94,6 +94,12 @@ function RealBackend.apply(device_id, updates)
 	local statements = Plan.update_statements(device_id, updates)
 	if not statements then return false end
 	return SqliteWriter.exec_sql("BEGIN;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;\n")
+end
+
+--- Empties the formatted copy of the typed text. Linux never stores it, so
+--- this is a no-op kept for the shared runner's single backend contract.
+function RealBackend.clear_rich_text(device_id)
+	return SqliteWriter.exec_sql(Plan.clear_rich_text_sql(device_id)) == true
 end
 
 function RealBackend.get_cursor()

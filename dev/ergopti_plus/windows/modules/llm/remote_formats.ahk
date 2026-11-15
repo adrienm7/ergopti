@@ -3,8 +3,8 @@
 ; ==============================================================================
 ; MODULE: Remote API Formats Beyond Chat Completions (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/remote_formats.lua: the request and answer
-; shapes of the provider formats of _shared/modules/llm/api_providers.json that
+; AutoHotkey port of _shared/ai/engine/api/remote_formats.lua: the request and answer
+; shapes of the provider formats of _shared/ai/data/api_providers.json that
 ; are not an OpenAI, Anthropic or Gemini chat call.
 ; - "backboard": Backboard's assistant/thread API. One assistant is created
 ;   once per key; each request is a message on a new thread naming its

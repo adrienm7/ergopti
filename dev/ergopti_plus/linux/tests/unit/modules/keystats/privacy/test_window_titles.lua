@@ -317,6 +317,9 @@ helpers.describe("window titles: privacy changes without a window change", funct
 	local policies = {
 		{ name = "disabled", close = function(k) k.set_enabled(false) end, open = function(k) k.set_enabled(true) end },
 		{ name = "paused", close = function(k) k.suspend_collection() end, open = function(k) k.resume_collection() end },
+		-- The driver's own pause (EDD-1, paused-records-no-keys): before, only the
+		-- Metrics menu's pause stopped application time.
+		{ name = "driver-paused", close = function(k) k.set_script_paused(true) end, open = function(k) k.set_script_paused(false) end },
 		{ name = "suppressed", close = function(k) k.suppress() end, open = function(k) k.unsuppress() end },
 		{ name = "private", close = function(k) k.set_private_window(true) end, open = function(k) k.set_private_window(false) end },
 		{ name = "secure", close = function(k) k.set_secure_field(true) end, open = function(k) k.set_secure_field(false) end },
@@ -324,7 +327,7 @@ helpers.describe("window titles: privacy changes without a window change", funct
 	}
 	for _, policy in ipairs(policies) do
 		it("privacy-open-interval: " .. policy.name .. " cannot backfill a stationary window", function()
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous_now, now = clock.now_ms, 1000
 			clock.now_ms = function() return now end
 			local ok, err = pcall(function()

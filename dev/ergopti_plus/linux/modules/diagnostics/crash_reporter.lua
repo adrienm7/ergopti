@@ -22,9 +22,9 @@
 --- ==============================================================================
 
 local M = {}
-local CrashReport = require("crash_report")
+local CrashReport = require("diagnostics.engine.reports.crash_report")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "diagnostics.crash_reporter"
 
 -- =========================================
@@ -48,7 +48,7 @@ local EEXIST = 17 -- Linux exclusive-create collision receipt.
 -- them, and follow a LogsDirPath override: resolved per call.
 --- @return string Absolute folder, no trailing slash.
 local function crash_dir()
-	return require("infra.logger_sink").crash_reports_dir()
+	return require("core.logger.engine.sink").crash_reports_dir()
 end
 
 
@@ -60,7 +60,7 @@ end
 
 --- Ensures the crash directory exists.
 local function _ensure_dir(directory)
-	return os.execute("mkdir -p " .. require("text_utils").shell_quote(directory) .. " 2>/dev/null")
+	return os.execute("mkdir -p " .. require("core.text.engine.utils_core").shell_quote(directory) .. " 2>/dev/null")
 end
 
 --- Deletes the reports beyond the shared cap, oldest first.
@@ -68,7 +68,7 @@ end
 --- file the user keeps in the folder is never removed.
 --- @param directory string Crash folder, no trailing slash.
 local function _rotate(directory)
-	local NativeDirectory = require("infra.native_directory")
+	local NativeDirectory = require("core.fs.engine.native_directory")
 	local listed, entries, message = pcall(NativeDirectory.entries, directory)
 	if not listed then
 		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(entries))
@@ -82,7 +82,7 @@ local function _rotate(directory)
 	for _, entry in ipairs(entries) do
 		if entry.kind == "file" then names[#names + 1] = entry.name end
 	end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	for _, name in ipairs(CrashReport.expired(names)) do
 		if FileSystem.delete(directory .. "/" .. name) ~= true then
 			Logger.warn(LOG, "Crash report '%s' could not be deleted by the retention policy.", name)
@@ -100,7 +100,7 @@ end
 --- @return integer removed Number of legacy dumps deleted.
 function M.remove_legacy_dumps(directory)
 	directory = directory or crash_dir()
-	local listed, entries, message = pcall(require("infra.native_directory").entries, directory)
+	local listed, entries, message = pcall(require("core.fs.engine.native_directory").entries, directory)
 	if not listed then
 		Logger.warn(LOG, "Legacy crash dump cleanup skipped, the folder cannot be listed: %s.", tostring(entries))
 		return 0
@@ -111,7 +111,7 @@ function M.remove_legacy_dumps(directory)
 		return 0
 	end
 	Logger.start(LOG, "Removing the legacy crash text dumps from %s…", directory)
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local removed = 0
 	for _, entry in ipairs(entries) do
 		if entry.kind == "file" and entry.name:match(LEGACY_DUMP_PATTERN) then
@@ -153,7 +153,7 @@ local function _build_facts()
 		return require("infra.version").VERSION
 	end)
 	local ok_app, app_dir = pcall(function()
-		return require("infra.paths").driver_root()
+		return require("core.fs.engine.paths").driver_root()
 	end)
 	local function failed(reason) return "unknown (resolution failed: " .. tostring(reason) .. ")" end
 	return {
@@ -189,8 +189,8 @@ end
 --- @param path string|nil The report path, shown when saved.
 local function _notify(saved, path)
 	pcall(function()
-		local i18n = require("infra.i18n")
-		local Notifier = require("adapters.notifier")
+		local i18n = require("core.i18n.engine.i18n")
+		local Notifier = require("platform.system.notifier")
 		if saved then
 			Notifier.send(path, { title = i18n.get("crash.report.saved_title"), level = "info" })
 		else
@@ -215,7 +215,7 @@ end
 --- @return string|nil path
 --- @return function|nil current_image Exact regular-path byte verification.
 local function open_report(directory, stem, live)
-	local available, Writer = pcall(require, "infra.regular_file_writer")
+	local available, Writer = pcall(require, "core.fs.engine.regular_file_writer")
 	if not available or type(Writer) ~= "table" or type(Writer.open) ~= "function" then return nil end
 	for attempt = 1, MAX_REPORT_FILENAME_ATTEMPTS do
 		if not live() then return nil end
@@ -235,14 +235,14 @@ end
 --- @return boolean True after write, close and the retained redacted path image acknowledge.
 function M.dump(module_name, error_msg, context)
 	if type(module_name) ~= "string" or type(error_msg) ~= "string" or error_msg == "" then return false end
-	local available, Sink = pcall(require, "infra.logger_sink")
+	local available, Sink = pcall(require, "core.logger.engine.sink")
 	if not available or type(Sink) ~= "table" or type(Sink.capture_redactor) ~= "function"
 		or type(Sink.crash_reports_dir) ~= "function" then return refused() end
 	local capture, resolve = Sink.capture_redactor, Sink.crash_reports_dir
 	local admitted, redact, current = pcall(capture)
 	if not admitted or type(redact) ~= "function" or type(current) ~= "function" then return refused() end
 	local function live()
-		if package.loaded["infra.logger_sink"] ~= Sink or Sink.capture_redactor ~= capture
+		if package.loaded["core.logger.engine.sink"] ~= Sink or Sink.capture_redactor ~= capture
 			or Sink.crash_reports_dir ~= resolve then return false end
 		local ok, value = pcall(current)
 		return ok and value == true
@@ -261,7 +261,8 @@ function M.dump(module_name, error_msg, context)
 			if type(context.stack_trace) == "string" then fields.stack_trace = context.stack_trace end
 			if type(context.locale) == "string" then fields.locale = context.locale end
 		end
-		return redact(CrashReport.encode(CrashReport.build(fields)))
+		local redacted = CrashReport.redact(CrashReport.build(fields), redact)
+		return redacted and CrashReport.encode(redacted) or nil
 	end)
 	if not prepared or type(document) ~= "string" or not live() then return refused() end
 	local made, status = pcall(_ensure_dir, directory)
@@ -332,7 +333,7 @@ end
 --- Counts report names only, as the retention policy does.
 --- @return number
 function M.get_crash_count()
-	local listed, entries = pcall(require("infra.native_directory").entries, crash_dir())
+	local listed, entries = pcall(require("core.fs.engine.native_directory").entries, crash_dir())
 	if not listed or entries == nil then return 0 end
 	local names = {}
 	for _, entry in ipairs(entries) do

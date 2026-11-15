@@ -19,16 +19,16 @@ local M = {}
 local hs         = hs
 local keystats  = require("modules.keystats")
 local WPMShared  = require("ui.wpm.shared")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local GraphicsRenderer = require("adapters.graphics_renderer")
-local Storage = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings = require("infra.timings")
-local TomlCodec = require("toml_codec")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local GraphicsRenderer = require("core.ui.adapters.graphics_renderer")
+local Storage = require("core.fs.adapters.storage")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings = require("core.timing.engine.timings")
+local TomlCodec = require("core.text.engine.toml_codec")
 -- What the readouts decide — colours, frames, the graph, the default place —
 -- shared with the Linux driver.
-local WPMModel = require("wpm_widget.model")
+local WPMModel = require("metrics.engine.wpm_widget_model")
 
 local LOG = "wpm_widget"
 
@@ -75,13 +75,13 @@ end
 -- ================================
 -- ================================
 
--- Reads the shared canon (_shared/modules/wpm_widget/constants.toml, checked
+-- Reads the shared canon (_shared/metrics/data/wpm_widget/constants.toml, checked
 -- key by key by the shared model) and the refresh, hold and idle timings.
 -- Fails SOFT per field: an unusable canon logs an ERROR and leaves every canon
 -- field nil rather than raising at module load, where the require-time pcall in
 -- menu_metrics would silently drop the whole widget.
 local function _load_shared_const()
-	local path = resolve_shared_constants_path("modules/wpm_widget/constants.toml")
+	local path = resolve_shared_constants_path("metrics/data/wpm_widget/constants.toml")
 	local canon, err = nil, "not found"
 	if path then canon, err = WPMModel.load(path, TomlCodec.decode) end
 	if not canon then
@@ -227,7 +227,7 @@ update_widget_body = function(generation)
 	local active_source = WPMShared.get_active_source(stats, CONFIG.source_color_duration, now)
 	if not is_current(generation) then return false end
 
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()

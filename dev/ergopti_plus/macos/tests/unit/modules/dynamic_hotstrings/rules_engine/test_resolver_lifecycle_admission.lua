@@ -34,8 +34,7 @@ local function with_stack(scenario)
 	local km, rules
 	local ok, err = xpcall(function()
 		for name in pairs(package.loaded) do
-			if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-				or name:match("^ui%.") or name:match("^logger%.") or name == "dynamic_hotstrings" then
+			if helpers.is_driver_module(name) or name == "hotstrings.engine.dynamic.core" then
 				package.loaded[name] = nil
 			end
 		end
@@ -72,7 +71,7 @@ local function with_stack(scenario)
 		tap.fn(physical_event("z"))
 		helpers.assert_eq(observed.physical, 2, "the native fixture must reach the real keymap buffer")
 		scenario({ keymap = km, rules = rules, observed = observed, tap = tap,
-			synthetic = require("adapters.synthetic_input") })
+			synthetic = require("platform.input.synthetic_input") })
 	end, debug.traceback)
 	if rules then pcall(rules.stop) end
 	if km then pcall(km.stop, true) end
@@ -89,7 +88,7 @@ end
 --- @return table|nil events
 local function deliver_retained(fixture, callback)
 	fixture.synthetic.enter_callback()
-	local result = callback(physical_event(MAGIC), "zz", { chars = MAGIC, flags = {} })
+	local result = callback(physical_event(MAGIC), "zz", { chars = MAGIC, flags = {}, elapsed = 0 })
 	return fixture.synthetic.leave_callback(result == "consume")
 end
 

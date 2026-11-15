@@ -14,7 +14,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.synthetic_input", "infra.field_run_selftest", "modules.keymap.selftest_gate",
+	"core.logger.engine.logger", "platform.input.synthetic_input", "infra.field_run_selftest", "modules.keymap.selftest_gate",
 }
 
 local SCRATCH_WINDOW = 4242
@@ -27,8 +27,8 @@ local function with_gate(world, body)
 		local log = { warns = {}, deferred = {} }
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, message, ...) log.warns[#log.warns + 1] = string.format(message, ...) end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["platform.input.synthetic_input"] = {
 			defer_after_callback = function(_, fn)
 				if world.refuse_defer == "raise" then error("scheduler failed") end
 				if world.refuse_defer then return false end
@@ -174,11 +174,11 @@ helpers.describe("keymap selftest gate", function()
 		with_gate({ running = true, focused = SCRATCH_WINDOW }, function(Gate, Publisher)
 			Gate._ports = nil
 			local saved_run, saved_window, saved_dev = package.loaded["infra.field_run"],
-				package.loaded["adapters.own_window"], package.loaded["infra.dev_source"]
+				package.loaded["core.ui.adapters.own_window"], package.loaded["core.lifecycle.engine.dev_source"]
 			local running = true
 			package.loaded["infra.field_run"] = { holds_reload = function() return running end }
-			package.loaded["adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
-			package.loaded["infra.dev_source"] = { is_active = function() return false end }
+			package.loaded["core.ui.adapters.own_window"] = { focused_window_id = function() return SCRATCH_WINDOW end }
+			package.loaded["core.lifecycle.engine.dev_source"] = { is_active = function() return false end }
 			local ok, err = pcall(function()
 				Publisher.publish(SCRATCH_WINDOW)
 				helpers.assert_true(Gate.admits(selftest_key()), "no developer source is needed")
@@ -187,8 +187,8 @@ helpers.describe("keymap selftest gate", function()
 				helpers.assert_true(admitted == false)
 				helpers.assert_eq(reason, "no_field_run")
 			end)
-			package.loaded["infra.field_run"], package.loaded["adapters.own_window"],
-				package.loaded["infra.dev_source"] = saved_run, saved_window, saved_dev
+			package.loaded["infra.field_run"], package.loaded["core.ui.adapters.own_window"],
+				package.loaded["core.lifecycle.engine.dev_source"] = saved_run, saved_window, saved_dev
 			assert(ok, err)
 		end)
 	end)

@@ -25,7 +25,7 @@ helpers.describe("gestures/engine.lua: diagonal detection uses total distance (a
 	-- drivers use. Read all three so the guard assertions survive those moves
 	-- (move-resilient); the shared corpus pins the same rule behaviourally.
 	local function read_geometry_src()
-		local handle = assert(io.open(helpers.shared("lua/gestures/direction.lua"), "r"))
+		local handle = assert(io.open(helpers.shared("gestures/engine/direction.lua"), "r"))
 		local shared = handle:read("*a")
 		handle:close()
 		return (read_source("local function triggerLiveAxisIfNeeded") or "") ..

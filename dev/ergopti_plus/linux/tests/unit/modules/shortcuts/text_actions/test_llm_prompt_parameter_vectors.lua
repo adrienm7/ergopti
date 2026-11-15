@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/llm_prompt_vectors.json"
@@ -32,7 +32,7 @@ local function read_corpus()
 end
 
 local Gestures = helpers.load_module("modules.gestures.manager")
-local PromptAction = require("llm.prompt_action")
+local PromptAction = require("ai.engine.prediction.prompt_action")
 
 --- Runs body over a fresh profile registry on isolated AI preferences.
 --- @param body function
@@ -48,6 +48,15 @@ end
 
 helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt corpus", function()
 	local corpus = read_corpus()
+
+	-- The count's bounds are the AI menu setting's, read from the shared value
+	-- schema, never a copy (value-validation).
+	helpers.it("the prediction count bounds are the declared llm.profiles.num_predictions bounds", function()
+		local declared = require("settings.engine.value_check").declaration("llm.profiles.num_predictions")
+		helpers.assert_eq(PromptAction.MIN_PREDICTIONS, declared.min)
+		helpers.assert_eq(PromptAction.MAX_PREDICTIONS, declared.max)
+		helpers.assert_nil(PromptAction.parse("p|" .. tostring(declared.max + 1)), "past the declared maximum")
+	end)
 
 	helpers.it("the parameter is declared by the generated catalogue", function()
 		helpers.assert_eq(Gestures.get_action_parameter_spec(ACTION), "llm_prompt")
@@ -87,14 +96,14 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 					"the prompt lists '" .. id .. "': " .. prompt)
 			end
 			helpers.assert_true(prompt:find("rewrite \226\128\148 "
-				.. require("infra.i18n").get("llm.profile.rewrite.label"), 1, true) ~= nil,
+				.. require("core.i18n.engine.i18n").get("llm.profile.rewrite.label"), 1, true) ~= nil,
 				"each line carries the menu label")
 		end)
 	end)
 
 	helpers.it("the refusal is the kind's own", function()
 		helpers.assert_eq(Gestures.get_action_parameter_error(ACTION),
-			require("infra.i18n").get("dialog.gestures.param_err_llm_prompt"))
+			require("core.i18n.engine.i18n").get("dialog.gestures.param_err_llm_prompt"))
 	end)
 
 	helpers.it("the picker's editor gets every parameterized row, the prompt choices and the menu count", function()
@@ -121,13 +130,13 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 				"the built-ins in menu order, then the user's own")
 			helpers.assert_eq(fields.prompt_choices[12].label, "Mine", "a user prompt shows its own label")
 			helpers.assert_eq(fields.prompt_choices[5].label,
-				require("infra.i18n").get("llm.profile.rewrite.label"), "a built-in shows its menu label")
+				require("core.i18n.engine.i18n").get("llm.profile.rewrite.label"), "a built-in shows its menu label")
 			helpers.assert_eq(fields.parameter_strings.prompts.llm_prompt,
 				Gestures.get_action_parameter_prompt(ACTION))
 			helpers.assert_eq(fields.parameter_strings.errors.llm_prompt,
 				Gestures.get_action_parameter_error(ACTION))
 			helpers.assert_eq(fields.parameter_strings.prompts.url, nil, "the page does not edit a URL")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(fields.edit_current_label, i18n.get("dialog.action_picker.edit_current"))
 			helpers.assert_eq(fields.parameter_strings.promptLabel, i18n.get("dialog.action_picker.prompt_label"))
 			helpers.assert_eq(fields.parameter_strings.countLabel, i18n.get("dialog.action_picker.count_label"))
@@ -135,7 +144,7 @@ helpers.describe("llm_prompt_prediction parameter: what the binding editors show
 				"the page fills the default count itself")
 		end, {
 			["llm.profiles.num_predictions"] = 3,
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_mine", label = "Mine", system_single = "Continue.", batch = false },
 			}),
 		})
@@ -175,7 +184,7 @@ helpers.describe("llm_prompt_prediction parameter: the dispatcher hands the stor
 			initialize()
 			helpers.assert_true(G.set_action_parameter("keyboard__primary_p", ACTION, "user_private_notes|2"))
 			local saved = assert(io.open(path, "rb"))
-			local document = require("toml_codec").decode(saved:read("*a"))
+			local document = require("core.text.engine.toml_codec").decode(saved:read("*a"))
 			assert(saved:close())
 			helpers.assert_eq(document.gesture_parameters.keyboard__primary_p__llm_prompt_prediction,
 				"user_private_notes|2", "the keyboard binding owns its custom profile parameter")

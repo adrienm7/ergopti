@@ -38,7 +38,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 
 	helpers.it("withholds private callback failures while preserving rollback visibility", function()
 		local _, registry = fresh_registry()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		local previous_level = Logger.current_level
@@ -127,12 +127,12 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		local key = "ergopti.hotstrings_section_broken_one"
 		hs.settings.set(key, false)
 
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("injected TOML parse failure") end,
 		}
 		local ok, committed = pcall(registry.enable_section, "broken", "one")
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 
 		helpers.assert_true(ok, "parse failure must be contained by the public mutator")
 		helpers.assert_eq(committed, false)
@@ -152,12 +152,12 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		state.groups.personal.kind = "toml"
 		add_group_mapping(registry, "personal", "stable")
 		local mapping_before = state.mappings[1]
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("injected editor reload failure", 0) end,
 		}
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		local previous_level = Logger.current_level
@@ -170,7 +170,7 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		)
 		Logger.set_sink(nil)
 		Logger.set_level(previous_level)
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 		-- Field log 2026-10-30 11:37: the editor reported a rolled-back reload
 		-- with no registry line naming the step that refused it.
 		helpers.assert_contains(table.concat(lines, "\n"), "did not load its saved file",
@@ -192,13 +192,13 @@ helpers.describe("registry mutations: exact commitment and rollback", function()
 		registry.register_lua_group("personal", "Personal", {})
 		add_group_mapping(registry, "personal", "stable")
 		helpers.assert_eq(registry.disable_group("personal"), true)
-		local previous_reader = package.loaded["infra.toml.reader"]
-		package.loaded["infra.toml.reader"] = {
+		local previous_reader = package.loaded["core.text.engine.toml.reader"]
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() error("disabled groups must not be loaded by Save", 0) end,
 		}
 
 		local committed = registry.reload_toml("personal", "/virtual/new-personal.toml")
-		package.loaded["infra.toml.reader"] = previous_reader
+		package.loaded["core.text.engine.toml.reader"] = previous_reader
 
 		helpers.assert_eq(committed, true)
 		helpers.assert_eq(registry.is_group_enabled("personal"), false)
@@ -360,7 +360,7 @@ helpers.describe("canonical hotstring cache projection", function()
 	local function fixture(source)
 		local state, registry = fresh_registry()
 		local files = { config = source }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
 			write_if_unchanged = function(path, content, expected)
 				if expected.status ~= (files[path] and "ok" or "absent")
@@ -530,7 +530,7 @@ helpers.describe("canonical hotstring cache projection", function()
 		helpers.assert_true(registry.disable_section("rolls", "hc"))
 		local state = { hotstrings = { rolls = false, ["ext:demo:test"] = false } }
 		helpers.assert_true(preferences.save("config", state, { "rolls", "ext:demo:test" }, { keymap = registry }))
-		local decoded = require("toml_codec").decode(files.config)
+		local decoded = require("core.text.engine.toml_codec").decode(files.config)
 		helpers.assert_nil(decoded.hotstrings.groups.rolls)
 		helpers.assert_nil(decoded.hotstrings.modules.rolls.hc)
 		helpers.assert_eq(decoded.hotstrings.groups.future.keep, 9)

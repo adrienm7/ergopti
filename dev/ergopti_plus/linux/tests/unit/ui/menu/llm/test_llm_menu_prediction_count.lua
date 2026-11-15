@@ -27,7 +27,7 @@ end
 --- @param items table Top-level tray rows.
 --- @return table rows
 local function ai_rows(items)
-	local label = require("infra.i18n").get("menu.llm.title")
+	local label = require("core.i18n.engine.i18n").get("menu.llm.title")
 	for _, item in ipairs(items) do
 		if item.title == label then return item.menu end
 	end
@@ -39,7 +39,7 @@ end
 --- @return table row, number index
 local function count_row(rows)
 	local current = require("modules.llm.profile_settings").get("num_predictions")
-	local label = string.format(require("infra.i18n").get("menu.llm.num_predictions_label"), current)
+	local label = string.format(require("core.i18n.engine.i18n").get("menu.llm.num_predictions_label"), current)
 	for index, row in ipairs(rows) do
 		if row.title == label then return row, index end
 	end
@@ -49,7 +49,7 @@ end
 helpers.describe("tray (linux): the AI suggestion count", function()
 
 	helpers.it("labels each count with the one/other plural keys (llm-count-plural)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local one = i18n.get("menu.llm.prediction_count_label_one")
 		local other = i18n.get("menu.llm.prediction_count_label_other")
 		helpers.assert_true(one:find("%d", 1, true) ~= nil, "the singular key must resolve, got: " .. one)
@@ -68,7 +68,7 @@ helpers.describe("tray (linux): the AI suggestion count", function()
 	-- rows are inline, so it heads them, right above the minimum words
 	-- (ai-generation-groups).
 	helpers.it("heads the generation parameters, not the profile block (llm-count-row)", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = ai_rows(build())
 		local _, index = count_row(rows)
 		local next_row = rows[index + 1]
@@ -89,9 +89,9 @@ end)
 
 -- The free numeric entry is a complete fixed tail, shared by debounce and all
 -- four generation pickers. Its context and native publication owners stay local.
-local NumericJson = require("json")
-local NumericSandbox = require("test.config_unused_keys_contract").sandbox
-local NumericRenderer = require("menu.renderer")
+local NumericJson = require("core.text.engine.json")
+local NumericSandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local NumericRenderer = require("menu.engine.renderer")
 local NumericRoot = helpers.driver_root() .. "/../_shared/"
 --- Reads an independent corpus or locale as exact physical bytes.
 --- @param path string
@@ -110,7 +110,7 @@ local NumericCorpus = NumericJson.decode(numeric_read(NumericRoot .. "tests/corp
 --- @param exercise function Actual rendered-owner assertions.
 local function with_numeric_menu(options, exercise)
 	options = options or {}
-	local prompt_preload = package.preload["ui.numeric_prompt.bridge"]
+	local prompt_preload = package.preload["core.ui.ui.numeric_prompt"]
 	local loaded = {}
 	for key, value in pairs(package.loaded) do loaded[key] = value end
 	local path = os.tmpname()
@@ -120,30 +120,30 @@ local function with_numeric_menu(options, exercise)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") or name:match("^infra%.llm_") then package.loaded[name] = nil end
 		end
-		package.loaded["toml_codec.writer"] = nil
-		local writer = require("toml_codec.writer")
+		package.loaded["core.text.engine.toml_codec.writer"] = nil
+		local writer = require("core.text.engine.toml_codec.writer")
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local locale = options.locale or "en"
-		local strings = NumericJson.decode(numeric_read(NumericRoot .. "data/locales/" .. locale .. ".json"))
+		local strings = NumericJson.decode(numeric_read(NumericRoot .. "core/i18n/data/locales/" .. locale .. ".json"))
 		local translate = { get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end, get_locale = function() return locale end }
-		setmetatable(translate, { __index = loaded["infra.i18n"] })
-		package.loaded["infra.i18n"] = translate
+		setmetatable(translate, { __index = loaded["core.i18n.engine.i18n"] })
+		package.loaded["core.i18n.engine.i18n"] = translate
 		local renderer = assert(NumericRenderer.new({ platform = options.platform or "linux",
-			manifest_path = function() return NumericRoot .. "modules/menu/menu_manifest.json" end, json_decode = NumericJson.decode,
-			i18n = translate, logger = require("logger.shim") }))
+			manifest_path = function() return NumericRoot .. "menu/data/menu_manifest.json" end, json_decode = NumericJson.decode,
+			i18n = translate, logger = require("core.logger.engine.shim") }))
 		local declaration = renderer.get_array("llm_numeric_custom_rows")
 		if options.mutate then options.mutate(declaration) end
 		package.loaded["infra.manifest_menu"] = renderer
 		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {}, reports = 0 }
 		if options.case_twin then writer.set_case_twin_reporter(function() log.reports = log.reports + 1 end) end
-		package.loaded["adapters.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
-		package.loaded["ui.numeric_prompt.bridge"] = { ask = function(spec, webview)
+		package.loaded["platform.system.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
+		package.loaded["core.ui.ui.numeric_prompt"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }
 		if options.prompt_missing then
-			package.loaded["ui.numeric_prompt.bridge"] = nil
-			package.preload["ui.numeric_prompt.bridge"] = function() error("independent missing native dialog owner") end
+			package.loaded["core.ui.ui.numeric_prompt"] = nil
+			package.preload["core.ui.ui.numeric_prompt"] = function() error("independent missing native dialog owner") end
 		end
 		local webview = { show = function() return false end }
 		local paused = options.paused == true
@@ -160,7 +160,7 @@ local function with_numeric_menu(options, exercise)
 			set_paused = function(value) paused = value; ctx.paused = value end,
 			rebuild = function() return mb.build(ctx) end })
 	end, debug.traceback)
-	package.preload["ui.numeric_prompt.bridge"] = prompt_preload
+	package.preload["core.ui.ui.numeric_prompt"] = prompt_preload
 	os.remove(path)
 	os.remove(path .. ".bak")
 	os.remove(path .. ".tmp")
@@ -312,7 +312,7 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)
 				helpers.assert_eq(f.log.changed, 0)
 				helpers.assert_type(f.writer.write_refusal(f.path), "string")
-				package.loaded["toml_codec.writer"] = nil
+				package.loaded["core.text.engine.toml_codec.writer"] = nil
 				package.loaded["infra.llm_preferences"] = nil
 				helpers.assert_eq(spec.on_save(context.candidate), false,
 					"replacement preference owners cannot adopt the retained request")
@@ -395,8 +395,9 @@ helpers.describe("tray (linux): declared free numeric tails", function()
 				if row.title:find(f.strings["menu.llm.title"], 1, true) == 1 then parent = row end
 			end
 			helpers.assert_not_nil(parent)
+			-- The AI parent still greys itself while paused; the tray no longer strips
+			-- its submenu (EDD-1), and no row acts while it is greyed.
 			helpers.assert_true(parent.disabled == true)
-			helpers.assert_nil(parent.menu)
 			helpers.assert_nil(parent.fn)
 			helpers.assert_eq(#f.log.prompts, 0)
 			helpers.assert_eq(NumericSandbox.read_bytes(f.path), f.initial)

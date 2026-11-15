@@ -4,7 +4,7 @@
 --- MODULE: Aggregate Walker (Linux)
 --- DESCRIPTION:
 --- The Linux side of the shared keystats walker
---- (_shared/lua/keystats/walker.lua): it feeds one application's buffered
+--- (_shared/metrics/engine/walker/walker.lua): it feeds one application's buffered
 --- character stream to the walk Windows and macOS run, and reads the derived
 --- batch out in the shape the Linux writer takes.
 ---
@@ -29,15 +29,15 @@
 
 local M = {}
 
-local Helpers = require("keystats.aggregator_helpers")
-local SharedWalker = require("keystats.walker")
-local Timings = require("infra.timings")
+local Helpers = require("metrics.engine.aggregator.helpers")
+local SharedWalker = require("metrics.engine.walker.walker")
+local Timings = require("core.timing.engine.timings")
 
 -- Which finger types which character, from the shared keycode catalogue — the
 -- same file the typing heatmap is generated from. Keyed by CHARACTER rather
 -- than by keycode because evdev numbers nothing the way the catalogue's macOS
 -- keycodes do; a keycode lookup would need a hand-written Linux table.
-local FingerMap = require("keystats.finger_map")
+local FingerMap = require("metrics.engine.finger_map")
 
 -- Milliseconds in a second, for turning a monotonic stamp into the wall-clock
 -- hour a keystroke belongs to.
@@ -50,7 +50,7 @@ local MIN5_STEP_MINUTES = 5
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("adapters.file_system").read(path)
+	return require("core.fs.adapters.file_system").read(path)
 end
 
 --- Validates the physical family against its actual provider registry.
@@ -64,7 +64,7 @@ end
 --- Captures the provider's family at input, before any mutable metric counters.
 --- @return string Physical keyboard family.
 function M.capture_layout()
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	assert(type(Hook.get_layout) == "function", "Metrics capture has no physical family provider")
 	return physical_family(Hook.get_layout())
 end
@@ -74,11 +74,11 @@ end
 --- character, and that is what the hook resolved it against.
 --- @return table|nil
 local function finger_lookup(family)
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if not ok_paths then return nil end
-	local path = Paths.shared("data/keycodes/azerty.json")
+	local path = Paths.shared("layouts/data/keycodes/azerty.json")
 	if not path then return nil end
-	local ok_json, Json = pcall(require, "json")
+	local ok_json, Json = pcall(require, "core.text.engine.json")
 	if not ok_json then return nil end
 	-- The shared finger catalogue names physical keys in QWERTY; its AZERTY
 	-- labels describe an Apple keyboard, whose punctuation differs from Linux.

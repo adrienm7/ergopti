@@ -42,27 +42,27 @@ OnError(_NativeDesktopStartupError)
 
 #Include test_framework.ahk
 _TestResultsBeginRun()
-#Include ../infra/app_state.ahk
+#Include ../core/lifecycle/engine/app_state.ahk
 #Include test_stubs.ahk
 #Include ../infra/hotpath_profiler.ahk
-#Include ../infra/json.ahk
-#Include ../infra/number.ahk
-#Include ../infra/wall_clock.ahk
+#Include ../core/text/engine/json.ahk
+#Include ../core/text/engine/number.ahk
+#Include ../core/logger/engine/wall_clock.ahk
 #Include ../_generated/logger_sub_files.ahk
 #Include ../_generated/app_dirs.ahk
 #Include ../infra/app_folders.ahk
 #Include ../infra/legacy_folder_migration.ahk
 global _LogsDir := A_Temp . "\ergopti_test_logs\" . AppDirsFolderName() . "\"
 global _DefaultLogsDir := _LogsDir
-#Include ../infra/logger.ahk
-#Include ../adapters/file_system.ahk
-#Include ../adapters/process_lifecycle.ahk
-#Include ../adapters/shell_runner.ahk
-#Include ../adapters/key_state.ahk
-#Include ../adapters/text_sender.ahk
+#Include ../core/logger/engine/logger.ahk
+#Include ../core/fs/adapters/file_system.ahk
+#Include ../core/process/adapters/lifecycle.ahk
+#Include ../core/process/adapters/shell_runner.ahk
+#Include ../platform/input/key_state.ahk
+#Include ../platform/input/text_sender.ahk
 #Include ../ui/console_window.ahk
 #Include ../infra/key_combinations.ahk
-#Include ../infra/toml/toml_helpers.ahk
+#Include ../core/text/engine/toml/helpers.ahk
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 ; The tap window of a lone modifier (TapHoldTapMaxMs) reads its default from

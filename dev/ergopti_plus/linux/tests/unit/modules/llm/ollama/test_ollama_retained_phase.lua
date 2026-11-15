@@ -1,7 +1,7 @@
 --- static/ergopti_plus/linux/tests/unit/modules/llm/ollama/test_ollama_retained_phase.lua
 --- Actual shared facade forwards the original captured budget to retained delivery.
 local helpers = require("tests.helpers")
-local Phase = require("llm.ollama_install_phase")
+local Phase = require("ai.engine.ollama.install_phase")
 local fixture = require("tests.support.ollama_retained_fixture")
 helpers.describe("Retained Ollama installation phase", function()
  local function start(f)

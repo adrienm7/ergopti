@@ -6,11 +6,11 @@
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef[[ int prctl(int option, unsigned long arg2, unsigned long arg3, unsigned long arg4, unsigned long arg5); ]]
 assert(ffi.C.prctl(36, 1, 0, 0, 0) == 0, "provider fixture requires owned child-subreaper support")
-local Providers = require("adapters.program_providers")
-local Runner = require("adapters.program_runner")
+local Providers = require("core.process.adapters.program_providers")
+local Runner = require("core.process.adapters.program_runner")
 local Owner = require("modules.gestures.program_owner")
-local Parameter = require("program_parameter")
-local Logger = require("logger.shim")
+local Parameter = require("settings.engine.program_parameter")
+local Logger = require("core.logger.engine.shim")
 local previous_error, messages = Logger.error, {}
 Logger.error = function(_, template, ...) messages[#messages + 1] = string.format(template, ...) end
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-provider-native-XXXXXX"))

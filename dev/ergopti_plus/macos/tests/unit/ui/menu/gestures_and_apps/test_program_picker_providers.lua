@@ -2,7 +2,7 @@
 
 --- Drives actual menu providers and helpers with independent persistence receipts.
 local helpers = require("tests.helpers")
-local ProgramParameter = require("program_parameter")
+local ProgramParameter = require("settings.engine.program_parameter")
 local SCALAR = '{"version":1,"executable":"/private/tool","arguments":["two words",""]}'
 
 local function with_provider(kind, options, body)
@@ -73,23 +73,23 @@ local function with_provider(kind, options, body)
 	local binding = kind == "keyboard" and "keyboard__primary_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
 	local picker_callback, rows, state
 	local ok, failure = xpcall(function()
-		package.loaded["infra.i18n"] = { get = function(key) return key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 			section = function(key) return key end, decorate_section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) fixture.errors = fixture.errors + 1; fixture.last_error = string.format(message, ...); if message:find("did not commit", 1, true) then fixture.transaction_error = string.format(message, ...) end end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.ui.engine.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
 			return options.cancel and cancel or confirm, scalar
 		end }
-		local original_prompt = package.loaded["infra.dialog_util"].text_prompt
-		package.loaded["infra.dialog_util"].text_prompt = function(...)
+		local original_prompt = package.loaded["core.ui.engine.dialog_util"].text_prompt
+		package.loaded["core.ui.engine.dialog_util"].text_prompt = function(...)
 			local button, value = original_prompt(...)
 			return button, options.scalar or value
 		end
-		package.loaded["infra.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
+		package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, reason) fixture.warning = reason end
 		package.loaded["platform.remap.lease_helper"] = { resolve = function() return nil end }
 		package.loaded["adapters.apple_shortcuts_native"] = nil
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			if options.reject_schedule then return false end
 			callback(); return true
 		end }
@@ -101,7 +101,7 @@ local function with_provider(kind, options, body)
 		end }
 		package.loaded["modules.gestures.actions_aux_owner"] = { program_available = function() return true end }
 		package.loaded["modules.shortcuts.input_source_conflict"] = { check = function(_, _, callback) callback({}); return true end }
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_tap_keys = function()
 			if fixture.action == selected then return receipt(options.reconcile) end
@@ -196,7 +196,7 @@ local function with_provider(kind, options, body)
 			end
 		end, state)
 	end, debug.traceback)
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(saved) do package.loaded[name] = value end
 	if not ok then error(failure, 0) end
@@ -258,7 +258,7 @@ for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 		if kind ~= "script" then
 			helpers.it("keeps the picker open when its parameter handoff is refused", function()
 				with_provider(kind, {}, function(fixture, pick)
-					local deferred = require("infra.deferred_work")
+					local deferred = require("core.timing.engine.deferred_work")
 					local previous = deferred.after
 					deferred.after = function() return false end
 					local ok, result = pcall(pick)
@@ -353,7 +353,7 @@ helpers.describe("program fixture final publication admission", function()
 	for _, mode in ipairs({ "false", "nil", "table", "throw" }) do
 		helpers.it("keeps the exact source after final admission " .. mode, function()
 			with_provider("script", {}, function()
-				local port = package.loaded["adapters.file_system"]
+				local port = package.loaded["core.fs.adapters.file_system"]
 				local before, status = port.read_with_status("config")
 				local called = 0
 				local result = port.write_if_unchanged_admitted("config", "candidate", { status = status, content = before }, nil,
@@ -372,7 +372,7 @@ helpers.describe("program fixture final publication admission", function()
 	end
 	helpers.it("refuses a genuine external write even when the caller mutates its expected source", function()
 		with_provider("script", {}, function()
-			local port = package.loaded["adapters.file_system"]
+			local port = package.loaded["core.fs.adapters.file_system"]
 			local before, status = port.read_with_status("config")
 			local expected, external_ack = { status = status, content = before }, nil
 			local result = port.write_if_unchanged_admitted("config", "candidate", expected, nil, function()

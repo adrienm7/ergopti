@@ -14,17 +14,17 @@
 ---    at click time, so a list changed since the menu was drawn is never
 ---    overwritten by a stale copy.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 --- A translated string, or its key when the catalogue cannot answer.
 --- @param key string
 --- @return string
 local function tr(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	local value = ok and type(i18n.get) == "function" and i18n.get(key) or nil
 	return type(value) == "string" and value ~= "" and value or key
 end
@@ -34,7 +34,7 @@ end
 --- @param excluded table Set of excluded identifiers.
 --- @return table Array of identifiers.
 local function running_apps(excluded)
-	local ok, WindowInfo = pcall(require, "adapters.window_info")
+	local ok, WindowInfo = pcall(require, "platform.focus.window_info")
 	if not ok then return {} end
 	local list, seen = {}, {}
 	for _, info in ipairs(WindowInfo.getAll()) do

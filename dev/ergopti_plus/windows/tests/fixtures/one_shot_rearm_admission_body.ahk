@@ -4,6 +4,8 @@
 ; passive hook Wait pumps messages. Keyboard I/O stays behind observers.
 global _SharedDir := A_Args[2], _TapHoldOneShotCache := 0
 global ScriptInformation := Map("MagicKey", "★"), OneShotShiftEnabled := false
+; The one-shot capture reads its timeout from the remap owner; no fallback exists.
+global ONE_SHOT_SHIFT_TIMEOUT_SEC := 2
 global LayerEnabled := false, CapsWordEnabled := false
 global TAPHOLD_DEFAULT_ACTIVATION_SECONDS := 0.2, TAPHOLD_MAX_ACTIVATION_SECONDS := 10
 global TAPHOLD_CANCEL_BY_OTHER_KEY := "another key during hold", TAPHOLD_CANCEL_BY_COMBINATION := "first key of a key combination"

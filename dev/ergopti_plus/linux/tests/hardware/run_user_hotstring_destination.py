@@ -16,8 +16,8 @@ import time
 
 
 WORKER = r"""
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
-local Atspi = require("adapters.atspi_focus")
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
+local Atspi = require("platform.focus.atspi_focus")
 local Destination = require("adapters.user_hotstring_destination")
 local direct, ok = Atspi._get_native_snapshot()
 assert(ok and direct.active_scope == true, "native active GTK field must be conclusive")
@@ -32,16 +32,16 @@ if direct.role == 40 then assert(capture == nil, "password field cannot own user
 else assert(capture and Destination.current(capture), "normal exact destination must be owned") end
 -- Exercise unsupported-compositor routing over real GTK/AT-SPI ownership.
 -- This qualifies the native accessibility path, not a GNOME/KDE compositor.
-require("infra.display_server")._set_for_test("wayland", "gnome")
-local identity = require("adapters.window_info").focused_identity()
+require("core.ui.engine.display_server")._set_for_test("wayland", "gnome")
+local identity = require("platform.focus.window_info").focused_identity()
 if direct.role == 40 then assert(identity == nil, "password fields cannot own AI output")
 else
     assert(identity == "atspi:" .. direct.native_bus_name .. ":" .. direct.native_object_path,
         "AI output must retain the exact real active accessible owner")
-    assert(require("adapters.window_info").focused_identity() == identity,
+    assert(require("platform.focus.window_info").focused_identity() == identity,
         "the same actual focused control must retain its identity")
 end
-io.write("RECEIPT:" .. require("json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role,ai_identity=identity}))
+io.write("RECEIPT:" .. require("core.text.engine.json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role,ai_identity=identity}))
 """
 
 

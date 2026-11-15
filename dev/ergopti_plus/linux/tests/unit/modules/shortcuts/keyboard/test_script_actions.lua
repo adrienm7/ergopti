@@ -80,17 +80,32 @@ helpers.describe("script lifecycle actions", function()
 		helpers.assert_true(not ScriptActions.is_script_action("open_url"))
 	end)
 
-	helpers.it("holds a user keyboard shortcut back while paused but still resumes", function()
-		local storage_before = package.loaded["adapters.storage"]
+	-- SCD-1: the pause admits the shared catalogue's paused_actions, the list
+	-- Windows and macOS read, not every id with the script_ prefix.
+	helpers.it("reads the shared paused_actions list, not the script_ prefix (scd1-paused-actions)", function()
+		local controller = ScriptActions.new({
+			reset = function() end, reload = function() end, quit = function() end,
+		})
+		controller.toggle_pause()
+		helpers.assert_true(not controller.allows("script_save_reload"),
+			"script_save_reload is not a paused action of the shared catalogue")
+		helpers.assert_true(controller.allows("open_personal_shortcuts"),
+			"open_personal_shortcuts is a paused action of the shared catalogue")
+		helpers.assert_true(ScriptActions.runs_while_paused("script_reload"))
+		helpers.assert_true(not ScriptActions.runs_while_paused("script_save_reload"))
+	end)
+
+	helpers.it("holds every keyboard slot back while paused, a script action included (scd1-slot-paused)", function()
+		local storage_before = package.loaded["core.fs.adapters.storage"]
 		local module_before = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		local gestures_before = package.loaded["modules.gestures.manager"]
 		local paths_before = package.loaded["infra.config_paths"]
 		local path = os.tmpname()
-		require("test.config_unused_keys_contract").sandbox.write_bytes(path,
+		require("tests.lua.settings.unused_keys_contract").sandbox.write_bytes(path,
 			'[shortcuts.keyboard]\nprimary_j = "select_line"\nprimary_k = "script_pause_toggle"\n')
 		package.loaded["infra.config_paths"] = { config = function() return path end }
 		local executed = {}
-		package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+		package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 			["shortcuts.keyboard.primary_j"] = "select_line",
 			["shortcuts.keyboard.primary_k"] = "script_pause_toggle",
 		} })
@@ -105,16 +120,19 @@ helpers.describe("script lifecycle actions", function()
 		local shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 		shortcuts._reset()
 		local held_back = shortcuts.dispatch({ key = "j", mods = { ctrl = true } }, { only_script = true })
+		local running = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = false })
 		local resumed = shortcuts.dispatch({ key = "k", mods = { ctrl = true } }, { only_script = true })
 		local chatgpt = shortcuts.dispatch({ key = "g", mods = { ctrl = true } }, { only_script = true })
-		package.loaded["adapters.storage"] = storage_before
+		package.loaded["core.fs.adapters.storage"] = storage_before
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = module_before
 		package.loaded["modules.gestures.manager"] = gestures_before
 		package.loaded["infra.config_paths"] = paths_before
 		os.remove(path)
 		helpers.assert_true(not held_back, "Ctrl+J fired select_line while the script was paused")
-		helpers.assert_true(resumed, "the resume shortcut must fire while paused")
+		helpers.assert_true(not resumed,
+			"a keyboard slot bound to script_pause_toggle fired while paused, unlike Windows and macOS")
 		helpers.assert_true(not chatgpt, "the default Ctrl+G must wait for resume too")
+		helpers.assert_true(running, "the same slot runs while the driver runs")
 		helpers.assert_eq(executed, { "script_pause_toggle" })
 	end)
 
@@ -165,4 +183,67 @@ helpers.describe("pause transition acknowledgement", function()
 			helpers.assert_eq(calls, 1, "acknowledgement does not apply a second transition")
 		end)
 	end
+end)
+
+
+-- A pause and a resume were silent on Linux while macOS announced both: a user
+-- who hit the pause chord by accident had no sign the driver had stopped.
+helpers.describe("pause and resume notices", function()
+	local ScriptActions = helpers.load_module("modules.shortcuts.script_actions")
+
+	local function controller_with(notices, on_pause_change)
+		return ScriptActions.new({ reset = function() end, reload = function() end, quit = function() end,
+			on_pause_change = on_pause_change,
+			notify = function(key, level) notices[#notices + 1] = key .. "/" .. level end })
+	end
+
+	helpers.it("announces a pause as a warning and a resume as a success", function()
+		local notices = {}
+		local controller = controller_with(notices)
+		helpers.assert_eq(controller.toggle_pause(), true)
+		helpers.assert_eq(controller.toggle_pause(), true)
+		helpers.assert_eq(notices, { "script_control.paused/warning", "script_control.resumed/success" })
+	end)
+
+	helpers.it("announces nothing when the transition listener refused", function()
+		local notices = {}
+		local controller = controller_with(notices, function() return false end)
+		helpers.assert_eq(controller.toggle_pause(), false)
+		helpers.assert_eq(notices, {}, "a refused transition must not claim it happened")
+	end)
+
+	helpers.it("keeps a committed transition when the notice itself fails", function()
+		local controller = ScriptActions.new({ reset = function() end, reload = function() end,
+			quit = function() end, notify = function() error("no desktop") end })
+		helpers.assert_eq(controller.toggle_pause(), true)
+		helpers.assert_true(controller.is_paused())
+	end)
+
+	helpers.it("is wired by the daemon to the application notifier with the notice level", function()
+		local source = assert(helpers.read_driver_unit("local script_actions = ScriptActions.new({"))
+		local construction = assert(source:match("local script_actions = ScriptActions%.new%(%{(.-)\n\t%}%)"))
+		helpers.assert_true(construction:find(
+			"notify = notifier and function(key, level)\n"
+				.. "\t\t\treturn notifier.send(require(\"core.i18n.engine.i18n\").get(key), { level = level })", 1, true) ~= nil,
+			"the daemon must pass the notice to the desktop, translated, at its level")
+	end)
+
+	helpers.it("uses the keys and levels macOS publishes, each translated in English", function()
+		local path = helpers.driver_root() .. "/../macos/modules/shortcuts/script_control.lua"
+		local handle = assert(io.open(path, "rb"))
+		local mac = assert(handle:read("*a"))
+		handle:close()
+		local publish = assert(mac:match("local function publish_pause_state%(target_paused%)(.-)\nend\n"),
+			"macOS publish_pause_state moved: re-pin the cross-driver notice contract")
+		local catalogue_handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
+		local catalogue = assert(catalogue_handle:read("*a"))
+		catalogue_handle:close()
+		for _, paused in ipairs({ true, false }) do
+			local notice = ScriptActions.PAUSE_NOTICES[paused]
+			helpers.assert_true(publish:find(string.format("notifications.notify(i18n.get(%q), nil, %q)",
+				notice.key, notice.level), 1, true) ~= nil, "macOS and Linux disagree on " .. notice.key)
+			helpers.assert_true(catalogue:find('"' .. notice.key .. '":', 1, true) ~= nil,
+				notice.key .. " is missing from the shared en.json")
+		end
+	end)
 end)

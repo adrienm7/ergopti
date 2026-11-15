@@ -27,8 +27,8 @@ local function declared_parent(top, id)
 	return { selected }
 end
 
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local CONFIG = '[hotstrings]\nunknown = "kept"\ngroups = { rolls = false, foreign = true }\n'
 	.. 'trigger_char = "§"\npreview_ai_enabled = true\nexpansion_delay = 2\n'
@@ -131,7 +131,7 @@ local function with_scope(body, source)
 		local context = { config_path = config_path, override_path = override_path, directory = directory,
 			published = {}, dynamic_calls = {}, preview = {}, paused = false }
 		local Config = require("modules.hotstrings.hotstrings_config")
-		local engine = require("hotstring_engine").new()
+		local engine = require("hotstrings.engine.matcher").new()
 		local publish = engine.load_mappings
 		engine.load_mappings = function(self, mappings)
 			if context.refuse_engine then return false end
@@ -174,7 +174,6 @@ local function with_scope(body, source)
 		context.suffix = ".hotstrings-test.bak"
 		context.scope = require("infra.hotstrings_scope").new({
 			path = config_path, backup_suffix = context.suffix, files = context.files,
-			is_paused = function() return context.paused end,
 			config = Config, preferences = context.Preferences, repeat_key = context.RepeatKey,
 			word_reset = context.WordReset,
 			magic_key = context.MagicKey, preview_settings = require("modules.hotstrings.preview_settings"),
@@ -423,7 +422,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					local action
 					for _, item in ipairs(menu) do
 						for _, row in ipairs(item.menu or {}) do
-							if action == nil and row.title == require("infra.i18n").get(key) then action = row.fn end
+							if action == nil and row.title == require("core.i18n.engine.i18n").get(key) then action = row.fn end
 						end
 					end
 					helpers.assert_eq(type(action), "function", "the hotstrings row is registered")
@@ -452,7 +451,7 @@ helpers.describe("hotstrings scope: refusals", function()
 					if command:find("dialog_host.lua' --question", 1, true) then return 0 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local menu = require("ui.menu.builder").build({ config = c.Config, paused = false,
 					is_paused = function() return false end, dyn_hotstrings = c.dynamic,
 					tooltip_preview = c.preview_port })
@@ -482,12 +481,11 @@ helpers.describe("hotstrings scope: refusals", function()
 		end)
 	end)
 
-	helpers.it("refuses to start while paused", function()
+	-- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+	helpers.it("clears with no pause owner (edd1-paused-writes)", function()
 		with_scope(function(c)
-			c.paused = true
-			helpers.assert_eq(c.scope.apply("clear"), false)
-			helpers.assert_eq(read(c.config_path), CONFIG)
-			helpers.assert_eq(#c.published, 0)
+			helpers.assert_eq(c.scope.apply("clear"), true)
+			helpers.assert_true(read(c.config_path) ~= CONFIG, "the paused driver still writes config.toml")
 		end)
 	end)
 end)
@@ -502,7 +500,7 @@ local DELIMITER_CONFIG = '[hotstrings]\nunknown = "kept"\n'
 --- @param key string Delimiter identity.
 --- @return boolean
 local function has_custom(key)
-	for _, def in ipairs(require("keymap.terminators").get_terminator_defs()) do
+	for _, def in ipairs(require("layouts.engine.layers.terminators").get_terminator_defs()) do
 		if def.key == key and def.custom then return true end
 	end
 	return false
@@ -515,7 +513,7 @@ helpers.describe("hotstrings scope: word delimiters", function()
 	for _, mode in ipairs({ "recommended", "clear" }) do
 		helpers.it("returns the shipped word delimiters to the catalogue and keeps the user's on " .. mode, function()
 			with_scope(function(c)
-				local Terminators = require("keymap.terminators")
+				local Terminators = require("layouts.engine.layers.terminators")
 				helpers.assert_eq(Terminators.is_terminator_enabled("space"), false, "the fixture delimiters are loaded")
 				helpers.assert_true(has_custom("custom_¤"))
 				local committed, detail = c.scope.apply(mode)
@@ -561,7 +559,7 @@ helpers.describe("hotstrings scope: word delimiters", function()
 
 	helpers.it("puts the word delimiters back when config.toml publication is refused", function()
 		with_scope(function(c)
-			local Terminators = require("keymap.terminators")
+			local Terminators = require("layouts.engine.layers.terminators")
 			c.refuse = c.config_path
 			helpers.assert_eq(c.scope.apply("clear"), false)
 			helpers.assert_eq(read(c.config_path), DELIMITER_CONFIG)
@@ -654,7 +652,7 @@ helpers.describe("hotstrings retained native release debt", function()
 			end
 		end
 		local scope = require("infra.hotstrings_scope").new({ path = c.config_path, backup_suffix = c.suffix,
-			files = c.files, is_paused = function() return c.paused end,
+			files = c.files,
 			config = c.Config, preferences = c.Preferences, repeat_key = c.RepeatKey, magic_key = c.MagicKey,
 			word_reset = c.WordReset,
 			preview_settings = require("modules.hotstrings.preview_settings"), terminators = c.Terminators,
@@ -771,9 +769,9 @@ helpers.describe("hotstrings retained native release debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { tap_holds = before, hotstrings = actual, llm = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)

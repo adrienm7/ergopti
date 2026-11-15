@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs real privacy consumers against controlled native observations.
 --- @param body function Fixture assertions.
 local function fixture(body, asynchronous)
-	local names = { "modules.keystats.keystats", "modules.keystats.focus_guard", "adapters.secure_field_detector" }
+	local names = { "modules.keystats.keystats", "modules.keystats.focus_guard", "platform.focus.secure_field_detector" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local called, detail = pcall(function()
@@ -27,7 +27,7 @@ local function fixture(body, asynchronous)
 			TapHold = { observe_copy_activity = function() end },
 			-- Bare keys: the shared expansion delay reads the held modifiers per key.
 			keyboard_hook = { held_modifiers = function() return {} end },
-			InputEvent = require("infra.input_event"), Monotonic = { now_ms = function() return state.now end },
+			InputEvent = require("platform.input.event"), Monotonic = { now_ms = function() return state.now end },
 			injector = { _is_injecting = function() return false end },
 			script_actions = { is_paused = function() return false end },
 			WordReset = { observe_key = function() return false end, apply_typed_newline = function() return false end, cascade_max_arrows = function() return 0 end },
@@ -58,7 +58,7 @@ local function fixture(body, asynchronous)
 			end,
 		}
 		local ports = {
-			watch = watch, detector = require("adapters.secure_field_detector"), keystats = logger,
+			watch = watch, detector = require("platform.focus.secure_field_detector"), keystats = logger,
 			now_ms = function() return state.now end, settle_ms = 250, retry_ms = 1000,
 			capture_context = function()
 				helpers.assert_eq(state.pumping == true, false, "context must not query from watch callbacks")
@@ -118,7 +118,7 @@ end
 helpers.describe("Native field application privacy context", function()
 	helpers.it("starts application metrics only when asynchronous focus is admitted", function()
 		fixture(function(guard, logger, state)
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous = clock.now_ms
 			clock.now_ms = function() return state.now end
 			local ok, err = pcall(function()
@@ -190,7 +190,7 @@ helpers.describe("Native field application privacy context", function()
 				helpers.assert_eq(logger._pending_buffer_count_for_test(), 1, "role 61 cannot override app/window privacy")
 				helpers.assert_eq(state.engine_calls, 1, "protected input cannot reach the text engine")
 				helpers.assert_true(guard.blocks_text(), "manual consumers must see protected context before physical input")
-				helpers.assert_true(require("adapters.secure_field_detector").isSecureField())
+				helpers.assert_true(require("platform.focus.secure_field_detector").isSecureField())
 				helpers.assert_eq(state.reads, 2)
 				helpers.assert_eq(state.max_depth, 1)
 			end)
@@ -254,7 +254,9 @@ helpers.describe("Native field application privacy context", function()
 				local configuration = logger.configuration_snapshot()
 				configuration[filter] = false
 				helpers.assert_true(logger.apply_configuration(configuration))
-				helpers.assert_eq(guard.blocks_text(), false)
+				-- ADD-1: a password manager stays a secure field as a whole with the
+				-- metrics' secure filter off; only the private-window filter lifts.
+				helpers.assert_eq(guard.blocks_text(), filter == "secure_filter_enabled")
 				configuration[filter] = true
 				helpers.assert_true(logger.apply_configuration(configuration))
 				helpers.assert_true(guard.blocks_text())

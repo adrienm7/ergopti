@@ -11,8 +11,8 @@
 local M = {}
 M.bridge_name = "dl_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 
 local APP_NAME = "download_window"
 local LOG = "bridge.download_window"
@@ -27,12 +27,12 @@ local _contract = nil
 local KINDS = { ollama_model = true, app_update = true }
 
 local function manager()
-	local ok, module = pcall(require, "ui.webview_manager")
+	local ok, module = pcall(require, "core.ui.ui.webview_manager")
 	return ok and type(module) == "table" and module or nil
 end
 
 local function translated(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
@@ -74,10 +74,10 @@ end
 --- Loads the one canonical policy through the driver's native file owner.
 local function contract()
 	if not _contract then
-		local path = require("infra.paths").shared("modules/network/managed_network.json")
-		local source, status = require("toml_codec.writer").read_classified(path)
+		local path = require("core.fs.engine.paths").shared("core/network/data/managed_network.json")
+		local source, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		assert(status == "ok", "managed network policy read or close refused")
-		_contract = require("network.failure").new(Json.decode(source))
+		_contract = require("core.network.engine.failure").new(Json.decode(source))
 	end
 	return _contract
 end

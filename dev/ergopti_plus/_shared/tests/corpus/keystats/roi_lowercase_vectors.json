@@ -10,7 +10,7 @@
 		"language": "0409",
 		"node_version": "v22.22.2",
 		"unicode_version": "17.0",
-		"unicode_source_sha256": "acad7c004feb6cd0aedb3c22dc2934af1575758c7e83ab2582b037abe5df93c7",
+		"unicode_table_sha256": "092408835807cad9094a1a8add6422add2e065d1841c2c79ce067121f01461e9",
 		"scalar_candidates": 1488,
 		"retained_scalars": 474,
 		"limitations": [

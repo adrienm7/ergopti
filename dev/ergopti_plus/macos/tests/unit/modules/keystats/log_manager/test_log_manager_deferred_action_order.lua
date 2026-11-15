@@ -17,7 +17,7 @@ local function plaintext_cipher()
 	package.loaded["infra.preferences"] = nil
 	local path = os.tmpname()
 	assert(os.remove(path))
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	local previous, errors = logger.error, {}
 	logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 	local _, status = helpers.load_with_stubs("infra.preferences").load(path)
@@ -33,9 +33,9 @@ local function load_fixture(options)
 	package.loaded["modules.keystats.sqlite_writer"] = nil
 	package.loaded["modules.keystats.aggregator"] = nil
 	package.loaded["modules.keystats.export"] = nil
-	package.loaded["keystats.metrics"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["metrics.engine.metrics"] = nil
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.events.timer_scheduler"] = nil
 
 	local appended = {}
 	local sink_failures = options.sink_failures or 0
@@ -81,7 +81,7 @@ local function load_fixture(options)
 	}
 
 	local wpm_calls = 0
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function()
 			wpm_calls = wpm_calls + 1
 			return 0
@@ -153,8 +153,8 @@ local function load_fixture(options)
 		end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		write = function() return true end,
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
@@ -167,7 +167,7 @@ local function load_fixture(options)
 		},
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	local state = {
 		LOG_DIR = "/tmp/ergopti_action_epoch_order",
 		CACHE_DIR = "/tmp/ergopti_action_epoch_order/cache",
@@ -396,10 +396,10 @@ helpers.describe("log_manager deferred action boundaries", function()
 end)
 
 for _, name in ipairs({
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
-	"modules.keystats.export", "keystats.metrics", "infra.logger",
-	"adapters.timer_scheduler",
+	"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
+	"core.events.timer_scheduler",
 }) do
 	package.loaded[name] = nil
 end

@@ -56,27 +56,27 @@ local function with_picker(options, callback)
 	local ok, failure = xpcall(function()
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
 		package.loaded["ui.menu.menu_utils"] = {}
-		package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		logger.error = function() fixture.errors = fixture.errors + 1 end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, confirm, cancel)
 				if options.cancel then return cancel end
 				return confirm, scalar
 			end,
 		}
-		package.loaded["infra.deferred_work"] = { after = function(_, work)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, work)
 			if options.reject_chooser then return false end
 			work(); return true
 		end }
 		-- The provider's declared child must use a fresh real renderer. Keep
 		-- only the original fixture's parent-provider capture controlled.
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
-			i18n = package.loaded["infra.i18n"], logger = logger,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
+			i18n = package.loaded["core.i18n.engine.i18n"], logger = logger,
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,
@@ -125,7 +125,7 @@ helpers.describe("gesture picker acknowledged parameter transaction", function()
 	end)
 	helpers.it("keeps the picker open when its parameter handoff is refused", function()
 		with_picker({}, function(fixture, pick)
-			local deferred = require("infra.deferred_work")
+			local deferred = require("core.timing.engine.deferred_work")
 			local previous = deferred.after
 			deferred.after = function() return false end
 			local ok, result = pcall(pick)

@@ -8,26 +8,26 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Paths = require("infra.paths")
-local Shell = require("adapters.shell_runner")
-local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
+local Shell = require("core.process.adapters.shell_runner")
+local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 local labels = assert(Json.decode_lossless(file:read("*a")))
 file:close()
 
 local function with_notice(tool, body)
-	local names = { "infra.i18n", "adapters.shell_runner", "adapters.keyboard_hook",
-		"adapters.notifier", "ui.llm_enable_refusal", "window_titles" }
+	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "platform.input.keyboard_hook",
+		"platform.system.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { order = {}, commands = {}, notifications = {}, captions = {}, release_ok = true, restore_ok = true }
-	package.loaded["window_titles"] = { compose = function(caption)
+	package.loaded["core.ui.engine.window_titles"] = { compose = function(caption)
 		world.captions[#world.captions + 1] = caption
 		world.composed_title = "Caption policy % ' — " .. caption
 		return world.composed_title
 	end }
-	package.loaded["infra.i18n"] = { get = function(key) return assert(labels[key], key) end }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return assert(labels[key], key) end }
+	package.loaded["core.process.adapters.shell_runner"] = {
 		has_command = function(name) return name == tool end,
 		quote = Shell.quote,
 		exec_checked = function(command)
@@ -36,7 +36,7 @@ local function with_notice(tool, body)
 			return world.command_ok ~= false, world.answer
 		end,
 	}
-	package.loaded["adapters.keyboard_hook"] = { while_released = function(callback, options)
+	package.loaded["platform.input.keyboard_hook"] = { while_released = function(callback, options)
 		world.order[#world.order + 1] = "release"
 		world.observer = type(options) == "table" and options.observer
 		if not world.release_ok then
@@ -52,7 +52,7 @@ local function with_notice(tool, body)
 		-- Production returns the dialog choice even when native restoration refuses.
 		return result, answer
 	end }
-	package.loaded["adapters.notifier"] = { send = function(message, options)
+	package.loaded["platform.system.notifier"] = { send = function(message, options)
 		world.notifications[#world.notifications + 1] = { message, options }; return true
 	end }
 	package.loaded["ui.llm_enable_refusal"] = nil
@@ -162,7 +162,7 @@ helpers.describe("AI refusal notice", function()
 			helpers.assert_true(shown)
 			helpers.assert_true(retry)
 			helpers.assert_eq(#world.commands, 1)
-			local dialog = require("ui.native_dialog").command() .. " --question "
+			local dialog = require("core.ui.ui.native_dialog").command() .. " --question "
 			helpers.assert_eq(world.commands[1]:sub(1, #dialog), dialog)
 			helpers.assert_eq(#world.notifications, 0)
 		end)

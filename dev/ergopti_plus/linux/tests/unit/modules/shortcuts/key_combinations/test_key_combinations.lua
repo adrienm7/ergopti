@@ -205,10 +205,10 @@ end
 helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("dispatches the action between acknowledged lift and restore in the actual hook", function()
 		local state = make(); local emitted, observed = {}, false
-		protected_modules({ ["adapters.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
 			local out = {}; for _, device in ipairs(devices) do out[#out + 1] = { path=device,sysfs="/controlled/physical",name="controlled",physical=true } end; return out
 		end } }, function()
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			helpers.assert_true(hook.set_remapper(state.native,function(action,slot)
 				observed = action == "run_program" and slot == binding and not hook.held_modifiers().ctrl
 				emitted[#emitted + 1] = "action"
@@ -222,19 +222,19 @@ helpers.describe("ordered pairs through actual native consumers", function()
 	end)
 	helpers.it("builds pairs from actual loader state without disabling them with tap-holds", function()
 		local Loader = require("platform.remap.tap_hold_loader")
-		local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded = Loader.load_document(defaults,{ tap_hold={enabled=false,inherit_defaults=true} },nil,"/controlled/tap_hold.toml")
+		local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
+		local loaded = Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local hook = {}; hook.set_remapper = function(engine,callback) hook.engine,hook.on_tap = engine,callback; return true end
 		for _, name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name] = function() return {} end end
 		protected_modules({ ["modules.shortcuts.key_combinations"] = false, ["platform.remap.tap_hold_manager"] = false, ["platform.remap.tap_hold_loader"]={ GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS, load=function() return loaded end },
 			["platform.remap.nav_layer"]={load=function() return {} end},
-			["adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
+			["core.fs.adapters.file_system"]={read_with_status=function() return base_text,"ok" end},
 			["infra.config_paths"]={config=function() return path end} },function()
 			-- The owner must capture these actual declared ports before the manager
 			-- requires it; previous cache identity is restored by the outer guard.
 			local manager = require("platform.remap.tap_hold_manager")
 			manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"})
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"})
 			helpers.assert_true(manager.is_active()); helpers.assert_true(hook.engine.has_combinations ~= nil)
 			helpers.assert_eq(next(hook.engine.by_code),nil,"tap-hold configuration switch stays independent")
 			local out = hook.engine:process(58,1,0,origin()); helpers.assert_eq(out,nil)
@@ -256,7 +256,7 @@ helpers.describe("combination binding canonical program dispatch",function()
 		publish()
 		local ok,err = pcall(function()
 			protected_modules({ ["modules.gestures.manager"]=false,
-				["adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
+				["core.fs.adapters.file_system"]={read_with_status=function() return state.bytes,"ok" end},
 				["modules.shortcuts.key_combinations"]={ get_action=state.owner.get_action,capture_action=state.owner.capture_action },
 				["modules.gestures.program_owner"]={new=function(capture) return {
 					stop=function() return true end,run=function(slot) captured,admission = capture(slot); return captured ~= nil and admission() == true end,
@@ -280,10 +280,10 @@ end)
 helpers.describe("pair native receipt refusal boundaries",function()
 	helpers.it("never invokes action or modal after a refused real hook output port",function()
 		local state = make(); local actions, modal = 0,0
-		protected_modules({ ["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _, device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end} },function()
-			local hook = require("adapters.keyboard_hook")
+			local hook = require("platform.input.keyboard_hook")
 			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},{type=1,code=15,value=0,at_ms=100}},
 				{onEmitRaw=function(code,value) return not (code==42 and value==1) end},true)
@@ -311,8 +311,8 @@ end)
 helpers.describe("configured pair publication lifecycle",function()
 	helpers.it("refreshes copied native slots only after exact retirement before owned publication release",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=true,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = true } })
 		local bytes=base_text
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then
@@ -324,15 +324,15 @@ helpers.describe("configured pair publication lifecycle",function()
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program","copy"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			local pairs=require("modules.shortcuts.key_combinations");local token={}
 			helpers.assert_true(pairs.acquire_configuration(token));helpers.assert_eq(hook.engine,nil)
 			local next_text=bytes:gsub('caps_lock_then_tab = "run_program"','caps_lock_then_tab = "copy"'):gsub('caps_lock_then_tab = "shift"','caps_lock_then_tab = "alt"')
-			local selected=pairs.configuration_candidate(require("toml_codec").decode(next_text),true)
+			local selected=pairs.configuration_candidate(require("core.text.engine.toml_codec").decode(next_text),true)
 			helpers.assert_true(pairs.apply_configuration(token,selected));helpers.assert_eq(hook.engine,nil,"unpublished candidate cannot receive physical input")
 			bytes=next_text
 			helpers.assert_true(pairs.release_configuration(token));helpers.assert_true(hook.engine~=nil)
@@ -343,7 +343,7 @@ helpers.describe("configured pair publication lifecycle",function()
 			local _,tap,slot,release=hook.engine:process(15,0,100,origin())
 			helpers.assert_eq(tap,"copy");helpers.assert_eq(slot,binding);helpers.assert_true(release.ack(true))
 			for _,unsupported in ipairs({"one_shot_shift"}) do
-				local accepted=pcall(pairs.configuration_candidate,require("toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
+				local accepted=pcall(pairs.configuration_candidate,require("core.text.engine.toml_codec").decode(next_text:gsub('"copy"','"'..unsupported..'"')),true)
 				assert_false(accepted,"native-only tap state must not be claimed as a dispatched pair action")
 			end
 		end)
@@ -352,10 +352,10 @@ end)
 helpers.describe("pair source and restoration refusals",function()
 	helpers.it("refuses malformed source after installation and forwards unrelated grabbed input",function()
 		local state=make();state.bytes='[shortcuts.key_combination_taps\n'
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");local emitted,actions={},0
+			local hook=require("platform.input.keyboard_hook");local emitted,actions={},0
 			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=30,value=1,at_ms=0},{type=1,code=30,value=0,at_ms=10}},
 				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;return true end},true)
@@ -393,8 +393,8 @@ end)
 helpers.describe("independent pair enablement across empty configuration",function()
 	helpers.it("installs the first pair and re-installs after last deletion with tap-holds disabled",function()
 		local Loader=require("platform.remap.tap_hold_loader")
-		local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-		local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+		local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
+		local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 		local bytes='[shortcuts.key_combination_taps]\n[shortcuts.key_combination_holds]\n'
 		local hook={};hook.set_remapper=function(engine,callback)
 			if hook.engine and hook.engine.has_combinations then hook.engine:release_all();if hook.engine:ack_retirement(true)~=true then return false end
@@ -405,16 +405,16 @@ helpers.describe("independent pair enablement across empty configuration",functi
 		for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 		protected_modules({["modules.shortcuts.key_combinations"]=false,["platform.remap.tap_hold_manager"]=false,
 			["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end},
-			["platform.remap.nav_layer"]={load=function() return {} end},["adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
+			["platform.remap.nav_layer"]={load=function() return {} end},["core.fs.adapters.file_system"]={read_with_status=function() return bytes,"ok" end},
 			["infra.config_paths"]={config=function() return path end}},function()
 			local manager=require("platform.remap.tap_hold_manager")
 			helpers.assert_true(manager.init({keyboard_hook=hook,execute_action=function() end,action_names=function() return {"run_program"} end,
-				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+				on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			helpers.assert_eq(hook.engine,nil)
 			local pairs=require("modules.shortcuts.key_combinations")
 			local function publish(text)
 				local token={};helpers.assert_true(pairs.acquire_configuration(token))
-				helpers.assert_true(pairs.apply_configuration(token,pairs.configuration_candidate(require("toml_codec").decode(text),true)))
+				helpers.assert_true(pairs.apply_configuration(token,pairs.configuration_candidate(require("core.text.engine.toml_codec").decode(text),true)))
 				bytes=text;helpers.assert_true(pairs.release_configuration(token))
 			end
 			for cycle=1,2 do
@@ -445,10 +445,10 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("resumes baseline letters after exact source-revocation retirement through the actual hook",function()
 		local state=make();local emitted,actions={},0
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
+			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
 				{type=1,code=30,value=1,at_ms=20},{type=1,code=30,value=0,at_ms=30}},
 				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;if code==42 and value==1 then state.bytes='[malformed\n' end;return true end},true)
@@ -458,10 +458,10 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("keeps baseline output acquisition owned during reentrant native retirement",function()
 		local state=make();local accepted,entered
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
+			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0}}, {onEmitRaw=function(code,value)
 				if code==29 and value==1 and not entered then entered=true;accepted=hook.set_remapper(nil) end
 				return true
@@ -565,16 +565,18 @@ helpers.describe("exact staged pair delivery fence",function()
 	end)
 end)
 
-helpers.describe("pair source receipt after final native pause callback",function()
+helpers.describe("pair source receipt after the final native source read",function()
+	-- The pause getter is no longer a configuration callback (EDD-1); the
+	-- source read is the last one, so a route handed off in it must refuse.
 	for _,phase in ipairs({"editor","configuration","matches"}) do
-		helpers.it("refuses a same-byte canonical route handoff in final "..phase.." pause getter",function()
-			local route, armed, calls=path,false,0;local token={}
+		helpers.it("refuses a same-byte canonical route handoff in the final "..phase.." source read",function()
+			local route, armed=path,false;local token={}
 			local owner=Owner.new({keys=catalog,hold_picker={modifiers={"shift","alt"},layers={"nav"}},
-				files={read_with_status=function() return base_text,"ok" end},route=function() return route end,
-				is_paused=function()
-					if armed then calls=calls+1;if calls==(phase=="editor" and 3 or 2) then route="/controlled/foreign.toml" end end
-					return false
-				end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
+				files={read_with_status=function()
+					if armed then armed=false;route="/controlled/foreign.toml" end
+					return base_text,"ok"
+				end},route=function() return route end,
+				is_paused=function() return false end,changed=function() return true end,actions={is_assignable=function(action) return action=="run_program" end}})
 			helpers.assert_true(owner.acquire_configuration(token));helpers.assert_true(owner.acquire_delivery_fence(token))
 			if phase=="editor" then helpers.assert_true(owner.release_configuration(token)) end
 			armed=true
@@ -582,7 +584,7 @@ helpers.describe("pair source receipt after final native pause callback",functio
 			if phase=="editor" then receipt=owner.capture_edit_source(token)
 			elseif phase=="configuration" then receipt=owner.configuration_source(token)
 			else receipt=owner.configuration_source_matches(token,{path=path,status="ok",content=base_text}) end
-			helpers.assert_eq(route,"/controlled/foreign.toml","The final native pause getter must cause the handoff")
+			helpers.assert_eq(route,"/controlled/foreign.toml","The final source read must cause the handoff")
 			if phase=="matches" then assert_false(receipt) else helpers.assert_eq(receipt,nil) end
 			helpers.assert_true(owner.owns_delivery_fence(token));helpers.assert_eq(owner.capture_runtime(),nil)
 		end)
@@ -632,7 +634,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 			assert_false(s.hook.input_owner_current({})); s.lease.ready = true
 			assert_false(s.hook.input_owner_current(s.lease))
 		end)
-		local broker = require("adapters.modifier_broker").controlled(); assert_false(broker.output_current())
+		local broker = require("platform.input.modifier_broker").controlled(); assert_false(broker.output_current())
 	end)
 	helpers.it("leaves ordinary custom Reader callbacks usable without issuing an input lease", function()
 		InputOwnerFixture.with_session({ custom_reader = true }, function(s)
@@ -747,7 +749,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 	end)
 	helpers.it("an original observer refuses closed capability copies busy sessions and export rebinding", function()
 		InputOwnerFixture.with_session(nil, function(s)
-			local Custody = require("input.modifier_custody")
+			local Custody = require("platform.input.modifier_custody")
 			local exact = Custody.new(s.writer, s.output); helpers.assert_true(exact.output_current())
 			local copied = {}; local view = s.writer.output_view(s.output)
 			helpers.assert_eq(Custody.new(s.writer, copied), nil)
@@ -759,7 +761,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 	end)
 	helpers.it("the original observer refuses a getter that reenters then returns its old view", function()
 		InputOwnerFixture.with_session(nil, function(s)
-			local Custody = require("input.modifier_custody"); local exact, reenter
+			local Custody = require("platform.input.modifier_custody"); local exact, reenter
 			local original = s.writer.output_view
 			local ports = { capture_output_observer = s.writer.capture_output_observer, output_view = function(cap)
 				local view = original(cap)
@@ -978,12 +980,12 @@ helpers.describe("original output lifetime terminal settlement (controlled ports
 			local ignored, terminal = s.writer.capture_output_observer(s.output)
 			assert_false(terminal({})); assert_false(s.broker.output_retired())
 			-- A separately issued Writer has its own real private terminal record.
-			local old = package.loaded["adapters.uinput_writer"]; package.loaded["adapters.uinput_writer"] = nil
-			local other = require("adapters.uinput_writer"); other._set_backend({ open = function() return 7 end,
+			local old = package.loaded["platform.input.uinput_writer"]; package.loaded["platform.input.uinput_writer"] = nil
+			local other = require("platform.input.uinput_writer"); other._set_backend({ open = function() return 7 end,
 				close = function() return true end, ioctl = function() return true end, write = function() return true end })
 			helpers.assert_true(other.open()); local cap = assert(other.capture_output()); local current, foreign = other.capture_output_observer(cap)
 			helpers.assert_true(other.close_owned(cap)); helpers.assert_true(foreign(cap)); assert_false(foreign(s.output)); assert_false(terminal(cap))
-			package.loaded["adapters.uinput_writer"] = old
+			package.loaded["platform.input.uinput_writer"] = old
 			assert_false(s.broker.output_retired()); helpers.assert_true(s.writer.output_current(s.output))
 		end)
 	end)
@@ -1014,7 +1016,7 @@ helpers.describe("original output observer constructor provenance (controlled po
 					helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open())
 					s.output = assert(capture()); s.writer.capture_output = function() return s.output, factory end
 				else
-					local other = helpers.fresh_module("adapters.uinput_writer")
+					local other = helpers.fresh_module("platform.input.uinput_writer")
 					s.writer.capture_output_observer = other.capture_output_observer
 				end
 				s.restore_factory = function() s.writer.capture_output, s.writer.capture_output_observer = capture, factory end
@@ -1181,7 +1183,7 @@ end)
 helpers.describe("cold installed input authority bootstrap (controlled ports)", function()
  helpers.it("the genuine Hook and Reader load before programmable backend callbacks",function()
   InputOwnerFixture.with_session({before_hook=function(s)
-   helpers.assert_eq(package.loaded["adapters.keyboard_hook"],s.hook)
+   helpers.assert_eq(package.loaded["platform.input.keyboard_hook"],s.hook)
    helpers.assert_eq(s.bootstrap,"cold-hook-before-backend")
   end},function(s)
    arm_input(s);helpers.assert_eq(s.before_arm_acquisitions,s.after_arm_acquisitions)
@@ -1328,7 +1330,7 @@ helpers.describe("same-device third slot through original production consumers (
 		return table.concat(out," ")
 	end
 	local function with_adversarial_clock(body)
-		local previous = package.loaded["infra.monotonic"]
+		local previous = package.loaded["core.logger.engine.monotonic"]
 		local reads, now = 0, 0
 		local external = {
 			now_ms = function() reads = reads + 1; now = now + 150; return now end,
@@ -1337,10 +1339,10 @@ helpers.describe("same-device third slot through original production consumers (
 			has_hires = function() return true end,
 			backend = function() return "adversarial-fixture-clock" end,
 		}
-		package.loaded["infra.monotonic"] = external
+		package.loaded["core.logger.engine.monotonic"] = external
 		local ok, failure = pcall(body)
-		local restored = package.loaded["infra.monotonic"] == external
-		package.loaded["infra.monotonic"] = previous
+		local restored = package.loaded["core.logger.engine.monotonic"] == external
+		package.loaded["core.logger.engine.monotonic"] = previous
 		if not ok then error(failure, 0) end
 		helpers.assert_true(restored, "fixture restores the exact inherited clock owner")
 		helpers.assert_eq(reads, 0, "controlled input never borrows host elapsed time")
@@ -1525,7 +1527,7 @@ helpers.describe("same-device third slot through original production consumers (
 		with_chord({},function(s)
 			local Engine=require("platform.remap.tap_hold_engine")
 			local Pair=require("platform.remap.key_combination_engine")
-			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},enabled=true,revision=0,
+			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},tap_min_ms=0,enabled=true,revision=0,
 				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
 				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
 				capture_chord=function()return function()return true end end}
@@ -1712,6 +1714,26 @@ helpers.describe("generated Linux defaults received by original native combinati
    if not called then error(detail,0) end
   end)
  end)
+ for _,stored in ipairs({'0','3.5','1001','"100"'}) do
+  helpers.it("reports a refused stored chord delay "..stored.." and keeps the chords off (value-validation)",function()
+   local Outdated=require("settings.engine.migration.outdated")
+   local original,reported=Outdated.report,{}
+   Outdated.report=function(path,detail,...) reported[#reported+1]={path,detail};return original(path,detail,...) end
+   local ok,err=pcall(with_public,{before_manager=function(s)
+     s.bytes='[mod_combos]\nsimultaneous_threshold_ms='..stored..'\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+    end},function(s)
+    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1},"a refused delay never delays the original hold")
+    s.edge("a",58,0,1100)
+   end)
+   Outdated.report=original
+   if not ok then error(err,0) end
+   local found=false
+   for _,row in ipairs(reported) do
+    if row[1]=="mod_combos.simultaneous_threshold_ms" and tostring(row[2]):find("refused",1,true) then found=true end
+   end
+   helpers.assert_true(found,"the refused delay is reported, never dropped silently")
+  end)
+ end
  for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
   '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
   helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
@@ -2024,12 +2046,12 @@ end)
 helpers.describe("original Manager pair action after genuine Logger callback (controlled transport)", function()
 	local Fixture = require("tests.support.input_owner_fixture")
 	local function logger_session(mode)
-		local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
+		local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
 		-- Fresh genuine core: no replacement debug method or invented effect ACK.
-		package.loaded.logger, package.loaded["logger.shim"] = nil, nil
-		local logger = require("logger")
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+		local logger = require("core.logger.engine")
 		logger.set_level("debug")
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local called, reason = pcall(function()
 			Fixture.with_manager_session({ before_manager = function(s)
 				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
@@ -2064,7 +2086,7 @@ helpers.describe("original Manager pair action after genuine Logger callback (co
 			end)
 		end)
 		logger.set_sink(nil)
-		package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = previous_logger, previous_shim
 		if not called then error(reason, 0) end
 	end
 	for _, mode in ipairs({ "source", "pause", "positive" }) do
@@ -2079,11 +2101,11 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 	helpers.it("(pair-manager-identity-rejoin) rejects real restored aliases without invoking __eq", function()
 		local Fixture = require("tests.support.input_owner_fixture")
 		for _, role in ipairs({ "combinations", "engine" }) do
-			local previous_logger, previous_shim = package.loaded.logger, package.loaded["logger.shim"]
-			package.loaded.logger, package.loaded["logger.shim"] = nil, nil
-			local logger = require("logger")
+			local previous_logger, previous_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
+			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+			local logger = require("core.logger.engine")
 			logger.set_level("debug")
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			local original, original_metatable, altered_metatable, previous_eq
 			local called, reason = pcall(function()
 				Fixture.with_manager_session({ before_manager = function(s)
@@ -2123,7 +2145,7 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 				altered_metatable.__eq = previous_eq
 				setmetatable(original, original_metatable)
 			end
-			package.loaded.logger, package.loaded["logger.shim"] = previous_logger, previous_shim
+			package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = previous_logger, previous_shim
 			if not called then error(reason, 0) end
 		end
 	end)
@@ -2185,5 +2207,31 @@ helpers.describe("owned roll journal action acknowledgement", function()
 		helpers.assert_eq(action.run(function() return false end, receipt), false)
 		helpers.assert_eq(action.finish(receipt), false)
 		local next_step, reason = journal.next(); helpers.assert_eq(next_step, nil); helpers.assert_eq(reason, "refused")
+	end)
+end)
+
+-- One chord action this driver lacks (another OS's, written by a shared
+-- configuration) used to drop every chord without a word (TCL-003).
+helpers.describe("chord slots read from config.toml", function()
+	helpers.it("(tcl-003-foreign-chord-action) a foreign chord action costs only its own pair", function()
+		local text = base_text .. '[mod_combos]\nenabled = true\n'
+			.. '[mod_combos.config.caps_lock_then_tab]\ncombo = "run_program"\n'
+			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "mission_control"\n'
+		local owner = Owner.new({ keys = catalog, hold_picker = { modifiers = { "ctrl", "shift", "alt" }, layers = { "nav" } },
+			files = { read_with_status = function(file)
+				if file == path then return text, "ok" end
+				return nil, "absent"
+			end },
+			route = function() return path end,
+			is_paused = function() return false end,
+			changed = function() return true end,
+			actions = { is_assignable = function(action) return action == "run_program" end } })
+		local token = {}
+		helpers.assert_true(owner.acquire_configuration(token))
+		local snapshot = owner.configuration_snapshot(token)
+		helpers.assert_true(snapshot ~= nil and snapshot.chords ~= nil, "the other chords survive")
+		helpers.assert_eq(snapshot.chords.caps_lock_then_tab, "run_program")
+		helpers.assert_eq(snapshot.chords.tab_then_caps_lock, "none", "the foreign action does nothing here")
+		helpers.assert_true(owner.release_configuration(token))
 	end)
 end)

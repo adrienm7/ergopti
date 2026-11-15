@@ -4,7 +4,7 @@
 ; MODULE: Healthcheck
 ; DESCRIPTION:
 ; The diagnostics window of the Debug menu. It collects a version 2 snapshot
-; (_shared/modules/diagnostics/schema.json) and shows it in the shared page
+; (_shared/diagnostics/data/schema.json) and shows it in the shared page
 ; (_shared/ui/healthcheck/), which renders every section, keeps the preview of
 ; what is shared and asks the host for each action by message.
 ;

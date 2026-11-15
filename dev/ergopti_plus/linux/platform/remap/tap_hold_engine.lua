@@ -44,10 +44,11 @@
 ---    rule in tap_hold.lone_tap); 0 keeps the strict threshold.
 --- ==============================================================================
 
-local EvdevCodes = require("infra.evdev_codes")
-local OneShotShift = require("tap_hold.one_shot_shift")
-local LoneTap = require("tap_hold.lone_tap")
-local InputEvent = require("infra.input_event")
+local EvdevCodes = require("platform.input.evdev_codes")
+local OneShotShift = require("tap_hold.engine.one_shot_shift_core")
+local LoneTap = require("tap_hold.engine.lone_tap")
+local OneShotTimeout = require("tap_hold.engine.one_shot_timeout")
+local InputEvent = require("platform.input.event")
 
 local M = {}
 -- Only the installed wrapper supplies the hook-backed port. Pure engine users
@@ -63,6 +64,7 @@ function M:set_roll_origin_capture(capture, current)
 		or next(self.held) or next(self.key_refs) or next(self.layer_keys) or next(self.instant_down)
 		or next(self.native_keys) or next(self.passed_down) or next(self.physical_down) or next(self.one_shot_keys)
 		or next(self.one_shot_swallowed) or self.one_shot_until ~= nil
+		or self.sticky ~= nil or next(self.sticky_keys)
 		or roll_origins[self] and next(roll_origins[self]) then return false end
 	roll_origin_ports[self] = { capture = capture, current = current }
 	return true
@@ -113,7 +115,7 @@ local UP, DOWN, REPEAT = 0, 1, 2
 
 -- evdev codes of the keys a tap-hold can be configured on (the Windows set).
 -- Their order in the tray and their hand are the shared key catalogue's
--- ([tap_hold.catalog] in _shared/tap_hold/defaults.toml, its `linux` column),
+-- ([tap_hold.catalog] in _shared/tap_hold/data/defaults.toml, its `linux` column),
 -- which the manager holds to exactly these keys.
 M.KEY_CODES = {
 	escape = 1, tab = 15, caps_lock = 58, left_shift = 42, left_ctrl = 29,
@@ -149,8 +151,9 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     itself, and a lone Right Alt, a plain Alt on some layouts, is masked
 --     before its release (mask_lone_release);
 --   - an alt_tab_monitor tap holds Alt for the switcher (tab.ahk 8.1,
---     lalt.ahk 4.3), and LAlt's Tab holds the navigation layer (lalt.ahk
---     4.2), from key-down as every hold is;
+--     lalt.ahk 4.3), from key-down as every hold is; LAlt's Tab with no hold
+--     layer is no such rule: lalt.ahk 4.2 needs a hold layer, so it is the
+--     generic tap-only block 4.9, a Tab at key-down and at each repeat;
 --   - RCtrl's one-shot Shift holds Shift for a long press only once its
 --     threshold has passed, as rctrl.ahk 7.3 presses it when its KeyWait
 --     times out: a key typed sooner is typed unshifted (`hold_past_threshold`,
@@ -159,22 +162,25 @@ local NATIVE_UNDER_MODIFIER = { [1] = true, [14] = true, [15] = true, [28] = tru
 --     key comes up (lalt.ahk 4.1): `tap_at_down`. Its hotkey has no *
 --     wildcard, so under a held modifier LAlt stays Alt (`native_under_
 --     modifier`), and it does nothing at all while RCtrl, CapsLock, LShift or
---     LCtrl is physically down (`skip_while_down`).
+--     LCtrl is physically down (`skip_while_down`);
+--   - the alt_tab_monitor taps and RCtrl's Tab tap wait for their release with
+--     the key's own threshold (KS_WaitReleased(.., TapHoldDuration) in
+--     tab.ahk 8.1, lalt.ahk 4.3, rctrl.ahk 7.2), never the lone tap window
+--     the other held modifiers get (`strict_tap`).
 local NO_HOLD_BY_KEY = {
 	left_shift = { own = true }, left_ctrl = { own = true }, right_shift = { own = true },
 	alt_gr = { own = true },
 }
 local NO_HOLD_BY_TAP = {
-	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT } } },
+	tab = { alt_tab_monitor = { mods = { KEY_LEFTALT }, strict_tap = true } },
 	left_alt = {
-		alt_tab_monitor = { mods = { KEY_LEFTALT } },
-		tab = { layer = "nav" },
+		alt_tab_monitor = { mods = { KEY_LEFTALT }, strict_tap = true },
 		one_shot_shift = {
 			mods = { KEY_LEFTSHIFT }, tap_at_down = true, native_under_modifier = true,
 			skip_while_down = { EvdevCodes.KEY_RIGHTCTRL, EvdevCodes.KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL },
 		},
 	},
-	right_ctrl = { tab = { own = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT }, hold_past_threshold = true } },
+	right_ctrl = { tab = { own = true, strict_tap = true }, one_shot_shift = { mods = { KEY_LEFTSHIFT }, hold_past_threshold = true } },
 }
 -- The keys that must be up when a key goes down for its tap to fire, by key.
 -- LCtrl taps only with CapsLock and LAlt up (lshift_lctrl.ahk 3.1, in its
@@ -184,7 +190,7 @@ local TAP_NEEDS_UP = { left_ctrl = { EvdevCodes.KEY_CAPSLOCK, KEY_LEFTALT } }
 -- LAlt tapping Backspace with the layer on hold taps only with CapsLock up at
 -- its release (lalt.ahk 4.5), against a Backspace on a quick LAlt+CapsLock.
 local LAYER_BACKSPACE_TAP_NEEDS_UP_AT_RELEASE = { left_alt = { EvdevCodes.KEY_CAPSLOCK } }
-local KEY_BACKSPACE, KEY_DELETE, KEY_RIGHT = 14, 111, 106
+local KEY_BACKSPACE, KEY_DELETE, KEY_RIGHT, KEY_TAB = 14, 111, 106, 15
 
 -- Tap actions that are a single key. They are dispatched through the hook
 -- like the key itself, so an Enter tapped on CapsLock ends a hotstring as a
@@ -252,7 +258,7 @@ function M.new(opts)
 		nav_layer = options.nav_layer or {},
 		tap_min_ms = assert(tonumber(options.tap_min_ms), "tap_min_ms is required"),
 		lone_tap_max_ms = LoneTap.validate(options.lone_tap_max_ms),
-		one_shot_timeout_ms = assert(tonumber(options.one_shot_timeout_ms), "one_shot_timeout_ms is required"),
+		one_shot_timeout_ms = OneShotTimeout.validate(options.one_shot_timeout_ms),
 		tap_blocked = options.tap_blocked,
 		key_text = options.key_text,
 		plan_text = options.plan_text,
@@ -273,6 +279,9 @@ function M.new(opts)
 		-- key took the Shift back, "rolled" for a key pressed then (several can overlap)
 		one_shot_keys = {},
 		one_shot_swallowed = {}, -- keys a one-shot Shift replaced by its result, until released
+		-- The armed sticky (one-shot) modifiers: { codes, until_ms, guard }, or nil.
+		sticky = nil,
+		sticky_keys = {},    -- code -> the modifier codes a sticky arm wrapped it in, until released
 		native_keys = {},    -- configured keys pressed under a modifier: themselves until released
 		instant_down = {},   -- keys with a tap and no hold, down since their tap fired
 		key_refs = {},       -- code -> how many of this engine's holders keep it down
@@ -340,6 +349,8 @@ function M.new(opts)
 				mods = layer and {} or mods,
 				layer = layer,
 				swallowed_on_layer = swallowed_on_layer,
+				-- The file's own hold modifier, whatever a layer or a rule makes of mods.
+				holds_modifier = type(config.hold_modifier) == "string" and config.hold_modifier ~= "",
 				-- A tap and no hold with no rule: nothing to wait for (see fire_instant).
 				instant = no_hold and not rule,
 				tap_at_down = rule and rule.tap_at_down or false,
@@ -362,7 +373,7 @@ function M.new(opts)
 			-- Every typing key is left out, as on macOS and Windows, whatever its tap.
 			entry.lone_modifier = #entry.mods > 0 and not entry.layer and not roll_keys[key_id]
 				and not entry.hold_past_threshold and not entry.tap_at_down and not entry.instant
-				and tap ~= "one_shot_shift"
+				and not (rule and rule.strict_tap) and tap ~= "one_shot_shift"
 		end
 		::continue::
 	end
@@ -569,7 +580,8 @@ local function arm_one_shot(self, now_ms, guard)
 		local ok, current = pcall(guard)
 		if not ok or current ~= true then return false end
 	end
-	self.one_shot_until = now_ms + self.one_shot_timeout_ms
+	-- 0 is no time limit: the arm waits until a key spends or clears it.
+	self.one_shot_until = OneShotTimeout.deadline(now_ms, self.one_shot_timeout_ms)
 	input_arms[self] = guard and { current = guard, state = "armed" } or nil
 	return true
 end
@@ -603,6 +615,74 @@ local function input_arm_current(self, arm)
 	if not arm then return true end
 	local ok, current = pcall(arm.current)
 	return ok and current == true and input_arms[self] == arm
+end
+
+-- The modifier keys a sticky (one-shot) modifier may hold, in the order they
+-- go down: the catalogue's sticky_* actions name them (cmd is Super, option
+-- is Alt, altgr is the layout's third level on Right Alt).
+M.STICKY_MODIFIER_CODES = {
+	ctrl = KEY_LEFTCTRL, shift = KEY_LEFTSHIFT, alt = KEY_LEFTALT,
+	super = EvdevCodes.KEY_LEFTMETA, altgr = EvdevCodes.KEY_RIGHTALT,
+}
+local STICKY_ORDER = { KEY_LEFTCTRL, KEY_LEFTALT, EvdevCodes.KEY_RIGHTALT, EvdevCodes.KEY_LEFTMETA, KEY_LEFTSHIFT }
+local STICKY_CODE = {}
+for _, code in ipairs(STICKY_ORDER) do STICKY_CODE[code] = true end
+
+--- Toggles sticky (one-shot) modifiers, each one independently, as macOS and
+--- Karabiner's sticky_modifier do: the next key that is not a modifier goes
+--- down with every modifier still armed, once. The arm lasts the one-shot
+--- timeout (0: no time limit), the same setting as the one-shot Shift.
+--- @param now_ms number The event clock of the arm.
+--- @param codes table Modifier key codes, from M.STICKY_MODIFIER_CODES.
+--- @param guard function|nil Input-owner currency, checked at arm and at spend.
+--- @return boolean published
+function M:arm_sticky(now_ms, codes, guard)
+	if type(now_ms) ~= "number" or now_ms ~= now_ms or math.abs(now_ms) == math.huge
+		or type(codes) ~= "table" or #codes == 0 then return false end
+	for _, code in ipairs(codes) do
+		if not STICKY_CODE[code] then return false end
+	end
+	if guard ~= nil then
+		if type(guard) ~= "function" then return false end
+		local ok, current = pcall(guard)
+		if not ok or current ~= true then return false end
+	end
+	local set = {}
+	for _, code in ipairs(self.sticky and self.sticky.codes or {}) do set[code] = true end
+	for _, code in ipairs(codes) do set[code] = (not set[code]) or nil end
+	local ordered = {}
+	for _, code in ipairs(STICKY_ORDER) do
+		if set[code] then ordered[#ordered + 1] = code end
+	end
+	if #ordered == 0 then
+		self.sticky = nil
+		return true
+	end
+	self.sticky = { codes = ordered, until_ms = OneShotTimeout.deadline(now_ms, self.one_shot_timeout_ms), guard = guard }
+	return true
+end
+
+--- The armed sticky modifier codes, in press order, or nil.
+--- @return table|nil codes A copy.
+function M:sticky_armed()
+	if not self.sticky then return nil end
+	local copy = {}
+	for index, code in ipairs(self.sticky.codes) do copy[index] = code end
+	return copy
+end
+
+--- Spends the sticky arm on a key going down that is not a modifier.
+--- @return table|nil codes The modifiers to wrap the key in, nil to leave it.
+local function take_sticky(self, code, now_ms)
+	local sticky = self.sticky
+	if not sticky or MODIFIER_KEYS[code] or code == EvdevCodes.KEY_CAPSLOCK then return nil end
+	self.sticky = nil
+	if now_ms > sticky.until_ms then return nil end
+	if sticky.guard then
+		local ok, current = pcall(sticky.guard)
+		if not ok or current ~= true then return nil end
+	end
+	return sticky.codes
 end
 
 --- Takes the one-shot Shift back from every key it still wraps. The Shift is
@@ -734,6 +814,13 @@ end
 --- unshifted and left the Shift for the next letter.
 --- @return table|nil tap Text for the injector, as type_text returns it.
 local function type_tap(self, out, code, now_ms)
+	local sticky = take_sticky(self, code, now_ms)
+	if sticky then
+		for _, mod in ipairs(sticky) do press(self, out, mod) end
+		tap_key(self, out, code)
+		for index = #sticky, 1, -1 do release(self, out, sticky[index]) end
+		return nil
+	end
 	local verdict, text = take_one_shot(self, code, now_ms)
 	if verdict == "text" then return type_text(self, out, text) end
 	if verdict == "shift" then press(self, out, KEY_LEFTSHIFT) end
@@ -778,7 +865,7 @@ end
 --- Types keystrokes with only their own modifiers, as Windows' TextPressKey
 --- sends them: every modifier down now is lifted around them and pressed back
 --- after, except a Ctrl when every keystroke is a Ctrl chord anyway.
---- @param chords table { { ctrl = boolean, key = code } }, typed in order.
+--- @param chords table { { ctrl = boolean, shift = boolean|nil, key = code } }, typed in order.
 local function type_chords(self, out, chords)
 	local all_ctrl = true
 	for _, chord in ipairs(chords) do all_ctrl = all_ctrl and chord.ctrl end
@@ -794,10 +881,28 @@ local function type_chords(self, out, chords)
 	for _, chord in ipairs(chords) do
 		local press_ctrl = chord.ctrl and not kept_ctrl
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = DOWN } end
+		if chord.shift then out[#out + 1] = { code = KEY_LEFTSHIFT, value = DOWN } end
 		tap_key(self, out, chord.key)
+		if chord.shift then out[#out + 1] = { code = KEY_LEFTSHIFT, value = UP } end
 		if press_ctrl then out[#out + 1] = { code = KEY_LEFTCTRL, value = UP } end
 	end
 	for index = #lifted, 1, -1 do out[#out + 1] = { code = lifted[index], value = DOWN, handoff = "restored" } end
+end
+
+--- Whether RCtrl, configured to tap the one-shot Shift, is physically down.
+--- @return boolean
+local function rctrl_one_shot_down(self)
+	local rctrl_config = self.by_code[EvdevCodes.KEY_RIGHTCTRL]
+	return self.physical_down[EvdevCodes.KEY_RIGHTCTRL] == true
+		and rctrl_config ~= nil and rctrl_config.tap == "one_shot_shift"
+end
+
+--- What LAlt's Tab tap types under RCtrl tapping the one-shot Shift: Shift+Tab,
+--- as lalt.ahk's `SC11D & SC038` combo sends it.
+--- @return table|nil chords As type_chords takes them; nil for the plain key.
+local function lalt_tab_chords(self)
+	if rctrl_one_shot_down(self) then return { { ctrl = false, shift = true, key = KEY_TAB } } end
+	return nil
 end
 
 --- What LAlt's Backspace tap types instead of a plain Backspace under the keys
@@ -837,16 +942,20 @@ local function rctrl_backspace_chords(self)
 	return nil
 end
 
--- The keys whose Backspace tap Windows types through a logic of its own.
-local BACKSPACE_CHORDS = { left_alt = lalt_backspace_chords, right_ctrl = rctrl_backspace_chords }
+-- The keys whose Backspace or Tab tap Windows types through a logic of its
+-- own, by the key the tap types, then by key id.
+local KEY_TAP_CHORDS = {
+	[KEY_BACKSPACE] = { left_alt = lalt_backspace_chords, right_ctrl = rctrl_backspace_chords },
+	[KEY_TAB] = { left_alt = lalt_tab_chords },
+}
 
 --- Types the key a tap stands for (type_tap), or what the key's Windows
 --- Backspace logic types in its place under the keys held now. That logic's
---- keystrokes all end in a Delete or a Backspace, which spend an armed
+--- keystrokes all end in a Delete, a Backspace or a Tab, which spend an armed
 --- one-shot Shift, as its OneShotShiftFix does.
 --- @return table|nil tap Text for the injector, as type_tap returns it.
 local function type_key_tap(self, out, config, typed, now_ms)
-	local logic = typed == KEY_BACKSPACE and BACKSPACE_CHORDS[config.id]
+	local logic = KEY_TAP_CHORDS[typed] and KEY_TAP_CHORDS[typed][config.id]
 	local chords = logic and logic(self)
 	if not chords then return type_tap(self, out, typed, now_ms) end
 	self.one_shot_until = nil
@@ -1118,13 +1227,24 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 			-- swallowed (SWALLOWED_ON_LAYER); any other key is itself, with its
 			-- auto-repeat (Space types a space, LShift is a Shift that copies
 			-- nothing, RCtrl a Ctrl, Tab a Tab).
+			-- The swallower comes first: nav_layer.ahk's static *SC038 is created
+			-- before the layer's bindings and AHK fires the earliest variant.
 			if self.layer_depth > 0 then
 				cancel_taps(self, nil)
+				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				local spec = self.nav_layer[code]
 				if spec then return press_layer_key(self, code, spec) end
-				if config.swallowed_on_layer then return swallow_until_release(self, code, now_ms) end
 				self.native_keys[code] = true
 				return pass(self, code, value)
+			end
+			-- LAlt tapping Tab with no hold modifier, struck under RCtrl tapping
+			-- the one-shot Shift, is lalt.ahk's `SC11D & SC038` combo, whatever
+			-- its hold layer: Shift+Tab at key-down and at each repeat.
+			if config.id == "left_alt" and config.tap == "tab" and not config.holds_modifier
+				and rctrl_one_shot_down(self) then
+				cancel_taps(self, nil)
+				self.instant_down[code] = true
+				return fire_instant(self, out, config, now_ms)
 			end
 			local native_under_modifier = NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier
 			if native_under_modifier and modifier_held(self) then
@@ -1226,6 +1346,28 @@ local function process(self, code, value, now_ms, scoped, receipt, skip_layer, s
 	if self.layer_depth > 0 and value == DOWN then
 		local spec = self.nav_layer[code]
 		if spec then return press_layer_key(self, code, spec) end
+	end
+
+	-- A sticky modifier arm wraps the next key that is not a modifier.
+	local sticky_wrapped = self.sticky_keys[code]
+	if sticky_wrapped and value == UP then
+		self.sticky_keys[code] = nil
+		release(self, out, code)
+		for index = #sticky_wrapped, 1, -1 do release(self, out, sticky_wrapped[index]) end
+		return out
+	end
+	if sticky_wrapped and value == REPEAT then
+		hold_row(self, out, code, REPEAT)
+		return out
+	end
+	if value == DOWN and not sticky_wrapped and not self.one_shot_keys[code] then
+		local sticky = take_sticky(self, code, now_ms)
+		if sticky then
+			self.sticky_keys[code] = sticky
+			for _, mod in ipairs(sticky) do press(self, out, mod) end
+			press(self, out, code)
+			return out
+		end
 	end
 
 	-- The one-shot Shift wraps the next key.
@@ -1368,7 +1510,9 @@ function M:process(code, value, now_ms, receipt)
 			if own then return {} end
 			-- A new physical source selects the active layer before sharing an
 			-- older source's held tap-hold state.
-			local layer_spec = self.layer_depth > 0 and self.nav_layer[code]
+			local config = self.by_code[code]
+			-- A swallowed key never takes the layer's binding (see process).
+			local layer_spec = self.layer_depth > 0 and not (config and config.swallowed_on_layer) and self.nav_layer[code]
 			if layer_spec and not layer_group then
 				cancel_taps(self, nil)
 				local rows = press_layer_key(self, code, layer_spec)
@@ -1376,7 +1520,6 @@ function M:process(code, value, now_ms, receipt)
 				layer_groups[code] = { [source] = { generation = generation, native_owner = native_owner } }
 				return rows
 			end
-			local config = self.by_code[code]
 			if self.layer_depth > 0 and not layer_spec and config and config.swallowed_on_layer then
 				cancel_taps(self, nil)
 				instant_groups = instant_groups or {}; instant_sources[self] = instant_groups
@@ -1619,6 +1762,7 @@ function M:release_all()
 	self.held, self.layer_keys, self.layer_depth, self.repeat_count = {}, {}, 0, 1
 	self.undecided = nil
 	self.one_shot_until, self.one_shot_keys, self.key_refs = nil, {}, {}
+	self.sticky, self.sticky_keys = nil, {}
 	self.key_order = {}
 	input_arms[self] = nil
 	self.one_shot_swallowed, self.instant_down = {}, {}
@@ -1634,7 +1778,7 @@ end
 --- existing owners and native-under-modifier/instant precedence are unchanged.
 function M:combination_first_available(code)
 	if self.layer_depth > 0 or self.undecided or next(self.held) or self.held[code] or self.native_keys[code] or self.instant_down[code]
-		or self.layer_keys[code] or self.one_shot_until then return false end
+		or self.layer_keys[code] or self.one_shot_until or self.sticky then return false end
 	local config = self.by_code[code]
 	if config then
 		if config.instant or config.tap_at_down or (NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier) and modifier_held(self) then return false end

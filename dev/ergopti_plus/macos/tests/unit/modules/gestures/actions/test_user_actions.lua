@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/user_action_vectors.json")
 local ACTION_OF_KIND = { command = "run_command", path = "open_path", apple_shortcut = "run_apple_shortcut" }
@@ -33,8 +33,8 @@ local function read_corpus()
 	return assert(json.decode(raw), "the user action corpus is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
@@ -62,9 +62,9 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "modules.gestures.apple_shortcut_action",
-	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "infra.logger", "infra.i18n",
-	"infra.notifications", "modules.gestures.actions_aux_owner", "adapters.file_system", "adapters.clipboard",
-	"adapters.synthetic_input", "adapters.shell_runner", "adapters.timer_scheduler",
+	"adapters.apple_shortcuts_cli", "adapters.apple_shortcuts", "core.logger.engine.logger", "core.i18n.engine.i18n",
+	"core.ui.engine.notifications", "modules.gestures.actions_aux_owner", "core.fs.adapters.file_system", "adapters.clipboard",
+	"platform.input.synthetic_input", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"adapters.apple_shortcuts_native", "modules.shortcuts.actions.text",
 }
 
@@ -81,8 +81,8 @@ local function with_world(body)
 				world.logs[#world.logs + 1] = string.format(tostring(fmt), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, ...)
 				local parts = { key }
@@ -90,7 +90,7 @@ local function with_world(body)
 				return table.concat(parts, "|")
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = function(text)
+		package.loaded["core.ui.engine.notifications"] = { notify = function(text)
 			world.notices[#world.notices + 1] = text
 			return true
 		end }
@@ -104,7 +104,7 @@ local function with_world(body)
 			is_paused = function() return world.paused == true end,
 		}
 		local temp_count = 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local status = world.status[path] or "present"
 				return status, status == "present" and { size = world.reported_size or #(world.files[path] or "") } or nil
@@ -142,11 +142,11 @@ local function with_world(body)
 			world.clipboard[#world.clipboard + 1] = text
 			return true
 		end }
-		package.loaded["adapters.synthetic_input"] = { emit_key_strokes = function(text)
+		package.loaded["platform.input.synthetic_input"] = { emit_key_strokes = function(text)
 			world.typed[#world.typed + 1] = text
 			return true
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, fn)
 				if world.raise_timer then error("timer unavailable") end
 				local handle = { fn = fn }
@@ -167,7 +167,7 @@ local function with_world(body)
 		}
 		--- The process layer of /usr/bin/shortcuts: a listing of world.library,
 		--- a run answered with world.run_code unless world.hold_run keeps it.
-		package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, on_done, _, _, private)
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, on_done, _, _, private)
 			local handle = { executable = executable, args = args, private = private, observers = {} }
 			world.spawned[#world.spawned + 1] = handle
 			local function settle(code, out, err)
@@ -222,8 +222,8 @@ helpers.describe("run_command runs the user's line hidden or in Terminal (macOS)
 			local run = world.runs[1]
 			helpers.assert_eq(run.executable, "/bin/sh")
 			helpers.assert_eq(run.args, { "-l", "-c", SECRET })
-			helpers.assert_eq(run.deadline, require("infra.timings").sec("gestures", "run_command_timeout_ms"))
-			helpers.assert_eq(run.max_bytes, require("infra.timings").count("limits", "user_action_output_bytes"))
+			helpers.assert_eq(run.deadline, require("core.timing.engine.timings").sec("gestures", "run_command_timeout_ms"))
+			helpers.assert_eq(run.max_bytes, require("core.timing.engine.timings").count("limits", "user_action_output_bytes"))
 			helpers.assert_eq(run.parent, "gestures")
 			run.callback({ code = 0, stdout = "token\n", stderr = "", overflow = false })
 			helpers.assert_eq(world.clipboard, { "token" })

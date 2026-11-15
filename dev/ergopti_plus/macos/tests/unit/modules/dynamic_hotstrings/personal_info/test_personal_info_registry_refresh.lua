@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"dynamic_hotstrings",
+	"hotstrings.engine.dynamic.core",
 	"modules.dynamic_hotstrings.personal_info",
 	"modules.dynamic_hotstrings.rules_engine",
 	"modules.keymap.registry",
@@ -82,7 +82,7 @@ local function with_fixture(scenario, source)
 			local Registry = require("modules.keymap.registry")
 			local RulesEngine = require("modules.dynamic_hotstrings.rules_engine")
 			local PersonalInfo = require("modules.dynamic_hotstrings.personal_info")
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 
 			local state = State.new({ trigger_char = "\u{2605}", expansion_delay = 0.4 },
 				{ autocorrection = 0.3 })
@@ -97,6 +97,7 @@ local function with_fixture(scenario, source)
 				is_group_enabled = Registry.is_group_enabled,
 				is_section_enabled = Registry.is_section_enabled,
 				register_interceptor = function() end,
+				dynamic_rule_within_delay = function() return true end,
 				register_lua_group = Registry.register_lua_group,
 				register_preview_provider = function() end,
 				registry_transaction = Registry.registry_transaction,
@@ -297,7 +298,7 @@ helpers.describe("personal-info aliases and literal prefix output (PIM-001, PIM-
 				fixture.PersonalInfo.get_info(), fixture.PersonalInfo.get_letters(), "É𐐀")
 			helpers.assert_eq(table.concat(resolved, "|"), "Lyon|Lyon")
 			helpers.assert_true(fixture.PersonalInfo.save_info({ last_name = "Durand" }))
-			local decoded = require("toml_codec.codec").decode(fixture.read_file())
+			local decoded = require("core.text.engine.toml_codec.codec").decode(fixture.read_file())
 			helpers.assert_eq(decoded.letters["é"], "city")
 			helpers.assert_eq(decoded.letters["𐐨"], "city")
 		end, source)

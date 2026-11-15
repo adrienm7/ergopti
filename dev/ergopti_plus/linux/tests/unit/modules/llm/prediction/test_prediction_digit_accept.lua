@@ -23,8 +23,8 @@ local function offering(count, apply_ok)
 	local Navigation = helpers.load_module("modules.llm.navigation_settings")
 	Navigation._reset()
 	Navigation.get()
-	state.previous_focus = package.loaded["adapters.secure_field_detector"]
-	package.loaded["adapters.secure_field_detector"] = {
+	state.previous_focus = package.loaded["platform.focus.secure_field_detector"]
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 	}
@@ -62,7 +62,7 @@ local function offering(count, apply_ok)
 	engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 })
 	function state.restore()
 		package.loaded["infra.llm_preferences"] = previous_storage
-		package.loaded["adapters.secure_field_detector"] = state.previous_focus
+		package.loaded["platform.focus.secure_field_detector"] = state.previous_focus
 		package.loaded["modules.llm.api_ollama"] = nil
 		package.loaded["modules.llm.profiles"] = nil
 		helpers.load_module("modules.llm.navigation_settings")._reset()
@@ -121,10 +121,10 @@ helpers.describe("prediction digit accept: the engine", function()
 
 	helpers.it("requires the modifier chosen in the AI menu", function()
 		with_offer(1, function(engine, state)
-			local previous_storage = package.loaded["adapters.storage"]
-			package.loaded["adapters.storage"] = Fakes.storage()
+			local previous_storage = package.loaded["core.fs.adapters.storage"]
+			package.loaded["core.fs.adapters.storage"] = Fakes.storage()
 			helpers.assert_true(require("modules.llm.navigation_settings").set({ "alt" }))
-			package.loaded["adapters.storage"] = previous_storage
+			package.loaded["core.fs.adapters.storage"] = previous_storage
 			helpers.assert_true(not engine.handle_shortcut({ key = "1", mods = {} }), "a bare 1 now types")
 			helpers.assert_true(engine.handle_shortcut({ key = "1", mods = { alt = true } }))
 			helpers.assert_eq(#state.applied, 1)
@@ -146,7 +146,7 @@ helpers.describe("prediction digit accept: through the keyboard hook", function(
 
 	helpers.it("never lets the accepting digit reach the application", function()
 		with_offer(1, function(engine, state)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted, chars = {}, {}
 			hook._test_drive({
 				{ type = 1, code = 2, value = 1 },
@@ -170,7 +170,7 @@ helpers.describe("prediction digit accept: a digit beyond the offer", function()
 
 	helpers.it("reaches the application through the hook, and keeps the offer", function()
 		with_offer(1, function(engine, state)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted = {}
 			hook._test_drive({
 				{ type = 1, code = 4, value = 1 },
@@ -189,7 +189,7 @@ end)
 helpers.describe("prediction digit accept: the real tooltip's presented state", function()
 
 	helpers.it("presents candidates before its window maps, and none once hidden", function()
-		local overlay = helpers.load_module("ui.tooltip.llm")
+		local overlay = helpers.load_module("core.ui.ui.tooltip.llm")
 		helpers.assert_true(overlay.init({ style = {}, renderer = {
 			show = function() return true end, hide = function() return true end,
 			is_visible = function() return false end,

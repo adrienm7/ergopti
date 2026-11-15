@@ -38,7 +38,7 @@ local function fixture(state)
 	local seen = { fired = {}, notices = {}, infos = {} }
 	local logger = helpers.make_logger_stub()
 	logger.info = function(_, fmt, ...) seen.infos[#seen.infos + 1] = string.format(fmt, ...) end
-	replace("logger.shim", logger)
+	replace("core.logger.engine.shim", logger)
 	replace("modules.llm.profiles", {
 		init = function() end,
 		is_enabled = function() return state.enabled ~= false end,
@@ -89,7 +89,7 @@ local function assert_refused(state, reason)
 		helpers.assert_eq(refusals(seen, reason), 1,
 			"the refusal must be logged at INFO with its reason '" .. reason .. "'")
 		helpers.assert_eq(#seen.notices, 1, "the user must be shown why nothing happened")
-		helpers.assert_eq(seen.notices[1], require("infra.i18n").get("llm.manual_prediction." .. reason),
+		helpers.assert_eq(seen.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction." .. reason),
 			"the notice is the localized text of the reason")
 		helpers.assert_eq(#seen.fired, 0, "a refused request must not reach predict()")
 	end)
@@ -134,7 +134,7 @@ helpers.describe("Linux manual prediction trigger (llm-manual-prediction-feedbac
 		engine.predict = function() return false end
 		local ok, err = pcall(function()
 			helpers.assert_eq(engine.trigger_now(), false)
-			helpers.assert_eq(seen.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+			helpers.assert_eq(seen.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"))
 		end)
 		restore()
 		if not ok then error(err, 0) end

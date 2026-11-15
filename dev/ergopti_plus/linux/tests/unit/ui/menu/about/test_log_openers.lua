@@ -14,24 +14,24 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 --- Loads the openers over a sink whose paths the test controls.
 --- @param state table { day, existing = { [path] = true } }
 --- @param body function Receives the openers module.
 local function with_openers(state, body)
-	local saved_sink = package.loaded["infra.logger_sink"]
+	local saved_sink = package.loaded["core.logger.engine.sink"]
 	local saved_openers = package.loaded["ui.log_openers"]
-	local saved_reader = package.loaded["infra.regular_file_reader"]
-	local reader = require("infra.regular_file_reader")
-	package.loaded["infra.logger_sink"] = {
+	local saved_reader = package.loaded["core.fs.engine.regular_file_reader"]
+	local reader = require("core.fs.engine.regular_file_reader")
+	package.loaded["core.logger.engine.sink"] = {
 		log_dir = function() return "/fixture/logs/" .. FOLDER end,
 		main_log_path = function() return "/fixture/logs/" .. FOLDER .. "/unified-" .. state.day .. ".log" end,
 		errors_log_path = function() return state.path or "/fixture/logs/" .. FOLDER .. "/errors-" .. state.day .. ".log" end,
 	}
 	package.loaded["ui.log_openers"] = nil
 	if not state.native then
-		package.loaded["infra.regular_file_reader"] = { ENOENT = reader.ENOENT, open = function(path)
+		package.loaded["core.fs.engine.regular_file_reader"] = { ENOENT = reader.ENOENT, open = function(path)
 			if state.existing[path] then
 				return { close = function()
 					if state.close_refuses then return nil, state.close_failure end
@@ -42,8 +42,8 @@ local function with_openers(state, body)
 		end }
 	end
 	local ok, err = pcall(function() body(require("ui.log_openers")) end)
-	package.loaded["infra.regular_file_reader"] = saved_reader
-	package.loaded["infra.logger_sink"] = saved_sink
+	package.loaded["core.fs.engine.regular_file_reader"] = saved_reader
+	package.loaded["core.logger.engine.sink"] = saved_sink
 	package.loaded["ui.log_openers"] = saved_openers
 	if not ok then error(err, 0) end
 end
@@ -134,7 +134,7 @@ helpers.describe("log-openers-native-refusal", function()
 		helpers.assert_eq(ffi.C.mkfifo(path, 384), 0)
 		local code = string.format([[
 			package.path = %q
-			package.loaded["infra.logger_sink"] = { errors_log_path = function() return %q end }
+			package.loaded["core.logger.engine.sink"] = { errors_log_path = function() return %q end }
 			local opened, notified = 0, 0
 			local handled = require("ui.log_openers").open_today_errors(
 				function() opened = opened + 1; return true end,
@@ -150,7 +150,7 @@ helpers.describe("log-openers-native-refusal", function()
 			native.close(timer)
 			native.close(child)
 		end))
-		assert(require("infra.native_timer").start(native, timer, 2000, 0, function() expired = true; child:kill("sigkill") end))
+		assert(require("core.timing.engine.native_timer").start(native, timer, 2000, 0, function() expired = true; child:kill("sigkill") end))
 		while not exited do native.run("once") end
 		native.run("nowait")
 		os.remove(path)
@@ -177,7 +177,7 @@ helpers.describe("log-openers-read-receipts", function()
 	helpers.it("(log-openers-read-receipts) native ENOENT is the only error-free-day notice", function()
 		local path = os.tmpname()
 		os.remove(path)
-		local reader = require("infra.regular_file_reader")
+		local reader = require("core.fs.engine.regular_file_reader")
 		local stream, _, code = reader.open(path)
 		helpers.assert_eq(stream, nil)
 		helpers.assert_eq(code, reader.ENOENT, "the canonical absence code must match the real native receipt")

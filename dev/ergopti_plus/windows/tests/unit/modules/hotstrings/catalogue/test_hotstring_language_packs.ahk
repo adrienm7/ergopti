@@ -4,7 +4,7 @@
 ; MODULE: Hotstring Language Pack Tests
 ; DESCRIPTION:
 ; French hotstrings moved out of the neutral packs into
-; _shared/modules/hotstrings/french/<stem>.toml and load as the group
+; _shared/hotstrings/data/catalogue/french/<stem>.toml and load as the group
 ; "french_<stem>". Every consumer builds that file path, and every one of them
 ; used to concatenate "<category>.toml" at the root — so a helper that missed the
 ; language folder would make the cache, the counters and the menu read a file
@@ -41,7 +41,7 @@ _HLP_PathResolvesLanguageFolder() {
 		AssertTrue(FileExist(Path) != "", "the French autocorrection pack must exist at " . Path)
 	}
 	Neutral := HotstringsBundledTomlPath("autocorrection")
-	AssertTrue(SubStr(Neutral, -StrLen("\hotstrings\autocorrection.toml")) == "\hotstrings\autocorrection.toml",
+	AssertTrue(SubStr(Neutral, -StrLen("\catalogue\autocorrection.toml")) == "\catalogue\autocorrection.toml",
 		"a neutral category stays at the root")
 }
 Test("hotstring languages: one resolver finds every spelling of a language file (hs-language-packs)", _HLP_PathResolvesLanguageFolder)

@@ -15,15 +15,15 @@ local text_owner = require("tests.support.text_owner_fixture")
 --- @param body function Receives the state and its real selection owner.
 function M.with(body)
 	text_owner.with(function(guard, field)
-		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
-			"adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"adapters.keyboard_hook", "logger.shim", "modules.hotstrings.selected_output", "infra.monotonic" }
+		local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "modules.hotstrings.injector",
+			"adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
+			"platform.input.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { allowed = true, guard = guard, field = field, wire = {}, held = {}, writes = {},
 			clipboard = "SAVED", starts = 0, emits = 0, resets = 0, stopped = 0, now = 0,
 			selection = { first = 0, last = 3, text = "btw" }, requests = {} }
-		package.loaded["infra.monotonic"] = { now_ms = function() return state.now end }
+		package.loaded["core.logger.engine.monotonic"] = { now_ms = function() return state.now end }
 		package.loaded["modules.hotstrings.selected_output"] = nil
 		local function boundary(name)
 			if state.on_boundary then state.on_boundary(name) end
@@ -49,9 +49,9 @@ function M.with(body)
 			end
 			return operation
 		end
-		package.loaded["adapters.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
+		package.loaded["platform.focus.atspi_focus"], package.loaded["adapters.selection_transaction"] = native, nil
 		local pending
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
@@ -67,17 +67,17 @@ function M.with(body)
 				return true
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_wayland = function() return false end, is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local injector
 		local ok, err = pcall(function()
 			local layout = helpers.load_module("adapters.keyboard_layout")
@@ -109,7 +109,7 @@ function M.with(body)
 			state.authorized = function() boundary("authorized"); return state.allowed end
 			function state.staged(token, text, construct)
 				text = text or "☃"
-				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				state.inserted = { first = 0, last = assert(require("core.lifecycle.engine.compat.utf8").len(text)), text = text }
 				local called, committed, result = false, false, nil
 				local accepted = state.owner.replace_staged(token, text, state.authorized, construct or injector.prepare_selected, function(value, physical)
 					called, committed, result = true, value, physical
@@ -141,7 +141,7 @@ function M.with(body)
 			function state.replace(token, emit, text)
 				local called, committed = false, false
 				text = text or "☃"
-				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				state.inserted = { first = 0, last = assert(require("core.lifecycle.engine.compat.utf8").len(text)), text = text }
 				local construct = state.construct
 				if emit then
 					construct = function(value, publication)

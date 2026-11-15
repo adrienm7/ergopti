@@ -45,7 +45,7 @@ local function with_world(body, public_policy)
 				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "r"))
 			local contents = file:read("*a")
 			assert(file:close())
-			local available = require("json").decode(contents)
+			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the recorded published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
 			helpers.assert_eq(available.greyed_when_paused, true, "the historical pause policy is retained")
@@ -78,7 +78,7 @@ end
 --- @param kind string
 --- @return table|nil parent
 local function parent(ctx, kind)
-	local title = require("infra.i18n").get("menu." .. kind .. ".title")
+	local title = require("core.i18n.engine.i18n").get("menu." .. kind .. ".title")
 	local found
 	for _, row in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(row.title) == "string" and row.title:sub(1, #title) == title then
@@ -98,8 +98,8 @@ helpers.describe("Linux AI persistence rows under a configuration saved by a new
 		with_world(function(ctx, renderer)
 			local Preferences = require("infra.llm_preferences")
 			local Scope = require("infra.llm_scope")
-			local Migrate = require("config_migrate")
-			local I18n = require("infra.i18n")
+			local Migrate = require("settings.engine.migration.migrate")
+			local I18n = require("core.i18n.engine.i18n")
 			local old_admit, old_apply, old_status = Preferences.admit, Scope.apply, Migrate.read_only_status
 			local old_toggle, native_build = ctx.llm.toggle, renderer.build
 			local writable, applied, toggled, retained = true, 0, 0, nil
@@ -251,8 +251,8 @@ helpers.describe("Linux shared AI outer parents with published available compone
 					local command
 					if kind == "agent" then command = row.menu[1].menu[2]
 					else
-						local title = require("infra.i18n").get("menu.llm.enable") .. " — "
-							.. require("infra.i18n").get("menu.llm.save_unavailable"):match("^([^:]+)"):gsub("%s+$", "")
+						local title = require("core.i18n.engine.i18n").get("menu.llm.enable") .. " — "
+							.. require("core.i18n.engine.i18n").get("menu.llm.save_unavailable"):match("^([^:]+)"):gsub("%s+$", "")
 						for _, child in ipairs(row.menu) do if child.title == title then command = child end end
 					end
 					helpers.assert_type(command, "table", "the genuine action row remains visible")
@@ -344,7 +344,8 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				local row = parent(ctx, kind)
 				helpers.assert_type(row, "table", "the paused feature remains visible")
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_nil(row.menu, "the original pause owner removes every executable child")
+				-- The tray no longer strips the paused submenu (EDD-1); the parent
+				-- itself still greys until the AI menu joins the real pause.
 				helpers.assert_nil(row.fn, "the original parent still has no click action")
 			end)
 		end)
@@ -355,7 +356,7 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				local row = parent(ctx, kind)
 				helpers.assert_type(row, "table", "the shared unavailable policy must reach the tray")
 				helpers.assert_eq(row.disabled, true)
-				helpers.assert_true(row.title:find(require("infra.i18n").get("menu.llm.unavailable"), 1, true) ~= nil,
+				helpers.assert_true(row.title:find(require("core.i18n.engine.i18n").get("menu.llm.unavailable"), 1, true) ~= nil,
 					"the unavailable reason comes from the existing translated shared declaration")
 			end)
 		end)
@@ -427,7 +428,7 @@ helpers.describe("Linux shared AI outer parents with published available compone
 				end
 				local row = parent(ctx, "agent")
 				helpers.assert_type(row, "table", "the current reasoned unavailable parent reaches the public tray")
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				helpers.assert_eq(row.title, i18n.get("menu.agent.title") .. " — " .. i18n.get("menu.agent.not_ready"),
 					"the public title retains the exact current translated reason")
 				helpers.assert_eq(row.disabled, true)

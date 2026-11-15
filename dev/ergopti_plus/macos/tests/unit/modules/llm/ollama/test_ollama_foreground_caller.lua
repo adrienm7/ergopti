@@ -9,10 +9,10 @@ local function with_api(kind, callback)
 	nonce_counter = nonce_counter + 1
 	nonce = string.format("%032x", nonce_counter)
 	helpers.with_stub_scope({ "modules.llm.api_ollama", "adapters.managed_ollama_daemon",
-		"adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-		"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+		"core.process.adapters.shell_runner", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
+		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+		"modules.llm.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control" }, function()
 		local shell = { tasks = {}, mode = "true", clients = {} }
 		function shell.spawn(executable, args, done, chunk, environment, private, owned)
@@ -40,11 +40,11 @@ local function with_api(kind, callback)
 			shell.tasks[#shell.tasks + 1] = task
 			return task
 		end
-		package.loaded["adapters.shell_runner"] = shell
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["adapters.http_client"] = { new = function()
+		package.loaded["core.process.adapters.shell_runner"] = shell
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.network.adapters.http_client"] = { new = function()
 			local client = { settled = true, cancel_calls = 0 }
 			function client.cancel() client.cancel_calls = client.cancel_calls + 1; return true end
 			function client.isActive() return false end
@@ -55,11 +55,11 @@ local function with_api(kind, callback)
 			shell.clients[#shell.clients + 1] = client
 			return client
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() error("no launch delay or readiness timer is admitted") end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+		package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 		package.loaded["modules.llm.ollama_binary"] = { resolve = function() return "/fixture/ollama", nil, kind end }
 		package.loaded["modules.llm.ollama_server_command"] = { build = function(_, _, _, _, caller_nonce)
 			helpers.assert_eq(caller_nonce, nonce)

@@ -8,23 +8,23 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
-local Notifications  = require("infra.notifications")
-local i18n           = require("infra.i18n")
+local Logger         = require("core.logger.engine.logger")
+local Notifications  = require("core.ui.engine.notifications")
+local i18n           = require("core.i18n.engine.i18n")
 local Profiles       = require("modules.llm.profiles")
 local ApiCommon      = require("modules.llm.api_common")
 local ApiMlxInference = require("modules.llm.api_mlx_inference")  -- request mechanics (post_and_parse / streaming)
 local ApiMlxFetch    = require("modules.llm.api_mlx_fetch")   -- dispatch strategies (batch/parallel/sequential)
 local ApiMlxDiscovery = require("modules.llm.api_mlx_discovery")  -- endpoint-route discovery + route/identifier cache
-local _warmup_client = require("adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
-local _check_client  = require("adapters.http_client").new()  -- Dedicated client for check_availability() GETs
-local JsonCodec      = require("adapters.json_codec")
-local Storage        = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
-local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("infra.timings")
+local _warmup_client = require("core.network.adapters.http_client").new()  -- Dedicated client for warmup POSTs; isolated so discovery probes cannot cancel an in-flight warmup
+local _check_client  = require("core.network.adapters.http_client").new()  -- Dedicated client for check_availability() GETs
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local Storage        = require("core.fs.adapters.storage")
+local TimerScheduler = require("core.events.timer_scheduler")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local Timings        = require("core.timing.engine.timings")
 local StreamRetirement = require("modules.llm.mlx_stream_retirement")
-local Paths          = require("infra.paths")
+local Paths          = require("core.fs.engine.paths")
 local LOG            = "llm.api_mlx"
 
 -- MLX warmup timeout comes from the shared cross-driver registry ([llm]).
@@ -33,7 +33,7 @@ local WARMUP_RETRY_DELAY_SEC     = 2
 local WARMUP_STAGE_ACQUIRE_RETRIES = 1
 local PGID_PENDING_TIMEOUT_SEC   = 15.0
 
--- MLX server bind address — single source of truth in _shared/modules/llm/mlx_server.json
+-- MLX server bind address — single source of truth in _shared/ai/data/mlx_server.json
 -- so the port is never hardcoded across api_mlx, the models_manager_mlx launcher,
 -- and the init.lua boot cleanup. Loaded once at module load; every consumer reads
 -- the resolved value via M.get_port() / M.get_host() / M.get_base_url(). The
@@ -86,7 +86,7 @@ local function load_mlx_server_config()
 	-- 1) Shared JSON default (the value shipped with the repo). Resolved through
 	-- the single shared-tree resolver (Paths.shared), which performs the dual-root
 	-- upward walk — robust to packaged .app builds and symlinked setups alike.
-	local p = Paths.shared("modules/llm/mlx_server.json")
+	local p = Paths.shared("ai/data/mlx_server.json")
 	if type(p) == "string" and p ~= "" then
 		local fh = io.open(p, "r")
 		if fh then
@@ -439,7 +439,7 @@ local WARMUP_GIVE_UP_SEC   = 120
 -- for the case where even the retry cycles never converge.
 local DISCOVERY_GIVE_UP_SEC = Timings.sec("llm", "discovery_max_wait_ms") + WARMUP_GIVE_UP_SEC
 
--- The MLX server base URL — single source of truth in _shared/modules/llm/mlx_server.json.
+-- The MLX server base URL — single source of truth in _shared/ai/data/mlx_server.json.
 -- Derived from MLX_HOST/MLX_PORT (loaded at the top of this file). Endpoint route
 -- discovery and the cached working URLs now live in api_mlx_discovery; this URL is
 -- handed to it via ApiMlxDiscovery.init() and refreshed on a port change.

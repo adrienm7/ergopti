@@ -96,19 +96,22 @@ _UCP_PersonalReadIsGuardedAndFlags() {
 
 	Lock := FileOpen(Path, _UCP_EXCLUSIVE_LOCK_FLAGS)
 	Assert(Lock != "" and IsObject(Lock), "the test could not take an exclusive lock — it would otherwise assert nothing")
-	Threw  := ""
+	; The caught state is the verdict: an Error with an empty message is still a
+	; throw, and a message sentinel alone accepted it.
+	Caught := false, Threw := ""
 	Result := ""
 	try {
 		Result := _UCP_WithTempPersonalToml(Path, ReadPersonalToml)
 	} catch as Err {
-		Threw := Err.Message
+		Caught := true
+		Threw := Type(Err) . ": " . Err.Message
 	}
 	Flagged := _UCP_IsFlagged(Path)
 	Lock.Close()
 	try FileDelete(Path)
 	_UCP_ClearFlag(Path)
 
-	Assert(Threw == "",
+	Assert(!Caught,
 		"ReadPersonalToml must not throw on a locked file — it runs from the boot loader and from menu click handlers, where an exception is an aborted boot or a dead menu. Got: " . Threw)
 	Assert(Result is Map, "it must still return a Map so callers' .Has checks keep working")
 	Assert(Flagged,

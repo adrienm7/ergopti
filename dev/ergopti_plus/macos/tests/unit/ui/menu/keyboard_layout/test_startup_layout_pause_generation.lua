@@ -17,7 +17,7 @@ local prime_counts = {apps = 0, keyboard_layout = 0, karabiner = 0}
 local pause_listener
 local paused = false
 
-local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 hs_stub.timer = {
 	new = function(delay, callback)
 		local timer = {
@@ -79,14 +79,14 @@ local state = {
 	update_check_interval_seconds = 3600,
 }
 
-package.loaded["infra.logger"] = helpers.make_logger_stub()
-package.loaded["infra.notifications"] = { notify = function() end }
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 package.loaded["ui.hotstring_editor"] = { set_update_menu = function() end }
-package.loaded["infra.text_utils"] = {
+package.loaded["core.text.engine.utils"] = {
 	escape_gsub_replacement = function(value) return value end,
 	shell_quote = function(value) return value end,
 }
-package.loaded["infra.i18n"] = { get = function(key) return key end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 package.loaded["infra.ui_restore"] = {}
 package.loaded["infra.preferences"] = {
 	build_initial_state = function() return state end,
@@ -142,7 +142,7 @@ package.loaded["adapters.tray_menu"] = {
 	adopt = function() end,
 	setMenu = function() return true end,
 }
-package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
+package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 for _, module_name in ipairs({
 	"ui.menu.menu_gestures",
@@ -174,7 +174,7 @@ package.loaded["modules.dynamic_hotstrings"] = {}
 package.loaded["modules.gestures"] = {}
 package.loaded["infra.personal_shortcuts"] = { load = function() end }
 
-package.loaded["adapters.timer_scheduler"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
 package.loaded["ui.menu.init"] = nil
 local Menu = require("ui.menu.init")
 

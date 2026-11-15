@@ -10,7 +10,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_signal_shutdown%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 
 if arg[1] == "child" then
@@ -19,7 +19,7 @@ if arg[1] == "child" then
 		package.preload["luv"] = function() error("fixture intentionally has no luv for CLI help") end
 		package.loaded["posix.signal"] = nil
 		package.preload["posix.signal"] = function() error("fixture intentionally has no posix.signal") end
-		assert(require("infra.signal_handlers").is_settled(), "pure signal module load acquired native state")
+		assert(require("core.lifecycle.engine.shutdown.signal_handlers").is_settled(), "pure signal module load acquired native state")
 		arg[0], arg[1], arg[2] = root .. "/ergopti_hotstrings.lua", "--help", nil
 		dofile(root .. "/ergopti_hotstrings.lua")
 		error("actual CLI help did not exit")
@@ -38,7 +38,7 @@ if arg[1] == "child" then
 	local state = { ready = false, terminal = 0, reloads = 0, loops = 0, closes = 0, ticks = 0 }
 	local owners = {}
 	local final_registry = compile("return " .. final, setmetatable({ privacy_owners = owners }, { __index = _G }))()
-	local coordinator = require("infra.shutdown_coordinator").new({
+	local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({
 		pre_wait = { { name = "external native cleanup", wait_for_ack = true, stop = function() return state.ready end } },
 		final_wait = final_registry,
 		keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
@@ -63,7 +63,7 @@ if arg[1] == "child" then
 			return original()
 		end
 		env.install_signal_handlers = compile(installer .. "\nreturn install_signal_handlers", env)()
-		env.event_loop = require("adapters.event_loop")
+		env.event_loop = require("core.events.loop")
 		local admission = assert(text:match("(%-%- Admit graceful terminal signals.-)\n\tBootProfiler.stage%(\"input hooks\"%)"))
 		local capture_reached = false
 		env.fixture_capture = function() capture_reached = true end
@@ -71,7 +71,7 @@ if arg[1] == "child" then
 		uv.new_signal = original
 		assert(not accepted and tostring(reason):find("refusing input capture", 1, true), "partial signal startup continued")
 		assert(not capture_reached and allocations == 2 and state.closes == 0)
-		assert(not coordinator.is_pending() and require("infra.signal_handlers").is_settled())
+		assert(not coordinator.is_pending() and require("core.lifecycle.engine.shutdown.signal_handlers").is_settled())
 		uv.run() -- Outside every callback: drain the loop adapter's own closing handles.
 		local remaining = 0; uv.walk(function() remaining = remaining + 1 end)
 		assert(remaining == 0, "partial signal admission retained native handles")
@@ -103,7 +103,7 @@ if arg[1] == "child" then
 	uv.run()
 	assert(not coordinator.is_pending() and state.loops == 1 and state.terminal == 3)
 	compile(teardown, env)()
-	assert(state.closes == 1 and require("infra.signal_handlers").is_settled())
+	assert(state.closes == 1 and require("core.lifecycle.engine.shutdown.signal_handlers").is_settled())
 	uv.timer_stop(timer); uv.close(timer); uv.run()
 	local remaining = 0; uv.walk(function() remaining = remaining + 1 end)
 	assert(remaining == 0, "native signal child retained handles")

@@ -17,11 +17,11 @@
 
 local helpers = require("tests.helpers")
 local ActualScenario = require("tests.support.agent_scenario")
-local i18n = require("infra.i18n")
+local i18n = require("core.i18n.engine.i18n")
 
 helpers.it("refuses fractional agent count limits", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	local settings = require("modules.llm.agent_settings")
 	for _, item in ipairs({
@@ -39,8 +39,8 @@ helpers.it("refuses fractional agent count limits", function()
 end)
 
 helpers.it("refuses a malformed Jev triage configuration", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.system1.jev = nil end,
@@ -56,8 +56,8 @@ helpers.it("refuses a malformed Jev triage configuration", function()
 end)
 
 helpers.it("refuses malformed action schemas before accepting agent output", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, damage in ipairs({
 		function(config) config.actions.calendar = false end,
@@ -74,8 +74,8 @@ helpers.it("refuses malformed action schemas before accepting agent output", fun
 end)
 
 helpers.it("refuses missing and invalid agent source labels", function()
-	local Json = require("json")
-	local path = assert(require("infra.paths").shared("modules/llm/agent.json"))
+	local Json = require("core.text.engine.json")
+	local path = assert(require("core.fs.engine.paths").shared("ai/data/agent.json"))
 	local file = assert(io.open(path, "rb")); local source = assert(file:read("*a")); assert(file:close())
 	for _, case in ipairs({ { "selection" }, { "selection", false }, { "typing", "" }, { "command", 5 } }) do
 		local config = assert(Json.decode(source)); config.source_kinds[case[1]] = case[2]
@@ -87,9 +87,9 @@ end)
 
 helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local original_shared, original_settings = Paths.shared, package.loaded["modules.llm.agent_settings"]
-	local source = assert(original_shared("modules/llm/agent.json"))
+	local source = assert(original_shared("ai/data/agent.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-agent-config-XXXXXX"))
 	local path = dir .. "/agent.json"
 	local made = os.execute("mkfifo '" .. path .. "'")
@@ -97,7 +97,7 @@ helpers.it("agent configuration refuses a FIFO rather than blocking", function()
 	package.loaded["modules.llm.agent_settings"] = nil
 	local Settings = require("modules.llm.agent_settings")
 	Paths.shared = function(relative)
-		if relative == "modules/llm/agent.json" then return path end
+		if relative == "ai/data/agent.json" then return path end
 		return original_shared(relative)
 	end
 	local exited, process = false, nil
@@ -186,7 +186,7 @@ local function with_agent_declaration(component, body)
 			file = assert(io.open(helpers.driver_root()
 				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "rb"))
 			local contents = assert(file:read("*a")); assert(file:close()); file = nil
-			local available = require("json").decode(contents)
+			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
 			helpers.assert_eq(available.greyed_when_paused, true, "the published pause policy is retained")
@@ -252,8 +252,8 @@ end
 --- @return table rows, table prompts
 local function build_menu(world, answers)
 	local prompts = {}
-	local previous = package.loaded["ui.text_prompt"]
-	package.loaded["ui.text_prompt"] = {
+	local previous = package.loaded["core.ui.ui.text_prompt"]
+	package.loaded["core.ui.ui.text_prompt"] = {
 		ask = function(title, prompt, initial, hidden, choices)
 			prompts[#prompts + 1] = { title = title, prompt = prompt, initial = initial, choices = choices }
 			local answer = table.remove(answers, 1)
@@ -268,7 +268,7 @@ local function build_menu(world, answers)
 		return menu_builder.build({ llm = world.engine, on_menu_changed = function() world.redraws =
 			(world.redraws or 0) + 1 end })
 	end)
-	world.restore_prompt = function() package.loaded["ui.text_prompt"] = previous end
+	world.restore_prompt = function() package.loaded["core.ui.ui.text_prompt"] = previous end
 	if not ok then
 		world.restore_prompt()
 		error(rows, 0)
@@ -425,8 +425,8 @@ helpers.describe("AI agent settings: stored like every llm.* setting", function(
 
 	helpers.it("warns once about a retired mode or spec and offers it for cleanup (config-outdated-llm-agent)", function()
 		local marked = {}
-		require("config_outdated").reset_for_tests()
-		local reported = require("config_outdated").collect_reports(function()
+		require("settings.engine.migration.outdated").reset_for_tests()
+		local reported = require("settings.engine.migration.outdated").collect_reports(function()
 			Scenario.run({ stored = { ["llm.agent_system1"] = "Bad Value", ["llm.agent_mode"] = "suggest" } }, function()
 				local Settings = require("modules.llm.agent_settings")
 				helpers.assert_eq(Settings.get_mode(), "off")
@@ -463,10 +463,10 @@ end)
 
 --- Reads independent mode expectations rather than generated menu data.
 local function mode_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_mode_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(raw))
+	local corpus = assert(require("core.text.engine.json").decode(raw))
 	helpers.assert_eq(#corpus.modes, 3)
 	helpers.assert_eq(#corpus.states, 3)
 	return corpus
@@ -618,10 +618,10 @@ end)
 
 --- Replays the independent fixed-system row contract through the actual menu.
 local function system_off_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_system_off.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("AI agent shared system Off row (agent-system-off)", function()
@@ -686,7 +686,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 	end)
 
 	helpers.it("preserves foreign physical source and refuses an actual scoped writer before Off ACK (agent-system-off)", function()
-		local sandbox = require("test.config_unused_keys_contract").sandbox
+		local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		-- The agent reads on: an off category greys every row of its submenu.
 		sandbox.with_config('[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "initial"\n', function(path)
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
@@ -705,7 +705,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 				helpers.assert_eq(sandbox.read_bytes(path), initial)
 				helpers.assert_eq(changes, 0)
 				helpers.assert_eq(preferences.release(owner), true)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local original_batch = writer.batch_write
 				local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras"\n[future]\nkeep = "external"\n'
 				local observed = {}
@@ -725,7 +725,7 @@ helpers.describe("AI agent shared system Off row (agent-system-off)", function()
 				helpers.assert_eq(changes, 0)
 				helpers.assert_eq(require("modules.llm.agent_settings").get_spec("system1"), "cerebras")
 				helpers.assert_eq(off.fn(), true)
-				local document = require("toml_codec").decode(sandbox.read_bytes(path))
+				local document = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(path))
 				helpers.assert_nil(document.llm.agent_system1)
 				helpers.assert_eq(document.future.keep, "external")
 				helpers.assert_eq(changes, 1)
@@ -739,22 +739,22 @@ end)
 
 --- Independently authored model-control rows, loaded from physical shared data.
 local function system_model_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/agent_system_model.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Holds genuine locale/backend/renderer identities and restores them on every exit.
 --- @param code string Runtime-only fixture locale.
 --- @param scenario function Receives the authentic production i18n owner.
 local function with_system_model_locale(code, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local native, owner, receipt, acquired
 	local ok, err = pcall(function()
-		native = require("infra.i18n")
+		native = require("core.i18n.engine.i18n")
 		native.init()
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner)
@@ -763,7 +763,7 @@ local function with_system_model_locale(code, scenario)
 		helpers.assert_not_nil(receipt)
 		helpers.assert_eq(native.scope_apply(owner, receipt, code), true)
 		helpers.assert_eq(native.get_locale(), code)
-		helpers.assert_eq(require("infra.locale").current_locale(), code)
+		helpers.assert_eq(require("core.i18n.engine.locale").current_locale(), code)
 		if component_depth > 0 then
 			with_agent_declaration(true, function() scenario(native) end)
 		else
@@ -865,7 +865,7 @@ end)
 
 helpers.describe("Agent model physical-source ownership (agent-system-model)", function()
 	helpers.it("preserves physical bytes on scope/CAS refusal and retries the real model writer (agent-system-model)", function()
-		local sandbox = require("test.config_unused_keys_contract").sandbox
+		local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 		-- The agent reads on: an off category greys every row of its submenu.
 		local initial = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "initial"\n'
 		local foreign = '[llm]\nagent_mode = "auto"\nagent_system1 = "cerebras|hand/50%"\n[future]\nkeep = "external"\n'
@@ -874,7 +874,7 @@ helpers.describe("Agent model physical-source ownership (agent-system-model)", f
 			local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.agent_settings", "ui.menu.agent_rows" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local original_batch = writer.batch_write
 			local ok, err = pcall(function()
 				package.loaded["infra.config_paths"] = { config = function() return path end }
@@ -924,17 +924,17 @@ end)
 --- @param scenario function Receives the French owner and newer backend.
 local function with_system_model_french_seed(scenario)
 	with_system_model_locale("fr", function(native)
-		local backend, core = package.loaded["infra.locale"], package.loaded["locale.core"]
+		local backend, core = package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"]
 		local ok, err = pcall(function()
 			require("infra.manifest_menu").get_root()
-			local newer = helpers.load_module("infra.locale")
+			local newer = helpers.load_module("core.i18n.engine.locale")
 			newer.set_locale("en")
 			helpers.assert_eq(newer.get("menu.agent.model"), "Model… ({1})")
 			helpers.assert_eq(native.get("menu.agent.model"), "Modèle… ({1})",
 				"the old fixture changes a different genuine backend than the native producer")
 			scenario(native, newer)
 		end)
-		package.loaded["infra.locale"], package.loaded["locale.core"] = backend, core
+		package.loaded["core.i18n.engine.locale"], package.loaded["core.i18n.engine.core"] = backend, core
 		if not ok then error(err, 0) end
 	end)
 end
@@ -942,7 +942,7 @@ end
 helpers.describe("Agent model locale cohort isolation (agent-system-model)", function()
 	helpers.it("uses actual English producers and restores the split French cohort exactly (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -966,7 +966,7 @@ helpers.describe("Agent model locale cohort isolation (agent-system-model)", fun
 
 	helpers.it("restores prior owners on a raised English scenario and permits a genuine retry (agent-system-model)", function()
 		with_system_model_french_seed(function(native, newer)
-			local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+			local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 			local before = {}
 			for _, name in ipairs(names) do before[name] = package.loaded[name] end
 			local strings = native.get("menu.agent.model")
@@ -1023,10 +1023,10 @@ end
 
 --- Loads captions frozen from prior physical locale bytes, never from new menu output.
 local function disabled_apps_frame_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/agent_linux_disabled_apps.json")
 	local file = assert(io.open(path, "rb"))
 	local content = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(content))
+	return assert(require("core.text.engine.json").decode(content))
 end
 
 --- Runs through the actual producer, modal boundary and shared final parent renderer.
@@ -1035,7 +1035,7 @@ local function with_disabled_apps_frame(apps, last, answers, scenario)
 		if last then world.type("a", last) end
 		local ok, err = pcall(function()
 			local rows, prompts = build_menu(world, answers or {})
-			local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+			local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 			local count = #require("modules.llm.agent_settings").get_disabled_apps()
 			local parent = find(agent.menu, Scenario.text("menu.agent.disabled_apps", { count }))
 			scenario(world, parent, prompts, agent)
@@ -1174,7 +1174,7 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 
 	helpers.it("keeps native dialog arguments, choices, cancellation, trimming and redraw (agent-disabled-apps-frame)", function()
 		with_system_model_locale("en", function()
-			local name = "adapters.window_info"
+			local name = "platform.focus.window_info"
 			local previous = package.loaded[name]
 			package.loaded[name] = { getAll = function() return {
 				{ appId = "z" }, { appId = "editor" }, { appId = "a" }, { appId = "z" }, {},
@@ -1186,8 +1186,8 @@ helpers.describe("Linux Agent complete excluded-applications frame (agent-disabl
 					helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "editor" })
 					helpers.assert_eq(world.redraws or 0, 0)
 					callback()
-					helpers.assert_eq(prompts[1].title, require("infra.i18n").get("menu.agent.title"))
-					helpers.assert_eq(prompts[1].prompt, require("infra.i18n").get("app_picker.search_placeholder"))
+					helpers.assert_eq(prompts[1].title, require("core.i18n.engine.i18n").get("menu.agent.title"))
+					helpers.assert_eq(prompts[1].prompt, require("core.i18n.engine.i18n").get("app_picker.search_placeholder"))
 					helpers.assert_eq(prompts[1].initial, "")
 					helpers.assert_eq(prompts[1].choices, { "a", "z" })
 					helpers.assert_eq(world.preferences.get("llm.agent_disabled_apps"), { "editor", "a" })
@@ -1248,10 +1248,10 @@ end)
 
 --- Frozen old captions; no output of the candidate renderer defines expectations.
 local function agent_system_frames_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/agent_linux_system_frames.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/agent_linux_system_frames.json")
 	local file = assert(io.open(path, "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Uses the registered native scenario, settings and menu producer unchanged.
@@ -1259,7 +1259,7 @@ local function with_agent_system_frames(spec, answers, scenario)
 	Scenario.run({ stored = { ["llm.agent_system1"] = spec, ["llm.agent_system2"] = spec } }, function(world)
 		local ok, err = pcall(function()
 			local rows, prompts = build_menu(world, answers or {})
-			local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+			local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 			scenario(world, agent, prompts)
 		end)
 		if world.restore_prompt then world.restore_prompt() end
@@ -1322,7 +1322,7 @@ helpers.describe("Linux Agent complete System1/System2 frames (agent-linux-syste
 				local ok, err = pcall(function()
 					descriptor.label = corpus.provider_literal
 					local rows = build_menu(world, {})
-					local agent = assert(find(rows, require("infra.i18n").get("menu.agent.title")))
+					local agent = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title")))
 					for index, system in ipairs({ "system1", "system2" }) do
 						local parent = agent.menu[index + 2]
 						helpers.assert_eq(parent.title, corpus.locales.en.systems[system].native_literal)
@@ -1486,7 +1486,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 					local context = { llm = world.engine, is_paused = function() return world.paused end,
 						on_menu_changed = function() world.redraws = (world.redraws or 0) + 1 end }
 					if state == "absent" then context.llm = nil end
-					local native_i18n = require("infra.i18n")
+					local native_i18n = require("core.i18n.engine.i18n")
 					local caption, found = native_i18n.get("menu.agent.title"), nil
 					for _, row in ipairs(helpers.load_module("ui.menu.builder").build(context)) do
 						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
@@ -1524,7 +1524,7 @@ helpers.describe("AI agent settings: current disabled public policy", function()
 			Scenario.run({}, function(world)
 				local rows = with_actual_ai_parent_probe(function() return build_menu(world, {}) end)
 				world.restore_prompt()
-				local retained = assert(find(rows, require("infra.i18n").get("menu.agent.title"))).menu[1].menu[1].fn
+				local retained = assert(find(rows, require("core.i18n.engine.i18n").get("menu.agent.title"))).menu[1].menu[1].fn
 				helpers.assert_type(retained, "function", "the genuine mode callback is retained")
 				local component_agent
 				for _, row in ipairs(renderer.get_root().top_level) do if row.id == "agent" then component_agent = row end end

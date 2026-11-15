@@ -23,8 +23,8 @@ end
 
 helpers.describe("CapsWord native graph and shared control tags", function()
 	helpers.it("emits an activation edge for the actual AltGr plus CapsLock path", function()
-		helpers.with_stub_scope({ "platform.remap.generator", "infra.logger", "adapters.file_system" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local Generator = helpers.load_with_stubs("platform.remap.generator")
 			local config, err = Generator.build_karabiner_json({
 				tap_hold_config = {}, mod_combos_config = {}, tap_hold_timeout_ms = 200,
@@ -43,7 +43,7 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 				if emitted.key_code == "f20" then seen[#seen + 1] = emitted end
 			end
 			helpers.assert_eq(#seen, 1, "Karabiner activation must notify Hammerspoon without a CLI read")
-			local signal = require("keymap.control_signals").decode(quartz_flags(seen[1].flags))
+			local signal = require("layouts.engine.layers.control_signals").decode(quartz_flags(seen[1].flags))
 			helpers.assert_eq(signal, "capsword_activated")
 			engine:up("caps_lock")
 			engine:up("right_option")
@@ -61,13 +61,13 @@ helpers.describe("CapsWord native graph and shared control tags", function()
 				if emitted.key_code == "f20" then exits[#exits + 1] = emitted end
 			end
 			helpers.assert_eq(#exits, 1, "native deactivation must invalidate earlier LED ownership")
-			helpers.assert_eq(require("keymap.control_signals").decode(quartz_flags(exits[1].flags)), "capsword_deactivated")
+			helpers.assert_eq(require("layouts.engine.layers.control_signals").decode(quartz_flags(exits[1].flags)), "capsword_deactivated")
 		end)
 	end)
 
 	helpers.it("keeps CapsWord tags separate from navigation, one-shot Shift and unrelated chords", function()
-		helpers.with_stub_scope({ "modules.keymap.control_sentinels", "infra.logger" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "modules.keymap.control_sentinels", "core.logger.engine.logger" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local owner = require("modules.keymap.control_sentinels")
 			local signals = {}
 			owner.set_listener("capsword.test", function(signal) signals[#signals + 1] = signal end)

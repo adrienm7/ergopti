@@ -11,7 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 
 --- Quotes one owned fixture path for the host shell.
 --- @param path string
@@ -59,7 +59,7 @@ helpers.describe("layout install: literal source directory", function()
 	}) do
 		helpers.it("discovers versions in " .. folder_name .. " (layout-source-literal-paths)", function()
 			with_bundle_source(folder_name, function(source)
-				helpers.with_fresh_modules({ "infra.fs_dir", "modules.keymap.layout_install" }, function()
+				helpers.with_fresh_modules({ "core.fs.engine.dir", "modules.keymap.layout_install" }, function()
 					local uv = require("luv")
 					local install = helpers.load_with_stubs("modules.keymap.layout_install", { fs = {
 						dir = function(path)

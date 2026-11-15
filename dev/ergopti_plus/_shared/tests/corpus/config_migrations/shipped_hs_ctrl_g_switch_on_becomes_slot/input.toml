@@ -1,8 +1,0 @@
-# _shared/tests/corpus/config_migrations/shipped_hs_ctrl_g_switch_on_becomes_slot/input.toml
-
-[_meta]
-schema_version = 19
-
-[shortcuts.keys]
-ctrl_g = true
-ctrl_x = true

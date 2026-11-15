@@ -18,8 +18,8 @@
 ---    loudly, rather than silently substituted here.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
-local AppDirs = require("app_dirs")
+local Identifiers = require("core.text.engine.identifiers")
+local AppDirs = require("core.fs.engine.app_dirs")
 local M = {}
 
 -- Shared package root. Command-line helpers remain under bin/, while v15.7+
@@ -67,7 +67,7 @@ M.NON_PRIVILEGED_AGENTS = SUPPORT_DIR
 
 --- The two Karabiner runtimes (ADR 011). Shared is the official application the
 --- user installed; owned is the Ergopti background runtime. The names are the
---- values of `[karabiner] runtime` in config_karabiner.toml.
+--- values of `[karabiner] runtime` in tap_hold.toml.
 M.RUNTIME_SHARED = "shared"
 M.RUNTIME_OWNED = "owned"
 

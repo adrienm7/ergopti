@@ -15,7 +15,7 @@ package.loaded["tests.support.modules.keystats.storage.keystats_sqlite_writer_fi
 local Fixture = require("tests.support.modules.keystats.storage.keystats_sqlite_writer_fixture")
 local helpers = Fixture.helpers
 local Fakes = helpers.load_module("tests.fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -68,7 +68,7 @@ end
 --- The columns of events_llm in the canonical schema.
 --- @return table columns Names in declaration order.
 local function schema_columns()
-	local schema = read(helpers.driver_root() .. "/../_shared/data/db/schema.sql")
+	local schema = read(helpers.driver_root() .. "/../_shared/metrics/data/db/schema.sql")
 	local body = schema:match("CREATE TABLE IF NOT EXISTS events_llm %((.-)\n%);")
 	assert(body, "events_llm is not in the schema")
 	local columns = {}
@@ -170,6 +170,7 @@ helpers.describe("keystats llm events: the recorder buffers and flushes them onc
 		local fake_writer = setmetatable({
 			open_db = function() return true end,
 			ensure_token_encoding = function() return true end,
+			ensure_awake_definition = function() return true end,
 			register_device = function() return true end,
 			read_open_walk = function() return nil, true end,
 			upsert_open_walk = function() return true end,

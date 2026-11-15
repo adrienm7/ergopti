@@ -11,7 +11,7 @@
 ; firing while the driver was paused, violating the documented "pause must
 ; silence ALL features" invariant:
 ;
-;   1. PLC_Poll (adapters/process_lifecycle.ahk) fires every 250 ms, reading the
+;   1. PLC_Poll (core/process/adapters/lifecycle.ahk) fires every 250 ms, reading the
 ;      foreground window and fanning out to every focus callback (which downstream
 ;      feed keystats app-switch events). It must early-return on A_IsSuspended.
 ;
@@ -37,8 +37,10 @@
 
 ; Reads a windows/-relative source file. A_ScriptDir is the runner dir (tests/);
 ; its parent is the windows/ driver root.
-_UFPS_ReadSource(FileName) {
-	return _DriverFileSource(FileName)
+; Reads the whole production file that defines Symbol: a structure move may
+; rename the file to a base name another file shares, its symbol stays.
+_UFPS_ReadSource(Symbol) {
+	return _DriverResolveConstants(FileRead(_DriverProductionFileForSymbol(Symbol), "UTF-8"))
 }
 
 
@@ -51,7 +53,7 @@ _UFPS_ReadSource(FileName) {
 ; ==================================================
 
 _UFPS_FocusPollHasSuspendGuard() {
-	Src := _UFPS_ReadSource("process_lifecycle.ahk")
+	Src := _UFPS_ReadSource("PLC_OnFocusChange")
 	Seg := _DriverFuncBody("PLC_Poll")
 	Assert(Seg != "", "PLC_Poll() declaration must exist in process_lifecycle.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,
@@ -60,7 +62,7 @@ _UFPS_FocusPollHasSuspendGuard() {
 Test("process_lifecycle: PLC_Poll has an A_IsSuspended guard (no-suspend-guard-on-background-tick-and-focus-poll)", _UFPS_FocusPollHasSuspendGuard)
 
 _UFPS_BackgroundTickHasSuspendGuard() {
-	Src := _UFPS_ReadSource("updater.ahk")
+	Src := _UFPS_ReadSource("Updater_BackgroundTick")
 	Seg := _DriverFuncBody("Updater_BackgroundTick")
 	Assert(Seg != "", "Updater_BackgroundTick(*) declaration must exist in modules/updater.ahk")
 	Assert(InStr(Seg, "A_IsSuspended") > 0,

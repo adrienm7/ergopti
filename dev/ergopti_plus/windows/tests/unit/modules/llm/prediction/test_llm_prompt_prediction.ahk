@@ -92,6 +92,23 @@ _LPP_RecordTransport(Calls, Entry, SystemPrompt, Ctx, Temperature, OnSuccess, On
 	return Calls.Length
 }
 
+; An HttpClient port whose Post is PostFn, of LLM_RemoteGenerate_Async's
+; signature. Cancel reaches the real registry, as it did before the engine had
+; ports: none of the recorded requests is in it.
+class _LPP_RecordingHttp {
+	__New(PostFn) {
+		this.PostFn := PostFn
+	}
+
+	Post(Args*) {
+		return this.PostFn.Call(Args*)
+	}
+
+	Cancel(SpareKind := "") {
+		return LLM_RemoteCancelAllAsync(SpareKind)
+	}
+}
+
 ; Answers one recorded request the way the curl poller does: the provider body
 ; goes through the real classifier, and its text and usage reach on_success.
 _LPP_Answer(Call, Content) {
@@ -132,12 +149,12 @@ _LPP_LastFinalRender() {
 ; binding parameters, the fake transport and a log capture in place, then puts
 ; every one of them back.
 _LPP_Run(Menu, Buffer, Body, AllowTimers := false) {
-	global _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer, _LLM_Engine_RemoteTransport
+	global _LLM_Menu, _LLM_Engine, _LLM_Bridge_Buffer
 	global GestureActionParameters, _Stub_LlmTooltipCalls
 	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED
 	Saved := {
 		Menu: _LLM_Menu, Engine: _LLM_Engine, Buffer: _LLM_Bridge_Buffer,
-		Transport: _LLM_Engine_RemoteTransport, Parameters: GestureActionParameters,
+		Http: 0, HttpInstalled: false, Parameters: GestureActionParameters,
 		Tooltip: _Stub_LlmTooltipCalls, Sink: _LOGGER_TEST_SINK, Info: _LOGGER_INFO_ENABLED
 	}
 	Calls := []
@@ -151,7 +168,8 @@ _LPP_Run(Menu, Buffer, Body, AllowTimers := false) {
 		_LLM_Bridge_Buffer := Buffer
 		GestureActionParameters := Saved.Parameters.Clone()
 		_Stub_LlmTooltipCalls := []
-		_LLM_Engine_RemoteTransport := _LPP_RecordTransport.Bind(Calls)
+		Saved.Http := LLM_Engine_SetPort("http", _LPP_RecordingHttp(_LPP_RecordTransport.Bind(Calls)))
+		Saved.HttpInstalled := true
 		_LOGGER_INFO_ENABLED := true
 		LoggerSetTestSink((Line) => Lines.Push(Line))
 		Body(Calls, Lines)
@@ -161,7 +179,8 @@ _LPP_Run(Menu, Buffer, Body, AllowTimers := false) {
 		TooltipHide("PromptPredictionTest", true)
 		_LOGGER_TEST_SINK := Saved.Sink
 		_LOGGER_INFO_ENABLED := Saved.Info
-		_LLM_Engine_RemoteTransport := Saved.Transport
+		if Saved.HttpInstalled
+			LLM_Engine_SetPort("http", Saved.Http)
 		_Stub_LlmTooltipCalls := Saved.Tooltip
 		GestureActionParameters := Saved.Parameters
 		_LLM_Bridge_Buffer := Saved.Buffer
@@ -688,7 +707,7 @@ _LPP_PublicPredictionAdmission(ProfileId, Boundary, Cancel) {
 		_LLM_Remote_AsyncCounter := Saved[2]
 	}
 	Body(Calls, Lines) {
-		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters
+		global _LLM_Engine, GestureActionParameters
 		Gate := Boundary == "target" ? _LLM_Engine_GetActiveApiEntry : _LLMRemote_BuildRequestContext
 		Dispatch := _LLMRemote_DispatchManagedCurl
 		AssertFalse(Dispatch.HasOwnProp("Call"))
@@ -696,7 +715,7 @@ _LPP_PublicPredictionAdmission(ProfileId, Boundary, Cancel) {
 		State := _ManagedCurlControlState()
 		Seen := false
 		try {
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
@@ -774,7 +793,7 @@ _LPP_VariantStopAdmission(ProfileId, Boundary, Cancel) {
 		_LLM_Remote_AsyncCounter := Saved[2]
 	}
 	Body(Calls, Lines) {
-		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters, LPP_SENTENCE
+		global _LLM_Engine, GestureActionParameters, LPP_SENTENCE
 		Gate := Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
 		Dispatch := _LLMRemote_DispatchManagedCurl
 		AssertFalse(Dispatch.HasOwnProp("Call"))
@@ -782,7 +801,7 @@ _LPP_VariantStopAdmission(ProfileId, Boundary, Cancel) {
 		Requests := []
 		Seen := false
 		try {
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			Dispatch.DefineProp("Call", {Call: ObserveDispatch})
 			if Boundary != "before_launch"
 				Gate.DefineProp("Call", {Call: ObserveGate})
@@ -904,7 +923,7 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 		_LLM_Live := Saved[3]
 	}
 	Body(Calls, Lines) {
-		global _LLM_Engine_RemoteTransport, _LLM_Engine, GestureActionParameters, _LLM_Bridge_Buffer, _LLM_Bridge_Active
+		global _LLM_Engine, GestureActionParameters, _LLM_Bridge_Buffer, _LLM_Bridge_Active
 		global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LPP_SENTENCE
 		Gate := Boundary == "context" ? _LLMRemote_BuildRequestContext : _LLMRemoteBuildPayload
 		Constructor := CurlAsyncRequest
@@ -919,7 +938,7 @@ _LPP_DefaultPredictionCustody(Boundary, Mode) {
 				LLM_Bridge_Start(_LLM_Engine.Clone())
 				AssertTrue(_LLM_Bridge_Active, "the actual bridge factory must acquire its production ownership")
 			}
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			Constructor.DefineProp("Call", {Call: Construct})
 			if Boundary == "context" || Boundary == "payload"
 				Gate.DefineProp("Call", {Call: ObserveGate})

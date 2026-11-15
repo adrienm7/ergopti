@@ -10,8 +10,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ParentSource = require("menu.frames.parent_source")
+local Logger = require("core.logger.engine.shim")
+local ParentSource = require("menu.engine.frames.parent_source")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -71,8 +71,9 @@ local function _build_configuration(ctx)
 	-- The global restore and clear compose every category's own scope owner,
 	-- all of them or none of them, at once: each owner backs up first, so
 	-- neither asks (the maintainer retired the clear's question on 2026-09-30).
+	-- A pause does not refuse them: a pause stops typing, not configuration
+	-- (EDD-1, maintainer decision 2026-11-12).
 	local function apply_global_scope(mode)
-		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 		local GlobalScope = require("infra.global_scope")
 		-- The layout category settles once the session holds its layout, after a
 		-- child answers: the outcome is shown from the continuation.
@@ -81,7 +82,7 @@ local function _build_configuration(ctx)
 			-- the generic « could not be saved, it has been reverted » claimed a
 			-- revert for a pending rollback or finalization, where none took place.
 			if not committed then
-				local title, message = require("config_reset_failure").message(report, i18n_safe)
+				local title, message = require("settings.engine.publication.reset_failure").message(report, i18n_safe)
 				show_error(message, title)
 			end
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -97,11 +98,11 @@ local function _build_configuration(ctx)
 		-- Every category through its own scope owner, hotstrings included: the
 		-- recommended hotstrings, never the neutral state where every catalogue is
 		-- off, and that neutral state for the clear.
-		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_global_scope("recommended") end,
-		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_global_scope("clear") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_global_scope("recommended") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_global_scope("clear") end,
 		-- The cleanup needs no daemon state: it reads config.toml itself and
 		-- opens the shared review page through the driver's WebView owner.
-		[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS] = function()
+		[require("settings.engine.keys").COMMAND.CLEAN_UNUSED_KEYS] = function()
 			local ok_cleanup, Cleanup = pcall(require, "ui.menu.unused_keys_cleanup")
 			if not ok_cleanup or type(Cleanup) ~= "table" then
 				Logger.error(LOG, "Unused-settings cleanup is unavailable: %s.", tostring(Cleanup))
@@ -115,16 +116,16 @@ local function _build_configuration(ctx)
 		-- The folders editor, as on the other two drivers. This row used to open
 		-- the hotstrings folder in the file manager, a second meaning for one
 		-- label.
-		[require("config_keys").COMMAND.CONFIG_FOLDER] = function()
+		[require("settings.engine.keys").COMMAND.CONFIG_FOLDER] = function()
 			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 				Logger.error(LOG, "No webview manager — the folders editor cannot open.")
 				return
 			end
 			ctx.webview.show("paths_editor")
 		end,
-		[require("config_keys").COMMAND.SETUP_WIZARD] = call_ctx("on_show_setup_wizard"),
+		[require("settings.engine.keys").COMMAND.SETUP_WIZARD] = call_ctx("on_show_setup_wizard"),
 		-- Self-contained: the shared edit flow reads and writes its own setting.
-		[require("config_keys").COMMAND.PROXY_OVERRIDE] = function() require("ui.proxy_override").run() end,
+		[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE] = function() require("core.network.proxy_override").run() end,
 	}
 
 	render_ctx.state_getters = {}

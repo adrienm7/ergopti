@@ -12,15 +12,15 @@ local helpers = require("tests.helpers")
 local OutputFixture = require("tests.support.toml_output_fixture")
 
 local function with_frame(body, paused)
-	local translator = require("infra.i18n")
-	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu",
+	local translator = require("core.i18n.engine.i18n")
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "infra.manifest_menu",
 		"modules.hotstrings.hotstrings_config", "ui.menu.menu_hotstrings_management" }, function()
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.i18n"] = translator
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = translator,
-			logger = require("infra.logger"),
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.i18n.engine.i18n"] = translator
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator,
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		return OutputFixture.with_output(function(path)
@@ -109,18 +109,20 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
 		end)
 	end)
-	helpers.it("preserves disabled parents and inert paused preview deliveries", function()
+	-- A pause stops typing, not configuration (EDD-1): the preview, delay and
+	-- word expander parents stay reachable.
+	helpers.it("keeps preview, delay and word expander parents reachable while paused (edd1-paused-writes)", function()
 		with_frame(function(f)
 			local menu = assert(f.build())
 			for _, row in ipairs(menu.menu) do
 				if row.title == f.captions("menu.hotstrings.preview_bubbles")
-					or row.title == f.captions("menu.hotstrings.word_expanders")
-					or row.title == f.captions("menu.hotstrings.delays_colors") then helpers.assert_eq(row.disabled, true) end
+					or row.title == f.captions("menu.hotstrings.delays_colors")
+					or row.title == f.captions("menu.hotstrings.word_expanders") then
+					helpers.assert_true(row.disabled ~= true, row.title)
+				end
 			end
 			local preview = children(menu, f.captions("menu.hotstrings.preview_bubbles"))
-			helpers.assert_eq(preview[1].disabled, true)
-			helpers.assert_eq(preview[1].fn(), false)
-			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
+			helpers.assert_true(preview[1].disabled ~= true)
 		end, true)
 	end)
 	helpers.it("reads all five canonical caption fields instead of retained native labels", function()
@@ -156,8 +158,8 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 		end)
 	end)
 	helpers.it("restores exact genuine owners after a raised scenario", function()
-		local names = { "infra.i18n", "infra.manifest_menu", "modules.hotstrings.hotstrings_config",
-			"ui.menu.menu_hotstrings_management", "infra.paths" }
+		local names = { "core.i18n.engine.i18n", "infra.manifest_menu", "modules.hotstrings.hotstrings_config",
+			"ui.menu.menu_hotstrings_management", "core.fs.engine.paths" }
 		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
 		local ok, err = pcall(function()
 			with_frame(function(f) assert(f.build()); error("parameter frame scenario sentinel", 0) end)
@@ -357,7 +359,7 @@ helpers.describe("parameter parent is owned only by its existing shared consumer
 					helpers.assert_true(rawequal(parent.menu, completed.menu), "the actual consumer retains completed child identity")
 					helpers.assert_nil(parent.fn, "the rendered canonical group is not clickable")
 					local preview = children(completed, f.captions("menu.hotstrings.preview_bubbles"))
-					helpers.assert_eq(preview[1].disabled == true, paused, "the native paused child gate remains unchanged")
+					helpers.assert_eq(preview[1].disabled == true, false, "a pause does not grey the preview rows")
 					helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
 				end)
 			end, paused)
@@ -418,7 +420,7 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 			set[#set + 1] = { "tap_hold", value }; tap_hold = value; return true
 		end
 		f.context.do_reload = function() return true end
-		local dialog = require("infra.dialog_util")
+		local dialog = require("core.ui.engine.dialog_util")
 		local prompt, alert = dialog.text_prompt, dialog.block_alert
 		local alerts = 0
 		dialog.text_prompt = function() return f.captions("button.ok"), prompt_answer end

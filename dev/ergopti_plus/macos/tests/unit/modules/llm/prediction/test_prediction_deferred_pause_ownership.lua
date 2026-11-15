@@ -16,8 +16,8 @@ local helpers = require("tests.helpers")
 --- Loads a fresh production prediction engine with faithful native timers.
 --- @return table fixture Observable engine, timers, and telemetry counters.
 local function load_fixture()
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["adapters.timer_scheduler"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.llm.prediction_engine"] = nil
 
 	local fixture = {
@@ -106,6 +106,7 @@ local function load_fixture()
 		end,
 		get_active_profile = function() return { label = "Fixture" } end,
 		get_backend = function() return "mlx" end,
+		request_settings = function() return { backend = "mlx", model = "fixture-model" } end,
 		get_current_model = function() return "fixture-model" end,
 		is_backend_ready = function() return true end,
 		pause_deferred_profile_warmup = function()
@@ -143,7 +144,6 @@ local function load_fixture()
 		end,
 	}
 	package.loaded["modules.llm.streaming_handler"] = {
-		arm_watchdog = function() return true end,
 		build_callbacks = function(config)
 			local function success(predictions)
 				config.pending_predictions_ref.value = predictions
@@ -154,21 +154,20 @@ local function load_fixture()
 		end,
 		init = function() return true end,
 		reset_failure_count = function() return true end,
-		stop_watchdog = function() return true end,
 	}
 	fixture.streaming_handler = package.loaded["modules.llm.streaming_handler"]
 	package.loaded["modules.llm.app_filter"] = {
 		is_blocked = function() return false end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.1 end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 		t = function(key) return key end,
 	}
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["ui.tooltip"] = {
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["core.ui.ui.tooltip"] = {
 		get_current_index = function() return nil end,
 		hide = function() return true end,
 		hide_forced = function() return true end,
@@ -184,7 +183,7 @@ local function load_fixture()
 		show_predictions = function() return true end,
 		tint = function() return nil end,
 	}
-	fixture.tooltip = package.loaded["ui.tooltip"]
+	fixture.tooltip = package.loaded["core.ui.ui.tooltip"]
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function()

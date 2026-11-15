@@ -141,6 +141,9 @@ SFD_Stop(*) {
 AltGrFamilyStopFollowing(*) {
 	return true
 }
+LayoutRegistryWatch_Stop(*) {
+	return true
+}
 MenuPopulation_Shutdown(*) {
 	return true
 }
@@ -160,6 +163,9 @@ WebView_StopBrowserWarmup(*) {
 	return true
 }
 WPMTrayReadout_Shutdown(*) {
+	return true
+}
+RawTouchpadStop(*) {
 	return true
 }
 MenuDispatcher_Shutdown(*) {

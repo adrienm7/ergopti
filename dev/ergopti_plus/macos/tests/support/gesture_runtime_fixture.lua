@@ -23,14 +23,14 @@ local M = {}
 -- =======================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"hs",
 	"hs._asm.undocumented.touchdevice",
 	"hs.caffeinate.watcher",
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.timings",
+	"core.ui.engine.notifications",
+	"core.timing.engine.timings",
 	"modules.gestures",
 	"modules.gestures.actions",
 	"modules.gestures.conflicts",
@@ -96,13 +96,13 @@ function M.with_fixture(options, scenario)
 			return pcall(fn, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			if key == "health_check_interval_ms" then return 30 end
 			if key == "startup_phase_timeout_ms" then return 10 end
@@ -150,7 +150,7 @@ function M.with_fixture(options, scenario)
 		if handle then handle.active = false end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	local watcher = {
 		running_state = false,

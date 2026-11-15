@@ -358,7 +358,7 @@ helpers.describe("dynamic rule families: the rows", function()
 	helpers.it("shows today's date in the label, not the placeholder", function()
 		with_storage()
 		local dh = manager()
-		local Engine = require("dynamic_hotstrings")
+		local Engine = require("hotstrings.engine.dynamic.core")
 		local today = Engine.today_date_strings()
 
 		for _, family in ipairs(dh.rule_families()) do
@@ -385,7 +385,7 @@ helpers.describe("dynamic rule families: the rows", function()
 		for index, key in ipairs({ "menu.hotstrings.scope_enable_all", "menu.hotstrings.scope_disable_all" }) do
 			local command = (sub or {})[index]
 			helpers.assert_not_nil(command)
-			helpers.assert_eq(command.title, require("infra.i18n").get(key))
+			helpers.assert_eq(command.title, require("core.i18n.engine.i18n").get(key))
 			helpers.assert_nil(command.checked)
 			helpers.assert_eq(command.disabled == true, false)
 			helpers.assert_type(command.fn, "function")
@@ -407,8 +407,8 @@ helpers.describe("dynamic rule families: the rows", function()
 end)
 
 helpers.describe("dynamic menu shared family order", function()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/dynamic_hotstrings/menu_vectors.json"), "rb"))
-	local corpus = assert(require("json").decode(file:read("*a")))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/dynamic_hotstrings/menu_vectors.json"), "rb"))
+	local corpus = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	helpers.it("keeps the independent published family metadata and returns detached records", function()
 		local menu = require("infra.manifest_menu")

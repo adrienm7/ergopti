@@ -13,7 +13,7 @@ helpers.describe("dashboard and onboarding focus ownership", function()
 	helpers.it("(metrics-cleanup-authority) refused deletion revokes bridge and data continuations", function()
 		with_window("ui.metrics_apps", function(dashboard, state)
 			local pending, discoveries = {}, 0
-			package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+			package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 				local handle = { timer = {} }
 				pending[#pending + 1] = function() handle.timer = nil; callback() end
 				return handle, true
@@ -111,7 +111,7 @@ end)
 local function with_onboarding_reuse(callback)
 	with_window("ui.onboarding", function(onboarding, state)
 		require("tests.support.onboarding_shared_data").install()
-		local builder = package.loaded["ui.ui_builder"]
+		local builder = package.loaded["core.ui.ui.builder"]
 		local show = builder.show_webview
 		local owners = {}
 		state.acquisitions, state.focus_calls = 0, 0
@@ -236,7 +236,7 @@ end)
 -- A failed factory returns diagnostics, never a caller-owned native window.
 local function onboarding_factory_error_observer()
 	local errors = {}
-	package.loaded["infra.logger"].error = function(_, message, ...)
+	package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 		errors[#errors + 1] = string.format(message, ...)
 	end
 	return errors
@@ -414,7 +414,7 @@ helpers.describe("onboarding retained same-source acknowledgment", function()
 	helpers.it("(onboarding-retained-same-source) acknowledges exact source without new native or write authority", function()
 		with_onboarding_reuse(function(onboarding, state, owners)
 			local native_new = hs.webview.usercontent.new
-			local writer = require("infra.toml.writer")
+			local writer = require("core.text.engine.toml.writer")
 			local batch_write = writer.batch_write
 			local bridges, writes = 0, 0
 			local called, primary = xpcall(function()

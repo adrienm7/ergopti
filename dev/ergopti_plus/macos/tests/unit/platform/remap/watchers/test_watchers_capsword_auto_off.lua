@@ -36,10 +36,10 @@ local function fresh_harness(overrides)
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
 	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	local h = {
 		clock = 1000, writers = {}, supersede_calls = 0, timers = {}, capslock = {},
@@ -57,8 +57,8 @@ local function fresh_harness(overrides)
 		if not results[1] then logger.error(module, "Exception: %s", tostring(results[2])) end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, cancelled = false }
@@ -70,7 +70,7 @@ local function fresh_harness(overrides)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
 	}
 	package.loaded["platform.remap.ke_variables"] = {
@@ -305,6 +305,22 @@ helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when ch
 		assert_logged(h, "delimiter typed")
 	end)
 
+	helpers.it("a second CapsWord action ends it at once and unlocks CapsLock", function()
+		-- The Mac check « a second CapsWord gesture or shortcut switches CapsWord
+		-- off and unlocks CapsLock » (TODO, To confirm on the Mac): gestures and
+		-- keyboard shortcuts both run the catalogue action, which ends a running
+		-- CapsWord through this one entry.
+		local h = fresh_harness()
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true, "the watcher owns the CapsWord listener")
+		helpers.assert_eq(h.capslock, {}, "nothing is unlocked while CapsWord is off")
+		activate(h)
+		key(h, "a")
+		helpers.assert_eq(h.watchers.deactivate_capsword_by_action(), true)
+		helpers.assert_eq(#h.writers, 1, "the action ends the running CapsWord")
+		helpers.assert_eq(h.capslock, { false }, "CapsLock goes off at once, before the next letter")
+		assert_logged(h, "switched off by its action")
+	end)
+
 	helpers.it("an unchecked Space leaves CapsWord on", function()
 		local h = fresh_harness({ caps_word_terminators = { "tab", "enter" } })
 		activate(h)
@@ -484,7 +500,7 @@ helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed p
 	helpers.it("arms the shipped inactivity delay at the activation", function()
 		local h = fresh_harness({ shipped = true })
 		activate(h)
-		local delay = require("caps_word.auto_off").idle_delay_ms(h.settings.policy()) / 1000
+		local delay = require("keyboard.engine.caps_word_auto_off").idle_delay_ms(h.settings.policy()) / 1000
 		helpers.assert_eq(delay, require("infra.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
 			"the shipped delay is the manifest default")
 		helpers.assert_eq(delay, 10, "10 s (maintainer decision of 2026-10-20)")
@@ -523,5 +539,36 @@ helpers.describe("CapsWord watcher: text the driver types ends CapsWord on a del
 		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
 		Output.report(" ")
 		helpers.assert_eq(h.supersede_calls, 0, "a stopped watcher receives nothing")
+	end)
+end)
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 7/ The Pause ==================
+-- ======================================
+-- ======================================
+
+-- Windows and Linux end CapsWord when the driver pauses; macOS kept its
+-- CapsLock on through the pause, the paused Karabiner graph holding no
+-- CapsWord rule (paused-ends-capsword).
+helpers.describe("CapsWord watcher: a pause ends CapsWord", function()
+	helpers.it("(paused-ends-capsword) a pause ends a running CapsWord and its CapsLock", function()
+		local h = fresh_harness()
+		activate(h)
+		helpers.assert_true(h.watchers.end_capsword_for_pause(), "the pause step settles")
+		helpers.assert_eq(#h.writers, 1, "the Karabiner CapsWord is cleared")
+		helpers.assert_eq(h.active, false)
+		helpers.assert_eq(h.capslock[#h.capslock], false, "CapsLock is switched off")
+		assert_logged(h, "script paused")
+	end)
+
+	helpers.it("(paused-ends-capsword) a pause keeps a CapsLock the user set themselves", function()
+		local h = fresh_harness()
+		helpers.assert_true(h.watchers.end_capsword_for_pause())
+		helpers.assert_eq(h.supersede_calls, 0, "no CapsWord, no write")
+		helpers.assert_eq(h.capslock, {}, "the user's CapsLock is untouched")
 	end)
 end)

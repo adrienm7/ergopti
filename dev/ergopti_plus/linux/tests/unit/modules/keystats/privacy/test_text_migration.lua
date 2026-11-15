@@ -27,13 +27,13 @@
 
 local helpers = require("tests.helpers")
 
-local Plan       = require("keystats.text_migration")
-local TextCrypto = require("keystats.text_crypto")
+local Plan       = require("metrics.engine.privacy.text_migration_core")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 --- Resolves the shell adapter at CALL time, never once at file scope: another
 --- test file reloads adapters.shell_runner, which replaces the cached instance.
 local function Shell()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 --- A syntactically valid AES-256 key and IV, for the fake derivation.
@@ -134,6 +134,7 @@ local function make_store(rows)
 			end
 			return true
 		end,
+		clear_rich_text = function() return true end,
 		get_cursor = function() return store.cursor end,
 		set_cursor = function(value) store.cursor = value; return true end,
 	}
@@ -146,17 +147,17 @@ end
 local function load_runner(store)
 	-- adapters/crypto captures the shell adapter at ITS load time; reload it so
 	-- it binds to the instance currently cached, or sha256 runs a REAL command.
-	helpers.load_module("adapters.crypto")
-	local previous = package.loaded["infra.openssl_cipher"]
+	helpers.load_module("core.crypto.crypto")
+	local previous = package.loaded["core.network.engine.openssl_cipher"]
 	local function transform(_, _, input)
 		if crypto_options.fail_crypto then return nil, "controlled native refusal" end
 		return input:reverse()
 	end
-	package.loaded["infra.openssl_cipher"] = { available = true, encrypt = transform, decrypt = transform,
-		encode_base64 = require("compat.base64").encode, decode_base64 = require("compat.base64").decode,
+	package.loaded["core.network.engine.openssl_cipher"] = { available = true, encrypt = transform, decrypt = transform,
+		encode_base64 = require("core.lifecycle.engine.compat.base64").encode, decode_base64 = require("core.lifecycle.engine.compat.base64").decode,
 	}
 	local ok, cipher = pcall(helpers.load_module, "modules.keystats.text_cipher")
-	package.loaded["infra.openssl_cipher"] = previous
+	package.loaded["core.network.engine.openssl_cipher"] = previous
 	assert(ok, cipher)
 	local dir  = os.getenv("TEMP") or os.getenv("TMPDIR") or "/tmp"
 	local path = (dir:gsub("[/\\]$", "")) .. "/ergopti_migration_machine_id_test"
@@ -248,9 +249,9 @@ end)
 helpers.describe("Linux migration backend identity admission", function()
 	helpers.it("refuses the complete batch when one native row identity is not exact", function()
 		local names = { "modules.keystats.sqlite_writer", "modules.keystats.text_cipher",
-			"modules.keystats.text_migration", "logger.shim" }
+			"modules.keystats.text_migration", "core.logger.engine.shim" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-		local meta, writes, encryptions, finishes, lines = nil, 0, 0, 0, nil
+		local meta, writes, clears, encryptions, finishes, lines = nil, 0, 0, 0, 0, nil
 		package.loaded["modules.keystats.sqlite_writer"] = {
 			is_available = function() return true end,
 			query_rows = function(sql)
@@ -259,18 +260,22 @@ helpers.describe("Linux migration backend identity admission", function()
 			end,
 			get_meta = function() return meta end,
 			set_meta = function(_, value) meta = value; return true end,
-			exec_sql = function() writes = writes + 1; return true end,
+			exec_sql = function(sql)
+				-- The encrypt pass's formatted-copy clear is no row rewrite.
+				if sql:find("SET rich_text = NULL", 1, true) then clears = clears + 1 else writes = writes + 1 end
+				return true
+			end,
 		}
 		package.loaded["modules.keystats.text_cipher"] = {
 			encrypt = function() encryptions = encryptions + 1; return "unreachable" end,
 			decrypt = function() error("unexpected decrypt") end,
 		}
 		local noop = function() end
-		package.loaded["logger.shim"] = { error = noop, warn = noop, info = noop, start = noop,
+		package.loaded["core.logger.engine.shim"] = { error = noop, warn = noop, info = noop, start = noop,
 			success = function() finishes = finishes + 1 end }
 		package.loaded["modules.keystats.text_migration"] = nil
 		local okay, failure = pcall(function()
-			for _, batch in ipairs({
+			for index, batch in ipairs({
 				{ "1|61|5B5D", "9007199254740993|62|5B5D" },
 				{ "9007199254740993|62|5B5D" },
 			}) do
@@ -282,6 +287,7 @@ helpers.describe("Linux migration backend identity admission", function()
 				helpers.assert_eq(migration.get_progress().scanned, 0)
 				helpers.assert_eq(meta, "encrypt:0")
 				helpers.assert_eq({ writes, encryptions, finishes }, { 0, 0, 0 })
+				helpers.assert_eq(clears, index, "each encrypt pass clears the formatted copy once")
 			end
 		end)
 		for _, name in ipairs(names) do package.loaded[name] = previous[name] end
@@ -665,10 +671,10 @@ helpers.describe("text_migration — failure never leaves data behind", function
 	end)
 end)
 
-require("test.text_migration_durability").register(helpers, {
+require("tests.lua.core.text_migration_durability").register(helpers, {
 	make_store = make_store, load = load_runner, install = install_shell,
 	restore = function() Shell()._reset_runner() end, drain = drain,
-	logger = function() return require("logger.shim") end,
+	logger = function() return require("core.logger.engine.shim") end,
 	log_tag = "modules.keystats.text_migration", device = DEVICE,
 	resume = function(migration, mode) return migration.resume(mode, DEVICE) end,
 })

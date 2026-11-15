@@ -4,8 +4,8 @@
 --- MODULE: Typed-Text Cipher (Linux)
 --- DESCRIPTION:
 --- Supplies the ports of the shared cipher policy
---- (_shared/lua/keystats/text_cipher.lua), which runs the shared at-rest codec
---- (_shared/lua/keystats/text_crypto.lua) against the columns that hold literal
+--- (_shared/metrics/engine/privacy/text_cipher_core.lua), which runs the shared at-rest codec
+--- (_shared/metrics/engine/privacy/text_crypto.lua) against the columns that hold literal
 --- typed text, using a key derived once from this machine's ID.
 ---
 --- FEATURES & RATIONALE:
@@ -27,11 +27,11 @@
 
 local M = {}
 
-local Logger  = require("logger.shim")
-local Crypto  = require("adapters.crypto")
-local OpenSSL = require("infra.openssl_command")
-local NativeCipher = require("infra.openssl_cipher")
-local TextCrypto = require("keystats.text_crypto")
+local Logger  = require("core.logger.engine.shim")
+local Crypto  = require("core.crypto.crypto")
+local OpenSSL = require("core.network.engine.openssl_command")
+local NativeCipher = require("core.network.engine.openssl_cipher")
+local TextCrypto = require("metrics.engine.privacy.text_crypto")
 
 local LOG = "modules.keystats.text_cipher"
 
@@ -74,7 +74,7 @@ local function machine_id_path()
 		and { _machine_id_override }
 		or { MACHINE_ID_PATH, MACHINE_ID_FALLBACK_PATH }
 	for _, path in ipairs(candidates) do
-		local opened, fh = pcall(require("infra.regular_file_reader").open_source, path)
+		local opened, fh = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 		if opened and fh then
 			local read_ok, first = pcall(fh.read, fh, "*l")
 			local close_ok, closed = pcall(fh.close, fh)
@@ -96,7 +96,7 @@ local function derive_key()
 	end
 
 	-- The private runtime's openssl (infra/owned_programs.lua), never a host copy.
-	local openssl = require("adapters.shell_runner").quote(require("infra.owned_programs").path("openssl"))
+	local openssl = require("core.process.adapters.shell_runner").quote(require("infra.owned_programs").path("openssl"))
 	local cmd, reason = TextCrypto.derive_key_command("file:" .. path, openssl)
 	if not cmd then
 		Logger.error(LOG, "Cannot compose the key derivation: %s.", reason)
@@ -160,7 +160,7 @@ local function decrypt_value(key, iv, payload)
 	return plaintext
 end
 
-local Cipher = require("keystats.text_cipher").new({
+local Cipher = require("metrics.engine.privacy.text_cipher_core").new({
 	logger = Logger,
 	log = LOG,
 	sha256 = Crypto.sha256,

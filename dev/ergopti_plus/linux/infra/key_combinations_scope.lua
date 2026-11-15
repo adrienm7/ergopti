@@ -2,22 +2,24 @@
 
 --- Ordered-pair edits use the shared conditional publisher and acknowledged
 --- inverse. Pair input stays fenced until both source and delivery ACKs settle.
-local Transaction = require("config_scope_transaction")
-local Shared = require("tap_hold.key_combinations")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local KeyPath = require("toml_codec.key_path")
-local Updates = require("shortcuts.physical_availability")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Shared = require("tap_hold.engine.key_combinations")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Updates = require("shortcuts.engine.physical_availability")
+local ConfigKeys = require("settings.engine.keys")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 require("infra.scope_registry").register("key_combinations_scope", function() return session_busy or (retained ~= nil and retained.pending() == true) end)
 --- Creates one exact ordered-pair publication owner. Native and source
 --- inverses retain their lease until literal acknowledgement.
---- @param options table Canonical path, backup, pause and owner ports.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Canonical path, backup and owner ports.
 --- @return table owner Edit, inverse and retained-debt controls.
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function")
+	assert(type(options) == "table")
 	local combinations = options.combinations or require("modules.shortcuts.key_combinations")
 	local parameters = options.parameters or require("modules.gestures.manager")
 	for _,name in ipairs({"acquire_configuration","release_configuration","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","owns_configuration","configuration_domain","validate_slot","configuration_snapshot","configuration_source","configuration_source_matches","capture_edit_source","configuration_candidate","apply_configuration"}) do
@@ -140,7 +142,7 @@ function M.new(options)
 		return parameters.apply_parameter_configuration(owner,snapshot.parameters) == true
 	end
 	local transaction = Transaction.new({path=options.path,backup_path=options.backup_path,
-		files=options.files or require("adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
+		files=options.files or require("core.fs.adapters.file_system"),manifest={scope_plan=function(scope,mode,...)
 			if scope == "key_combinations_gate" then
 				assert(mode == "configured" and type(gate_value) == "boolean")
 				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }
@@ -203,7 +205,6 @@ function M.new(options)
 			return false
 		end,
 		apply=function(config,updates,_,candidate_bytes)
-			if options.is_paused() ~= false then return false end
 			local candidate = { pairs = combinations.configuration_candidate(config,true),
 				parameters = parameters.parameter_configuration_snapshot(owner) }
 			if type(candidate.parameters) ~= "table" then return false end
@@ -231,8 +232,6 @@ function M.new(options)
 		if owner.pending() then return false end
 		busy = true
 		no_op_frame = nil
-		local observed, paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
 		if options.expected_source then
 			local checked, current = pcall(options.expected_source.guard)
 			if not checked or current ~= true then busy = false; return false end
@@ -341,8 +340,6 @@ function M.new(options)
 	function owner.revert()
 		if owner.pending() then return false end
 		busy = true
-		local observed,paused = pcall(options.is_paused)
-		if not observed or paused ~= false then busy = false; return false end
 		local called,reverted = pcall(transaction.revert)
 		busy = false
 		return called and reverted == true
@@ -356,24 +353,22 @@ end
 --- Retains exact compensation/acquisition debt across picker sessions. A fresh
 --- edit cannot replace its private native token while retirement is unresolved.
 --- @param rows table Dense canonical slot and parameter assignments.
---- @param is_paused function Current daemon pause getter.
 --- @return boolean committed
 
-local function session(is_paused,expected_source)
-	if type(is_paused) ~= "function" or is_paused() ~= false then return nil end
+local function session(expected_source)
 	if retained and retained.pending() and retained.retry_restore() ~= true then return nil end
 	if retained and retained.release() ~= true then return nil end
 	sequence = sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
-	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",is_paused=is_paused,expected_source=expected_source})
+	retained = M.new({path=path,backup_path=path..".combinations-"..os.date("%Y%m%d-%H%M%S").."-"..sequence..".bak",expected_source=expected_source})
 	return retained
 end
 
-local function operate(is_paused,expected_source,apply)
+local function operate(expected_source,apply)
 	if session_busy then return false end
 	session_busy = true
 	local called, committed = pcall(function()
-		local owner = session(is_paused,expected_source)
+		local owner = session(expected_source)
 		return owner ~= nil and apply(owner) == true
 	end)
 	session_busy = false
@@ -391,24 +386,24 @@ function M.retry_restore()
 	session_busy = false
 	return called and settled == true
 end
-function M.edit(rows,is_paused,expected_source)
+function M.edit(rows,expected_source)
 	rows=Updates.capture_updates(rows);if rows==nil then return false end
-	return operate(is_paused,expected_source,function(owner) return owner.edit(rows) end)
+	return operate(expected_source,function(owner) return owner.edit(rows) end)
 end
-function M.set_enabled(enabled,is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.set_enabled(enabled) end)
+function M.set_enabled(enabled,expected_source)
+	return operate(expected_source,function(owner) return owner.set_enabled(enabled) end)
 end
-function M.set_chord_settings(values,is_paused,expected_source)
+function M.set_chord_settings(values,expected_source)
 	if type(values)~="table" or getmetatable(values)~=nil then return false end
 	for key in pairs(values) do if key~=ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS and key~=ConfigKeys.COMMAND.COMBO_SYMMETRIC then return false end end
 	local called,detached=pcall(Shared.chord_settings,values);if not called then return false end
 	values=detached
-	return operate(is_paused,expected_source,function(owner) return owner.set_chord_settings(values) end)
+	return operate(expected_source,function(owner) return owner.set_chord_settings(values) end)
 end
-function M.copy_taps_to_chords(is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.copy_taps_to_chords() end)
+function M.copy_taps_to_chords(expected_source)
+	return operate(expected_source,function(owner) return owner.copy_taps_to_chords() end)
 end
-function M.apply(mode,is_paused,expected_source)
-	return operate(is_paused,expected_source,function(owner) return owner.apply(mode) end)
+function M.apply(mode,expected_source)
+	return operate(expected_source,function(owner) return owner.apply(mode) end)
 end
 return M

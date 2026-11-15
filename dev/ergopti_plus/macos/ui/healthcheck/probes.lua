@@ -6,7 +6,7 @@
 --- The asynchronous half of the diagnostics snapshot: every fact that needs a
 --- subprocess or the network. Each probe runs off the main run loop (hs.task
 --- through adapters.shell_runner, hs.http through adapters.http_client), is
---- bounded by its timeout in _shared/modules/diagnostics/schema.json, and
+--- bounded by its timeout in _shared/diagnostics/data/schema.json, and
 --- answers exactly once: its result, a timeout or an error.
 ---
 --- FEATURES & RATIONALE:
@@ -39,7 +39,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "healthcheck.probes"
 
@@ -97,7 +97,7 @@ local function start_probe(run, id, timeout_ms, body)
 			for key, value in pairs(result) do parent_result[key] = value end
 			result = parent_result
 		end
-		if timer and require("adapters.timer_scheduler").cancel(timer) == true then
+		if timer and require("core.events.timer_scheduler").cancel(timer) == true then
 			timer = nil
 			run.watchdogs[id] = nil
 		end
@@ -135,7 +135,7 @@ local function start_probe(run, id, timeout_ms, body)
 		end
 		local retained = run.watchdogs[id]
 		if retained then
-			local ok, acknowledged = pcall(require("adapters.timer_scheduler").cancel, retained)
+			local ok, acknowledged = pcall(require("core.events.timer_scheduler").cancel, retained)
 			if ok and acknowledged == true then
 				if run.watchdogs[id] == retained then run.watchdogs[id] = nil end
 				if timer == retained then timer = nil end
@@ -143,12 +143,12 @@ local function start_probe(run, id, timeout_ms, body)
 		end
 	end
 	Logger.trace(LOG, "Probe '%s' started (timeout %d ms)…", id, timeout_ms)
-	local handle, committed = require("adapters.timer_scheduler").after(timeout_ms / 1000, function()
+	local handle, committed = require("core.events.timer_scheduler").after(timeout_ms / 1000, function()
 		finish({ state = "timeout" })
 	end)
 	if id == "appleevent_transport" and handle then
 		run.watchdogs[id] = handle
-		if require("adapters.timer_scheduler").onSettled(handle, function()
+		if require("core.events.timer_scheduler").onSettled(handle, function()
 			if run.watchdogs[id] == handle then run.watchdogs[id] = nil end
 		end) ~= true then
 			timer = handle
@@ -174,7 +174,7 @@ end
 --- @return table|nil
 local function decode(body)
 	if type(body) ~= "string" or body == "" then return nil end
-	local ok, data = pcall(require("adapters.json_codec").decode, body)
+	local ok, data = pcall(require("core.fs.adapters.json_codec").decode, body)
 	return (ok and type(data) == "table") and data or nil
 end
 
@@ -193,7 +193,7 @@ end
 --- @return function Probe body.
 local function github_api(config)
 	return function(done, on_cancel)
-		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		local client = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_ms })
 		on_cancel(function() client.cancel() end)
 		client.get(config.url, { ["User-Agent"] = USER_AGENT, ["Accept"] = "application/vnd.github+json" },
 			function(result)
@@ -231,7 +231,7 @@ local function ai_health(config)
 		end
 		local base = backend == "mlx" and require("modules.llm.api_mlx").get_base_url()
 			or require("modules.llm.api_ollama").get_base_url()
-		local client = require("adapters.http_client").new({ timeout_ms = config.timeout_ms })
+		local client = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_ms })
 		on_cancel(function() client.cancel() end)
 		client.get(base .. path, {}, function(result)
 			local status = tonumber(result.status) or 0
@@ -254,7 +254,7 @@ end
 --- @param on_output function
 --- @param on_failure function
 local function run_task(executable, args, on_cancel, on_output, on_failure)
-	local handle = require("adapters.shell_runner").spawn(executable, args, function(code, stdout)
+	local handle = require("core.process.adapters.shell_runner").spawn(executable, args, function(code, stdout)
 		if code == 0 then on_output(stdout or "") else on_failure(executable .. " exited with " .. tostring(code)) end
 	end)
 	on_cancel(function() handle.terminate() end)
@@ -266,14 +266,14 @@ end
 --- @return function Probe body.
 local function proxy_pac()
 	return function(done, on_cancel)
-		local PacCheck = require("network.pac_check")
+		local PacCheck = require("core.network.engine.pac_check")
 		run_task(SCUTIL, { "--proxy" }, on_cancel, function(stdout)
 			local url = PacCheck.url_from_scutil(stdout)
 			if not url then
 				done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } })
 				return
 			end
-			local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+			local client = require("core.network.adapters.http_client").new({ timeout_ms = 6000 })
 			on_cancel(function() client.cancel() end)
 			client.get(url, { ["User-Agent"] = USER_AGENT }, function(result)
 				local state, text = PacCheck.judge(result.status, result.body, result.error)
@@ -446,10 +446,10 @@ end
 --- @return function Probe body.
 local function configuration(schema, overrides)
 	return function(done, on_cancel)
-		local Timers = require("adapters.timer_scheduler")
-		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
+		local Timers = require("core.events.timer_scheduler")
+		local handle = Timers.after(require("core.timing.engine.timings").sec("ui", "healthcheck_probe_yield_ms"), function()
 			local context = require("ui.healthcheck.helpers").configuration_context(schema, overrides)
-			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
 			if not ok then
 				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
 				return
@@ -471,8 +471,8 @@ end
 --- @return function Probe body.
 local function local_state(slice_ms, snapshot)
 	return function(done, on_cancel)
-		local Timers = require("adapters.timer_scheduler")
-		local yield = require("infra.timings").sec("ui", "healthcheck_probe_yield_ms")
+		local Timers = require("core.events.timer_scheduler")
+		local yield = require("core.timing.engine.timings").sec("ui", "healthcheck_probe_yield_ms")
 		local steps, sections = require("ui.healthcheck.core").local_state_steps(snapshot)
 		local next_step, failures, handle = 1, {}, nil
 		local function slice()

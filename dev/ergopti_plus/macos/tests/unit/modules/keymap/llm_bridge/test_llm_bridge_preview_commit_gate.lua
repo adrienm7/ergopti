@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 --- @return table fixture Observable fixture fields and the loaded bridge.
 local function load_fixture(render_result, previews_enabled, options)
 	options = options or {}
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local fixture = {
 		scheduled = {},
 		live_stops = {},
@@ -36,7 +36,7 @@ local function load_fixture(render_result, previews_enabled, options)
 	fixture.schedule_calls = 0
 	fixture.cancel_mode = options.cancel_mode
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
 	local scheduler = {}
@@ -90,7 +90,7 @@ local function load_fixture(render_result, previews_enabled, options)
 			fixture.scheduled[#fixture.scheduled + 1] = handle
 			return handle, true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	if options.real_scheduler then
 		fixture.native_timers = {}
 		fixture.native_cancel_mode = nil
@@ -121,7 +121,7 @@ local function load_fixture(render_result, previews_enabled, options)
 			fixture.native_timers[#fixture.native_timers + 1] = candidate
 			return candidate
 		end
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 	end
 	package.loaded["modules.keymap.utils"] = {
 		tokens_from_repl = function(value) return value end,
@@ -203,7 +203,7 @@ local function load_fixture(render_result, previews_enabled, options)
 		log_hotstring_suggested = function() fixture.suggested = fixture.suggested + 1 end,
 		log_hotstring_dismissed = function() fixture.dismissed = fixture.dismissed + 1 end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -629,7 +629,7 @@ helpers.describe("personal-file identity reaches the deferred native preview own
 		helpers.assert_true(Registry.init(state))
 		Registry.set_group_context("personal_ext_memory")
 		Registry.add("abc", "replacement", { auto_expand = false, is_case_sensitive_strict = true,
-			personal_source = require("hotstrings.personal_files").describe({ "Équipe", "mémoire.toml" }) })
+			personal_source = require("hotstrings.engine.catalogue.personal_files").describe({ "Équipe", "mémoire.toml" }) })
 		helpers.assert_eq(#state.mappings, 1)
 		Registry.set_group_context(nil)
 		local mapping = state.mappings[1]

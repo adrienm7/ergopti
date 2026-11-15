@@ -23,35 +23,37 @@ local M = {}
 
 local hs       = hs
 local utf8     = utf8
-local Logger   = require("infra.logger")
-local Timings  = require("infra.timings")
-local WPMActivity = require("keystats.wpm_activity")
+local Logger   = require("core.logger.engine.logger")
+local Timings  = require("core.timing.engine.timings")
+local WPMActivity = require("metrics.engine.wpm.activity")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
-local i18n     = require("infra.i18n")
-local dialog   = require("infra.dialog_util")
-local TeardownTransaction = require("infra.teardown_transaction")
+local i18n     = require("core.i18n.engine.i18n")
+local dialog   = require("core.ui.engine.dialog_util")
+local TeardownTransaction = require("core.lifecycle.engine.shutdown.teardown_transaction")
 local InputSourceBroker = require("adapters.input_source_broker")
 
 local LogManager     = require("modules.keystats.log_manager")
+local HostSignature  = require("modules.keystats.host_signature")
 local ContextTracker = require("modules.keystats.context_tracker")
 local KcBridge       = require("modules.keystats.kc_bridge")
 local AccountingMode = require("modules.keystats.physical_accounting_mode")
 local Timestamp      = require("modules.keystats.timestamp")
 local PrivacyContext = require("modules.keystats.privacy_context")
+local ClipboardTelemetry = require("modules.keystats.clipboard_telemetry")
 -- The WPM formula lives once, in the shared metrics module. This file used to
--- divide by a literal 5 in two places while _shared/lua/keystats/metrics.lua
+-- divide by a literal 5 in two places while _shared/metrics/engine/metrics.lua
 -- already defined DEFAULT_CHARS_PER_WORD and the exact batch formula its own
 -- docstring says macOS uses — the shared copy existed only to be shadowed.
-local Metrics        = require("keystats.metrics")
-local TriggerRoi     = require("keystats.trigger_roi")
+local Metrics        = require("metrics.engine.metrics")
+local TriggerRoi     = require("metrics.engine.privacy.trigger_roi")
 local Watchers       = require("modules.keystats.watchers")
-local ProcessLifecycle = require("adapters.process_lifecycle")
-local KeyboardHook   = require("adapters.keyboard_hook")
+local ProcessLifecycle = require("core.process.adapters.lifecycle")
+local KeyboardHook   = require("platform.input.keyboard_hook")
 local EventProvenance = require("adapters.event_provenance")
-local SyntheticInput = require("adapters.synthetic_input")
-local TableUtil = require("table_util")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TableUtil = require("core.text.engine.table_util")
 local LOG            = "keystats"
 
 
@@ -65,7 +67,7 @@ local LOG            = "keystats"
 -- ============================
 
 -- Timing thresholds come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [keystats]) so the AHK and macOS keystatss
+-- (_shared/core/timing/data/constants.toml [keystats]) so the AHK and macOS keystatss
 -- stay in sync; the comment after each names the canonical value for reference.
 -- Typing session idle threshold before a "micro-idle" event is logged (30 s)
 local MICRO_IDLE_TIMEOUT_MS      = Timings.ms("keystats", "micro_idle_timeout_ms")
@@ -132,6 +134,7 @@ local F_KEY_CODES = {
 local SILENT_KEYCODES = {
 	[80] = true,   -- F19: reserved synthetic channel
 	[90] = true,   -- F20: synthetic "typing complete" signal (KE bridge)
+	[110] = true,  -- Context menu: Karabiner's tap-hold modifier-hold marker
 }
 
 -- Keycodes for navigation keys (arrows + Delete, Home, End, PageUp, PageDown).
@@ -703,6 +706,15 @@ local function build_shortcut_key(event_obj, flags, keycode)
 	return table.concat(parts, "+")
 end
 
+--- Clears the copy provenance when a refused key-down is a copy chord: its app
+--- must not reach a later recorded paste (modules/keystats/clipboard_telemetry).
+--- @param event_obj table The raw hs.eventtap event object.
+--- @param evt_type number The event type.
+local function refuse_clipboard_chord(event_obj, evt_type)
+	if evt_type ~= hs.eventtap.event.types.keyDown then return end
+	ClipboardTelemetry.refuse(event_obj:getCharacters(true), event_obj:getFlags() or {})
+end
+
 --- Returns the foreground application name already maintained by ContextTracker.
 --- Native application queries can cross process boundaries and therefore cannot
 --- run in the eventtap callback.
@@ -853,6 +865,7 @@ local function handle_key(event_obj)
 		and _script_control.is_paused()
 		then
 			discard_roi_word()
+			refuse_clipboard_chord(event_obj, evt_type)
 			-- Observed physical releases retire their old hold even while telemetry
 			-- is paused. A new paused press has no usable timestamp: retain only
 			-- its crossing-release marker until that exact key releases.
@@ -878,6 +891,7 @@ local function handle_key(event_obj)
 		-- expansions this branch would have refused.
 		if not M.context_allows_logging() then
 			discard_roi_word()
+			refuse_clipboard_chord(event_obj, evt_type)
 			-- Retain observed per-key release state, never an excluded duration.
 			if evt_type == hs.eventtap.event.types.flagsChanged then
 				local keycode = event_obj:getKeyCode()
@@ -992,6 +1006,10 @@ local function handle_key(event_obj)
 				build_shortcut_key(event_obj, flags, keycode),
 				current_cached_app_name()
 			)
+			local clipboard_action = ClipboardTelemetry.action(event_obj:getCharacters(true), flags)
+			if clipboard_action then
+				ClipboardTelemetry.record(clipboard_action, current_cached_app_name(), now, LogManager.log_clipboard_event)
+			end
 			return
 		end
 
@@ -1307,7 +1325,7 @@ function M.bind_physical_configuration_observer(owner, capacity, receive, on_ref
 	assert(type(owner) == "table" and type(receive) == "function" and type(on_refused) == "function",
 		"Invalid physical configuration subscriber")
 	if _physical_configuration_binding then return false, "Physical configuration subscriber already bound" end
-	local Observation = require("keystats.physical_configuration_observation")
+	local Observation = require("metrics.engine.capture.physical_configuration_observation")
 	-- Verify policy data before installing ownership or severing legacy aliases.
 	Observation.copy({ disabled_apps = CoreState.disabled_apps,
 		private_filter_enabled = CoreState.private_filter_enabled,
@@ -1379,7 +1397,7 @@ end
 --- @return boolean committed Exact policy acknowledgement.
 function M.apply_configuration(config)
 	if _physical_configuration_binding then
-		local Observation = require("keystats.physical_configuration_observation")
+		local Observation = require("metrics.engine.capture.physical_configuration_observation")
 		-- Own and validate the complete bound plan before encryption, migration
 		-- or posture callbacks can mutate caller aliases or observe partial policy.
 		config = Observation.own_data(config)
@@ -1409,7 +1427,7 @@ function M.apply_configuration(config)
 	CoreState.options = copy_configuration(config.options)
 	sync_roi_text()
 	CoreState.disabled_apps = _physical_configuration_binding
-		and require("keystats.physical_configuration_observation").own_apps(config.disabled_apps)
+		and require("metrics.engine.capture.physical_configuration_observation").own_apps(config.disabled_apps)
 		or copy_configuration(config.disabled_apps)
 	CoreState.private_filter_enabled = config.private_filter_enabled
 	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
@@ -1424,7 +1442,7 @@ end
 function M.set_disabled_apps(apps)
 	local assigned = type(apps) == "table" and apps or {}
 	CoreState.disabled_apps = _physical_configuration_binding
-		and require("keystats.physical_configuration_observation").own_apps(assigned) or assigned
+		and require("metrics.engine.capture.physical_configuration_observation").own_apps(assigned) or assigned
 	assert(settle_context_modifiers(), "Disabled apps modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
@@ -2232,6 +2250,13 @@ local function teardown_runtime(opts)
 			end,
 		},
 		{
+			name = "clipboard-telemetry",
+			run = function()
+				ClipboardTelemetry.reset()
+				return true
+			end,
+		},
+		{
 			name = "hardware-watchers",
 			run = function()
 				if not _state then return true end
@@ -2254,7 +2279,7 @@ local function teardown_runtime(opts)
 end
 
 --- Engine observations are dormant; actual pause commits remain a separate writer.
-local _physical_lifecycle = require("keystats.physical_lifecycle_observation").new("engine", function()
+local _physical_lifecycle = require("metrics.engine.capture.physical_lifecycle_observation").new("engine", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
 
@@ -2287,6 +2312,16 @@ local function physical_lifecycle_snapshot(initial)
 	local paused = _is_paused()
 	if generation ~= _runtime_generation then return {} end
 	return { enabled = CoreState.is_enabled, paused = paused, runtime_generation = generation }
+end
+
+--- Reads the hardware UUID off the main thread before the first start needs it.
+--- The log manager's first M.init() otherwise runs a synchronous ioreg pipeline
+--- (151 ms on the Mac at boot+1 s). Pending callers are resumed by on_ready.
+--- @param on_ready function|nil Zero-argument callback run once the read settles.
+--- @return boolean ready True when start may run now; on_ready is then not retained.
+function M.prepare_start(on_ready)
+	if _state then return true end
+	return HostSignature.prefetch(on_ready)
 end
 
 --- Starts the keystats engine and all background daemons.
@@ -2592,6 +2627,21 @@ end
 --- suppresses everything while paused, which also means an app switch made DURING
 --- a pause never updated the cached context — and nothing else re-syncs it.
 --- @return boolean True when the context was re-synchronised.
+--- Closes the foreground application's interval as the driver pauses: the
+--- time up to the pause is credited, the paused time never is, and the resume
+--- opens a new interval (resync_context). Left open, the resume dropped the
+--- time before the pause and a reload while paused credited none of it.
+--- @return boolean settled Always true: no open interval is a closed one, and a
+---   refused close is logged, never a reason to keep the driver from pausing.
+function M.close_app_interval_for_pause()
+	if not _state or type(ContextTracker.close_active_app) ~= "function" then return true end
+	local ok, err = pcall(ContextTracker.close_active_app)
+	if not ok then
+		Logger.error(LOG, "The foreground interval could not be closed at pause: %s.", tostring(err))
+	end
+	return true
+end
+
 function M.resync_context()
 	CoreState.foreground_refresh_pending = true
 	local results = table.pack(pcall(_physical_lifecycle.run, "resync", function()

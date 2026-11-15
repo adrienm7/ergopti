@@ -371,7 +371,7 @@ Test("config cleanup: selecting the same whole-root receipt twice refuses before
 	_CUK_RetiredRootRefusesBorrowedRecord.Bind("duplicate"))
 
 
-; The three complete images of _shared/lua/test/config_cleanup_roots_contract.lua,
+; The three complete images of _shared/tests/lua/settings/cleanup_roots_contract.lua,
 ; byte for byte except the schema stamp, which has to be current to be writable
 ; here: Windows and the Lua engine must leave the same file behind (config policy
 ; 33 and 42). Each root row is selected alone, as the Lua contract selects it.

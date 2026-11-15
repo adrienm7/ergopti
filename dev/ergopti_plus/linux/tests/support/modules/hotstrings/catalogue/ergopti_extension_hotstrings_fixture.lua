@@ -10,18 +10,18 @@
 
 local helpers = require("tests.helpers")
 
-local Paths      = require("infra.paths")
+local Paths      = require("core.fs.engine.paths")
 
-local Json       = require("json")
+local Json       = require("core.text.engine.json")
 
-local Extension  = require("layouts.extension")
+local Extension  = require("layouts.engine.composer.extension")
 
-local Extensions = require("hotstrings.extensions")
+local Extensions = require("hotstrings.engine.extensions")
 
 --- The registry settings the drivers read, from the shared defaults.
 --- @return table
 local function registry_settings()
-	local fh = assert(io.open(Paths.shared("modules/layouts/defaults.json"), "r"))
+	local fh = assert(io.open(Paths.shared("layouts/data/defaults.json"), "r"))
 	local text = fh:read("*a")
 	fh:close()
 	return Json.decode(text).registry
@@ -59,8 +59,8 @@ local function load(with_ergopti)
 		list_dirs = Loader.list_subdirs, list_files = Loader.find_toml_files, read_file = Loader.read_file,
 	})
 	local paths, language_sources = {}, {}
-	local root = Paths.shared("modules/hotstrings")
-	local Languages = require("hotstrings.languages")
+	local root = Paths.shared("hotstrings/data/catalogue")
+	local Languages = require("hotstrings.engine.languages")
 	for _, pack in ipairs(Config.language_packs()) do
 		for _, stem in ipairs(pack.categories) do
 			local path = root .. "/" .. pack.id .. "/" .. stem .. ".toml"
@@ -141,7 +141,7 @@ local function with_offline_shipped_probe(body)
 	local updater_name, registry_name = "modules.updater.manager", "modules.keymap.layout_registry"
 	local previous_updater, previous_preload = package.loaded[updater_name], package.preload[updater_name]
 	local previous_registry = package.loaded[registry_name]
-	local Http, FileSystem = require("adapters.http_client"), require("adapters.file_system")
+	local Http, FileSystem = require("core.network.adapters.http_client"), require("core.fs.adapters.file_system")
 	local previous_get, previous_read = Http.get, FileSystem.read
 	local observed = { updater = 0, network = 0, reads = {} }
 	package.loaded[updater_name] = nil
@@ -172,10 +172,10 @@ end
 --- @param configure function Receives the recording native ports and actual owner list.
 --- @param body function Receives the fresh actual Loader.
 local function with_exact_loader_ports(configure, body)
-	local names = { "lfs", "luv", "modules.hotstrings.loader", "infra.curl_identity" }
+	local names = { "lfs", "luv", "modules.hotstrings.loader", "core.network.engine.curl_identity" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-	local Exact = require("infra.curl_identity")
+	local Exact = require("core.network.engine.curl_identity")
 	local original_new = Exact.new
 	local Ports = require("tests.support.exact_identity_ports")
 	local native, state = Ports.new({ planned_inode = "9223372036855917341" })

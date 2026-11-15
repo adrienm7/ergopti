@@ -2,7 +2,7 @@
 
 --- Real action, preference and native task owners with explicit test-owned tasks.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 local DIGEST = string.rep("a", 64)
 
@@ -13,10 +13,10 @@ local function with_program(callback, program_admission)
 	local path = os.tmpname()
 	os.remove(path)
 	local tasks, actions, auxiliary = {}, nil, nil
-	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "adapters.shell_runner",
-		"adapters.owned_program_runner", "platform.remap.lease_helper", "adapters.crypto",
-		"adapters.task_environment", "adapters.file_system", "adapters.timer_scheduler", "infra.preferences",
-		"infra.config_paths", "infra.paths", "infra.i18n", "infra.logger", "infra.timings",
+	local owned = { "modules.gestures.actions", "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
+		"core.process.adapters.owned_program_runner", "platform.remap.lease_helper", "core.crypto.crypto",
+		"core.process.adapters.task_environment", "core.fs.adapters.file_system", "core.events.timer_scheduler", "infra.preferences",
+		"infra.config_paths", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.timing.engine.timings",
 		"modules.shortcuts.keyboard_shortcuts", "tests.stubs.hs", "hs" }
 	for _, name in ipairs(owned) do package.loaded[name] = nil end
 	local ok, failure = xpcall(function()
@@ -24,8 +24,8 @@ local function with_program(callback, program_admission)
 		native.__reset()
 		_G.hs = native
 		package.loaded["hs"] = native
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end, format = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, format = function(key) return key end }
 		package.loaded["infra.config_paths"] = { get = function() return path end }
 		package.loaded["platform.remap.lease_helper"] = { resolve = function()
 			return HELPER, nil, { ERGOPTI_LAUNCHER_EXECUTABLE = HELPER,
@@ -191,7 +191,7 @@ helpers.describe("private program parameter transaction admission", function()
 	helpers.it("rechecks transaction admission after a physical source callback", function()
 		local pending = false
 		with_program(function(actions, _, _, _, tasks)
-			local filesystem = require("adapters.file_system")
+			local filesystem = require("core.fs.adapters.file_system")
 			local read = filesystem.read_with_status
 			filesystem.read_with_status = function(...)
 				local content, status = read(...)
@@ -272,7 +272,7 @@ helpers.describe("private run_program owned source admission", function()
 	helpers.it("fails closed when the exact supervised handle has no Boolean cleanup-debt receipt", function()
 		for _, receipt in ipairs({ "missing", "throw", "nil", "string", "number" }) do
 			with_program(function(actions, _, _, _, tasks)
-				local runner = require("adapters.shell_runner")
+				local runner = require("core.process.adapters.shell_runner")
 				local spawn = runner.spawn_private
 				runner.spawn_private = function(...)
 					local handle = spawn(...)
@@ -294,7 +294,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("contains dispatch reentry from an owned cleanup-debt query", function()
 		with_program(function(actions, _, _, _, tasks)
-			local runner = require("adapters.shell_runner")
+			local runner = require("core.process.adapters.shell_runner")
 			local spawn, nested, attempted = runner.spawn_private, nil, false
 			runner.spawn_private = function(...)
 				local handle = spawn(...)
@@ -314,7 +314,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("rechecks native cancellation invoked inside a cleanup query before successor admission", function()
 		with_program(function(actions, auxiliary, _, _, tasks)
-			local runner = require("adapters.shell_runner")
+			local runner = require("core.process.adapters.shell_runner")
 			local spawn = runner.spawn_private
 			runner.spawn_private = function(...)
 				local handle = spawn(...)
@@ -415,7 +415,7 @@ helpers.describe("private run_program owned source admission", function()
 
 	helpers.it("preserves unrelated outdated parameters while executing the acknowledged program", function()
 		with_program(function(actions, _, preferences, _, tasks, path, scalar)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local content = '[gestures]\ntap_3 = "run_program"\n[gestures.action_parameters]\n'
 				.. '"tap_3__run_program" = ' .. Json.encode(scalar) .. '\n"old__send_text" = 42\n'
 			local file = assert(io.open(path, "wb")); file:write(content); file:close()
@@ -669,8 +669,8 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
 			package.loaded["modules.shortcuts.tap_keys"] = nil
-			package.loaded["adapters.keyboard_geometry"] = nil
-			local geometry = require("adapters.keyboard_geometry")
+			package.loaded["platform.input.keyboard_geometry"] = nil
+			local geometry = require("platform.input.keyboard_geometry")
 			require("tests.support.keyboard_geometry").initialize(geometry)
 			local tap = require("modules.shortcuts.tap_keys")
 			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)

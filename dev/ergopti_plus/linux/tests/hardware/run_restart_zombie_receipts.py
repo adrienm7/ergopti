@@ -83,7 +83,7 @@ def check_case(root, interpreter, name, state):
             wait_for(lambda: zombie(target), "owned target did not become a zombie")
         env = dict(os.environ)
         env.update(
-            LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+            LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
             ERGOPTI_RELAY_TARGET=str(target),
             ERGOPTI_RELAY_WRAPPER=str(wrapper),
             ERGOPTI_RELAY_RECEIPT=str(receipt),

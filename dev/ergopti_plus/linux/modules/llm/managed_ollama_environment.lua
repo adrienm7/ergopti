@@ -11,14 +11,14 @@
 
 local M = {}
 
-local SOURCE = "modules/llm/managed_ollama_environment.json"
-local MAXIMUM_BYTES = require("infra.timings").count("limits", "declaration_file_bytes")
+local SOURCE = "ai/data/managed_ollama_environment.json"
+local MAXIMUM_BYTES = require("core.timing.engine.timings").count("limits", "declaration_file_bytes")
 
 --- Validates the decoded declaration; the launch owner keeps host and models.
 --- @param decoded any Decoded JSON document.
 --- @return table|nil rows Sorted "NAME=value" entries.
 local function rows_from(decoded)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	if type(decoded) ~= "table" or Json.is_array(decoded) or decoded.schema_version ~= 1 then return nil end
 	for key in pairs(decoded) do
 		if key ~= "schema_version" and key ~= "serve_environment" then return nil end
@@ -47,7 +47,7 @@ end
 --- @return string|nil reason Classified refusal.
 function M.decode(data)
 	if type(data) ~= "string" or #data > MAXIMUM_BYTES then return nil, "managed_environment_invalid" end
-	local ok, decoded = pcall(require("json").decode_lossless, data)
+	local ok, decoded = pcall(require("core.text.engine.json").decode_lossless, data)
 	local rows = ok and rows_from(decoded) or nil
 	if not rows then return nil, "managed_environment_invalid" end
 	return rows
@@ -57,9 +57,9 @@ end
 --- @return table|nil rows Sorted "NAME=value" entries.
 --- @return string|nil reason Classified refusal.
 function M.load()
-	local path = require("infra.paths").shared(SOURCE)
+	local path = require("core.fs.engine.paths").shared(SOURCE)
 	if not path then return nil, "managed_environment_unreadable" end
-	local acquired, file = pcall(require("infra.regular_file_reader").open_source, path)
+	local acquired, file = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 	if not acquired or not file then return nil, "managed_environment_unreadable" end
 	local read, data = pcall(file.read, file, MAXIMUM_BYTES + 1)
 	local closed, acknowledged = pcall(file.close, file)

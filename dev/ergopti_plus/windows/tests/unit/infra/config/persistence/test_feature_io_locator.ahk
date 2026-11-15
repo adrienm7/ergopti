@@ -164,9 +164,8 @@ Test("feature_io: unknown path returns false", _FIL_Unresolved)
 
 ; Regression for personal-hotstring-live-toggle-seed: WriteFeatureV2 must fail
 ; fast (return false, and log) for an unseeded personal section, and succeed
-; once EnsurePersonalHotstringFeature has seeded the Features node — exactly
-; what the editor's _NewSection fix now does before the tray menu can ever
-; reach the section's toggle.
+; once EnsurePersonalHotstringFeature has seeded the Features node, as a
+; section must be before the tray menu can ever reach its toggle.
 _FIL_PersonalSectionUnseededFailsBody() {
 	global Features
 	AssertEqual(false, WriteFeatureV2(Features, "hotstrings.personal.voyage", true),

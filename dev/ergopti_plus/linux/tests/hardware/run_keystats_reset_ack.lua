@@ -7,16 +7,16 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;"
-	.. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;"
+	.. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local uv = require("luv")
 assert(jit and jit.os == "Linux", "sampled reset must exercise the real Linux JIT runtime")
 assert(debug.getinfo(uv.fs_stat, "S").what == "C", "sampled reset requires the actual native luv provider")
-local Clock = require("infra.monotonic")
-local Timings = require("infra.timings")
+local Clock = require("core.logger.engine.monotonic")
+local Timings = require("core.timing.engine.timings")
 local checks = 0
 
 --- Observes an actual native predicate within the canonical SQLite deadline.

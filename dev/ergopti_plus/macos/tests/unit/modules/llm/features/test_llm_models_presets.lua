@@ -2,8 +2,8 @@
 local helpers = require("tests.helpers")
 
 -- Bootstrap the hs stub so hs.json.decode is available
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- No models_mgr stub here. Two used to sit at this spot — "modules.llm.models_mgr"
 -- and "ui.menu.menu_llm.models_mgr" — and neither module has ever existed:
@@ -13,17 +13,17 @@ helpers.load_with_stubs("infra.logger")
 -- inert stub is indistinguishable from a working one from inside the test, which
 -- is why they survived; test-stubs-intercept-something.cjs now says so out loud.
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get = function(key) return key end
 }
 
 -- Load the module. This will trigger load_models_presets() internally
--- which reads static/ergopti_plus/_shared/modules/llm/models.json
+-- which reads static/ergopti_plus/_shared/ai/data/models.json
 local Models = helpers.load_with_stubs("ui.menu.menu_llm.models_manager")
 
 helpers.describe("LLM Models Catalogue", function()
 	helpers.it("keeps equal model metadata independent when one catalogue entry changes", function()
-		helpers.with_fresh_modules({ "adapters.json_codec" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.json_codec" }, function()
 			local fresh_models = helpers.load_with_stubs("ui.menu.menu_llm.models_manager")
 			local tags = { "chat" }
 			local model = { name = "fixture", capabilities = { tags = tags } }

@@ -7,8 +7,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local OWNED = { "infra.logger", "adapters.http_client", "adapters.timer_scheduler",
-	"ui.menu.menu_llm.ollama_enable_probe", "llm.enable_admission" }
+local OWNED = { "core.logger.engine.logger", "core.network.adapters.http_client", "core.events.timer_scheduler",
+	"ui.menu.menu_llm.ollama_enable_probe", "ai.engine.settings.enable_admission_core" }
 
 -- ===================================
 -- ===================================
@@ -21,7 +21,7 @@ local OWNED = { "infra.logger", "adapters.http_client", "adapters.timer_schedule
 --- @param callback function Receives probe owner and observed ports.
 local function with_probe(options, callback)
 	helpers.with_stub_scope(OWNED, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local ports = { requests = {}, timers = {}, delivered = {} }
 		local scheduler = {}
 		function scheduler.after(_, action)
@@ -41,7 +41,7 @@ local function with_probe(options, callback)
 			if handle.timer == nil then observer() else handle.observers[#handle.observers + 1] = observer end
 			return true
 		end
-		package.loaded["adapters.timer_scheduler"] = scheduler
+		package.loaded["core.events.timer_scheduler"] = scheduler
 		local Probe = helpers.load_with_stubs("ui.menu.menu_llm.ollama_enable_probe", {
 			http = { doAsyncRequest = function(url, method, body, headers, done, cache_policy, follow_redirects)
 				local request = { url = url, done = done, cancels = 0, method = method,

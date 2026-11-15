@@ -20,11 +20,11 @@ local helpers = require("tests.helpers")
 local ByteCursor = require("tests.support.keystats.byte_stream_cursor")
 
 local MUTATED_PACKAGE_SLOTS = {
-	"adapters.file_system", "adapters.timer_scheduler",
+	"core.fs.adapters.file_system", "core.events.timer_scheduler",
 	"hs", "hs.fs", "hs.json", "hs.sqlite3", "hs.timer",
-	"infra.logger", "infra.timings", "keystats.metrics",
+	"core.logger.engine.logger", "core.timing.engine.timings", "metrics.engine.metrics",
 	"modules.keystats.aggregator", "modules.keystats.export",
-	"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 	"modules.keystats.sqlite_writer", "modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"tests.stubs.hs",
@@ -78,7 +78,7 @@ local function load_rotation_fixture(options)
 	package.loaded["modules.keystats.timestamp"] = {
 		now_ts = function() return "2026-08-13 12:00:00.000" end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local durable_lines = {}
 	local open_failures = options.open_failures or 0
@@ -148,15 +148,15 @@ end
 local function load_log_manager_fixture(sink_failures, initialize)
 	local restore_runtime = capture_runtime()
 	for _, name in ipairs({
-		"adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
+		"core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.rotation",
 		"modules.keystats.sqlite_writer", "modules.keystats.aggregator",
-		"modules.keystats.export", "keystats.metrics", "infra.logger",
-		"infra.timings", "adapters.timer_scheduler",
+		"modules.keystats.export", "metrics.engine.metrics", "core.logger.engine.logger",
+		"core.timing.engine.timings", "core.events.timer_scheduler",
 		"modules.keystats.physical_accounting_mode",
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local appended, attempts = {}, {}
 	local controls = {}
@@ -204,7 +204,7 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		get_sqlite_path = function() return nil end,
 		get_db_rev = function() return 0 end,
 	}
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 12 end,
 	}
 
@@ -255,14 +255,14 @@ local function load_log_manager_fixture(sink_failures, initialize)
 	package.loaded["hs.fs"] = hs_stub.fs
 	package.loaded["hs.json"] = hs_stub.json
 	package.loaded["hs.sqlite3"] = hs_stub.sqlite3
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 5 end,
 		ms = function() return 2000 end,
 		count = function() return 65536 end,
 	}
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -273,9 +273,9 @@ local function load_log_manager_fixture(sink_failures, initialize)
 		read = function() return nil end,
 	}
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local manager = require("modules.keystats.log_manager")
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 
 	local state = {
 		is_enabled = true,
@@ -690,9 +690,9 @@ end)
 --- provider below is an explicit pure source port, never physical admission.
 local function with_media_fifo(failures, callback)
 	helpers.with_stub_scope({ "modules.keystats.aggregator.core" }, function()
-		local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+		local file = assert(io.open(helpers.shared("layouts/data/keycodes/metrics_media_keys.json"), "rb"))
 		local bytes = file:read("*a"); file:close()
-		local policy = require("keystats.media_store").policy(require("json").decode(bytes))
+		local policy = require("metrics.engine.media.store").policy(require("core.text.engine.json").decode(bytes))
 		local core = { media_policy = function() return policy end, HOLD_THRESHOLD_MS = 200 }
 		package.loaded["modules.keystats.aggregator.core"] = core
 		with_fixture(function() return load_log_manager_fixture(failures) end, function(fixture)
@@ -825,7 +825,7 @@ end)
 --- Real catalogue-loader source with a declared Lua file leaf. These models
 --- prove read/close/cache ordering only, never installed or native authority.
 local function with_catalogue_loader(options, callback)
-	local handle = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("layouts/data/keycodes/metrics_media_keys.json"), "rb"))
 	local frozen = handle:read("*a"); assert(handle:close())
 	helpers.with_fresh_modules({ "modules.keystats.aggregator.core" }, function()
 		local core = require("modules.keystats.aggregator.core")

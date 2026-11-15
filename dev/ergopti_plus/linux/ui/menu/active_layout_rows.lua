@@ -9,21 +9,22 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One owner of the desktop's layouts: the input source adapter the pause
----    switch already holds (GNOME gsettings, the KDE keyboard daemon or
----    setxkbmap). Each build draws its last reading and asks for a fresh one;
+---    switch already holds (the Ergopti GNOME Shell extension, the KDE keyboard
+---    daemon or setxkbmap). Each build draws its last reading and asks for a fresh one;
 ---    the tray is rebuilt only when the desktop's list or active layout changed.
 --- 2. A desktop with no supported backend shows the declared status line, and
 ---    an empty list the shared « Open Keyboard Settings… » row.
 --- 3. A refused switch is told: the tick would otherwise stay on the old
----    layout with no reason given.
+---    layout with no reason given. GNOME without the extension names it.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
+local InputSourceSwitch = require("adapters.input_source_switch")
 local ManifestMenu = require("infra.manifest_menu")
-local Shell = require("adapters.shell_runner")
-local COMMAND = require("config_keys").COMMAND
+local Shell = require("core.process.adapters.shell_runner")
+local COMMAND = require("settings.engine.keys").COMMAND
 
 local LOG = "ui.menu.active_layout_rows"
 
@@ -88,12 +89,15 @@ function M.rows(ctx)
 			disabled = choice.active == true,
 			action = function()
 				Logger.start(LOG, "Switching the keyboard layout to '%s' from the menu…", id)
-				switcher.select(id, function(ok, detail)
+				switcher.select(id, function(ok, detail, code)
 					if ok then
 						Logger.success(LOG, "Keyboard layout switched to '%s' from the menu.", id)
 					else
 						Logger.error(LOG, "Keyboard layout not switched to '%s': %s.", id, tostring(detail))
-						ctx.show_error(ctx.t("menu.layout.select_failed"), ctx.t("common.error_title"))
+						-- GNOME switches only through the Ergopti Shell extension: say so.
+						local message = code == InputSourceSwitch.GNOME_EXTENSION_MISSING
+							and "menu.layout.select_failed_gnome_extension" or "menu.layout.select_failed"
+						ctx.show_error(ctx.t(message), ctx.t("common.error_title"))
 					end
 					switcher.refresh(function() ctx.on_changed() end)
 				end)

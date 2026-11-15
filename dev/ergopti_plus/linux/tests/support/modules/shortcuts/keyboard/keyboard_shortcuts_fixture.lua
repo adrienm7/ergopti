@@ -10,9 +10,9 @@
 
 local helpers = require("tests.helpers")
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local Fakes = helpers.load_module("tests.fakes")
 
@@ -27,14 +27,14 @@ local _files = {}
 --- @return table shortcuts, table storage
 local function load_over_config(initial, writes_fail, chatgpt)
 	if not _displaced.held then
-		_displaced.storage = package.loaded["adapters.storage"]
+		_displaced.storage = package.loaded["core.fs.adapters.storage"]
 		_displaced.chatgpt = package.loaded["modules.shortcuts.chatgpt"]
 		_displaced.module = package.loaded["modules.shortcuts.keyboard_shortcuts"]
 		_displaced.paths = package.loaded["infra.config_paths"]
 		_displaced.held = true
 	end
 	local storage = Fakes.storage({ initial = initial, writes_fail = writes_fail })
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	local path = os.tmpname()
 	_files[#_files + 1] = path
 	local lines = { "[shortcuts.keyboard]" }
@@ -43,7 +43,7 @@ local function load_over_config(initial, writes_fail, chatgpt)
 	end
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
 	package.loaded["infra.config_paths"] = { config = function() return path end }
-	if writes_fail then require("toml_codec.writer").refuse_writes(path, "injected persistence refusal") end
+	if writes_fail then require("core.text.engine.toml_codec.writer").refuse_writes(path, "injected persistence refusal") end
 	package.loaded["modules.shortcuts.chatgpt"] = chatgpt or { open = function() return true end }
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	local shortcuts = require("modules.shortcuts.keyboard_shortcuts")
@@ -66,7 +66,7 @@ end
 
 --- Puts back exactly what was there.
 local function drop_config()
-	package.loaded["adapters.storage"] = _displaced.storage
+	package.loaded["core.fs.adapters.storage"] = _displaced.storage
 	package.loaded["modules.shortcuts.chatgpt"] = _displaced.chatgpt
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = _displaced.module
 	package.loaded["infra.config_paths"] = _displaced.paths

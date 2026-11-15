@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(callback, native_timers)
-	helpers.with_fresh_modules({ "ui.menu.menu_paths", "infra.toml.codec", "infra.toml.writer",
-		"adapters.file_system", "infra.config_paths", "platform.remap", "json",
+	helpers.with_fresh_modules({ "ui.menu.menu_paths", "core.text.engine.toml.codec", "core.text.engine.toml.writer",
+		"core.fs.adapters.file_system", "infra.config_paths", "platform.remap", "core.text.engine.json",
 		"modules.keymap.number_row_live" }, function()
 		-- No layout of ours types in the fixture: the number-row order is greyed.
 		package.loaded["modules.keymap.number_row_live"] = {
@@ -22,8 +22,8 @@ local function with_delivery(callback, native_timers)
 			get_config_dir = function() return "/virtual/current/" end,
 			metrics_dir = function(dir) return "<metrics of " .. dir .. ">" end,
 			get = function(key)
-				assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-				return "/virtual/current/hammerspoon/config_karabiner.toml"
+				assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+				return "/virtual/current/hammerspoon/tap_hold.toml"
 			end,
 		}
 		-- The remap owner reports the tap-hold keys beside each config.toml read:
@@ -40,21 +40,21 @@ local function with_delivery(callback, native_timers)
 				return "/virtual/chosen/"
 			end,
 		}
-		package.loaded["infra.toml.codec"] = { decode = function() return {} end }
+		package.loaded["core.text.engine.toml.codec"] = { decode = function() return {} end }
 		with_window("ui.onboarding", function(onboarding, state)
 			require("tests.support.onboarding_shared_data").install()
 			local pending, errors, evaluations = {}, {}, {}
-			local i18n = package.loaded["infra.i18n"]
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			i18n.get_locale = function() return "en" end
 			i18n.format = function(key) return key end
 			i18n.get_sorted_locales = function() return {} end
 			state.picker = picker
 			state.titles = {}
-			package.loaded["ui.ui_builder"].set_window_title = function(view, title)
+			package.loaded["core.ui.ui.builder"].set_window_title = function(view, title)
 				state.titles[#state.titles + 1] = { view = view, title = title }
 				return true
 			end
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local shared_encode, native_encode = Json.encode, hs.json.encode
 			Json.encode = function(value)
 				if state.encode then return state.encode(value) end
@@ -100,26 +100,26 @@ local function with_delivery(callback, native_timers)
 					owned_timers[#owned_timers + 1] = timer
 					return timer
 				end
-				package.loaded["adapters.timer_scheduler"] = nil
-				scheduler = require("adapters.timer_scheduler")
-				package.loaded["infra.deferred_work"] = nil
-				require("infra.deferred_work")
+				package.loaded["core.events.timer_scheduler"] = nil
+				scheduler = require("core.events.timer_scheduler")
+				package.loaded["core.timing.engine.deferred_work"] = nil
+				require("core.timing.engine.deferred_work")
 				package.loaded["ui.onboarding"] = nil
 				onboarding = require("ui.onboarding")
 				state.focus_attempts = 0
-				package.loaded["ui.ui_builder"].force_focus = function(view, _, options)
+				package.loaded["core.ui.ui.builder"].force_focus = function(view, _, options)
 					state.focus_attempts = state.focus_attempts + 1
 					return options.is_current() == true and state.view == view
 				end
 				state.native_timers, state.scheduler = owned_timers, scheduler
 				state.fire_timer = function(index) owned_timers[index].callback() end
 			else
-				package.loaded["infra.deferred_work"].after = function(_, fn)
+				package.loaded["core.timing.engine.deferred_work"].after = function(_, fn)
 					pending[#pending + 1] = fn
 					return true
 				end
 			end
-			package.loaded["infra.logger"].error = function(_, message, ...)
+			package.loaded["core.logger.engine.logger"].error = function(_, message, ...)
 				errors[#errors + 1] = string.format(message, ...)
 				if state.on_error then state.on_error() end
 			end

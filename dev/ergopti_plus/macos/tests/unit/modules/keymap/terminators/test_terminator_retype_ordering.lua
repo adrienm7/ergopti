@@ -12,16 +12,16 @@ local helpers = require("tests.helpers")
 
 local scoped_helpers = helpers
 local OWNED = {
-	"adapters.secure_field_detector", "adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "adapters.timer_scheduler", "adapters.tooltip_renderer",
-	"compat.utf8", "hotstring_engine", "hotstrings.personal_files",
-	"hs", "infra.capsword_output", "infra.deferred_work",
-	"infra.hotstring_engine", "infra.keystroke_integrity", "infra.logger",
-	"infra.text_utils", "infra.timings", "json",
-	"keymap.terminators", "keymap.terminators_catalogue", "keymap.utils",
-	"logger.shim", "modules.keystats", "modules.keymap.expander",
+	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "platform.input.synthetic_input",
+	"platform.input.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
+	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
+	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",
+	"infra.hotstring_engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
+	"core.text.engine.utils", "core.timing.engine.timings", "core.text.engine.json",
+	"layouts.engine.layers.terminators", "layouts.engine.layers.terminators_catalogue", "layouts.engine.utils",
+	"core.logger.engine.shim", "modules.keystats", "modules.keymap.expander",
 	"modules.keymap.state", "modules.keymap.terminator_replay", "modules.keymap.terminators",
-	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "text_utils",
+	"modules.keymap.utils", "adapters.clipboard", "tests.stubs.hs", "core.text.engine.utils_core",
 }
 
 -- Keep native consumers isolated even when a historical assertion aborts early.
@@ -118,8 +118,8 @@ local function load_fixture(options)
 		end
 		return event
 	end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_, key)
 			return key == "clipboard_restore_ms" and 0.15 or 0.08
 		end,
@@ -133,10 +133,10 @@ local function load_fixture(options)
 		log_hotstring = function() end,
 	}
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local scheduled = {}
 	local awake_time = 0
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
 		-- The expansion's hot-path segment reads the scheduler's monotonic clock.
 		now_ns = function() return awake_time * 1e9 end,
@@ -170,7 +170,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.text_sender"] = {
+	package.loaded["platform.input.text_sender"] = {
 		eraseChars = function(count, delay)
 			for _ = 1, count do
 				if not synthetic.emit_key_stroke({}, "delete", delay or 0) then return false end
@@ -187,7 +187,7 @@ local function load_fixture(options)
 			return options.terminal_target
 		end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() end,
 	}
 

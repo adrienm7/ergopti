@@ -22,12 +22,12 @@
 local helpers = require("tests.helpers")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
-local LIVE_JSON = helpers.driver_root() .. "/../_shared/modules/llm/live.json"
+local LIVE_JSON = helpers.driver_root() .. "/../_shared/ai/data/live.json"
 local SENTENCE = "on se voit demain"
 
 -- Modules loaded afresh for each scenario, so they bind the scripted boundaries
@@ -38,7 +38,7 @@ local RELOADED = {
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -75,19 +75,19 @@ local function scenario(opts, body)
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local world = { posts = {}, notices = {}, injected = {}, shown = {}, live_changes = 0,
 			preferences = preferences, buffer = opts.buffer or "", paused = false, preview = false }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
 				return true
 			end,
 			cancel = function() return true end,
 		}
-		require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"])
+		require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"])
 		package.loaded["modules.llm.api_entries"] = { active = function() return ENTRY end }
 		local ai_on = opts.disabled ~= true
 		local profiles = ProfilesFixture.without_inventory({
@@ -232,7 +232,7 @@ end
 local function on_notice(id, count)
 	local ProfileSettings = require("modules.llm.profile_settings")
 	local label = ProfileSettings.menu_label(ProfileSettings.resolve_id(id), count)
-	local template = require("infra.i18n").get("llm.live.on")
+	local template = require("core.i18n.engine.i18n").get("llm.live.on")
 	local at = assert(template:find("{1}", 1, true), "llm.live.on names the prompt")
 	return template:sub(1, at - 1) .. label .. template:sub(at + 3)
 end
@@ -259,9 +259,9 @@ end
 
 helpers.it("live mode refuses a FIFO configuration without blocking", function()
 	scenario({}, function(world)
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original = Paths.shared
-		local source = assert(original("modules/llm/live.json"))
+		local source = assert(original("ai/data/live.json"))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-live-config-XXXXXX"))
 		local path = dir .. "/live.json"
 		local made = os.execute("mkfifo '" .. path .. "'")
@@ -271,7 +271,7 @@ helpers.it("live mode refuses a FIFO configuration without blocking", function()
 			exited = true; process:close()
 		end))
 		Paths.shared = function(relative)
-			if relative == "modules/llm/live.json" then return path end
+			if relative == "ai/data/live.json" then return path end
 			return original(relative)
 		end
 		local called, started = pcall(world.handlers.llm_live_prompt_toggle, "tap_3", "translate_en|1")
@@ -451,7 +451,7 @@ helpers.describe("live mode: turning it on and off", function()
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en|1"), true)
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_4", "rewrite|2"), true)
 			helpers.assert_eq(world.engine.get_live(), nil, "off")
-			helpers.assert_eq(world.notices[2], require("infra.i18n").get("llm.live.off"))
+			helpers.assert_eq(world.notices[2], require("core.i18n.engine.i18n").get("llm.live.off"))
 			helpers.assert_eq(world.live_changes, 2)
 			world.type("Bonjour Marc")
 			world.scheduler.test.advance(live_json().debounce_ms / 1000 * 2)
@@ -482,7 +482,7 @@ helpers.describe("live mode: turning it on and off", function()
 		scenario({}, function(world)
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "user_deleted|2"), false)
 			helpers.assert_eq(world.engine.get_live(), nil)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.prompt_prediction.unknown_prompt"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.prompt_prediction.unknown_prompt"))
 			helpers.assert_eq(world.live_changes, 0)
 			assert_menu_untouched(world)
 		end)
@@ -490,7 +490,7 @@ helpers.describe("live mode: turning it on and off", function()
 
 	helpers.it("stops, never falls back, when its prompt is deleted while it runs", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
@@ -514,17 +514,17 @@ helpers.describe("live mode: turning it on and off", function()
 		scenario({ disabled = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), false)
 			helpers.assert_eq(world.engine.get_live(), nil)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 		end)
 		scenario({}, function(world)
 			world.paused = true
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.paused"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.paused"))
 		end)
 		scenario({}, function(world)
 			package.loaded["modules.llm.api_entries"] = { active = function() return nil end }
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.backend_not_ready"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.backend_not_ready"))
 		end)
 	end)
 
@@ -683,7 +683,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 
 	helpers.it("has one profile chooser, keeps prompt actions and retires their override on explicit selection", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
@@ -691,7 +691,7 @@ helpers.describe("live mode: one normal profile chooser and retained prompt acti
 			local builder = helpers.load_module("ui.menu.builder")
 			local rebuilt = 0
 			local ctx = { llm = world.engine, on_menu_changed = function() rebuilt = rebuilt + 1 end }
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local settings = require("modules.llm.profile_settings")
 			local rows = builder.build(ctx)
 			helpers.assert_nil(find(rows, i18n.get("menu.llm.live_mode_title")), "the retired second profile chooser stays absent")
@@ -767,12 +767,12 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 
 	helpers.it("requires exact stop ACK before profile persistence and never redraws a refused cancellation", function()
 		scenario({ stored = {
-			["llm.user_profiles"] = require("llm.profile_registry_codec").encode({
+			["llm.user_profiles"] = require("ai.engine.settings.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
 			}),
 		} }, function(world)
 			local builder = helpers.load_module("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
 			local spec = Json.decode(file:read("*a")); file:close()
 			local redraws, calls, observed = 0, 0, {}
@@ -819,14 +819,14 @@ helpers.describe("manual profile selection retires retained Linux live actions",
 	helpers.it("retains the real shortcut stop notice in all locales while the second chooser stays absent", function()
 		scenario({}, function(world)
 			local builder = helpers.load_module("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local saved_get = i18n.get
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
 			local spec = Json.decode(file:read("*a")); file:close()
 			local count = 0
 			local ok, err = xpcall(function()
 				for _, code in ipairs(spec.locales) do
-					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "r"))
+					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. code .. ".json", "r"))
 					local catalog = Json.decode(locale:read("*a")); locale:close()
 					i18n.get = function(key) return catalog[key] or key end
 					helpers.assert_true(world.engine.set_live("translate_en"))

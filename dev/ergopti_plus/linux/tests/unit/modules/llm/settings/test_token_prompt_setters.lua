@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: The Settings Window Saves What It Says It Saves
 --- DESCRIPTION:
---- Every setter `ui/token_prompt/bridge.lua` calls when the user saves, and the
+--- Every setter `core/ui/ui/token_prompt.lua` calls when the user saves, and the
 --- values it hands over.
 ---
 --- THE DEFECT THIS PINS:

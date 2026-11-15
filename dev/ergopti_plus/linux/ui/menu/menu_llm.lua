@@ -10,13 +10,13 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local Logger = require("logger.shim")
-local TextPrompt = require("ui.text_prompt")
-local PrivacyPolicy = require("llm.trigger_policy")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local Logger = require("core.logger.engine.shim")
+local TextPrompt = require("core.ui.ui.text_prompt")
+local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
 local LlmBackendRows = require("ui.menu.llm_backend_rows")
-local COMMAND = require("config_keys").COMMAND
-local KeyNames = require("keycodes.key_names")
+local COMMAND = require("settings.engine.keys").COMMAND
+local KeyNames = require("platform.input.keycodes.key_names")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -68,12 +68,20 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 	local function current()
 		return owner_current() and revision_current(revision) == true and ports_current()
 	end
-	local function refused(page_current, invalid)
+	local function refused(page_current, invalid, value)
 		Logger.error(LOG, "Numeric setting '%s' refused: its opening configuration is no longer current.", name)
 		if page_current and page_current() ~= true then return false end
-		local okay, notifier = pcall(require, "adapters.notifier")
+		local okay, notifier = pcall(require, "platform.system.notifier")
 		if okay and type(notifier.send) == "function" and (not page_current or page_current() == true) then
 			local message = i18n_safe(invalid and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
+			-- A value outside its shared value schema declaration is named with its
+			-- range; only a value inside it can be the word-limit conflict.
+			if invalid then
+				local ValueCheck = require("settings.engine.value_check")
+				local known, entry = pcall(ValueCheck.declaration, path)
+				local checked = known and ValueCheck.check_value(entry, value)
+				if checked and not checked.ok then message = ValueCheck.refusal_text(path, checked, i18n_safe) end
+			end
 			if not page_current or page_current() == true then pcall(notifier.send, message, { level = "error" }) end
 		end
 		return false
@@ -96,7 +104,7 @@ local function numeric_setting_request(refresh, owner, module_name, name, path)
 			local reread, _, observed = pcall(get_many, { path })
 			if not reread or type(observed) ~= "table" or observed.status ~= source.status
 				or observed.content ~= source.content then return false end
-			return refused(page_current, reason == "invalid")
+			return refused(page_current, reason == "invalid", value)
 		end
 		if not owner_current() or (page_current and page_current() ~= true) then return false end
 		if type(refresh) == "function" then refresh() end
@@ -173,11 +181,11 @@ local function commit_choice(owner, name, value, source, prefix, expected, origi
 		local reread, _, after = pcall(read, { prefix .. name })
 		if not reread or type(after) ~= "table" or after.status ~= observed.status or after.content ~= observed.content
 			or not current() then return false end
-		local okay, notifier = pcall(require, "adapters.notifier")
+		local okay, notifier = pcall(require, "platform.system.notifier")
 		if okay and type(notifier.send) == "function" and current() then
 			local send = notifier.send
 			local message = i18n_safe(reason == "invalid" and "menu.llm.word_limits_incompatible" or "dialog.personal_info.save_failed_title")
-			if current() and package.loaded["adapters.notifier"] == notifier and notifier.send == send then
+			if current() and package.loaded["platform.system.notifier"] == notifier and notifier.send == send then
 				pcall(send, message, { level = "error" })
 			end
 		end
@@ -249,15 +257,15 @@ local function _build_llm(ctx)
 			local never = offers_never and TriggerSettings.is_never(name, current)
 			if offers_never then
 				for _, row in ipairs(ManifestMenu.template_rows("llm_debounce_never_row", {
-					[require("config_keys").COMMAND.LLM_DEBOUNCE_NEVER] = choose(TriggerSettings.NEVER_MS),
+					[require("settings.engine.keys").COMMAND.LLM_DEBOUNCE_NEVER] = choose(TriggerSettings.NEVER_MS),
 				}, {
 					["llm_debounce_is_never"] = function() return never end,
 				}) or {}) do delay_choices[#delay_choices + 1] = row end
 			end
 			local bounds = TriggerSettings.bounds(name)
 			local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
-				[require("config_keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
-					local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+				[require("settings.engine.keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
+					local ok_prompt, Prompt = pcall(require, "core.ui.ui.numeric_prompt")
 					if not ok_prompt then
 						Logger.error(LOG, "No numeric prompt; %s can only take a preset.", name)
 						return
@@ -291,9 +299,9 @@ local function _build_llm(ctx)
 				items = delay_choices,
 			}
 		end
-		rows[#rows + 1] = delay_row(require("config_keys").LEAF.DEBOUNCE_MS, "menu.llm.debounce_label", true)
+		rows[#rows + 1] = delay_row(require("settings.engine.keys").LEAF.DEBOUNCE_MS, "menu.llm.debounce_label", true)
 		-- The one minimum time between two automatic requests (shortcuts are never held).
-		rows[#rows + 1] = delay_row(require("config_keys").LEAF.MIN_REQUEST_INTERVAL_MS, "menu.llm.min_interval_label", false)
+		rows[#rows + 1] = delay_row(require("settings.engine.keys").LEAF.MIN_REQUEST_INTERVAL_MS, "menu.llm.min_interval_label", false)
 		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
 		if not boundary_rows then return end
 		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
@@ -306,7 +314,7 @@ local function _build_llm(ctx)
 				paused = true, blocked = true}
 			local ok, detail = xpcall(function()
 				local path = "llm.trigger." .. name
-				local values, source = Preferences.get_many({require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_MODELS_SELECTED, path})
+				local values, source = Preferences.get_many({require("settings.engine.keys").KEY.LLM_ENABLED, require("settings.engine.keys").KEY.LLM_MODELS_SELECTED, path})
 				snapshot.source = source
 				snapshot.preferences_generation = Preferences.generation()
 				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
@@ -317,8 +325,8 @@ local function _build_llm(ctx)
 				snapshot.backend = llm.get_backend()
 				snapshot.paused = ctx.paused == true or ctx.is_paused()
 				snapshot.blocked = Preferences.admit() ~= true
-					or values[require("config_keys").KEY.LLM_ENABLED] ~= snapshot.enabled
-					or values[require("config_keys").KEY.LLM_MODELS_SELECTED] ~= snapshot.backend or values[path] ~= snapshot.value
+					or values[require("settings.engine.keys").KEY.LLM_ENABLED] ~= snapshot.enabled
+					or values[require("settings.engine.keys").KEY.LLM_MODELS_SELECTED] ~= snapshot.backend or values[path] ~= snapshot.value
 			end, debug.traceback)
 			if not ok then
 				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
@@ -326,8 +334,8 @@ local function _build_llm(ctx)
 			end
 			return snapshot
 		end
-		local url_source = privacy_snapshot(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED)
-		local secure_source = privacy_snapshot(require("config_keys").LEAF.SECURE_FILTER_ENABLED)
+		local url_source = privacy_snapshot(require("settings.engine.keys").LEAF.URL_BAR_FILTER_ENABLED)
+		local secure_source = privacy_snapshot(require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED)
 		local function privacy_command(expected, name)
 			local current = privacy_snapshot(name)
 			local decision = PrivacyPolicy.intent(expected, current)
@@ -339,9 +347,10 @@ local function _build_llm(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end
+		-- A pause stops typing, not configuration (EDD-1): the rows commit while
+		-- paused and the engine reads them when typing resumes.
 		local function ready()
-			return llm.is_enabled() == true and ctx.paused ~= true
-				and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+			return llm.is_enabled() == true
 		end
 		local function toggle(name)
 			if not ready() then return false end
@@ -352,13 +361,13 @@ local function _build_llm(ctx)
 		end
 		local trigger_ctx = {
 			commands = {
-				[require("config_keys").COMMAND.LLM_URL_BAR_FILTER] = function() return privacy_command(url_source, require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
-				[require("config_keys").COMMAND.LLM_SECURE_FIELD_FILTER] = function() return privacy_command(secure_source, require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
-				[require("config_keys").COMMAND.LLM_INSTANT_ON_WORD_END] = function() return toggle(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
-				[require("config_keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("config_keys").LEAF.AFTER_HOTSTRING) end,
-				[require("config_keys").COMMAND.LLM_INLINE_AUTOTYPE] = function() return toggle(require("config_keys").LEAF.INLINE_AUTOTYPE) end,
-				[require("config_keys").COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
-					local leaf = require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP
+				[require("settings.engine.keys").COMMAND.LLM_URL_BAR_FILTER] = function() return privacy_command(url_source, require("settings.engine.keys").LEAF.URL_BAR_FILTER_ENABLED) end,
+				[require("settings.engine.keys").COMMAND.LLM_SECURE_FIELD_FILTER] = function() return privacy_command(secure_source, require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED) end,
+				[require("settings.engine.keys").COMMAND.LLM_INSTANT_ON_WORD_END] = function() return toggle(require("settings.engine.keys").LEAF.INSTANT_ON_WORD_END) end,
+				[require("settings.engine.keys").COMMAND.LLM_AFTER_HOTSTRING] = function() return toggle(require("settings.engine.keys").LEAF.AFTER_HOTSTRING) end,
+				[require("settings.engine.keys").COMMAND.LLM_INLINE_AUTOTYPE] = function() return toggle(require("settings.engine.keys").LEAF.INLINE_AUTOTYPE) end,
+				[require("settings.engine.keys").COMMAND.LLM_WHILE_HOTSTRING_TOOLTIP] = function(value)
+					local leaf = require("settings.engine.keys").LEAF.WHILE_HOTSTRING_TOOLTIP
 					local current = TriggerSettings.get(leaf)
 					if not ready() or current == value then return false end
 					if not commit_choice(TriggerSettings, leaf, value, nil, "llm.trigger.", current, origin) then return false end
@@ -367,15 +376,15 @@ local function _build_llm(ctx)
 				end,
 			},
 			state_getters = {
-				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.URL_BAR_FILTER_ENABLED) end,
-				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.SECURE_FILTER_ENABLED) end,
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get(require("settings.engine.keys").LEAF.URL_BAR_FILTER_ENABLED) end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get(require("settings.engine.keys").LEAF.SECURE_FILTER_ENABLED) end,
 				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
 				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
-				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INSTANT_ON_WORD_END) end,
-				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.AFTER_HOTSTRING) end,
-				["llm_inline_autotype_enabled"] = function() return TriggerSettings.get(require("config_keys").LEAF.INLINE_AUTOTYPE) end,
-				[require("config_keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
-					return TriggerSettings.get(require("config_keys").LEAF.WHILE_HOTSTRING_TOOLTIP)
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get(require("settings.engine.keys").LEAF.INSTANT_ON_WORD_END) end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get(require("settings.engine.keys").LEAF.AFTER_HOTSTRING) end,
+				["llm_inline_autotype_enabled"] = function() return TriggerSettings.get(require("settings.engine.keys").LEAF.INLINE_AUTOTYPE) end,
+				[require("settings.engine.keys").KEY.LLM_TRIGGER_WHILE_HOTSTRING_TOOLTIP] = function()
+					return TriggerSettings.get(require("settings.engine.keys").LEAF.WHILE_HOTSTRING_TOOLTIP)
 				end,
 				["llm_trigger_ready"] = ready,
 			},
@@ -416,7 +425,7 @@ local function _build_llm(ctx)
 		-- The model predictions actually use: an API entry's when the API answers.
 		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
 		local effective = ProfileSettings.effective_profile(current_model)
-		local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS) or 1
+		local count = ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS) or 1
 		local function refresh()
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
@@ -450,10 +459,12 @@ local function _build_llm(ctx)
 			if saved then refresh() end
 			return saved
 		end
+		-- A pause stops typing, not configuration (EDD-1): a profile is created
+		-- or cloned while paused. An unreadable pause still refuses.
 		local function create_ready()
-			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+			if type(ctx.is_paused) ~= "function" then return false end
 			local ok, current = pcall(ctx.is_paused)
-			return ok and current == false
+			return ok and type(current) == "boolean"
 		end
 		local function open_editor(existing, activate, opts, create)
 			if type(edit_current) ~= "function" or edit_current() ~= true then
@@ -477,8 +488,9 @@ local function _build_llm(ctx)
 				opts = editor_opts
 			end
 			if create and not create_ready() then return false end
+			-- The page's save runs while paused: a pause stops typing, not
+			-- configuration (EDD-1, maintainer decision 2026-11-12).
 			return Editor.open(existing, function(profile)
-				if create and not create_ready() then return false end
 				return save_profile(profile, activate, expected_existing)
 			end, opts)
 		end
@@ -486,9 +498,9 @@ local function _build_llm(ctx)
 		local active_builtin, user_profiles, seed
 		local function auto_profile()
 			if not create_ready() then return false end
-			local current = ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL)
+			local current = ProfileSettings.get(require("settings.engine.keys").LEAF.AUTO_PROFILE_FOR_MODEL)
 			if type(current) ~= "boolean" or not create_ready() then return false end
-			local saved = ProfileSettings.set(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL, not current, current_model)
+			local saved = ProfileSettings.set(require("settings.engine.keys").LEAF.AUTO_PROFILE_FOR_MODEL, not current, current_model)
 			if saved ~= true then return false end
 			refresh()
 			return true
@@ -538,9 +550,9 @@ local function _build_llm(ctx)
 				rows[#rows + 1] = {
 					label = label,
 					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
-						[require("config_keys").COMMAND.LLM_PROFILE_USE] = function() return select_profile(profile_id) end,
-						[require("config_keys").COMMAND.LLM_PROFILE_EDIT] = function() return open_editor(owned_profile, false) end,
-						[require("config_keys").COMMAND.LLM_PROFILE_DELETE] = function()
+						[require("settings.engine.keys").COMMAND.LLM_PROFILE_USE] = function() return select_profile(profile_id) end,
+						[require("settings.engine.keys").COMMAND.LLM_PROFILE_EDIT] = function() return open_editor(owned_profile, false) end,
+						[require("settings.engine.keys").COMMAND.LLM_PROFILE_DELETE] = function()
 								if type(edit_current) ~= "function" or edit_current() ~= true then
 									Logger.error(LOG, "Profile deletion refused: its originating configuration is no longer current.")
 									return false
@@ -586,7 +598,7 @@ local function _build_llm(ctx)
 		--- The per-application overrides: map the application last typed in to the profile
 		--- in force, and one row per mapping that clears it. The same rows as Windows.
 		local function app_override_rows()
-			local AppOverrides = require("llm.app_profile_overrides")
+			local AppOverrides = require("ai.engine.policy.app_profile_overrides")
 			local mapped = AppOverrides.rows(ProfileSettings.app_overrides())
 			local last = type(llm.get_agent_last_app) == "function" and llm.get_agent_last_app() or nil
 			local clear_rows = {}
@@ -617,11 +629,11 @@ local function _build_llm(ctx)
 			}) or {}
 		end
 		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
-			[require("config_keys").COMMAND.LLM_PROFILE_AUTO_DETECT] = auto_profile,
-			[require("config_keys").COMMAND.LLM_PROFILE_CLONE] = function() return open_editor(seed, true, { as_new = true }, true) end,
-			[require("config_keys").COMMAND.LLM_PROFILE_CREATE] = function() return open_editor(nil, true, nil, true) end,
+			[require("settings.engine.keys").COMMAND.LLM_PROFILE_AUTO_DETECT] = auto_profile,
+			[require("settings.engine.keys").COMMAND.LLM_PROFILE_CLONE] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			[require("settings.engine.keys").COMMAND.LLM_PROFILE_CREATE] = function() return open_editor(nil, true, nil, true) end,
 		}, {
-			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get(require("config_keys").LEAF.AUTO_PROFILE_FOR_MODEL) == true end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get(require("settings.engine.keys").LEAF.AUTO_PROFILE_FOR_MODEL) == true end,
 			["llm_profile_custom_present"] = custom_present,
 			["llm_profile_clone_present"] = clone_present,
 			["llm_profile_create_ready"] = create_ready,
@@ -654,29 +666,28 @@ local function _build_llm(ctx)
 		local origin = choice_origin()
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
-		local DisplayPolicy = require("llm.display_policy")
+		local DisplayPolicy = require("ai.engine.settings.display_policy")
 		local ProfileSettings = require("modules.llm.profile_settings")
 		local function show_all_ready()
-			return DisplayPolicy.ready(ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS),
-				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
-				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
+			return DisplayPolicy.ready(ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS),
+				type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
 		end
 		local Preferences = require("infra.llm_preferences")
 		local function streaming_snapshot()
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
-			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_STREAMING, require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI })
+			local values, source = Preferences.get_many({ require("settings.engine.keys").KEY.LLM_ENABLED, require("settings.engine.keys").KEY.LLM_DISPLAY_STREAMING, require("settings.engine.keys").KEY.LLM_DISPLAY_STREAMING_MULTI })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get(require("settings.engine.keys").LEAF.STREAMING_MULTI)
 			return {
 				owner = Preferences, source = source,
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				platform = "linux",
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
-					or streaming ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING] or progressive ~= values[require("config_keys").KEY.LLM_DISPLAY_STREAMING_MULTI],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("settings.engine.keys").KEY.LLM_ENABLED]
+					or streaming ~= values[require("settings.engine.keys").KEY.LLM_DISPLAY_STREAMING] or progressive ~= values[require("settings.engine.keys").KEY.LLM_DISPLAY_STREAMING_MULTI],
 				progressive = progressive, streaming = streaming,
 			}
 		end
@@ -684,11 +695,11 @@ local function _build_llm(ctx)
 		local rows = {}
 		local function indentation_snapshot()
 			local snapshot = streaming_snapshot()
-			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS, require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT })
-			snapshot.count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
-			snapshot.indentation = DisplaySettings.get(require("config_keys").LEAF.PRED_INDENT)
-			snapshot.blocked = snapshot.blocked or snapshot.count ~= values[require("config_keys").KEY.LLM_PROFILES_NUM_PREDICTIONS]
-				or snapshot.indentation ~= values[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT]
+			local values, source = Preferences.get_many({ require("settings.engine.keys").KEY.LLM_PROFILES_NUM_PREDICTIONS, require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT })
+			snapshot.count = ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS)
+			snapshot.indentation = DisplaySettings.get(require("settings.engine.keys").LEAF.PRED_INDENT)
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values[require("settings.engine.keys").KEY.LLM_PROFILES_NUM_PREDICTIONS]
+				or snapshot.indentation ~= values[require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT]
 			-- Re-reading the canonical owner advances its revision for every source
 			-- change, including unrelated fields and away/back transitions.
 			snapshot.source = source
@@ -700,10 +711,10 @@ local function _build_llm(ctx)
 		end
 		local indentation_source = indentation_snapshot()
 		local function info_bar_snapshot()
-			local values, source = Preferences.get_many({ require("config_keys").KEY.LLM_ENABLED, require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR })
+			local values, source = Preferences.get_many({ require("settings.engine.keys").KEY.LLM_ENABLED, require("settings.engine.keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR })
 			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
 			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
-			local selected = DisplaySettings.get(require("config_keys").LEAF.SHOW_INFO_BAR)
+			local selected = DisplaySettings.get(require("settings.engine.keys").LEAF.SHOW_INFO_BAR)
 			local paused
 			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
 			return {
@@ -711,29 +722,29 @@ local function _build_llm(ctx)
 				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
 				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
 				info_bar = selected, enabled = enabled, paused = paused,
-				blocked = Preferences.admit() ~= true or enabled ~= values[require("config_keys").KEY.LLM_ENABLED]
-					or selected ~= values[require("config_keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR],
+				blocked = Preferences.admit() ~= true or enabled ~= values[require("settings.engine.keys").KEY.LLM_ENABLED]
+					or selected ~= values[require("settings.engine.keys").KEY.LLM_DISPLAY_SHOW_INFO_BAR],
 			}
 		end
 		local info_bar_source = info_bar_snapshot()
 		local display_ctx = {
 			commands = {
-				[require("config_keys").COMMAND.LLM_INDENTATION] = function(value)
+				[require("settings.engine.keys").COMMAND.LLM_INDENTATION] = function(value)
 					local current = indentation_snapshot()
 					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
 					if decision.admitted ~= true then return false end
-					if not commit_choice(DisplaySettings, require("config_keys").LEAF.PRED_INDENT, decision.value, current.source, "llm.display.", nil, origin) then return false end
+					if not commit_choice(DisplaySettings, require("settings.engine.keys").LEAF.PRED_INDENT, decision.value, current.source, "llm.display.", nil, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				[require("config_keys").COMMAND.LLM_SHOW_ALL] = function()
+				[require("settings.engine.keys").COMMAND.LLM_SHOW_ALL] = function()
 					if not show_all_ready() then return false end
-					local current = DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)
-					if type(current) ~= "boolean" or not commit_choice(DisplaySettings, require("config_keys").LEAF.STREAMING_MULTI, not current, nil, "llm.display.", current, origin) then return false end
+					local current = DisplaySettings.get(require("settings.engine.keys").LEAF.STREAMING_MULTI)
+					if type(current) ~= "boolean" or not commit_choice(DisplaySettings, require("settings.engine.keys").LEAF.STREAMING_MULTI, not current, nil, "llm.display.", current, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				[require("config_keys").COMMAND.LLM_TOKEN_STREAMING] = function()
+				[require("settings.engine.keys").COMMAND.LLM_TOKEN_STREAMING] = function()
 					local current = streaming_snapshot()
 					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
 					if decision.admitted ~= true then return false end
@@ -741,19 +752,19 @@ local function _build_llm(ctx)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-				[require("config_keys").COMMAND.LLM_INFO_BAR] = function()
+				[require("settings.engine.keys").COMMAND.LLM_INFO_BAR] = function()
 					local current = info_bar_snapshot()
 					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
 					if decision.admitted ~= true then return false end
-					if not commit_choice(DisplaySettings, require("config_keys").LEAF.SHOW_INFO_BAR, decision.value, current.source, "llm.display.", nil, origin) then return false end
+					if not commit_choice(DisplaySettings, require("settings.engine.keys").LEAF.SHOW_INFO_BAR, decision.value, current.source, "llm.display.", nil, origin) then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				[require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
+				[require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT] = function() return indentation_source.indentation end,
 				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
-				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get(require("config_keys").LEAF.STREAMING_MULTI)) end,
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get(require("settings.engine.keys").LEAF.STREAMING_MULTI)) end,
 				["llm_show_all_ready"] = show_all_ready,
 				["llm_token_streaming_enabled"] = function()
 					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
@@ -846,7 +857,7 @@ local function _build_llm(ctx)
 	end
 
 	-- The dialogs the model selector page's transactions open: the menu owns
-	-- them, so they never fight the keyboard grab (ui/modal.lua).
+	-- them, so they never fight the keyboard grab (core/ui/ui/modal.lua).
 	local page_dialogs = {
 		prompt = function(title, text, initial, hidden, choices)
 			return prompt_text(title, plain_markup(text), initial, hidden, choices)
@@ -866,7 +877,7 @@ local function _build_llm(ctx)
 	--- @param tag string
 	--- @param reason string|nil
 	local function deletion_notice(succeeded, tag, reason)
-		local Notifier = require("adapters.application_notifier")
+		local Notifier = require("platform.focus.application_notifier")
 		-- A notification caption, not a menu row: it never reaches the renderer.
 		local delivered
 		if succeeded then
@@ -885,11 +896,12 @@ local function _build_llm(ctx)
 	--- @param page_current function|nil Exact page projection owner.
 	--- @return boolean dispatched
 	local function delete_model(model, page_current)
+		-- A pause stops typing, not configuration (EDD-1): removing an
+		-- installed model runs while paused. An unreadable pause refuses.
 		local function admitted()
-			if ctx.paused == true then return false end
 			if type(ctx.is_paused) == "function" then
 				local ok, paused = pcall(ctx.is_paused)
-				if not ok or paused ~= false then return false end
+				if not ok or type(paused) ~= "boolean" then return false end
 			end
 			if page_current == nil then return true end
 			local ok, current = pcall(page_current)
@@ -942,7 +954,7 @@ local function _build_llm(ctx)
 				tostring(ProfileSettings))
 			return nil
 		end
-		local current = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
+		local current = ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS)
 		local choices = {}
 		for value = 1, 10 do
 			-- One key per plural form, the rows macOS and Windows draw.
@@ -952,7 +964,7 @@ local function _build_llm(ctx)
 				label = string.format(i18n_safe(count_key), value),
 				checked = current == value,
 				action = function()
-					return commit_preset(ProfileSettings, require("config_keys").LEAF.NUM_PREDICTIONS, value, ctx.on_menu_changed, false, "llm.profiles.", generation_origin)
+					return commit_preset(ProfileSettings, require("settings.engine.keys").LEAF.NUM_PREDICTIONS, value, ctx.on_menu_changed, false, "llm.profiles.", generation_origin)
 				end,
 			}
 		end
@@ -1002,8 +1014,8 @@ local function _build_llm(ctx)
 			local bounds = Settings.bounds(setting.name)
 			if bounds then
 				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
-					[require("config_keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
-						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+					[require("settings.engine.keys").COMMAND.LLM_NUMERIC_CUSTOM_VALUE] = function()
+						local ok_prompt, Prompt = pcall(require, "core.ui.ui.numeric_prompt")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
 							return
@@ -1043,21 +1055,21 @@ local function _build_llm(ctx)
 		--- Reads current group, pause and prediction-count facts before delivery.
 		--- @return boolean ready
 		local function ready()
-			local count = ProfileSettings.get(require("config_keys").LEAF.NUM_PREDICTIONS)
-			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+			local count = ProfileSettings.get(require("settings.engine.keys").LEAF.NUM_PREDICTIONS)
+			return type(llm.is_enabled) == "function" and llm.is_enabled() == true
 				and type(count) == "number" and count >= 2
 		end
 		local generation_ctx = {
 			commands = {
-				[require("config_keys").COMMAND.LLM_AUTO_RAISE_TEMPERATURE] = function()
+				[require("settings.engine.keys").COMMAND.LLM_AUTO_RAISE_TEMPERATURE] = function()
 					if not ready() then return false end
-					if Settings.set(require("config_keys").LEAF.AUTO_RAISE_TEMP, not Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP)) ~= true then return false end
+					if Settings.set(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP, not Settings.get(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP)) ~= true then return false end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			},
 			state_getters = {
-				["llm_auto_raise_enabled"] = function() return Settings.get(require("config_keys").LEAF.AUTO_RAISE_TEMP) end,
+				["llm_auto_raise_enabled"] = function() return Settings.get(require("settings.engine.keys").LEAF.AUTO_RAISE_TEMP) end,
 				["llm_auto_raise_ready"] = ready,
 			},
 		}
@@ -1068,9 +1080,9 @@ local function _build_llm(ctx)
 		-- Whether a navigation or Escape clears the AI's typing context, the row
 		-- Windows and macOS show in the same submenu.
 		local function generation_ready()
-			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+			return type(llm.is_enabled) == "function" and llm.is_enabled() == true
 		end
-		local RESET_ON_NAV = require("config_keys").LEAF.RESET_ON_NAV
+		local RESET_ON_NAV = require("settings.engine.keys").LEAF.RESET_ON_NAV
 		local reset_rows = ManifestMenu.build("llm_generation_reset_navigation", "LLM", nil, nil, {
 			commands = {
 				[COMMAND.LLM_RESET_ON_NAV] = function()
@@ -1105,38 +1117,44 @@ local function _build_llm(ctx)
 	llm_ctx.commands = {}
 	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
 	local Preferences = require("infra.llm_preferences")
+	-- A pause stops typing, not configuration (EDD-1): the switch turns the AI
+	-- off while paused, which only stops work. Turning it on waits for resume:
+	-- it starts model warmups and may offer an install (decided by the agent on
+	-- 2026-11-14, to review by the maintainer).
 	local function toggle_ready()
-		return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true
+		local paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+		return type(llm.toggle) == "function" and Preferences.admit() == true
+			and (not paused or (type(llm.is_enabled) == "function" and llm.is_enabled() == true))
 	end
 	-- The AI rows that write config.toml: greyed, and their retained clicks
 	-- refused, while paused or while the configuration refuses writes.
+	-- A pause does not grey them: a pause stops typing, not configuration (EDD-1).
 	local function scope_ready()
-		return Preferences.admit() == true and ctx.paused ~= true
+		return Preferences.admit() == true
 	end
 	-- A configuration saved by a newer version names its own cause on those rows.
 	local function newer_schema()
-		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
+		return require("settings.engine.migration.migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "newer"
 	end
 	-- So does one too old for this build to migrate.
 	local function older_schema()
-		return require("config_migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "unsupported"
+		return require("settings.engine.migration.migrate").read_only_status(require("infra.config_paths").config("config.toml")) == "unsupported"
 	end
 	-- The restore alone: the AI menu's clear row was retired.
-	llm_ctx.commands[require("config_keys").COMMAND.SCOPE_RESTORE] = function()
+	llm_ctx.commands[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function()
 		-- A retained row rechecks what greyed it when it was built.
 		if not scope_ready() then
-			Logger.warn(LOG, "AI settings restore refused: %s.", ctx.paused == true and "the script is paused"
-				or "the configuration is protected from writes")
+			Logger.warn(LOG, "AI settings restore refused: the configuration is protected from writes.")
 			return false
 		end
-		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
+		local committed = require("infra.llm_scope").apply("recommended")
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
-	llm_ctx.commands[require("config_keys").COMMAND.LLM_TEST_PREDICTION] = function()
+	llm_ctx.commands[require("settings.engine.keys").COMMAND.LLM_TEST_PREDICTION] = function()
 		return llm.test_prediction()
 	end
-	llm_ctx.commands[require("config_keys").COMMAND.LLM_TOGGLE] = function()
+	llm_ctx.commands[require("settings.engine.keys").COMMAND.LLM_TOGGLE] = function()
 		if not toggle_ready() then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end

@@ -1,6 +1,6 @@
 {
 	"$schema": "https://ergopti.com/schema/corpus/dynamic_hotstrings_prefix.v1.json",
-	"description": "Cross-driver regression corpus for the personal-info dynamic-hotstrings prefix-counting logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'prefix_count_vectors' pins compute_prefix_counts() (the phone/SSN/IBAN threshold arithmetic, mirrored by AHK's CountDynamicSection and Lua's compute_prefix_counts); 'spaced_prefix_vectors' pins spaced_prefix() (the shortest-prefix-containing-N-non-space-chars helper). Expected values are computed programmatically from the shared Lua reference (_shared/lua/dynamic_hotstrings/init.lua), not hand-typed.",
+	"description": "Cross-driver regression corpus for the personal-info dynamic-hotstrings prefix-counting logic. Every vector must pass in both the AHK and Hammerspoon driver test suites without modification. 'prefix_count_vectors' pins compute_prefix_counts() (the phone/SSN/IBAN threshold arithmetic, mirrored by AHK's CountDynamicSection and Lua's compute_prefix_counts); 'spaced_prefix_vectors' pins spaced_prefix() (the shortest-prefix-containing-N-non-space-chars helper). Expected values are computed programmatically from the shared Lua reference (_shared/hotstrings/engine/dynamic/core.lua), not hand-typed.",
 	"version": "1.0.0",
 	"prefix_count_vectors": [
 		{

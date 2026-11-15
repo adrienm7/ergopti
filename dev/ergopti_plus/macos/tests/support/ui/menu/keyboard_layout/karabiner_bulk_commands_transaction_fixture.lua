@@ -76,10 +76,10 @@ local PICKER_ACTION_CASES = { SPECIAL_PICKER_ACTION, GROUPED_PICKER_ACTION }
 -- Neither scope row asks (a question would be counted here) and both name a
 -- backup under the remap file; both boundaries are doubles for the whole
 -- module, restored at its end.
-local SAVED_DIALOGS = package.loaded["infra.dialog_util"]
+local SAVED_DIALOGS = package.loaded["core.ui.engine.dialog_util"]
 local SAVED_PATHS = package.loaded["infra.config_paths"]
 local CONFIRMATION = { answer = "yes", asked = 0 }
-package.loaded["infra.dialog_util"] = {
+package.loaded["core.ui.engine.dialog_util"] = {
 	block_alert = function(_, _, no, yes)
 		CONFIRMATION.asked = CONFIRMATION.asked + 1
 		return CONFIRMATION.answer == "yes" and yes or no
@@ -87,8 +87,8 @@ package.loaded["infra.dialog_util"] = {
 }
 package.loaded["infra.config_paths"] = {
 	get = function(key)
-		assert(key == "KarabinerConfigPath", "unexpected path key " .. tostring(key))
-		return "/remap/config_karabiner.toml"
+		assert(key == "TapHoldConfigPath", "unexpected path key " .. tostring(key))
+		return "/remap/tap_hold.toml"
 	end,
 }
 
@@ -208,7 +208,7 @@ end
 --- @param key string i18n key.
 --- @return string text
 local function english_text(key)
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local english = hs.json.decode(file:read("*a"))
 	file:close()
 	local text = english[key]
@@ -365,10 +365,10 @@ local function build_menu(mode, configure)
 		logs = {},
 		refreshes = 0,
 	}
-	local saved_logger = package.loaded["infra.logger"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_controller = package.loaded["platform.remap.lease_controller"]
 	local saved_manifest = package.loaded["infra.manifest_menu"]
-	package.loaded["infra.logger"] = recording_logger(observations)
+	package.loaded["core.logger.engine.logger"] = recording_logger(observations)
 	package.loaded["platform.remap.lease_controller"] = {
 		status = function() return "active", { phase = "active" } end,
 		stop = function() return true end,
@@ -389,7 +389,7 @@ local function build_menu(mode, configure)
 	-- Preserve the second group's boundary: its scope rows belong to that
 	-- group, not to the Tap-Holds first-row contract asserted below.
 	built.submenu[#built.submenu + 1] = { title = "menu.shortcuts.key_combinations", submenu = group }
-	package.loaded["infra.logger"] = saved_logger
+	package.loaded["core.logger.engine.logger"] = saved_logger
 	package.loaded["platform.remap.lease_controller"] = saved_controller
 	package.loaded["infra.manifest_menu"] = saved_manifest
 	return built, observations, remap

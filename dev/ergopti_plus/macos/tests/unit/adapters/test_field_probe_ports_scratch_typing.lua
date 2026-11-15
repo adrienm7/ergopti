@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"infra.logger", "adapters.field_probe_ports", "adapters.timer_scheduler", "adapters.own_window",
-	"adapters.synthetic_input", "ui.ui_builder", "modules.keymap", "infra.field_run_selftest",
+	"core.logger.engine.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "core.ui.adapters.own_window",
+	"platform.input.synthetic_input", "core.ui.ui.builder", "modules.keymap", "infra.field_run_selftest",
 	"modules.keymap.utils",
 }
 
@@ -31,11 +31,11 @@ local now = 0
 local function run(world, keys, options)
 	world.emitted, world.published_at_key = {}, {}
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- A virtual clock: the earliest pending timer fires next.
 		local queue = {}
 		now = 0
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				local entry = { at = now + seconds, fn = fn }
 				queue[#queue + 1] = entry
@@ -43,9 +43,9 @@ local function run(world, keys, options)
 			end,
 			cancel = function(entry) entry.cancelled = true; return true end,
 		}
-		package.loaded["adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
+		package.loaded["core.ui.adapters.own_window"] = { for_webview = function() return { id = function() return SCRATCH_WINDOW end } end }
 		-- The shared chrome is its own owner's concern; the steps are recorded only
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			-- macOS tells the window it has the focus, unless the world scripts silence
 			force_focus = function()
 				world.refocused = (world.refocused or 0) + 1
@@ -77,7 +77,7 @@ local function run(world, keys, options)
 				end,
 			}
 		end
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			emit_selftest_key_stroke = function(modifiers, key)
 				world.emitted[#world.emitted + 1] = key
 				world.polls_at_first_key = world.polls_at_first_key or world.polls

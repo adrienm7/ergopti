@@ -17,7 +17,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(opts)
 	opts = opts or {}
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 	hs_stub.__reset()
 	local runtime = { bindings = true, keyboard = true }
 	local script_actions = { return_key = "script_pause_toggle", backspace = "script_reload", escape = "script_quit" }
@@ -45,14 +45,14 @@ local function load_fixture(opts)
 		update_check_interval_seconds = 3600,
 	}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.preferences"] = {
 		build_initial_state = function() return state end,
@@ -115,13 +115,13 @@ local function load_fixture(opts)
 		setMenu = function() return true end,
 		destroy = function() destroyed = destroyed + 1 end,
 	}
-	package.loaded["chord"] = { format = function() return "ctrl+x" end }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_exit = function() return true end,
 	}
 

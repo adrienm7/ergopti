@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Snapshot = require("diagnostics.snapshot")
+local Json = require("core.text.engine.json")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "c3005e0b9aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "c3005e0b9"
@@ -30,7 +30,7 @@ local APP_SOURCE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergo
 
 -- The modules a case replaces or reloads; restored after each case.
 local FIXTURE_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.diagnostic_snapshot",
 	"modules.updater",
 	"ui.menu.menu_about",
@@ -93,7 +93,7 @@ local CHECKOUTS = {
 --- The shipped French catalogue, so the row is checked against real wording.
 --- @return table
 local function french()
-	local handle = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -112,8 +112,8 @@ local function load_updater(is_local, version)
 	logger.error = function(tag, fmt, ...)
 		errors[#errors + 1] = tostring(tag) .. ": " .. string.format(fmt, ...)
 	end
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.logger"] = logger
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.diagnostic_snapshot"] = nil
 	package.loaded["modules.updater"] = nil
 	local Updater = require("modules.updater")
@@ -129,7 +129,7 @@ local function version_row(Updater)
 	package.loaded["ui.menu.menu_about"] = nil
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
-	require("infra.i18n").get = function(key) return catalogue[key] or key end
+	require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 	local owner = { get = function() return "dev" end, set = function() end }
 	local rows = About.build({ channel_owner = owner }, {
 		start_at_login = function() error("Building About must not change startup.") end,

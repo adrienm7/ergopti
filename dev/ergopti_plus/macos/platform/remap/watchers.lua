@@ -31,22 +31,22 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
+local Logger         = require("core.logger.engine.logger")
 local InputSourceBroker = require("adapters.input_source_broker")
-local Timings        = require("infra.timings")
-local Keycodes       = require("infra.keycodes")
-local ShellRunner    = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
-local SystemInfo     = require("adapters.system_info")
-local KeyState       = require("adapters.key_state")
+local Timings        = require("core.timing.engine.timings")
+local Keycodes       = require("platform.input.keycodes")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
+local SystemInfo     = require("platform.system.info")
+local KeyState       = require("platform.input.key_state")
 local MouseControl   = require("adapters.mouse_control")
-local Registrar      = require("adapters.hotkey_registrar")
-local RunningApplication = require("adapters.running_application")
+local Registrar      = require("platform.input.hotkey_registrar")
+local RunningApplication = require("platform.focus.running_application")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
 local CapsWordOutput = require("infra.capsword_output")
-local AutoOffPolicy  = require("caps_word.auto_off")
+local AutoOffPolicy  = require("keyboard.engine.caps_word_auto_off")
 -- Layout observation does not own keyboard-control resources. Acquire this
 -- dependency only when the CapsWord generation starts its gesture watcher.
 local ControlSentinels = nil
@@ -733,6 +733,32 @@ end
 function M.deactivate_capsword_by_action()
 	if not _capsword_listener_owned then return false end
 	deactivate_capsword(_capsword_watcher_gen, "switched off by its action", true)
+	return true
+end
+
+--- Ends a running CapsWord as the driver pauses, as Windows and Linux do. The
+--- paused Karabiner graph holds no CapsWord rule, so its auto-off could not
+--- answer, and the CapsLock it raised stayed on through the whole pause. A
+--- CapsLock the user set themselves, with no CapsWord known active, is kept.
+--- @return boolean settled Always true: a refused clear is logged, never a
+---   reason to keep the driver from pausing.
+function M.end_capsword_for_pause()
+	if KeVariables.capsword_known_active() ~= true then return true end
+	if _capsword_listener_owned then
+		deactivate_capsword(_capsword_watcher_gen, "script paused", true)
+	else
+		local called, superseded = Logger.pcall(LOG, KeVariables.supersede_capsword_activation)
+		if not called or superseded ~= true then
+			Logger.error(LOG, "CapsWord could not be cleared in Karabiner at pause.")
+		end
+	end
+	cancel_capsword_idle_timer()
+	local called, cleared = Logger.pcall(LOG, KeyState.set_capslock, false)
+	if not called or cleared ~= true then
+		Logger.error(LOG, "CapsLock could not be switched off as CapsWord ended at pause.")
+	else
+		Logger.info(LOG, "CapsWord ended: script paused.")
+	end
 	return true
 end
 

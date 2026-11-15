@@ -33,14 +33,14 @@ local function recording_manager()
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 	logger.error = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-	local saved = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = logger
+	local saved = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded[MANAGER] = nil
 	-- The workspace provider captures its shell and display dependencies when
 	-- required. Earlier native fixtures may have replaced either table.
 	package.loaded["modules.gestures.workspace_switcher"] = nil
 	local ok, manager = pcall(require, MANAGER)
-	package.loaded["logger.shim"] = saved
+	package.loaded["core.logger.engine.shim"] = saved
 	if not ok then error(manager, 0) end
 	return manager, warnings
 end
@@ -65,7 +65,7 @@ end
 --- that compositor instead of the session the test scripts.
 --- @param body function
 local function without_tools(body)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local real_getenv = os.getenv
 	os.getenv = function(name)
 		if name == "HYPRLAND_INSTANCE_SIGNATURE" or name == "SWAYSOCK" then return nil end
@@ -85,11 +85,11 @@ local function with_recorded_shell(body, native_webview)
 	local real_execute, real_popen = os.execute, io.popen
 	os.execute = function() return true end
 	io.popen = function() return nil end
-	local saved_webview = package.loaded["ui.webview_manager"]
-	package.loaded["ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
+	local saved_webview = package.loaded["core.ui.ui.webview_manager"]
+	package.loaded["core.ui.ui.webview_manager"] = native_webview or { show = function() return true end, toggle = function() return true end }
 	local ok, err = pcall(body)
 	os.execute, io.popen = real_execute, real_popen
-	package.loaded["ui.webview_manager"] = saved_webview
+	package.loaded["core.ui.ui.webview_manager"] = saved_webview
 	if not ok then error(err, 0) end
 end
 
@@ -198,13 +198,13 @@ helpers.describe("action picker items (Linux)", function()
 		-- Reload the chain, and the manager on top of it, so this test switches
 		-- the very core the headings are read from.
 		local saved = {}
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", MANAGER }) do
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", MANAGER }) do
 			saved[name] = package.loaded[name]
 		end
-		package.loaded["infra.i18n"] = nil
-		package.loaded["infra.locale"] = nil
-		local i18n = require("infra.i18n")
-		local Locale = require("locale.core")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		package.loaded["core.i18n.engine.locale"] = nil
+		local i18n = require("core.i18n.engine.i18n")
+		local Locale = require("core.i18n.engine.core")
 		recording_manager()
 		local ok, err = pcall(function()
 			for _, code in ipairs({ "de", "en" }) do
@@ -255,7 +255,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("greys an action whose requirement is proven absent, with the reason", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local M = recording_manager()
 		Display._set_for_test(Display.WAYLAND, "gnome")
 		local ok, items
@@ -267,10 +267,10 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.left_click_toggle.disabled, true,
 			"xdotool cannot hold a button under Wayland, so the row is greyed")
 		helpers.assert_eq(by_id.left_click_toggle.hint,
-			require("infra.i18n").get("dialog.action_picker.requires_x11"))
+			require("core.i18n.engine.i18n").get("dialog.action_picker.requires_x11"))
 		helpers.assert_eq(by_id.open_url.disabled, true, "no xdg-open on PATH, nothing to open a URL with")
 		helpers.assert_eq(by_id.open_url.hint,
-			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "xdg-open")))
+			(require("core.i18n.engine.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "xdg-open")))
 		helpers.assert_eq(by_id.enter.disabled, nil, "an action with no requirement stays enabled")
 		-- GNOME under Wayland lets no process read its workspaces: the plain
 		-- step presses its own shortcut, which stops at the edges, but nothing
@@ -278,8 +278,35 @@ helpers.describe("action picker items (Linux)", function()
 		helpers.assert_eq(by_id.desktop_next.disabled, nil, "the plain step works on every desktop")
 		helpers.assert_eq(by_id.desktop_next_wrap.disabled, true, "GNOME cannot wrap its workspaces")
 		helpers.assert_eq(by_id.desktop_next_wrap.hint,
-			require("infra.i18n").get("dialog.action_picker.requires_workspaces"))
+			require("core.i18n.engine.i18n").get("dialog.action_picker.requires_workspaces"))
 		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true)
+	end)
+
+	helpers.it("greys the folder actions with the reason when no file manager publishes its folder", function()
+		local Display = require("core.ui.engine.display_server")
+		local Shell = require("core.process.adapters.shell_runner")
+		local M = recording_manager()
+		local function rows(nautilus)
+			Display._set_for_test(Display.X11, "xfce")
+			Shell._set_runner(function(command) return nautilus or not command:find("nautilus", 1, true) end)
+			local ok, items = pcall(M.get_picker_items)
+			Shell._reset_runner()
+			Display._set_for_test(nil, nil)
+			helpers.assert_true(ok, tostring(items))
+			local by_id = {}
+			for _, item in ipairs(items) do if item.type == "action" then by_id[item.id] = item end end
+			return by_id
+		end
+		local reason = require("core.i18n.engine.i18n").get("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
+		local without = rows(false)
+		for _, id in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+			helpers.assert_eq(without[id].disabled, true, id .. ": Thunar or Dolphin alone cannot tell their folder")
+			helpers.assert_eq(without[id].hint, reason, id)
+		end
+		local with = rows(true)
+		for _, id in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+			helpers.assert_eq(with[id].disabled, nil, id .. ": offered with Nautilus installed")
+		end
 	end)
 
 	helpers.it("greys the agent's manual actions with the AI notice while the AI is off (ai-off-picker)", function()
@@ -293,8 +320,8 @@ helpers.describe("action picker items (Linux)", function()
 				for _, item in ipairs(M.get_picker_items()) do if item.type == "action" then by_id[item.id] = item end end
 				return by_id
 			end
-			local notice = require("infra.i18n").get("dialog.action_picker.requires_ai")
-			helpers.assert_true(notice ~= require("infra.i18n").get("llm.manual_prediction.disabled"),
+			local notice = require("core.i18n.engine.i18n").get("dialog.action_picker.requires_ai")
+			helpers.assert_true(notice ~= require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"),
 				"the greyed row has its own AI-off hint, not the suggestions notice")
 			local off = rows()
 			for _, id in ipairs({ "llm_agent_selection", "llm_agent_command" }) do
@@ -312,7 +339,7 @@ helpers.describe("action picker items (Linux)", function()
 	end)
 
 	helpers.it("names the missing tool when a desktop could wrap without it", function()
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		local M = recording_manager()
 		Display._set_for_test(Display.X11, "xfce")
 		local ok, items
@@ -323,16 +350,16 @@ helpers.describe("action picker items (Linux)", function()
 		for _, item in ipairs(items) do if item.type == "action" then by_id[item.id] = item end end
 		helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true, "X11 without wmctrl cannot list its desktops")
 		helpers.assert_eq(by_id.desktop_prev_wrap.hint,
-			(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
+			(require("core.i18n.engine.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
 	end)
 
 	helpers.it("does not borrow tool availability from an earlier workspace fixture", function()
 		local name = "modules.gestures.workspace_switcher"
 		local saved = package.loaded[name]
-		local Display = require("infra.display_server")
+		local Display = require("core.ui.engine.display_server")
 		Display._set_for_test(Display.X11, "xfce")
 		local ok, err = pcall(function()
-			local stale = helpers.load_module_with_dependency(name, "adapters.shell_runner", {
+			local stale = helpers.load_module_with_dependency(name, "core.process.adapters.shell_runner", {
 				has_command = function() return true end,
 			})
 			helpers.assert_eq(stale.detect().name, "wmctrl", "the earlier fixture captured a different tool provider")
@@ -345,7 +372,7 @@ helpers.describe("action picker items (Linux)", function()
 				helpers.assert_eq(by_id.desktop_prev_wrap.disabled, true,
 					"this fixture must inspect its own absent wmctrl provider")
 				helpers.assert_eq(by_id.desktop_prev_wrap.hint,
-					(require("infra.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
+					(require("core.i18n.engine.i18n").get("dialog.action_picker.requires_tool"):gsub("{1}", "wmctrl")))
 			end)
 		end)
 		package.loaded[name] = saved
@@ -458,9 +485,9 @@ end)
 helpers.describe("Cursor-window native picker admission", function()
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("uses actual GNU timeout admission in the picker: " .. receipt, function()
-			local Display = require("infra.display_server")
-			local Runner = require("adapters.program_runner")
-			local Shell = require("adapters.shell_runner")
+			local Display = require("core.ui.engine.display_server")
+			local Runner = require("core.process.adapters.program_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			local previous = Display.kind()
 			local cached_switch = package.loaded["adapters.window_switch"]
 			local supported, has_command, run = Runner.supported, Shell.has_command, Shell.run
@@ -490,7 +517,7 @@ helpers.describe("Cursor-window native picker admission", function()
 				helpers.assert_eq(window.disabled == true, receipt ~= "supported")
 				helpers.assert_eq(probes, 1)
 				if receipt ~= "supported" then
-					local hint = require("infra.i18n").get("dialog.action_picker.requires_tool")
+					local hint = require("core.i18n.engine.i18n").get("dialog.action_picker.requires_tool")
 					helpers.assert_eq(window.hint, (hint:gsub("{1}", "GNU timeout")))
 				end
 			end)

@@ -128,7 +128,7 @@ local function with_source_root(directory, callback)
 end
 
 local function with_quote(quote, callback)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local saved = Json.quote
 	Json.quote = function(value) return quote(value, saved) end
 	local ok, err = xpcall(callback, debug.traceback)
@@ -187,7 +187,7 @@ helpers.describe("MLX helper directory quotation ownership", function()
 					end
 					helpers.assert_type(source, "string")
 					scalar_packets[#scalar_packets + 1] = {
-						expected = directory .. "/platform/network", source = source,
+						expected = directory .. "/core/network/adapters", source = source,
 					}
 				end)
 			end)
@@ -241,6 +241,6 @@ end)
 local receiving_path = os.getenv("ERGOPTI_MLX_SCALAR_RECEIPT")
 if receiving_path then
 	local file = assert(io.open(receiving_path, "w"))
-	assert(file:write(require("json").encode(scalar_packets)))
+	assert(file:write(require("core.text.engine.json").encode(scalar_packets)))
 	assert(file:close())
 end

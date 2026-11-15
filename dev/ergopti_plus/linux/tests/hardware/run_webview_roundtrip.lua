@@ -39,14 +39,14 @@ local ok_webkit = pcall(function() return lgi.require("WebKit2", "4.1") end)
 if not ok_webkit then abort("WebKit2GTK is not available to lgi.") end
 local Gtk = lgi.require("Gtk", "3.0")
 
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 local register_idle = EventLoop.add_idle_handler
 local idle_registrations = 0
 EventLoop.add_idle_handler = function(handler)
 	idle_registrations = idle_registrations + 1
 	return register_idle(handler)
 end
-local Manager = require("ui.webview_manager")
+local Manager = require("core.ui.ui.webview_manager")
 
 -- The day and app the page must end up holding: only the daemon knows them.
 local DAY, APP, CHARS = "2026-09-24", "Firefox", 4242

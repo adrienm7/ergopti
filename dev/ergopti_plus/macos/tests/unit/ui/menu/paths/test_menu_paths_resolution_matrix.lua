@@ -25,7 +25,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Every named path the driver asks for. Kept as data so a new key added to
 --- M.get() without a row here is visible as a count mismatch below.
@@ -35,7 +35,7 @@ local PATH_KEYS = {
 	"HotstringsDirPath",
 	"PersonalHotstringsDir",
 	"ConfigTomlPath",
-	"KarabinerConfigPath",
+	"TapHoldConfigPath",
 	"PersonalShortcutsLuaPath",
 }
 
@@ -112,10 +112,10 @@ local function load_paths(opts)
 
 	package.loaded["ui.menu.menu_paths"] = nil
 	package.loaded["infra.config_paths"] = nil
-	local previous_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = make_bootstrap_file_system()
+	local previous_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = make_bootstrap_file_system()
 	local ok, mod = pcall(helpers.load_with_stubs, "ui.menu.menu_paths")
-	package.loaded["adapters.file_system"] = previous_file_system
+	package.loaded["core.fs.adapters.file_system"] = previous_file_system
 	os.getenv = real_getenv
 	if not ok then error(mod, 0) end
 	return mod

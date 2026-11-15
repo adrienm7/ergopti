@@ -92,8 +92,10 @@ else
 	assert(mode == "uncached")
 	local result = fetch(1)
 	assert(receipts[1].error_body == "")
-	check("completed 304 without a cached page remains unexpected", result.body == nil and result.status == 304
-		and type(result.error) == "string" and result.reason == "unexpected" and exits[1].code == 0)
+	-- UPD-1 (maintainer, 2026-11-11): a 304 with no usable cached page is « no
+	-- connection », so the check falls back to the public feed.
+	check("completed 304 without a cached page is no connection", result.body == nil and result.status == 304
+		and type(result.error) == "string" and result.reason == "no_connection" and exits[1].code == 0)
 end
 assert(checks == (mode == "reset" and 3 or 1), "native conditional receipt floor changed")
 print("Native TLS updater conditional receipts: " .. checks .. " checks, " .. failures .. " failures")

@@ -1,11 +1,11 @@
 --- tests/unit/modules/gestures/engine/test_gesture_click_retirement.lua
 
 --- Real manager/lifecycle with explicit native process admission and settlement.
-local Errors = require("adapter_errors")
+local Errors = require("diagnostics.engine.adapter_errors")
 local helpers = require("tests.helpers")
 local function with_manager(body)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
-	local Process, Clock = require("adapters.owned_process"), require("infra.monotonic")
+	local Process, Clock = require("core.process.adapters.owned_process"), require("core.logger.engine.monotonic")
 	local start, now, execute = Process.start, Clock.now_ms, os.execute
 	local state = { paused = false, time = 1000, operations = {}, commands = {} }
 	local function record(command)
@@ -14,8 +14,8 @@ local function with_manager(body)
 		return true
 	end
 	local ok, err = pcall(function()
-		local logger = dofile(helpers.driver_root() .. "/../_shared/lua/logger/init.lua")
-		package.loaded["logger.shim"] = logger
+		local logger = dofile(helpers.driver_root() .. "/../_shared/core/logger/engine/init.lua")
+		package.loaded["core.logger.engine.shim"] = logger
 		state.logger, state.diagnostics, state.errors = logger, {}, 0
 		logger.clock_fn = function() return state.time / 1000 end
 		logger.set_sink(function(line, variant)
@@ -30,7 +30,7 @@ local function with_manager(body)
 		Process.start = function(executable, args, options)
 			if state.start_throws then error("PRIVATE_CONSTRUCTOR_BODY") end
 			helpers.assert_eq(executable, "xdotool")
-			helpers.assert_eq(options.timeout_ms, require("infra.timings").ms("gestures", "aux_shell_timeout_ms"))
+			helpers.assert_eq(options.timeout_ms, require("core.timing.engine.timings").ms("gestures", "aux_shell_timeout_ms"))
 			helpers.assert_eq(options.capture_output, false)
 			local op = { started = true, settled = false, options = options, action = args[1], button = args[2] }
 			function op:is_settled() return self.settled end
@@ -58,7 +58,7 @@ local function with_manager(body)
 		end })
 		function state.harvest() manager.pump(); manager.pump() end
 		function state.advance()
-			state.time = state.time + require("infra.timings").ms("gestures", "aux_shell_cleanup_retry_ms")
+			state.time = state.time + require("core.timing.engine.timings").ms("gestures", "aux_shell_cleanup_retry_ms")
 			state.harvest()
 		end
 		body(manager, state)
@@ -82,11 +82,40 @@ local function holds(manager, state)
 	helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3" })
 end
 helpers.describe("gesture click retirement", function()
+	-- click.ahk: an InputHook started with the hold releases it at the next
+	-- key-down (GestureOnKeyDown). Linux kept the button down until the next
+	-- toggle, a pause or a disable (GSL-002, click-hold-key-release).
+	helpers.it("releases both held buttons at the next key press (click-hold-key-release)", function()
+		with_manager(function(manager, state)
+			helpers.assert_true(manager.release_clicks_on_activity(), "nothing held: nothing to do")
+			helpers.assert_eq(edges(state), {}, "and no native helper runs for it")
+			holds(manager, state)
+			manager.release_clicks_on_activity()
+			state.harvest()
+			helpers.assert_eq(edges(state), { "mousedown:1", "mousedown:3", "mouseup:1", "mouseup:3" })
+			manager.execute_action("left_click_toggle", "left")
+			state.harvest()
+			helpers.assert_eq(edges(state)[5], "mousedown:1", "a released hold can be taken again")
+		end)
+	end)
+
+	-- The daemon's physical key observer is the caller, ahead of the privacy
+	-- gate: a key typed in a secure field ends the hold too.
+	helpers.it("wires every physical key press to the click release (click-hold-key-release)", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = file:read("*a")
+		file:close()
+		local start = assert(source:find("local function handle_physical(", 1, true), "the physical key observer")
+		local gate = assert(source:find("secure_focus_guard.blocks_text()", start, true), "its privacy gate")
+		local call = source:find("gestures.release_clicks_on_activity()", start, true)
+		helpers.assert_true(call ~= nil and call < gate, "the release runs before the privacy gate")
+	end)
+
 	helpers.it("releases a toggled button when its gesture binding is removed", function()
 		with_manager(function(manager, state)
 			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad",
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
 				drain = function() return 0, "would_block" end, close = function() return true end }
 			helpers.assert_true(manager.enable())
 			helpers.assert_true(manager.dispatch_gesture({ fingers = 3, direction = "left" }))
@@ -193,7 +222,7 @@ helpers.describe("gesture click retirement", function()
 	helpers.it("does not start a removed gesture click during parameter publication", function()
 		with_manager(function(manager, state)
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
 			helpers.assert_true(manager.enable())
 			helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 			local path = os.tmpname(); local backup = path .. ".backup"
@@ -223,7 +252,7 @@ helpers.describe("gesture click retirement", function()
 		helpers.it("preserves the click until gesture disable is " .. (accepted and "committed" or "refused"), function()
 			with_manager(function(manager, state)
 				manager._test_begin_reading({ feed = function() end })
-				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad",
+				package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
 					close = function() return true end, drain = function() return 0, "would_block" end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
@@ -234,8 +263,8 @@ helpers.describe("gesture click retirement", function()
 					return accepted
 				end
 				if not accepted then
-					package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
-					local reader = package.loaded["adapters.evdev_reader"]
+					package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+					local reader = package.loaded["platform.input.evdev_reader"]
 					reader.open = function() return true end
 				end
 				local result = manager.set_enabled(false)
@@ -252,9 +281,9 @@ helpers.describe("gesture click retirement", function()
 		helpers.it("fences gesture clicks until activation is " .. (accepted and "committed" or "refused"), function()
 			with_manager(function(manager, state)
 				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
-				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", open = function() return true end,
+				package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", open = function() return true end,
 					close = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				local persist, observed = manager._persist_updates, nil
 				manager._persist_updates = function()
 					observed = manager.dispatch_gesture({ fingers = 3, direction = "left" })
@@ -278,7 +307,7 @@ helpers.describe("gesture click retirement", function()
 	helpers.it("keeps a held click when the provisional touchpad close is refused", function()
 		with_manager(function(manager, state)
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return false, "refused" end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return false, "refused" end,
 				drain = function() return 0, "would_block" end }
 			helpers.assert_true(manager.enable())
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
@@ -291,7 +320,7 @@ helpers.describe("gesture click retirement", function()
 	helpers.it("retains and retries the disable owner when applying raises", function()
 		with_manager(function(manager, state)
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 				drain = function() return 0, "would_block" end }
 			helpers.assert_true(manager.enable())
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
@@ -318,12 +347,12 @@ helpers.describe("gesture click retirement", function()
 				local file = assert(io.open(path, "w")); file:write('[gestures]\nenabled = true\n'); file:close()
 				manager.init({ enabled = false, persist = true, config_path = path, is_paused = function() return false end })
 				manager._test_begin_reading({ feed = function() end })
-				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
+				package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-				local writer, write = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+				local writer, write = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 				writer.batch_write = function(...)
 					if publish then helpers.assert_true(write(...)) end
 					error("controlled writer exception")
@@ -350,12 +379,12 @@ helpers.describe("gesture click retirement", function()
 				local f = assert(io.open(path, "wb")); assert(f:write(original)); assert(f:close())
 				manager.init({ enabled = false, persist = true, config_path = path, is_paused = function() return false end })
 				manager._test_begin_reading({ feed = function() end })
-				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
+				package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-				local writer = require("toml_codec.writer"); local write, read = writer.batch_write, writer.read_classified
+				local writer = require("core.text.engine.toml_codec.writer"); local write, read = writer.batch_write, writer.read_classified
 				writer.batch_write = function()
 					if mode == "foreign" then local x = assert(io.open(path, "wb")); assert(x:write('[gestures]\nenabled = true\n# foreign\n')); assert(x:close())
 					else writer.read_classified = function() return nil, "error" end end
@@ -379,7 +408,7 @@ helpers.describe("gesture click retirement", function()
 		with_manager(function(manager, state)
 			manager._test_begin_reading({ feed = function() end })
 			local nested
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", drain = function() return 0, "would_block" end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", drain = function() return 0, "would_block" end,
 				close = function() nested = manager.set_enabled(true); return true end }
 			helpers.assert_true(manager.enable())
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
@@ -394,7 +423,7 @@ helpers.describe("gesture click retirement", function()
 		with_manager(function(manager, state)
 			manager._test_begin_reading({ feed = function() end })
 			local called = false
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", drain = function() return 0, "would_block" end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", drain = function() return 0, "would_block" end,
 				close = function()
 					called = true
 					manager.dispatch_gesture({ fingers = 3, direction = "left" })
@@ -415,10 +444,10 @@ helpers.describe("gesture click retirement", function()
 			local file = assert(io.open(path, "w")); file:write('[gestures]\nenabled = true\nswipe_3_left = "left_click_toggle"\n'); file:close()
 			manager.init({ enabled = false, persist = true, config_path = path, is_paused = function() return false end })
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end, drain = function() return 0, "would_block" end }
 			helpers.assert_true(manager.enable())
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
-			local writer, publish = require("toml_codec.writer"), require("toml_codec.writer").publish_if_unchanged
+			local writer, publish = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").publish_if_unchanged
 			local reentered = false
 			writer.publish_if_unchanged = function(...)
 				if not reentered then
@@ -443,20 +472,20 @@ helpers.describe("gesture click retirement", function()
 			local path = os.tmpname(); local backup = path .. ".backup"
 			local file = assert(io.open(path, "w")); file:write('[gestures]\nenabled = true\nswipe_3_left = "left_click_toggle"\n'); file:close()
 			manager._test_begin_reading({ feed = function() end })
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 				open = function() return true end, drain = function() return 0, "would_block" end }
-			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 			helpers.assert_true(manager.enable()); helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 			manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 			local scope = require("infra.gesture_scope").new({ path = path, backup_path = backup, gestures = manager })
-			local participant = require("config_scope_participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
+			local participant = require("settings.engine.scope.participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
 			local releases, reversions = 0, 0
 			local other = { pending = function() return false end, apply = function(_, done) done(true) end,
 				revert = function(done) reversions = reversions + 1; done(true) end,
 				release = function() releases = releases + 1; return releases > 1 end,
 				retry_restore = function(done) done(true) end }
 			local logger = { start = function() end, success = function() end, info = function() end, warn = function() end, error = function() end }
-			local composed = require("config_scope_composition").new({ scope = "all", logger = logger,
+			local composed = require("settings.engine.scope.composition").new({ scope = "all", logger = logger,
 				manifest = { scopes = function() return { all = { includes = { "gestures", "other" } }, gestures = {}, other = {} } end },
 				participants = function() return { gestures = participant, other = other } end })
 			local ok, detail = xpcall(function()
@@ -479,14 +508,14 @@ helpers.describe("gesture click retirement", function()
 				local path = os.tmpname(); local backup = path .. ".backup"
 				local file = assert(io.open(path, "w")); file:write('[gestures]\nenabled = true\nswipe_3_left = "left_click_toggle"\n'); file:close()
 				manager._test_begin_reading({ feed = function() end })
-				package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
+				package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end,
 					open = function() return true end, drain = function() return 0, "would_block" end }
-				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
+				package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function() return { path = "/dev/input/test", max_fingers = 5 } end }
 				helpers.assert_true(manager.enable())
 				helpers.assert_true(manager.set_action("swipe_3_left", "left_click_toggle"))
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local scope = require("infra.gesture_scope").new({ path = path, backup_path = backup, gestures = manager })
-				local participant = require("config_scope_participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
+				local participant = require("settings.engine.scope.participant").synchronous({ apply = function(mode) return scope.apply(mode) end, owner = function() return scope end })
 				local reached = false
 				local other = { pending = function() return false end, apply = function(_, done)
 						reached = true
@@ -495,7 +524,7 @@ helpers.describe("gesture click retirement", function()
 					end,
 					revert = function(done) done(true) end, release = function() end, retry_restore = function(done) done(true) end }
 				local logger = { start = function() end, success = function() end, info = function() end, warn = function() end, error = function() end }
-				local composed = require("config_scope_composition").new({ scope = "all", logger = logger,
+				local composed = require("settings.engine.scope.composition").new({ scope = "all", logger = logger,
 					manifest = { scopes = function() return { all = { includes = { "gestures", "other" } }, gestures = {}, other = {} } end },
 					participants = function() return { gestures = participant, other = other } end })
 				local ok, detail = xpcall(function()
@@ -519,7 +548,7 @@ helpers.describe("gesture click retirement", function()
 				manager.execute_action("left_click_toggle", "swipe_3_left"); state.harvest()
 				local path = os.tmpname(); local backup = path .. ".backup"
 				local file = assert(io.open(path, "w")); file:write('[gestures]\nswipe_3_left = "left_click_toggle"\n'); file:close()
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local files = {
 					read_with_status = function(target) return Writer.read_classified(target) end,
 					write = function() error("unconditional publication is forbidden") end,
@@ -662,7 +691,7 @@ helpers.describe("gesture click retirement", function()
 			if setfenv then chunk = assert(loadstring("return " .. entry)); setfenv(chunk, env)
 			else chunk = assert(load("return " .. entry, "gesture-shutdown", "t", env)) end
 			local stops = 0
-			local coordinator = require("infra.shutdown_coordinator").new({ pre_wait = { chunk() },
+			local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({ pre_wait = { chunk() },
 				keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 				event_loop = { stop = function() stops = stops + 1 end } })
 			helpers.assert_eq(coordinator.request("owned-button"), true)
@@ -816,7 +845,7 @@ helpers.describe("gesture click retirement", function()
 					if behavior == "throw" then error("sink output unavailable") end
 					manager.disable()
 					manager.execute_action("right_click_toggle", "from-diagnostic")
-					require("adapters.owned_process").start = function() foreign = foreign + 1; error("foreign issuer") end
+					require("core.process.adapters.owned_process").start = function() foreign = foreign + 1; error("foreign issuer") end
 				end
 				manager.execute_action("left_click_toggle", "left"); state.harvest()
 				helpers.assert_eq(#state.diagnostics, 1)

@@ -97,7 +97,7 @@ global DriverPid := DllCall("GetCurrentProcessId", "UInt")
 ; Features directly.
 ;
 ; The fixture below mirrors the manifest defaults — extend it alongside
-; any new feature added to static/ergopti_plus/_shared/modules/features/manifest.toml
+; any new feature added to static/ergopti_plus/_shared/settings/data/features/manifest.toml
 ; so existing tests don't break when a new HotIf reads Features["…"].
 global Features := Map(
     "layout", Map(
@@ -307,10 +307,10 @@ global _PathsFile := A_Temp . "\ergopti_test_paths_" . A_ScriptHwnd . ".toml"
 global SpaceAroundSymbols := ""
 
 ; ``_StaticDir`` is normally computed by ErgoptiPlus.ahk and read by
-; infra/i18n.ahk to build the path to the locale JSON files. Without this stub,
+; core/i18n/engine/i18n.ahk to build the path to the locale JSON files. Without this stub,
 ; the very first t() call (e.g. from modules/gestures.ahk's top-level
 ; GESTURE_SLOT_LABELS builder) raised "global variable has not been assigned a
-; value" inside infra/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
+; value" inside core/i18n/engine/i18n.ahk's _I18nLocalePath helper. AHK then surfaced the
 ; error as a MsgBox under default settings — invisible but blocking on the
 ; headless CI runner, which is the root cause of the recurring "5-minute
 ; timeout" failures of the AHK test suite.
@@ -336,7 +336,7 @@ global _ExtensionsDir := _StaticDir . "\ergopti_plus\extensions"
 ; The LastSentCharacters ring buffer is defined in infra/hotstring_engine.ahk;
 ; tests seed it via _LSCResetFrom([...]) instead of touching it directly.
 global LastSentCharacterKeyTime := Map()
-; Mirrors the pruning thresholds of infra/boot.ahk: AppState_TouchLastSentKey
+; Mirrors the pruning thresholds of core/lifecycle/engine/boot.ahk: AppState_TouchLastSentKey
 ; (infra/hotstrings/hotstring_send.ahk) reads them on every timestamp write.
 global LAST_SENT_KEY_TIME_MAX_AGE_MS := 60000
 global LAST_SENT_KEY_TIME_PRUNE_AT := 150
@@ -381,6 +381,13 @@ global _OB_ALTGR_PASSTHROUGH := false
 IsOnboardingActive() {
 	global _OB_ALTGR_PASSTHROUGH
 	return IsSet(_OB_ALTGR_PASSTHROUGH) and _OB_ALTGR_PASSTHROUGH
+}
+; The Configuration menu binds the wizard's menu entry by name; a test that
+; builds that menu records a click instead of opening the wizard.
+global _Stub_OnboardingMenuOpens := 0
+Onboarding_ShowFromMenu(*) {
+	global _Stub_OnboardingMenuOpens
+	_Stub_OnboardingMenuOpens += 1
 }
 global OneShotShiftEnabled := false
 global NumberOfRepetitions := 1
@@ -471,7 +478,7 @@ ToggleSuspend() {
     _Stub_SentText.Push({ kind: "toggle_suspend" })
 }
 
-; The pause-preserving reload. The real one lives in infra/lifecycle.ahk, which
+; The pause-preserving reload. The real one lives in core/lifecycle/engine/lifecycle.ahk, which
 ; this runner cannot include: it defines ToggleSuspend, colliding with the stub
 ; above, and loading the genuine article would let a test actually Suspend(1) the
 ; runner and arm its watchdog timers. Stubbed rather than IsSet-guarded at the
@@ -609,7 +616,7 @@ SimulateMicrosoftOffice() {
 ; =============================================
 ; =============================================
 
-; Replaces the injectable send primitives from adapters/text_sender.ahk with
+; Replaces the injectable send primitives from platform/input/text_sender.ahk with
 ; no-ops so no real keystroke ever reaches the OS while tests are running.
 ; This mirrors the _SendHook pattern used for hotstring engine tests.
 ; _AHK_SendText and _AHK_SendInput are declared as globals in text_sender.ahk
@@ -638,7 +645,7 @@ InstallSendNoOps() {
 ; =====================================================================
 
 ; These functions are called by modules/llm/prediction_engine.ahk at
-; runtime. In production they live in ui/tooltip/tooltip_llm.ahk and
+; runtime. In production they live in core/ui/ui/tooltip/tooltip_llm.ahk and
 ; modules/keystats/keystats.ahk (which register hotkeys or OS hooks
 ; and therefore cannot be #Included by the test runner). The stubs
 ; below record calls so individual tests can assert on them.

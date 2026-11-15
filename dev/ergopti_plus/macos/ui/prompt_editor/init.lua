@@ -16,13 +16,13 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
 local hs         = hs
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local i18n       = require("infra.i18n")
-local Paths      = require("infra.paths")
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local i18n       = require("core.i18n.engine.i18n")
+local Paths      = require("core.fs.engine.paths")
 
 local LOG = "prompt_editor"
 
@@ -191,6 +191,20 @@ end
 
 --- Opens the Prompt Editor window.
 --- @param existing table|nil An existing profile to edit, or nil for a new one.
+--- Tells the user a save was refused, as Windows and Linux do: the editor stays
+--- open with the prompt. The alert runs as deferred work, never inside the
+--- page's message callback.
+local function report_save_failure()
+	local scheduled = require("core.timing.engine.deferred_work").after(0, function()
+		local shown, err = pcall(function()
+			require("core.ui.engine.dialog_util").block_alert(i18n.get("common.error_title"),
+				i18n.get("prompt_editor.save_failed"), i18n.get("button.ok"), nil, "critical")
+		end)
+		if not shown then Logger.error(LOG, "The save failure could not be shown: %s.", tostring(err)) end
+	end, "prompt_editor.save_failed")
+	if scheduled ~= true then Logger.error(LOG, "The save failure notice could not be scheduled.") end
+end
+
 --- @param on_save function Callback invoked when the user clicks "Save". An
 ---   explicit false return refuses settlement and keeps the editor retryable.
 --- @return boolean opened
@@ -275,9 +289,9 @@ function M.open(existing, on_save)
 					raw_prompt = type(body.prompt) == "string" and body.prompt or "",
 				})
 			active.saving = false
-			if not callback_ok then return end
-			if callback_result == false then
+			if not callback_ok or callback_result == false then
 				Logger.warn(LOG, "Prompt editor save was refused; keeping the editor open.")
+				report_save_failure()
 				return
 			end
 			active.settled = true
@@ -310,7 +324,7 @@ function M.open(existing, on_save)
 		delete_on_close = true,
 		frame         = frame,
 		title         = context.payload.title,
-		style_masks   = {"titled", "closable", "utility"},
+		style_masks   = {"titled", "closable", "resizable", "utility"},
 		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
 		on_navigation = function(action)

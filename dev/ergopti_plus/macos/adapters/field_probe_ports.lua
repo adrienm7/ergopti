@@ -43,7 +43,7 @@ local function permission_facts()
 	local eventtap = type(hs.eventtap) == "table" and hs.eventtap or {}
 	return {
 		accessibility = (require("adapters.accessibility_permission").is_trusted()),
-		screen_recording = (require("adapters.screen_capture").permission_state()),
+		screen_recording = (require("platform.system.screen_capture").permission_state()),
 		-- Only some Hammerspoon builds can ask without prompting; nil otherwise
 		input_monitoring = optional_query(eventtap.checkKeyboardEventAccess, false),
 		secure_input = optional_query(eventtap.isSecureInputEnabled),
@@ -82,7 +82,7 @@ local function hold_counts()
 	return {
 		over_250ms = PhaseStats.counter("runtime.timer_hold_over_250ms"),
 		over_1000ms = PhaseStats.counter("runtime.timer_hold_over_1000ms"),
-		worst = require("infra.logger").worst_timer_hold(),
+		worst = require("core.logger.engine.logger").worst_timer_hold(),
 	}
 end
 
@@ -110,7 +110,7 @@ end
 --- The Ergopti layout files installed for this user and for every user.
 --- @return table files { keylayouts = { path }, plists = { path } }
 local function layout_files()
-	local FsDir = require("infra.fs_dir")
+	local FsDir = require("core.fs.engine.dir")
 	local files = { keylayouts = {}, plists = {} }
 	local dirs = {}
 	local home = os.getenv("HOME")
@@ -150,7 +150,7 @@ end
 -- The configuration files the storage step parses, by config_paths key.
 local CONFIG_FILES = {
 	{ name = "config_toml", key = "ConfigTomlPath" },
-	{ name = "karabiner_toml", key = "KarabinerConfigPath" },
+	{ name = "tap_hold_toml", key = "TapHoldConfigPath" },
 	{ name = "personal_toml", key = "PersonalTomlPath" },
 	{ name = "personal_info_toml", key = "PersonalInfoTomlPath" },
 }
@@ -159,7 +159,7 @@ local CONFIG_FILES = {
 --- @return table files { { name, path, present } }
 local function config_files()
 	local ConfigPaths = require("infra.config_paths")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local files = {}
 	for _, entry in ipairs(CONFIG_FILES) do
 		local path = ConfigPaths.get(entry.key)
@@ -173,9 +173,9 @@ end
 --- @param path string Absolute path.
 --- @return boolean parsed
 local function parse_toml(path)
-	local ok, document = pcall(require("infra.toml.reader").parse, path)
+	local ok, document = pcall(require("core.text.engine.toml.reader").parse, path)
 	if not ok then
-		require("infra.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
+		require("core.logger.engine.logger").warn("adapters.field_probe_ports", "A configuration file did not parse: %s.",
 			tostring(document))
 	end
 	return ok and type(document) == "table"
@@ -184,8 +184,8 @@ end
 --- The logs folder: today's log, a probe write, and the files it holds.
 --- @return table facts { today_present, writable, files, bytes }
 local function log_facts()
-	local Logger = require("infra.logger")
-	local FileSystem = require("adapters.file_system")
+	local Logger = require("core.logger.engine.logger")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local dir = Logger.logs_dir()
 	local facts = { today_present = FileSystem.exists(Logger.today_log_path()) == true, writable = false,
 		files = 0, bytes = 0 }
@@ -200,7 +200,7 @@ local function log_facts()
 		local closed = handle:close() == true
 		facts.writable = written and closed and os.remove(probe) == true
 	end
-	for _, name in ipairs(require("infra.fs_dir").entries(dir)) do
+	for _, name in ipairs(require("core.fs.engine.dir").entries(dir)) do
 		local attributes = hs.fs.attributes(dir .. "/" .. name)
 		local size = type(attributes) == "table" and attributes.mode == "file" and attributes.size or nil
 		if type(size) == "number" then
@@ -225,7 +225,7 @@ local function keystats_database()
 	local path = type(manager) == "table" and type(manager.get_sqlite_path) == "function"
 		and manager.get_sqlite_path() or nil
 	if type(path) ~= "string" or path == "" then return { path = nil, present = false } end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	-- The cache of earlier versions, <TMPDIR>/ergopti_metrics/<device>/db.sqlite,
 	-- which the log manager adopts once (log_manager._adopt_legacy_cache).
 	local device, tmp = path:match("([^/]+)/db%.sqlite$"), os.getenv("TMPDIR")
@@ -271,8 +271,8 @@ end
 --- @param callback function fn(exit_code|nil, stdout, stderr).
 --- @param environment table|nil Explicit child environment.
 local function exec_input(executable, args, input, timeout_s, callback, environment)
-	local ShellRunner = M._shell_runner or require("adapters.shell_runner")
-	local Timer = require("adapters.timer_scheduler")
+	local ShellRunner = M._shell_runner or require("core.process.adapters.shell_runner")
+	local Timer = require("core.events.timer_scheduler")
 	local settled, timer = false, nil
 	local function settle(code, stdout, stderr)
 		if settled then return end
@@ -325,7 +325,7 @@ local function loopback_server(path, callback)
 			})
 		end
 	end
-	require("infra.logger").warn("adapters.field_probe_ports", "No loopback port could be bound for the HTTP worker check.")
+	require("core.logger.engine.logger").warn("adapters.field_probe_ports", "No loopback port could be bound for the HTTP worker check.")
 	callback(nil)
 end
 
@@ -353,7 +353,7 @@ local OWNED_CRASH_PROCESSES = {
 --- shared folder through hs.fs, which a port loaded for another probe may lack.
 --- @return number Bytes.
 local function crash_read_bytes()
-	return require("infra.timings").count("limits", "crash_report_head_bytes")
+	return require("core.timing.engine.timings").count("limits", "crash_report_head_bytes")
 end
 
 --- The closed tokens of one crash report: its kind (hang or crash), the
@@ -385,8 +385,8 @@ end
 --- @param since number|nil Epoch seconds of the current app start; nil judges the whole day.
 --- @return table counts { driver, driver_earlier, owned = { { process, kind } }, earlier = { process = n }, other }
 local function crash_counts(since)
-	local FileSystem = require("adapters.file_system")
-	local FsDir = require("infra.fs_dir")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local FsDir = require("core.fs.engine.dir")
 	local now = os.time()
 	local function recent(dir, visit)
 		if FileSystem.exists(dir) ~= true then return end
@@ -398,7 +398,7 @@ local function crash_counts(since)
 	end
 	local counts = { driver = 0, driver_earlier = 0, owned = {}, earlier = {}, other = 0 }
 	local function current(modified) return since == nil or modified >= since end
-	recent(require("infra.logger").crash_reports_dir():gsub("/+$", ""), function(_, modified)
+	recent(require("core.logger.engine.logger").crash_reports_dir():gsub("/+$", ""), function(_, modified)
 		if current(modified) then counts.driver = counts.driver + 1
 		else counts.driver_earlier = counts.driver_earlier + 1 end
 	end)
@@ -440,12 +440,12 @@ local PREDICTION_TIMEOUT_SECONDS = 60
 --- @param backend string "ollama" or "mlx".
 --- @return table models { { name, runtime_name, download_gb } }
 local function catalogue_models(backend)
-	local path = require("infra.paths").shared_llm_path("models.json")
-	local text = path and require("adapters.file_system").read(path) or nil
+	local path = require("core.fs.engine.paths").shared_llm_path("models.json")
+	local text = path and require("core.fs.adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return {} end
-	local ModelCatalogue = require("llm.model_catalogue")
+	local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
 	local models = {}
-	for _, provider in ipairs(require("json").decode(text)) do
+	for _, provider in ipairs(require("core.text.engine.json").decode(text)) do
 		for _, family in ipairs(type(provider.families) == "table" and provider.families or {}) do
 			for _, model in ipairs(type(family.models) == "table" and family.models or {}) do
 				local runtime = ModelCatalogue.runtime_name(model, backend)
@@ -537,7 +537,7 @@ end
 --- @param text string The check's own text.
 --- @param callback function fn(answered, failure_token|nil, elapsed_ms).
 local function ollama_predict(model, text, callback)
-	local Timer = require("adapters.timer_scheduler")
+	local Timer = require("core.events.timer_scheduler")
 	local started, settled, timer = hs.timer.absoluteTime(), false, nil
 	local function settle(answered, token)
 		if settled then return end
@@ -675,8 +675,8 @@ end
 ---        (until_prediction) is polled for wait_seconds; effect_ms is the time
 ---        from the last key to the effect, nil when it never came.
 local function scratch_typing(keys, callback, options)
-	local Timer = require("adapters.timer_scheduler")
-	local OwnWindow = require("adapters.own_window")
+	local Timer = require("core.events.timer_scheduler")
+	local OwnWindow = require("core.ui.adapters.own_window")
 	local Selftest = require("infra.field_run_selftest")
 	options = options or {}
 	local outcome = { focused = false, posted = 0 }
@@ -692,7 +692,7 @@ local function scratch_typing(keys, callback, options)
 		if publication then
 			local retracted, err = pcall(Selftest.retract, publication)
 			if not retracted then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window was not retracted: %s.",
 					tostring(err))
 			end
 			publication = nil
@@ -741,13 +741,13 @@ local function scratch_typing(keys, callback, options)
 		-- The shared chrome keeps the normal level: the field is focused before
 		-- each key and the run aborts when it loses the focus, so floating it
 		-- would only leave it above the windows the user opens meanwhile
-		local UiBuilder = require("ui.ui_builder")
+		local UiBuilder = require("core.ui.ui.builder")
 		for _, step in ipairs(UiBuilder.window_chrome_steps(view)) do step.apply() end
 		view:windowTitle("Ergopti field run"):allowTextEntry(true):html(SCRATCH_HTML):show()
 		UiBuilder.force_focus(view, true)
 	end)
 	if not ok then
-		require("infra.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
+		require("core.logger.engine.logger").error("adapters.field_probe_ports", "The scratch field could not open: %s.", tostring(err))
 		return settle("scratch_refused")
 	end
 	bound = Timer.after(options.bound_seconds or SCRATCH_BOUND_SECONDS, function()
@@ -795,7 +795,7 @@ local function scratch_typing(keys, callback, options)
 		if publication == nil then
 			local published, generation = pcall(Selftest.publish, reason)
 			if not published then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
 					tostring(generation))
 				return settle("selftest_busy")
 			end
@@ -805,7 +805,7 @@ local function scratch_typing(keys, callback, options)
 		started = started or hs.timer.absoluteTime()
 		-- The selftest class: the keymap decodes these keys as typing in this
 		-- window only, keystats never counts them, the passive counter sees them
-		local sent, emitted = pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
+		local sent, emitted = pcall(require("platform.input.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
 		if not sent or emitted ~= true then return settle("injection_refused") end
 		last_key_at = hs.timer.absoluteTime()
 		outcome.posted = index
@@ -823,14 +823,14 @@ local function scratch_typing(keys, callback, options)
 		if not focused then
 			if focus_polls >= SCRATCH_FOCUS_POLLS then return settle(reason) end
 			if focus_polls > 0 and focus_polls % SCRATCH_REFOCUS_POLLS == 0 then
-				pcall(require("ui.ui_builder").force_focus, view, false)
+				pcall(require("core.ui.ui.builder").force_focus, view, false)
 			end
 			return Timer.after(SCRATCH_POLL_SECONDS, function() await_classification(0, nil, focus_polls + 1) end)
 		end
 		if publication == nil then
 			local published, generation = pcall(Selftest.publish, reason)
 			if not published then
-				require("infra.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
+				require("core.logger.engine.logger").error("adapters.field_probe_ports", "The selftest window could not be published: %s.",
 					tostring(generation))
 				return settle("selftest_busy")
 			end
@@ -866,7 +866,7 @@ local ROWS_FILE_PREFIX = "ErgoptiFieldRows-"
 --- The boot that started this app (infra/field_check_session.lua).
 --- @return table { complete_ms, cpu_ms, slowest }
 local function boot_facts()
-	local Boot = require("infra.boot_profiler")
+	local Boot = require("core.logger.engine.boot_profiler")
 	return { complete_ms = Boot.boot_complete_ms(), cpu_ms = Boot.boot_cpu_ms(), slowest = Boot.slowest_stages(3) }
 end
 
@@ -875,7 +875,7 @@ end
 --- category, never as an ERROR line of the session.
 --- @return table { dir, mode, exists, append, write }
 local function fifo()
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local tmp = (os.getenv("TMPDIR") or "/tmp"):gsub("/+$", "")
 	local function expected_refusal() end
 	return {
@@ -977,7 +977,7 @@ function M.new()
 		end,
 		launcher = launcher,
 		exec_input = exec_input,
-		read_text = function(path) return require("adapters.file_system").read(path) end,
+		read_text = function(path) return require("core.fs.adapters.file_system").read(path) end,
 		loopback_server = loopback_server,
 		crash_counts = crash_counts,
 		ax_value_watch_counts = ax_value_watch_counts,
@@ -1010,6 +1010,18 @@ function M.new()
 				deliveries = counts.deliveries,
 			}
 		end,
+		physical_shortcut_facts = function()
+			local Shortcuts = require("modules.shortcuts.keyboard_shortcuts")
+			local bound = 0
+			for _, entry in ipairs(Shortcuts.physical_assignments()) do
+				if entry.action ~= nil and entry.action ~= "none" then bound = bound + 1 end
+			end
+			-- The hook module holds the process counts even before its first owner starts
+			local counts = require("adapters.physical_shortcut_hook").counts()
+			return { available = Shortcuts.physical_delivery_available() == true, bound = bound,
+				suppressed = counts.suppressed, delivered = counts.delivered,
+				unacknowledged = counts.unacknowledged, dropped = counts.dropped }
+		end,
 		hotstring_candidates = hotstring_candidates,
 		prediction_readiness = prediction_readiness,
 		layout_rows_env = layout_rows_env,
@@ -1018,13 +1030,13 @@ function M.new()
 		boot_facts = boot_facts,
 		fifo = fifo,
 		apple_shortcut_action = function() return require("modules.gestures.apple_shortcut_action") end,
-		today_log_path = function() return require("infra.logger").today_log_path() end,
+		today_log_path = function() return require("core.logger.engine.logger").today_log_path() end,
 		-- Process CPU and a monotonic clock, both in milliseconds
 		cpu_ms = function() return os.clock() * 1000 end,
 		-- The idle window starts from a collected heap and names its timers.
 		collect_garbage = function() collectgarbage("collect") end,
-		begin_callback_accounting = function() require("infra.logger").begin_callback_accounting() end,
-		end_callback_accounting = function() return require("infra.logger").end_callback_accounting() end,
+		begin_callback_accounting = function() require("core.logger.engine.logger").begin_callback_accounting() end,
+		end_callback_accounting = function() return require("core.logger.engine.logger").end_callback_accounting() end,
 		now_ms = function() return hs.timer.absoluteTime() / 1000000 end,
 	}
 end

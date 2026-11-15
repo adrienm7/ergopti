@@ -106,8 +106,8 @@ helpers.describe("ScriptControl — physical F13/F14/F15 must not misfire pause/
 	-- is not acted on late: pause, reload or quit 1.2 s after the press is a
 	-- surprise, and macOS may already have delivered the key without the tap.
 	helpers.it("a genuine sentinel that waited behind the main thread passes untouched (stale-physical-event)", function()
-		local EventClock = require("adapters.event_clock")
-		local Health = require("infra.key_event_health")
+		local EventClock = require("core.events.clock")
+		local Health = require("core.logger.engine.key_event_health")
 		EventClock.reset()
 		Health.reset()
 		local host_ns = 3600 * 1e9
@@ -255,7 +255,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		end
 		-- pause now treats tooltip teardown as required. Keep this unit test
 		-- behavioral and deterministic instead of loading the real TOML-backed UI.
-		package.loaded["ui.tooltip"] = { hide_forced = rec("tt_hide") }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = rec("tt_hide") }
 		local keymap_spy = {
 			pause_processing  = rec("km_pause"),
 			resume_processing = rec("km_resume"),
@@ -313,7 +313,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		helpers.assert_true((calls.k_resume or 0) >= 1, "resume must call karabiner.resume")
 
 		SC.stop()
-		package.loaded["ui.tooltip"] = nil
+		package.loaded["core.ui.ui.tooltip"] = nil
 	end)
 end)
 

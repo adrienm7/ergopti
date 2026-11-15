@@ -14,7 +14,7 @@
 --- The earlier "fix" wrapped the reporter call in hs.timer.doAfter(0, ...). That
 --- moves the call off the THROWING CALLBACK'S STACK FRAME but keeps it on the
 --- SAME MAIN THREAD one run loop tick later. The stack frame was never the cause;
---- the synchronous nested modal loop is. infra/dialog_util.lua:57-58 documents this
+--- the synchronous nested modal loop is. core/ui/engine/dialog_util.lua:57-58 documents this
 --- directly: modal dialogs block the main thread and its runloop.
 ---
 --- Fix: a throw inside a timer callback is RECOVERABLE by definition — the
@@ -63,8 +63,8 @@ helpers.describe("logger: a recoverable timer-callback error never reaches the c
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
 
-		package.loaded["infra.logger"] = nil
-		local Logger = require("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.install_runtime_error_capture()
 
@@ -142,8 +142,8 @@ helpers.describe("shell_runner: crash report is deferred off the hs.task complet
 			},
 		}
 
-		package.loaded["adapters.shell_runner"] = nil
-		local sr = helpers.load_with_stubs("adapters.shell_runner", hs_overrides)
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		local sr = helpers.load_with_stubs("core.process.adapters.shell_runner", hs_overrides)
 
 		local reported = false
 		_G.ergopti_report_crash = function() reported = true end

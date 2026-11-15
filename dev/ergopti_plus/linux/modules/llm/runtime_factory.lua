@@ -22,43 +22,43 @@ local M = {}
 --- @return string|nil reason Classified native construction refusal.
 function M.new(engine, profiles)
 	local native = require("luv")
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	local resolver, reason = require("modules.llm.ollama_install_resolver").new()
 	if not resolver then return nil, reason end
 	local serve_environment, environment_reason = require("modules.llm.managed_ollama_environment").load()
 	if not serve_environment then return nil, environment_reason end
 	-- The daemon cannot evaluate a PAC: the desktop proxy is resolved for it.
-	local proxy_policy, proxy_reason = require("infra.proxy_policy").load()
+	local proxy_policy, proxy_reason = require("core.network.engine.proxy_policy").load()
 	if not proxy_policy then return nil, proxy_reason end
-	local origins, origins_reason = require("infra.route_origins").client("ollama")
+	local origins, origins_reason = require("core.network.engine.route_origins").client("ollama")
 	if not origins then return nil, origins_reason end
 	-- A proxy that demands an NTLM/Negotiate sign-in is answered by the local relay.
-	local Relay = require("infra.proxy_auth_relay")
+	local Relay = require("core.network.engine.proxy_auth_relay")
 	local relay_policy, relay_reason = Relay.load()
 	if not relay_policy then return nil, relay_reason end
 	local source = require("modules.llm.runtime_source").new({
 		preferences = require("infra.llm_preferences"), profiles = profiles,
-		writer = require("toml_codec.writer"), manifest = require("infra.manifest_reader"),
+		writer = require("core.text.engine.toml_codec.writer"), manifest = require("infra.manifest_reader"),
 		engine = engine, backend_key = engine.backend_key,
 		path = require("infra.config_paths").config("config.toml"),
 	})
-	local process = require("llm.process_port").new(require("native_worker_owner"),
-		require("adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
-	local timer = require("modules.llm.owned_timer").new(native, require("infra.native_timer"))
+	local process = require("ai.engine.policy.process_port").new(require("core.lifecycle.engine.native_worker_owner"),
+		require("core.process.adapters.owned_process"), native, Timings.ms("llm", "poll_interval_ms"))
+	local timer = require("modules.llm.owned_timer").new(native, require("core.timing.engine.native_timer"))
 	local installed = require("modules.llm.ollama_installed_runtime")
 	local controller = require("modules.llm.runtime_composition").new({
 		source = source, resolver = resolver, installed = installed,
 		file_factory = require("modules.llm.ollama_install_files"),
 		archive_factory = require("infra.archive_output"),
 		admission = require("modules.llm.ollama_install_admission"),
-		install_phase = require("llm.ollama_install_phase"), process = process,
-		http = require("adapters.http_client"), owned_timer = timer, timings = Timings,
+		install_phase = require("ai.engine.ollama.install_phase"), process = process,
+		http = require("core.network.adapters.http_client"), owned_timer = timer, timings = Timings,
 		serve_environment = serve_environment,
-		network = { policy = proxy_policy, lookup = require("adapters.system_proxy").lookup_owned,
+		network = { policy = proxy_policy, lookup = require("core.network.adapters.system_proxy").lookup_owned,
 			timeout_ms = Timings.ms("llm", "managed_proxy_lookup_timeout_ms"), origins = origins,
 			relay = { policy = relay_policy, probe = Relay.probe, executable = Relay.executable,
 				timings = Relay.timings, timeout_ms = Relay.timings().probe_ms },
-			probe = require("adapters.tcp_probe").probe, relay_address = require("adapters.tcp_probe").relay_address,
+			probe = require("core.network.adapters.tcp_probe").probe, relay_address = require("core.network.adapters.tcp_probe").relay_address,
 			probe_timeout_ms = Timings.ms("llm", "managed_proxy_probe_timeout_ms") },
 		environment = function()
 			local values = native.os_environ()

@@ -114,7 +114,7 @@ helpers.describe("MLX non-stream response schema", function()
 		scheduler.after = function() return {}, true end
 		scheduler.cancel = function() return true end
 		client.post = function(_, _, _, done) callback = done end
-		codec.decode = function(raw) return require("json").decode(raw), nil end
+		codec.decode = function(raw) return require("core.text.engine.json").decode(raw), nil end
 		local ok, err = xpcall(function()
 			inference.init({ stream = {}, cancel_streaming = function() return true end,
 				completions_endpoint = function() return "http://fixture/completions" end,
@@ -146,7 +146,7 @@ helpers.describe("MLX non-stream provider errors", function()
 		scheduler.cancel = function() return true end
 		client.post = function(_, _, _, done) callback = done end
 		codec.decode = function(body)
-			local value = require("json").decode(body)
+			local value = require("core.text.engine.json").decode(body)
 			if body:find('"error":null', 1, true) then value.error = nil end
 			return value, nil
 		end

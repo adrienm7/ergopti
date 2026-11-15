@@ -19,9 +19,23 @@
 local M = {}
 
 local llm_mod = require("modules.llm")
-local Logger  = require("infra.logger")
+local Logger  = require("core.logger.engine.logger")
 
 local LOG = "menu_llm.warmup"
+
+--- Defers a warmup asked for while the script is paused to resume (EDD-1).
+--- An unreadable pause state refuses the warmup rather than guessing.
+--- @param label string Short call-site label used in log messages.
+--- @return boolean|nil handled True once deferred, false on refusal, nil when not paused.
+local function defer_while_paused(label)
+	local ok, paused = pcall(function() return require("modules.shortcuts.script_control").is_paused() end)
+	if not ok or type(paused) ~= "boolean" then
+		Logger.error(LOG, "warmup('%s'): the pause state is unreadable — refused.", tostring(label))
+		return false
+	end
+	if not paused then return nil end
+	return require("modules.llm.warmup_controller").defer_to_resume("menu " .. tostring(label)) == true
+end
 
 
 
@@ -37,6 +51,8 @@ local LOG = "menu_llm.warmup"
 --- Safe to call even when no model is configured: exits silently in that case.
 --- @param label string Short call-site label used in log messages.
 function M.warmup(label)
+	local deferred = defer_while_paused(label)
+	if deferred ~= nil then return deferred end
 	-- Gate on the runtime enable flag so backend/API panel actions reachable
 	-- while LLM is off cannot trigger paid remote POST requests (M-12).
 	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
@@ -65,6 +81,8 @@ end
 --- @param model string The backend model name to warm up.
 --- @param label string Short call-site label used in log messages.
 function M.warmup_model(model, label)
+	local deferred = defer_while_paused(label)
+	if deferred ~= nil then return deferred end
 	-- Gate on the runtime enable flag (M-12); mirrors set_active_profile's guard.
 	if type(llm_mod.get_runtime_llm_enabled) == "function" and not llm_mod.get_runtime_llm_enabled() then
 		Logger.debug(LOG, "warmup_model('%s'): runtime LLM disabled — skipping.", tostring(label))

@@ -29,9 +29,9 @@ local function load_hook()
 			return text, text, nil
 		end,
 		-- A layout whose modifier keys all play their usual role.
-		modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code], nil end,
+		modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code], nil end,
 	}
-	local hook = helpers.load_module("adapters.keyboard_hook")
+	local hook = helpers.load_module("platform.input.keyboard_hook")
 	package.loaded[name] = saved
 	return hook
 end
@@ -139,7 +139,7 @@ end
 --- No kernel, display, libuv handle or native command is acquired by these controls.
 local function aggregate_consumer_session(streams, options)
 	options = options or {}
-	local Input = require("infra.input_event")
+	local Input = require("platform.input.event")
 	local paths, queues, desired = {}, {}, {}
 	for _, id in ipairs({ "a", "b", "c" }) do
 		if streams[id] then
@@ -161,7 +161,7 @@ local function aggregate_consumer_session(streams, options)
 		is_interceptable_key_device = function() return true end,
 		is_interceptable_event_mask = require("tests.support.evdev_capabilities_fixture").policy,
 	}
-	local reader = helpers.load_module("adapters.evdev_reader")
+	local reader = helpers.load_module("platform.input.evdev_reader")
 	local backend = multi_recorder(queues)
 	local open, refused = backend.open, {}
 	backend.open = function(path)
@@ -169,7 +169,7 @@ local function aggregate_consumer_session(streams, options)
 		return open(path)
 	end
 	reader._set_backend(backend)
-	local writer = helpers.load_module("adapters.uinput_writer")
+	local writer = helpers.load_module("platform.input.uinput_writer")
 	local session = { rows = {}, captures = {}, chars = {}, paths = paths, queues = queues, Input = Input }
 	writer._set_backend({
 		open = function() return 7 end, ioctl = function() return true end,
@@ -187,7 +187,7 @@ local function aggregate_consumer_session(streams, options)
 		is_ready = function() return true end,
 		reset_state = function() held = {}; return true end,
 		modifier_role = function(code)
-			return options.roles and options.roles[code] or require("infra.evdev_codes").MODIFIER_OF[code], nil
+			return options.roles and options.roles[code] or require("platform.input.evdev_codes").MODIFIER_OF[code], nil
 		end,
 		process = function(code, value)
 			session.captures[#session.captures + 1] = { code, value }
@@ -198,7 +198,7 @@ local function aggregate_consumer_session(streams, options)
 		end,
 		caps_locked = function() return false end,
 	}
-	local hook = helpers.load_module("adapters.keyboard_hook")
+	local hook = helpers.load_module("platform.input.keyboard_hook")
 	package.loaded["adapters.xkb_capture"] = saved_xkb
 	session.hook = hook
 	if options.engine then assert(hook.set_remapper(options.engine)) end

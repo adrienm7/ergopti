@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/tr.msg
-# AUTO-GENERATED from _shared/data/locales/tr.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/tr.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT ağ modülü kaynaktan derlendi.
 build_luv.recipe_required=Yerel luv derlemesi kaynak tarifini gerektirir.
 install.already_installed={1} — zaten yüklü
 install.archive_digest_unavailable=tutulan tanımlayıcılı güncellemeler gerçek bir OpenSSL3 çalışma zamanı gerektirir; yetenek kullanılamaz durumda kalıyor.
+install.bytecode_skipped=Önceden derlenmiş modüller oluşturulamadı — Ergopti kaynak koddan, biraz daha yavaş başlıyor.
 install.capability_verified={1} — yetenek doğrulandı
 install.command_still_missing={1} yüklendi, ancak '{2}' hâlâ bulunamıyor.
 install.daemon_manual=Daemon'u elle başlatmak için:
 install.daemon_running=Daemon arka planda çalışıyor. Durumunu denetlemek için:
+install.focus_integration_enabled={1} odak entegrasyonu etkinleştirildi
+install.focus_integration_failed={1} odak entegrasyonu etkinleştirilemedi — uygulamaya özel kurallar bu masaüstünde etkin değil.
+install.focus_integration_next_login={1} odak entegrasyonu kuruldu (bir sonraki oturum açışta etkin)
+install.focus_integration_updated={1} odak entegrasyonu güncellendi
 install.gnome_extension_active=GNOME AppIndicator uzantısı — zaten etkin
 install.gnome_extension_enabled=GNOME AppIndicator uzantısı etkinleştirildi
 install.gnome_extension_failed=AppIndicator uzantısı etkinleştirilemedi — o olmadan GNOME simgeyi göstermez.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — bağımlılık denetimi
 install.section_deps_skipped=Bağımlılıklar atlandı (--no-deps)
 install.section_done=Kurulum tamamlandı
 install.section_files=Dosyalar yükleniyor
+install.section_focus=Wayland altında etkin uygulama (GNOME, KDE)
 install.section_lua_deps=İsteğe bağlı Lua bağımlılıkları (olay döngüsü, zamanlayıcılar, web görünümleri, sinyaller)
 install.section_permissions=Giriş izinleri (sudo gerekir)
 install.section_services=systemd kullanıcı hizmetleri oluşturuluyor
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG otomatik başlatma: {1}
 launch.already_running=Ergopti+ bu oturumda zaten çalışıyor ({1} kilitli); bu başlatma reddedildi.
 launch.authorization_failed=Giriş erişimi yetkilendirmesi iptal edildi veya başarısız oldu.
 launch.groups_unavailable=Oturum yapılandırılmış giriş gruplarını alamadı.
+launch.restarting=Ergopti+ bu oturumda zaten çalışıyor; kapanması isteniyor, ardından yeniden başlatılıyor.
 launch.session_lock_invalid=Oturum kilidi klasörü mutlak bir yol olmalıdır.
 launcher.dependencies_installed=Bağımlılıklar yüklendi.
 launcher.driver_missing=Hata: Linux sürücüsü dizini bulunamadı: {1}

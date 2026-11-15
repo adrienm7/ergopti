@@ -22,32 +22,32 @@
 local M = {}
 
 local hs            = hs
-local Logger        = require("infra.logger")
-local NativePath = require("native_path")
+local Logger        = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
 local Manifest      = require("infra.manifest_reader")
-local DeferredWork  = require("infra.deferred_work")
-local Timings       = require("infra.timings")
+local DeferredWork  = require("core.timing.engine.deferred_work")
+local Timings       = require("core.timing.engine.timings")
 local PhaseStats    = require("infra.phase_stats")
-local notifications = require("infra.notifications")
-local i18n          = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local i18n          = require("core.i18n.engine.i18n")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
-local NumberRowPolicy = require("layout.number_row_policy")
-local PauseSwitchPolicy = require("layout.pause_switch_policy")
+local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
+local PauseSwitchPolicy = require("layouts.engine.layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
 
 M.DEFAULT_STATE = {
-	layout_number_row_mode       = Manifest.default_for(require("config_keys").KEY.LAYOUT_DIRECT_ACCESS_DIGITS),
-	layout_pause_switch_enabled = Manifest.default_for(require("config_keys").KEY.LAYOUT_PAUSE_SWITCH_ENABLED),
-	layout_on_pause             = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_PAUSE),
-	layout_on_resume            = Manifest.default_for(require("config_keys").KEY.LAYOUT_ON_RESUME),
+	layout_number_row_mode       = Manifest.default_for(require("settings.engine.keys").KEY.LAYOUT_DIRECT_ACCESS_DIGITS),
+	layout_pause_switch_enabled = Manifest.default_for(require("settings.engine.keys").KEY.LAYOUT_PAUSE_SWITCH_ENABLED),
+	layout_on_pause             = Manifest.default_for(require("settings.engine.keys").KEY.LAYOUT_ON_PAUSE),
+	layout_on_resume            = Manifest.default_for(require("settings.engine.keys").KEY.LAYOUT_ON_RESUME),
 	-- config.toml [ui] menubar_icon; its values and default are the manifest's.
-	menubar_icon                = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON),
+	menubar_icon                = Manifest.default_for(require("settings.engine.keys").KEY.UI_MENUBAR_ICON),
 	-- config.toml [layout] virtual_keyboard: the Karabiner virtual keyboard type.
-	layout_virtual_keyboard     = Manifest.default_for(require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD),
+	layout_virtual_keyboard     = Manifest.default_for(require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD),
 }
 
 -- The phases one build records, so the field run's menu step names the one
@@ -632,9 +632,9 @@ function M.build(ctx)
 	if #records == 0 then
 		local ManifestMenu = require("infra.manifest_menu")
 		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
-			[require("config_keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
+			[require("settings.engine.keys").COMMAND.LAYOUT_OPEN_PREFERENCES] = function()
 				local ok, started = pcall(function()
-					return require("adapters.shell_runner").open(KEYBOARD_PREFS_URL)
+					return require("core.process.adapters.shell_runner").open(KEYBOARD_PREFS_URL)
 				end)
 				if not ok or started ~= true then
 					Logger.error(LOG, "Keyboard settings could not be opened.")
@@ -674,7 +674,6 @@ function M.build(ctx)
 	-- state.layout_on_resume so they survive a reload via preferences.lua.
 	local state      = ctx and ctx.state
 	local save_prefs = ctx and ctx.save_prefs
-	local hs_paused_pre = ctx and ctx.paused
 
 	local function build_layout_switching_rows()
 		if not state then return {} end
@@ -689,7 +688,8 @@ function M.build(ctx)
 		end
 		local getters = {
 			layout_switch_checked = function() return feature_on end,
-			layout_switch_ready = function() return feature_on and not hs_paused_pre end,
+			-- A pause does not grey it: a pause stops typing, not configuration (EDD-1).
+			layout_switch_ready = function() return feature_on end,
 			layout_pause_caption = function() return target_label(cur_pause) end,
 			layout_resume_caption = function() return target_label(cur_resume) end,
 		}
@@ -791,8 +791,8 @@ function M.build(ctx)
 	for key, value in pairs(type(ctx) == "table" and type(ctx.state_getters) == "table" and ctx.state_getters or {}) do
 		render_ctx.state_getters[key] = value
 	end
-	render_ctx.state_getters[require("config_keys").KEY.UI_MENUBAR_ICON] = function() return state and state.menubar_icon end
-	render_ctx.commands[require("config_keys").COMMAND.MENUBAR_ICON] = function(variant)
+	render_ctx.state_getters[require("settings.engine.keys").KEY.UI_MENUBAR_ICON] = function() return state and state.menubar_icon end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.MENUBAR_ICON] = function(variant)
 		if not state then return false end
 		state.menubar_icon = variant
 		if type(save_prefs) ~= "function" or save_prefs() ~= true then return false end
@@ -803,8 +803,8 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
-	render_ctx.state_getters[require("config_keys").KEY.LAYOUT_VIRTUAL_KEYBOARD] = function() return state and state.layout_virtual_keyboard end
-	render_ctx.commands[require("config_keys").COMMAND.VIRTUAL_KEYBOARD] = function(choice)
+	render_ctx.state_getters[require("settings.engine.keys").KEY.LAYOUT_VIRTUAL_KEYBOARD] = function() return state and state.layout_virtual_keyboard end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.VIRTUAL_KEYBOARD] = function(choice)
 		if not state then return false end
 		local previous = state.layout_virtual_keyboard
 		state.layout_virtual_keyboard = choice
@@ -829,10 +829,13 @@ function M.build(ctx)
 		if type(update_menu) == "function" then pcall(update_menu) end
 		return true
 	end
-	render_ctx.commands[require("config_keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
+	render_ctx.commands[require("settings.engine.keys").COMMAND.LAYOUT_MANAGER] = LayoutManagerWindow.menu_command()
+	-- « Create or edit a layout… » opens the same window straight on the layout editor.
+	render_ctx.commands[require("settings.engine.keys").COMMAND.OPEN_LAYOUT_EDITOR] = LayoutManagerWindow.editor_menu_command()
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		render_ctx.commands[command] = function()
-			if ctx.paused == true or type(ctx.apply_preference_scope) ~= "function" then return false end
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			local applied = ctx.apply_preference_scope("keyboard_layout", mode)
 			-- The scope holds the emulation's rows too: it types what was restored.
 			require("modules.keymap.layout_emulation").reload_if_started()
@@ -840,8 +843,8 @@ function M.build(ctx)
 		end
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
-	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
-	render_ctx.commands[require("config_keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_MODE] = function() return false end
+	render_ctx.commands[require("settings.engine.keys").COMMAND.NUMBER_ROW_EDGES] = function() return false end
 	local function bundle_frame_rows()
 		local function system_provider() return latest and {bundle_rows[1]} or {} end
 		local function user_provider() return latest and {bundle_rows[2]} or {} end
@@ -870,7 +873,7 @@ function M.build(ctx)
 	-- The layout emulation (modules/keymap/layout_emulation.lua): the layout it
 	-- types over the selected input source, its two layers and its four rows. A
 	-- change is stored, then the emulation reloads it at once.
-	local EmulationRows = require("layouts.emulation_menu")
+	local EmulationRows = require("layouts.engine.emulation.menu")
 	local function emulation_changed(committed)
 		if not committed then pcall(notifications.notify, i18n.get("menu.layout.emulation_not_saved"), nil, "error") end
 		local reloaded = require("modules.keymap.layout_emulation").reload_if_started()
@@ -922,10 +925,10 @@ function M.build(ctx)
 			})
 		end,
 		["layout_features_base"] = function()
-			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
+			return { emulation_switch(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_BASE, "layout.ergoptibase") }
 		end,
 		["layout_features_altgr"] = function()
-			return { emulation_switch(require("config_keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
+			return { emulation_switch(require("settings.engine.keys").KEY.LAYOUT_ERGOPTI_ALT_GR, "layout.ergoptialtgr") }
 		end,
 		["number_row_policy"] = function() return number_row_rows(state, save_prefs, update_menu, render_ctx) end,
 		["custom_layouts"]   = function() return custom_rows end,
@@ -933,7 +936,7 @@ function M.build(ctx)
 		["layout_bundle"] = function() return declared_bundle_rows end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
-		[require("config_keys").LEAF.MAGIC_KEY_SOURCE] = function()
+		[require("settings.engine.keys").LEAF.MAGIC_KEY_SOURCE] = function()
 			return MagicKeySourceMenu.rows({
 				state = state, save_prefs = save_prefs, keymap = ctx and ctx.keymap,
 				update_menu = update_menu, paused = ctx and ctx.paused,
@@ -998,7 +1001,7 @@ end
 
 --- The layout an event switches to, or nil when switching is off or set to
 --- « no change ». Pause, resume and quit all read it here, through the policy
---- the Windows and Linux drivers share (_shared/lua/layout/pause_switch_policy.lua).
+--- the Windows and Linux drivers share (_shared/layouts/engine/layout/pause_switch_policy.lua).
 --- @param state table|nil Menu state (layout_pause_switch_enabled, layout_on_pause, layout_on_resume).
 --- @param event string "pause", "resume" or "quit".
 --- @return string|nil kl_name
@@ -1044,7 +1047,7 @@ function M.capture_scope(state, source)
 		if type(source) ~= "table" or (source.status ~= "ok" and source.status ~= "absent") then return nil end
 		if source.status == "ok" then
 			if type(source.content) ~= "string" then return nil end
-			local decoded, document = pcall(require("infra.toml.codec").decode, source.content)
+			local decoded, document = pcall(require("core.text.engine.toml.codec").decode, source.content)
 			if not decoded or type(document) ~= "table" then return nil end
 			local layout = document.layout
 			if layout ~= nil and type(layout) ~= "table" then return nil end

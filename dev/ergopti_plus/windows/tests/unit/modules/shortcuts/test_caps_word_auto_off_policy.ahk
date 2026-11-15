@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/caps_word/auto_off_vectors.json against the AHK
 ; port of the CapsWord auto-off policy, the same hand-written vectors the macOS
-; and Linux suites replay against _shared/lua/caps_word/auto_off.lua.
+; and Linux suites replay against _shared/keyboard/engine/caps_word_auto_off.lua.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -34,7 +34,7 @@ _CWAOP_Join(List) {
 
 _CWAOP_CompileVectors() {
 	Corpus := _CWAOP_Corpus()
-	AssertEqual(16, Corpus["compile"].Length, "complete compile vectors")
+	AssertEqual(18, Corpus["compile"].Length, "complete compile vectors")
 	for Row in Corpus["compile"] {
 		Policy := _CWAOP_Compile(Corpus, Row["idle"], Row["terminators"], Row["pointer"], &Reason)
 		if Row["valid"] {

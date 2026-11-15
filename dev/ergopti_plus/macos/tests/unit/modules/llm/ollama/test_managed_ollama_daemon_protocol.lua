@@ -24,11 +24,11 @@ end
 
 local function with_builder(callback)
 	helpers.with_stub_scope({ "modules.llm.ollama_server_command", "modules.llm.ollama_binary",
-		"modules.llm.managed_native_python", "adapters.file_system" }, function()
+		"modules.llm.managed_native_python", "core.fs.adapters.file_system" }, function()
 		local builder = helpers.load_with_stubs("modules.llm.ollama_server_command")
 		local binary = require("modules.llm.ollama_binary")
 		local python = require("modules.llm.managed_native_python")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local old_candidate, old_python, old_exists = binary.native_candidate, python.resolve, files.exists
 		local path = "/fixture/managed/ollama"
 		binary.native_candidate = function() return path, { admission = 17, idle = 23, retirement = 11 } end
@@ -118,7 +118,7 @@ helpers.describe("Managed daemon original-task lifecycle receiver", function()
 	end)
 
 	helpers.it("(daemon-dead-unpublished-release) the pause releases an exited daemon that never published", function()
-		local Lifecycle = require("core.llm.managed_ollama_daemon_lifecycle")
+		local Lifecycle = require("core.lifecycle.engine.core.managed_ollama_daemon_lifecycle")
 		local function build(published)
 			local task, nonce = owned_task()
 			local released = {}
@@ -260,7 +260,7 @@ end)
 
 helpers.describe("Managed daemon shared policy ports", function()
 	helpers.it("(daemon-shared-ports) captures explicit transport ports without Mac dependencies", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		task.isSettled = nil
 		local ports = {
@@ -310,7 +310,7 @@ end)
 
 helpers.describe("Managed daemon constructor publication", function()
 	helpers.it("(daemon-constructor-reentry) preserves the first receiver acquired inside a predicate", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		local inner
 		local outer, reason = Shared.new(task, nonce, {
@@ -382,7 +382,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 	end)
 
 	helpers.it("(daemon-observed-rollback) keeps frame custody and rechecks attempt after settlement lookup", function()
-		local Shared = require("core.llm.managed_ollama_daemon_receipt")
+		local Shared = require("core.lifecycle.engine.core.managed_ollama_daemon_receipt")
 		local task, nonce = owned_task()
 		function task.wasStartAttempted() return false end
 		local receiver = assert(Receiver.new(task, nonce))
@@ -410,7 +410,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 		local handles = {}
 		local native = {}
 		local outcome = table.pack(xpcall(function()
-			helpers.with_stub_scope({ "adapters.shell_runner" }, function()
+			helpers.with_stub_scope({ "core.process.adapters.shell_runner" }, function()
 				local controlled_new = function(_, done)
 					local environment = { HOME = "/fixture/home" }
 					local task = { starts = 0, complete = done }
@@ -422,7 +422,7 @@ helpers.describe("Managed daemon exact preactivation rollback", function()
 					native[#native + 1] = task
 					return task
 				end
-				local runner = helpers.load_with_stubs("adapters.shell_runner", { task = { new = controlled_new } })
+				local runner = helpers.load_with_stubs("core.process.adapters.shell_runner", { task = { new = controlled_new } })
 				local prepared = runner.spawn("/fixture/managed-serve", {}, nil, nil, nil, true, true)
 				handles[#handles + 1] = prepared
 				local _, nonce = owned_task()
@@ -457,16 +457,16 @@ end)
 
 helpers.describe("Managed daemon refusal diagnostic", function()
 	helpers.it("(daemon-refusal-logged) logs the serve owner's fixed refusal line and nothing else", function()
-		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "adapters.shell_runner",
-			"core.llm.managed_ollama_daemon_lifecycle", "infra.logger" }, function()
+		helpers.with_stub_scope({ "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
+			"core.lifecycle.engine.core.managed_ollama_daemon_lifecycle", "core.logger.engine.logger" }, function()
 			local logs = {}
 			local Logger = helpers.make_logger_stub()
 			Logger.warn = function(_log, format_string, ...)
 				logs[#logs + 1] = string.format(format_string, ...)
 			end
-			package.loaded["infra.logger"] = Logger
+			package.loaded["core.logger.engine.logger"] = Logger
 			local callbacks = {}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(_, _, on_done, on_chunk)
 					callbacks.done, callbacks.chunk = on_done, on_chunk
 					local task = {}
@@ -478,7 +478,7 @@ helpers.describe("Managed daemon refusal diagnostic", function()
 					return task
 				end,
 			}
-			package.loaded["core.llm.managed_ollama_daemon_lifecycle"] = {
+			package.loaded["core.lifecycle.engine.core.managed_ollama_daemon_lifecycle"] = {
 				new = function()
 					return { complete = function() end, feed = function() end }
 				end,

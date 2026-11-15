@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/shipped_released_v16_refused/input.toml
+
+[_meta]
+schema_version = 16
+
+[llm.profiles]
+user_profiles = [{ id = "user_first", label = "First" }]

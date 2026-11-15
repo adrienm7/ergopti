@@ -28,7 +28,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local engine_keys = 0
 			for _ in pairs(require("platform.remap.tap_hold_engine").KEY_CODES) do engine_keys = engine_keys + 1 end
 			helpers.assert_eq(#key_rows(section), engine_keys, "every key the engine can remap has its row")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local reset = find(section.menu, i18n.get("common.restore_recommended"))
 			local disable = find(section.menu, i18n.get("common.clear_to_system"))
 			local toggle = find(section.menu, i18n.get("menu.tapholds.enable"))
@@ -65,8 +65,8 @@ helpers.describe("Linux Tap-Holds menu", function()
 			-- Both apply at once, after the scope's backups: the restore since
 			-- restore-recommended-no-confirm, the clear since 2026-09-30.
 			helpers.assert_eq(#asked, 0, "no scope row asks")
-			helpers.assert_eq(calls[1], { "scope", "recommended", false })
-			helpers.assert_eq(calls[2], { "scope", "clear", false })
+			helpers.assert_eq(calls[1], { "scope", "recommended", 0 })
+			helpers.assert_eq(calls[2], { "scope", "clear", 0 })
 			helpers.assert_eq(calls[3][1], "set_enabled")
 			helpers.assert_eq(calls[3][2], false, "the switch was on, a click turns it off")
 		end)
@@ -80,7 +80,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local caps = find(key_rows(section), i18n.get("key_name.caps_lock"))
 			helpers.assert_true(caps ~= nil, "a CapsLock row")
 			local hold = find(caps.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4))
@@ -112,8 +112,8 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
-			local HoldOptions = require("tap_hold.hold_options")
+			local i18n = require("core.i18n.engine.i18n")
+			local HoldOptions = require("tap_hold.engine.hold_options")
 			local options = Manager.hold_options()
 			local shift = find(key_rows(section), i18n.get("key_name.left_shift"))
 			find(shift.menu, string.format(i18n.get("tap_hold.picker.hold"), ""):sub(1, 4)).fn()
@@ -138,7 +138,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 			local set_hold = writer.set_hold
 			local execute = os.execute
 			local ok, err = pcall(function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				if receipt == "false" then writer.set_hold = function() return false end
 				elseif receipt == "nil" then writer.set_hold = function() return nil end
 				elseif receipt == "throw" then writer.set_hold = function() error("controlled write failure") end end
@@ -163,7 +163,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local shift = find(key_rows(section), i18n.get("key_name.left_shift"))
 			local tap = find(shift.menu, string.format(i18n.get("tap_hold.picker.tap"), ""):sub(1, 4))
 			tap.fn()
@@ -187,7 +187,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local alt_gr = find(key_rows(section), i18n.get("key_name.alt_gr"))
 			helpers.assert_true(alt_gr ~= nil, "an AltGr row")
 			helpers.assert_contains(alt_gr.title, "  /  " .. i18n.get("key_name.alt_gr"),
@@ -213,7 +213,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked, '[tap_hold.keys.caps_lock]\nhold_modifier = "Shift + Ctrl"\n')
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local combo = i18n.get("key_name.ctrl") .. " + " .. i18n.get("key_name.shift")
 			local caps = find(key_rows(section), i18n.get("key_name.caps_lock"))
 			helpers.assert_contains(caps.title, "  /  " .. combo)
@@ -225,18 +225,18 @@ helpers.describe("Linux Tap-Holds menu", function()
 	end)
 
 	helpers.it("has a label for every modifier of every hold in all 21 locales", function()
-		local HoldOptions = require("tap_hold.hold_options")
-		local Json = require("json")
-		local Paths = require("infra.paths")
+		local HoldOptions = require("tap_hold.engine.hold_options")
+		local Json = require("core.text.engine.json")
+		local Paths = require("core.fs.engine.paths")
 		local picker = require("platform.remap.tap_hold_loader").load(DEFAULTS, nil).hold_picker
 		local options = HoldOptions.build(picker)
 		helpers.assert_true(#options > #picker.modifiers, "the shipped picker must be read, or this proves nothing")
-		local order_fh = assert(io.open(Paths.shared("data/locale_order.json"), "r"))
+		local order_fh = assert(io.open(Paths.shared("core/i18n/data/locale_order.json"), "r"))
 		local locales = Json.decode(order_fh:read("*a")).order
 		order_fh:close()
 		helpers.assert_eq(#locales, 21, "every shipped locale")
 		for _, code in ipairs(locales) do
-			local fh = assert(io.open(Paths.shared("data/locales/" .. code .. ".json"), "r"))
+			local fh = assert(io.open(Paths.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 			local strings = Json.decode(fh:read("*a"))
 			fh:close()
 			local function translate(key)
@@ -249,7 +249,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 				if option.kind == "modifier" then
 					local expected = {}
 					for modifier in option.id:gmatch("[^+]+") do
-					expected[#expected + 1] = translate(require("keycodes.key_names").i18n(modifier, "linux"))
+					expected[#expected + 1] = translate(require("platform.input.keycodes.key_names").i18n(modifier, "linux"))
 				end
 					helpers.assert_true(#expected >= 1, code .. ": " .. option.id .. " names at least one modifier")
 					helpers.assert_eq(label, table.concat(expected, " + "), code .. ": " .. option.id)
@@ -262,7 +262,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local ctrl = find(key_rows(section), i18n.get("key_name.left_ctrl"))
 			helpers.assert_true(ctrl.checked, "a configured key is ticked")
 			find(ctrl.menu, i18n.get("tap_hold.action.disable")).fn()
@@ -281,7 +281,7 @@ helpers.describe("Linux Tap-Holds menu", function()
 		local calls, picked = {}, {}
 		local section, Manager = build(calls, picked)
 		local ok, err = pcall(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = section.menu
 			local function index_of(title)
 				for index, row in ipairs(rows) do
@@ -324,7 +324,7 @@ helpers.describe("declared per-key native command", function()
 			local calls, picked = {}, {}
 			local section, Manager = build(calls, picked)
 			local ok, err = pcall(function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local key = configured and "left_ctrl" or "escape"
 				local parent = assert(find(key_rows(section), i18n.get("key_name." .. key)))
 				local row = parent.menu[1]
@@ -350,7 +350,7 @@ helpers.describe("declared per-key native command", function()
 			local calls, picked = {}, {}
 			local section
 			section, Manager = build(calls, picked)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			helpers.assert_eq(ctrl.menu[1].title, i18n.get("menu.shortcuts.title"))
 			ctrl.menu[1].fn()
@@ -362,8 +362,8 @@ helpers.describe("declared per-key native command", function()
 	end)
 
 	helpers.it("replays the independent platform captions and states in all 21 locales (tap-hold-key-native)", function()
-		local Json = require("json")
-		local Paths = require("infra.paths")
+		local Json = require("core.text.engine.json")
+		local Paths = require("core.fs.engine.paths")
 		local function read_json(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
 			local text = file:read("*a")
@@ -371,14 +371,14 @@ helpers.describe("declared per-key native command", function()
 			return Json.decode(text)
 		end
 		local corpus = read_json("tests/corpus/menus/tap_hold_key_native.json")
-		local locales = read_json("data/locale_order.json").order
+		local locales = read_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read_json("data/locales/" .. code .. ".json")
+			local strings = read_json("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({
+				local renderer = assert(require("menu.engine.renderer").new({
 					platform = platform,
-					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 					json_decode = Json.decode,
 					i18n = { get = function(key) return assert(strings[key], code .. ": " .. key) end,
 						section = function(key) return assert(strings[key], code .. ": " .. key) end },
@@ -440,7 +440,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 				_version = "test", on_quit = function() end, tap_holds = Manager,
 				on_menu_changed = function() refreshes = refreshes + 1 end,
 			})
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			local callback = ctrl.menu[1].fn
@@ -453,7 +453,7 @@ helpers.describe("declared native command reaches the actual Linux writer", func
 			helpers.assert_eq(notices, 1, "native refusal still reaches its error owner")
 			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntap_action = "copy"\nhold_modifier = "ctrl"\n[tap_hold.keys.left_shift]\ntap_action = "paste"\nhold_modifier = "shift"\n[future]\nkeep = "neighbour"\n')
 			helpers.assert_nil(callback(), "success retains the original callback return policy")
-			local document = assert(require("toml_codec").decode(read()))
+			local document = assert(require("core.text.engine.toml_codec").decode(read()))
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.tap_action, "")
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.hold_modifier, "")
 			helpers.assert_eq(document.tap_hold.keys.left_shift.tap_action, "paste", "other key remains untouched")
@@ -486,7 +486,7 @@ helpers.describe("declared complete per-key head", function()
 			if mutate then mutate(declaration) end
 			local calls, picked, section = {}, {}, nil
 			section, Manager = build(calls, picked)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local key = assert(find(key_rows(section), i18n.get("key_name.left_shift")))
 			body(key.menu, calls, picked, i18n)
 		end)
@@ -550,19 +550,19 @@ helpers.describe("declared complete per-key head", function()
 	end)
 
 	helpers.it("replays full platform projection and literal captions in all 21 locales (tap-hold-key-head)", function()
-		local Json, Paths = require("json"), require("infra.paths")
+		local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
 		local function read(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
 			local text = file:read("*a"); file:close()
 			return Json.decode(text)
 		end
-		local corpus, locales = read("tests/corpus/menus/tap_hold_key_head.json"), read("data/locale_order.json").order
+		local corpus, locales = read("tests/corpus/menus/tap_hold_key_head.json"), read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 					json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
 						section = function(key) return assert(strings[key]) end },
 					logger = { error = function() end, warn = function() end, debug = function() end } }))
@@ -624,20 +624,20 @@ end)
 
 helpers.describe("declared complete per-key delay tail", function()
 	helpers.it("replays handwritten delay projection and inherited state in all 21 locales (tap-hold-key-delay)", function()
-		local Json, Paths = require("json"), require("infra.paths")
+		local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
 		local function read(relative)
 			local file = assert(io.open(Paths.shared(relative), "r"))
 			local value = Json.decode(file:read("*a")); file:close(); return value
 		end
 		local corpus = read("tests/corpus/menus/tap_hold_key_delay.json")
-		local locales = read("data/locale_order.json").order
+		local locales = read("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, code in ipairs(locales) do
-			local strings = read("data/locales/" .. code .. ".json")
+			local strings = read("core/i18n/data/locales/" .. code .. ".json")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				for _, inherited in ipairs({ false, true }) do
-					local renderer = assert(require("menu.renderer").new({ platform = platform,
-						manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+					local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+						manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 						json_decode = Json.decode, i18n = { get = function(key) return assert(strings[key]) end,
 							section = function(key) return assert(strings[key]) end },
 						logger = { error = function() end, warn = function() end, debug = function() end } }))
@@ -699,7 +699,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			group.i18n, group.caption_getter = "tap_hold.picker.hold", "tap_hold_key_hold_caption"
 			local section, current = build({}, {})
 			Manager = current
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local key = assert(find(key_rows(section), i18n.get("key_name.left_shift")))
 			helpers.assert_eq(key.menu[6].title, string.format(i18n.get("tap_hold.picker.hold"), i18n.get("key_name.shift")))
 			helpers.assert_nil(key.menu[6].menu, "the delay row is a command, not a submenu")
@@ -721,9 +721,9 @@ helpers.describe("declared complete per-key delay tail", function()
 		local Writer = require(WRITER)
 		local path = Manager.user_path()
 		local reloads, refreshes, notices = 0, 0, 0
-		local TextPrompt = require("ui.text_prompt")
+		local TextPrompt = require("core.ui.ui.text_prompt")
 		local previous_ask, previous_execute = TextPrompt.ask, os.execute
-		local answer, prompts, during_prompt = "375.4", {}, nil
+		local answer, prompts, during_prompt = "375", {}, nil
 		local function write(text) local file = assert(io.open(path, "w")); file:write(text); file:close() end
 		local function read() local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close(); return text end
 		local ok, err = pcall(function()
@@ -741,7 +741,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			local items = helpers.load_module("ui.menu.builder").build({ _version = "test",
 				on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 				on_menu_changed = function() refreshes = refreshes + 1 end })
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local section = assert(find(items, i18n.get("menu.tapholds.title")))
 			local ctrl = assert(find(key_rows(section), i18n.get("key_name.left_ctrl")))
 			helpers.assert_nil(ctrl.menu[6].menu, "the delay row opens the prompt itself")
@@ -756,7 +756,7 @@ helpers.describe("declared complete per-key delay tail", function()
 			write('[tap_hold]\nenabled = true\n[tap_hold.keys.left_ctrl]\ntime_activation_seconds = 0.2\n[tap_hold.keys.left_shift]\ntime_activation_seconds = 0.4\n[future]\nkeep = "neighbour"\n')
 			helpers.assert_eq(Manager.reload(), true, "the repaired source is the current editable configuration")
 			helpers.assert_eq(callback(), true, "only durable native acceptance acknowledges the chosen delay")
-			local document = assert(require("toml_codec").decode(read()))
+			local document = assert(require("core.text.engine.toml_codec").decode(read()))
 			helpers.assert_eq(document.tap_hold.keys.left_ctrl.time_activation_seconds, 0.375)
 			helpers.assert_eq(document.tap_hold.keys.left_shift.time_activation_seconds, 0.4)
 			helpers.assert_eq(document.future.keep, "neighbour")

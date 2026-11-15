@@ -6,7 +6,7 @@
 --- Drives the real field run engine over in-memory files, a fake folder watcher
 --- and a fake clock, against the shipped data/field_run.json:
 --- 1. developer source mode only: without the clone root nothing starts, and
----    init.lua starts it only behind infra/dev_source.lua;
+---    init.lua starts it only behind core/lifecycle/engine/dev_source.lua;
 --- 2. request parsing: every step, a subset in declaration order, and the
 ---    refusals (unknown step, unknown key, bad deadline, oversized);
 --- 3. a run writes one result per step with the declared shape, runs every
@@ -26,9 +26,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local MODULES = { "infra.logger", "infra.field_run", "infra.termination_coordinator", "infra.emergency_exit" }
+local MODULES = { "core.logger.engine.logger", "infra.field_run", "core.lifecycle.engine.shutdown.termination_coordinator", "core.lifecycle.engine.shutdown.emergency_exit" }
 local FOLDER = "/repo/build/field-run"
 
 local function read(path)
@@ -42,7 +42,7 @@ local SPEC_TEXT = read(helpers.driver_root() .. "data/field_run.json")
 
 --- Loads a fresh engine with a silent logger and returns it.
 local function engine()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.field_run"] = nil
 	return require("infra.field_run")
 end
@@ -159,7 +159,7 @@ end
 --- @return table coordinator
 --- @return function refuse_fence Settles that exact native boundary as refused.
 local function pending_coordinator(kind)
-	local coordinator = require("infra.termination_coordinator")
+	local coordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 	local fence
 	local function forbidden() error("no post-fence capability may run before the held fence") end
 	-- A reload must arm its deadline at acceptance; the held handle never fires
@@ -281,8 +281,8 @@ helpers.describe("field run: developer source mode only", function()
 	helpers.it("is started by init.lua only for a developer clone or the collector's admitted clone", function()
 		local source = assert(helpers.read_driver_unit('require("infra.field_run").start('))
 		-- The installed signed app takes the clone only from ERGOPTI_FIELD_RUN_ROOT, which its launcher admits.
-		local root = source:find('local field_run_root = require("infra.dev_source").is_active() and '
-			.. 'require("infra.dev_source").root()\n\tor os.getenv(require("identifiers").field_report.environment)', 1, true)
+		local root = source:find('local field_run_root = require("core.lifecycle.engine.dev_source").is_active() and '
+			.. 'require("core.lifecycle.engine.dev_source").root()\n\tor os.getenv(require("core.text.engine.identifiers").field_report.environment)', 1, true)
 		helpers.assert_not_nil(root, "the root must come from developer source mode or the collector's variable only")
 		local gate = source:find('if type(field_run_root) == "string" and field_run_root ~= "" then', 1, true)
 		local start = source:find('require("infra.field_run").start(', 1, true)
@@ -573,7 +573,17 @@ helpers.describe("field run: a run", function()
 			local session = FieldRun.new({ spec = spec, folder = FOLDER, pid = 4242, ports = state.ports })
 			session:start()
 			state.request({ schema = 1, request_id = "r11", steps = Json.array({ "all" }) })
-			state.advance(0)
+			-- The guided steps wait for a gesture no one makes here: the clock runs past each bound
+			local settle_ms = 0
+			for _, step in ipairs(spec.steps) do
+				if step.kind == "guided" then settle_ms = settle_ms + step.deadline_seconds * 1000 end
+			end
+			-- Second by second, so the clock stops at the reload a step asks for
+			local function advance_to_reload(count)
+				local limit = state.now + settle_ms
+				repeat state.advance(1000) until #state.reloads >= count or state.now >= limit
+			end
+			advance_to_reload(1)
 			-- Each timed reload: this state is torn down, the reloaded one carries on
 			local reload_steps = 0
 			for _, step in ipairs(spec.steps) do if step.kind == "reload" then reload_steps = reload_steps + 1 end end
@@ -588,7 +598,7 @@ helpers.describe("field run: a run", function()
 				session = FieldRun.new({ spec = enabled_spec_of(FieldRun), folder = FOLDER, pid = 4343 + reload,
 					ports = state.ports })
 				session:start()
-				state.advance(0)
+				advance_to_reload(reload + 1)
 			end
 			for index, step in ipairs(spec.steps) do
 				local result = state.json(result_path("r11", index, step.id))
@@ -614,7 +624,21 @@ helpers.describe("field run: a run", function()
 			for _, id in ipairs(state.calls) do ran[id] = true end
 			for _, step in ipairs(spec.steps) do
 				helpers.assert_nil(step.person, step.id .. " waits for a person: the field run must be automatic")
-				if step.kind ~= "reload" then helpers.assert_true(ran[step.id], step.id .. " did not run") end
+				if step.kind == "guided" then
+					-- No gesture and no answer here: recorded as waiting for the person, never a pass
+					local index
+					for position, item in ipairs(spec.steps) do if item == step then index = position end end
+					local guided = state.json(result_path("r11", index, step.id))
+					helpers.assert_eq(guided.verdict, "needs_person", step.id)
+					local bound_code = "^[a-z_]+_" .. step.gesture_seconds .. "s$"
+					helpers.assert_true(tostring(guided.codes[1]):match(bound_code) ~= nil, step.id)
+					-- An observed step reads its check for the baseline; an attested one only on an answer
+					if step.mode == "observe" then
+						helpers.assert_true(ran[step.id], step.id .. " never read its check")
+					end
+				elseif step.kind ~= "reload" then
+					helpers.assert_true(ran[step.id], step.id .. " did not run")
+				end
 			end
 			local lease_index
 			for index, step in ipairs(spec.steps) do
@@ -694,7 +718,7 @@ helpers.describe("field run: a run", function()
 			-- (field run 2026-10-27 16:53:45: the Ollama pull failed on a digest
 			-- mismatch a minute after the timeout). That answer is expected and is
 			-- the only record of what happened: INFO with its verdict, not a warning.
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local warnings, infos = {}, {}
 			logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			logger.info = function(_, fmt, ...) infos[#infos + 1] = string.format(fmt, ...) end
@@ -718,7 +742,7 @@ helpers.describe("field run: a run", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local warnings = {}
-			package.loaded["infra.logger"].warn = function(_, fmt, ...)
+			package.loaded["core.logger.engine.logger"].warn = function(_, fmt, ...)
 				warnings[#warnings + 1] = string.format(fmt, ...)
 			end
 			local state = world({ field_network = function(_, finish)
@@ -926,13 +950,13 @@ helpers.describe("field run: configuration guard", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
 			local state = world()
-			state.restore_outcome = { restored = { "KarabinerConfigPath" }, failed = {}, reload = false }
+			state.restore_outcome = { restored = { "TapHoldConfigPath" }, failed = {}, reload = false }
 			started(FieldRun, state)
 			state.request({ schema = 1, request_id = "r41", steps = Json.array({ "field_lease" }) })
 			state.advance(0)
 			helpers.assert_eq(#state.reloads, 0)
 			helpers.assert_eq(table.concat(state.json(result_path("r41", 2, "config_guard")).codes, ","),
-				"restored_KarabinerConfigPath")
+				"restored_TapHoldConfigPath")
 		end)
 	end)
 
@@ -1018,7 +1042,7 @@ helpers.describe("field run: pure helpers", function()
 	helpers.it("picks the smallest pullable catalogue model per backend", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
-			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local catalogue = Json.decode(read(helpers.shared("ai/data/models.json")))
 			for _, backend in ipairs({ "ollama", "mlx" }) do
 				local chosen = FieldRun.smallest_model(catalogue, backend)
 				helpers.assert_not_nil(chosen, "no " .. backend .. " model")
@@ -1045,7 +1069,7 @@ helpers.describe("field run: pure helpers", function()
 	helpers.it("prefers an installed model over a smaller one it would have to download", function()
 		helpers.with_stub_scope(MODULES, function()
 			local FieldRun = engine()
-			local catalogue = Json.decode(read(helpers.shared("modules/llm/models.json")))
+			local catalogue = Json.decode(read(helpers.shared("ai/data/models.json")))
 			local smallest = FieldRun.smallest_model(catalogue, "mlx")
 			local installed_name = nil
 			local largest = 0
@@ -1073,17 +1097,17 @@ end)
 
 helpers.describe("field run ports: configuration guard", function()
 	helpers.it("puts back a changed file, removes a created one and restores a preference", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
-			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
+			"infra.config_paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = {} }
 			local files = { ["/cfg/config.toml"] = "a = 1\n" }
 			local settings = { llm_backend = "ollama", keep = true }
 			package.loaded["infra.config_paths"] = { get = function(key)
 				return key == "ConfigTomlPath" and "/cfg/config.toml" or ("/cfg/" .. key)
 			end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					if files[path] == nil then return nil, "absent" end
 					return files[path], "ok"
@@ -1091,7 +1115,7 @@ helpers.describe("field run ports: configuration guard", function()
 				write = function(path, text) files[path] = text; return true end,
 				delete = function(path) files[path] = nil; return true end,
 			}
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				keys = function()
 					local keys = {}
 					for key in pairs(settings) do keys[#keys + 1] = key end
@@ -1102,27 +1126,27 @@ helpers.describe("field run ports: configuration guard", function()
 				set = function(key, value) settings[key] = value; return true end,
 				delete = function(key) settings[key] = nil; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["adapters.field_run_ports"] = nil
 			local ports = require("adapters.field_run_ports").new("/repo")
 			local snapshot = ports.config_snapshot()
 			helpers.assert_eq(ports.config_restore(snapshot).restored[1], nil, "an untouched configuration restores nothing")
 			files["/cfg/config.toml"] = "a = 2\n"
-			files["/cfg/KarabinerConfigPath"] = "new"
+			files["/cfg/TapHoldConfigPath"] = "new"
 			settings.llm_backend = "mlx"
 			settings.added = 1
 			local outcome = ports.config_restore(snapshot)
 			helpers.assert_eq(files["/cfg/config.toml"], "a = 1\n")
-			helpers.assert_nil(files["/cfg/KarabinerConfigPath"], "a file the run created is removed")
+			helpers.assert_nil(files["/cfg/TapHoldConfigPath"], "a file the run created is removed")
 			helpers.assert_eq(settings.llm_backend, "ollama")
 			helpers.assert_nil(settings.added, "a preference the run added is removed")
 			helpers.assert_eq(settings.keep, true)
 			helpers.assert_eq(table.concat(outcome.restored, ","),
-				"ConfigTomlPath,KarabinerConfigPath,setting_added,setting_llm_backend")
+				"ConfigTomlPath,TapHoldConfigPath,setting_added,setting_llm_backend")
 			helpers.assert_eq(#outcome.failed, 0)
 			helpers.assert_true(outcome.reload, "config.toml put back under the live preferences needs a reload")
-			files["/cfg/KarabinerConfigPath"] = "regenerated"
+			files["/cfg/TapHoldConfigPath"] = "regenerated"
 			helpers.assert_eq(ports.config_restore(snapshot).reload, false,
 				"a file the driver does not read back into its preferences needs none")
 		end)
@@ -1131,18 +1155,18 @@ end)
 
 helpers.describe("field run ports: configuration guard and runtime state", function()
 	helpers.it("never rewinds the Karabiner lease's used-token ledger", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.storage",
-			"infra.config_paths", "adapters.shell_runner", "adapters.timer_scheduler", "platform.remap.lease_controller" }
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.fs.adapters.storage",
+			"infra.config_paths", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "platform.remap.lease_controller" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.config_paths"] = { get = function(key) return "/cfg/" .. key end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 				write = function() return true end,
 				delete = function() return true end,
 			}
 			local settings = { ["karabiner.used_tokens.v1"] = { "t1" }, llm_backend = "ollama" }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				keys = function()
 					local keys = {}
 					for key in pairs(settings) do keys[#keys + 1] = key end
@@ -1154,8 +1178,8 @@ helpers.describe("field run ports: configuration guard and runtime state", funct
 				delete = function(key) settings[key] = nil; return true end,
 			}
 			package.loaded["platform.remap.lease_controller"] = { RUNTIME_SETTING_KEYS = { "karabiner.used_tokens.v1" } }
-			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
 			package.loaded["adapters.field_run_ports"] = nil
 			local ports = require("adapters.field_run_ports").new("/repo")
 			local snapshot = ports.config_snapshot()
@@ -1176,19 +1200,19 @@ helpers.describe("field run ports: the MLX model step", function()
 	--- @param write_ok boolean|nil False makes putting the file back fail.
 	--- @return table outcome { verdict, codes, files }
 	local function run_mlx_model(initial, write_ok)
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "infra.config_paths",
-			"adapters.shell_runner", "adapters.timer_scheduler", "infra.paths", "infra.field_run",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "infra.config_paths",
+			"core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run",
 			"modules.llm.backend_detector", "modules.llm.mlx_deps_checker", "modules.llm", "ui.menu.menu_llm" }
 		local outcome = {}
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local active = "/cfg/mlx_active_model.txt"
 			local files = { [active] = initial, ["/shared/models.json"] = "{}" }
 			package.loaded["infra.config_paths"] = { get = function(key)
 				assert(key == "MlxActiveModelPath", "only the active-model path is asked for")
 				return active
 			end }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = function(path) return files[path] end,
 				read_with_status = function(path)
 					if files[path] == nil then return nil, "absent" end
@@ -1201,9 +1225,9 @@ helpers.describe("field run ports: the MLX model step", function()
 				end,
 				delete = function(path) files[path] = nil; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-			package.loaded["adapters.timer_scheduler"] = { after = function() end, cancel = function() end }
-			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["core.events.timer_scheduler"] = { after = function() end, cancel = function() end }
+			package.loaded["core.fs.engine.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "LFM2.5-350M", download_gb = 0.38 } end,
 			}
@@ -1260,19 +1284,19 @@ end)
 
 helpers.describe("field run ports: Ollama model step", function()
 	helpers.it("waits for the runtime metadata an install just changed instead of skipping", function()
-		local stubbed = { "infra.logger", "adapters.field_run_ports", "adapters.file_system", "adapters.shell_runner",
-			"adapters.timer_scheduler", "infra.paths", "infra.field_run", "modules.llm.ollama_binary",
+		local stubbed = { "core.logger.engine.logger", "adapters.field_run_ports", "core.fs.adapters.file_system", "core.process.adapters.shell_runner",
+			"core.events.timer_scheduler", "core.fs.engine.paths", "infra.field_run", "modules.llm.ollama_binary",
 			"modules.llm.api_ollama", "modules.llm.ollama_deps_checker", "ui.menu.menu_llm" }
 		helpers.with_stub_scope(stubbed, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.file_system"] = { read = function() return "{}" end }
-			package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.fs.adapters.file_system"] = { read = function() return "{}" end }
+			package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
 			local timers = 0
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(_, callback) timers = timers + 1; callback() end,
 				cancel = function() end,
 			}
-			package.loaded["infra.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
+			package.loaded["core.fs.engine.paths"] = { shared_llm_path = function() return "/shared/models.json" end }
 			package.loaded["infra.field_run"] = {
 				smallest_model = function() return { name = "Granite", runtime_name = "granite4:350m-h", download_gb = 0.36 } end,
 			}

@@ -45,7 +45,7 @@ local function run_action(label, outcome, options)
 	options = options or {}
 	local saved = {}
 	local module_names = {
-		"infra.manifest_menu", "infra.manifest_reader", "infra.notifications",
+		"infra.manifest_menu", "infra.manifest_reader", "core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config", "ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
 	}
@@ -53,7 +53,7 @@ local function run_action(label, outcome, options)
 	for _, name in ipairs({
 		"infra.manifest_menu",
 		"infra.manifest_reader",
-		"infra.notifications",
+		"core.ui.engine.notifications",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.keymap_lifecycle",
 		"ui.menu.menu_hotstrings_management",
@@ -85,19 +85,19 @@ local function run_action(label, outcome, options)
 	local last_changes = nil
 	local consumed = { space = false, slash = true }
 
-	local native_renderer = assert(require("menu.renderer").new({
+	local native_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local value = require("adapters.json_codec").decode(raw)
+			local value = require("core.fs.adapters.json_codec").decode(raw)
 			if options.reorder then
 				local rows = value.word_expanders_menu
 				rows[1], rows[3] = rows[3], rows[1]
 			end
 			return value
 		end,
-		i18n = require("infra.i18n"),
-		logger = require("infra.logger"),
+		i18n = require("core.i18n.engine.i18n"),
+		logger = require("core.logger.engine.logger"),
 	}))
 	local command_row = require("infra.manifest_menu").command_row
 	package.loaded["infra.manifest_menu"] = {
@@ -114,7 +114,7 @@ local function run_action(label, outcome, options)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "★" end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_title, _body, kind)
 			helpers.assert_eq(kind, "error")
 			calls.notices = calls.notices + 1
@@ -176,7 +176,7 @@ local function run_action(label, outcome, options)
 			do_reload = function() end,
 		}
 		local built = Management.build_management(ctx)
-		local parent = find_row(built.menu, require("infra.i18n").get("menu.hotstrings.word_expanders"))
+		local parent = find_row(built.menu, require("core.i18n.engine.i18n").get("menu.hotstrings.word_expanders"))
 		local controls = parent.items or parent.submenu or parent.menu
 		if options.pause_after_build then ctx.paused = true end
 		local row = find_row(built.menu, label)
@@ -201,7 +201,7 @@ end
 
 
 helpers.describe("word-expander terminator mutations are transactional", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local bulk_labels = {
 		i18n.get("menu.hotstrings.check_all"),
 		i18n.get("menu.hotstrings.uncheck_all"),
@@ -304,12 +304,12 @@ end)
 
 
 helpers.describe("shared word-expander fixed commands", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local function corpus()
 		local raw = assert(io.open(helpers.shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
 		local content = raw:read("*a")
 		raw:close()
-		return assert(require("adapters.json_codec").decode(content))
+		return assert(require("core.fs.adapters.json_codec").decode(content))
 	end
 
 	helpers.it("replays the independent three-command golden through the real child renderer", function()
@@ -338,14 +338,12 @@ helpers.describe("shared word-expander fixed commands", function()
 		helpers.assert_eq(fixture.calls.saves, 1)
 	end)
 
-	helpers.it("refuses an existing native command when the captured context becomes paused", function()
+	-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+	helpers.it("runs an existing native command when the captured context becomes paused", function()
 		for _, row in ipairs(corpus().rows) do
 			local fixture = run_action(i18n.get(row.i18n), "true", { pause_after_build = true })
-			helpers.assert_eq(fixture.result, false)
-			helpers.assert_eq(fixture.calls.batches, 0)
-			helpers.assert_eq(fixture.calls.saves, 0)
-			helpers.assert_eq(fixture.calls.updates, 0)
-			helpers.assert_eq(fixture.state.terminator_states, corpus().delimiter_states.initial)
+			helpers.assert_eq(fixture.result, true)
+			helpers.assert_eq(fixture.calls.saves, 1)
 		end
 	end)
 end)

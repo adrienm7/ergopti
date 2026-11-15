@@ -23,8 +23,8 @@
 
 #Requires AutoHotkey v2.0
 
-#Include ../../adapters/file_publication.ahk
-#Include ../../adapters/screen_capture.ahk
+#Include ../../core/fs/adapters/file_publication.ahk
+#Include ../../platform/system/screen_capture.ahk
 
 global _GestureRegionCapture := false
 global _GestureRegionCaptureEpoch := 0

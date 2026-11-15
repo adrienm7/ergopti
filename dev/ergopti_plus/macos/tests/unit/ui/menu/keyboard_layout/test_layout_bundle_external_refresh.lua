@@ -28,19 +28,19 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 		local ok, err = xpcall(function()
 			helpers.with_fresh_modules({
 				"modules.keymap.layout_install",
-				"infra.fs_dir",
+				"core.fs.engine.dir",
 				"modules.keymap.input_sources",
 				"ui.menu.menu_keyboard_layout",
-				"infra.logger",
-				"infra.text_utils",
-				"infra.i18n",
-				"infra.notifications",
-				"adapters.storage",
-				"infra.deferred_work",
-				"infra.timings",
+				"core.logger.engine.logger",
+				"core.text.engine.utils",
+				"core.i18n.engine.i18n",
+				"core.ui.engine.notifications",
+				"core.fs.adapters.storage",
+				"core.timing.engine.deferred_work",
+				"core.timing.engine.timings",
 				"ui.menu.keymap_lifecycle",
 				"infra.manifest_menu",
-				"infra.paths",
+				"core.fs.engine.paths",
 				"hs",
 				"tests.stubs.hs",
 			}, function()
@@ -48,9 +48,9 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 				hs_stub.__reset()
 				_G.hs = hs_stub
 				package.loaded["hs"] = hs_stub
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.paths"] = { shared = helpers.shared }
-				package.loaded["infra.text_utils"] = {
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+				package.loaded["core.text.engine.utils"] = {
 					shell_quote = function(value) return "'" .. tostring(value) .. "'" end,
 					applescript_format = function(template) return template end,
 				}
@@ -61,11 +61,11 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					["menu.layout.scope_system"] = "system",
 					["menu.layout.scope_user"] = "user",
 				}
-				package.loaded["infra.i18n"] = {
+				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key) return labels[key] or key end,
 					section = function(key) return key end,
 				}
-				package.loaded["infra.notifications"] = { notify = function() return true end }
+				package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 
 				local bundles_dir = "/fixture/driver/../../ergopti/macos/bundles/"
 				local user_dir = (os.getenv("HOME") or "~") .. "/Library/Keyboard Layouts/"
@@ -162,14 +162,14 @@ helpers.describe("menu_keyboard_layout: external bundle mutations invalidate dis
 					if path == user_dir then user_listings = user_listings + 1 end
 					return list_directory(path)
 				end
-				package.loaded["adapters.storage"] = {
+				package.loaded["core.fs.adapters.storage"] = {
 					get = function() return nil end,
 					set = function() return true end,
 				}
-				package.loaded["infra.deferred_work"] = { after = function() return true end }
-				package.loaded["infra.timings"] = { sec = function() return 0.1 end }
+				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+				package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
 				package.loaded["ui.menu.keymap_lifecycle"] = { ensure_started = function() return true end }
-				local actual_manifest = LayoutFixture.install(package.loaded["infra.i18n"])
+				local actual_manifest = LayoutFixture.install(package.loaded["core.i18n.engine.i18n"])
 				package.loaded["infra.manifest_menu"] = {
 					template_rows = actual_manifest.template_rows,
 					group_row = actual_manifest.group_row,

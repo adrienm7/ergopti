@@ -110,7 +110,7 @@ helpers.describe("actual managed document causal seams",function()
 		run(function(c)
 			c.start_load();c.now=5100;c.timers[1].expired();c.timers[1].expired()
 			helpers.assert_eq(#c.notices,1)
-			helpers.assert_eq(c.notices[1].title,require("infra.i18n").get("error_dialog.heading"))
+			helpers.assert_eq(c.notices[1].title,require("core.i18n.engine.i18n").get("error_dialog.heading"))
 			helpers.assert_eq(#c.effects,0)
 		end)
 	end)
@@ -152,8 +152,8 @@ helpers.describe("actual STARTED and successor before native install acceptance"
 	for _, port in ipairs({"blocked","find"})do
 		helpers.it("reload during actual "..port.." cannot borrow successor for backup",function()
 			run(function(c,Bridge,calls)
-				local Installation=require("infra.installation")
-				local Parser=require("updater.release_parser")
+				local Installation=require("core.lifecycle.engine.installation")
+				local Parser=require("updater.engine.release_parser")
 				local old_source,old_parse=Installation.is_source_run,Parser.parse_tag
 				local old_manager=package.loaded["modules.updater.manager"]
 				local real_manager=require("modules.updater.manager")
@@ -183,17 +183,17 @@ end)
 
 helpers.describe("actual owned native notification effect boundary",function()
 	helpers.it("capability probe reentry cannot admit old notify-send command",function()
-		local old_shell,old_notifier=package.loaded["adapters.shell_runner"],package.loaded["adapters.notifier"]
+		local old_shell,old_notifier=package.loaded["core.process.adapters.shell_runner"],package.loaded["platform.system.notifier"]
 		local live,invoked=true,0
-		package.loaded["adapters.shell_runner"]={has_command=function()live=false;return true end,
+		package.loaded["core.process.adapters.shell_runner"]={has_command=function()live=false;return true end,
 			quote=function(value)return value end,run=function()invoked=invoked+1;return true end}
-		package.loaded["adapters.notifier"]=nil
+		package.loaded["platform.system.notifier"]=nil
 		local ok,err=pcall(function()
-			local Notifier=require("adapters.notifier")
+			local Notifier=require("platform.system.notifier")
 			helpers.assert_eq(Notifier.send_owned("Generic error",{level="error"},function()return live end),false)
 			helpers.assert_eq(invoked,0)
 		end)
-		package.loaded["adapters.shell_runner"],package.loaded["adapters.notifier"]=old_shell,old_notifier
+		package.loaded["core.process.adapters.shell_runner"],package.loaded["platform.system.notifier"]=old_shell,old_notifier
 		if not ok then error(err)end
 	end)
 end)

@@ -4,7 +4,7 @@
 --- MODULE: copy_selected_path opens what the selection names (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/shortcuts/open_target_vectors.json, which the
---- Linux and Windows suites replay too, through _shared/lua/open_target with
+--- Linux and Windows suites replay too, through _shared/shortcuts/engine with
 --- the corpus's POSIX environment, then drives copy_or_open_path's
 --- selection handler with recording URL, open(1), file and notice ports.
 ---
@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local OpenTarget = require("open_target")
+local json = require("core.text.engine.json")
+local OpenTarget = require("shortcuts.engine.open_target")
 
 local CORPUS = helpers.shared("tests/corpus/shortcuts/open_target_vectors.json")
 
@@ -34,14 +34,14 @@ end
 --- @param target string
 --- @return string
 local function notice(key, target)
-	return (tostring(require("infra.i18n").get(key)):gsub("%%s", function() return target end))
+	return (tostring(require("core.i18n.engine.i18n").get(key)):gsub("%%s", function() return target end))
 end
 
 --- The modules a fixture replaces; with_fresh_modules restores each one, so a
 --- recording port never reaches the next test file the runner loads.
 local OWNED_MODULES = {
-	"modules.shortcuts.actions.apps", "adapters.window_info", "adapters.shell_runner",
-	"adapters.file_system", "infra.notifications", "infra.logger",
+	"modules.shortcuts.actions.apps", "platform.focus.window_info", "core.process.adapters.shell_runner",
+	"core.fs.adapters.file_system", "core.ui.engine.notifications", "core.logger.engine.logger",
 }
 
 --- Runs a case against the apps actions with recording ports.
@@ -50,16 +50,16 @@ local OWNED_MODULES = {
 local function with_apps(existing, body)
 	helpers.with_fresh_modules(OWNED_MODULES, function()
 		local world = { urls = {}, opened = {}, notices = {} }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["platform.focus.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path) return (existing or {})[path] and "present" or "absent" end,
 			exists = function(path) return (existing or {})[path] == true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target, on_done)
 				world.opened[#world.opened + 1] = target
 				on_done(true)
@@ -170,7 +170,7 @@ helpers.describe('selected existing path with punctuation', function()
   end)
   helpers.it('refuses the cleaned path when exact metadata cannot be read', function()
     with_apps({ ['/tmp/report']=true }, function(world)
-      package.loaded['adapters.file_system'].path_status = function() return 'error' end
+      package.loaded['core.fs.adapters.file_system'].path_status = function() return 'error' end
       helpers.assert_eq(world.apps._open_or_search('/tmp/report.'), false)
       helpers.assert_eq(world.opened, {})
     end)

@@ -1,9 +1,9 @@
 --- tests/unit/platform/remap/config/test_config_corrupt_toml.lua
 
 --- ==============================================================================
---- MODULE: config_karabiner.toml Corruption Guard
+--- MODULE: tap_hold.toml Corruption Guard
 --- DESCRIPTION:
---- Guards that a corrupt (unparseable) config_karabiner.toml is surfaced loudly
+--- Guards that a corrupt (unparseable) tap_hold.toml is surfaced loudly
 --- via Logger.error rather than silently reset to defaults and overwritten.
 --- Before the fix, _load_toml_file returned nil for both "file absent" and
 --- "present but corrupt", and load_user_config treated both identically — logging
@@ -17,11 +17,11 @@ local helpers = require("tests.helpers")
 -- Stub the TOML codec so we can control decode behaviour.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
 _toml_stub.decode_with_shapes = function(raw) return _toml_stub.decode(raw) end
-package.loaded["toml_codec"]     = _toml_stub
-package.loaded["infra.toml.codec"] = _toml_stub
+package.loaded["core.text.engine.toml_codec"]     = _toml_stub
+package.loaded["core.text.engine.toml.codec"] = _toml_stub
 
 -- Capture Logger calls via the runtime capture helper.
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 helpers.admit_logger_privacy(Logger)
 local captured = {}
 local original_fn = {}
@@ -53,7 +53,7 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 		local orig_decode = _toml_stub.decode
 		_toml_stub.decode = function(_raw) return nil end
 
-		local data, err = Config._load_toml_file(helpers.driver_root() .. "platform/remap/config.lua")
+		local data, err = Config._load_toml_file(assert(package.searchpath("platform.remap.config", package.path)))
 		_toml_stub.decode = orig_decode
 
 		helpers.assert_nil(data, "corrupt TOML must return nil data")
@@ -91,7 +91,7 @@ helpers.describe("Config._load_toml_file — corrupt TOML detection (karabiner-s
 		reset_captured()
 		local original_open = io.open
 		io.open = function() return nil, "PRIVATE-READ-FAILURE", 13 end
-		local call_ok, data, err = pcall(Config._load_toml_file, "/controlled/config_karabiner.toml")
+		local call_ok, data, err = pcall(Config._load_toml_file, "/controlled/tap_hold.toml")
 		io.open = original_open
 
 		helpers.assert_true(call_ok, "a permission or transient-lock failure must not escape")
@@ -113,7 +113,7 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 		_toml_stub.decode = function(_raw) return nil end
 
 		local state, status = Config.load_user_config(
-			{}, {}, helpers.driver_root() .. "platform/remap/config.lua")
+			{}, {}, assert(package.searchpath("platform.remap.config", package.path)))
 		_toml_stub.decode = orig_decode
 
 		-- A caller must receive no publishable state: otherwise init can deploy
@@ -144,12 +144,17 @@ helpers.describe("Config.load_user_config — corrupt file vs absent (karabiner-
 	helpers.it("handles genuine first-launch (absent file) with quiet INFO", function()
 		reset_captured()
 		local orig_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return nil  -- absent, not corrupt
+		local orig_part = Config._read_config_part
+		Config._load_toml_file = function(path)
+			return nil, "absent", { path = path, status = "absent" }  -- absent, not corrupt
+		end
+		-- No config.toml beside it either: a genuine first launch.
+		Config._read_config_part = function(path)
+			return {}, { path = Config.config_toml_path_for(path), status = "absent" }, nil
 		end
 
 		local state, status = Config.load_user_config({}, {}, "/fake/first_launch.toml")
-		Config._load_toml_file = orig_load
+		Config._load_toml_file, Config._read_config_part = orig_load, orig_part
 
 		helpers.assert_true(type(state) == "table")
 		helpers.assert_eq(status, "absent")

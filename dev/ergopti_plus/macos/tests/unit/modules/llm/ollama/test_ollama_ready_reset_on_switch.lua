@@ -34,8 +34,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 helpers.describe("core_llm resets Ollama readiness on every switch", function()
 	helpers.it("set_backend and set_llm_model_ollama call ApiOllama.reset_ready", function()
@@ -95,15 +95,15 @@ end)
 
 helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness", function()
 	helpers.it("a warmup response that lands after reset_ready() is discarded", function()
-		local saved_http   = package.loaded["adapters.http_client"]
-		local saved_notify = package.loaded["infra.notifications"]
+		local saved_http   = package.loaded["core.network.adapters.http_client"]
+		local saved_notify = package.loaded["core.ui.engine.notifications"]
 		local saved_api    = package.loaded["modules.llm.api_ollama"]
 
 		-- Capture the callback rather than invoking it: the warmup POST for model-a
 		-- is still in flight when the backend round-trip happens.
 		local captured_cb = nil
 		local post_count  = 0
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					post = function(_url, _headers, _payload, cb)
@@ -119,7 +119,7 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 
 		-- A stale 200 must not fire the user-facing "server ready" notification either.
 		local notify_count = 0
-		package.loaded["infra.notifications"] = { notify = function() notify_count = notify_count + 1 end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() notify_count = notify_count + 1 end }
 
 		package.loaded["modules.llm.api_ollama"] = nil
 		local ApiOllama = require("modules.llm.api_ollama")
@@ -138,8 +138,8 @@ helpers.describe("ApiOllama — a stale warmup 200 must not resurrect readiness"
 		local observed_notify = notify_count
 		local observed_posts  = post_count
 
-		package.loaded["adapters.http_client"]   = saved_http
-		package.loaded["infra.notifications"]      = saved_notify
+		package.loaded["core.network.adapters.http_client"]   = saved_http
+		package.loaded["core.ui.engine.notifications"]      = saved_notify
 		package.loaded["modules.llm.api_ollama"] = saved_api
 
 		-- Arrangement guard: if the POST never went out (or the callback was never

@@ -100,9 +100,9 @@ helpers.describe("shortcut retained native release debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, level in ipairs({ "start", "success", "warn", "info", "error" }) do logger[level] = function() end end
-			local global = require("config_scope_composition").new({ manifest = Manifest, scope = "global", logger = logger,
+			local global = require("settings.engine.scope.composition").new({ manifest = Manifest, scope = "global", logger = logger,
 				participants = function() return { tap_holds = before, shortcuts = actual, llm = after } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
@@ -271,7 +271,7 @@ end)
 
 
 
-require("test.config_obsolete_parents_contract").register(helpers)
+require("tests.lua.settings.obsolete_parents_contract").register(helpers)
 
 
 
@@ -298,35 +298,31 @@ end)
 
 
 helpers.describe("Linux paused shortcut compensation source custody", function()
-	helpers.it("settles a pause refusal through its exact fence while ordinary source admission stays closed", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision
+	-- 2026-11-12): the exact fence reads its source while paused, and only
+	-- runtime delivery stays closed (edd1-paused-writes).
+	helpers.it("reads the exact fenced source while paused and keeps runtime delivery closed (edd1-paused-writes)", function()
 		with_scope(function(_, owners, controls)
 			local pairs, token = owners.combinations, {}
 			helpers.assert_true(pairs.acquire_configuration(token))
 			helpers.assert_true(pairs.acquire_delivery_fence(token))
 			controls.paused = true
-			helpers.assert_eq(pairs.configuration_source(token), nil)
-			local source = pairs.configuration_source(token, true)
+			local source = pairs.configuration_source(token)
 			helpers.assert_type(source, "table")
-			helpers.assert_eq(pairs.configuration_source_matches(token, source), false)
-			helpers.assert_true(pairs.configuration_source_matches(token, source, true))
-			helpers.assert_eq(pairs.configuration_source_matches({}, source, true), false)
+			helpers.assert_true(pairs.configuration_source_matches(token, source))
+			helpers.assert_eq(pairs.configuration_source_matches({}, source), false)
 			helpers.assert_eq(pairs.capture_runtime(), nil)
 			helpers.assert_true(pairs.release_configuration(token))
-			local restored = pairs.capture_edit_source(token, true)
+			local restored = pairs.capture_edit_source(token)
 			helpers.assert_type(restored, "table")
 			helpers.assert_true(restored.guard())
-			helpers.assert_eq(pairs.capture_edit_source(token), nil)
-			helpers.assert_eq(pairs.capture_edit_source(nil, true), nil)
-			helpers.assert_eq(pairs.capture_edit_source({}, true), nil)
+			helpers.assert_eq(pairs.capture_edit_source(nil), nil)
+			helpers.assert_eq(pairs.capture_edit_source({}), nil)
 			local alias = setmetatable({}, { __eq = function() return true end })
-			helpers.assert_eq(pairs.capture_edit_source(alias, true), nil)
-			controls.paused = "unknown"
-			helpers.assert_eq(restored.guard(), false)
-			helpers.assert_eq(pairs.capture_edit_source(token, true), nil)
-			controls.paused = true
+			helpers.assert_eq(pairs.capture_edit_source(alias), nil)
 			helpers.assert_true(pairs.release_delivery_fence(token))
-			helpers.assert_eq(restored.guard(), false, "settled fence cannot grant later paused source currency")
-			helpers.assert_eq(pairs.capture_runtime(), nil)
+			helpers.assert_eq(pairs.capture_runtime(), nil, "a pause still keeps runtime delivery closed")
+			helpers.assert_type(pairs.capture_edit_source(), "table", "an ordinary editor reads the source while paused")
 		end)
 	end)
 
@@ -476,7 +472,7 @@ helpers.describe("Linux physical edit four-owner collision preflight", function(
 		end)
 	end
 	helpers.it("the shared policy preserves None and ordered claim identity without granting readiness", function()
-		local policy = require("shortcuts.physical_conflicts")
+		local policy = require("shortcuts.engine.physical_conflicts")
 		local request = { slot = "physical_none_CapsLock", code = 58, action = "none", mods = {}, aliases = {} }
 		local claims = { { kind = "prefix", binding = "combination__caps_lock_then_tab", codes = { 58, 15 } } }
 		helpers.assert_eq(policy.conflicts(request, claims), false)
@@ -529,7 +525,7 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 					local decision = owners.keyboard.magic_editor_decision({ master = true, paused = false, inhibited = false })
 					helpers.assert_true(decision.active); helpers.assert_eq(decision.source.native_code, 36)
 					helpers.assert_eq(decision.action, case.stored or Manifest.default_for("shortcuts.keyboard.magic_editor"))
-					local policy = require("shortcuts.magic_editor")
+					local policy = require("shortcuts.engine.magic_editor_core")
 					local projected = policy.resolve({ default_action = Manifest.default_for(policy.PATH), stored_action = case.stored,
 						is_action = owners.gestures.is_assignable, trigger = "★", source = facts, known_codes = { KeyJ = true },
 						explicit_claims = { ["evdev:36"] = { action = "copy", binding_id = "keyboard__physical_super_KeyJ" } },
@@ -611,6 +607,10 @@ helpers.describe("physical preflight joins the original Magic Key replacement", 
 			local source = removing and MAGIC_COLLISION_SOURCE:gsub('magic_editor = "none"\n', 'magic_editor = "none"\nphysical_none_KeyJ = "copy"\n', 1) or MAGIC_COLLISION_SOURCE
 			with_magic_publication_scope(source, function(scope, owners, controls, path, Source)
 				-- Both legitimate native-intent writes must publish while actual readiness is false.
+				-- The production getter answers true since 2026-11-11 (LIN-004): this
+				-- case keeps the unqualified answer the safety refusal still handles.
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), true, "the production getter")
+				owners.keyboard.physical_delivery_available = function() return false end
 				helpers.assert_eq(scope.physical_delivery_available(), false)
 				local observations = 0
 				Source.capture_collision_inventory = function() observations = observations + 1; error("native intent must not acquire an output collision frame") end

@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 local M = {}
-local OWNED = { "tests.support.file_system_transaction_fixture", "adapters.file_system", "infra.fs_dir",
-	"infra.logger", "adapters.ledger_append", "infra.timings", "keystats.metrics", "modules.keystats.aggregator",
+local OWNED = { "tests.support.file_system_transaction_fixture", "core.fs.adapters.file_system", "core.fs.engine.dir",
+	"core.logger.engine.logger", "core.fs.adapters.ledger_append", "core.timing.engine.timings", "metrics.engine.metrics", "modules.keystats.aggregator",
 	"modules.keystats.export", "modules.keystats.log_manager", "modules.keystats.rotation",
-	"modules.keystats.sqlite_writer", "adapters.timer_scheduler", "modules.keystats.timestamp", "lfs",
-	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "keystats.physical_release",
-	"toml_codec.record_scanner", "toml_codec.key_path", "diagnostics.operation_reporter", "infra.toml.reader",
-	"toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom", "text_utils", "compat.utf8" }
+	"modules.keystats.sqlite_writer", "core.events.timer_scheduler", "modules.keystats.timestamp", "lfs",
+	"modules.keystats.physical_accounting_mode", "modules.keystats.physical_wire", "metrics.engine.capture.physical_release",
+	"core.text.engine.toml_codec.record_scanner", "core.text.engine.toml_codec.key_path", "diagnostics.engine.operation_reporter", "core.text.engine.toml.reader",
+	"core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8" }
 
 local function upvalue(fn, wanted)
 	for index = 1, math.huge do
@@ -72,10 +72,10 @@ function M.with_manager(scenario)
 				function db:errmsg() return "owned clear refusal" end
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
-				package.loaded["infra.logger"] = logger
-				package.loaded["adapters.file_system"] = adapter
-				package.loaded["infra.timings"] = { sec = function() return 1 end, ms = function() return 5000 end }
-				package.loaded["keystats.metrics"] = {}
+				package.loaded["core.logger.engine.logger"] = logger
+				package.loaded["core.fs.adapters.file_system"] = adapter
+				package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end, ms = function() return 5000 end }
+				package.loaded["metrics.engine.metrics"] = {}
 				package.loaded["modules.keystats.aggregator"] = {}
 				local export = helpers.load_with_stubs("modules.keystats.export")
 				package.loaded["modules.keystats.export"] = {
@@ -104,7 +104,7 @@ function M.with_manager(scenario)
 				end
 				function state.restart()
 					state.closed = false
-					package.loaded["adapters.ledger_append"] = nil
+					package.loaded["core.fs.adapters.ledger_append"] = nil
 					package.loaded["modules.keystats.log_manager"] = nil
 					manager = helpers.load_with_stubs("modules.keystats.log_manager")
 					upvalue(upvalue(manager.ingest_once, "_flush_local_data_sql_outbox"), "_paths").data_sql_path = state.path

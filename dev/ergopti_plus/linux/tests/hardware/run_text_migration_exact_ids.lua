@@ -38,7 +38,7 @@ insert("9007199254740993", "second-original")
 local sql = "SELECT id||'|'||hex(text)||'|'||hex(events_json) FROM events_typing WHERE device_id='owned' ORDER BY id;"
 local before = assert(Writer.query_rows(sql))
 local messages = {}
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 Logger.set_level("debug")
 Logger.set_sink(function(line) messages[#messages + 1] = line end)
 Cipher.set_enabled(true)

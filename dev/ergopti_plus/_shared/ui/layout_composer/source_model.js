@@ -24,6 +24,9 @@ var LayoutSource = (function () {
 	const VERSION = 1;
 	const ID = /^[a-z][a-z0-9_]*$/;
 	const KEY = /^[A-Z][A-Za-z0-9]*$/;
+	const CONTROL = /[\u0000-\u001F\u007F-\u009F]/;
+	// A bundle resource stem: no path separator, quote, backslash or leading dot.
+	const FILE_NAME = /^[^./\\"][^/\\"]*$/;
 	const BUILTIN_MODIFIERS = [
 		'shift',
 		'shift_left',
@@ -39,8 +42,24 @@ var LayoutSource = (function () {
 		'meta_right',
 		'caps_lock',
 		'num_lock',
-		'scroll_lock'
+		'scroll_lock',
+		// Windows' Kana level (KBDKANA), the level Ergopti's KbdEdit layout uses in
+		// place of AltGr; each target maps it to its closest native level.
+		'kana'
 	];
+	// The four character levels every target types text on, by the modifiers that
+	// select them (macOS semantics: Option is AltGr). The one definition of the text
+	// levels: the editor's layer selector and a key's shortcut_key read it.
+	const TEXT_LEVELS = Object.freeze(
+		[
+			{ id: 'base', required: [] },
+			{ id: 'shift', required: ['shift'] },
+			{ id: 'altgr', required: ['alt'] },
+			{ id: 'shift_altgr', required: ['shift', 'alt'] }
+		].map((level) => Object.freeze({ id: level.id, required: Object.freeze(level.required) }))
+	);
+	// The modifiers a key's shortcut_key covers in every combination but the text levels.
+	const SHORTCUT_MODIFIERS = Object.freeze(['shift', 'control', 'alt', 'meta']);
 	const TARGETS = [
 		{ target: 'macos', artifact: 'keylayout' },
 		{ target: 'linux', artifact: 'xkb', unavailable: 'tooling_export_required' },
@@ -50,8 +69,19 @@ var LayoutSource = (function () {
 		{ target: 'driver_windows', artifact: 'emulation' },
 		{ target: 'web', artifact: 'emulation' }
 	];
+	// Export fields holding a table of LCID (4 hex digits) -> text instead of a
+	// string: the Windows version resource's per-language texts.
+	const EXPORT_TABLES = { windows: ['descriptions', 'language_names'] };
 	const EXPORT_METADATA = {
-		windows: ['locale', 'layout_id', 'dll_name'],
+		windows: [
+			'locale',
+			'layout_id',
+			'dll_name',
+			'copyright',
+			'company',
+			'descriptions',
+			'language_names'
+		],
 		linux: ['name', 'description']
 	};
 	const EDITS = [
@@ -65,6 +95,18 @@ var LayoutSource = (function () {
 		'tap_holds',
 		'windows'
 	];
+	// The ISO key left of Z, and where the ANSI derivation moves it by default.
+	const ISO_EXTRA_KEY = 'IntlBackslash';
+	const ANSI_EXTRA_KEY = 'Backquote';
+	const MACOS_EXPORT_STRINGS = [
+		'internal_name',
+		'ansi_internal_name',
+		'ansi_display_name',
+		'input_source_id',
+		'version'
+	];
+	const MACOS_ICONS = ['icon', 'ansi_icon'];
+	const ICON_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]*\.png$/;
 	const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 	const table = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
@@ -133,7 +175,12 @@ var LayoutSource = (function () {
 
 	/** Validate a text, dead-state, action, physical chord or disabled mapping. */
 	function mapping(value, path, deadKeys, modifiers) {
-		record(value, ['text', 'dead_key', 'action', 'key', 'modifiers', 'disabled'], [], path);
+		record(
+			value,
+			['text', 'compose', 'compose_as', 'dead_key', 'action', 'key', 'modifiers', 'disabled'],
+			[],
+			path
+		);
 		const kinds = ['text', 'dead_key', 'action', 'key', 'disabled'].filter((kind) =>
 			own(value, kind)
 		);
@@ -143,10 +190,31 @@ var LayoutSource = (function () {
 		if (own(value, 'action')) identifier(value.action, `${path}.action`);
 		if (own(value, 'key')) keyCode(value.key, `${path}.key`);
 		if (own(value, 'disabled')) requireValue(value.disabled === true, `${path}.disabled`);
+		// A text's dead-key identity: compose = false types it outside every dead key,
+		// compose_as names the rule input it answers to when that differs from the text.
+		if (own(value, 'compose')) {
+			requireValue(own(value, 'text'), `${path}.compose`);
+			requireValue(typeof value.compose === 'boolean', `${path}.compose`);
+		}
+		if (own(value, 'compose_as')) {
+			requireValue(own(value, 'text') && value.compose !== false, `${path}.compose_as`);
+			string(value.compose_as, `${path}.compose_as`);
+		}
 		if (own(value, 'modifiers')) {
 			requireValue(own(value, 'key'), `${path}.modifiers`);
 			list(value.modifiers, `${path}.modifiers`, (id, at) => reference(id, modifiers, at));
 		}
+	}
+
+	/** Check one modifier combination: required and optional modifiers never overlap. */
+	function selector(value, path, modifiers) {
+		const required = list(value.required, `${path}.required`, (id, where) =>
+			reference(id, modifiers, where)
+		);
+		list(value.optional, `${path}.optional`, (id, where) => {
+			reference(id, modifiers, where);
+			requireValue(!required.has(id), where, 'source_modifier_overlap');
+		});
 	}
 
 	/** Read an imported document through the existing composer, never a second parser. */
@@ -188,10 +256,27 @@ var LayoutSource = (function () {
 		for (const field of ['description', 'author'])
 			if (own(source.layout, field)) string(source.layout[field], `layout.${field}`, true);
 		if (own(source.layout, 'languages')) list(source.layout.languages, 'layout.languages', string);
-		record(source.physical, ['base', 'ansi_extra_key'], ['base'], 'physical');
+		record(source.physical, ['base', 'ansi_extra_key', 'ansi_swaps'], ['base'], 'physical');
 		requireValue(['iso', 'ansi'].includes(source.physical.base), 'physical.base');
 		if (own(source.physical, 'ansi_extra_key'))
 			keyCode(source.physical.ansi_extra_key, 'physical.ansi_extra_key');
+		if (own(source.physical, 'ansi_swaps')) {
+			// Each position moves once: a key in two pairs would make the derivation order-dependent.
+			const moved = new Set([ISO_EXTRA_KEY, source.physical.ansi_extra_key || ANSI_EXTRA_KEY]);
+			list(
+				source.physical.ansi_swaps,
+				'physical.ansi_swaps',
+				(pair, at) => {
+					requireValue(Array.isArray(pair) && pair.length === 2, at);
+					pair.forEach((key, index) => {
+						keyCode(key, `${at}[${index}]`);
+						requireValue(!moved.has(key), `${at}[${index}]`, 'source_duplicate');
+						moved.add(key);
+					});
+				},
+				(pair) => pair.join(':')
+			);
+		}
 		if (own(source, 'imported_keylayout')) {
 			record(
 				source.imported_keylayout,
@@ -225,14 +310,29 @@ var LayoutSource = (function () {
 				(entry) => entry.id
 			);
 		const deadKeys = new Set();
+		const states = new Set();
 		if (own(source, 'dead_keys'))
 			list(
 				source.dead_keys,
 				'dead_keys',
 				(entry, at) => {
-					record(entry, ['id', 'name', 'terminator', 'rules'], ['id', 'terminator', 'rules'], at);
+					record(
+						entry,
+						['id', 'name', 'state', 'action_id', 'terminator', 'rules'],
+						['id', 'terminator', 'rules'],
+						at
+					);
 					identifier(entry.id, `${at}.id`);
 					if (own(entry, 'name')) string(entry.name, `${at}.name`);
+					// The .keylayout state and action names, kept when an import's differ from the id.
+					for (const field of ['state', 'action_id'])
+						if (own(entry, field)) {
+							string(entry[field], `${at}.${field}`);
+							requireValue(!CONTROL.test(entry[field]), `${at}.${field}`);
+						}
+					const state = own(entry, 'state') ? entry.state : entry.id;
+					requireValue(state !== 'none' && !states.has(state), `${at}.state`, 'source_duplicate');
+					states.add(state);
 					string(entry.terminator, `${at}.terminator`, true);
 					deadKeys.add(entry.id);
 				},
@@ -243,13 +343,16 @@ var LayoutSource = (function () {
 				entry.rules,
 				`dead_keys[${index}].rules`,
 				(rule, at) => {
-					record(rule, ['input', 'text', 'next'], ['input'], at);
-					string(rule.input, `${at}.input`);
+					record(rule, ['input', 'input_dead_key', 'text', 'next'], [], at);
+					// The typed text a rule answers to, or the dead key pressed while this one is pending.
+					requireValue(own(rule, 'input') !== own(rule, 'input_dead_key'), at);
+					if (own(rule, 'input')) string(rule.input, `${at}.input`);
+					else reference(rule.input_dead_key, deadKeys, `${at}.input_dead_key`);
 					requireValue(own(rule, 'text') || own(rule, 'next'), at);
 					if (own(rule, 'text')) string(rule.text, `${at}.text`, true);
 					if (own(rule, 'next')) reference(rule.next, deadKeys, `${at}.next`);
 				},
-				(rule) => rule.input
+				(rule) => (own(rule, 'input') ? `text:${rule.input}` : `dead:${rule.input_dead_key}`)
 			);
 		const layers = new Set();
 		if (own(source, 'layers'))
@@ -259,23 +362,32 @@ var LayoutSource = (function () {
 				(entry, at) => {
 					record(
 						entry,
-						['id', 'required', 'optional', 'keys', 'platform_keys'],
+						['id', 'required', 'optional', 'alternatives', 'keys', 'platform_keys', 'ansi_keys'],
 						['id', 'required', 'optional', 'keys'],
 						at
 					);
 					identifier(entry.id, `${at}.id`);
 					layers.add(entry.id);
-					const required = list(entry.required, `${at}.required`, (id, where) =>
-						reference(id, modifiers, where)
-					);
-					list(entry.optional, `${at}.optional`, (id, where) => {
-						reference(id, modifiers, where);
-						requireValue(!required.has(id), where, 'source_modifier_overlap');
-					});
+					selector(entry, at, modifiers);
+					// Further modifier combinations that select the same layer (one keyMapSelect).
+					if (own(entry, 'alternatives'))
+						list(entry.alternatives, `${at}.alternatives`, (alternative, where) => {
+							record(alternative, ['required', 'optional'], ['required', 'optional'], where);
+							selector(alternative, where, modifiers);
+						});
 					requireValue(table(entry.keys), `${at}.keys`);
 					for (const [key, value] of Object.entries(entry.keys)) {
 						keyCode(key, `${at}.keys.${key}`);
 						mapping(value, `${at}.keys.${key}`, deadKeys, modifiers);
+					}
+					// The ANSI variant's own mappings where the derivation rule is not enough
+					// (Bépo's ANSI hardware map), applied after it, on every platform.
+					if (own(entry, 'ansi_keys')) {
+						requireValue(table(entry.ansi_keys), `${at}.ansi_keys`);
+						for (const [key, value] of Object.entries(entry.ansi_keys)) {
+							keyCode(key, `${at}.ansi_keys.${key}`);
+							mapping(value, `${at}.ansi_keys.${key}`, deadKeys, modifiers);
+						}
 					}
 					if (own(entry, 'platform_keys')) {
 						record(entry.platform_keys, ['windows', 'macos', 'linux'], [], `${at}.platform_keys`);
@@ -300,7 +412,15 @@ var LayoutSource = (function () {
 				keyCode(key, at);
 				record(
 					entry,
-					['name', 'caps_lock', 'caps_layer', 'caps_shift_layer', 'caps_altgr', 'virtual_key'],
+					[
+						'name',
+						'caps_lock',
+						'caps_layer',
+						'caps_shift_layer',
+						'caps_altgr',
+						'virtual_key',
+						'shortcut_key'
+					],
 					[],
 					at
 				);
@@ -319,6 +439,14 @@ var LayoutSource = (function () {
 				}
 				if (own(entry, 'caps_altgr'))
 					requireValue(typeof entry.caps_altgr === 'boolean', `${at}.caps_altgr`);
+				if (own(entry, 'shortcut_key')) {
+					keyCode(entry.shortcut_key, `${at}.shortcut_key`);
+					requireValue(
+						entry.shortcut_key !== key,
+						`${at}.shortcut_key`,
+						'source_shortcut_key_self'
+					);
+				}
 				if (own(entry, 'virtual_key'))
 					requireValue(
 						Number.isInteger(entry.virtual_key) &&
@@ -380,8 +508,23 @@ var LayoutSource = (function () {
 				(entry) => entry.key
 			);
 		if (own(source, 'windows')) {
-			record(source.windows, ['flags', 'nls'], [], 'windows');
+			record(source.windows, ['flags', 'nls', 'key_names', 'kana_key'], [], 'windows');
+			// The physical key that holds the Kana level on Windows (Right Alt by default).
+			if (own(source.windows, 'kana_key')) keyCode(source.windows.kana_key, 'windows.kana_key');
 			if (own(source.windows, 'flags')) list(source.windows.flags, 'windows.flags', identifier);
+			// The key names of scan codes no physical key of the registry names
+			// (F13 to F24, Pause, Sys Req…), keyed sc_<hex> or e0_<hex> for an extended one.
+			if (own(source.windows, 'key_names')) {
+				const names = source.windows.key_names;
+				requireValue(
+					names && typeof names === 'object' && !Array.isArray(names),
+					'windows.key_names'
+				);
+				for (const [scan, name] of Object.entries(names)) {
+					requireValue(/^(sc|e0)_[0-9a-f]{2}$/.test(scan), `windows.key_names.${scan}`);
+					string(name, `windows.key_names.${scan}`);
+				}
+			}
 			if (own(source.windows, 'nls'))
 				list(
 					source.windows.nls,
@@ -416,17 +559,49 @@ var LayoutSource = (function () {
 		if (own(source, 'exports')) {
 			record(source.exports, ['macos', 'windows', 'linux'], [], 'exports');
 			if (own(source.exports, 'macos')) {
-				record(source.exports.macos, ['format'], ['format'], 'exports.macos');
-				requireValue(
-					['bundle', 'iso', 'ansi'].includes(source.exports.macos.format),
-					'exports.macos.format'
+				const macos = source.exports.macos;
+				record(
+					macos,
+					['format', ...MACOS_EXPORT_STRINGS, 'keyboard_id', 'ansi_keyboard_id', ...MACOS_ICONS],
+					['format'],
+					'exports.macos'
 				);
+				requireValue(['bundle', 'iso', 'ansi'].includes(macos.format), 'exports.macos.format');
+				for (const field of MACOS_EXPORT_STRINGS)
+					if (own(macos, field)) {
+						string(macos[field], `exports.macos.${field}`);
+						requireValue(!CONTROL.test(macos[field]), `exports.macos.${field}`);
+					}
+				// The internal name is the .keylayout file name, its KLInfo key and its strings key.
+				for (const field of ['internal_name', 'ansi_internal_name'])
+					if (own(macos, field))
+						requireValue(FILE_NAME.test(macos[field]), `exports.macos.${field}`);
+				// A PNG beside the source file, wrapped into each variant's .icns by the exporter.
+				for (const field of MACOS_ICONS)
+					if (own(macos, field))
+						requireValue(
+							typeof macos[field] === 'string' && ICON_FILE.test(macos[field]),
+							`exports.macos.${field}`
+						);
+				for (const field of ['keyboard_id', 'ansi_keyboard_id'])
+					if (own(macos, field))
+						requireValue(Number.isSafeInteger(macos[field]), `exports.macos.${field}`);
 			}
 			for (const [target, fields] of Object.entries(EXPORT_METADATA))
 				if (own(source.exports, target)) {
 					record(source.exports[target], fields, [], `exports.${target}`);
-					for (const [key, value] of Object.entries(source.exports[target]))
-						string(value, `exports.${target}.${key}`);
+					for (const [key, value] of Object.entries(source.exports[target])) {
+						if ((EXPORT_TABLES[target] || []).includes(key)) {
+							requireValue(
+								value && typeof value === 'object' && !Array.isArray(value),
+								`exports.${target}.${key}`
+							);
+							for (const [lang, text] of Object.entries(value)) {
+								requireValue(/^[0-9a-f]{4}$/.test(lang), `exports.${target}.${key}.${lang}`);
+								string(text, `exports.${target}.${key}.${lang}`);
+							}
+						} else string(value, `exports.${target}.${key}`);
+					}
 				}
 		}
 		return source;
@@ -515,9 +690,33 @@ var LayoutSource = (function () {
 		return codec.stringify(source);
 	}
 
+	/**
+	 * The modifier combinations a key's shortcut_key covers: every combination of
+	 * SHORTCUT_MODIFIERS that selects no text level, except Control with Alt, which
+	 * Windows reports for AltGr (AltGr typing must never become a shortcut).
+	 * @returns {string[][]} Each combination in SHORTCUT_MODIFIERS order.
+	 */
+	function shortcutKeyCombinations() {
+		const text = new Set(TEXT_LEVELS.map((level) => level.required.slice().sort().join('+')));
+		const combinations = [];
+		for (let mask = 1; mask < 1 << SHORTCUT_MODIFIERS.length; mask++) {
+			const ids = SHORTCUT_MODIFIERS.filter((id, bit) => mask & (1 << bit));
+			if (text.has(ids.slice().sort().join('+'))) continue;
+			if (ids.includes('control') && ids.includes('alt')) continue;
+			combinations.push(ids);
+		}
+		return combinations;
+	}
+
 	return {
 		FORMAT,
 		VERSION,
+		TEXT_LEVELS,
+		SHORTCUT_MODIFIERS,
+		shortcutKeyCombinations,
+		ISO_EXTRA_KEY,
+		ANSI_EXTRA_KEY,
+		BUILTIN_MODIFIERS,
 		SourceError,
 		validate,
 		importKeylayout,

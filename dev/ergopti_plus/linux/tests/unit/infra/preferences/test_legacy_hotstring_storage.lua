@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local FAMILIES = { { id = "date_fr", section = "datefr" }, { separator = true } }
 
@@ -185,7 +185,7 @@ helpers.describe("legacy hotstring storage import: word delimiters", function()
 
 			-- The owner reads exactly what was imported.
 			local Settings = require("modules.hotstrings.terminator_settings")
-			local Terminators = require("keymap.terminators")
+			local Terminators = require("layouts.engine.layers.terminators")
 			local before = Settings.snapshot()
 			local paths = require("infra.config_paths")
 			local config = paths.config

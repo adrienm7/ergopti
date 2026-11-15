@@ -39,7 +39,7 @@ helpers.describe("Main selected payload cache boundary", function()
 			local injector = { prepare_selected = state.injector.prepare_selected,
 				inject = function() undo_outputs = undo_outputs + 1; return { ok = true } end }
 			local replace, control, undo = factory(injector, { selection = owner }, { dry_run = false }, engine,
-				{ observe_key = function() end }, { now_ms = function() return 0 end }, require("logger.shim"),
+				{ observe_key = function() end }, { now_ms = function() return 0 end }, require("core.logger.engine.shim"),
 				{ is_paused = function() return false end }, { withdraw = function() state.allowed = false; owner.cancel() end },
 				{ blocks_text = function() return false end, current_context = function() return context end },
 				{ is_password_app = function() return false end, is_unrecorded_app = function() return false end, suppress = function() end, unsuppress = function() end,

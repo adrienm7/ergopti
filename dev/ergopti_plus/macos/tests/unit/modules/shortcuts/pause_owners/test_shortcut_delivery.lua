@@ -16,7 +16,7 @@ local function load_real_keep_awake_owner()
 	local arm_mode = "true"
 	local cancel_mode = "true"
 	local handles = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return 0 end,
 		after = function(_, callback)
 			if arm_mode == "throw" then error("keep-awake timer arm exploded") end
@@ -202,11 +202,11 @@ local function load_real_shortcut_delivery_owner()
 	package.loaded["modules.shortcuts.actions.system"] = system_actions
 	package.loaded["modules.shortcuts.actions.text"] = inert_actions
 	package.loaded["modules.shortcuts.actions.apps"] = inert_actions
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The real i18n and a gestures owner loaded against it. A cached gestures
 	-- module may have been bound by an earlier file to a get-only i18n double,
 	-- which made the combined run fail in `i18n.format` while this file passed alone.
-	package.loaded["infra.i18n"] = nil
+	package.loaded["core.i18n.engine.i18n"] = nil
 	package.loaded["modules.gestures.actions"] = nil
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return "https://example.invalid" end,

@@ -1,9 +1,9 @@
 --- tests/unit/infra/scope/test_metrics_scope.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[metrics]\nenabled = true\nprivate_filter_enabled = false\nwpm_widget_visible = true\nwpm_menubar_visible = true\nunknown = "keep"\n[other]\nvalue = 42\n'
 
@@ -201,12 +201,12 @@ helpers.describe("Linux metrics scope rendered commands", function()
 		local loaded = {}
 		for name, value in pairs(package.loaded) do loaded[name] = value end
 		local ok, err = pcall(function()
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("metrics scope must not write legacy storage") end,
 			}
 			with_scope(function(_, collector)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				package.loaded["ui.menu.builder"] = nil
 				local passed, detail = pcall(function()
 					local rows = require("ui.menu.builder").build({ keystats = collector,
@@ -235,7 +235,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 			local loaded = {}
 			for name, value in pairs(package.loaded) do loaded[name] = value end
 			local ok, err = pcall(function()
-				package.loaded["adapters.storage"] = {
+				package.loaded["core.fs.adapters.storage"] = {
 					get = function(_, default) return default end,
 					set = function() error("metrics scope must not write legacy storage") end,
 				}
@@ -244,7 +244,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 					local root = renderer.get_root()
 					local old_rows, old_top = root.metrics_menu, root.top_level
 					local execute = os.execute
-					local old_files = package.loaded["adapters.file_system"]
+					local old_files = package.loaded["core.fs.adapters.file_system"]
 					local backups, changed, questions, paused = {}, 0, 0, false
 					local mode = "recommended"
 					local key, id = "common.restore_recommended", "scope_restore"
@@ -260,7 +260,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 							if target ~= path then backups[#backups + 1] = target end
 						end
 						if scenario == "publication refusal" then controls.refuse = path end
-						package.loaded["adapters.file_system"] = controls.files
+						package.loaded["core.fs.adapters.file_system"] = controls.files
 						os.execute = function(command)
 							if command:find("dialog_host.lua", 1, true) then
 								questions = questions + 1
@@ -275,7 +275,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						local action
 						local function find(items)
 							for _, row in ipairs(items) do
-								if row.title == require("infra.i18n").get(key) then action = row.fn end
+								if row.title == require("core.i18n.engine.i18n").get(key) then action = row.fn end
 								if row.menu then find(row.menu) end
 							end
 						end
@@ -283,7 +283,8 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						helpers.assert_eq(type(action), "function", "the real renderer must bind the scope command")
 						if scenario == "pause before the click" then paused = true end
 						action()
-						local committed = scenario == "recommended"
+						-- EDD-1 (maintainer, 2026-11-12): a click after a pause still restores.
+						local committed = scenario ~= "publication refusal"
 						helpers.assert_eq(changed, committed and 1 or 0)
 						helpers.assert_eq(questions, 0, "the restore applies at once (restore-recommended-no-confirm)")
 						if committed then
@@ -302,7 +303,7 @@ helpers.describe("Linux metrics scope rendered commands", function()
 						end
 					end)
 					root.metrics_menu, root.top_level, os.execute = old_rows, old_top, execute
-					package.loaded["adapters.file_system"] = old_files
+					package.loaded["core.fs.adapters.file_system"] = old_files
 					for _, backup in ipairs(backups) do os.remove(backup) end
 					if not passed then error(detail, 0) end
 				end)
@@ -348,7 +349,7 @@ helpers.describe("metrics private native claim", function()
 			revert = function() committed = false; reverted = reverted + 1; return true end,
 			release = function() end,
 		}
-		local owner = require("config_scope_fenced_transaction").new({ owner = {}, transaction = primary,
+		local owner = require("settings.engine.scope.fenced_transaction").new({ owner = {}, transaction = primary,
 			scope = "metrics", available = function() return true end, fences = { {
 				acquire = function() held = true; return true end,
 				release = function() if refusal then return false end; held = false; return true end,
@@ -368,13 +369,13 @@ helpers.describe("metrics private native claim", function()
 			local public, claim, primary = {}, {}, nil
 			local runtime = "original"
 			claim.pending = function() return primary.pending() end
-			primary = require("config_scope_transaction").new({ path = path, backup_path = backup,
+			primary = require("settings.engine.scope.transaction").new({ path = path, backup_path = backup,
 				files = controls.files, manifest = require("infra.manifest_reader"),
 				capture = function() return { marker = runtime } end,
 				apply = function() runtime = "candidate"; return true end,
 				restore = function(snapshot) runtime = snapshot.marker; return true end })
 			local releases = 0
-			local owner = require("config_scope_fenced_transaction").new({ owner = public, native_token = claim,
+			local owner = require("settings.engine.scope.fenced_transaction").new({ owner = public, native_token = claim,
 				transaction = primary, scope = "metrics", available = function() return true end,
 				fences = { { acquire = Preferences.acquire, release = function(token)
 					helpers.assert_eq(token, claim)
@@ -503,9 +504,9 @@ helpers.describe("metrics retained native release debt", function()
 			local after = { apply = function(_, done) trace[#trace + 1] = "after.apply"; done(true) end,
 				revert = function(done) done(true) end, release = function() end,
 				pending = function() return false end, retry_restore = function(done) done(true) end }
-			local actual = require("config_scope_participant").synchronous({ apply = scope.apply, owner = function() return scope end })
+			local actual = require("settings.engine.scope.participant").synchronous({ apply = scope.apply, owner = function() return scope end })
 			local logger = {}; for _, name in ipairs({ "start", "success", "warn", "info", "error" }) do logger[name] = function() end end
-			local global = require("config_scope_composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
+			local global = require("settings.engine.scope.composition").new({ manifest = require("infra.manifest_reader"), scope = "global",
 				logger = logger, participants = function() return { tap_holds = before, metrics = { actual, after } } end })
 			local verdict, report
 			global.apply("recommended", function(ok, detail) verdict, report = ok, detail end)
@@ -528,7 +529,7 @@ helpers.describe("metrics retained native release debt", function()
 		-- dropped without a word. The refusal stays, and now it is logged.
 		with_scope(function(_owner, collector)
 			local Preferences = require("infra.metrics_preferences")
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local claim = { pending = function() return false end }
 			helpers.assert_true(Preferences.acquire(claim))
 			local logged, original = {}, Logger.error

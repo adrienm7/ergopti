@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Exercises a fresh connector with independently controlled process close ACKs.
 --- @param options table Constructor fault and completion controls.
@@ -18,7 +18,7 @@ local function with_owner(options, body)
 	package.loaded["modules.llm.agent_connectors"] = nil
 	local Connector = require("modules.llm.agent_connectors")
 	local state = { operations = {}, callbacks = 0, writes = 0, removals = 0, lists = 0, directories = 0, files = {} }
-	local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/llm/agent.json", "r"))
+	local file = assert(io.open(helpers.driver_root() .. "/../_shared/ai/data/agent.json", "r"))
 	local config = assert(Json.decode(file:read("*a"))); file:close()
 	local function done()
 		state.callbacks = state.callbacks + 1
@@ -314,7 +314,7 @@ helpers.describe("agent connector owned shutdown", function()
 
 	for _, mode in ipairs({ "cancel", "second calendar" }) do
 		helpers.it("(agent-connector-shutdown) logger reentry " .. mode .. " retains the first calendar input", function()
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local original = Logger.info
 			local ok, why = pcall(function()
 				with_owner({}, function(Connector, state)
@@ -360,7 +360,7 @@ local function with_main(connector, body)
 	local capture = assert(text:match("(local shutdown_runtime = prediction_engine and prediction_engine%.shutdown_runtime.-)\nlocal shutdown = ShutdownCoordinator"))
 	local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 	local observed = { stops = 0, flushes = 0, imports = 0, loaded = { ["modules.llm.agent_connectors"] = connector } }
-	local env = setmetatable({ ShutdownCoordinator = require("infra.shutdown_coordinator"), package = { loaded = observed.loaded },
+	local env = setmetatable({ ShutdownCoordinator = require("core.lifecycle.engine.shutdown.coordinator"), package = { loaded = observed.loaded },
 		keystats = { stop = function() return true end }, privacy_owners = {}, prediction_engine = false,
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
 		webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
@@ -423,7 +423,7 @@ helpers.describe("agent connector native deadline admission", function()
 	for _, mode in ipairs({ "fresh clock", "stop during refresh" }) do
 		helpers.it("(agent-connector-clock) " .. mode .. " before native allocation", function()
 			local uv = require("luv")
-			local old_clock, old_backend = uv.update_time, package.loaded["adapters.owned_process"]
+			local old_clock, old_backend = uv.update_time, package.loaded["core.process.adapters.owned_process"]
 			local old_connector = package.loaded["modules.llm.agent_connectors"]
 			package.loaded["modules.llm.agent_connectors"] = nil
 			local Connector = require("modules.llm.agent_connectors")
@@ -432,7 +432,7 @@ helpers.describe("agent connector native deadline admission", function()
 				refreshed = true
 				if mode == "stop during refresh" then stop_ack = Connector.shutdown() end
 			end
-			package.loaded["adapters.owned_process"] = { start = function(_, _, options, callback)
+			package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, options, callback)
 				assert(refreshed, "native deadline was armed against a stale loop clock")
 				if not options.authorized() then return nil, "revoked before allocation" end
 				allocated = allocated + 1
@@ -454,7 +454,7 @@ helpers.describe("agent connector native deadline admission", function()
 				end
 				helpers.assert_true(Connector.shutdown())
 			end, debug.traceback)
-			uv.update_time, package.loaded["adapters.owned_process"] = old_clock, old_backend
+			uv.update_time, package.loaded["core.process.adapters.owned_process"] = old_clock, old_backend
 			package.loaded["modules.llm.agent_connectors"] = old_connector
 			if not ok then error(why, 0) end
 		end)
@@ -466,7 +466,7 @@ helpers.describe("native agent connector shutdown", function()
 		for _, mode in ipairs({ "normal", "shutdown", "cold", "spawn-refused" }) do
 			helpers.it("(agent-connector-shutdown-native) actual " .. mode .. " helper lifetime", function()
 				local uv = require("luv")
-				local quote = require("text_utils").shell_quote
+				local quote = require("core.text.engine.utils_core").shell_quote
 				local fixture = helpers.driver_root() .. "/tests/fixtures/native_agent_connector_shutdown.lua"
 				local result = os.execute(quote(assert(uv.exepath())) .. " " .. quote(fixture) .. " " .. quote(mode))
 				helpers.assert_true(result == true or result == 0, "native connector lifetime must retire all physical resources")

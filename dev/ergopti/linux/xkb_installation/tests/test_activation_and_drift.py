@@ -22,6 +22,7 @@ from layout_package import (  # noqa: E402
     parse_kde_layouts,
     remove_layout_specs,
 )
+import desktop_activation  # noqa: E402
 import xkb_files_installer_clean as clean_installer  # noqa: E402
 
 LAYOUT_DIR = Path(__file__).resolve().parents[2]
@@ -71,6 +72,80 @@ class GSettingsMergeTests(unittest.TestCase):
         pairs = [("xkb", "fr"), ("xkb", "ergopti+plus")]
         formatted = format_gsettings_sources(pairs)
         self.assertEqual(parse_gsettings_sources(formatted), pairs)
+
+
+class GnomeLiveSelectTests(unittest.TestCase):
+    def select(self, answers):
+        """Runs _gnome_select with the extension answering ``answers`` in turn."""
+        writes, calls = [], []
+        selection = desktop_activation.DesktopSelection(
+            "gnome",
+            {"sources": "[('xkb', 'us'), ('xkb', 'ergol')]", "mru-sources": "[('xkb', 'us')]"},
+            "ergol",
+        )
+
+        def fake_set(key, pairs, _label):
+            writes.append((key, list(pairs)))
+            return True
+
+        def fake_capture(command):
+            return desktop_activation.format_gsettings_sources(
+                [pairs for key, pairs in writes if key == command[-1]][-1]
+            )
+
+        def fake_activate(source_id):
+            calls.append(source_id)
+            return answers.pop(0)
+
+        with mock.patch.object(desktop_activation, "_gnome_set", fake_set), mock.patch.object(
+            desktop_activation, "run_capture", fake_capture
+        ), mock.patch.object(
+            desktop_activation, "gnome_extension_activate", fake_activate
+        ), mock.patch.object(desktop_activation.time, "sleep", lambda _s: None):
+            state = desktop_activation._gnome_select(
+                "ergol_live", ("ergol", "ergol_live"), selection
+            )
+        return state, writes, calls
+
+    def test_a_running_shell_switches_through_the_extension(self):
+        """gnome-runtime-switch: GNOME Shell 46 keeps its in-memory sources and
+        recent list, so only the Ergopti extension switches it; the lists keep
+        the slot first for the next login and are never written as the slot alone."""
+        state, writes, calls = self.select(
+            [desktop_activation.GNOME_SWITCH_UNLISTED, desktop_activation.GNOME_SWITCH_SWITCHED]
+        )
+        self.assertEqual(state, desktop_activation.GNOME_SWITCH_SWITCHED)
+        self.assertEqual(
+            writes,
+            [
+                ("sources", [("xkb", "ergol_live"), ("xkb", "us")]),
+                ("mru-sources", [("xkb", "ergol_live"), ("xkb", "us")]),
+            ],
+        )
+        self.assertEqual(calls, ["xkb:ergol_live"] * 2, "asked again until the Shell lists it")
+
+    def test_a_missing_extension_is_named(self):
+        state, _, calls = self.select([desktop_activation.GNOME_SWITCH_MISSING])
+        self.assertEqual(state, desktop_activation.GNOME_SWITCH_MISSING)
+        self.assertEqual(calls, ["xkb:ergol_live"], "a missing extension is not asked twice")
+
+    def test_the_extension_constants_match_the_shipped_extension(self):
+        extension = (
+            Path(__file__).resolve().parents[4]
+            / "ergopti_plus"
+            / "linux"
+            / "platform"
+            / "desktop_focus"
+            / "gnome"
+            / "extension.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "const INPUT_SOURCE_PATH = '%s';" % desktop_activation.GNOME_SWITCH_PATH, extension
+        )
+        self.assertIn(
+            "const INPUT_SOURCE_INTERFACE = '%s';" % desktop_activation.GNOME_SWITCH_INTERFACE,
+            extension,
+        )
 
 
 class KDEMergeTests(unittest.TestCase):

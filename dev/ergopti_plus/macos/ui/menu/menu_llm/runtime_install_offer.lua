@@ -30,10 +30,10 @@ local M = {}
 
 local hs = hs
 
-local Logger        = require("infra.logger")
-local i18n          = require("infra.i18n")
+local Logger        = require("core.logger.engine.logger")
+local i18n          = require("core.i18n.engine.i18n")
 local OllamaBinary  = require("modules.llm.ollama_binary")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 
 local LOG = "menu_llm.runtime_offer"
 
@@ -44,8 +44,8 @@ local function ollama_deps() return require("modules.llm.ollama_deps_checker") e
 local function mlx_deps() return require("modules.llm.mlx_deps_checker") end
 local function mlx_repair_offer() return require("ui.menu.menu_llm.mlx_repair_offer") end
 local function backend_detector() return require("modules.llm.backend_detector") end
-local function dialogs() return require("infra.dialog_util") end
-local function notifications() return require("infra.notifications") end
+local function dialogs() return require("core.ui.engine.dialog_util") end
+local function notifications() return require("core.ui.engine.notifications") end
 
 
 

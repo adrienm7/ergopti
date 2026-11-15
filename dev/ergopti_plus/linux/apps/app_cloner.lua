@@ -3,7 +3,7 @@
 local literal_driver = os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT")
 if literal_driver and literal_driver ~= "" then
 	local literal_shared = assert(os.getenv("ERGOPTI_LITERAL_SHARED_ROOT"), "literal shared root unavailable")
-	assert(loadfile(literal_driver .. "/infra/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
+	assert(loadfile(literal_driver .. "/core/lifecycle/engine/literal_module_loader.lua"))().install(literal_driver, literal_shared, os.getenv("ERGOPTI_RUNTIME_PREFIX"), os.getenv("ERGOPTI_LITERAL_DIRECT") == "1" and "child-direct" or (os.getenv("ERGOPTI_LITERAL_DAEMON") == "1" and "daemon" or nil))
 end
 
 
@@ -27,14 +27,14 @@ M.SYSTEM_APPLICATIONS = "/usr/share/applications/"
 --- Whether a command exits 0.
 local function succeeded(command)
 	-- Both os.execute ABIs (a LuaJIT number, or Lua 5.2 true/exit/code) read as one code.
-	local code = require("ui.native_dialog").exit_code(os.execute(command))
+	local code = require("core.ui.ui.native_dialog").exit_code(os.execute(command))
 	return code == 0
 end
 
 --- The real filesystem ports of a clone run.
 --- @return table ports
 function M.native_ports()
-	local quote = require("text_utils").shell_quote
+	local quote = require("core.text.engine.utils_core").shell_quote
 	local ConfigPaths = require("infra.config_paths")
 	-- The real account home: a clone's profile and the shared VS Code settings
 	-- live there, never in the temporary folder home() falls back to.
@@ -58,25 +58,36 @@ function M.native_ports()
 			local real = pipe and pipe:read("*l")
 			if pipe then pipe:close() end
 			if not real or real == "" then return false end
-			local folder = require("native_path").dirname(real) or "/"
+			local folder = require("core.fs.engine.native_path").dirname(real) or "/"
 			return succeeded("test -e " .. quote(folder .. "/" .. marker))
 		end,
 		write = function(plan) return require("apps.app_cloner_core").write(plan) end,
 	}
 end
 
---- Validates the optional item to open, as the macOS builder does: a path
---- must exist, anything else must carry a URL scheme.
+--- Validates the optional item to open, as the macOS builder's
+--- validateOpenArg does (BAP-005): a path, absolute or under « ~ », must exist;
+--- anything else must be a URL with « :// », or Teams' documented single-slash
+--- forms. A typo such as « https:/x » or « localhost:3000 » is refused.
+--- @param item string The trimmed answer.
+--- @param exists function exists(path) -> boolean.
+--- @param home string The account's home folder.
 --- @return string|nil error_key
 --- @return string|nil value Substituted into the message.
-local function invalid_open_item(item, exists)
-	if item == "" then return nil end
-	if item:sub(1, 1) == "/" then
-		if exists(item) then return nil end
-		return "apps.cloner.err_path_missing", item
+--- @return string item The item to open, « ~ » expanded (the launcher's exec
+---   word is quoted, so no shell would expand it).
+local function invalid_open_item(item, exists, home)
+	if item == "" then return nil, nil, item end
+	local path = item
+	if item == "~" or item:sub(1, 2) == "~/" then path = home .. item:sub(2) end
+	if path:sub(1, 1) == "/" then
+		if exists(path) then return nil, nil, path end
+		return "apps.cloner.err_path_missing", item, item
 	end
-	if item:match("^[%a][%w+.%-]*:") then return nil end
-	return "apps.cloner.err_url_format"
+	if item:find("://", 1, true) or item:match("^msteams:/l/") or item:match("^msteams:/calendar") then
+		return nil, nil, item
+	end
+	return "apps.cloner.err_url_format", nil, item
 end
 
 --- Runs the clone dialogs and writes the clone.
@@ -104,7 +115,7 @@ function M.run(ports)
 			{ initial = t("apps.cloner.default_clone_name", source_name), ok = t("apps.cloner.btn_validate"),
 				cancel = t("button.cancel") })
 		if name == nil then return "cancelled" end
-		name = require("text_utils").trim(name)
+		name = require("core.text.engine.utils_core").trim(name)
 		if name == "" then
 			dialogs.message("warning", t("apps.cloner.title_empty_input"), t("apps.cloner.err_open_empty"))
 		end
@@ -115,9 +126,12 @@ function M.run(ports)
 		open_item = dialogs.entry(t("apps.cloner.title_open_arg"), t("apps.cloner.msg_open_optional_portable"),
 			{ initial = "", ok = t("apps.cloner.btn_validate"), cancel = t("button.cancel") })
 		if open_item == nil then return "cancelled" end
-		open_item = require("text_utils").trim(open_item)
-		local key, value = invalid_open_item(open_item, ports.exists)
-		if not key then break end
+		open_item = require("core.text.engine.utils_core").trim(open_item)
+		local key, value, resolved = invalid_open_item(open_item, ports.exists, ports.home)
+		if not key then
+			open_item = resolved
+			break
+		end
 		dialogs.message("warning", t("apps.cloner.title_invalid_input"), t(key, value))
 	end
 
@@ -173,7 +187,7 @@ function M.main(argv)
 	return 0
 end
 
-if type(arg) == "table" and type(arg[0]) == "string" and require("native_path").basename(arg[0]) == "app_cloner.lua" then
+if type(arg) == "table" and type(arg[0]) == "string" and require("core.fs.engine.native_path").basename(arg[0]) == "app_cloner.lua" then
 	local argv = {}
 	for index = 1, #arg do argv[index] = arg[index] end
 	os.exit(M.main(argv))

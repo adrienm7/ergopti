@@ -13,12 +13,12 @@
 
 local M = {}
 local hs            = hs
-local notifications = require("infra.notifications")
-local Logger = require("infra.logger")
-local fs_dir       = require("infra.fs_dir")
-local i18n = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local Logger = require("core.logger.engine.logger")
+local fs_dir       = require("core.fs.engine.dir")
+local i18n = require("core.i18n.engine.i18n")
 local ApiCommon = require("modules.llm.api_common")
-local TaskLifecycle = require("adapters.task_lifecycle")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 
@@ -42,7 +42,7 @@ local LOG = "menu_llm.mlx"
 -- api_mlx is the MLX backend's core module — if it cannot load, MLX predictions
 -- are dead anyway, so failing fast is correct.
 local ApiMlx = require("modules.llm.api_mlx")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 
 

@@ -8,19 +8,19 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PersonalFiles = require("hotstrings.personal_files")
-local TextUtils = require("infra.text_utils")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local TextUtils = require("core.text.engine.utils")
 
 --- Owns real source files, registry state and the conditional publication port.
 --- @param collision boolean Whether two sources share one legacy group.
 --- @param body function Receives the actual native-owner fixture.
 local function with_fixture(collision, body)
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "adapters.storage", "infra.config_paths",
-		"infra.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
+		"infra.preferences", "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.config_paths",
+		"core.ui.engine.notifications", "ui.menu.keymap_lifecycle", "modules.keymap.registry", "modules.keymap.registry_index",
 		"modules.keymap.registry_groups", "ui.menu.menu_hotstrings_custom", "infra.personal_file_scope",
 		"infra.personal_hotstrings",
-		"infra.i18n", "infra.manifest_menu", "infra.locale", "locale.core",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.i18n.engine.locale", "core.i18n.engine.core",
 	}, function()
 		-- These fixtures own registered sources, not the boot scanner catalogue.
 		-- Keep only its empty diagnostics port scoped; the real registry and
@@ -83,12 +83,12 @@ local function with_fixture(collision, body)
 				disk = content; return true
 			end,
 		}
-		package.loaded["adapters.file_system"] = native_files
+		package.loaded["core.fs.adapters.file_system"] = native_files
 		package.loaded["infra.config_paths"] = { get = function(key)
 			if key == "PersonalHotstringsDir" then return controls.root or root end
 			if key == "ConfigTomlPath" then return config end
 		end }
-		package.loaded["infra.notifications"] = { notify = function(...)
+		package.loaded["core.ui.engine.notifications"] = { notify = function(...)
 			observations.notices[#observations.notices + 1] = { ... }
 		end }
 		local R = helpers.load_with_stubs("modules.keymap.registry")
@@ -111,10 +111,10 @@ local function with_fixture(collision, body)
 		local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
 		-- Only the two newly declared affixes need a physical translated source.
 		-- Keep every existing identity-caption assertion on its original test port.
-		local NativeLocale = require("infra.locale")
+		local NativeLocale = require("core.i18n.engine.locale")
 		NativeLocale.set_locale("en")
 		assert(NativeLocale.current_locale() == "en")
-		local CaptionPort, PreviousGet = require("infra.i18n")
+		local CaptionPort, PreviousGet = require("core.i18n.engine.i18n")
 		PreviousGet = CaptionPort.get
 		CaptionPort.get = function(key)
 			if key == "menu.hotstrings.default_category_prefix" or key == "menu.hotstrings.shortcut_prefix" then
@@ -203,7 +203,7 @@ helpers.describe("personal file callback admission", function()
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_unique"), true)
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_sibling"), false)
 			helpers.assert_eq(f.ctx.state.hotstrings, { personal_ext_unique = true, personal_ext_sibling = false })
-			local parsed = require("toml_codec").decode(f.content())
+			local parsed = require("core.text.engine.toml_codec").decode(f.content())
 			helpers.assert_eq(parsed.future.keep, "owned-unrelated-value")
 			helpers.assert_eq(parsed.hotstrings.groups.future_group, false)
 			helpers.assert_eq(parsed.hotstrings.modules.future_group.unknown_section, true)
@@ -224,7 +224,7 @@ helpers.describe("personal file callback admission", function()
 			helpers.assert_eq(f.mapping("personal_ext_sibling").repl, "Sibling")
 			helpers.assert_eq(f.R.is_group_enabled("personal_ext_sibling"), true)
 			helpers.assert_eq({ f.observations.writes, f.observations.refreshes, f.observations.starts }, { 2, 2, 0 })
-			local restored = require("toml_codec").decode(f.content())
+			local restored = require("core.text.engine.toml_codec").decode(f.content())
 			helpers.assert_eq(restored.hotstrings.groups.future_group, false)
 			helpers.assert_eq(restored.hotstrings.modules.future_group.unknown_section, true)
 		end)
@@ -367,7 +367,7 @@ end)
 helpers.describe("personal directory hand corpus drives the genuine native separator policy", function()
 	helpers.it("replays every directory vector including explicit separate_files=false", function()
 		local saved_hs = rawget(_G, "hs")
-		local saved_i18n = rawget(package.loaded, "infra.i18n")
+		local saved_i18n = rawget(package.loaded, "core.i18n.engine.i18n")
 		local saved_get = type(saved_i18n) == "table" and rawget(saved_i18n, "get") or nil
 		local saved_renderer = rawget(package.loaded, "infra.manifest_menu")
 		local fixture_root
@@ -389,9 +389,9 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 			helpers.assert_type(actual,"table");helpers.assert_true(ok)
 			helpers.assert_type(native_tree,"function","actual physical-file provider invokes its native tree renderer")
 			local held = assert(f.commands()[1]).row.menu
-			local file=assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"),"rb"))
 			local bytes=file:read("*a");assert(file:close())
-			local hand=assert(require("json").decode(assert(bytes)))
+			local hand=assert(require("core.text.engine.json").decode(assert(bytes)))
 			local vectors, explicit_false = 0, 0
 			for _,vector in ipairs(hand.directory_cases)do
 				local node={folders={},files={}}
@@ -413,7 +413,7 @@ helpers.describe("personal directory hand corpus drives the genuine native separ
 		end)
 		end, debug.traceback)
 		helpers.assert_true(rawequal(rawget(_G, "hs"), saved_hs), "the genuine fixture restores the raw native global")
-		helpers.assert_true(rawequal(rawget(package.loaded, "infra.i18n"), saved_i18n), "the genuine caption module identity is restored")
+		helpers.assert_true(rawequal(rawget(package.loaded, "core.i18n.engine.i18n"), saved_i18n), "the genuine caption module identity is restored")
 		if saved_i18n then helpers.assert_true(rawequal(rawget(saved_i18n, "get"), saved_get)) end
 		helpers.assert_true(rawequal(rawget(package.loaded, "infra.manifest_menu"), saved_renderer))
 		if fixture_root then

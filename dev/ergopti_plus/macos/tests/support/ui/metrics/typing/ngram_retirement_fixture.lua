@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local Publication = require("tests.support.ui.metrics.typing.publication")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local FakeSqlite = require("tests.support.fake_ngram_sqlite")
 local with_delivery = require("tests.support.typing_delivery_fixture")
 local M = {}
@@ -117,7 +117,7 @@ function M.run(callback)
 				local reader = require("modules.keystats.sqlite_reader")
 				reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
 				local projection = require("ui.metrics_typing.projection")
-				local encoder = require("infra.paced_json").encode
+				local encoder = require("core.timing.engine.paced_json").encode
 				state.reader, state.projection = reader, projection
 				dashboard._app_icon_cache.Editor = false
 				local original_read, original_merge = reader.read_ngrams, reader.merge_ngrams
@@ -236,7 +236,7 @@ function M.run(callback)
 					if job then assert(job.state == "cancelled" and job.timer == nil) end
 					return job
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local original_show = builder.show_webview
 				builder.show_webview = function(options)
 					local prototype = original_show(options)

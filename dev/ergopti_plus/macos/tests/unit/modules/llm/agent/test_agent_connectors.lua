@@ -19,15 +19,15 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "modules.llm.agent_connectors", "adapters.shell_runner", "adapters.file_system", "infra.logger" }
+local MODULES = { "modules.llm.agent_connectors", "core.process.adapters.shell_runner", "core.fs.adapters.file_system", "core.logger.engine.logger" }
 
 --- Loads the connectors over a fake process launcher and file system.
 --- @param scenario function Receives (Connectors, world).
 local function with_connectors(scenario)
 	helpers.with_fresh_modules(MODULES, function()
 		local world = { spawns = {}, opens = {}, files = {}, removed = {}, next_file = 0 }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local record = { executable = executable, args = args, on_done = on_done, started = false }
 				world.spawns[#world.spawns + 1] = record
@@ -38,7 +38,7 @@ local function with_connectors(scenario)
 			end,
 			open = function(target) world.opens[#world.opens + 1] = target; return true end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_secure_temp_file = function()
 				world.next_file = world.next_file + 1
 				local path = "/private/tmp/lua_agent" .. world.next_file
@@ -59,7 +59,7 @@ local function with_connectors(scenario)
 		local ok, err = pcall(scenario, require("modules.llm.agent_connectors"), world)
 		-- with_fresh_modules restores the real module too; the explicit reset keeps
 		-- the suite-wide stub hygiene gate able to see it
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not ok then error(err, 0) end
 	end)
 end

@@ -12,13 +12,13 @@
 local helpers = require("tests.helpers")
 
 local DEPENDENCIES = {
-	"infra.logger",
-	"infra.timings",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"error_description",
-	"number_policy",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 	"modules.gestures.actions_click",
 }
 
@@ -104,7 +104,7 @@ local function with_fixture(failure_mode, body)
 		},
 	}
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
@@ -112,7 +112,7 @@ local function with_fixture(failure_mode, body)
 			fixture.errors[#fixture.errors + 1] = string.format(format_string, ...)
 		end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.25 end,
 	}
 	package.loaded["adapters.event_provenance"] = {
@@ -121,7 +121,7 @@ local function with_fixture(failure_mode, body)
 			return nil, "foreign", { events = {} }
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		prepare_mouse_event = function(_, event_type, position, options)
 			local event = hs_stub.eventtap.event.newMouseEvent(event_type, position)
 			if event == nil or event == false then return nil, "newMouseEvent returned nil" end
@@ -173,9 +173,9 @@ local function with_fixture(failure_mode, body)
 			fixture.deferred[#fixture.deferred + 1] = { label = label, callback = callback }
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["error_description"] = nil
-	package.loaded["number_policy"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["diagnostics.engine.reports.error_description"] = nil
+	package.loaded["core.text.engine.number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
 	_G.hs = hs_stub
 

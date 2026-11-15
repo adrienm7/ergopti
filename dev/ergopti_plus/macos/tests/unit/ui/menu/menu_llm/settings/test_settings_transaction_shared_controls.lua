@@ -32,7 +32,7 @@ local function auto_raise_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/auto_raise_temperature.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared automatic temperature control", function()
@@ -115,7 +115,7 @@ local function show_all_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/show_all_control.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared Show-all check", function()
@@ -172,9 +172,10 @@ helpers.describe("LLM shared Show-all check", function()
 			helpers.assert_eq(fixture.persisted().llm_streaming_multi, true)
 			helpers.assert_eq(fixture.calls.save, 0)
 			fixture.state.llm_num_predictions = 2
+			-- A pause stops typing, not configuration (EDD-1).
 			options.paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(fixture.calls.save, 0)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(fixture.calls.save, 1)
 		end)
 	end)
 
@@ -210,7 +211,7 @@ local function trigger_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/automatic_trigger_controls.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared automatic trigger controls", function()
@@ -288,7 +289,7 @@ helpers.describe("LLM shared automatic trigger controls", function()
 		end)
 	end)
 
-	helpers.it("rereads current values and refuses old callbacks after pause or master withdrawal (shared-automatic-triggers)", function()
+	helpers.it("rereads current values, commits while paused and refuses old callbacks after master withdrawal (shared-automatic-triggers)", function()
 		for _, expected in ipairs(trigger_corpus().rows) do
 			local options = {trigger_states = {false, false}, prediction_count = 2}
 			with_fixture(options, function(fixture)
@@ -297,15 +298,16 @@ helpers.describe("LLM shared automatic trigger controls", function()
 				fixture.state.llm_num_predictions = 1
 				helpers.assert_eq(row.fn(), true, "changing variant count does not revoke a trigger setting")
 				helpers.assert_eq(fixture.state[expected.state], false)
-				local saves, runtime_calls = fixture.calls.save, fixture.calls.runtime
 				options.paused = true
-				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(row.fn(), true, "a pause stops typing, not configuration (EDD-1)")
+				helpers.assert_eq(fixture.persisted()[expected.state], true)
 				options.paused = false
+				local saves, runtime_calls = fixture.calls.save, fixture.calls.runtime
 				fixture.state.llm_enabled = false
 				helpers.assert_eq(row.fn(), false)
 				helpers.assert_eq(fixture.calls.save, saves)
 				helpers.assert_eq(fixture.calls.runtime, runtime_calls)
-				helpers.assert_eq(fixture.persisted()[expected.state], false)
+				helpers.assert_eq(fixture.persisted()[expected.state], true)
 			end)
 		end
 	end)
@@ -332,10 +334,10 @@ end)
 
 helpers.describe("shared token streaming policy", function()
 	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
-		local policy = require("llm.display_policy")
+		local policy = require("ai.engine.settings.display_policy")
 		local corpus = token_streaming_corpus()
 		helpers.assert_eq(#corpus.capabilities, 9)
-		helpers.assert_eq(#corpus.cases, 15)
+		helpers.assert_eq(#corpus.cases, 16)
 		for _, vector in ipairs(corpus.capabilities) do
 			helpers.assert_eq(policy.streaming_capable(vector.platform, vector.backend), vector.capable)
 		end
@@ -352,7 +354,16 @@ helpers.describe("shared token streaming policy", function()
 end)
 
 helpers.describe("native streaming checkbox admission", function()
-	for _, condition in ipairs({ "paused", "off", "backend", "runtime disagreement", "retired owner" }) do
+	helpers.it("commits a retained checkbox while paused, read on resume (shared-token-streaming)", function()
+		local options = {}
+		with_fixture(options, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), "menu.llm.show_streaming"))
+			options.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(fixture.persisted().llm_streaming, true)
+		end)
+	end)
+	for _, condition in ipairs({ "off", "backend", "runtime disagreement", "retired owner" }) do
 		helpers.it("refuses a retained checkbox after " .. condition .. " (shared-token-streaming)", function()
 			local options = {}
 			with_fixture(options, function(fixture)
@@ -382,8 +393,8 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-		package.loaded["adapters.file_system"] = {
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
 				return disk, "ok"
@@ -426,7 +437,7 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = initial})
 					helpers.assert_eq(fixture.state.llm_temperature, previous_temperature)
 					helpers.assert_eq(fixture.runtime.llm_temperature, previous_temperature)
-					helpers.assert_eq(require("infra.toml.codec").decode(disk).llm.generation.temperature, 0.9)
+					helpers.assert_eq(require("core.text.engine.toml.codec").decode(disk).llm.generation.temperature, 0.9)
 					helpers.assert_eq(unconditional, 0)
 					helpers.assert_eq(wrong_path, false)
 					return
@@ -441,7 +452,7 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 				else
 					helpers.assert_eq(receipt.id, 1, "only the true owned forward save issues authority")
 					helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
-					local acknowledged = require("infra.toml.codec").decode(receipt.source.content)
+					local acknowledged = require("core.text.engine.toml.codec").decode(receipt.source.content)
 					helpers.assert_eq(acknowledged.llm.enabled, true)
 					helpers.assert_eq((acknowledged.llm.display or {}).streaming, nil, "acknowledged true follows the shared sparse default")
 					helpers.assert_eq(preferences.source_snapshot(path), receipt.source)
@@ -465,7 +476,7 @@ helpers.describe("macOS acknowledged token streaming checkbox", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -557,7 +568,16 @@ helpers.describe("macOS shared indentation choice", function()
 		end)
 	end)
 
-	for _, condition in ipairs({"paused", "off", "single", "runtime disagreement", "retired owner"}) do
+	helpers.it("commits a retained native choice while paused, read on resume (shared-indentation)", function()
+		local options = {}
+		with_fixture(options, function(fixture)
+			local command = assert(indentation_item(fixture.streaming_menu()).menu[1].fn)
+			options.paused = true
+			helpers.assert_eq(command(), true)
+			helpers.assert_true(fixture.persisted().llm_pred_indent ~= 1, "the paused choice is stored")
+		end)
+	end)
+	for _, condition in ipairs({"off", "single", "runtime disagreement", "retired owner"}) do
 		helpers.it("refuses a retained native choice after " .. condition .. " (shared-indentation)", function()
 			local options = {}
 			with_fixture(options, function(fixture)

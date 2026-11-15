@@ -4,7 +4,7 @@
 --- MODULE: Tone Ladder Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/tone_vectors.json through the shared tone
---- ladder (_shared/lua/llm/tone.lua) that the Linux prediction engine loads for
+--- ladder (_shared/ai/engine/prediction/tone.lua) that the Linux prediction engine loads for
 --- the more formal and more familiar actions: the next register, which text a
 --- step rewrites, and how the model's answer is read.
 ---
@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/tone_vectors.json"
 
@@ -31,7 +31,7 @@ end
 
 helpers.describe("tone corpus: the shared tone ladder on Linux", function()
 	local corpus = read_corpus()
-	local Tone = helpers.load_module("llm.tone")
+	local Tone = helpers.load_module("ai.engine.prediction.tone")
 
 	helpers.it("the corpus holds every family of vectors", function()
 		helpers.assert_true(#corpus.step_vectors >= 6, "step vectors")

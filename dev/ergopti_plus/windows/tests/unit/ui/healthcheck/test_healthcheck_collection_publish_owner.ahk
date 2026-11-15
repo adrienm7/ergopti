@@ -103,7 +103,7 @@ _HCPT_Assets(Root) {
 	_EDOT_Assets(Root)
 	FSCreateDirectoryExclusiveStrict(Root . "\localappdata")
 	for Pair in [
-		[_SharedDir . "\modules\diagnostics\collection.json", Root . "\shared\modules\diagnostics\collection.json"],
+		[_SharedDir . "\diagnostics\data\collection.json", Root . "\shared\diagnostics\data\collection.json"],
 		[_VendorDir . "\ergopti_diagnostics.ps1", Root . "\vendor\ergopti_diagnostics.ps1"]] {
 		FileCopy(Pair[1], Pair[2], false)
 		AssertEqual(CryptoSha256Bytes(FSReadBytesStrict(Pair[1])), CryptoSha256Bytes(FSReadBytesStrict(Pair[2])),

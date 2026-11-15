@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local MODULES = {
-	"adapters.file_system", "adapters.hotkey_registrar", "infra.paths", "infra.logger",
-	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "toml_codec.writer",
+	"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "core.logger.engine.logger",
+	"infra.preferences", "infra.config_paths", "infra.manifest_reader", "core.text.engine.toml_codec.writer",
 	"modules.gestures.actions", "modules.shortcuts.magic_editor",
 	"modules.shortcuts.keyboard_shortcuts",
 }
@@ -22,21 +22,21 @@ local function with_subject(assignments, scenario)
 	return helpers.with_stub_scope(MODULES, function()
 		local observed = { specs = {}, actions = {}, claims = {}, writes = 0, binds = 0 }
 		local controls = { admission_refuses = false, publication_refuses = false, stop_refuses = false }
-		local file = assert(io.open("../_shared/modules/actions/modifier_chords.json", "rb"))
+		local file = assert(io.open("../_shared/shortcuts/data/actions/modifier_chords.json", "rb"))
 		local catalogue = Json.decode(file:read("*a"))
 		file:close()
 		catalogue.keys = { { id = "c", label = "C" } }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "modifier-chords.json" end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "modifier-chords.json" end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_reader"] = nil
 		package.loaded["modules.gestures.actions"] = {
 			is_assignable = function(action) return type(action) == "string" end,
 			execute_single = function(action) observed.actions[#observed.actions + 1] = action; return true end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function() observed.binds = observed.binds + 1; return "ordinary-handle" end,
 			unbind = function() return true end,
 			setEnabled = function() return true end,
@@ -58,7 +58,7 @@ local function with_subject(assignments, scenario)
 			observed.callback_during_write = observed.latest.execute(observed.latest.action, "keyboard__magic_editor")
 			if controls.publication_refuses then error("owned publication refused") end
 		end)
-		require("toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("infra.manifest_reader"))
+		require("core.text.engine.toml_codec.writer").set_sparse_defaults("keyboard-fixture-config", require("infra.manifest_reader"))
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 		local subject = require("modules.shortcuts.keyboard_shortcuts")
 		local context = {
@@ -153,7 +153,7 @@ end)
 helpers.describe("contextual keyboard slot: logger-bound source rejoin", function()
 	helpers.it("refuses a source revoked inside the actual parent logger callback", function()
 		with_subject({}, function(_, observed)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			local original_callback, source_current, logger_entries, rechecks = logger.callback, true, 0, 0
 			logger.callback = function(log, name, callback, ...)
 				logger_entries = logger_entries + 1

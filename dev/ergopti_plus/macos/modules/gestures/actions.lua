@@ -8,46 +8,46 @@
 --- ==============================================================================
 
 local M = {}
-local BindingIdentity = require("config_binding_identity")
-local KeyboardPublication = require("config_keyboard_publication")
-local BindingPublication = require("config_binding_publication")
+local BindingIdentity = require("settings.engine.publication.binding_identity")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
-local Paths         = require("infra.paths")
-local Timings       = require("infra.timings")
-local i18n          = require("infra.i18n")
-local KeyNames      = require("keycodes.key_names")
-local StickyLabel   = require("actions.sticky_label")
-local text_utils    = require("infra.text_utils")
-local FileSystem    = require("adapters.file_system")
-local KeyState      = require("adapters.key_state")
-local SyntheticInput = require("adapters.synthetic_input")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
+local Paths         = require("core.fs.engine.paths")
+local Timings       = require("core.timing.engine.timings")
+local i18n          = require("core.i18n.engine.i18n")
+local KeyNames      = require("platform.input.keycodes.key_names")
+local StickyLabel   = require("shortcuts.engine.actions.sticky_label")
+local text_utils    = require("core.text.engine.utils")
+local FileSystem    = require("core.fs.adapters.file_system")
+local KeyState      = require("platform.input.key_state")
+local SyntheticInput = require("platform.input.synthetic_input")
 local Clipboard     = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local Click         = require("modules.gestures.actions_click")
 local Sticky        = require("modules.gestures.sticky_modifiers")
 local AuxOwner      = require("modules.gestures.actions_aux_owner")
 local ScreenshotSave = require("modules.shortcuts.actions.screenshot_save")
-local WrapPair      = require("wrap_pair")
-local DesktopNavigation = require("desktop_navigation")
-local SendInput     = require("send_input")
-local AppParameter  = require("app_parameter")
-local ProgramParameter = require("program_parameter")
-local UserActionParameter = require("user_action_parameter")
+local WrapPair      = require("keyboard.engine.wrap_pair")
+local DesktopNavigation = require("keyboard.engine.desktop_navigation")
+local SendInput     = require("platform.input.send_input")
+local AppParameter  = require("apps.engine.parameter")
+local ProgramParameter = require("settings.engine.program_parameter")
+local UserActionParameter = require("shortcuts.engine.user_action_parameter")
 local _program_revision = 0
 local _program_parameters_owned = false
-local PromptAction  = require("llm.prompt_action")
-local ProfileSelector = require("llm.profile_selector")
-local Tone          = require("llm.tone")
-local Vision        = require("llm.vision")
-local JsonCodec     = require("adapters.json_codec")
+local PromptAction  = require("ai.engine.prediction.prompt_action")
+local ProfileSelector = require("ai.engine.settings.profile_selector")
+local Tone          = require("ai.engine.prediction.tone")
+local Vision        = require("ai.engine.prediction.vision")
+local JsonCodec     = require("core.fs.adapters.json_codec")
 local ChordCatalogue = require("infra.script_chord_catalogue")
 local LOG           = "gestures.actions"
-local Brightness = require("brightness_actions").load()
-local ConfigKeys = require("config_keys")
+local Brightness = require("shortcuts.engine.brightness_actions").load()
+local ConfigKeys = require("settings.engine.keys")
 
 -- Explicit inter-key delay for every simulated keystroke. hs.eventtap.keyStroke()
 -- defaults this argument to 200 000 us and implements it as a BLOCKING usleep on the
@@ -108,7 +108,7 @@ end
 
 --- The dedicated script-control tap survives global PAUSE, but only the
 --- script-management actions of the shared chord catalogue (paused_actions of
---- _shared/modules/actions/script_chords.json) may bypass feature admission.
+--- _shared/shortcuts/data/actions/script_chords.json) may bypass feature admission.
 --- Arbitrary catalogue actions assigned to the same chords remain fenced
 --- normally.
 --- @param name string Action identifier.
@@ -873,7 +873,7 @@ sg("cmd_shift_tab",     switch_to_least_recent_application)
 --
 -- 27 registrations used to be written out here, each spelling a key and its
 -- modifiers into its own closure. They now come from
--- _shared/modules/actions/actions.toml via _generated/gesture_emit_actions.lua.
+-- _shared/shortcuts/data/actions/actions.toml via _generated/gesture_emit_actions.lua.
 --
 -- These are macOS values, not shared ones: of the 24 actions both drivers
 -- implement as a bare keystroke, 15 differ. macOS moves by word with Option
@@ -950,7 +950,7 @@ local function sticky_timeout_sec()
 		return nil
 	end
 	local ms = Remap.get_sticky_timeout()
-	if type(ms) ~= "number" or ms <= 0 then
+	if not require("tap_hold.engine.one_shot_timeout").is_valid(ms) then
 		Logger.error(LOG, "Sticky timeout is '%s' — refusing to arm on a guessed delay.", tostring(ms))
 		return nil
 	end
@@ -1075,6 +1075,9 @@ sg("sticky_cmd_option_ctrl",   function() arm_sticky({ "cmd", "alt", "ctrl" }) e
 sg("sticky_cmd_shift_ctrl",    function() arm_sticky({ "cmd", "shift", "ctrl" }) end)
 sg("sticky_option_shift_ctrl", function() arm_sticky({ "alt", "shift", "ctrl" }) end)
 sg("sticky_hyper",             function() arm_sticky({ "cmd", "alt", "shift", "ctrl" }) end)
+-- Ergopti's AltGr level is Option on macOS (the Kana layers compile to it too).
+sg("sticky_altgr",             function() arm_sticky({ "alt" }) end)
+sg("sticky_altgr_shift",       function() arm_sticky({ "alt", "shift" }) end)
 
 
 -- Tabs
@@ -1323,7 +1326,7 @@ end)
 -- built-in profile gets its action without a hand-written registration here.
 local BUILTIN_PROMPT_PROFILES = ProfileSelector.load_built_in_profiles()
 if #BUILTIN_PROMPT_PROFILES == 0 then
-	error("gestures/actions: _shared/modules/llm/profiles.json holds no built-in profile — "
+	error("gestures/actions: _shared/ai/data/profiles.json holds no built-in profile — "
 		.. "the llm_predict_* actions cannot be registered.")
 end
 for _, profile in ipairs(BUILTIN_PROMPT_PROFILES) do
@@ -1529,7 +1532,7 @@ sg("open_app", function(binding)
 	return System.open_app(value, current_action_parent())
 end)
 -- The user's own command line, file or folder, and Apple shortcut: each value
--- is decoded by _shared/lua/user_action_parameter and never logged.
+-- is decoded by _shared/user_action_parameter and never logged.
 local USER_ACTIONS = {
 	run_command = function(fields, parent)
 		return require("modules.gestures.user_actions").run_command(fields, parent,
@@ -1575,7 +1578,7 @@ local WINDOW_ACTIONS = {
 }
 M.WINDOW_ACTIONS = WINDOW_ACTIONS
 for action_id, page in pairs(WINDOW_ACTIONS) do
-	sg(action_id, function() return require("ui.window_toggle").toggle(page) end)
+	sg(action_id, function() return require("core.ui.ui.window_toggle").toggle(page) end)
 end
 sg("open_script_source",               function()
 	return AuxOwner.open(hs.configdir, "open script source", nil, current_action_parent())
@@ -2364,6 +2367,17 @@ sg("script_quit",                         function()
 		if not request_ok or accepted_or_err ~= true then
 			Logger.error(LOG, "script_quit controlled exit was rejected: %s",
 				tostring(accepted_or_err))
+			-- The same notice as the menubar Quit and Windows' quit admission: a
+			-- refused shortcut or gesture Quit must not look like nothing (NUI-001).
+			local told, notice_err = pcall(function()
+				local notifications = require("core.ui.engine.notifications")
+				require("menu.engine.feature_notice").quit_refused({
+					send = function(text, level) return notifications.notify(text, nil, level) end,
+					info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
+					warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
+				}, require("core.i18n.engine.i18n").get)
+			end)
+			if not told then Logger.error(LOG, "The refused Quit notice failed: %s.", tostring(notice_err)) end
 		end
 	end
 	local scheduled, schedule_result = pcall(function()
@@ -2401,9 +2415,9 @@ sg("open_console",                        function() return require("ui.console_
 -- tools/test/test-action-labels-have-locale-keys.cjs fails if any registered
 -- action lacks a label key in any of the 21 locales.
 
-local _modifier_chords_json = Paths.shared("modules/actions/modifier_chords.json")
+local _modifier_chords_json = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 
--- The macOS action catalogue, generated from _shared/modules/actions/actions.toml
+-- The macOS action catalogue, generated from _shared/shortcuts/data/actions/actions.toml
 -- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
 -- platform: picker order, heading levels and locale keys, per-action metadata
 -- and the Karabiner aliases. It replaces a hand-written line reader that only
@@ -2474,7 +2488,7 @@ function M.get_action_parameter_spec(action)
 end
 
 --- The built-in wrap pairs in catalogue order, from the text module that loads
---- _shared/modules/wrap_symbols/wrap_symbols.json.
+--- _shared/keyboard/data/wrap_symbols/wrap_symbols.json.
 --- @return table Array of { left, right }.
 local function wrap_pair_list()
 	local ok, Text = pcall(require, "modules.shortcuts.actions.text")
@@ -2494,10 +2508,10 @@ function M.wrap_pair_for(value)
 end
 
 -- The vocabulary of the send_* parameters, read on first use.
-local SEND_KEYS_PATH = Paths.shared("modules/actions/send_keys.json")
+local SEND_KEYS_PATH = Paths.shared("shortcuts/data/actions/send_keys.json")
 local _send_vocabulary = nil
 
---- The decoded _shared/modules/actions/send_keys.json. A missing or malformed
+--- The decoded _shared/shortcuts/data/actions/send_keys.json. A missing or malformed
 --- file raises: every send_* binding would otherwise refuse its value with no
 --- explanation.
 --- @return table
@@ -2706,7 +2720,7 @@ function M.get_action_parameter(binding, action)
 		local fits, reason = M.action_parameter_binding_fits(binding)
 		if fits == false then
 			if _state and type(_state.action_params) == "table" and _state.action_params[parameter_key(binding, action)] ~= nil then
-				require("config_outdated").report({ "gestures", "action_parameters", parameter_key(binding, action) }, reason, Logger)
+				require("settings.engine.migration.outdated").report({ "gestures", "action_parameters", parameter_key(binding, action) }, reason, Logger)
 			end
 			return ""
 		end
@@ -2754,7 +2768,7 @@ function M.run_program(binding)
 			or not aux_admission_open(parent) then return false end
 		local Preferences = require("infra.preferences")
 		local ConfigPaths = require("infra.config_paths")
-		local Toml = require("infra.toml.codec")
+		local Toml = require("core.text.engine.toml.codec")
 		local path = ConfigPaths.get("ConfigTomlPath")
 		local scalar = M.get_action_parameter(binding, "run_program")
 		local parsed = ProgramParameter.parse(scalar, "posix")
@@ -2805,7 +2819,7 @@ function M.run_program(binding)
 				and ConfigPaths.get("ConfigTomlPath") == path and revision == _program_revision
 				and Preferences.source_matches(source, Preferences.source_snapshot(path)) == true
 		end
-		local digest = require("adapters.crypto").sha256_bytes(source.content, function()
+		local digest = require("core.crypto.crypto").sha256_bytes(source.content, function()
 			Logger.error(LOG, "Private user program source hashing refused.")
 		end)
 		if type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return false end
@@ -3006,7 +3020,7 @@ end
 --- Every id a binding may name: the listed single actions (modifier chords
 --- included), the axis actions and "none". Built once — the catalogue and the
 --- chord matrix are fixed for the life of the process.
-local ASSIGNABLE = require("actions.assignable").build(Catalogue, ModifierChordCatalogue, "macos")
+local ASSIGNABLE = require("shortcuts.engine.actions.assignable").build(Catalogue, ModifierChordCatalogue, "macos")
 
 --- True when `name` is an action the catalogue offers on macOS. Bindings are
 --- validated against this, as Windows validates against its registry, so an id
@@ -3043,7 +3057,9 @@ function M.get_label(name)
 	local meta = Catalogue.actions[name]
 	local keys = meta and { meta.label_key } or { "sg_actions." .. name, "ax_actions." .. name }
 	for _, key in ipairs(keys) do
-		local s = i18n.get(key)
+		-- The declared key must exist (a miss is logged); the conventional ones
+		-- are probed, since an id from another OS may have neither.
+		local s = (meta or i18n.has(key)) and i18n.get(key) or key
 		if s ~= key then
 			-- A sticky label is a template its modifiers fill (« 📌 {1} rémanents »).
 			if StickyLabel.is_sticky(name) then return StickyLabel.label(name, key, "macos", i18n.get) end

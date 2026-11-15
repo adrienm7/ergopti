@@ -8,12 +8,11 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 M.bridge_name = "hotstrings_config_bridge"
 
-local Logger = require("logger.shim")
-local NumberPolicy = require("number_policy")
-local Extensions = require("hotstrings.extensions")
+local Logger = require("core.logger.engine.shim")
+local Extensions = require("hotstrings.engine.extensions")
 local LOG = "bridge.hotstrings_config"
 
 -- The page's directory under _shared/ui/, which is both where its HTML is read
@@ -23,7 +22,7 @@ local APP_NAME = "hotstrings_config_window"
 -- The category id holding the user's own hotstrings, which the window puts in a
 -- group of its own rather than among the shipped packs.
 local PERSONAL_CATEGORY = "personal"
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local _rendered_personal
 
 --- Checks the trusted native page epoch, which is recreated in each route context.
@@ -37,9 +36,9 @@ local function window_current(context, manager)
 end
 
 -- The colour palette the window offers, generated from
--- _shared/data/native_theme.toml like the macOS window's (same colours, same
+-- _shared/core/ui/data/native_theme.toml like the macOS window's (same colours, same
 -- order). A palette typed here again would be the second source rule 5.2 forbids.
-local COLOR_PRESETS = require("native_theme_data").hotstring_palette
+local COLOR_PRESETS = require("core.ui.engine.native_theme_data").hotstring_palette
 
 --- Translates a key, falling back to the key itself.
 ---
@@ -49,19 +48,11 @@ local COLOR_PRESETS = require("native_theme_data").hotstring_palette
 --- @param key string
 --- @return string
 local function i18n_label(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	if not ok or type(i18n.get) ~= "function" then return key end
 	local value = i18n.get(key)
 	return (type(value) == "string" and value ~= "") and value or key
 end
-
--- The collision-priority range the settings window offers. Mirrored from the
--- window's own `v >= 0 && v <= 100` guard, and re-checked here rather than
--- trusted: the page is the least trusted input the daemon has, and a priority
--- outside the tier range silently reorders every hotstring source against every
--- other with nothing on screen to say so.
-local PRIORITY_MIN = 0
-local PRIORITY_MAX = 100
 
 -- Delays cross this bridge in milliseconds and are stored in seconds. The window
 -- shows milliseconds because that is the unit a person means by "a bit longer";
@@ -73,7 +64,7 @@ local MS_PER_SEC = 1000
 local _writer = nil
 local function _get_writer()
 	if _writer then return _writer end
-	local ok, mod = pcall(require, "toml_codec.writer")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.writer")
 	if ok and type(mod) == "table" and type(mod.write) == "function" then _writer = mod end
 	return _writer
 end
@@ -82,7 +73,7 @@ end
 local _reader = nil
 local function _get_reader()
 	if _reader then return _reader end
-	local ok, mod = pcall(require, "toml_codec.reader")
+	local ok, mod = pcall(require, "core.text.engine.toml_codec.reader")
 	if ok and type(mod) == "table" and type(mod.parse) == "function" then _reader = mod end
 	return _reader
 end
@@ -144,7 +135,7 @@ local function category_title(id, category)
 	local description = category and category.description or nil
 	if type(description) ~= "table" then return id end
 	local locale = "en"
-	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 	if ok_i18n and type(i18n.get_locale) == "function" then
 		local current = i18n.get_locale()
 		if type(current) == "string" and current ~= "" then locale = current end
@@ -305,7 +296,7 @@ end
 --- @param context table|nil Trusted native page owner.
 --- @return boolean
 local function push_state(state, context)
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod.encode) ~= "function" then
 		Logger.error(LOG, "Cannot push setData(): the shared json module is unavailable.")
 		return false
@@ -319,7 +310,7 @@ local function push_state(state, context)
 		return false
 	end
 
-	local ok_mgr, Manager = pcall(require, "ui.webview_manager")
+	local ok_mgr, Manager = pcall(require, "core.ui.ui.webview_manager")
 	if not ok_mgr or type(Manager.eval_js) ~= "function" then
 		Logger.error(LOG, "Cannot push setData(): webview_manager.eval_js is unavailable.")
 		return false
@@ -350,7 +341,7 @@ local function set_override(state, category, section, field, value, context)
 	local rendered, manager
 	if PersonalFiles.components(category) then
 		rendered = _rendered_personal
-		manager = require("ui.webview_manager")
+		manager = require("core.ui.ui.webview_manager")
 		if not rendered or rendered.state ~= state or rendered.config ~= state.config
 			or not window_current(context, manager) or rendered.epoch ~= context.epoch then return false end
 		local binding = rendered.bindings[category]
@@ -426,10 +417,14 @@ function M.on_message(payload, state, context)
 		-- Milliseconds on the wire, seconds in the store: the cascade, the TOMLs
 		-- and the engine all speak seconds, and the conversion belongs at this
 		-- boundary rather than in the resolver.
-		local ms = (type(payload.ms) == "number" or type(payload.ms) == "string") and tonumber(payload.ms) or nil
-		if not NumberPolicy.is_finite(ms) or ms < 0 then
-			Logger.warn(LOG, "Refusing delay %s for '%s' — not a non-negative number of milliseconds.",
-				tostring(payload.ms), tostring(payload.category))
+		-- The shared value schema bounds it: whole milliseconds within the
+		-- declared range, the same rule as the page and the menu prompt.
+		local ValueCheck = require("settings.engine.value_check")
+		local ms = payload.ms
+		local admitted, reason = ValueCheck.check_whole_scaled(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_DELAY, ms, 1 / MS_PER_SEC)
+		if not admitted then
+			Logger.warn(LOG, "Refusing delay %s for '%s' (%s).", tostring(payload.ms), tostring(payload.category),
+				tostring(reason))
 			return push_state(state, context)
 		end
 		set_override(state, payload.category, section_of(payload), "delay", ms / MS_PER_SEC, context)
@@ -445,7 +440,7 @@ function M.on_message(payload, state, context)
 		-- Guarded like both references: an empty select is the page's "no choice",
 		-- and writing it as an override would pin the category to nothing.
 		local hex = payload.hex
-		if type(hex) ~= "string" or not require("hotstrings.personal_metadata").valid("color", hex) then
+		if type(hex) ~= "string" or not require("hotstrings.engine.catalogue.personal_metadata").valid("color", hex) then
 			Logger.warn(LOG, "Refusing colour %s for '%s' — not a colour string.",
 				tostring(hex), tostring(payload.category))
 			return push_state(state, context)
@@ -483,11 +478,12 @@ function M.on_message(payload, state, context)
 	-- daemon has, and a priority outside the tier range silently reorders every
 	-- source against every other.
 	if action == "set_priority" and payload.category then
-		local value = (type(payload.priority) == "number" or type(payload.priority) == "string")
-			and tonumber(payload.priority) or nil
-		if not NumberPolicy.is_finite(value) or value % 1 ~= 0 or value < PRIORITY_MIN or value > PRIORITY_MAX then
-			Logger.warn(LOG, "Refusing priority %s for '%s' — outside %d-%d.",
-				tostring(payload.priority), tostring(payload.category), PRIORITY_MIN, PRIORITY_MAX)
+		local ValueCheck = require("settings.engine.value_check")
+		local value = payload.priority
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_CONFIG_ANY_PRIORITY), value)
+		if not checked.ok then
+			Logger.warn(LOG, "Refusing priority %s for '%s' (%s, %s-%s).", tostring(payload.priority),
+				tostring(payload.category), checked.reason, tostring(checked.min), tostring(checked.max))
 			return push_state(state, context)
 		end
 		set_override(state, payload.category, section_of(payload), "priority", value, context)
@@ -514,7 +510,7 @@ function M.on_message(payload, state, context)
 			-- No `or "#……"` here. The colour comes from the shared defaults, which
 			-- the config module loads fail-fast; substituting a literal would repaint
 			-- the user's categories a shade nothing else in the product uses.
-			local manager = require("ui.webview_manager")
+			local manager = require("core.ui.ui.webview_manager")
 			local setter = config.set_override
 			local function owned()
 				return state.config == config and config.set_override == setter
@@ -536,7 +532,7 @@ function M.on_message(payload, state, context)
 				return { grey = false }
 			end
 			local neutral = config.get_neutral_color()
-			if not owned() or not require("hotstrings.personal_metadata").valid("color", neutral) then return refused() end
+			if not owned() or not require("hotstrings.engine.catalogue.personal_metadata").valid("color", neutral) then return refused() end
 			local categories = config.get_categories()
 			if not owned() or type(categories) ~= "table" then return refused() end
 			for id, category in pairs(categories) do
@@ -568,7 +564,7 @@ function M.on_message(payload, state, context)
 			for id in pairs(categories) do
 				if PersonalFiles.components(id) then
 					Logger.error(LOG, "Reset all refused: personal-file metadata cannot be reset atomically.")
-					local manager = require("ui.webview_manager")
+					local manager = require("core.ui.ui.webview_manager")
 					if type(state.notify_error) == "function" and (context == nil or window_current(context, manager)) then
 						pcall(state.notify_error, "hs_config.reset_all_personal_unavailable")
 					end
@@ -576,7 +572,7 @@ function M.on_message(payload, state, context)
 				end
 			end
 			local config, clear = state.config, state.config.clear_override
-			local manager = require("ui.webview_manager")
+			local manager = require("core.ui.ui.webview_manager")
 			local function reset_one(id, section)
 				if state.config ~= config or config.clear_override ~= clear
 					or context ~= nil and not window_current(context, manager) then return false end

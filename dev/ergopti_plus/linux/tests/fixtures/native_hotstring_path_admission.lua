@@ -3,14 +3,14 @@
 local root, mode = assert(arg[1]), assert(arg[2])
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = assert(source:match("^(.*)/tests/fixtures/native_hotstring_path_admission%.lua$"))
-package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/lua/?.lua;"
-	.. driver .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local Paths = require("infra.paths")
+package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
+	.. driver .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local Paths = require("core.fs.engine.paths")
 if mode == "index" then
 	local shared = Paths.shared
 	Paths.shared = function(path)
-		if path == "modules/hotstrings/_index.toml" then return root .. "/index.toml" end
+		if path == "hotstrings/data/catalogue/_index.toml" then return root .. "/index.toml" end
 		return shared(path)
 	end
 end
@@ -37,7 +37,7 @@ elseif mode == "retained" then
 	local _, committed = Config.load_all()
 	assert(committed and loads == 1, "healthy catalogue must be published first")
 	local target = root .. "/french/autocorrection.toml"
-	assert(require("adapters.shell_runner").run("mkfifo " .. require("adapters.shell_runner").quote(target)))
+	assert(require("core.process.adapters.shell_runner").run("mkfifo " .. require("core.process.adapters.shell_runner").quote(target)))
 	local _, next_committed, reason = Config.load_all()
 	assert(not next_committed and reason == "source-unavailable" and loads == 1,
 		"refused override must preserve the active catalogue")

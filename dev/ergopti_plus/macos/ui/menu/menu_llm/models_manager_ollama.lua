@@ -13,22 +13,22 @@
 local M = {}
 
 local hs            = hs
-local Errors = require("adapter_errors")
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
-local i18n          = require("infra.i18n")
-local text_utils    = require("infra.text_utils")
+local Errors = require("diagnostics.engine.adapter_errors")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
+local i18n          = require("core.i18n.engine.i18n")
+local text_utils    = require("core.text.engine.utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
-local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local RuntimeChoice = require("core.lifecycle.engine.core.ollama_runtime_choice")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
 local NetworkEnv = require("modules.llm.network_env")
 local ManagedPullReceipt = require("adapters.managed_ollama_pull")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
-local ShellRunner = require("adapters.shell_runner")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
-local HttpClient = require("adapters.http_client")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
+local HttpClient = require("core.network.adapters.http_client")
 local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_registry")
 
 -- GC-root table: hs.task objects pinned here survive until their callback fires.

@@ -27,7 +27,7 @@ local function load_fixture(options)
 	options.render_success = true
 	local fixture = Pipeline.load(options)
 	fixture.notices = {}
-	package.loaded["ui.tooltip"].show = function(content)
+	package.loaded["core.ui.ui.tooltip"].show = function(content)
 		fixture.notices[#fixture.notices + 1] = content
 		return true
 	end
@@ -59,7 +59,7 @@ local function assert_refused(fixture, reason)
 		"the refusal must be logged at INFO with its reason '" .. reason .. "'")
 	helpers.assert_eq(#fixture.notices, 1, "the user must be shown why nothing happened")
 	helpers.assert_eq(fixture.notices[1],
-		package.loaded["infra.i18n"].get("llm.manual_prediction." .. reason),
+		package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction." .. reason),
 		"the notice must be the localized text of the reason")
 	helpers.assert_eq(fixture.fetches, 0, "a refused request must not reach the backend")
 end

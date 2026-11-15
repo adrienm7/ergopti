@@ -22,18 +22,18 @@
 
 local helpers = require("tests.helpers")
 
-local Paths = helpers.load_module("infra.paths")
+local Paths = helpers.load_module("core.fs.engine.paths")
 
 --- Every `list` id the built manifest declares for this platform.
 --- @return table Array of { menu = string, id = string }.
 local function declared_lists()
 	local root = Paths.shared_root()
 	helpers.assert_not_nil(root, "the shared tree must be findable")
-	local handle = assert(io.open(root .. "/modules/menu/menu_manifest.json", "r"))
+	local handle = assert(io.open(root .. "/menu/data/menu_manifest.json", "r"))
 	local body = handle:read("*a")
 	handle:close()
 
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local manifest = Json.decode(body)
 	helpers.assert_eq(type(manifest), "table", "the built menu manifest must decode")
 
@@ -65,11 +65,11 @@ end
 local function genuine_shared_providers(damage)
 	local loaded, getenv = {}, os.getenv
 	for name, value in pairs(package.loaded) do loaded[name] = value end
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.builder", "keymap.magic_key_source", "modules.hotstrings.magic_key_source",
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
+		"ui.menu.builder", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key_source",
 		"infra.hotstring_preferences", "modules.shortcuts.tap_keys", "infra.config_paths",
-		"adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
-		"menu.renderer", "infra.paths", "json" }
+		"core.fs.adapters.storage", "modules.keymap.layout_registry", "modules.hotstrings.input_reader",
+		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local found, restore = {}, function() end
 	local ok, result = xpcall(function()
@@ -87,9 +87,9 @@ local function genuine_shared_providers(damage)
 		local written, write_error = file:write('[hotstrings]\nmagic_key_source = "auto"\n')
 		local closed, close_error = file:close()
 		assert(written, write_error); assert(closed, close_error)
-		local native = require("infra.i18n"); native.init()
+		local native = require("core.i18n.engine.i18n"); native.init()
 		local manifest = require("infra.manifest_menu")
-		local shared = require("keymap.magic_key_source")
+		local shared = require("layouts.engine.layers.magic_key_source")
 		local preferences = require("infra.hotstring_preferences")
 		assert(preferences._set_file_for_test(path))
 		local source = require("modules.hotstrings.magic_key_source")
@@ -171,10 +171,10 @@ local function genuine_trigger_providers(damage, default_source)
 	local loaded, getenv = {}, os.getenv
 	local original_i18n_safe = rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "modules.hotstrings.magic_key", "infra.manifest_reader",
-		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
-		"menu.renderer", "infra.paths", "json" }
+		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
+		"menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local directory, path, filesystem, directory_created
 	local restore, found = function() end, {}
 	local observed = { provider_calls = 0, reset_rows = 0, effects = 0 }
@@ -194,7 +194,7 @@ local function genuine_trigger_providers(damage, default_source)
 		local written, write_error = file:write(bytes)
 		local closed, close_error = file:close()
 		assert(written, write_error); assert(closed, close_error)
-		require("infra.i18n").init()
+		require("core.i18n.engine.i18n").init()
 		local manifest = require("infra.manifest_menu")
 		assert(require("infra.hotstring_preferences")._set_file_for_test(path))
 		local magic = require("modules.hotstrings.magic_key")
@@ -313,9 +313,9 @@ local function genuine_gesture_providers(damage)
 	local loaded, getenv = {}, os.getenv
 	local original_i18n_safe = rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 		"ui.menu.builder", "ui.gesture_conflicts", "modules.gestures.manager",
-		"adapters.storage", "infra.paths", "json", "menu.renderer" }
+		"core.fs.adapters.storage", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer" }
 	local directory, filesystem, created
 	local restore = function() end
 	local observed = { calls = 0, effects = 0, status_calls = 0 }
@@ -328,7 +328,7 @@ local function genuine_gesture_providers(damage)
 			return getenv(name)
 		end
 		for _, name in ipairs(names) do package.loaded[name] = nil end
-		require("infra.i18n").init()
+		require("core.i18n.engine.i18n").init()
 		local manifest = require("infra.manifest_menu")
 		local native = require("modules.gestures.manager")
 		local producer = require("ui.gesture_conflicts")
@@ -445,9 +445,9 @@ end
 local function genuine_language_providers(damage, exercise)
 	local loaded, getenv, original_safe = {}, os.getenv, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do loaded[name] = value end
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-		"ui.menu.builder", "infra.paths", "json", "menu.renderer",
-		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
+		"ui.menu.builder", "core.fs.engine.paths", "core.text.engine.json", "menu.engine.renderer",
+		"infra.hotstring_preferences", "infra.config_paths", "core.fs.adapters.storage",
 		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
 	local directory, path, filesystem, created
 	local restore = function() end
@@ -464,7 +464,7 @@ local function genuine_language_providers(damage, exercise)
 		end
 		for _, name in ipairs(names) do package.loaded[name] = nil end
 		local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
-		require("infra.i18n").init()
+		require("core.i18n.engine.i18n").init()
 		assert(require("infra.hotstring_preferences")._set_file_for_test(path))
 		local manifest, builder = require("infra.manifest_menu"), require("ui.menu.builder")
 		local function upvalue(owner, wanted)
@@ -814,7 +814,7 @@ local function registered_providers(omitted_delegate)
 		for id in registered_source:gmatch('%["([a-z0-9_]+)"%]%s*=') do found[id] = true end
 		for id in registered_source:gmatch('providers%.([a-z0-9_]+)%s*=') do found[id] = true end
 	end
-	if omitted_delegate ~= "keymap.magic_key_source" then
+	if omitted_delegate ~= "layouts.engine.layers.magic_key_source" then
 		for id in pairs(genuine_shared_providers()) do found[id] = true end
 	end
 	for id in pairs(genuine_trigger_providers()) do found[id] = true end
@@ -896,7 +896,7 @@ helpers.describe("actual shared list factory coverage", function()
 		local found, err = genuine_shared_providers()
 		helpers.assert_nil(err)
 		helpers.assert_true(found.magic_key_source_candidates == true)
-		local omitted = registered_providers("keymap.magic_key_source")
+		local omitted = registered_providers("layouts.engine.layers.magic_key_source")
 		helpers.assert_nil(omitted.magic_key_source_candidates)
 		local mutations = {
 			function(builder, slot) debug.setupvalue(builder.build, slot, function() return {} end) end,

@@ -32,7 +32,7 @@ local SECTION_COUNT = 24
 --- Loads registry_index with counting wrappers around the two rebuild halves.
 --- @return table RI, table counts
 local function load_with_counters()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	local Registry = helpers.load_with_stubs("modules.keymap.registry")
 	package.loaded["modules.keymap.state"] = nil
 	local State = require("modules.keymap.state")
@@ -82,7 +82,7 @@ end
 helpers.describe("registry_index: a batched section toggle rebuilds the group once", function()
 	helpers.it("keeps colliding legacy identities separate and reads legacy choices (section-cache-identity)", function()
 		local RI, counts = load_with_counters()
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local legacy = RI.legacy_section_setting_key("a_b", "c")
 		helpers.assert_eq(legacy, RI.legacy_section_setting_key("a", "b_c"))
 		helpers.assert_true(Storage.set(legacy, false))

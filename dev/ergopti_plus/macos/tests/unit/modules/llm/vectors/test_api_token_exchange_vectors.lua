@@ -4,7 +4,7 @@
 --- MODULE: API Token Exchange Corpus (macOS)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/api_token_exchange_vectors.json through
---- _shared/lua/llm/api_token_exchange.lua: the auth blocks a provider may
+--- _shared/ai/engine/api/token_exchange.lua: the auth blocks a provider may
 --- declare, the exchange form of a stored key (IBM API key, Google
 --- authorized_user credentials, a Google service-account key's signed
 --- assertion), the answer read and the refresh decision.
@@ -17,12 +17,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Exchange = require("llm.api_token_exchange")
+local Exchange = require("ai.engine.api.token_exchange")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -111,7 +111,7 @@ helpers.describe("api_token_exchange replays the shared corpus", function()
 	end
 
 	helpers.it("the catalogue's Vertex AI block is the corpus's Google block", function()
-		local providers = read_json("modules/llm/api_providers.json").providers
+		local providers = read_json("ai/data/api_providers.json").providers
 		local catalogue = assert(Exchange.parse(providers.vertex.auth))
 		helpers.assert_true(helpers.deep_equal(catalogue, assert(Exchange.parse(block(corpus, "google")))))
 	end)

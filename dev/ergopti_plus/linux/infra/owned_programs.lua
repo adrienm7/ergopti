@@ -53,7 +53,7 @@ end
 
 --- The program to run for one owned program, without logging.
 --- For a helper process that has only the driver tree on package.path
---- (adapters/sqlite_process_worker.lua, platform/network/system_proxy_probe.lua):
+--- (core/process/adapters/sqlite_process_worker.lua, core/network/adapters/system_proxy_probe.lua):
 --- the daemon already logged the mode, and a helper's stdout may be its protocol.
 --- @param name string One of M.PROGRAMS.
 --- @param getenv function|nil os.getenv by default; a test seam.
@@ -74,7 +74,7 @@ function M.path(name, getenv)
 	if program:sub(1, 1) == "/" then return program end
 	if not _path_mode_reported then
 		_path_mode_reported = true
-		require("logger.shim").info(LOG, "No private runtime prefix (%s unset): a source run uses curl, sqlite3, "
+		require("core.logger.engine.shim").info(LOG, "No private runtime prefix (%s unset): a source run uses curl, sqlite3, "
 			.. "openssl and zstd from PATH.", M.PREFIX_ENV)
 	end
 	return program
@@ -86,7 +86,7 @@ end
 --- @return boolean
 function M.available(name, getenv)
 	local program = M.path(name, getenv)
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	if program:sub(1, 1) == "/" then
 		local ok = os.execute("test -x " .. Shell.quote(program))
 		return ok == true or ok == 0

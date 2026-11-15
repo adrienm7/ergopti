@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 assert(uv.getuid() ~= 0, "permission regressions require an ordinary user")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-file-delete-XXXXXX"))
 local files, directories = {}, { root }

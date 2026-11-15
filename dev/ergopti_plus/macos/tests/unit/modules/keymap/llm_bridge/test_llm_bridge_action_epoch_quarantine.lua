@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 
 local function load_fixture(reset_result)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 
 	local initial = { id = "initial" }
 	local current_token = initial
@@ -29,11 +29,11 @@ local function load_fixture(reset_result)
 	local tooltip_guard
 	local reset_hook
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return current_token end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return 0 end,
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback, timer = {} }
@@ -46,7 +46,7 @@ local function load_fixture(reset_result)
 		tokens_from_repl = function(value) return value end,
 		resolve_prediction_overlap = function(_buffer, deletes, text) return deletes, text end,
 	}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		is_letter_char = function() return false end,
 		trig_lower = function(value) return tostring(value or ""):lower() end,
 		conform_replacement = function(value) return value end,
@@ -58,7 +58,7 @@ local function load_fixture(reset_result)
 		},
 		check_modifiers = function() return false end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
@@ -89,7 +89,7 @@ local function load_fixture(reset_result)
 		set_colorization_enabled = function() end,
 		set_accent_color = function() end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 
 	local engine = setmetatable({
 		set_runtime_guard = function(guard) engine_guard = guard end,

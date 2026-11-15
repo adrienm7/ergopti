@@ -13,10 +13,10 @@ local helpers = require("tests.helpers")
 
 --- The business-timing fixture delegates the actual new template ABI and retains native row dialect.
 local function actual_layout_binding()
-	local Json, Paths = require("json"), require("infra.paths")
-	local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
+	local Json, Paths = require("core.text.engine.json"), require("core.fs.engine.paths")
+	local file = assert(io.open(Paths.shared("core/i18n/data/locales/en.json"), "rb"))
 	local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return labels[key] or key end
 	package.loaded["infra.manifest_menu"] = nil
 	return require("infra.manifest_menu")
@@ -26,18 +26,18 @@ end
 helpers.describe("menu_keyboard_layout: async layout selection", function()
 	helpers.it("waits for the business terminal instead of the dispatch result", function()
 		helpers.with_fresh_modules({
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"modules.keymap.input_sources",
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
-			"infra.notifications",
-			"infra.i18n",
+			"core.ui.engine.notifications",
+			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")
 			local scheduled = {}
-			package.loaded["infra.deferred_work"] = { after = function(delay, callback)
+			package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 				scheduled[#scheduled + 1] = { delay = delay, callback = callback }
 				return true
 			end }
@@ -59,7 +59,7 @@ helpers.describe("menu_keyboard_layout: async layout selection", function()
 			install.pick_latest_bundle = function() return nil end
 			install.highest_installed = function() return nil end
 
-			package.loaded["infra.notifications"] = { notify = function() end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 			local actual_manifest = actual_layout_binding()
 			package.loaded["infra.manifest_menu"] = {
 				template_rows = actual_manifest.template_rows,
@@ -107,13 +107,13 @@ end)
 --- @param business_ok boolean Terminal result delivered by the async owner.
 local function exercise_bundle_action(operation, business_ok, live)
 	helpers.with_fresh_modules({
-		"infra.deferred_work",
+		"core.timing.engine.deferred_work",
 		"modules.keymap.input_sources",
 		"modules.keymap.layout_install",
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
-		"infra.notifications",
-			"infra.i18n",
+		"core.ui.engine.notifications",
+			"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
@@ -121,7 +121,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 		local notices = {}
 		local business_done = nil
 		local dispatches = 0
-		package.loaded["infra.deferred_work"] = { after = function(delay, callback)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(delay, callback)
 			scheduled[#scheduled + 1] = { delay = delay, callback = callback }
 			return true
 		end }
@@ -163,7 +163,7 @@ local function exercise_bundle_action(operation, business_ok, live)
 			return { name = "Ergopti_v2.2.2.bundle", version = { 2, 2, 2 } }
 		end
 
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(_title, _body, kind) notices[#notices + 1] = kind end,
 		}
 		local actual_manifest = actual_layout_binding()
@@ -240,13 +240,13 @@ end)
 helpers.describe("menu_keyboard_layout: mixed stable and legacy state", function()
 	helpers.it("keeps the legacy cleanup action visible when every stable variant is active", function()
 		helpers.with_fresh_modules({
-			"infra.deferred_work",
+			"core.timing.engine.deferred_work",
 			"modules.keymap.input_sources",
 			"modules.keymap.layout_install",
 			"ui.menu.menu_keyboard_layout",
 			"infra.manifest_menu",
-			"infra.notifications",
-			"infra.i18n",
+			"core.ui.engine.notifications",
+			"core.i18n.engine.i18n",
 		}, function()
 			local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 			local install = require("modules.keymap.layout_install")

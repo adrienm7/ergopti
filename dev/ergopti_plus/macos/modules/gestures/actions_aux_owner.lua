@@ -10,10 +10,10 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local ShellRunner = require("adapters.shell_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings = require("infra.timings")
+local Logger = require("core.logger.engine.logger")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings = require("core.timing.engine.timings")
 
 local LOG = "gestures.actions.aux_owner"
 

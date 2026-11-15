@@ -10,8 +10,8 @@
 --- positions with a one-to-one logical/physical mapping.
 --- ==============================================================================
 
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 local M = {}
 
 local LAYOUT_MARKER_PREFIX = "__ergopti_release_layout_key__"

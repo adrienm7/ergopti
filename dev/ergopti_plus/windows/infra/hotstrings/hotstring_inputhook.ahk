@@ -100,7 +100,7 @@ global _PrefixVisibleFireDecisions := []
 
 ; Configuration constants.
 global _MIN_PREFIX_LEN := 2
-; Mirrors the shared cap _shared/lua/hotstring_engine/init.lua BUFFER_MAX_CHARS
+; Mirrors the shared cap _shared/hotstrings/engine/matcher/init.lua BUFFER_MAX_CHARS
 ; (256) so a long trigger matches identically on all three drivers — Windows was
 ; 64, which silently failed to match triggers of 65-256 chars that macOS/Linux
 ; matched. Pinned equal by tools/test/test-hotstring-buffer-cap-parity.cjs.
@@ -679,7 +679,7 @@ _PrefixInvalidateDeferredEffects() {
 	return _PrefixDeferredGeneration
 }
 
-; Lifecycle hooks called by infra/lifecycle.ahk. Suspend retains the fire batch;
+; Lifecycle hooks called by core/lifecycle/engine/lifecycle.ahk. Suspend retains the fire batch;
 ; resume re-arms it exactly once; shutdown drains it before KL_Stop closes the
 ; durable keystats sinks and then invalidates every remaining timer owner.
 HotstringPrefixWatcherOnSuspend() {
@@ -1648,6 +1648,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; Kill the obsolete pre-expansion preview before the send burst so it
 				; cannot fire reentrantly inside HSE_DispatchMatch's message pump.
 				_PrefixCancelRender()
+				HotPath_SpanTrace("hotstring.expand")
 				_HseDispatchTick := HotPath_Now()
 				; A match is not necessarily a FIRE: a raw callback may decline (the
 				; E-circumflex deadkey and ellipsis guards refuse in the wrong context), and
@@ -1669,6 +1670,7 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 				; part that actually correlates with dispatch cost.
 				HotPath_LogIfSlow("HSE.Dispatch", _HseDispatchTick,
 					HotstringIsPrivate ? PersonalInfoRedactForLog(HSEMatch.Trigger) : HSEMatch.Trigger)
+				HotPath_SpanDone("hotstring.expand", _HseDispatchTick, HotstringDispatchOutcome(_HseFired))
 				if (_HseFired is Map) && _HseFired.Has("Pending") {
 					_PrefixRecordMagicOutcome(Char, "pending")
 					; Scheduling is not a fire verdict. The owner will commit buffers,
@@ -1972,7 +1974,9 @@ HotstringCompleteEndKey(Char, GateTick := 0) {
 			return false
 		IsPrivate := Match.HasOwnProp("IsPrivate") && Match.IsPrivate
 		Effect := 0
+		SpanStart := HotPath_SpanTrace("hotstring.expand")
 		Fired := HSE_DispatchMatch(Match, HSE_LastEndChar, &Effect, false, unset, GateTick, false)
+		HotPath_SpanDone("hotstring.expand", SpanStart, HotstringDispatchOutcome(Fired))
 		if (Fired is Map) && Fired.Has("Pending")
 			return true
 		if !Fired

@@ -27,7 +27,7 @@ local function load_fixture(opts)
 	package.loaded["modules.keymap.expander"] = nil
 	package.loaded["modules.keymap.terminator_replay"] = nil
 	local expander = helpers.load_with_stubs("modules.keymap.expander")
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local state = {
 		buffer = opts.buffer,
 		llm_private_mark = opts.mark or "",

@@ -14,8 +14,8 @@ local BATCH = "BEGIN TRANSACTION;\nINSERT INTO events VALUES (1);\nCOMMIT;\n"
 --- Replays one importer over real timer owners and a deterministic native queue.
 --- @param check function Receives the exporter, scheduler and native observations.
 local function observe(check)
-	helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export",
-		"adapters.foreign_ledger_snapshot", "adapters.timer_scheduler", "infra.paced_job" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export",
+		"adapters.foreign_ledger_snapshot", "core.events.timer_scheduler", "core.timing.engine.paced_job" }, function()
 		local source = BATCH:rep(8000)
 		local h = { now = 0, timers = {}, read_bytes = 0, foreground = 0, watermark = 0, applied = {}, closes = 0 }
 		local timer = { absoluteTime = function() return h.now * 1e9 end }
@@ -40,8 +40,8 @@ local function observe(check)
 			selected.callback()
 			if selected.active then selected.due = h.now + selected.delay end
 		end
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 		local db = {
 			prepare = function() return { bind_values = function() return 0 end,
 				step = function() return 101 end, finalize = function() return 0 end } end,
@@ -65,7 +65,7 @@ local function observe(check)
 		local export = helpers.load_with_stubs("modules.keystats.export", {
 			fs = { attributes = function() return { size = #source } end }, hash = oracle, timer = timer,
 		})
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		export.init({ paths = { metrics_dir = "/foreign-pump/metrics/" }, device_id = "local", get_db = function() return db end })
 		local original_open = io.open
 		io.open = function(path, ...)
@@ -102,7 +102,7 @@ end
 helpers.describe("foreign ledger foreground pump", function()
 	helpers.it("(foreign-ledger-real-cadence) verifies between ingests while foreground timers run", function()
 		observe(function(export, scheduler, h, source, oracle)
-			local ingest_interval = require("infra.timings").sec("keystats", "ingest_tick_ms")
+			local ingest_interval = require("core.timing.engine.timings").sec("keystats", "ingest_tick_ms")
 			local observer, committed = scheduler.every(0.005, function() h.foreground = h.foreground + 1 end)
 			helpers.assert_true(committed)
 			helpers.assert_type(observer, "table")

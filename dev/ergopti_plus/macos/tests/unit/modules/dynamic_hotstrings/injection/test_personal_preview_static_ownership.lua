@@ -25,7 +25,7 @@ local function install_collaborators(effects)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name:match("^modules%.dynamic_hotstrings")
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
@@ -59,7 +59,7 @@ local function install_collaborators(effects)
 		end,
 		set_buffer = function(value) effects.post_buffer = value end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -81,7 +81,7 @@ local function install_collaborators(effects)
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = {
+	package.loaded["core.ui.adapters.tooltip_renderer"] = {
 		hide = function() return true end,
 	}
 end
@@ -185,7 +185,7 @@ helpers.describe("personal preview and static engine ownership", function()
 		Keymap.set_preview_autocorrect_enabled(true)
 
 		PersonalInfo.start("", Keymap,
-			helpers.shared("core/config_schema/examples/personal_info.example.toml"),
+			helpers.shared("settings/data/config_schema/examples/personal_info.example.toml"),
 			function(_, publish) return publish() end)
 		PersonalInfo.enable()
 

@@ -30,8 +30,8 @@ local PRODUCTION_SOURCE_FLOOR = 200
 -- poller fails instead of hiding behind one already-approved file.
 -- Keyed by module name (helpers.module_name_of), never by path.
 local RAW_TIMER_NEW_OWNERS = {
-	["adapters.timer_scheduler"] = "canonical native timer owner",
-	["infra.launcher_guard"] = "runs before TimerScheduler and publishes before start",
+	["core.events.timer_scheduler"] = "canonical native timer owner",
+	["core.lifecycle.engine.launcher_guard"] = "runs before TimerScheduler and publishes before start",
 	["modules.keystats"] = "legacy keystats runtime transaction pending migration",
 	["modules.keystats.log_manager"] = "legacy ingest owner pending migration",
 	["modules.keymap"] = "legacy tap-watchdog owner pending migration",
@@ -184,8 +184,8 @@ helpers.describe("recurring native timer single owner", function()
 		helpers.assert_eq(#owners, 1,
 			"only the runtime callback wrapper may reference doEvery directly; got "
 				.. table.concat(owners, ", "))
-		helpers.assert_true(owners[1]:match("/infra/logger%.lua$") ~= nil,
-			"the sole direct doEvery owner must be infra.logger, got " .. tostring(owners[1]))
+		helpers.assert_true(owners[1]:match("/core/logger/engine/logger%.lua$") ~= nil,
+			"the sole direct doEvery owner must be core.logger.engine.logger, got " .. tostring(owners[1]))
 	end)
 
 	helpers.it("inventories every explicit repeating timer.new acquisition", function()

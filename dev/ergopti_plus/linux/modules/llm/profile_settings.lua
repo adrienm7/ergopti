@@ -8,18 +8,18 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local Selector = require("llm.profile_selector")
+local Selector = require("ai.engine.settings.profile_selector")
 local ModelProfile = require("modules.llm.model_profile")
-local RegistryCodec = require("llm.profile_registry_codec")
-local AppOverrides = require("llm.app_profile_overrides")
-local Json = require("json")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local RegistryCodec = require("ai.engine.settings.profile_registry_codec")
+local AppOverrides = require("ai.engine.policy.app_profile_overrides")
+local Json = require("core.text.engine.json")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 local LOG = "modules.llm.profile_settings"
@@ -31,8 +31,9 @@ local DEFINITIONS = {
 	num_predictions = {
 		path = KEY.LLM_PROFILES_NUM_PREDICTIONS,
 		type = "number",
-		min = 1,
-		max = 10,
+		-- The shared value schema's declaration owns the range.
+		min = require("settings.engine.value_check").declaration(KEY.LLM_PROFILES_NUM_PREDICTIONS).min,
+		max = require("settings.engine.value_check").declaration(KEY.LLM_PROFILES_NUM_PREDICTIONS).max,
 	},
 	auto_profile_for_model = {
 		path = KEY.LLM_PROFILES_AUTO_PROFILE_FOR_MODEL,
@@ -469,7 +470,7 @@ end
 --- @return string label
 function M.menu_label(profile, count)
 	if not built_in_exists(profile.id) then return profile.label end
-	local label = require("infra.i18n").get("llm.profile." .. profile.id .. ".label")
+	local label = require("core.i18n.engine.i18n").get("llm.profile." .. profile.id .. ".label")
 	label = fill_if_present(label, "{n}", tostring(count))
 	return fill_if_present(label, "{s}", count == 1 and "" or "s")
 end

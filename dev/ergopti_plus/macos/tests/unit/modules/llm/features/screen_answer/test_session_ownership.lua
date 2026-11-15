@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local Fixture = require("tests.support.modules.llm.screen_answer_fixture")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
@@ -23,7 +23,7 @@ end
 
 local function with_world(scenario, text_token)
 	return helpers.with_fresh_modules({ "modules.llm.screen_answer", "modules.llm.local_model_offer",
-		"infra.dialog_util", "modules.shortcuts.script_control" }, function()
+		"core.ui.engine.dialog_util", "modules.shortcuts.script_control" }, function()
 		return Scope.run(function()
 			local world = Fixture.build_world()
 			local api = world.core.api_remote
@@ -183,7 +183,7 @@ helpers.describe("private screen data retains the exact answer session", functio
 		helpers.it("requires strict optional local continuation for " .. verdict, function()
 			with_world(function(world)
 				local failures, errors = {}, {}
-				require("infra.logger").error = function(_, format, ...)
+				require("core.logger.engine.logger").error = function(_, format, ...)
 					errors[#errors + 1] = string.format(format, ...)
 				end
 				local guard

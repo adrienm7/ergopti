@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 local HOME = "/home/jdoe"
 
@@ -31,12 +31,12 @@ local HOME = "/home/jdoe"
 local function load_bridge(controls)
 	controls = controls or {}
 	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
-		"ui.webview_manager", "adapters.clipboard", "infra.config_paths",
-		"adapters.keyboard_hook" }
+		"core.ui.ui.webview_manager", "adapters.clipboard", "infra.config_paths",
+		"platform.input.keyboard_hook" }
 	local loaded = {}
 	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
 	-- The input section reads the real hook; a fake left by another module must not stand in.
-	package.loaded["adapters.keyboard_hook"] = nil
+	package.loaded["platform.input.keyboard_hook"] = nil
 	local context = { pushed = {}, copied = {}, warnings = {}, starts = 0, cancels = 0, closed = 0, epoch = 7 }
 	for _, name in ipairs({ "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }) do
 		package.loaded[name] = nil
@@ -50,7 +50,7 @@ local function load_bridge(controls)
 			return { cancel = function() context.cancels = context.cancels + 1 end }
 		end,
 	}
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.ui.ui.webview_manager"] = {
 		current_epoch = function() return context.epoch end,
 		eval_js = function(_, js)
 			context.pushed[#context.pushed + 1] = js
@@ -66,14 +66,14 @@ local function load_bridge(controls)
 	}
 	package.loaded["infra.config_paths"] = setmetatable({ home = function() return HOME end },
 		{ __index = require("infra.config_paths") })
-	local sink = require("infra.logger_sink")
+	local sink = require("core.logger.engine.sink")
 	local previous_log_dir = sink.log_dir
 	if controls.logs_dir ~= nil then
 		assert(type(controls.logs_dir) == "string" and controls.logs_dir:sub(1, #HOME) == HOME)
 		sink.log_dir = function() return controls.logs_dir end
 	end
 	local bridge = helpers.load_module("ui.healthcheck.bridge")
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local warn = logger.warn
 	context.restore = function()
 		sink.log_dir = previous_log_dir
@@ -210,7 +210,7 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 	helpers.it("copies the redacted report", function()
 		with_bridge(nil, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
-			local redacted = require("diagnostics.redact").apply("at /home/jdoe/x by jdoe",
+			local redacted = require("diagnostics.engine.reports.redact").apply("at /home/jdoe/x by jdoe",
 				ready.config.redaction, ready.config.context)
 			helpers.assert_eq({ redacted }, { "at ~/x by <user>" })
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 1 }, {}, page(context))
@@ -275,7 +275,7 @@ helpers.describe("diagnostics bridge (linux): the page's messages", function()
 
 	helpers.it("replaces an open window", function()
 		with_bridge(nil, function(bridge, context)
-			local manager = package.loaded["ui.webview_manager"]
+			local manager = package.loaded["core.ui.ui.webview_manager"]
 			local hidden, shown = {}, {}
 			manager.hide = function(app, epoch) hidden[#hidden + 1] = app .. "#" .. tostring(epoch); return true end
 			manager.show = function(app) shown[#shown + 1] = app; return true end
@@ -402,15 +402,15 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 		with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
-			local fs = require("adapters.file_system")
-			local old_write, old_shell = fs.write_new, package.loaded["adapters.shell_runner"]
+			local fs = require("core.fs.adapters.file_system")
+			local old_write, old_shell = fs.write_new, package.loaded["core.process.adapters.shell_runner"]
 			local old_desktop = package.loaded["adapters.desktop_opener"]
 			local calls, written = {}, {}
 			fs.write_new = function(path, value)
 				assert(path:sub(1, #HOME) == HOME and path:find("/diagnostics/", 1, true))
 				written[#written + 1] = value; calls[#calls + 1] = "write"; return true
 			end
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				quote = function(value) return string.format("%q", value) end,
 				run = function(command) calls[#calls + 1] = command; return true end,
 			}
@@ -430,11 +430,11 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				helpers.assert_true(calls[1]:find("mkdir -p", 1, true) == 1)
 				helpers.assert_eq(calls[2], "write")
 				local repo = bridge.config().repository
-				local stable = require("healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
-				local url = require("diagnostics.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
+				local stable = require("diagnostics.engine.healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
+				local url = require("diagnostics.engine.reports.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
 				helpers.assert_eq(calls[4], { executable = "xdg-open", args = { url } })
 			end, debug.traceback)
-			fs.write_new, package.loaded["adapters.shell_runner"] = old_write, old_shell
+			fs.write_new, package.loaded["core.process.adapters.shell_runner"] = old_write, old_shell
 			package.loaded["adapters.desktop_opener"] = old_desktop
 			if not ok then error(err, 0) end
 		end)
@@ -446,7 +446,7 @@ end)
 --- delivered explicitly by the subject, outside the producer's protected call.
 local function with_deferred_opener(body)
 	with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
-		local shell, fs = package.loaded["adapters.shell_runner"], require("adapters.file_system")
+		local shell, fs = package.loaded["core.process.adapters.shell_runner"], require("core.fs.adapters.file_system")
 		local held_write, desktop = fs.write_new, package.loaded["adapters.desktop_opener"]
 		context.openers, context.writes = {}, 0
 		fs.write_new = function()
@@ -454,8 +454,8 @@ local function with_deferred_opener(body)
 			if context.after_write then context.after_write() end
 			return true
 		end
-		package.loaded["adapters.shell_runner"] = {
-			quote = require("adapters.shell_runner").quote, run = function() return true end,
+		package.loaded["core.process.adapters.shell_runner"] = {
+			quote = require("core.process.adapters.shell_runner").quote, run = function() return true end,
 		}
 		package.loaded["adapters.desktop_opener"] = {
 			open = function(target, done)
@@ -471,7 +471,7 @@ local function with_deferred_opener(body)
 		local ok, detail = xpcall(function()
 			bridge.on_message("ready", {}, page(context)); body(bridge, context, request)
 		end, debug.traceback)
-		fs.write_new, package.loaded["adapters.shell_runner"] = held_write, shell
+		fs.write_new, package.loaded["core.process.adapters.shell_runner"] = held_write, shell
 		package.loaded["adapters.desktop_opener"] = desktop
 		if not ok then error(detail, 0) end
 	end)
@@ -486,7 +486,7 @@ helpers.describe("diagnostics asynchronous opener ownership", function()
 			helpers.assert_eq(#c.pushed, 0, "browser admission does not acknowledge report completion")
 			c.openers[2].done({ ok = false, code = 24, error = "native browser refused" })
 			helpers.assert_eq(#c.pushed, 1)
-			local result = require("json").decode(c.pushed[1]:match("receiveDiagnostics%((.*)%)$"))
+			local result = require("core.text.engine.json").decode(c.pushed[1]:match("receiveDiagnostics%((.*)%)$"))
 			helpers.assert_eq(result.ok, false); helpers.assert_eq(result.action, "report")
 			c.openers[2].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
 		end)
@@ -554,11 +554,11 @@ helpers.describe("diagnostics bridge fixture ownership", function()
 	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
 		local paths = require("infra.config_paths")
 		local preferences = require("infra.metrics_preferences")
-		local names = { "infra.config_paths", "infra.metrics_preferences", "ui.webview_manager", "adapters.clipboard",
+		local names = { "infra.config_paths", "infra.metrics_preferences", "core.ui.ui.webview_manager", "adapters.clipboard",
 			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
 		local before = {}
 		for _, name in ipairs(names) do before[name] = package.loaded[name] end
-		local logger, sink = require("logger.shim"), require("infra.logger_sink")
+		local logger, sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 		local warn, log_dir, getenv = logger.warn, sink.log_dir, os.getenv
 		local failure, visited = {}, 0
 		local ok, detail = pcall(with_bridge, nil, function(bridge, context)

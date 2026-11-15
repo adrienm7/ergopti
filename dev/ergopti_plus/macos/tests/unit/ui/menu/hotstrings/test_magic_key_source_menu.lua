@@ -19,9 +19,9 @@ local KEYCODE_SPACE = 49
 local KEYCODE_ESCAPE = 53
 
 local MODULES = {
-	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
+	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
-	"adapters.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
+	"platform.input.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -40,7 +40,7 @@ local function with_menu(body, faults)
 			get_pause_epoch = function() return world.pause.epoch end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = world.pause_owner
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
 				local mode = delay == 0 and world.faults.answer or world.faults.deadline
@@ -58,7 +58,7 @@ local function with_menu(body, faults)
 				return true
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind)
 				world.notices[#world.notices + 1] = { title = title, body = body, kind = kind }
 				return true
@@ -103,7 +103,7 @@ local function with_menu(body, faults)
 			world.taps[#world.taps + 1] = tap
 			return tap
 		end
-		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
+		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
 		world.keycodes = { map = { [KEYCODE_J] = "j", [KEYCODE_SPACE] = "space" } }
 		local Menu = helpers.load_with_stubs("ui.menu.magic_key_source_menu",
 			{ eventtap = eventtap, keycodes = world.keycodes })
@@ -167,7 +167,7 @@ helpers.describe("magic key source menu: choosing a key", function()
 		end)
 	end)
 
-	helpers.it("(magic-key-source) the rows label keys by the input source and grey capture while paused", function()
+	helpers.it("(paused-magic-capture) the rows label keys by the input source and keep capture while paused", function()
 		with_menu(function(Menu)
 			local rows = Menu.rows(context(true))
 			local items = rows[1].items
@@ -179,7 +179,9 @@ helpers.describe("magic key source menu: choosing a key", function()
 			helpers.assert_true(found, "KeyJ is labelled by what the input source types on it")
 			local paused = context(true)
 			paused.paused = true
-			helpers.assert_true(Menu.rows(paused)[1].items[1].disabled, "no capture while Ergopti is paused")
+			-- EDD-1: the capture runs while paused (decided on 2026-11-14).
+			helpers.assert_eq(Menu.rows(paused)[1].items[1].disabled == true, false, "the capture runs while paused")
+			helpers.assert_type(Menu.rows(paused)[1].items[1].action, "function", "the paused capture row presses a key")
 		end)
 	end)
 end)
@@ -192,7 +194,7 @@ helpers.describe("magic key source menu: capturing a key", function()
 			helpers.assert_eq(Menu.capture(ctx), false, "one capture at a time")
 			local tap = world.taps[1]
 			helpers.assert_true(tap.running)
-			helpers.assert_eq(world.notices[1].body, require("infra.i18n").get("dialog.magic_key_source.prompt"),
+			helpers.assert_eq(world.notices[1].body, require("core.i18n.engine.i18n").get("dialog.magic_key_source.prompt"),
 				"the user is asked for a key")
 			helpers.assert_eq(tap.callback(key_down(KEYCODE_J)), true, "the answering key never reaches an app")
 			helpers.assert_eq(tap.callback(key_down(KEYCODE_SPACE)), false, "every later key passes through")
@@ -232,7 +234,7 @@ helpers.describe("magic key source menu: capturing a key", function()
 			run_deferred(world)
 			helpers.assert_eq(#ctx.applied, 0)
 			helpers.assert_eq(world.notices[#world.notices].body,
-				require("infra.i18n").get("dialog.magic_key_source.not_a_candidate"))
+				require("core.i18n.engine.i18n").get("dialog.magic_key_source.not_a_candidate"))
 			helpers.assert_eq(world.notices[#world.notices].kind, "warning")
 		end)
 	end)
@@ -251,7 +253,7 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			helpers.assert_eq(ctx.saves, 0)
 			helpers.assert_eq(ctx.applied, {})
 			helpers.assert_eq(ctx.state.magic_key_source, "auto")
-			local reason = require("infra.i18n").get(require("keymap.magic_key_source").TAP_CONFLICT_REASON)
+			local reason = require("core.i18n.engine.i18n").get(require("layouts.engine.layers.magic_key_source").TAP_CONFLICT_REASON)
 			helpers.assert_eq(world.notices[1].body, reason)
 			local row = nil
 			for _, candidate in ipairs(Menu.rows(ctx)[1].items) do
@@ -273,11 +275,11 @@ end)
 
 helpers.describe("magic key source: the actual declared native menu", function()
 	helpers.it("(magic-key-source) cold English and warm French use the real native renderer and retain capture and choice callbacks", function()
-		helpers.with_stub_scope({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
+		helpers.with_stub_scope({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "ui.menu.magic_key_source_menu" }, function()
 			with_menu(function(_, world)
-				package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
-				local translations = require("infra.i18n")
-				local locale = require("infra.locale")
+				package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"] = nil, nil
+				local translations = require("core.i18n.engine.i18n")
+				local locale = require("core.i18n.engine.locale")
 				package.loaded["infra.manifest_menu"], package.loaded["ui.menu.magic_key_source_menu"] = nil, nil
 				local Menu = require("ui.menu.magic_key_source_menu")
 				local Source = require("modules.keymap.magic_key_source")
@@ -288,7 +290,7 @@ helpers.describe("magic key source: the actual declared native menu", function()
 					local rows = Menu.rows(ctx)
 					helpers.assert_eq(#world.taps, 0, "construction cannot start native capture")
 					helpers.assert_eq(ctx.saves, 0, "construction never persists")
-					helpers.assert_eq(rows[1].label, require("locale.label_value").compose(translations.get,
+					helpers.assert_eq(rows[1].label, require("core.i18n.engine.label_value").compose(translations.get,
 						translations.get("menu.layout.magic_key_source"), "j   (KeyJ)"))
 					helpers.assert_eq(rows[1].items[1].label, translations.get("menu.layout.magic_key_source.capture"))
 					helpers.assert_eq(rows[1].items[3].label, translations.get("menu.layout.magic_key_source.auto"))
@@ -529,7 +531,23 @@ helpers.describe("magic key source menu: retained event provenance fences", func
 end)
 
 helpers.describe("magic key source menu: live pause admission", function()
-	for _, invalid in ipairs({ "missing", "paused", "pending", "unknown", "negative", "fractional", "throw" }) do
+	-- A settled pause admits the capture: the key is saved at once and stays
+	-- inert until resume, since the paused keymap remaps nothing. Before, a
+	-- paused driver refused it (paused-magic-capture).
+	helpers.it("(paused-magic-capture) a settled pause captures and saves the key", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			world.pause.paused = true
+			helpers.assert_true(Menu.capture(ctx), "a paused driver captures")
+			helpers.assert_true(world.taps[1].callback(key_down(KEYCODE_J)))
+			run_deferred(world)
+			helpers.assert_eq(ctx.saves, 1, "the paused choice is saved at once")
+			helpers.assert_eq(ctx.state.magic_key_source, "KeyJ")
+			helpers.assert_eq(Menu.capturing(), false)
+		end)
+	end)
+
+	for _, invalid in ipairs({ "missing", "pending", "unknown", "negative", "fractional", "throw" }) do
 		helpers.it("refuses capture with " .. invalid .. " live pause state before acquisition", function()
 			with_menu(function(Menu, world)
 				local ctx = context(true)

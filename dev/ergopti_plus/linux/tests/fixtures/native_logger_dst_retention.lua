@@ -3,17 +3,17 @@
 local root = assert(arg[1])
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local driver = assert(source:match("^(.*)/tests/fixtures/native_logger_dst_retention%.lua$"))
-package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/lua/?.lua;"
-	.. driver .. "/../_shared/lua/?/init.lua;" .. package.path
+package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. driver .. "/../_shared/?.lua;"
+	.. driver .. "/../_shared/?/init.lua;" .. package.path
 
 local time, date = os.time, os.date
 local now
 os.time = function(value) if value == nil then return now end; return time(value) end
 os.date = function(format, stamp) return date(format, stamp or now) end
-package.loaded["infra.timings"] = { count = function(group, key)
+package.loaded["core.timing.engine.timings"] = { count = function(group, key)
 	assert(group == "logger" and key == "retention_days"); return 1
 end }
-local Sink = require("infra.logger_sink")
+local Sink = require("core.logger.engine.sink")
 local logger = { set_sink = function() end, enable_repeat_collapsing = function() end,
 	disable_repeat_collapsing = function() end }
 

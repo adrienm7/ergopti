@@ -5,12 +5,12 @@
 --- DESCRIPTION:
 --- Drives the real prediction engine and real streaming handler around a captured
 --- backend request. Once the live action-epoch predicate closes, every callback
---- created for that request (partial, success, failure, watchdog and debounce)
+--- created for that request (partial, success, failure and debounce)
 --- must become a no-op before it mutates refs, persists telemetry, logs, or paints.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SharedParser = require("llm.parser")
+local SharedParser = require("ai.engine.api.parser_core")
 
 
 local DEFAULTS = {
@@ -35,7 +35,7 @@ local DEFAULTS = {
 
 
 local function load_fixture(streaming)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	hs.application.frontmostApplication = function()
 		return { title = function() return "FixtureApp" end }
 	end
@@ -55,24 +55,24 @@ local function load_fixture(streaming)
 	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 		Logger[level] = function() effects.logs = effects.logs + 1 end
 	end
-	package.loaded["infra.logger"] = Logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
-			if key == "stream_watchdog_ms" then return 7 end
 			if key == "chain_fallback_ms" then return 1 end
 			return 0.1
 		end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 	}
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["core.events.timer_scheduler"] = nil
 
 	local core = {
 		DEFAULT_STATE = DEFAULTS,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		get_active_profile = function() return { label = "Test" } end,
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,
@@ -141,7 +141,7 @@ local function load_fixture(streaming)
 		navigate = function() return true end,
 		tint = function() return nil end,
 	}
-	package.loaded["ui.tooltip"] = tooltip
+	package.loaded["core.ui.ui.tooltip"] = tooltip
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() effects.keystats_writes = effects.keystats_writes + 1 end,
@@ -230,19 +230,6 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 		helpers.assert_true(effect_total(fail_effects) > 0,
 			"the failure callback must have observable effects while open")
 
-		local _, watchdog_effects, watchdog_callbacks, _, clear_watchdog, watchdog_dispatch = load_fixture(true)
-		helpers.assert_eq(watchdog_dispatch(), 1)
-		watchdog_callbacks.partial("watchdog seed")
-		local watchdog
-		for _, timer in ipairs(hs.timer.__timers) do
-			if timer.delay == 7 then watchdog = timer; break end
-		end
-		helpers.assert_not_nil(watchdog)
-		clear_watchdog()
-		watchdog:fire()
-		helpers.assert_true(effect_total(watchdog_effects) > 0,
-			"the watchdog must be executable before its stale twin is tested")
-
 		local PE_debounce, _, _, _, _, _, get_debounce_fetches = load_fixture(false)
 		local timers_before = #hs.timer.__timers
 		PE_debounce.start_timer(0.02)
@@ -325,23 +312,5 @@ helpers.describe("prediction_engine: action-epoch quarantine closes async produc
 		callbacks.fail()
 		helpers.assert_eq(effect_total(effects), 0,
 			"stale failure escaped quarantine: " .. effect_summary(effects))
-	end)
-
-
-	helpers.it("the stream watchdog rechecks the live epoch before logging or rendering", function()
-		local _, effects, callbacks, set_available, clear_effects, dispatch = load_fixture(true)
-		helpers.assert_eq(dispatch(), 1)
-		callbacks.partial("positive control")
-		local watchdog
-		for _, timer in ipairs(hs.timer.__timers) do
-			if timer.delay == 7 then watchdog = timer; break end
-		end
-		helpers.assert_not_nil(watchdog, "perform_check must arm the real stream watchdog")
-		helpers.assert_true(watchdog.running)
-		set_available(false)
-		clear_effects()
-		watchdog:fire()
-		helpers.assert_eq(effect_total(effects), 0,
-			"stale watchdog escaped quarantine: " .. effect_summary(effects))
 	end)
 end)

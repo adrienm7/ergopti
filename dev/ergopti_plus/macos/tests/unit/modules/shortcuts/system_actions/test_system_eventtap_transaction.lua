@@ -33,8 +33,8 @@ end
 --- @return table fixture Loaded module and native tap observations.
 local function load_fixture(plans, timer_plans)
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_contract = require("tests.stubs.hs")
@@ -119,7 +119,7 @@ local function load_fixture(plans, timer_plans)
 		STATUS_FOREIGN = "foreign",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return {} end,
 		emit_key_stroke = function() return true end,
 		seal = function() return true end,
@@ -194,14 +194,14 @@ helpers.describe("system shortcut eventtap factories are transactional", functio
 		local fixture = load_fixture({{ enable_on_start = false }})
 		local errors = {}
 		local saved_permission = package.loaded["adapters.accessibility_permission"]
-		local saved_error = package.loaded["infra.logger"].error
+		local saved_error = package.loaded["core.logger.engine.logger"].error
 		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return false end }
-		package.loaded["infra.logger"].error = function(_, text, ...)
+		package.loaded["core.logger.engine.logger"].error = function(_, text, ...)
 			errors[#errors + 1] = string.format(text, ...)
 		end
 		local ok, owner = pcall(fixture.system.bind_cmd_star)
 		package.loaded["adapters.accessibility_permission"] = saved_permission
-		package.loaded["infra.logger"].error = saved_error
+		package.loaded["core.logger.engine.logger"].error = saved_error
 		helpers.assert_true(ok)
 		helpers.assert_nil(owner)
 		helpers.assert_true(table.concat(errors, " | "):find("accessibility_trusted=false", 1, true) ~= nil,

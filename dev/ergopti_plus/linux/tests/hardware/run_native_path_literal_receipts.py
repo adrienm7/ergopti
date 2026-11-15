@@ -24,10 +24,10 @@ local root = assert(os.getenv("ERGOPTI_NATIVE_DRIVER_ROOT"))
 local shared = assert(os.getenv("ERGOPTI_NATIVE_SHARED_ROOT"))
 assert(Paths.driver_root() == root, "native source/cwd filename bytes were rewritten")
 assert(Paths.shared_root() == shared, "real shared-tree lookup lost literal directory bytes")
-local locale_path = assert(Paths.shared("data/locales/en.json"))
+local locale_path = assert(Paths.shared("core/i18n/data/locales/en.json"))
 local file = assert(io.open(locale_path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
-assert(#bytes > 100 and require("json").decode(bytes), "actual shared locale file was not read")
-package.loaded["infra.paths"] = Paths
+assert(#bytes > 100 and require("core.text.engine.json").decode(bytes), "actual shared locale file was not read")
+package.loaded["core.fs.engine.paths"] = Paths
 local Installer = require("modules.updater.installer")
 local context = Installer.resolve(assert(os.getenv("ERGOPTI_NATIVE_MANAGER_SOURCE")))
 assert(context.kind == "standalone", "literal directory bytes prevented native installation classification")
@@ -61,19 +61,20 @@ def main():
             install = prefix / "lib" / "ergopti_plus"
             root = install / "linux"
             shared = install / "_shared" if layout == "sibling" else root / "_shared"
-            (root / "infra").mkdir(parents=True)
+            engine = pathlib.Path("core", "fs", "engine")
+            (root / engine).mkdir(parents=True)
             (root / "modules" / "updater").mkdir(parents=True)
-            (shared / "data" / "locales").mkdir(parents=True)
-            (shared / "lua").mkdir()
+            locales = pathlib.Path("core", "i18n", "data", "locales")
+            (shared / locales).mkdir(parents=True)
             (prefix / "bin").mkdir()
-            source = root / "infra" / "paths.lua"
+            source = root / engine / "paths.lua"
             manager = root / "modules" / "updater" / "manager.lua"
             wrapper = prefix / "bin" / "ergopti-hotstrings"
-            shutil.copyfile(driver / "infra" / "paths.lua", source)
+            shutil.copyfile(driver / engine / "paths.lua", source)
             shutil.copyfile(driver / "modules" / "updater" / "manager.lua", manager)
             shutil.copyfile(
-                shared_source / "data" / "locales" / "en.json",
-                shared / "data" / "locales" / "en.json",
+                shared_source / locales / "en.json",
+                shared / locales / "en.json",
             )
             wrapper.write_text("#!/bin/sh\n")
             expected_shared = str(root) + "/../_shared" if layout == "sibling" else str(shared)
@@ -85,7 +86,7 @@ def main():
                     "XDG_CONFIG_HOME": str(prefix / "config"),
                     "ERGOPTI_NATIVE_PATH_SOURCE": str(source)
                     if loading == "absolute"
-                    else "linux/infra/paths.lua",
+                    else "linux/core/fs/engine/paths.lua",
                     "ERGOPTI_NATIVE_DRIVER_ROOT": str(root),
                     "ERGOPTI_NATIVE_SHARED_ROOT": expected_shared,
                     "ERGOPTI_NATIVE_MANAGER_SOURCE": str(manager)
@@ -98,9 +99,9 @@ def main():
                     + ";"
                     + str(driver / "?" / "init.lua")
                     + ";"
-                    + str(shared_source / "lua" / "?.lua")
+                    + str(shared_source / "?.lua")
                     + ";"
-                    + str(shared_source / "lua" / "?" / "init.lua")
+                    + str(shared_source / "?" / "init.lua")
                     + ";;",
                 }
             )

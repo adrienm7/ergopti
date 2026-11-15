@@ -4,7 +4,7 @@
 --- MODULE: Remap Action Label Localisation Tests
 --- DESCRIPTION:
 --- Eighteen of `platform/remap/data/actions.json`'s entries are ALSO rows of the
---- one action registry (`_shared/modules/actions/actions.toml`), and those
+--- one action registry (`_shared/shortcuts/data/actions/actions.toml`), and those
 --- eighteen already carry an `sg_actions.<id>` label in all twenty-one locales.
 --- The French string in the JSON was a second declaration of the same label, so
 --- the remap picker showed French to every user while the gesture picker — which
@@ -24,7 +24,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json    = require("json")
+local json    = require("core.text.engine.json")
 
 
 
@@ -52,13 +52,15 @@ local ACTIONS_JSON = helpers.driver_root() .. "/platform/remap/data/actions.json
 --- @return table config
 local function fresh()
 	local config = helpers.load_with_stubs("platform.remap.config")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key)
 		if key == "sg_actions." .. KEYED_ID then return TRANSLATED end
 		-- Everything else answers with the key, which is what the real module does
 		-- when a key has no entry — and is the sentinel the code must recognise.
 		return key
 	end
+	-- The catalogue answers which keys exist without decoding a fallback locale.
+	i18n.has = function(key) return key == "sg_actions." .. KEYED_ID end
 	return config
 end
 
@@ -88,7 +90,7 @@ helpers.describe("remap action labels: the two groups", function()
 		-- stubs i18n and would make this assert its own stub. If a merge gives
 		-- every remap action a key, the second half fails and this file's third
 		-- case has to be retired deliberately.
-		local fh = io.open(helpers.shared("data/locales/fr.json"), "r")
+		local fh = io.open(helpers.shared("core/i18n/data/locales/fr.json"), "r")
 		assert(fh, "the French catalogue must be readable")
 		local locale = json.decode(fh:read("*a"))
 		fh:close()
@@ -137,6 +139,25 @@ helpers.describe("remap action labels: localisation", function()
 			"and must not be the unresolved key: i18n.get answers with the KEY when it cannot resolve, " ..
 			"so writing it through would put 'sg_actions." .. UNKEYED_ID .. "' in the menu")
 	end)
+
+	helpers.it("an unresolved key is asked of the catalogue, never translated", function()
+		-- i18n.get decodes en.json on the active locale's first miss: these
+		-- probes made every boot decode it, although every shipped catalogue
+		-- carries the same keys, so the miss was certain.
+		local config = fresh()
+		local i18n = require("core.i18n.engine.i18n")
+		local translate = i18n.get
+		local probed = {}
+		i18n.get = function(key)
+			if key:find("^sg_actions%.") then probed[#probed + 1] = key end
+			return translate(key)
+		end
+		helpers.assert_eq(type(config.load_available_actions(ACTIONS_JSON)), "table", "the catalogue must load")
+		for _, key in ipairs(probed) do
+			helpers.assert_eq(key, "sg_actions." .. KEYED_ID, "only a key the catalogue has is translated")
+		end
+		helpers.assert_true(#probed >= 1, "the keyed action is still translated")
+	end)
 end)
 
 
@@ -153,11 +174,11 @@ helpers.describe("remap action labels: picker headings and key actions", functio
 		-- The headings read « Modificateurs », « Touches » or « Keyboard shortcuts »
 		-- whatever the user's language: the catalogue held the French text.
 		local config = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(key) return key:find("^remap%.category%.") and "<" .. key .. ">" or key end
 		local actions = config.load_available_actions(ACTIONS_JSON)
 		helpers.assert_eq(type(actions), "table", "the catalogue must load")
-		local fh = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local fh = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
 		local english = json.decode(fh:read("*a"))
 		fh:close()
 		local seen = 0
@@ -172,7 +193,7 @@ helpers.describe("remap action labels: picker headings and key actions", functio
 
 	helpers.it("AltGr is named from the key name table", function()
 		local config = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(key) return key == "key_name.right_option" and "RIGHT-OPTION" or key end
 		local altgr = find(config.load_available_actions(ACTIONS_JSON), "altgr")
 		helpers.assert_true(altgr ~= nil, "'altgr' must be in the catalogue")

@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local OpenAI-Compatible Servers (macOS)
 --- DESCRIPTION:
---- Drives the real catalogue (_shared/modules/llm/local_servers.json), the
+--- Drives the real catalogue (_shared/ai/data/local_servers.json), the
 --- detection (modules/llm/local_servers.lua), the remote backend that sends
 --- their requests (modules/llm/api_remote.lua), the API entry persistence
 --- (modules/llm/init.lua) and the AI menus (local_server_panel, agent_panel),
@@ -319,7 +319,7 @@ helpers.describe("Configured local menu leases and native pause (local-configure
 			local original = { id = "personal", provider = "openai", token = "", model = "before", base_url = "http://localhost:8000/v1" }
 			api.set_entries({ original })
 			local newer = { id = "personal", provider = "openai_compat", token = "", model = "newer", base_url = original.base_url }
-			local dialogs = require("infra.dialog_util")
+			local dialogs = require("core.ui.engine.dialog_util")
 			dialogs.text_prompt = function(_, _, _, ok_label)
 				api.set_entries({ newer }); return ok_label, "http://127.0.0.1:8000/v1"
 			end

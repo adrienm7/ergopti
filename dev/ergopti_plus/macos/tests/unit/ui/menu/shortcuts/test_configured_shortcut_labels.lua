@@ -14,9 +14,9 @@ local script_prefix = require("modules.shortcuts.script_control").BINDING_PREFIX
 local names = {
 	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
-	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.renderer",
+	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"core.timing.engine.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
+	"core.fs.engine.paths", "menu.engine.renderer",
 }
 
 helpers.describe("configured shortcut row labels", function()
@@ -55,7 +55,7 @@ helpers.describe("configured shortcut row labels", function()
 				}
 				package.loaded["modules.shortcuts.bindings"] = {}
 				package.loaded["modules.shortcuts.actions.text"] = {}
-				package.loaded["infra.i18n"] = {
+				package.loaded["core.i18n.engine.i18n"] = {
 					get = function(key)
 						return key:find("right_opt", 1, true) and "%s"
 							or helpers.I18N_PLACEHOLDER_FORMATS[key] or key
@@ -63,11 +63,11 @@ helpers.describe("configured shortcut row labels", function()
 					section = function(key) return key end,
 					decorate_section = function(label) return label end,
 				}
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.deferred_work"] = {}
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+				package.loaded["core.timing.engine.deferred_work"] = {}
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.menu_utils"] = {}
-				package.loaded["infra.paths"] = { shared = helpers.shared }
+				package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 				-- The Shortcuts submenu opens the script chords' group, whose rows
 				-- are its provider's.
 				local actual_manifest = require("infra.manifest_menu")
@@ -117,16 +117,16 @@ helpers.describe("real script-action catalogue projection", function()
 	for _, language in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("preserves every genuine script action and heading in " .. language, catalogue_scope(function()
 			-- Establish the existing controlled native environment before publishing translation.
-			helpers.load_with_stubs("action_parameter_label")
-			local Json = require("adapters.json_codec")
+			helpers.load_with_stubs("shortcuts.engine.action_parameter_label")
+			local Json = require("core.fs.adapters.json_codec")
 			local function read(relative)
 				local file = assert(io.open(helpers.shared(relative), "rb"))
 				local bytes = assert(file:read("*a")); assert(file:close())
 				return assert(Json.decode(bytes))
 			end
 			local expected = read("tests/corpus/menus/script_action_original_catalogue_projection.json").locales[language].rows
-			local dictionary = read("data/locales/" .. language .. ".json")
-			local translator = package.loaded["infra.i18n"]
+			local dictionary = read("core/i18n/data/locales/" .. language .. ".json")
+			local translator = package.loaded["core.i18n.engine.i18n"]
 			translator.get = function(key) return dictionary[key] or key end
 			translator.format = function(key, ...)
 				local result, args = translator.get(key), table.pack(...)
@@ -138,7 +138,7 @@ helpers.describe("real script-action catalogue projection", function()
 			local actions = require("modules.gestures.actions")
 			local script = require("modules.shortcuts.script_control")
 			helpers.assert_eq(script.ACTIONS, actions.SG_NAMES)
-			helpers.assert_eq(#script.ACTIONS, 840)
+			helpers.assert_eq(#script.ACTIONS, 842)
 			for index, row in ipairs(expected) do
 				helpers.assert_eq(script.ACTIONS[index], row[1], "genuine catalogue order " .. index)
 				helpers.assert_true(row[1] ~= "-" and row[1] ~= "--", "original catalogue has no retired token")
@@ -176,7 +176,7 @@ helpers.describe("real script-action catalogue projection", function()
 				return context.save_prefs()
 			end
 			-- The slot row opens the shared picker, as on Windows: the catalogue
-			-- reaches the picker, not 840 inline rows per slot (menu-script-slots-picker).
+			-- reaches the picker, not 842 inline rows per slot (menu-script-slots-picker).
 			local opened = {}
 			package.loaded["ui.action_picker"] = {
 				open = function(options, on_pick) opened[#opened + 1] = { options = options, on_pick = on_pick } end,
@@ -192,8 +192,10 @@ helpers.describe("real script-action catalogue projection", function()
 				helpers.assert_eq(#captured, #control.script_chord_slots())
 				for _, slot in ipairs(captured) do
 					helpers.assert_nil(slot.items, "a slot row must not inline the action catalogue")
-					helpers.assert_eq(slot.disabled == true, paused)
-					helpers.assert_eq(type(slot.action), paused and "nil" or "function")
+					-- A slot row runs while paused: script_control keeps the change
+					-- until the resume settles (paused-chord-change).
+					helpers.assert_eq(slot.disabled == true, false)
+					helpers.assert_eq(type(slot.action), "function")
 				end
 			end
 			context.paused = false; owner.build(context)

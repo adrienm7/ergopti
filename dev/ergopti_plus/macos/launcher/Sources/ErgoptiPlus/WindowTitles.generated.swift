@@ -8,7 +8,9 @@ enum WindowTitles {
 	static func compose(_ label: String? = nil) -> String {
 		let prefix = "ErgoptiPlus"
 		let separator = " — "
+		let productNames: Set<String> = ["Ergopti Studio"]
 		guard let label, !label.isEmpty else { return prefix }
+		if productNames.contains(label) { return label }
 		guard !prefix.isEmpty else { return label }
 		return prefix + separator + label
 	}

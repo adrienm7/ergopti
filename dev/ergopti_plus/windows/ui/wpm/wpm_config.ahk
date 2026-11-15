@@ -44,15 +44,15 @@ _WPMWidget_NeedTiming(Section, Key, Missing) {
 		}
 }
 
-; Reads _shared/modules/wpm_widget/constants.toml — the canon macOS and Linux
+; Reads _shared/metrics/data/wpm_widget/constants.toml — the canon macOS and Linux
 ; draw from too — and the timings registry into WPMWidgetConst. No key carries
 ; a copied default: one missing key keeps the widget off and names itself.
 ; @returns {Integer} true when every key was read.
 WPMWidget_LoadSharedConst() {
 		global _SharedDir
-		wpm_c := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		wpm_c := ParseTomlFile(_SharedDir . "\metrics\data\wpm_widget\constants.toml")
 		if !wpm_c.Count {
-				LoggerError("WPMWidget", "_shared/modules/wpm_widget/constants.toml not found — the widget stays off.")
+				LoggerError("WPMWidget", "_shared/metrics/data/wpm_widget/constants.toml not found — the widget stays off.")
 				return false
 		}
 		Missing := []

@@ -49,7 +49,7 @@ helpers.describe("Shortcuts wrap-symbol groups are populated", function()
 end)
 
 
-local WrapJson = require("json")
+local WrapJson = require("core.text.engine.json")
 local wrap_file = assert(io.open(helpers.shared("tests/corpus/menus/wrap_symbol_controls.json"), "rb"))
 local wrap_expectations = assert(WrapJson.decode(wrap_file:read("*a")))
 wrap_file:close()
@@ -58,18 +58,18 @@ wrap_file:close()
 local function with_wrap_controls(options, callback)
 	options = options or {}
 	return helpers.with_stub_scope({
-		"ui.menu.menu_shortcuts", "menu.wrap_mutation", "infra.manifest_menu", "infra.i18n", "infra.paths",
-		"infra.logger", "infra.dialog_util", "modules.shortcuts.actions.text",
+		"ui.menu.menu_shortcuts", "menu.engine.wrap_mutation", "infra.manifest_menu", "core.i18n.engine.i18n", "core.fs.engine.paths",
+		"core.logger.engine.logger", "core.ui.engine.dialog_util", "modules.shortcuts.actions.text",
 		"ui.menu.menu_utils", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 		"ui.menu.menu_tap_keys", "infra.manifest_reader",
 	}, function()
 		local renderer = helpers.load_with_stubs("infra.manifest_menu")
 		-- Keys read as themselves, except the label-value join, the French template.
 		local translations = { ["common.label_value"] = "{1} : {2}" }
-		package.loaded["infra.i18n"].get = function(key) return translations[key] or key end
+		package.loaded["core.i18n.engine.i18n"].get = function(key) return translations[key] or key end
 		local calls = { saves = 0, updates = 0, prompts = 0 }
 		local responses = options.responses or {}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				calls.prompts = calls.prompts + 1
 				local response = assert(responses[calls.prompts], "unexpected native prompt")
@@ -227,16 +227,17 @@ helpers.describe("declared fixed wrap-symbol controls", function()
 		end)
 	end)
 
-	helpers.it("keeps the native paused management rows inert (wrap-controls)", function()
+	-- A pause stops typing, not configuration (EDD-1): the paused typing tap
+	-- reads the pairs live, so the rows commit and apply on resume.
+	helpers.it("keeps the paused management rows available (wrap-controls, edd1-paused-writes)", function()
 		with_wrap_controls({ paused = true }, function(f)
 			local wrap = f.build()
-			helpers.assert_eq(wrap.disabled, true)
+			helpers.assert_true(wrap.disabled ~= true)
 			for _, index in ipairs({ 1, 2, 3, #wrap.menu }) do
-				local row = wrap.menu[index]
-				helpers.assert_eq(row.disabled, true)
-				if row.fn then helpers.assert_eq(row.fn(), false) end
+				helpers.assert_true(wrap.menu[index].disabled ~= true)
 			end
-			helpers.assert_eq(f.calls.saves + f.calls.updates + f.calls.prompts, 0)
+			helpers.assert_eq(wrap.menu[1].fn(), true, "a paused control commits")
+			helpers.assert_eq(f.calls.saves, 1)
 		end)
 	end)
 
@@ -291,11 +292,11 @@ end
 helpers.describe("independent complete fixed wrap declaration coverage", function()
 	helpers.it("pins each published section field and hides every control on Linux (wrap-controls)", function()
 		with_wrap_controls({}, function(f)
-			local Renderer = require("menu.renderer")
+			local Renderer = require("menu.engine.renderer")
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
 				local renderer = assert(Renderer.new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end, json_decode = WrapJson.decode,
-					i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub() }))
+					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end, json_decode = WrapJson.decode,
+					i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub() }))
 				for _, section in ipairs(wrap_expectations.sections) do
 					local definitions = renderer.get_array(section.section)
 					helpers.assert_eq(#definitions, #section.rows)
@@ -326,7 +327,7 @@ helpers.describe("independent complete fixed wrap declaration coverage", functio
 		with_wrap_controls({ custom = { { left = "a", right = "b" } } }, function(f)
 			local count = 0
 			for _, code in ipairs(wrap_expectations.locales) do
-				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "rb"))
+				local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 				local translated = assert(WrapJson.decode(file:read("*a")))
 				file:close()
 				for _, section in ipairs(wrap_expectations.sections) do
@@ -401,17 +402,14 @@ helpers.describe("every fixed wrap mutation retains its exact native receipt", f
 end)
 
 
-helpers.describe("native wrap-control pause eligibility keeps its original truthiness", function()
-	helpers.it("refuses a truthy native pause value before any control effect (wrap-controls)", function()
+helpers.describe("native wrap-control eligibility ignores the pause value", function()
+	helpers.it("keeps the controls available under a truthy native pause value (wrap-controls)", function()
 		with_wrap_controls({ paused = "native pause claim" }, function(f)
 			local wrap = f.build()
-			helpers.assert_eq(wrap.disabled, "native pause claim", "native outer row stays unchanged")
+			helpers.assert_true(wrap.disabled ~= true and wrap.disabled ~= "native pause claim")
 			for _, index in ipairs({ 1, 2, 3, #wrap.menu }) do
-				local row = wrap.menu[index]
-				helpers.assert_eq(row.disabled, true)
-				if row.fn then helpers.assert_eq(row.fn(), false) end
+				helpers.assert_true(wrap.menu[index].disabled ~= true)
 			end
-			helpers.assert_eq(f.calls.saves + f.calls.updates + f.calls.prompts, 0)
 		end)
 	end)
 end)
@@ -579,14 +577,14 @@ local function with_shortcut_presentation(language, scenario)
 	local names = {
 		"ui.menu.menu_shortcuts", "infra.manifest_menu", "ui.menu.menu_utils",
 		"ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils", "ui.menu.menu_tap_keys",
-		"infra.i18n", "infra.locale", "locale.core", "menu.renderer", "infra.logger",
-		"infra.dialog_util", "infra.paths", "modules.shortcuts", "menu.row_dialect",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.renderer", "core.logger.engine.logger",
+		"core.ui.engine.dialog_util", "core.fs.engine.paths", "modules.shortcuts", "menu.engine.row_dialect",
 	}
 	return helpers.with_fresh_modules(names, function()
 		helpers.load_with_stubs("infra.manifest_menu")
-		package.loaded["infra.i18n"], package.loaded["infra.locale"] = nil, nil
-		local locale = require("infra.locale")
-		local native_i18n = require("infra.i18n")
+		package.loaded["core.i18n.engine.i18n"], package.loaded["core.i18n.engine.locale"] = nil, nil
+		local locale = require("core.i18n.engine.locale")
+		local native_i18n = require("core.i18n.engine.i18n")
 		native_i18n.set_locale_injector(function(code) locale.set_locale(code) end)
 		native_i18n.init()
 		local owner = { pending = function() return false end }
@@ -598,7 +596,7 @@ local function with_shortcut_presentation(language, scenario)
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = require("infra.manifest_menu")
 		local effects = { saves = 0, updates = 0, prompts = 0, urls = {}, catalogue_wires = 0 }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				effects.prompts = effects.prompts + 1
 				return native_i18n.get("button.ok"), "https://hand.changed/"
@@ -651,7 +649,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			with_shortcut_presentation(language, function(f)
 				local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 				local raw = assert(file:read("*a")); assert(file:close())
-				local hand = assert(require("adapters.json_codec").decode(raw))[language]
+				local hand = assert(require("core.fs.adapters.json_codec").decode(raw))[language]
 				local actual = assert(f.build())
 				local wrap = assert(shortcut_nested_row(actual.menu, hand.lua_wrap))
 				helpers.assert_true(type(wrap.menu) == "table" and #wrap.menu > 0)
@@ -679,7 +677,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			f.ctx.shortcuts.get_chatgpt_url = function() return active end
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 			local raw = assert(file:read("*a")); assert(file:close())
-			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local hand = assert(require("core.fs.adapters.json_codec").decode(raw)).en
 			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
 			editor.fn()
 			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.changed/")
@@ -695,7 +693,7 @@ helpers.describe("complete declared Shortcut presentation", function()
 			f.ctx.save_prefs = function() return false end
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/shortcut_presentation_frames.json"), "rb"))
 			local raw = assert(file:read("*a")); assert(file:close())
-			local hand = assert(require("adapters.json_codec").decode(raw)).en
+			local hand = assert(require("core.fs.adapters.json_codec").decode(raw)).en
 			local editor = assert(shortcut_nested_row(assert(f.build()).menu, hand.mac_url))
 			editor.fn()
 			helpers.assert_eq(f.ctx.state.chatgpt_url, "https://hand.original/")
@@ -745,18 +743,15 @@ helpers.describe("complete declared Shortcut presentation", function()
 		end)
 	end)
 
-	helpers.it("retains the native non-Boolean pause claim while every child transaction refuses", function()
+	helpers.it("keeps the wrap rows and the ChatGPT URL editor available while paused (edd1-paused-writes)", function()
 		with_shortcut_presentation("en", function(f)
 			f.ctx.paused = "native pause claim"
 			local actual = assert(f.build())
 			local wrap = assert(shortcut_nested_row(actual.menu, "Wrapping symbols"))
-			helpers.assert_eq(wrap.disabled, f.ctx.paused)
-			for _, child in ipairs(wrap.menu) do if child.fn then helpers.assert_eq(child.fn(), false) end end
+			helpers.assert_true(wrap.disabled ~= true and wrap.disabled ~= f.ctx.paused)
 			local editor = assert(shortcut_nested_row(actual.menu, "   ↳ Edit ChatGPT URL…"))
-			helpers.assert_eq(editor.disabled, true)
-			helpers.assert_nil(editor.fn)
-			helpers.assert_eq(f.effects.saves + f.effects.updates + f.effects.prompts, 0)
-			helpers.assert_eq(#f.effects.urls, 0)
+			helpers.assert_true(editor.disabled ~= true)
+			helpers.assert_type(editor.fn, "function")
 		end)
 	end)
 end)

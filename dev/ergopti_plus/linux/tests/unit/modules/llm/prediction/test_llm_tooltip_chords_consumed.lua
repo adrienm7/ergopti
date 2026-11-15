@@ -26,7 +26,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local Fakes = require("tests.fakes")
 
 local NAVIGATION_KEY = "llm.navigation.nav_modifiers"
@@ -61,12 +61,12 @@ local MODIFIER_SETS = {
 }
 
 local FAKED = {
-	"infra.llm_preferences", "adapters.secure_field_detector",
+	"infra.llm_preferences", "platform.focus.secure_field_detector",
 	"modules.llm.api_ollama", "modules.llm.profiles",
 }
 local RELOADED = {
-	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "ui.tooltip.llm",
-	"adapters.keyboard_hook",
+	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "core.ui.ui.tooltip.llm",
+	"platform.input.keyboard_hook",
 }
 
 
@@ -151,7 +151,7 @@ local function with_offer(options, body)
 		} })
 		helpers.load_module("modules.llm.navigation_settings")._reset()
 		helpers.load_module("modules.llm.display_settings")._reset()
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 		}
@@ -175,7 +175,7 @@ local function with_offer(options, body)
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
-		local overlay = helpers.load_module("ui.tooltip.llm")
+		local overlay = helpers.load_module("core.ui.ui.tooltip.llm")
 		helpers.assert_true(overlay.init({ style = {}, renderer = {
 				show = function(rows)
 					local count = 0
@@ -212,7 +212,7 @@ local function with_offer(options, body)
 		--- Types evdev events through the real keyboard hook in intercept mode.
 		--- @return table emitted "code:value" of every event the application receives
 		function world.drive(events)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted = {}
 			hook._test_drive(events, {
 				onConsume = function(detail) return world.engine.handle_shortcut(detail) end,
@@ -388,7 +388,7 @@ helpers.describe("prediction tooltip: Shift+Tab (llm-nav-left-right-windows)", f
 	end)
 
 	helpers.it("(llm-nav-left-right-windows) the hook names the side of the one Shift held", function()
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local sides = {}
 		hook._test_drive({
 			{ type = EV_KEY, code = EvdevCodes.KEY_LEFTSHIFT, value = 1 },
@@ -495,7 +495,7 @@ end)
 --- @return table details { code, mods }
 local function consumed_details(keys, events)
 	local Engine = require("platform.remap.tap_hold_engine")
-	local hook = helpers.load_module("adapters.keyboard_hook")
+	local hook = helpers.load_module("platform.input.keyboard_hook")
 	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }))
 	local details = {}
 	local ok, err = pcall(hook._test_drive, events, {
@@ -549,10 +549,10 @@ end)
 --- Reads event expectations independent of the production display condition.
 --- @return table
 local function display_events_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("prediction tooltip: canonical progressive display", function()
@@ -592,7 +592,7 @@ end)
 --- Original AI owners over acknowledged files; external effects are recording ports.
 local function with_configured_prediction(source, body, options)
 	options = options or {}
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local open = io.open
 	local ok, failure = pcall(function()
@@ -748,7 +748,7 @@ helpers.describe("Configured prediction shortcut collision reservations", functi
 			helpers.assert_eq(engine.is_enabled(), false)
 			helpers.assert_eq(engine.capture_collision_inventory(), nil)
 			local profile
-			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			for _, item in ipairs(require("ai.engine.settings.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
 			helpers.assert_true(profile ~= nil, "use the actual shared raw profile")
 			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
 			helpers.assert_eq(observed.requests, 1, "controlled external provider receives the original direct request")
@@ -788,7 +788,7 @@ helpers.describe("Prediction collision source admission controls", function()
 		with_configured_prediction(source, function(engine, _, observed)
 			helpers.assert_eq(engine.is_enabled(), false)
 			local profile
-			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			for _, item in ipairs(require("ai.engine.settings.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
 			helpers.assert_true(profile ~= nil)
 			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
 			helpers.assert_eq(observed.requests, 1)

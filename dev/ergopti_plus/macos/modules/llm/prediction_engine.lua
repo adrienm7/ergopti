@@ -6,13 +6,13 @@
 --- Owns the full lifecycle of AI-assisted text predictions: request dispatch,
 --- streaming ingestion, deduplication, display, and state management. Extracted
 --- from modules/keymap/llm_bridge so all LLM-specific logic is consolidated
---- under modules/llm/ and the keymap bridge can focus on hotstring preview and
+--- under ai/data/ and the keymap bridge can focus on hotstring preview and
 --- keystroke routing. App exclusion logic is also handled here as a private
 --- helper, keeping it alongside the prediction pipeline that consumes it.
 ---
 --- KEY RESPONSIBILITIES:
 --- 1. State ownership: pending predictions, visibility flag, request counters,
----    inactivity / chain / watchdog timers, and all LLM configuration.
+---    inactivity / chain timers, and all LLM configuration.
 --- 2. LLM pipeline: sends async requests, streams results progressively,
 ---    deduplicates candidates, and manages the auto-dismiss countdown.
 --- 3. Chain trigger: after a prediction is accepted, arms F16 detection so the
@@ -30,24 +30,25 @@ local WarmupController = require("modules.llm.warmup_controller")
 local PromptBuilder    = require("modules.llm.prompt_builder")
 local StreamingHandler = require("modules.llm.streaming_handler")
 local AppFilter        = require("modules.llm.app_filter")
-local InfoBar = require("llm.request_plan.info_bar")
+local InfoBar = require("ai.engine.request_plan.info_bar")
 local PredictionTooltipPort = require("adapters.prediction_tooltip_port")
-local LivePlan = require("llm.request_plan.live")
-local AppProfileOverrides = require("llm.app_profile_overrides")
-local Rewrite          = require("llm.rewrite")
-local PromptAction     = require("llm.prompt_action")
-local Logger           = require("infra.logger")
-local Timings          = require("infra.timings")
-local TimerScheduler   = require("adapters.timer_scheduler")
-local Storage          = require("adapters.storage")
-local FileSystem       = require("adapters.file_system")
-local JsonCodec        = require("adapters.json_codec")
-local Paths            = require("infra.paths")
-local i18n             = require("infra.i18n")
-local Keycodes         = require("infra.keycodes")
-local tooltip          = require("ui.tooltip")
+local LivePlan = require("ai.engine.request_plan.live")
+local AppProfileOverrides = require("ai.engine.policy.app_profile_overrides")
+local Rewrite          = require("ai.engine.prediction.rewrite")
+local RequestSettings  = require("ai.engine.settings.request_settings")
+local PromptAction     = require("ai.engine.prediction.prompt_action")
+local Logger           = require("core.logger.engine.logger")
+local Timings          = require("core.timing.engine.timings")
+local TimerScheduler   = require("core.events.timer_scheduler")
+local Storage          = require("core.fs.adapters.storage")
+local FileSystem       = require("core.fs.adapters.file_system")
+local JsonCodec        = require("core.fs.adapters.json_codec")
+local Paths            = require("core.fs.engine.paths")
+local i18n             = require("core.i18n.engine.i18n")
+local Keycodes         = require("platform.input.keycodes")
+local tooltip          = require("core.ui.ui.tooltip")
 local keystats        = require("modules.keystats")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG    = "llm.prediction_engine"
 local _state = nil  -- Shared keymap core state; injected via M.init()
@@ -115,7 +116,7 @@ local LLM_DEFAULTS = core_llm.DEFAULT_STATE
 --- with made-up numbers that no other driver uses.
 --- @return table { debounce_sec = number, min_words = number }
 local function load_live_config()
-	local path = Paths.shared("modules/llm/live.json")
+	local path = Paths.shared("ai/data/live.json")
 	local raw = path and FileSystem.read(path) or nil
 	local decoded = raw and JsonCodec.decode(raw) or nil
 	local config, reason = LivePlan.config(decoded)
@@ -231,10 +232,10 @@ local chain_pending = false
 -- (llm.trigger.min_request_interval_ms, shared with Linux); an explicit request
 -- is never held. It is one value for every backend.
 local request_floor_sec = LLM_DEFAULTS.llm_min_request_interval
--- The debounce and rate-floor decisions (_shared/lua/llm/request_plan): this
+-- The debounce and rate-floor decisions (_shared/ai/engine/request_plan): this
 -- engine feeds the plan events and the clock, and owns the native timers and
 -- the backend calls. The plan also holds when the last request went out.
-local _plan = require("llm.request_plan.debounce").new(function()
+local _plan = require("ai.engine.request_plan.debounce").new(function()
 	return request_floor_sec * 1000
 end)
 
@@ -816,7 +817,7 @@ function M.set_llm_model(model_name)
 	local my_transition_generation = _model_transition_generation
 	local changed = active_model ~= model_name
 	if changed then
-		-- Model identity owns every pending debounce, watchdog and backend request.
+		-- Model identity owns every pending debounce and backend request.
 		-- Tear those down before publishing the new identity so a completion from
 		-- the old model cannot appear under the new menu selection.
 		if M.reset() ~= true then return false end
@@ -875,9 +876,18 @@ end
 
 function M.set_llm_temperature(t)
 	-- Reaches `temperature <= GREEDY_TEMP_THRESHOLD` in the shared prompt_builder
-	-- on the single-prediction path, which throws on a string
-	temperature = tonumber(t) or LLM_DEFAULTS.llm_temperature
+	-- on the single-prediction path, which throws on a string: the shared value
+	-- schema's declaration is checked first.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_TEMPERATURE), t)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Temperature '%s' refused (%s).", tostring(t), checked.reason)
+		return false
+	end
+	temperature = t
 	Logger.debug(LOG, "Temperature: %s.", tostring(temperature))
+	return true
 end
 
 function M.set_llm_num_predictions(n)
@@ -885,9 +895,16 @@ function M.set_llm_num_predictions(n)
 	-- path, since llm_auto_raise_temp ships enabled — which throws on a string.
 	-- Floor + clamp because a fractional or zero count would also make
 	-- compute_temperature and the streaming batch logic behave nonsensically.
-	local coerced = tonumber(n) or LLM_DEFAULTS.llm_num_predictions
-	num_predictions = math.max(MIN_NUM_PREDICTIONS, math.floor(coerced))
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_PROFILES_NUM_PREDICTIONS), n)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Prediction count '%s' refused (%s).", tostring(n), checked.reason)
+		return false
+	end
+	num_predictions = math.max(MIN_NUM_PREDICTIONS, n)
 	Logger.debug(LOG, "Prediction count: %s.", tostring(num_predictions))
+	return true
 end
 
 function M.set_llm_pred_indent(v)
@@ -1020,13 +1037,29 @@ function M.set_llm_min_words(w)
 	-- string, which later reaches `<=`/`>` comparisons in the shared prompt_builder
 	-- and `> 0` in the menu — both crash on a non-number. SettingsManager remains
 	-- the sole native plist publisher; this setter owns runtime state only.
-	min_words = tonumber(w) or LLM_DEFAULTS.llm_min_words
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_MIN_WORDS), w)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Min words '%s' refused (%s).", tostring(w), checked.reason)
+		return false
+	end
+	min_words = w
 	Logger.debug(LOG, "Min words: %s.", tostring(min_words))
+	return true
 end
 
 function M.set_llm_max_words(w)
-	max_words = tonumber(w) or LLM_DEFAULTS.llm_max_words
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_GENERATION_MAX_WORDS), w)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Max words '%s' refused (%s).", tostring(w), checked.reason)
+		return false
+	end
+	max_words = w
 	Logger.debug(LOG, "Max words: %s (0 = unlimited).", tostring(max_words))
+	return true
 end
 
 --- Reads the actual engine-owned runtime value for one transactional menu key.
@@ -1075,7 +1108,17 @@ function M.set_llm_debounce(seconds)
 	-- Coerce for the same reason as the other numeric setters: the value is fed
 	-- straight to setDelay() and to the adaptive-debounce arithmetic, and a string
 	-- from config.toml would blow up inside the timer callback where nothing logs
-	inactivity_debounce_sec = tonumber(seconds) or LLM_DEFAULTS.llm_debounce
+	-- The declaration is in milliseconds (-1 = never); the engine keeps seconds.
+	local declared_ms = type(seconds) == "number" and seconds ~= -1 and math.floor(seconds * 1000 + 0.5) or seconds
+	if type(seconds) == "number" and seconds ~= seconds then declared_ms = seconds end
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(require("settings.engine.keys").KEY.LLM_TRIGGER_DEBOUNCE_MS), declared_ms)
+	if not checked.ok then
+		-- Fails fast instead of coercing: the value keeps what was in force.
+		Logger.error(LOG, "Debounce '%s' refused (%s).", tostring(seconds), checked.reason)
+		return false
+	end
+	inactivity_debounce_sec = seconds
 	if _inactivity_timer then
 		if stop_inactivity_timer() ~= true then
 			Logger.error(LOG, "Debounce update rejected because the active timer could not be stopped.")
@@ -1347,7 +1390,7 @@ local function start_inactivity_timer(delay_override, ends_word)
 		return false
 	end
 	descriptor.authorized = true
-	local labels = require("llm.request_plan.debounce").REASON
+	local labels = require("ai.engine.request_plan.debounce").REASON
 	if arm.why == labels.override or arm.why == labels.word_end then
 		Logger.trace(LOG, "Inactivity timer started (override: %.3fs).", delay)
 	else
@@ -1805,7 +1848,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		local lookup_ok, live_profile = xpcall(function()
 			if live.translation_target ~= nil then
 				local translation = require("modules.llm.selection_translation")
-				return require("llm.translate").prediction_profile(live.translation_target,
+				return require("ai.engine.prediction.translate").prediction_profile(live.translation_target,
 					translation.config(), translation.locale_names(), i18n.get_locale())
 			end
 			return core_llm.find_profile(live.profile_id)
@@ -1996,6 +2039,28 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	log_request_cancellation(superseded_log_id, "supersede")
 	if not is_current_fetch() then return end
 
+	-- A change of the settings it was sent with retires the request, as on
+	-- Windows and Linux (maintainer decision AID-3, llm.request_settings): every
+	-- backend and streaming callback reads the request id through here.
+	local request_settings = core_llm.request_settings()
+	--- The current request id, after retiring this request when its settings changed.
+	--- @return number id
+	local function current_fetch_id()
+		if fetch_request_counter == my_fetch_id then
+			local changed = RequestSettings.change(request_settings, core_llm.request_settings())
+			if changed then
+				retire_request_log(my_fetch_id)
+				Logger.info(LOG, "LLM request retired: its %s changed while it was in flight (request=%d).",
+					changed, my_fetch_id)
+				local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
+				if not reset_ok or reset_result ~= true then
+					Logger.error(LOG, "LLM request retirement did not reset the pipeline: %s.", tostring(reset_result))
+				end
+			end
+		end
+		return fetch_request_counter
+	end
+
 	--- Fails closed only while this request still owns the surface.
 	--- @param stage string UI stage that failed to commit.
 	--- @param detail any Returned value or raised error.
@@ -2010,21 +2075,6 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		if not reset_ok or reset_result ~= true then
 			Logger.error(LOG, "LLM request cleanup did not commit after '%s' (result: %s).",
 				tostring(stage), tostring(reset_result))
-			return false
-		end
-		return true
-	end
-
-	--- Abandons a request whose model showed nothing before the watchdog fired.
-	--- @return boolean reset True when this request performed the reset.
-	local function abandon_silent_request()
-		if not is_current_fetch() then return false end
-		retire_request_log(my_fetch_id)
-		log_request_cancellation(my_fetch_id, "timeout")
-		local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
-		if not reset_ok or reset_result ~= true then
-			Logger.error(LOG, "LLM request cleanup did not commit after its timeout (result: %s).",
-				tostring(reset_result))
 			return false
 		end
 		return true
@@ -2104,14 +2154,13 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 
 	-- Callback construction happens after the loading surface is live. Keep both
 	-- the context builders and the factory inside the same boundary: a throw here
-	-- otherwise strands a spinner with no watchdog and no backend callback able to
-	-- dismiss it.
+	-- otherwise strands a spinner with no backend callback able to dismiss it.
 	local callbacks_ok, on_partial_cb, on_success_cb, on_fail_cb = xpcall(function()
 		return StreamingHandler.build_callbacks({
 			buffer                  = buffer,
 			tail                    = params.tail,
 			my_fetch_id             = my_fetch_id,
-			get_fetch_id            = function() return fetch_request_counter end,
+			get_fetch_id            = current_fetch_id,
 			is_streaming_enabled    = is_streaming_enabled,
 			is_streaming_multi_enabled = is_streaming_multi_enabled,
 			num_predictions         = num_preds,
@@ -2180,31 +2229,6 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 		run_async_callback("partial callback", on_partial_cb, partial_raw, stream_identity)
 	end or nil
 
-	-- A request without a live watchdog can strand the loading surface forever.
-	-- Treat timer construction and start verification as part of dispatch commit.
-	local watchdog_ok, watchdog_result = xpcall(function()
-		return StreamingHandler.arm_watchdog({
-			my_fetch_id             = my_fetch_id,
-			get_fetch_id            = function() return fetch_request_counter end,
-			pending_predictions_ref = pending_ref,
-			predictions_visible_ref = visible_ref,
-			validation_mods         = normalize_mods(validation_mods),
-			navigation_mods         = normalize_mods(navigation_mods),
-			show_info_bar           = show_info_bar,
-			llm_display_name        = llm_display_name,
-			prediction_indent       = prediction_indent,
-			is_ai_preview_enabled   = is_ai_preview_enabled,
-			build_info_bar_text     = build_info_bar_text,
-			resolve_backend_label   = resolve_backend_label,
-			runtime_available       = runtime_available,
-			on_ui_unavailable       = close_current_request,
-			on_stream_timeout       = abandon_silent_request,
-		})
-	end, debug.traceback)
-	if not watchdog_ok or watchdog_result ~= true then
-		close_current_request("watchdog arm", watchdog_result)
-		return
-	end
 	if not is_current_fetch() then return end
 
 	_request_log_id = my_fetch_id
@@ -2222,7 +2246,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			params.max_tokens, num_preds,
 			on_success,
 			on_fail,
-			sequential_mode, force_trigger, function() return fetch_request_counter end,
+			sequential_mode, force_trigger, current_fetch_id,
 			on_partial, request_profile
 		)
 	end, debug.traceback)
@@ -2234,7 +2258,7 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 	dispatch_committed = true
 
 	-- Rate-limit and duplicate-suppression state describes real backend calls,
-	-- never a loading paint or failed watchdog construction.
+	-- never a loading paint.
 	last_buffer_signature    = signature
 	_plan:on_sent(hs.timer.secondsSinceEpoch() * 1000)
 end
@@ -2353,7 +2377,7 @@ function M.request_prompt_prediction(value)
 	local lookup_ok, profile = xpcall(function()
 		if parsed.translation_target ~= nil then
 			local translation = require("modules.llm.selection_translation")
-			return require("llm.translate").prediction_profile(parsed.translation_target,
+			return require("ai.engine.prediction.translate").prediction_profile(parsed.translation_target,
 				translation.config(), translation.locale_names(), i18n.get_locale())
 		end
 		return core_llm.find_profile(parsed.profile_id)
@@ -2483,6 +2507,16 @@ function M.is_focus_blocked(excluded_apps)
 	return AppFilter.is_blocked(_state, type(excluded_apps) == "table" and excluded_apps or {}, false, true) == true
 end
 
+--- Whether the AI's excluded applications or filtered fields refuse a
+--- selection action here, as the tone rewrite asks before it runs: the
+--- translation asks it before it reads the selection, as Windows'
+--- LLM_Translate_Trigger does (_LLM_Engine_ShouldSuppressForDisabledApps, AIX-001).
+--- @return boolean excluded
+function M.selection_action_excluded()
+	if not require_state("selection_action_excluded") then return true end
+	return AppFilter.is_blocked(_state, excluded_apps, url_bar_filter_enabled, secure_field_filter_enabled) == true
+end
+
 --- Sends one answer request to the current backend: a plain chat turn with the
 --- caller's system prompt, answered unparsed, with no PREFIX/TAIL turn, no
 --- tooltip and no streaming.
@@ -2528,7 +2562,7 @@ function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_r
 end
 
 --- The AI menu's « Test a prediction »: one prediction on a sample context, showing
---- the answer or why it could not run (llm/test_prediction.lua). It goes straight
+--- the answer or why it could not run (ai/engine/prediction/test_prediction.lua). It goes straight
 --- to the backend, past the prediction cache: the notice is plain text, whereas a
 --- prediction tooltip is a text the user could accept into the focused document.
 --- It sends its own high temperature: the same sample at the low generation
@@ -2543,7 +2577,7 @@ function M.test_prediction()
 			if reason == "empty_context" then return nil end
 			return reason
 		end
-		M._test_prediction = require("llm.test_prediction").new({
+		M._test_prediction = require("ai.engine.prediction.test_prediction").new({
 			text = function(key) return i18n.get(key) end,
 			refusal = function()
 				local reason = live_refusal()
@@ -2727,7 +2761,7 @@ function M.start_live_prompt(value)
 	local lookup_ok, profile = xpcall(function()
 		if parsed.translation_target ~= nil then
 			local translation = require("modules.llm.selection_translation")
-			return require("llm.translate").prediction_profile(parsed.translation_target,
+			return require("ai.engine.prediction.translate").prediction_profile(parsed.translation_target,
 				translation.config(), translation.locale_names(), i18n.get_locale())
 		end
 		return core_llm.find_profile(parsed.profile_id)
@@ -2893,7 +2927,6 @@ function M.reset(options)
 	if not hidden then cleanup_committed = false end
 
 	cleanup_stage("inactivity timer stop", stop_inactivity_timer, true)
-	cleanup_stage("stream watchdog stop", StreamingHandler.stop_watchdog, true)
 	-- Cancel any in-flight streaming curl UNCONDITIONALLY — not gated on the current
 	-- is_streaming_enabled. A stream dispatched while streaming was ON can still be in
 	-- flight after the user toggles streaming OFF; gating on the live flag would skip
@@ -2953,7 +2986,7 @@ function M._inline_accept(preds, fetch_id, deps)
 		return runtime_available() and fetch_request_counter == fetch_id and predictions_visible
 			and pending_predictions[1] == first
 	end
-	local after = deps.after or require("infra.deferred_work").after
+	local after = deps.after or require("core.timing.engine.deferred_work").after
 	local scheduled = after(0, function()
 		if not is_current() then
 			Logger.debug(LOG, "Inline prediction #%s superseded before typing.", tostring(fetch_id))
@@ -3146,7 +3179,7 @@ function M.init(core_state, ports)
 		Logger.error(LOG, "M.init(): ports must be a table (got %s).", type(ports))
 		return false
 	end
-	local Ports = require("llm.request_plan.ports")
+	local Ports = require("ai.engine.request_plan.ports")
 	local timer_port = Ports.check("TimerScheduler", ports.TimerScheduler or TimerScheduler)
 	-- The backends build their own HTTP clients; only an injected one is checked here.
 	local http_port = ports.HttpClient ~= nil and Ports.check("HttpClient", ports.HttpClient) or nil

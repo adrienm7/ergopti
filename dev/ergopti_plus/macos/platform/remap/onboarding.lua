@@ -38,18 +38,18 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
-local NativePath = require("native_path")
-local i18n   = require("infra.i18n")
-local LabelValue = require("locale.label_value")
-local text_utils = require("infra.text_utils")
+local Logger = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
+local i18n   = require("core.i18n.engine.i18n")
+local LabelValue = require("core.i18n.engine.label_value")
+local text_utils = require("core.text.engine.utils")
 local KePaths = require("platform.remap.ke_paths")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
 
 -- Optional dependency: only used to surface user-friendly notifications.
 -- Falls back to silent operation if the notifications lib is not present.
-local ok_notif, Notifications = pcall(require, "infra.notifications")
+local ok_notif, Notifications = pcall(require, "core.ui.engine.notifications")
 if not ok_notif then Notifications = nil end
 
 local LOG = "karabiner.onboarding"
@@ -79,7 +79,7 @@ local MANIFEST_PATH = _SELF_DIR .. "../../vendor/karabiner-elements/manifest.lua
 
 -- Where the downloaded DMG is cached. Standard macOS cache location for
 -- regenerable, app-specific data.
-local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("app_dirs").macos.cache_relative
+local CACHE_DIR = (os.getenv("HOME") or "") .. "/" .. require("core.fs.engine.app_dirs").macos.cache_relative
 	.. "/karabiner-elements/"
 
 -- Filesystem signposts revealing the install state of KE.
@@ -852,6 +852,14 @@ local function download_async(owner, url, dest, callback)
 			return
 		end
 	end
+	-- Behind the system network route and over https only, as every remap
+	-- download (platform/remap/network_download.lua, NET-001).
+	local download, download_args, describe = require("platform.remap.network_download").command("KARABINER-DMG",
+		{ "-L", "--fail", "--silent", "--show-error", "--proto", "=https", "--output", dest, url })
+	if not download then
+		callback(false, "the network route is unavailable: " .. tostring(download_args))
+		return
+	end
 	local task
 	local start_gate, on_completion = latch_install_task_completion(owner, "download",
 		function(rc, _, stderr)
@@ -863,13 +871,13 @@ local function download_async(owner, url, dest, callback)
 				return
 			end
 			if rc ~= 0 then
-				callback(false, "curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr))
+				local named = describe(rc, stderr)
+				callback(false, named or ("curl rc=" .. tostring(rc) .. " stderr=" .. tostring(stderr)))
 				return
 			end
 			callback(true, nil)
 		end)
-	task = TaskLifecycle.native("Karabiner installer download", "/usr/bin/curl",
-		on_completion, { "-L", "--fail", "--silent", "--show-error", "--output", dest, url })
+	task = TaskLifecycle.native("Karabiner installer download", download, on_completion, download_args)
 	start_owned_task(owner, task, "download", "Karabiner installer download", callback, start_gate)
 end
 
@@ -1515,7 +1523,7 @@ run_wizard_step = function(epoch)
 
 	-- Decide which step to run based on the first missing dependency in order
 	-- of the install pipeline (app → sysext → daemon running).
-	local dialog_util = require("infra.dialog_util")
+	local dialog_util = require("core.ui.engine.dialog_util")
 	if not report.ke_installed or not report.grabber_present then
 		local choice = dialog_util.block_alert(
 			i18n.get("karabiner.onboarding.required_title"),

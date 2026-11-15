@@ -2,7 +2,7 @@
 
 --- Controlled native ports qualify software custody, not Dock or physical input.
 local helpers = require("tests.helpers")
-local NativeOwner = require("native_app_switcher_owner")
+local NativeOwner = require("core.ui.engine.native_app_switcher_owner")
 local eq = helpers.assert_eq
 
 local function fixture(configure)

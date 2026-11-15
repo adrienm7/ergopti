@@ -4,7 +4,7 @@
 --- MODULE: Model Capabilities Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/model_capabilities_vectors.json through the
---- shared module (_shared/lua/llm/model_capabilities.lua) and the thinking-off
+--- shared module (_shared/ai/engine/local_servers/model_capabilities.lua) and the thinking-off
 --- resolver, which macOS and Linux use and the AutoHotkey port replays too:
 --- recorded OpenRouter, Anthropic and Gemini listings, the controls they say
 --- a model lacks, the request bodies that follow, and the listing cache.
@@ -15,13 +15,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local ThinkingOff = require("llm.thinking_off")
-local Caps = require("llm.model_capabilities")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
+local Caps = require("ai.engine.local_servers.model_capabilities")
 
 --- @param path string Absolute JSON path (helpers.shared).
 --- @return table decoded
@@ -74,8 +74,8 @@ helpers.describe("model_capabilities replays the shared corpus (thinking-off-cap
 		helpers.assert_true(Caps.lacks(records["owned-model"], "unused", nil, { reasoning = true }))
 	end)
 	local corpus = read_json(helpers.shared("tests/corpus/llm/model_capabilities_vectors.json"))
-	local providers = read_json(helpers.shared("modules/llm/api_providers.json")).providers
-	local raw_families = read_json(helpers.shared("modules/llm/thinking_off.json"))
+	local providers = read_json(helpers.shared("ai/data/api_providers.json")).providers
+	local raw_families = read_json(helpers.shared("ai/data/thinking_off.json"))
 	local families = assert(ThinkingOff.parse_families(raw_families))
 
 	--- The records of one recorded listing answer.

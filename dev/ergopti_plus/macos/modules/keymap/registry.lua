@@ -18,15 +18,15 @@
 
 local M = {}
 
-local JsonCodec   = require("adapters.json_codec")
-local text_utils  = require("infra.text_utils")
+local JsonCodec   = require("core.fs.adapters.json_codec")
+local text_utils  = require("core.text.engine.utils")
 -- The collision cascade is shared with the Linux driver rather than defined here:
 -- it existed in two Lua copies and one AutoHotkey copy, and the Linux driver had
 -- none, so the same pair of colliding entries elected different winners per OS.
-local HotstringPriority = require("hotstring_priority")
+local HotstringPriority = require("hotstrings.engine.priority")
 local km_utils    = require("modules.keymap.utils")
-local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
+local Logger      = require("core.logger.engine.logger")
+local Paths       = require("core.fs.engine.paths")
 local Terminators = require("modules.keymap.terminators")
 local Groups      = require("modules.keymap.registry_groups")
 local RI          = require("modules.keymap.registry_index")
@@ -35,8 +35,8 @@ local RI          = require("modules.keymap.registry_index")
 -- RI.setup(core_state) is called from M.init() to wire up _state for the index functions.
 for k, v in pairs(RI) do M[k] = v end
 
-local PersonalFiles = require("hotstrings.personal_files")
-local TriggerRoi = require("keystats.trigger_roi")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local TriggerRoi = require("metrics.engine.privacy.trigger_roi")
 local LOG    = "keymap.registry"
 local _state = nil  -- Injected via M.init(); required before all public functions.
 
@@ -71,7 +71,7 @@ end
 -- outrank "ext." packages, which outrank bundled common ones. The cascade above
 -- these defaults (individual > section > file) is resolved by the loader before
 -- M.add; these are the final fallback.
--- SINGLE SOURCE OF TRUTH: _shared/modules/hotstrings/priority.json, LOADED at
+-- SINGLE SOURCE OF TRUTH: _shared/hotstrings/data/catalogue/priority.json, LOADED at
 -- module-init time (fail-fast: a missing or malformed file logs ERROR and falls
 -- back to the hardcoded tier values). The AHK driver still mirrors the same
 -- values (HSE_PRIORITY_*), locked by tools/test/test-priority-parity.cjs.
@@ -84,7 +84,7 @@ local PRIORITY_PERSONAL = 50
 -- bad JSON, missing key) the hardcoded fallbacks stay and an ERROR is logged.
 do
 	local function _load_priority_tiers()
-		local prio_path = Paths.shared("modules/hotstrings/priority.json")
+		local prio_path = Paths.shared("hotstrings/data/catalogue/priority.json")
 		if not prio_path then
 			Logger.error(LOG, "priority.json: Paths.shared returned nil — keeping hardcoded tiers.")
 			return
@@ -833,10 +833,11 @@ function M.add(trigger, replacement, opts)
 	-- Title/UPPER replacement plain-text forms are computed lazily below, only on
 	-- the explicit-variant path (the case-conform path never needs them, which is
 	-- the bulk of the corpus at startup).
-	-- Case variants belong to the trigger BODY, never to the configured magic
-	-- action suffix. With an alphabetic key such as "a", uppercasing the whole
-	-- string registered "BTWA" while the physical action is still lowercase
-	-- "a", making the advertised uppercase expansion unreachable.
+	-- Case variants belong to the trigger body; a letter magic key follows the
+	-- word's case in the UPPER variant, as Windows' conform compares against the
+	-- uppercased canonical trigger (maintainer decision HSE-004, 2026-11-12):
+	-- with the key "a", BTWA (Shift held on the magic press) expands and BTWa
+	-- does not. The Title variant keeps the key lowercase (Btwa), as Windows.
 	local case_suffix = ""
 	local case_body   = trigger
 	if owns_magic then
@@ -898,8 +899,9 @@ function M.add(trigger, replacement, opts)
 			title_trigs[#title_trigs + 1] = body .. case_suffix
 		end
 		local upper_trigs = {}
+		local upper_suffix = case_suffix ~= "" and (text_utils.trig_upper(case_suffix)[1] or case_suffix) or ""
 		for _, body in ipairs(text_utils.trig_upper(lower_body)) do
-			upper_trigs[#upper_trigs + 1] = body .. case_suffix
+			upper_trigs[#upper_trigs + 1] = body .. upper_suffix
 		end
 
 		add_with_space_variants(lower_trig, replacement, plain_repl_base, false)

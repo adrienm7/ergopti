@@ -19,7 +19,7 @@ import threading
 
 PROXY_REQUEST = r"""
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 local result, callbacks = nil, 0
 assert(HTTP.get("http://ergopti-native-proxy.invalid/native", {},
 	{ owner = "native-curlrc-proxy", timeout_ms = 2000 },
@@ -41,7 +41,7 @@ def main():
         retained = b"Synthetic retained output bytes"
         env = dict(os.environ)
         env["CURL_HOME"] = str(root)
-        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+        env["LUA_PATH"] = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
         def check(name, test):
             nonlocal checks, failures

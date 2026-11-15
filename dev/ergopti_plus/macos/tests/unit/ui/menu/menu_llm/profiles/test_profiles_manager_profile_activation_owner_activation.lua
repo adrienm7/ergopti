@@ -298,8 +298,8 @@ end)
 
 -- Independent child presentation consumes the actual provider and native transactions.
 helpers.describe("shared custom profile child: native macOS owner", function()
-	local Renderer = require("menu.renderer")
-	local Json = require("json")
+	local Renderer = require("menu.engine.renderer")
+	local Json = require("core.text.engine.json")
 	local function read_json(relative)
 		local file = assert(io.open(helpers.shared(relative), "rb"))
 		local value = Json.decode(file:read("*a")); file:close()
@@ -310,11 +310,11 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 		options = options or {}
 		options.user_profiles = {{ id = "user_custom", label = "Custom" }}
 		with_profiles_fixture(options, function(fixture)
-			local document = read_json("modules/menu/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
+			local document = read_json("menu/data/menu_manifest.json")
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			local renderer = assert(Renderer.new({
-				platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-				json_decode = function() return document end, i18n = i18n, logger = package.loaded["infra.logger"],
+				platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+				json_decode = function() return document end, i18n = i18n, logger = package.loaded["core.logger.engine.logger"],
 			}))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
@@ -381,14 +381,17 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 			helpers.assert_eq(fixture.direct_saves(), 0)
 		end)
 	end)
-	helpers.it("custom-profile-child: native pause and removed profile refuse held delivery", function()
+	helpers.it("custom-profile-child: a pause keeps Use, Edit and Delete and refuses only the shortcut; a removed profile refuses", function()
 		with_child({}, function(fixture, child)
 			local held = child()
 			fixture.native_dependencies.script_control.is_paused = function() return true end
-			for _, index in ipairs({1, 2, 4, 5}) do helpers.assert_eq(held[index].fn(), false) end
+			-- A pause stops typing, not configuration (EDD-1); a shortcut binds a hotkey.
+			helpers.assert_eq(held[2].fn(), false, "the held shortcut waits for resume")
 			local paused = child()
-			for _, index in ipairs({1, 2, 4, 5}) do
-				helpers.assert_true(paused[index].disabled); helpers.assert_nil(paused[index].fn)
+			helpers.assert_true(paused[2].disabled); helpers.assert_nil(paused[2].fn)
+			for _, index in ipairs({1, 4, 5}) do
+				helpers.assert_true(paused[index].disabled ~= true, "a paused profile row stays live")
+				helpers.assert_type(paused[index].fn, "function")
 			end
 			fixture.native_dependencies.script_control.is_paused = function() return false end
 			fixture.state.llm_user_profiles = {}
@@ -411,10 +414,10 @@ helpers.describe("shared custom profile child: native macOS owner", function()
 	end
 	helpers.it("custom-profile-child: all 21 original native captions stay translated", function()
 		with_child({}, function(_, child, _, i18n)
-			local languages = read_json("data/locale_order.json").order
+			local languages = read_json("core/i18n/data/locale_order.json").order
 			assert(#languages == 21, "the independent caption control must exercise 21 locales")
 			for _, language in ipairs(languages) do
-				local values = read_json("data/locales/" .. language .. ".json")
+				local values = read_json("core/i18n/data/locales/" .. language .. ".json")
 				i18n.get = function(key) return values[key] or key end
 				helpers.assert_eq(captions(child()), { values["menu.profiles.use_profile"], values["menu.profiles.shortcut_prefix"], "-", values["menu.profiles.edit_profile"], values["menu.profiles.delete_profile"] }, language)
 			end
@@ -445,7 +448,7 @@ end)
 
 -- The native list and callbacks keep ownership; only the inert profile headings are declared.
 helpers.describe("shared profile section headings: actual macOS provider", function()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local function read_json(relative)
 		local file = assert(io.open(helpers.shared(relative), "rb"))
 		local value = Json.decode(file:read("*a")); file:close(); return value
@@ -453,17 +456,17 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 	local expected = read_json("tests/corpus/menus/profile_section_headings.json")
 	local function with_headings(custom, body)
 		with_profiles_fixture({user_profiles = custom and {{id="user_canonical",label="Canonical"}} or {}}, function(fixture)
-			local document = read_json("modules/menu/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
-			i18n.section = function(key) return require("menu.labels").decorate_section(i18n.get(key)) end
-			local renderer = assert(require("menu.renderer").new({platform="hs",
-				manifest_path=function() return helpers.shared("modules/menu/menu_manifest.json") end,
-				json_decode=function() return document end,i18n=i18n,logger=package.loaded["infra.logger"]}))
+			local document = read_json("menu/data/menu_manifest.json")
+			local i18n = package.loaded["core.i18n.engine.i18n"]
+			i18n.section = function(key) return require("menu.engine.labels").decorate_section(i18n.get(key)) end
+			local renderer = assert(require("menu.engine.renderer").new({platform="hs",
+				manifest_path=function() return helpers.shared("menu/data/menu_manifest.json") end,
+				json_decode=function() return document end,i18n=i18n,logger=package.loaded["core.logger.engine.logger"]}))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = renderer.template_rows, renderer.render_rows
 			body({document=document,i18n=i18n,heading_index=2,other_platform="linux",
 				caption=function(key) return i18n.section(key) end,
-				decorate=function(value) return require("menu.labels").decorate_section(value) end,
+				decorate=function(value) return require("menu.engine.labels").decorate_section(value) end,
 				rows=function() return fixture.manager.get_menu_item().menu end,
 				untouched=function()
 					helpers.assert_eq(#fixture.selections,0); helpers.assert_eq(fixture.direct_saves(),0)
@@ -545,7 +548,7 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 			local count = 0
 			for language, pair in pairs(expected.captions) do
 				count = count + 1
-				local values = read_json("data/locales/" .. language .. ".json")
+				local values = read_json("core/i18n/data/locales/" .. language .. ".json")
 				helpers.assert_eq({values[expected.keys[1]], values[expected.keys[2]]}, pair, language)
 				f.i18n.get = function(key) return values[key] or key end
 				local rows = f.rows()
@@ -568,12 +571,13 @@ helpers.describe("shared profile section headings: actual macOS provider", funct
 			helpers.assert_eq(f.fixture.state.llm_active_profile,"advanced")
 		end)
 	end)
-	helpers.it("profile-headings: native pause still disables actual builtin choices", function()
+	helpers.it("profile-headings: a builtin choice commits while paused (EDD-1)", function()
 		with_headings(true, function(f)
 			f.fixture.native_dependencies.script_control.is_paused=function() return true end
 			local _, builtin = position(f.rows(), "Advanced")
-			helpers.assert_true(builtin.disabled); helpers.assert_nil(builtin.fn)
-			f.untouched()
+			helpers.assert_true(builtin.disabled ~= true); helpers.assert_type(builtin.fn, "function")
+			helpers.assert_eq(builtin.fn(), true)
+			helpers.assert_eq(f.fixture.state.llm_active_profile, "advanced")
 		end)
 	end)
 end)

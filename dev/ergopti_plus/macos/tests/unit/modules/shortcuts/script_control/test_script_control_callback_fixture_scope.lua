@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
-	"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n", "infra.paths",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-	"adapters.event_provenance", "adapters.synthetic_input", "adapters.timer_scheduler",
-	"adapters.key_state", "modules.shortcuts.script_control", "adapters.file_system",
-	"adapters.hotkey_registrar", "adapters.storage", "modules.shortcuts.keyboard_shortcuts", "chord",
+	"adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
+	"platform.input.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
+	"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
 	"infra.config_paths", "infra.preferences",
 }
 
@@ -26,10 +26,10 @@ helpers.describe("Script control callback fixture isolation", function()
 				helpers.with_stub_scope(OWNERS, function()
 					helpers.load_with_stubs("hs")
 					local prior_hs = _G.hs
-					local identity_name = kind == "sentinel" and "infra.keycodes" or "adapters.storage"
+					local identity_name = kind == "sentinel" and "platform.input.keycodes" or "core.fs.adapters.storage"
 					local prior_identity = {}
 					package.loaded[identity_name] = prior_identity
-					package.loaded["infra.logger"] = false
+					package.loaded["core.logger.engine.logger"] = false
 					package.loaded["modules.gestures.actions"] = nil
 					local subject_name = kind == "sentinel"
 						and "modules.shortcuts.script_control" or "modules.shortcuts.keyboard_shortcuts"
@@ -58,7 +58,7 @@ helpers.describe("Script control callback fixture isolation", function()
 					end
 					helpers.assert_eq(reached, failure == "construction" and 0 or 1)
 					helpers.assert_nil(package.loaded["modules.gestures.actions"])
-					helpers.assert_eq(package.loaded["infra.logger"], false)
+					helpers.assert_eq(package.loaded["core.logger.engine.logger"], false)
 					helpers.assert_true(package.loaded[identity_name] == prior_identity)
 					helpers.assert_true(_G.hs == prior_hs)
 				end)

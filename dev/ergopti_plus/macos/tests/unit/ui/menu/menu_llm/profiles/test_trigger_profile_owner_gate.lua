@@ -3,10 +3,10 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
-	"chord",
-	"adapters.hotkey_registrar",
+	"keyboard.engine.chord",
+	"platform.input.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
 }
@@ -21,7 +21,7 @@ local function with_fixture(body)
 		local prediction_calls = 0
 		local trigger_mode = "success"
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.llm"] = {
 			BUILTIN_PROFILES = {
 				{id = "basic", label = "Basic"},
@@ -40,8 +40,8 @@ local function with_fixture(body)
 				return true
 			end,
 		}
-		package.loaded["chord"] = {}
-		package.loaded["adapters.hotkey_registrar"] = {}
+		package.loaded["keyboard.engine.chord"] = {}
+		package.loaded["platform.input.hotkey_registrar"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
 		package.loaded["ui.menu.menu_llm.trigger_orchestrator"] = nil
 

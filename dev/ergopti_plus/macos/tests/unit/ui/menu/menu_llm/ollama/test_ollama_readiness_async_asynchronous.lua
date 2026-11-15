@@ -375,10 +375,10 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			local daemon = foreground_fixture({})
 			package.loaded["modules.llm.api_ollama"] = daemon.api
 
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = {notify = function() return true end}
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return tostring(value) end}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return tostring(value) end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/opt/homebrew/bin/ollama" end,
 			}
@@ -390,7 +390,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				update = function() return true end,
 				complete = function() return true end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, executable, on_done, on_chunk_or_args, args)
 					local on_stream = type(on_chunk_or_args) == "function"
 						and on_chunk_or_args or nil
@@ -451,8 +451,8 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				urlevent = {openURL = function() return true end},
 			}
 
-			package.loaded["adapters.shell_runner"] = nil
-			package.loaded["adapters.timer_scheduler"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
+			package.loaded["core.events.timer_scheduler"] = nil
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 			local manager = require("ui.menu.menu_llm.models_manager_ollama").new({
 				-- The warm-up timer below is armed only with the AI on
@@ -461,7 +461,7 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			}, {}, function() return 0 end)
 			helpers.assert_eq(#native_timers, 1)
 			helpers.assert_eq(
-				require("adapters.timer_scheduler").cancelAll(), true)
+				require("core.events.timer_scheduler").cancelAll(), true)
 			helpers.assert_eq(native_timers[1]:running(), false)
 			table.remove(native_timers, 1)
 

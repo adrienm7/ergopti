@@ -30,17 +30,17 @@
 ---    whose late results are dropped by generation.
 ---
 --- The pure logic (binding parameter, request bodies, answer reading) is shared:
---- _shared/lua/llm/vision.lua, configured by _shared/modules/llm/vision.json.
+--- _shared/ai/engine/prediction/vision.lua, configured by _shared/ai/data/vision.json.
 --- ==============================================================================
 
 local M = {}
 
-local Vision       = require("llm.vision")
-local Logger       = require("infra.logger")
-local i18n         = require("infra.i18n")
-local Paths        = require("infra.paths")
-local FileSystem   = require("adapters.file_system")
-local JsonCodec    = require("adapters.json_codec")
+local Vision       = require("ai.engine.prediction.vision")
+local Logger       = require("core.logger.engine.logger")
+local i18n         = require("core.i18n.engine.i18n")
+local Paths        = require("core.fs.engine.paths")
+local FileSystem   = require("core.fs.adapters.file_system")
+local JsonCodec    = require("core.fs.adapters.json_codec")
 local MouseControl = require("adapters.mouse_control")
 
 local LOG = "llm.screen_answer"
@@ -82,14 +82,14 @@ local function require_field(config, key, kind)
 	end
 end
 
---- Returns the decoded _shared/modules/llm/vision.json, read once. A missing or
+--- Returns the decoded _shared/ai/data/vision.json, read once. A missing or
 --- malformed file is a broken install and raises.
 --- @return table config
 function M.config()
 	if _config then return _config end
 	local path = Paths.shared_llm_path("vision.json")
 	local raw = path and FileSystem.read(path) or nil
-	if type(raw) ~= "string" then error("screen_answer: _shared/modules/llm/vision.json is unreadable") end
+	if type(raw) ~= "string" then error("screen_answer: _shared/ai/data/vision.json is unreadable") end
 	local config, decode_error = JsonCodec.decode(raw)
 	if type(config) ~= "table" then
 		error("screen_answer: vision.json is not valid JSON: " .. tostring(decode_error))
@@ -126,7 +126,7 @@ end
 --- Shows a notice explaining why a screen reading did nothing.
 --- @param key string Locale key of the notice.
 local function show_notice(key)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, i18n.get(key), true, true)

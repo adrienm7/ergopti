@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Healthcheck Core
 --- DESCRIPTION:
---- The version 2 diagnostics snapshot (_shared/modules/diagnostics/schema.json)
+--- The version 2 diagnostics snapshot (_shared/diagnostics/data/schema.json)
 --- and the window that shows it. The window loads the shared page
 --- (_shared/ui/healthcheck/); the page renders the snapshot, keeps the preview
 --- of what is shared and asks for every action by message.
@@ -26,16 +26,16 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 local H        = require("ui.healthcheck.helpers")
-local Paths    = require("infra.paths")
-local Snapshot = require("healthcheck.snapshot")
-local Cleanup = require("healthcheck.cleanup")
-local Actions  = require("healthcheck.actions")
-local TimerScheduler = require("adapters.timer_scheduler")
-local DeferredWork = require("infra.deferred_work")
-local TableUtil = require("table_util")
-local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
+local Paths    = require("core.fs.engine.paths")
+local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
+local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
+local Actions  = require("diagnostics.engine.healthcheck.actions")
+local TimerScheduler = require("core.events.timer_scheduler")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local TableUtil = require("core.text.engine.table_util")
+local NativeClose = require("core.ui.ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
 
@@ -359,7 +359,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.power_source",
+		id       = "platform.system.power_source",
 		contract = { "on_battery" },
 		-- Read by the keystats aggregate recovery, which paces its slices by it.
 		wired    = true,
@@ -402,12 +402,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.program_providers",
+		id       = "core.process.adapters.program_providers",
 		contract = { "create" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.owned_program_runner",
+		id       = "core.process.adapters.owned_program_runner",
 		contract = { "available", "spawn" },
 		wired    = true,
 	},
@@ -422,7 +422,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.webview_result",
+		id       = "core.ui.adapters.webview_result",
 		contract = { "is_error" },
 		wired    = true,
 	},
@@ -438,7 +438,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.screen_capture",
+		id       = "platform.system.screen_capture",
 		contract = { "permission_state", "request_permission", "open_permission_settings",
 			"clipboard_change_count", "clipboard_has_image", "copy_image_file_to_clipboard" },
 		wired    = true,
@@ -459,13 +459,13 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.running_application",
+		id       = "platform.focus.running_application",
 		contract = { "by_name", "by_bundle_id", "current" },
 		-- Every application lookup goes through it; none scans windows.
 		wired    = true,
 	},
 	{
-		id       = "adapters.own_window",
+		id       = "core.ui.adapters.own_window",
 		contract = { "webview_window_number", "for_webview", "console", "is_webview_focused" },
 		-- Every webview and console window lookup; none scans other applications.
 		wired    = true,
@@ -481,7 +481,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.boot_journal",
+		id       = "core.logger.adapters.boot_journal",
 		contract = { "append", "write_now", "set_user_log_ready", "describe_path" },
 		wired    = true,
 	},
@@ -496,7 +496,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.crypto",
+		id       = "core.crypto.crypto",
 		contract = { "sha256" },
 		wired    = true,
 	},
@@ -506,18 +506,18 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.event_clock",
+		id       = "core.events.clock",
 		contract = { "lateness_ms", "duration_ms" },
 		-- The keymap taps and the physical fence read every key event's lateness.
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_geometry",
+		id       = "platform.input.keyboard_geometry",
 		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.file_system",
+		id       = "core.fs.adapters.file_system",
 		contract = { "read", "write", "exists", "prepare_parent_for_create" },
 		wired    = true,
 	},
@@ -528,18 +528,18 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.ledger_append",
+		id       = "core.fs.adapters.ledger_append",
 		contract = { "cleanup", "recover", "flush" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.write_lock_path",
+		id       = "core.fs.adapters.write_lock_path",
 		contract = { "for_canonical" },
 		-- Every cooperative publication and removal of adapters.file_system.
 		wired    = true,
 	},
 	{
-		id       = "adapters.legacy_folder_migration",
+		id       = "core.fs.adapters.legacy_folder_migration",
 		contract = { "native_ports", "plan", "rewrites", "run" },
 		-- init.lua moves the old folders once at boot, before paths.toml is read.
 		wired    = true,
@@ -551,18 +551,18 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.graphics_renderer",
+		id       = "core.ui.adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_info",
+		id       = "platform.system.info",
 		contract = { "os_version", "runtime_version", "arch", "monitor_count",
 			"main_screen_scale", "keyboard_layout", "elevated", "home" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.hotkey_registrar",
+		id       = "platform.input.hotkey_registrar",
 		contract = { "bind", "unbind", "setEnabled" },
 		wired    = true,
 	},
@@ -572,32 +572,32 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.http_client",
+		id       = "core.network.adapters.http_client",
 		contract = { "get", "post" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.json_codec",
+		id       = "core.fs.adapters.json_codec",
 		contract = { "encode", "decode" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.key_state",
+		id       = "platform.input.key_state",
 		contract = { "isDown", "isUp" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.keyboard_hook",
+		id       = "platform.input.keyboard_hook",
 		contract = { "start", "stop" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.log_transport",
+		id       = "core.logger.adapters.log_transport",
 		contract = { "start", "enqueue", "drain", "stop", "status" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.modifier_injector",
+		id       = "platform.input.modifier_injector",
 		contract = { "arm", "disarm", "is_armed" },
 		wired    = true,
 	},
@@ -607,17 +607,17 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.network_info",
+		id       = "core.network.adapters.info",
 		contract = { "getSsidHash", "getSignalStrength", "isInternetReachable", "isVpnActive" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.application_notifier",
+		id       = "platform.focus.application_notifier",
 		contract = { "send", "new" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.notifier",
+		id       = "platform.system.notifier",
 		contract = { "send" },
 		wired    = true,
 	},
@@ -627,12 +627,12 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.process_lifecycle",
+		id       = "core.process.adapters.lifecycle",
 		contract = { "start", "stop" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.secure_field_detector",
+		id       = "platform.focus.secure_field_detector",
 		contract = { "isSecureField", "isSecureApp", "refresh" },
 		wired    = true,
 	},
@@ -642,17 +642,17 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.shell_runner",
+		id       = "core.process.adapters.shell_runner",
 		contract = { "exec", "spawn" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.storage",
+		id       = "core.fs.adapters.storage",
 		contract = { "get", "set" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.synthetic_input",
+		id       = "platform.input.synthetic_input",
 		contract = {
 			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
 			"current_action_epoch", "register_action_listener", "enter_callback",
@@ -661,7 +661,7 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.synthetic_input_loopback_owner",
+		id       = "platform.input.synthetic_input_loopback_owner",
 		contract = { "new" },
 		wired    = true,
 	},
@@ -674,44 +674,44 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.system_curl",
+		id       = "core.network.adapters.system_curl",
 		contract = { "check", "message_for", "parse_version", "verdict_for" },
 		-- Every curl start goes through ShellRunner.spawn or TaskLifecycle.native.
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_environment",
+		id       = "core.process.adapters.task_environment",
 		contract = { "sanitize" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_lifecycle",
+		id       = "core.process.adapters.task_lifecycle",
 		contract = { "guard_callback", "create", "native", "start" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.task_output_turn",
+		id       = "core.process.adapters.task_output_turn",
 		contract = { "request" },
 		-- The Karabiner lease ACK deadlines prove a task output turn before failing.
 		wired    = true,
 	},
 	{
-		id       = "adapters.text_sender",
+		id       = "platform.input.text_sender",
 		contract = { "send" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.timer_scheduler",
+		id       = "core.events.timer_scheduler",
 		contract = { "after", "every" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.toml_cache",
+		id       = "core.fs.adapters.toml_cache",
 		contract = { "init", "load", "store", "stats" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.tooltip_renderer",
+		id       = "core.ui.adapters.tooltip_renderer",
 		contract = { "show", "hide" },
 		wired    = true,
 	},
@@ -732,17 +732,17 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
-		id       = "adapters.wake_watcher",
+		id       = "core.events.wake_watcher",
 		contract = { "new" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.window_info",
+		id       = "platform.focus.window_info",
 		contract = { "getFocused", "getAll" },
 		wired    = true,
 	},
 	{
-		id       = "adapters.window_manager",
+		id       = "platform.focus.window_manager",
 		contract = { "activate", "exists", "kill", "getList" },
 		wired    = true,
 	},
@@ -883,7 +883,7 @@ end
 local function collect_issues()
 	local recent, source = {}, "unavailable"
 	local ok, err = pcall(function()
-		local limits = Snapshot.load_recent_issue_limits(Paths.shared("modules/diagnostics/recent_issues.json"))
+		local limits = Snapshot.load_recent_issue_limits(Paths.shared("diagnostics/data/recent_issues.json"))
 		recent, source = Snapshot.collect_recent_issues(Logger.today_errors_path(), Logger.ring_buffer_snapshot() or {},
 			limits)
 	end)
@@ -906,7 +906,7 @@ local function collect_developer()
 		modules_disabled    = {},
 		log_level           = level_name(),
 		ring_lines          = #(Logger.ring_buffer_snapshot() or {}),
-		event_tap_telemetry = M.event_tap_telemetry(require("adapters.system_info").runtime_version()).summary,
+		event_tap_telemetry = M.event_tap_telemetry(require("platform.system.info").runtime_version()).summary,
 	}
 end
 
@@ -1005,7 +1005,7 @@ function M.run(opts)
 	-- A report from the Debug menu has no page to keep responsive: its
 	-- configuration is collected now, after phase A was measured
 	if opts.complete_local == true then
-		local err = require("healthcheck.configuration").complete(snapshot,
+		local err = require("diagnostics.engine.healthcheck.configuration").complete(snapshot,
 			H.configuration_context(schema, opts.configuration))
 		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
 		complete_local_state(snapshot)
@@ -1034,7 +1034,7 @@ local function send(session, message)
 		Logger.error(LOG, "A diagnostics message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	local WebviewResult = require("adapters.webview_result")
+	local WebviewResult = require("core.ui.adapters.webview_result")
 	local ok, err = pcall(function()
 		session.webview:evaluateJavaScript("if(window.receiveDiagnostics)window.receiveDiagnostics(" .. json .. ")",
 			function(_, script_error)
@@ -1099,17 +1099,17 @@ local function perform_action(session, action, documents)
 	Cleanup.refresh(session)
 	if _session ~= session or _window ~= session.webview or session.action_epoch ~= epoch then return end
 	if action.action == "export_snapshot" then
-		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+		if not require("diagnostics.engine.healthcheck.share").capture_page_checks(session.snapshot, action) then
 			send(session, { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence })
 			return
 		end
 		send(session, { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
-			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
+			share_text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, documents.schema,
+				require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text })
 	elseif action.action == "day_log" then
 		-- Opt-in: ticking collects and redacts today's log; unticking drops it
-		local DayLogHost = require("healthcheck.day_log")
+		local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 		if not action.enabled then
 			DayLogHost.discard(session.snapshot)
 			send(session, { type = "action", action = "day_log", ok = true, state = "off" })
@@ -1199,7 +1199,7 @@ end
 --- an inline page.
 --- @param webview table
 local function inject_strings(webview)
-	local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
+	local ok_strings, strings = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 	if not ok_strings or type(strings) ~= "table" then
 		Logger.error(LOG, "The diagnostics page's strings could not be read: %s.", tostring(strings))
 		return
@@ -1253,8 +1253,8 @@ function M.show_window(opts)
 		return false
 	end
 
-	local i18n = require("infra.i18n")
-	local ui_builder = require("ui.ui_builder")
+	local i18n = require("core.i18n.engine.i18n")
+	local ui_builder = require("core.ui.ui.builder")
 	local title = ui_builder.window_title(i18n.get("menu.debug.healthcheck"))
 	local shared_ui_dir = (Paths.shared("ui/healthcheck") or "") .. "/"
 	local ok_html, html = pcall(ui_builder.build_injected_html, shared_ui_dir)

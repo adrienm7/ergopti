@@ -20,7 +20,7 @@ local with_profiles_fixture = Fixture.with_profiles_fixture
 -- The two declared frame orders own every fixed control; native row providers
 -- keep real profile data and transactions, including captured recommendation pause.
 helpers.describe("complete ordered profile frame: actual macOS owner", function()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local function read(relative)
 		local file = assert(io.open(helpers.shared(relative), "rb"))
 		local value = Json.decode(file:read("*a")); file:close(); return value
@@ -42,12 +42,12 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 		options = options or {}
 		if options.custom then options.user_profiles = { { id = "user_canonical", label = "Canonical" } } end
 		with_profiles_fixture(options, function(fixture)
-			local document = read("modules/menu/menu_manifest.json")
-			local i18n = package.loaded["infra.i18n"]
+			local document = read("menu/data/menu_manifest.json")
+			local i18n = package.loaded["core.i18n.engine.i18n"]
 			i18n.section = function(key) return "— " .. i18n.get(key) .. " —" end
-			local Menu = assert(require("menu.renderer").new({ platform = "hs",
-				manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-				json_decode = function() return document end, i18n = i18n, logger = package.loaded["infra.logger"] }))
+			local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
+				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+				json_decode = function() return document end, i18n = i18n, logger = package.loaded["core.logger.engine.logger"] }))
 			local binding = package.loaded["infra.manifest_menu"]
 			binding.template_rows, binding.render_rows = Menu.template_rows, Menu.render_rows
 			if options.paused then fixture.native_dependencies.script_control.is_paused = function() return true end end
@@ -99,14 +99,13 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 			for key, value in pairs(oracle.sections) do helpers.assert_eq(f.document[key], value, key) end
 		end)
 	end)
-	helpers.it("greys the automatic-profile check and hides clone while paused", function()
+	-- A pause stops typing, not configuration (EDD-1).
+	helpers.it("keeps the automatic-profile check and clone live while paused", function()
 		with_frame({ custom = true, paused = true }, function(f)
 			local rows = f.rows()
 			local auto = assert(at(rows, f.i18n.get(oracle.labels.auto_detect)))
-			helpers.assert_eq(auto.fn ~= nil and auto.fn() or false, false, "a paused driver changes nothing")
-			helpers.assert_eq(f.fixture.direct_saves(), 0)
-			helpers.assert_nil(at(rows, f.i18n.get(oracle.labels.clone)))
-			helpers.assert_eq(#f.fixture.recommendations, 0)
+			helpers.assert_type(auto.fn, "function", "the paused check stays clickable")
+			helpers.assert_not_nil(at(rows, f.i18n.get(oracle.labels.clone)))
 		end)
 	end)
 	-- llm.profiles.auto_profile_for_model, as on Windows and Linux: a check, not a
@@ -173,10 +172,10 @@ helpers.describe("complete ordered profile frame: actual macOS owner", function(
 	end
 	helpers.it("consumes all 21 existing fixed captions through the complete actual native frame", function()
 		with_frame({ custom = true }, function(f)
-			local languages = read("data/locale_order.json").order
+			local languages = read("core/i18n/data/locale_order.json").order
 			helpers.assert_eq(#languages, 21)
 			for _, language in ipairs(languages) do
-				local values = read("data/locales/" .. language .. ".json")
+				local values = read("core/i18n/data/locales/" .. language .. ".json")
 				f.i18n.get = function(key) return values[key] or key end
 				local rows = f.rows()
 				for _, id in ipairs({ "auto_detect", "builtin_heading", "custom_heading", "clone", "create" }) do

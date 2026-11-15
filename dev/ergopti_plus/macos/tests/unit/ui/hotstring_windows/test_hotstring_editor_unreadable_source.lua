@@ -55,14 +55,14 @@ local function load_editor(writer, reader, file_system)
 		return { setCallback = function(_, callback) dispatch = callback end }
 	end
 	_G.hs = hs_stub
-	package.loaded["adapters.file_system"] = file_system
-	package.loaded["infra.toml.writer"] = writer
-	package.loaded["toml_codec.writer"] = nil
-	package.loaded["infra.toml.reader"] = reader
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.fs.adapters.file_system"] = file_system
+	package.loaded["core.text.engine.toml.writer"] = writer
+	package.loaded["core.text.engine.toml_codec.writer"] = nil
+	package.loaded["core.text.engine.toml.reader"] = reader
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function() state.notifications = state.notifications + 1 end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 800, height = 700 } end,
 		get_centered_frame = function(width, height) return { w = width, h = height } end,
 		force_focus = function() end,
@@ -520,7 +520,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		})
 		editor.init("/virtual/personal_hotstrings.toml", { PERSONAL_GROUP_NAME = "personal" },
 			function() end, 50)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
@@ -552,7 +552,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		}, function()
 			error("injected deferred menu refresh failure", 0)
 		end, 50)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")
@@ -589,7 +589,7 @@ helpers.describe("hotstring editor: unreadable source fails closed", function()
 		end)
 		editor.open("menu")
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local lines = {}
 		Logger.set_level("DEBUG")

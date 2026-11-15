@@ -35,7 +35,7 @@
 ; ==================================
 ; ==================================
 
-; The vector count, pinned as _shared/lua/test/tap_hold_decision_contract.lua
+; The vector count, pinned as _shared/tests/lua/keyboard/tap_hold_decision_contract.lua
 ; pins it, so a truncated corpus fails instead of shrinking the contract.
 global _CTHD_VECTOR_COUNT := 30
 
@@ -329,7 +329,7 @@ _CTHD_HoldPickerOrder() {
 	global _SharedDir
 	static Order := 0
 	if !IsObject(Order)
-		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
+		Order := TOML_ParseFreshFile(_SharedDir . "\tap_hold\data\defaults.toml")["tap_hold.hold_picker"]["modifiers"]
 	return Order
 }
 
@@ -431,7 +431,8 @@ _CTHD_OneShotSourcePinned() {
 	AssertTrue(Body != "", "OneShotShift must exist")
 	AssertTrue(InStr(Body, "TextCaseTitle(Scalar)") > 0, "the replay reads a capitalised letter through this title-casing")
 	AssertTrue(InStr(Body, "TapHoldOneShotResult(Scalar, MagicKey)") > 0, "the replay reads special results through this table")
-	AssertTrue(InStr(Body, 'InputHook("L2 T" . TimeoutSec') > 0, "the native capture must time out at the shared timeout the replay reads")
+	AssertTrue(InStr(Body, "TimeoutOption := TapHoldOneShotHookTimeoutOption()") > 0
+		&& InStr(Body, 'InputHook("L2" . TimeoutOption') > 0, "the native capture must time out at the shared timeout the replay reads")
 }
 Test("tap_hold decision corpus: the one-shot replay matches OneShotShift's own steps", _CTHD_OneShotSourcePinned)
 

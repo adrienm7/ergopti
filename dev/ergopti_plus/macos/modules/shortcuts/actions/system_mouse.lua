@@ -20,13 +20,13 @@
 local M = {}
 
 local hs             = hs
-local Logger         = require("infra.logger")
-local notifications  = require("infra.notifications")
-local i18n           = require("infra.i18n")
+local Logger         = require("core.logger.engine.logger")
+local notifications  = require("core.ui.engine.notifications")
+local i18n           = require("core.i18n.engine.i18n")
 local MouseControl   = require("adapters.mouse_control")
-local ShellRunner    = require("adapters.shell_runner")
-local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TimerScheduler = require("core.events.timer_scheduler")
 local PythonInterpreter = require("adapters.python_interpreter")
 
 local LOG = "shortcuts.actions.system"

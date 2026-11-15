@@ -17,7 +17,7 @@ end
 
 helpers.describe("dynamic rules consume the exact committed preview snapshot", function()
 	helpers.it("does not invoke a mutable resolver twice for one visible action", function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 
@@ -32,6 +32,7 @@ helpers.describe("dynamic rules consume the exact committed preview snapshot", f
 			register_lua_group = function() end,
 			set_post_load_hook = function() end,
 			register_interceptor = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function(fn) provider = fn end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			owns_visible_magic_action = function(token, buffer)

@@ -21,7 +21,7 @@ local M = {}
 -- A test file run on its own, without tests/run.lua, still loads these helpers
 -- first: isolating here keeps its logs and config away from the account's own
 -- ~/Library/Logs/Ergopti. Idempotent, the runner already isolated.
-require("test.runner_home").isolate()
+require("tests.lua.core.runner_home").isolate()
 
 --- English formats of the keys a caption with several getters (caption_getters) reads.
 --- Such a caption refuses a format without its placeholders, so a stub that echoes
@@ -40,7 +40,7 @@ M.I18N_PLACEHOLDER_FORMATS = {
 
 --- The shared timing registry, built from the real file on first use. A fixture that virtualises
 --- the file system or the shared paths calls M.provide_timings() before it does, so a call-time
---- read of the registry (`require("infra.timings").sec(...)`) answers with the real values
+--- read of the registry (`require("core.timing.engine.timings").sec(...)`) answers with the real values
 --- instead of failing on a missing virtual constants.toml.
 local REAL_TIMINGS = nil
 
@@ -49,10 +49,10 @@ local REAL_TIMINGS = nil
 local function real_timings()
 	if REAL_TIMINGS == nil then
 		local silent = setmetatable({}, { __index = function() return function() end end })
-		REAL_TIMINGS = require("timings").new({
+		REAL_TIMINGS = require("core.timing.engine.timings_core").new({
 			logger = silent, log = "timings", loaded_level = "done",
 			shared_path = function(rel) return M.shared(rel) end,
-			parse = require("infra.toml.reader").parse,
+			parse = require("core.text.engine.toml.reader").parse,
 		})
 	end
 	return REAL_TIMINGS
@@ -65,13 +65,13 @@ end
 
 --- Installs the real timing registry reader as the module the code under test requires.
 function M.provide_timings()
-	package.loaded["infra.timings"] = real_timings()
+	package.loaded["core.timing.engine.timings"] = real_timings()
 end
 local SourceFile = require("tests.support.source_file")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 -- Value formatting and stack-trace helpers shared with Linux (single source of truth).
-local fmt = require("test.format")
+local fmt = require("tests.lua.format")
 local _timing = nil
 local _current_module = nil
 M.inspect = fmt.inspect
@@ -98,6 +98,51 @@ function M.driver_root()
 	-- src is .../tests/helpers/init.lua — go two dirs up.
 	local helper_dir = src:match("^(.*)[/\\]helpers[/\\]init%.lua$") or "./tests"
 	return helper_dir:gsub("[/\\]tests$", "") .. "/"
+end
+
+--- True for a UI source: a file under a ui/ folder of any feature. The core/ui
+--- feature's own name is no such folder: its adapters and engine are not UI
+--- sources, its ui/ role folder is. A source ratchet partitioned by this keeps
+--- a file in its tree whichever feature folder the structure plan moves it to.
+--- @param relative string Driver-relative path, separated by "/".
+--- @return boolean
+function M.is_ui_source(relative)
+	local rest = relative:gsub("^core/ui/", "")
+	return ("/" .. rest):find("/ui/", 1, true) ~= nil
+end
+
+-- Top-level folders of the driver's production Lua, read once per process.
+local _production_heads = nil
+
+--- True when `name` is a module of this driver's production code: its first
+--- segment is a top-level folder holding the driver's Lua (tests/ excluded),
+--- and it does not resolve to a shared module. The folders come from the tree,
+--- never from a list of their names, so a package.loaded sweep through this
+--- predicate keeps covering a module that moves to another folder; a stub a
+--- test placed under such a name is covered too.
+--- @param name any A package.loaded key.
+--- @return boolean
+function M.is_driver_module(name)
+	if type(name) ~= "string" then return false end
+	if not _production_heads then
+		local root = (M.driver_root():gsub("[/\\]$", ""))
+		local paths, detail = require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true })
+		assert(paths, detail)
+		local heads = {}
+		for _, path in ipairs(paths) do
+			local head = path:sub(#root + 2):match("^([^/\\]+)[/\\]")
+			if head then heads[head] = true end
+		end
+		-- An empty inventory is no evidence: a sweep over it would clear nothing.
+		assert(next(heads), "no production folder under " .. root)
+		_production_heads = heads
+	end
+	local head = name:match("^([%w_]+)%.")
+	if not head or not _production_heads[head] then return false end
+	local file = package.searchpath(name, package.path)
+	return not (file and file:gsub("\\", "/"):find("/_shared/", 1, true))
 end
 
 --- Returns the path to the tests/fixtures directory.
@@ -163,11 +208,11 @@ end
 local CASE_TWIN_KEY = "dialog.config_save.case_twin"
 setmetatable(M.I18N_PLACEHOLDER_FORMATS, { __index = function(formats, key)
 	if key ~= CASE_TWIN_KEY then return nil end
-	local english = require("json").decode(SourceFile.read(M.shared("data/locales/en.json")))
+	local english = require("core.text.engine.json").decode(SourceFile.read(M.shared("core/i18n/data/locales/en.json")))
 	rawset(formats, key, assert(english[key], "the case-twin notice is localized"))
 	return formats[key]
 end })
-local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
+local logger_privacy_policy = SourceFile.read(M.shared("diagnostics/data/redaction.json"))
 local logger_privacy_owners = setmetatable({}, { __mode = "k" })
 
 --- Gives a real logger instance the same explicit privacy boot as production.
@@ -342,8 +387,8 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- Foreign ledger readers retain the native hash API across ingest turns.
 	loaded["adapters.foreign_ledger_snapshot"] = nil
 	if module_name == "modules.keystats.export" or module_name == "adapters.foreign_ledger_snapshot" then
-		loaded["infra.paced_job"] = nil
-		loaded["adapters.timer_scheduler"] = nil
+		loaded["core.timing.engine.paced_job"] = nil
+		loaded["core.events.timer_scheduler"] = nil
 	end
 	-- The keystats and its process-lifetime physical-source settlement port
 	-- form one ownership unit. A fresh fixture parent cannot inherit a child
@@ -430,17 +475,17 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- utf8_len / repl_title). Without this, modules that capture text_utils at
 	-- require-time get the stub instead of the full shared module, causing
 	-- "attempt to call a nil value (field 'utf8_len')" crashes in subsequent tests.
-	-- text_utils/init.lua is pure Lua with no hs deps, so reloading it is safe.
-	loaded["infra.text_utils"] = nil
+	-- core/text/engine/utils_core.lua is pure Lua with no hs deps, so reloading it is safe.
+	loaded["core.text.engine.utils"] = nil
 
 	-- Clear any toml_codec stub installed at module level by test files that
 	-- treat it as a native C library (e.g. test_config.lua). The real codec is
 	-- pure Lua and loads fine in CI; the stub's encode() returns "" which
 	-- causes preferences.save() to write an empty TOML file and all persistence
 	-- tests to see flat = {}.
-	loaded["infra.toml.codec"]   = nil
-	loaded["toml_codec"]       = nil
-	loaded["toml_codec.codec"] = nil
+	loaded["core.text.engine.toml.codec"]   = nil
+	loaded["core.text.engine.toml_codec"]       = nil
+	loaded["core.text.engine.toml_codec.codec"] = nil
 
 	-- Clear any partial lib.timings stub installed at module level by test files
 	-- that only need M.sec (e.g. test_apply_prediction_paste_ops.lua installs
@@ -453,7 +498,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- The real registry itself is immutable and survives: a fixture that
 	-- virtualised the file system installed it through M.provide_timings(), and
 	-- re-parsing constants.toml here would fail under that virtual file system.
-	if loaded["infra.timings"] ~= REAL_TIMINGS then loaded["infra.timings"] = nil end
+	if loaded["core.timing.engine.timings"] ~= REAL_TIMINGS then loaded["core.timing.engine.timings"] = nil end
 
 	-- Clipboard borrowing admission is process-global: each test starts with no
 	-- borrower registered by a previous test's module instances.
@@ -506,7 +551,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- at require-time (terminators, conflicts, actions, profiles …) never crash
 	-- with "attempt to call a nil value (field 'get')". The real lib.i18n depends
 	-- on hs.settings and locale JSON files unavailable in headless unit tests.
-	-- Tests that need a richer stub should override loaded["infra.i18n"]
+	-- Tests that need a richer stub should override loaded["core.i18n.engine.i18n"]
 	-- AFTER calling load_with_stubs (this baseline is always restored here).
 	-- decorate_section / section mirror the real i18n: menu builders (via
 	-- ui.menu.menu_utils.build_section_header) wrap disabled headers in the
@@ -515,12 +560,15 @@ function M.load_with_stubs(module_name, hs_overrides)
 	-- A caption that takes several getters (caption_getters) refuses a format without its
 	-- placeholders, so the keys the AI menu builds that way carry their English format.
 	local PLACEHOLDER_FORMATS = M.I18N_PLACEHOLDER_FORMATS
-	loaded["infra.i18n"] = {
+	loaded["core.i18n.engine.i18n"] = {
 		get             = function(key) return PLACEHOLDER_FORMATS[key] or key end,
+		-- get answers a key it cannot translate with the key itself, so only a
+		-- key with a format resolves.
+		has             = function(key) return PLACEHOLDER_FORMATS[key] ~= nil end,
 		get_locale      = function() return "fr" end,
 		set_locale      = function() end,
-		decorate_section = function(text) return require("menu.labels").decorate_section(text) end,
-		section          = function(key) return require("menu.labels").decorate_section(key) end,
+		decorate_section = function(text) return require("menu.engine.labels").decorate_section(text) end,
+		section          = function(key) return require("menu.engine.labels").decorate_section(key) end,
 		-- Mirrors the real {n} substitution. A stub narrower than the module it
 		-- stands in for is how a production call to a missing function reaches
 		-- nil under test and nobody notices: every consumer of i18n.format would
@@ -536,18 +584,18 @@ function M.load_with_stubs(module_name, hs_overrides)
 	}
 
 	-- Stub lib.paths so that any module (e.g. llm/api_remote, profiles resolution)
-	-- can find _shared/modules/llm/api_providers.json and profiles.json during headless
+	-- can find _shared/ai/data/api_providers.json and profiles.json during headless
 	-- tests. Without this, io.open fails or returns nil path, causing "not found"
 	-- errors in tests that load api_remote or exercise catalogue-dependent code.
-	loaded["infra.paths"] = {
+	loaded["core.fs.engine.paths"] = {
 		-- Single shared-tree resolver: all three helpers delegate to M.shared so
 		-- the folder name lives in exactly one place (SHARED_REL). Mirrors the
 		-- production Paths.shared contract (nil/"" → the shared root dir).
 		shared          = function(rel) return M.shared(rel) end,
 		shared_root     = function() return M.shared() end,
-		shared_llm_path = function(name) return M.shared("modules/llm/" .. name) end,
+		shared_llm_path = function(name) return M.shared("ai/data/" .. name) end,
 		find_from_configdir = function(relative_target)
-			-- relative_target is usually "static/ergopti_plus/_shared/data/locales"
+			-- relative_target is usually "static/ergopti_plus/_shared/core/i18n/data/locales"
 			-- M.driver_root() is .../static/ergopti_plus/macos/
 			-- We want to return .../relative_target
 			return M.driver_root() .. "../../" .. relative_target
@@ -581,7 +629,7 @@ function M.load_with_stubs(module_name, hs_overrides)
 	end
 
 	local result = require(module_name)
-	if module_name == "infra.logger" then M.admit_logger_privacy(result) end
+	if module_name == "core.logger.engine.logger" then M.admit_logger_privacy(result) end
 	return result
 end
 
@@ -639,15 +687,15 @@ local _production_sources = nil
 --- @param text string Lua source text.
 --- @return string expanded
 function M.expand_config_keys(text)
-	local keys = require("config_keys")
+	local keys = require("settings.engine.keys")
 	local function resolve(whole, root_table, name)
 		local found, tbl = pcall(function() return keys[root_table] end)
 		if not found then return whole end
 		local ok, value = pcall(function() return tbl[name] end)
 		return ok and type(value) == "string" and string.format("%q", value) or whole
 	end
-	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
-		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	text = text:gsub('require%("settings.engine.keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("settings.engine.keys").' .. root_table .. "." .. name, root_table, name)
 	end)
 	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
 		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
@@ -657,7 +705,7 @@ end
 local function production_sources()
 	if _production_sources then return _production_sources end
 
-	local Discovery = require("test.runner_discovery")
+	local Discovery = require("tests.lua.core.runner_discovery")
 
 	-- The relative directory census excludes the harness, never a checkout's parents.
 	-- Native pathnames remain data, including newlines and shell syntax.
@@ -754,7 +802,7 @@ end
 --- same name is its twin).
 --- The read goes through SourceFile, so an open, read or close failure raises
 --- naming its phase and path instead of reading as an absent module.
---- @param module_name string Dotted module name, e.g. "infra.fs_dir".
+--- @param module_name string Dotted module name, e.g. "core.fs.engine.dir".
 --- @return string|nil body, string|nil err Body, or nil plus why the module is not found.
 function M.read_module_source(module_name)
 	local path, missing = package.searchpath(module_name, package.path)
@@ -775,7 +823,7 @@ end
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
--- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- The seven assertions come from _shared/tests/lua/assertions.lua. Both drivers
 -- carried their own copy: six of the seven bodies were byte-identical once
 -- whitespace was normalised, and the seventh differed by a single COMMENT line.
 -- Two copies of an assertion library is two places for a fix to land in one of,
@@ -783,7 +831,7 @@ local deep_equal = fmt.deep_equal
 --
 -- fail_msg is injected because it is the one genuinely per-driver part: it skips
 -- the stack frames belonging to THIS file so a failure reports the caller's line.
-local _assertions = require("test.assertions").build("helpers[/\\\\]init%.lua$", fmt)
+local _assertions = require("tests.lua.assertions").build("helpers[/\\\\]init%.lua$", fmt)
 M.assert_eq        = _assertions.assert_eq
 M.assert_true      = _assertions.assert_true
 M.assert_nil       = _assertions.assert_nil
@@ -900,7 +948,7 @@ end
 
 --- Builds a minimal lib.logger stub suitable for injection via package.loaded.
 --- All log methods are no-ops so modules can log without crashing in headless tests.
---- @return table Logger stub with the same public API as infra/logger.lua.
+--- @return table Logger stub with the same public API as core/logger/engine/logger.lua.
 function M.make_logger_stub()
 	local noop = function() end
 	return {
@@ -910,7 +958,7 @@ function M.make_logger_stub()
 		set_level = noop, set_sink = noop, is_enabled = function() return false end,
 		-- The level table is the real shared one: production reads Logger.LEVELS
 		-- to gate work that only an enabled level prints.
-		LEVELS = require("logger").LEVELS,
+		LEVELS = require("core.logger.engine").LEVELS,
 		ring_buffer_snapshot = function() return {} end,
 		session_issues = function() return { warn_count = 0, err_count = 0, last_error = nil } end,
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
@@ -960,7 +1008,7 @@ function M.set_only_filter(substr) _only_filter = substr end
 --- Support imports by E2E do not acquire a clock or claim unit timing coverage.
 function M.initialize_timing()
 	assert(_timing == nil, "Lua unit timing is already initialized")
-	_timing = require("test.runner_timing").capture("macos")
+	_timing = require("tests.lua.core.runner_timing").capture("macos")
 end
 
 --- Measures one module load while retaining its current case ownership.

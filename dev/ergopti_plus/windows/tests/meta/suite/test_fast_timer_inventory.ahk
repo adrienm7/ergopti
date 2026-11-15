@@ -97,7 +97,9 @@ _FTI_Inventory() {
 		"BoundFn",                      "?",     ; generic scheduler adapter, period is the caller's
 		"_SuspendStateWatchdog",        "500",   ; lifecycle transitions and one-shot boot restore
 		"SimulateActivity",             "?",     ; randomised interval, awake mode only
-		"MagicKeyCapturePoll",          "?")     ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
+		"MagicKeyCapturePoll",          "?",     ; only armed while "Press the key…" is open; timings [ui] magic_key_capture_poll_ms (10), reads the physical key state
+		"_RawTouchpadWatchdog",         "?",     ; only armed while a swipe shortcut waits for its touch to end; timings [gestures] incremental_handoff_ms (300), no OS call
+		"Tick",                         "?")     ; keyboard layout registry watch; timings [adapters] layout_registry_watch_poll_ms (100), one zero-timeout event wait per watched key
 }
 
 
@@ -181,7 +183,7 @@ _FTI_ResolvePeriod(Src, Expr) {
 	; This exact native getter exposes one owned field of the shared brightness
 	; policy. Arbitrary local Maps and other shared fields remain unresolved.
 	if Expr == 'ScreenBrightnessData()["worker_poll_ms"]' {
-		Policy := JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+		Policy := JsonParse(FileRead(_SharedDir . "\shortcuts\data\actions\brightness.json", "UTF-8"))
 		if !(Policy is Map)
 			throw ValueError("Invalid shared brightness timer policy.")
 		Period := Policy.Get("worker_poll_ms", 0)

@@ -8,13 +8,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Queries = require("keystats.queries")
-local Json = require("json")
+local Queries = require("metrics.engine.queries")
+local Json = require("core.text.engine.json")
 
 helpers.describe("trigger ROI SQLite events", function()
 	helpers.it("routes each ROI event with the exact Windows metadata fields", function()
-		helpers.with_stub_scope({ "modules.keystats.sqlite_writer", "infra.logger", "hs.json" }, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+		helpers.with_stub_scope({ "modules.keystats.sqlite_writer", "core.logger.engine.logger", "hs.json" }, function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local writer = helpers.load_with_stubs("modules.keystats.sqlite_writer")
 			local json = require("hs.json")
 			local original_encode = json.encode
@@ -33,9 +33,11 @@ helpers.describe("trigger ROI SQLite events", function()
 					end
 					local encoded = Json.encode(meta)
 					helpers.assert_eq(Json.decode(encoded), meta)
+					-- Stored in UTC with the offset in force then (KMD-1).
+					local utc, offset = require("metrics.engine.local_time").from_local(event.timestamp)
 					local expected = Queries.render("events.roi", "native", {
-						device_id = "nil", id = index, ts = event.timestamp, date = "2026-11-07",
-						kind = event.type, app = event.app, meta_json = encoded,
+						device_id = "nil", id = index, ts = utc, date = "2026-11-07",
+						kind = event.type, app = event.app, meta_json = encoded, utc_offset_min = offset,
 					})
 					helpers.assert_eq(writer.build_inserts(event), { expected })
 				end

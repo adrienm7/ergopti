@@ -9,7 +9,7 @@
 --- (SUEnableAutomaticChecks is false in the launcher's Info.plist).
 ---
 --- FEATURES & RATIONALE:
---- 1. One schedule on every driver: _shared/lua/updater/schedule.lua decides
+--- 1. One schedule on every driver: _shared/updater/engine/schedule.lua decides
 ---    from the wall clock and the persisted check record (Storage port, shared
 ---    key), so every menu preset works (Sparkle refuses intervals under an
 ---    hour), a restart mid-interval does not check at boot, and a Mac that was
@@ -42,20 +42,20 @@
 local M = {}
 local pending_session_cleanup = nil
 
-local Logger    = require("infra.logger")
-local Paths     = require("infra.paths")
-local FileSystem = require("adapters.file_system")
-local JsonCodec = require("adapters.json_codec")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local Parser   = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local ReleaseSources = require("updater.release_sources")
+local Logger    = require("core.logger.engine.logger")
+local Paths     = require("core.fs.engine.paths")
+local FileSystem = require("core.fs.adapters.file_system")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local Parser   = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local ReleaseSources = require("updater.engine.release_sources")
 local Updater   = require("modules.updater")
 local UpdateLauncher = require("adapters.update_launcher")
-local notifications = require("infra.notifications")
-local i18n      = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local i18n      = require("core.i18n.engine.i18n")
 
 local LOG = "updater.auto_check"
 
@@ -80,7 +80,7 @@ local MS_PER_SEC = 1000
 --- no fallback: a guessed cadence or URL would check the wrong list or never.
 --- @return table config { timing, state_key, list_key, releases_url, feed_url, timeout_sec }
 function M.load_config()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and path ~= "" and FileSystem.read(path) or nil
 	if type(raw) ~= "string" then error("the shared updater defaults are unreadable", 0) end
 	local decoded, decode_err = JsonCodec.decode(raw)
@@ -158,8 +158,12 @@ end
 local function stored_interval(state, timing)
 	local raw = state[M.STATE_KEY]
 	if raw == nil then return timing.default_check_interval_sec end
-	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds.", tostring(raw))
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s).",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max))
 		return timing.default_check_interval_sec
 	end
 	local seconds = Schedule.snap_interval(raw, timing)
@@ -446,8 +450,9 @@ function M.new(opts)
 			Logger.debug(LOG, "Release list unchanged (304); reusing the stored copy.")
 			return request_copy.body
 		end
-		if type(result) == "table" and result.ok == true and type(result.body) == "string"
-			and result.body:match("^%s*%[") then
+		-- An answer that does not open a JSON array (a proxy or captive portal
+		-- answering with HTTP 200) is no list, by the rule Linux shares (UPD-1).
+		if type(result) == "table" and result.ok == true and ReleaseSources.opens_release_array(result.body) then
 			local decoded, decode_error = JsonCodec.decode(result.body)
 			if decode_error or type(decoded) ~= "table" then
 				return nil, "parse_failed", "a malformed release list: " .. tostring(decode_error)
@@ -814,13 +819,13 @@ function M.start_session(opts)
 		is_paused = opts.is_paused,
 		on_available = opts.on_available,
 		config = config,
-		timer = require("adapters.timer_scheduler"),
-		storage = require("adapters.storage"),
-		http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
-		manual_http = require("adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		timer = require("core.events.timer_scheduler"),
+		storage = require("core.fs.adapters.storage"),
+		http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
+		manual_http = require("core.network.adapters.http_client").new({ timeout_ms = config.timeout_sec * MS_PER_SEC }),
 		now = os.time,
 	})
-	local watcher = require("adapters.wake_watcher").new(owner.on_wake)
+	local watcher = require("core.events.wake_watcher").new(owner.on_wake)
 	local watcher_ok, watcher_started = pcall(watcher.start)
 	if not watcher_ok or watcher_started ~= true then
 		Logger.error(LOG, "The wake watcher did not start; a wake is caught at the next bounded re-evaluation.")

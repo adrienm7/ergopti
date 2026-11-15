@@ -13,9 +13,9 @@ local helpers = require("tests.helpers")
 
 helpers.describe("field run FIFO check writers (fifo-expected-refusal)", function()
 	helpers.it("passes the writers a refusal owner, so no ERROR line is written", function()
-		helpers.with_stub_scope({ "adapters.field_probe_ports", "adapters.file_system" }, function()
+		helpers.with_stub_scope({ "adapters.field_probe_ports", "core.fs.adapters.file_system" }, function()
 			local owners = {}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				followed_mode = function() return "present", "named pipe" end,
 				exists = function() return true end,
 				append_reporting = function(_, _, on_error) owners.append = on_error; return false end,

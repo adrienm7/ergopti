@@ -267,14 +267,14 @@ helpers.describe("root boot has one bounded post-onboarding failure boundary", f
 			local finish = start and source:find('\n\t\t},', start, true)
 			if not finish or count_plain(source, 'name = "vscode-bridge"') ~= 1 then return false end
 			source = source:sub(start, finish - 1)
-			return count_plain(source, 'local module = package.loaded["infra.vscode_bridge"]') == 1
+			return count_plain(source, 'local module = package.loaded["core.network.engine.vscode_bridge"]') == 1
 				and count_plain(source, 'error("infra.vscode_bridge.stop_server is unavailable")') == 1
 				and source:find('if module == nil then return true end', 1, true) ~= nil
 				and source:find('if type(module) ~= "table" or type(module.stop_server) ~= "function" then', 1, true) ~= nil
 				and source:find('return module.stop_server()', 1, true) ~= nil
 		end
 		helpers.assert_true(cleanup_is_exact(before), "retirement must preserve the existing loaded-owner cleanup")
-		for _, target in ipairs({ 'local module = package.loaded["infra.vscode_bridge"]',
+		for _, target in ipairs({ 'local module = package.loaded["core.network.engine.vscode_bridge"]',
 			'error("infra.vscode_bridge.stop_server is unavailable")', 'return module.stop_server()',
 			'if module == nil then return true end',
 			'if type(module) ~= "table" or type(module.stop_server) ~= "function" then' }) do

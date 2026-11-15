@@ -4,7 +4,7 @@
 --- MODULE: Shortcut Catalogue Tests (macOS)
 --- DESCRIPTION:
 --- Pins the shared tap-key list and action-catalogue lookup
---- (_shared/lua/shortcuts/catalogue.lua): a missing, empty or malformed list
+--- (_shared/shortcuts/engine/catalogue.lua): a missing, empty or malformed list
 --- raises instead of showing no key, an entry without this platform's keycodes
 --- is refused, the identity is withdrawn until the owner is registered, the
 --- list is cached by identity until reset. The action-catalogue lookup is
@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Catalogue = require("shortcuts.catalogue")
+local Catalogue = require("shortcuts.engine.catalogue")
 
 local function list_over(text, owner)
 	return Catalogue.new_tap_keys({
@@ -20,7 +20,7 @@ local function list_over(text, owner)
 		resolve_path = function(rel) return "/shared/" .. rel end,
 		read = function() return text end,
 		decode = function(raw)
-			local ok, decoded = pcall(require("json").decode, raw)
+			local ok, decoded = pcall(require("core.text.engine.json").decode, raw)
 			return ok and decoded or nil
 		end,
 		valid_entry = function(entry) return type(entry.id) == "string" and type(entry.code) == "number" end,

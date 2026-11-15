@@ -20,11 +20,11 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local ShellRunner = require("adapters.shell_runner")
-local Timer = require("adapters.timer_scheduler")
-local FileSystem = require("adapters.file_system")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.logger")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local Timer = require("core.events.timer_scheduler")
+local FileSystem = require("core.fs.adapters.file_system")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "adapters.field_check_ports"
 
@@ -190,7 +190,7 @@ local function tap_hold_threshold_facts()
 		facts.reason = "unreadable"
 		return facts
 	end
-	local decoded = require("adapters.json_codec").decode(text)
+	local decoded = require("core.fs.adapters.json_codec").decode(text)
 	if type(decoded) ~= "table" then
 		facts.reason = "not_json"
 		return facts
@@ -247,7 +247,7 @@ end
 --- it is the only clue a field report carries (issue #104).
 --- @param callback function fn(status|nil, body|nil).
 local function fetch_pac(url, callback)
-	local client = require("adapters.http_client").new({ timeout_ms = 6000 })
+	local client = require("core.network.adapters.http_client").new({ timeout_ms = 6000 })
 	client.get(url, {}, function(result)
 		if (tonumber(result.status) or 0) == 0 then
 			-- The transport's error text ends with the request URL: the company PAC
@@ -313,7 +313,7 @@ end
 local function relay_executable()
 	local launcher = require("platform.remap.lease_helper").resolve()
 	if not launcher then return nil end
-	local path = NativePath.dirname(launcher) .. "/" .. require("network.proxy_auth_relay").EXECUTABLE_NAME
+	local path = NativePath.dirname(launcher) .. "/" .. require("core.network.engine.proxy_auth_relay_core").EXECUTABLE_NAME
 	return FileSystem.exists(path) and path or nil
 end
 
@@ -328,8 +328,8 @@ local function relay_probe(upstream, callback)
 	local origins = NetworkEnv.route_origins("ollama")
 	if not policy or not origins then return callback(nil, "relay_unavailable") end
 	local executable = relay_executable()
-	if not executable then return callback({ status = require("network.proxy_auth_relay").NOT_INSTALLED }) end
-	local Timings = require("infra.timings")
+	if not executable then return callback({ status = require("core.network.engine.proxy_auth_relay_core").NOT_INSTALLED }) end
+	local Timings = require("core.timing.engine.timings")
 	local args = policy.probe_args(upstream, policy.authority(origins[1]), {
 		dial_ms = Timings.ms("adapters", "proxy_relay_dial_timeout_ms"),
 		handshake_ms = Timings.ms("adapters", "proxy_relay_handshake_timeout_ms"),
@@ -482,11 +482,11 @@ M.exec = exec
 --- @param installed function|nil fn(model) -> boolean.
 --- @return table|nil model { name, runtime_name, download_gb }
 function M.smallest_model(backend, installed)
-	local path = require("infra.paths").shared_llm_path("models.json")
+	local path = require("core.fs.engine.paths").shared_llm_path("models.json")
 	-- Resolved per call: the field run's ports and these share the caller's adapters.
-	local text = path and require("adapters.file_system").read(path) or nil
+	local text = path and require("core.fs.adapters.file_system").read(path) or nil
 	if type(text) ~= "string" then return nil end
-	return require("infra.field_run").smallest_model(require("json").decode(text), backend, installed)
+	return require("infra.field_run").smallest_model(require("core.text.engine.json").decode(text), backend, installed)
 end
 
 function M.new()
@@ -499,8 +499,8 @@ function M.new()
 		tap_copy_facts = tap_copy_facts,
 		guardian_registration_note = guardian_registration_note,
 		keystats_facts = keystats_facts,
-		health_counts = function() return require("infra.key_event_health").counts() end,
-		swallowed_keys = function() return require("infra.keystroke_integrity").drop_count() end,
+		health_counts = function() return require("core.logger.engine.key_event_health").counts() end,
+		swallowed_keys = function() return require("core.logger.engine.keystroke_integrity").drop_count() end,
 		deploy_facts = function() return require("platform.remap.generator").last_deploy() end,
 		count_keys = count_keys,
 		fetch_pac = fetch_pac,

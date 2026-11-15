@@ -45,7 +45,7 @@ set -uo pipefail
 
 DRIVER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LUA_BIN="$(command -v luajit || command -v lua5.4 || command -v lua || true)"
-export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
+export LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;"
 
 PASS=0
 FAIL=0
@@ -89,9 +89,9 @@ fi
 # any other way would test a second implementation.
 cd "$DRIVER_DIR" || exit 2
 "$LUA_BIN" - "$PROBE_CHARS" <<'LUA_EOF'
-local UinputWriter   = require("adapters.uinput_writer")
+local UinputWriter   = require("platform.input.uinput_writer")
 local KeyboardLayout = require("adapters.keyboard_layout")
-local EvdevCodes     = require("infra.evdev_codes")
+local EvdevCodes     = require("platform.input.evdev_codes")
 
 local MODIFIER_CODES = { shift = EvdevCodes.KEY_LEFTSHIFT, altgr = EvdevCodes.KEY_RIGHTALT }
 

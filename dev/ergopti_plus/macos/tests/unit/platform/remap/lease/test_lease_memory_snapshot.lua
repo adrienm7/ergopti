@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "adapters.shell_runner", "adapters.timer_scheduler",
+local MODULES = { "core.logger.engine.logger", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
 	"platform.remap.lease_memory_snapshot" }
 
 --- Loads the module over a scripted runner, clock and logger.
@@ -24,9 +24,9 @@ local function with_snapshot(scenario)
 				world.lines[#world.lines + 1] = { level = level, text = string.format(fmt, ...) }
 			end
 		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = { now_ns = function() return world.now_ns end }
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = { now_ns = function() return world.now_ns end }
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local spawn = { executable = executable, args = args, on_done = on_done }
 				world.spawns[#world.spawns + 1] = spawn

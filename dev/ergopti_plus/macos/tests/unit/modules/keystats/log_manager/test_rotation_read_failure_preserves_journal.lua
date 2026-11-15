@@ -28,16 +28,16 @@ local STUBBED_MODULES = {
 	"modules.keystats.aggregator",
 	"modules.keystats.rotation",
 	"modules.keystats.export",
-	"keystats.metrics",
-	"adapters.file_system",
-	"adapters.ledger_append",
-	"adapters.timer_scheduler",
+	"metrics.engine.metrics",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.ledger_append",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
 	"modules.keystats.physical_wire",
-	"keystats.physical_release",
-	"infra.logger",
+	"metrics.engine.capture.physical_release",
+	"core.logger.engine.logger",
 }
 
 local function fake_writer(on_write, on_close, initial_bytes)
@@ -165,8 +165,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		for _, name in ipairs(STUBBED_MODULES) do package.loaded[name] = nil end
 		local errors, logger = {}, helpers.make_logger_stub()
 		logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				assert(delay == 0 and type(callback) == "function" and scheduled == nil)
 				scheduled = { timer = {}, committed = true, callback = callback }
@@ -180,7 +180,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			now = os.time,
 		}
 		-- A typed unit owner, not a second implementation of the disk protocol.
-		package.loaded["adapters.ledger_append"] = {
+		package.loaded["core.fs.adapters.ledger_append"] = {
 			recover = function(...)
 				assert(select("#", ...) == 3)
 				local ledger, batch, journal = ...
@@ -273,8 +273,8 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			get_db_rev = function() return 0 end,
 			sync_foreign_data_sql = function() return {} end,
 		}
-		package.loaded["keystats.metrics"] = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["metrics.engine.metrics"] = {}
+		package.loaded["core.fs.adapters.file_system"] = {
 			-- This non-IO scenario begins with an existing user metrics ignore.
 			path_status = function(path)
 				assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -285,7 +285,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 			read = function() return nil end,
 		}
 		require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-			package.loaded["adapters.file_system"], false)
+			package.loaded["core.fs.adapters.file_system"], false)
 		local rotation = helpers.load_with_stubs("modules.keystats.rotation")
 		manager = helpers.load_with_stubs("modules.keystats.log_manager", {
 			execute = function(command)
@@ -359,7 +359,7 @@ local function run_rollover_case(failure_mode, exercise_resume)
 		cleanup(function() if handle.running then handle:stop() end; assert(handle.running == false) end)
 	end
 	cleanup(function()
-		if scheduled then assert(package.loaded["adapters.timer_scheduler"].cancel(scheduled) == true) end
+		if scheduled then assert(package.loaded["core.events.timer_scheduler"].cancel(scheduled) == true) end
 		assert(scheduled == nil and active_db == nil and transaction == nil)
 	end)
 	io.open, os.remove, _G.hs = real_open, real_remove, real_hs
@@ -468,7 +468,7 @@ helpers.describe("keystats rollover requires committed EOF", function()
 			"SELECT value FROM meta WHERE key='rollover_settlement_receipt';",
 			"SELECT value FROM meta WHERE key='aggregate_cache_revision'",
 			"SELECT value FROM meta WHERE key='ngram_ctx_json';",
-			require("keystats.queries").render("meta.rev_bump", "native"),
+			require("metrics.engine.queries").render("meta.rev_bump", "native"),
 			"INSERT OR REPLACE INTO meta(key,value) VALUES('rollover_settlement_receipt',",
 			"UPDATE meta SET value='0' WHERE key='today_log_offset';",
 			"UPDATE meta SET value='" .. result.reset_date .. "' WHERE key='today_log_date';",

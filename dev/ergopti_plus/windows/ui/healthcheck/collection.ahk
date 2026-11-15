@@ -45,7 +45,7 @@ HealthCheck_CollectWindows() {
 class DiagnosticCollectionWindows {
 	__New() {
 		global _SharedDir, _VendorDir
-		this.ContractPath := _SharedDir . "\modules\diagnostics\collection.json"
+		this.ContractPath := _SharedDir . "\diagnostics\data\collection.json"
 		if FileGetSize(this.ContractPath) > 262144
 			throw Error("Diagnostic collection contract exceeded its bound.")
 		this.Contract := JsonParse(FSReadStrict(this.ContractPath))

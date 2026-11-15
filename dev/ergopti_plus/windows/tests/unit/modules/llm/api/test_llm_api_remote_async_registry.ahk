@@ -409,6 +409,10 @@ _RemoteCancelPublication_WinHttpBoundary() {
 		"poll", _RemoteCancelPublication_Poll.Bind(State),
 		"tick", (*) => 1314)
 	ReqId := 891303
+	; A refused override fails the route before Send; that is another test's state.
+	Choice := ProxyOverride_Current()
+	AssertTrue(Choice is Map && Choice["mode"] == "automatic",
+		"precondition: the proxy override must be automatic so the route reaches Send")
 	try {
 		AssertTrue(_LLMRemote_DispatchWinHttp(ReqId,
 			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
@@ -436,33 +440,43 @@ class _RemoteOverrideHttp extends _RemoteCancelPublicationHttp {
 	}
 }
 
+; The publication lives in process globals, never in the environment, so the
+; fixture restores those globals: a refused value left published made every later
+; WinHTTP dispatch fail its route before Send, which --reverse exposed.
 _RemoteOverride_Dispatch(Stored) {
 	global _LLM_Remote_Async
+	global _ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideBootSealSource
 	_LLM_Remote_Async := Map()
 	State := _RemoteCancelPublication_NewState()
 	State["proxy"] := "unset"
 	Failed := 0
 	Port := Map("create_http", (*) => _RemoteOverrideHttp(State),
 		"poll", _RemoteCancelPublication_Poll.Bind(State), "tick", (*) => 1314)
-	ProxyOverride_Publish(Stored)
+	Saved := [_ProxyOverrideStored, _ProxyOverridePublished, _ProxyOverrideSealed, _ProxyOverrideBootSealSource]
 	try {
+		ProxyOverride_Publish(Stored)
 		_LLMRemote_DispatchWinHttp(891304, _RemoteCancelPublication_Resolved(),
 			"https://safe.invalid/v1", "{}", (*) => 0, (*) => (Failed += 1), 1000, Port)
 		State["failed"] := Failed
 		return State
 	} finally {
-		EnvSet(PROXY_OVERRIDE_ENVIRONMENT, "")
+		_ProxyOverrideStored := Saved[1], _ProxyOverridePublished := Saved[2]
+		_ProxyOverrideSealed := Saved[3], _ProxyOverrideBootSealSource := Saved[4]
 		_LLM_Remote_Async := Map()
 	}
 }
 
 _RemoteOverride_WinHttpRoute() {
+	global _ProxyOverridePublished
+	Predecessor := _ProxyOverridePublished
 	AssertEqual("unset", _RemoteOverride_Dispatch("")["proxy"], "automatic leaves the object's route alone")
 	AssertEqual("1|", _RemoteOverride_Dispatch("direct")["proxy"], "direct is explicit")
 	AssertEqual("2|proxy.corp.invalid:3128", _RemoteOverride_Dispatch("http://proxy.corp.invalid:3128")["proxy"])
 	Refused := _RemoteOverride_Dispatch("not a proxy")
 	AssertEqual(0, Refused["sends"], "a refused override sends nothing")
 	AssertEqual(1, Refused["failed"], "and says so")
+	AssertEqual(Predecessor, _ProxyOverridePublished,
+		"the override fixture must restore the predecessor publication, not leave the refused token")
 }
 Test("api_remote: the WinHTTP request takes the proxy override's route (remote-winhttp-override)",
 	_RemoteOverride_WinHttpRoute)

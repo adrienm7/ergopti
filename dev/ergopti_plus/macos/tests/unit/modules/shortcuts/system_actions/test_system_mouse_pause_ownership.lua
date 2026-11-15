@@ -37,13 +37,13 @@ end
 local function fresh_mouse_owner()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.system_mouse",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
 		"adapters.mouse_control",
-		"adapters.synthetic_input",
-		"infra.logger",
-		"infra.notifications",
-		"infra.i18n",
+		"platform.input.synthetic_input",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
 	}) do package.loaded[name] = nil end
 
 	local fixture = {
@@ -344,8 +344,8 @@ local function fresh_mouse_owner()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
@@ -354,7 +354,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["adapters.mouse_control"] = {
 		setPos = function()
 			if type(fixture.boundary_hook) == "function" then
@@ -364,7 +364,7 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function()
 			if type(fixture.boundary_hook) == "function" then
 				fixture.boundary_hook("emoji")
@@ -373,8 +373,8 @@ local function fresh_mouse_owner()
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = shell_runner
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = shell_runner
+	package.loaded["core.events.timer_scheduler"] = nil
 	fixture.python = helpers.healthy_python_resolver()
 	package.loaded["adapters.python_interpreter"] = fixture.python
 	fixture.python_offers = {}
@@ -481,7 +481,7 @@ helpers.describe("SystemMouse mirror owner: positive and synchronous controls", 
 		local fixture = fresh_mouse_owner()
 		helpers.assert_eq(fixture.subject.toggle_display_mirror(), true)
 		local handle = fixture.shells[1]
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local command = "python3 -B " .. quote(helpers.driver_root()
 			.. "tests/support/modules/shortcuts/mirror_configuration_fixture.py")
 			.. " " .. quote(handle.args[2]) .. " 2>&1"

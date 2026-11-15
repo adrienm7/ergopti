@@ -9,7 +9,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Single Source of Truth: the manifest is shared with the Hammerspoon driver
 ;    and the SvelteKit front-end — changing menu order requires editing one file.
-; 2. Canonical Parser: delegates all JSON parsing to infra/json.ahk (JsonParse).
+; 2. Canonical Parser: delegates all JSON parsing to core/text/engine/json.ahk (JsonParse).
 ; 3. Safe Fallback: returns hard-coded lists on any read or parse failure.
 ; ==============================================================================
 
@@ -101,7 +101,7 @@ _MM_GetManifestRoot() {
 	if (_MM_MANIFEST_ROOT_CACHE != false)
 		return _MM_MANIFEST_ROOT_CACHE
 
-	FilePath := _SharedDir . "\modules\menu\menu_manifest.json"
+	FilePath := _SharedDir . "\menu\data\menu_manifest.json"
 	if !FileExist(FilePath) {
 		try LoggerWarn("MenuManifest", "manifest not found at '{1}' — callers fall back to their hard-coded lists.", FilePath)
 		return false

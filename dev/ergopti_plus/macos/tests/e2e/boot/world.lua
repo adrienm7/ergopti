@@ -422,7 +422,7 @@ local function keyboard_source_answer(args, layout)
 		local dead = type(value) == "table" and value.dead == true or false
 		levels[#levels+1] = {code=code, text=text, dead=dead, direct=not dead and text ~= ""}
 	end
-	return {code=0, stdout=require("json").encode({version=1, source_id=layout.source_id,
+	return {code=0, stdout=require("core.text.engine.json").encode({version=1, source_id=layout.source_id,
 		keyboard_type=40, levels=levels}) .. "\n"}
 end
 M.keyboard_source_answer = keyboard_source_answer
@@ -682,6 +682,15 @@ local function machine_answer(path, args, helper, environment, launcher_environm
 		and args[1] == "-l" and args[2] == "1" and args[3] == "-n" and args[4] == "0" then
 		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
 	end
+	-- A remap download runs curl behind the system network prelude
+	-- (platform/remap/network_download.lua): /bin/sh -c '<prelude>exec /usr/bin/curl "$@"'
+	-- <tag> <curl arguments>. The shell becomes curl, so it answers as curl does
+	-- here; the generic shell answer below would report a download that never ran.
+	if path == "/bin/sh" and args[1] == "-c" and tostring(args[2]):find('exec /usr/bin/curl "$@"', 1, true) then
+		local curl_args = {}
+		for index = 4, #args do curl_args[#curl_args + 1] = args[index] end
+		return machine_answer("/usr/bin/curl", curl_args, helper, environment, launcher_environment)
+	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
 	-- Ergopti's own runtime artifact (platform/remap/runtime_artifact_fetch.lua):
 	-- its folder steps succeed and the E2E Mac is offline, so the download fails
@@ -730,7 +739,7 @@ end
 --- @return table env
 function M.launcher_environment(app_root, home)
 	local bundle = app_root .. "/ErgoptiPlus.app"
-	local AppDirs = require("app_dirs")
+	local AppDirs = require("core.fs.engine.app_dirs")
 	local logs = home .. "/" .. AppDirs.macos.relative
 	return {
 		ERGOPTI_KEYBOARD_GEOMETRY_V1 = require("tests.support.keyboard_geometry").launcher_value(),
@@ -755,7 +764,7 @@ end
 --- next clock turn, as the launcher's datagram worker does.
 local function install_log_transport()
 	local pending, options = {}, nil
-	package.preload["adapters.log_transport"] = function()
+	package.preload["core.logger.adapters.log_transport"] = function()
 		local transport = {}
 		function transport.start(start_options) options = start_options; return true end
 		function transport.enqueue(line, variant)
@@ -823,7 +832,7 @@ end
 
 --- Runs the folder commands of the modelled Mac for real inside its HOME.
 --- The shared hs.execute stub answers any command it does not know with a
---- synthetic success that does nothing. infra/driver_control.lua makes its
+--- synthetic success that does nothing. core/lifecycle/engine/driver_control.lua makes its
 --- folder with `/bin/mkdir -p P && /bin/chmod 700 P` and then checks the result
 --- with hs.fs.attributes, so the stub's success left no folder and every boot
 --- logged that the control could not start. Only that exact shape, on paths
@@ -1345,7 +1354,7 @@ end
 
 --- Delivers every queued log record to the logger's sink.
 function M.flush_logs()
-	local loaded = package.loaded["adapters.log_transport"]
+	local loaded = package.loaded["core.logger.adapters.log_transport"]
 	if type(loaded) == "table" and type(loaded.flush) == "function" then loaded.flush() end
 end
 

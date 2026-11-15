@@ -31,14 +31,14 @@
 local M = {}
 
 local hs          = hs
-local Logger      = require("infra.logger")
-local IssueLink   = require("diagnostics.issue_link")
-local Redact      = require("diagnostics.redact")
-local Share       = require("healthcheck.share")
-local ReportRunner = require("healthcheck.report")
-local ConfigKeys = require("config_keys")
+local Logger      = require("core.logger.engine.logger")
+local IssueLink   = require("diagnostics.engine.reports.issue_link")
+local Redact      = require("diagnostics.engine.reports.redact")
+local Share       = require("diagnostics.engine.healthcheck.share")
+local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "healthcheck.report"
+local LOG = "diagnostics.engine.healthcheck.report"
 
 -- The executable that reveals a file in Finder and opens folders and URLs
 local OPEN_BIN = "/usr/bin/open"
@@ -75,13 +75,13 @@ local retained_openers = {}
 --- @param current function Exact action owner predicate.
 --- @return table request Cancellable native opener.
 local function open_with(args, done, current)
-	local timeout = require("infra.timings").sec("ui", "desktop_open_timeout_ms")
+	local timeout = require("core.timing.engine.timings").sec("ui", "desktop_open_timeout_ms")
 	local cleanup = {}
 	for request, retired in pairs(retained_openers) do
 		if retired() then cleanup[#cleanup + 1] = request end
 	end
 	for _, request in ipairs(cleanup) do request.cancel() end
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local request, task, timer = {}, nil, nil
 	local active, terminal, retiring, forced_error = true, false, false, nil
 	local function stop_timer()
@@ -137,7 +137,7 @@ local function open_with(args, done, current)
 	end
 	retained_openers[request] = function() return retiring end
 	if current() ~= true then request.cancel(); return request end
-	local built, candidate = pcall(require("adapters.shell_runner").spawn, OPEN_BIN, args, function(code)
+	local built, candidate = pcall(require("core.process.adapters.shell_runner").spawn, OPEN_BIN, args, function(code)
 		complete(code, code ~= 0 and "desktop opener refused" or nil)
 	end)
 	if not built or type(candidate) ~= "table" or type(candidate.start) ~= "function"
@@ -176,7 +176,7 @@ local DEFAULT_EFFECTS = {
 		if not make_dir(dir) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")
 		stem, extension = stem or name, extension or ""
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		for index = 0, 999 do
 			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
 			-- This probe only skips a visibly occupied name; creation still belongs
@@ -199,11 +199,11 @@ local DEFAULT_EFFECTS = {
 	reveal = function(path, done, current) return open_with({ "-R", path }, done, current) end,
 	open = function(target, done, current) return open_with({ target }, done, current) end,
 	open_url = function(url, done)
-		done({ ok = require("ui.ui_builder").open_http_url(url) == true })
+		done({ ok = require("core.ui.ui.builder").open_http_url(url) == true })
 		return { cancel = function() end }
 	end,
 	notify = function(title, body, kind)
-		return require("adapters.application_notifier").send(title, { body = body, kind = kind })
+		return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 	end,
 	identity = function()
 		local ConfigPaths = require("infra.config_paths")
@@ -305,7 +305,7 @@ function M.report_bug(opts, overrides, complete)
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
 		local document = Share.document(snapshot, documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		return M.perform({ action = "report", text = document.text, fields = document.fields },
 			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
 	end)
@@ -320,7 +320,7 @@ function M.suggest_feature(overrides, complete)
 		local bridge = require("ui.healthcheck.core")
 		local documents = bridge.config()
 		local document = Share.document(bridge.run(), documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
 	end)

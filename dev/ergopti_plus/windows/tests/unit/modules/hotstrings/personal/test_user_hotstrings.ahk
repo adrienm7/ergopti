@@ -178,7 +178,7 @@ _UCHPackageRoots() {
 		; The bundle preserves shared static paths and relocates Windows vendor
 		; sources to vendor/, exactly as the production compiled boot owner does.
 		Shared := PackageRoot . "\static\ergopti_plus\_shared", Vendor := PackageRoot . "\vendor"
-		Assert(FSStrictExists(Shared . "\modules\hotstrings\user_code.ahk"), "Packaged shared policy must be installed")
+		Assert(FSStrictExists(Shared . "\hotstrings\data\catalogue\user_code.ahk"), "Packaged shared policy must be installed")
 		Assert(FSStrictExists(Vendor . "\ergopti_user_hotstrings.ahk"), "Packaged worker source must be installed")
 		_SharedDir := Shared, _VendorDir := Vendor
 	}

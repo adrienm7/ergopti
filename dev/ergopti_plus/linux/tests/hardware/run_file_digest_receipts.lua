@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Digest = require("adapters.file_digest")
+local Digest = require("core.fs.adapters.file_digest")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-digest-XXXXXX"))
 local directories, files = { root }, {}
 local checks, failures = 0, 0

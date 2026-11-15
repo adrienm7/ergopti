@@ -20,7 +20,7 @@
 local helpers = require("tests.helpers")
 
 local DRIVER_ROOT = helpers.driver_root()
-local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
+local SCAN_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core" }
 local NATIVE_KEYS = { space = true, tab = true, enter = true, star = true }
 -- The one file allowed to spell the pointer kinds, resolved from its module name.
 local POINTER_MAP = assert(package.searchpath("modules.shortcuts.caps_word_auto_off", package.path))
@@ -72,7 +72,7 @@ end
 helpers.describe("CapsWord auto-off single source (Linux)", function()
 	helpers.it("no Linux CapsWord source spells a delimiter or pointer-kind list of its own", function()
 		local forbidden_keys = {}
-		for _, def in ipairs(require("keymap.terminators_catalogue")) do
+		for _, def in ipairs(require("layouts.engine.layers.terminators_catalogue")) do
 			if def.key and not NATIVE_KEYS[def.key] then forbidden_keys[#forbidden_keys + 1] = def.key end
 		end
 		helpers.assert_true(#forbidden_keys > 10, "the catalogue must provide the delimiter keys")

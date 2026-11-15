@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/ar.msg
-# AUTO-GENERATED from _shared/data/locales/ar.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ar.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=تم بناء وحدة الشبكة لـ LuaJIT من المصدر.
 build_luv.recipe_required=يتطلب البناء الأصلي لـ luv وصفة المصدر الخاصة به.
 install.already_installed={1} — مثبّت بالفعل
 install.archive_digest_unavailable=تتطلب التحديثات ذات الواصف المحتفَظ به بيئة OpenSSL3 فعلية؛ تبقى القدرة غير متاحة.
+install.bytecode_skipped=تعذّر إنشاء الوحدات المُصرَّفة مسبقًا — يبدأ Ergopti من الشيفرة المصدرية، أبطأ قليلًا.
 install.capability_verified={1} — تم التحقق من القدرة
 install.command_still_missing=ثُبّت {1}، لكن '{2}' ما زال غير موجود.
 install.daemon_manual=لتشغيل الخدمة يدويًا:
 install.daemon_running=تعمل الخدمة في الخلفية. للتحقق من حالتها:
+install.focus_integration_enabled=تم تفعيل تكامل التركيز في {1}
+install.focus_integration_failed=تعذّر تفعيل تكامل التركيز في {1} — تبقى القواعد الخاصة بكل تطبيق غير نشطة على سطح المكتب هذا.
+install.focus_integration_next_login=تم تثبيت تكامل التركيز في {1} (يسري عند تسجيل الدخول التالي)
+install.focus_integration_updated=تم تحديث تكامل التركيز في {1}
 install.gnome_extension_active=إضافة GNOME AppIndicator — مفعّلة بالفعل
 install.gnome_extension_enabled=تم تفعيل إضافة GNOME AppIndicator
 install.gnome_extension_failed=تعذّر تفعيل إضافة AppIndicator — بدونها لا يعرض GNOME الأيقونة.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — التحقق من التبعي�
 install.section_deps_skipped=تم تخطي التبعيات (‎--no-deps)
 install.section_done=اكتمل التثبيت
 install.section_files=تثبيت الملفات
+install.section_focus=التطبيق النشط في Wayland (GNOME وKDE)
 install.section_lua_deps=تبعيات Lua الاختيارية (حلقة الأحداث، المؤقتات، عروض الويب، الإشارات)
 install.section_permissions=أذونات الإدخال (يتطلب sudo)
 install.section_services=إنشاء خدمات systemd للمستخدم
@@ -79,6 +85,7 @@ install.xdg_autostart=التشغيل التلقائي لـ XDG: {1}
 launch.already_running=يعمل Ergopti+ بالفعل في هذه الجلسة ({1} محجوز)؛ رُفض هذا التشغيل.
 launch.authorization_failed=أُلغي تفويض الوصول إلى الإدخال أو فشل.
 launch.groups_unavailable=تعذّر على الجلسة الحصول على مجموعات الإدخال المكوّنة لها.
+launch.restarting=يعمل Ergopti+ بالفعل في هذه الجلسة؛ يُطلب منه الإنهاء ثم تتم إعادة تشغيله.
 launch.session_lock_invalid=يجب أن يكون مسار مجلد قفل الجلسة مطلقًا.
 launcher.dependencies_installed=تم تثبيت التبعيات.
 launcher.driver_missing=خطأ: لم يُعثر على مجلد مشغّل Linux: {1}

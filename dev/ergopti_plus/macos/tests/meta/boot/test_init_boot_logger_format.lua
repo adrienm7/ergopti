@@ -29,11 +29,11 @@ helpers.describe("boot privacy admission", function()
 				end,
 				os = { exit = function(code) observed.exits[#observed.exits + 1] = code end },
 				require = function(name)
-					if name == "adapters.boot_journal" then
+					if name == "core.logger.adapters.boot_journal" then
 						return assert(load(adapter, "actual boot journal", "t", {
 							assert = assert, type = type, pcall = pcall, io = env.io,
 							require = function(module)
-								helpers.assert_eq(module, "infra.logger")
+								helpers.assert_eq(module, "core.logger.engine.logger")
 								return logger
 							end,
 						}))()
@@ -47,7 +47,7 @@ helpers.describe("boot privacy admission", function()
 					end }
 				end,
 				io = { open = function(path, access)
-					helpers.assert_eq(path, "/owned-shared/modules/diagnostics/redaction.json")
+					helpers.assert_eq(path, "/owned-shared/diagnostics/data/redaction.json")
 					helpers.assert_eq(access, "rb")
 					if mode == "open" then error("PrivateUser /Users/PrivateUser/private") end
 					return { read = function()

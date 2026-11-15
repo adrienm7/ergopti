@@ -35,21 +35,21 @@ for _HSCS_AdmissionVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hots
 	Test("personal-file-admission: " . _HSCS_AdmissionVector["name"], _HSCS_PersonalAdmission.Bind(_HSCS_AdmissionVector))
 
 
-; A caller-owned native menu keeps its ordinary editor leaf and current pause
-; owner. Callback observations are asserted after the dispatcher returns.
+; A caller-owned native menu keeps its ordinary editor leaf. The editor is
+; configuration: it opens whatever the pause (EDD-1), so the shared vectors'
+; pause receipts change nothing. Callback observations follow the dispatcher.
 _HSCS_PersonalEditorDelivery(Vector) {
 	global _MenuDispatchCallbacks
-	if Vector["pause_receipt"] != "boolean" || !Vector["opener"]
+	if !Vector["opener"]
 		return
-	State := Map("paused", Vector["initial_paused"], "calls", 0)
+	State := Map("calls", 0)
 	Open(State, *) {
 		State["calls"] += 1
 		return true
 	}
-	Paused(State, *) => State["paused"]
 	Built := Menu()
 	try {
-		Row := _HS_PersonalEditorRow(Open.Bind(State), Paused.Bind(State))
+		Row := _HS_PersonalEditorRow(Open.Bind(State))
 		Assert(Row is Map, "the canonical declaration must produce provider data")
 		MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal", [Row])
 		AssertEqual(1, TrayMenuItemCount(Built))
@@ -58,14 +58,13 @@ _HSCS_PersonalEditorDelivery(Vector) {
 		AssertEqual(!Vector["enabled"], (Flags & 0x3) != 0)
 		Id := DllCall("GetMenuItemID", "Ptr", Built.Handle, "Int", 0, "UInt")
 		Assert(_MenuDispatchCallbacks.Has(Id), "the real renderer must register the actual leaf callback")
-		State["paused"] := Vector["delivered_paused"]
 		_MenuDispatchCallbacks[Id].Call()
-		AssertEqual(Vector["calls"], State["calls"], "the retained native callback obeys the live pause owner")
+		AssertEqual(Vector["calls"], State["calls"], "the retained native callback opens the editor")
 	} finally _CTC_ReleaseMenu(Built)
 }
 
 for _HSCS_EditorVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_editor_command.json", "UTF-8"))["vectors"] {
-	if _HSCS_EditorVector["pause_receipt"] == "boolean" && _HSCS_EditorVector["opener"]
+	if _HSCS_EditorVector["opener"]
 		Test("shared-personal-editor: " . _HSCS_EditorVector["name"], _HSCS_PersonalEditorDelivery.Bind(_HSCS_EditorVector))
 }
 
@@ -88,7 +87,7 @@ _HSCS_PersonalEditorSharedLabel() {
 	Item := Declaration[1], Before := Item["i18n"], Built := Menu()
 	try {
 		Item["i18n"] := "menu.hotstrings.shortcut_none"
-		Row := _HS_PersonalEditorRow((*) => true, (*) => false)
+		Row := _HS_PersonalEditorRow((*) => true)
 		MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal", [Row])
 		AssertEqual(t("menu.hotstrings.shortcut_none"), _CTC_LabelAt(Built, 0), "the native row follows its shared label")
 	} finally {
@@ -98,56 +97,17 @@ _HSCS_PersonalEditorSharedLabel() {
 }
 Test("shared-personal-editor: the actual native provider follows a changed shared label", _HSCS_PersonalEditorSharedLabel)
 
-_HSCS_PersonalEditorUnknownPause(Throws) {
-	State := Map("calls", 0)
-	Open(State, *) {
-		State["calls"] += 1
-		return true
-	}
-	Paused(Throws, *) {
-		if Throws
-			throw Error("injected native pause read failure")
-		return Map("unconfirmed", true)
-	}
-	Built := Menu()
-	try {
-		Row := _HS_PersonalEditorRow(Open.Bind(State), Paused.Bind(Throws))
-		AssertTrue(Row["disabled"], "a refused actual pause receipt cannot enable the editor")
-		MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal", [Row])
-		Id := DllCall("GetMenuItemID", "Ptr", Built.Handle, "Int", 0, "UInt")
-		global _MenuDispatchCallbacks
-		Assert(_MenuDispatchCallbacks.Has(Id))
-		AssertFalse(_MenuDispatchCallbacks[Id].Call())
-		AssertEqual(0, State["calls"])
-	} finally _CTC_ReleaseMenu(Built)
+; A pause stops typing, not configuration (EDD-1): the editor row reads no
+; suspension, so a suspended driver still opens it (edd1-paused-writes). The
+; unit runner never suspends itself, so the row's own body is checked.
+_HSCS_PersonalEditorIgnoresSuspension() {
+	Body := _DriverFuncBody("_HS_PersonalEditorRow")
+	Assert(Body != "", "the actual editor row owner must exist")
+	Assert(!InStr(Body, "A_IsSuspended"), "the editor row must not read the suspension")
+	Row := _HS_PersonalEditorRow((*) => true)
+	AssertFalse(Row.Get("disabled", false), "the editor row is ready with an opener")
 }
-for _HSCS_PauseThrows in [true, false]
-	Test("shared-personal-editor: refused native pause owner " . _HSCS_PauseThrows,
-		_HSCS_PersonalEditorUnknownPause.Bind(_HSCS_PauseThrows))
-
-
-_HSCS_PersonalEditorUntypedPause(Value) {
-	global _MenuDispatchCallbacks
-	State := Map("calls", 0)
-	Open(State, *) {
-		State["calls"] += 1
-		return true
-	}
-	Paused(Value, *) => Value
-	Built := Menu()
-	try {
-		Row := _HS_PersonalEditorRow(Open.Bind(State), Paused.Bind(Value))
-		AssertTrue(Row["disabled"], "only an actual native Integer pause receipt may enable the editor")
-		MenuRenderer_AppendRows(Built, "hotstrings_menu", "hotstring_personal", [Row])
-		Id := DllCall("GetMenuItemID", "Ptr", Built.Handle, "Int", 0, "UInt")
-		Assert(_MenuDispatchCallbacks.Has(Id))
-		AssertFalse(_MenuDispatchCallbacks[Id].Call())
-		AssertEqual(0, State["calls"], "untyped zero cannot permit a retained callback")
-	} finally _CTC_ReleaseMenu(Built)
-}
-for _HSCS_UntypedPause in ["0", "false", "", 0.0]
-	Test("shared-personal-editor: untyped native pause receipt " . Type(_HSCS_UntypedPause) . ":" . _HSCS_UntypedPause,
-		_HSCS_PersonalEditorUntypedPause.Bind(_HSCS_UntypedPause))
+Test("shared-personal-editor: ignores the suspension (edd1-paused-writes)", _HSCS_PersonalEditorIgnoresSuspension)
 
 
 ; Observe the native opening callback outside the renderer's caught delivery.

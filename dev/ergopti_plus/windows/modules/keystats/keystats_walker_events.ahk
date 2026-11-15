@@ -17,7 +17,13 @@
 ;    kept in this file because it is only called from KLW_WalkTypingEntry.
 ; 3. KLW_WalkAppSwitch / KLW_WalkWindowSwitch / KLW_WalkSystemEvent: non-typing
 ;    event handlers; much simpler than the typing walker but same batch pattern.
+; 4. Every day, hour slot and night wake is read in the local time the user
+;    lived (maintainer decision KMD-1): a replayed row's entry carries its UTC
+;    ts and the offset it is read with (KLW_EntryLocalTimestamp), a journal
+;    entry has no offset and its timestamp is local already.
 ; ==============================================================================
+
+#Include keystats_local_time.ahk
 
 
 
@@ -29,6 +35,20 @@
 ; ================================
 ; ================================
 
+; The local timestamp of a walked entry: its timestamp plus its utc_offset_min
+; when it carries one (a replayed raw row, whose ts is UTC, or an older Linux
+; row given this device's offset by the reader), else the timestamp itself (a
+; journal entry, an older macOS or Windows row, both local).
+; @param entry {Map} A walker entry.
+; @returns {String} "YYYY-MM-DD HH:MM:SS[.mmm]" local, or "" without a timestamp.
+KLW_EntryLocalTimestamp(entry) {
+		ts := KLW_GetMap(entry, "timestamp", "")
+		if (Type(ts) != "String" || ts = "")
+				return ""
+		Offset := KLW_GetMap(entry, "utc_offset_min", "")
+		return (Offset = "") ? ts : KL_RowLocalTimestamp(ts, Offset)
+}
+
 ; Add one canonical shortcut event to the same n-gram state used by legacy
 ; typing payloads that carry meta.sc. Dedicated events_shortcut rows bypass the
 ; typing buffer, so both live callers and cold replay enter through this helper.
@@ -39,7 +59,7 @@ KLW_WalkShortcut(entry) {
 		if (Type(shortcut_key) != "String" || shortcut_key = "")
 				return false
 		app := KLW_GetMap(entry, "app", "Unknown")
-		ts := KLW_GetMap(entry, "timestamp", "")
+		ts := KLW_EntryLocalTimestamp(entry)
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		app_day_key := KLW_Key(date_str, app)
 		ctx := KLW_GetAppCtx(app)
@@ -94,7 +114,7 @@ KLW_WalkTypingEntry(entry, Activity := unset) {
 		if !(entry is Map)
 				return
 		app      := KLW_GetMap(entry, "app", "Unknown")
-		ts       := KLW_GetMap(entry, "timestamp", "")
+		ts       := KLW_EntryLocalTimestamp(entry)
 		TimeBucket := _KLW_ResolveTypingTime(ts)
 		date_str := TimeBucket["date"]
 		events   := KLW_GetMap(entry, "events", "")
@@ -595,7 +615,7 @@ KLW_WalkAppSwitch(entry) {
 		prev_app := KLW_GetMap(entry, "prev_app", "")
 		if (prev_app = "")
 				return
-		ts := KLW_GetMap(entry, "timestamp", "")
+		ts := KLW_EntryLocalTimestamp(entry)
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		duration := KLW_GetMap(entry, "duration_ms", 0)
 
@@ -618,7 +638,7 @@ KLW_WalkWindowSwitch(entry) {
 		prev_title := KLW_GetMap(entry, "prev_title", "")
 		if (prev_title = "")
 				return
-		ts := KLW_GetMap(entry, "timestamp", "")
+		ts := KLW_EntryLocalTimestamp(entry)
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		app := KLW_GetMap(entry, "app", "Unknown")
 		duration := KLW_GetMap(entry, "duration_ms", 0)
@@ -630,7 +650,7 @@ KLW_WalkWindowSwitch(entry) {
 }
 
 KLW_WalkSystemEvent(entry) {
-		ts := KLW_GetMap(entry, "timestamp", "")
+		ts := KLW_EntryLocalTimestamp(entry)
 		date_str := (ts != "") ? SubStr(ts, 1, 10) : KL_Today()
 		action := KLW_GetMap(entry, "action", "")
 

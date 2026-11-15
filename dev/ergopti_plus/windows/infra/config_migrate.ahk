@@ -6,15 +6,15 @@
 ; Versions config.toml at boot, before anything applies or saves it. It reads
 ; ``[_meta] schema_version``, runs the shared registry's steps for the ``ahk``
 ; driver in order, and publishes the migrated file once, after a verified
-; byte-exact backup. The Windows counterpart of _shared/lua/config_migrate.lua;
-; the registry is _shared/core/config_schema/migrations.toml and the decision
+; byte-exact backup. The Windows counterpart of _shared/settings/engine/migration/migrate.lua;
+; the registry is _shared/settings/data/config_schema/migrations.toml and the decision
 ; record docs/adr/009-config-versioning.md.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Data-only steps, read at runtime with the driver's own TOML reader. A
 ;    step is a list of ops from a closed set (rename, rename_prefix,
 ;    move_section, merge_into, map_value, wrap_value, encode_value, delete,
-;    set_if_absent)
+;    set_if_absent, import_companion)
 ;    and this file holds their only Windows semantics. The corpus under _shared/tests/corpus/config_migrations is
 ;    replayed here, by the Lua engine and by the JS reference, so the three
 ;    cannot drift; _shared/tests/corpus/config_migration_registries pins which
@@ -53,7 +53,7 @@
 ; live in function statics so no include order can leave them unset.
 ConfigMigrateRegistryPath() {
 	global _SharedDir
-	static Relative := "core/config_schema/migrations.toml"
+	static Relative := "settings/data/config_schema/migrations.toml"
 	return _SharedDir . "\" . StrReplace(Relative, "/", "\")
 }
 
@@ -162,6 +162,9 @@ _ConfigMigrateValidateOp(Op, Where) {
 				throw Error(Where . ": each map entry is { from, to } with scalar values")
 		}
 	}
+	; A companion is named bare: the driver resolves its path, never the registry.
+	if (Op["op"] == "import_companion") && !((Op["file"] is String) && RegExMatch(Op["file"], "^[A-Za-z0-9_-]+\.toml$"))
+		throw Error(Where . ": import_companion names its file bare, as name.toml")
 	if (Op["op"] == "set_if_absent" && !_ConfigMigrateIsScalar(Op["value"])) {
 		if !(Op["value"] is Array)
 			throw Error(Where . ": set_if_absent writes a scalar or an array")
@@ -571,6 +574,45 @@ _ConfigMigrateCanonicalJson(Value) {
 	return (Value is String) ? JsonStringLiteral(Value) : String(Value)
 }
 
+; The sections of the companion file a driver handed in the migration context
+; (Context["companions"][File] := Map("status", "ok" | "absent", "content", Text)).
+; A companion the migration needs and the driver did not hand throws: reading it
+; as empty would stamp config.toml without the values it must receive.
+_ConfigMigrateCompanionSections(Context, FileName) {
+	if !(Context is Map) || !(Context.Get("companions", 0) is Map) || !(Context["companions"].Get(FileName, 0) is Map)
+		throw Error("config_migrate: the migration needs the companion " . FileName . ", which the driver did not hand")
+	Companion := Context["companions"][FileName]
+	if Companion.Get("status", "") == "absent"
+		return Map()
+	if !(Companion.Get("status", "") == "ok") || !(Companion.Get("content", 0) is String)
+		throw Error("config_migrate: the companion " . FileName . " could not be read")
+	return _ConfigMigrateParse(Companion["content"], FileName)
+}
+
+; Copies values the driver kept in a companion file into config.toml where it
+; holds none (the copy_if_absent rule): one key, or every key of a section and
+; of every section below it, each to the same place under to_section.
+_ConfigMigrateImportCompanion(Model, Op, Context) {
+	Companion := _ConfigMigrateCompanionSections(Context, Op["file"])
+	Leaves := []
+	if Op.Has("key") {
+		if Companion.Has(Op["section"]) && Companion[Op["section"]].Has(Op["key"])
+			Leaves.Push([Op["section"], Op["key"], Op["to_section"]])
+	} else {
+		for Name in _ConfigMigrateSectionsAtOrBelow(Companion, Op["section"]) {
+			for Key in _ConfigMigrateKeys(Companion[Name])
+				Leaves.Push([Name, Key, Op["to_section"] . SubStr(Name, StrLen(Op["section"]) + 1)])
+		}
+	}
+	for Leaf in Leaves {
+		if !_ConfigMigrateCopyDestinationAbsent(Model, Leaf[3], Leaf[2])
+			continue
+		if !Model.Has(Leaf[3])
+			Model[Leaf[3]] := Map()
+		Model[Leaf[3]][Leaf[2]] := ManifestCloneValue(Companion[Leaf[1]][Leaf[2]])
+	}
+}
+
 ; Applies one validated op to the model.
 _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 	Section := Op["section"]
@@ -646,6 +688,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 				Model[Section] := Map()
 			if !Model[Section].Has(Op["key"])
 				Model[Section][Op["key"]] := Op["value"]
+		case "import_companion":
+			_ConfigMigrateImportCompanion(Model, Op, Context)
 		default:
 			throw Error("unknown config migration op '" . Op["op"] . "'")
 	}
@@ -954,6 +998,21 @@ _ConfigMigratePublish(FilePath, Candidate, Source, AdmissionFn := 0) {
 	return ""
 }
 
+; Words why a version classification refuses the file, shared by the migration
+; and the boot that refuses from its prepared classification.
+ConfigMigrateVersionRefusalDetail(Status, Version, Registry) {
+	switch Status {
+		case "newer":
+			return "the file declares schema v" . Version . ", newer than this build's v" . Registry["current"]
+		case "invalid":
+			return "[_meta] schema_version is not a positive integer"
+		case "unsupported":
+			return "no migration path from schema v" . Version
+				. ": the oldest this build migrates is v" . Registry["oldest"]
+	}
+	throw ValueError("'" . Status . "' is not a version refusal")
+}
+
 ; Migrates FilePath for the Windows driver. Returns Map("status", "read_only",
 ; "from", "to", "backup", "detail"); status is "absent", "current",
 ; "migrated", "newer", "invalid", "unsupported" or "failed", and only
@@ -1026,14 +1085,8 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 				try LoggerSuccess("ConfigMigrate", "'{1}' is at schema v{2}; nothing to migrate.",
 					FilePath, Registry["current"])
 				return Result
-			case "newer":
-				return Refuse("newer", "the file declares schema v" . Version
-					. ", newer than this build's v" . Registry["current"])
-			case "invalid":
-				return Refuse("invalid", "[_meta] schema_version is not a positive integer")
-			case "unsupported":
-				return Refuse("unsupported", "no migration path from schema v" . Version
-					. ": the oldest this build migrates is v" . Registry["oldest"])
+			case "newer", "invalid", "unsupported":
+				return Refuse(Outcome, ConfigMigrateVersionRefusalDetail(Outcome, Version, Registry))
 		}
 
 		ConfigMigrateClassify(Before, Registry, &LegacyVersion)
@@ -1648,6 +1701,15 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			Row.phase := "refused"
 			Detail := "the original native source classification remains refused for this session"
 			TOML_RefuseWrites(FilePath, Detail)
+			; The migration is never run on this source, so its refusal ERROR is
+			; logged here, as the macOS and Linux boots log theirs.
+			try {
+				Native.classify.Call(Native.decode.Call(Row.image.source), Row.registry_shadow, &RefusedVersion)
+				RefusalDetail := ConfigMigrateVersionRefusalDetail(Row.classification, RefusedVersion, Row.registry_shadow)
+			} catch as Err
+				RefusalDetail := "the prepared classification could not be read again: " . Err.Message
+			try LoggerError("ConfigMigrate", "Config migration of '{1}' refused ({2}): {3}. The file is "
+				. "left untouched and this session will not write it.", FilePath, Row.classification, RefusalDetail)
 			return PreserveVariantRefusal(Map("status", Row.classification, "read_only", 1, "from", "", "to", Row.registry_shadow["current"],
 				"backup", "", "detail", Detail))
 		}

@@ -217,6 +217,27 @@ helpers.describe("llm settings: the bounds", function()
 				.. "sides")
 	end)
 
+	-- The bounds are the shared value schema's, the same on the three drivers
+	-- (value-validation): checking them against the declarations pins that.
+	helpers.it("takes every range from the shared value schema (value-validation)", function()
+		local settings = load_over_storage()
+		local ValueCheck = require("settings.engine.value_check")
+		local KEY = require("settings.engine.keys").KEY
+		local declared = {
+			temperature = KEY.LLM_GENERATION_TEMPERATURE, context_length = KEY.LLM_GENERATION_CONTEXT_LENGTH,
+			min_words = KEY.LLM_GENERATION_MIN_WORDS, max_words = KEY.LLM_GENERATION_MAX_WORDS,
+		}
+		local results = {}
+		for name, key in pairs(declared) do
+			local bounds = settings.bounds(name)
+			local entry = ValueCheck.declaration(key)
+			results[#results + 1] = { name, bounds.min == entry.min and bounds.max == entry.max }
+			results[#results + 1] = { name .. " past max", settings.set(name, entry.max + 1) ~= true }
+		end
+		drop_storage()
+		for _, row in ipairs(results) do helpers.assert_true(row[2], row[1]) end
+	end)
+
 	helpers.it("offers only presets inside the range", function()
 		local settings = load_over_storage()
 		local checked = 0
@@ -267,11 +288,11 @@ local function with_auto_menu(options, callback)
 	local profiles = require("modules.llm.profile_settings")
 	settings._reset()
 	profiles._reset()
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if root.llm_generation_menu then
 				if options.label then root.llm_generation_menu[2].i18n = options.label end
 				if options.auto_first then
@@ -280,7 +301,7 @@ local function with_auto_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("logger.shim"),
+		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0 }
@@ -310,7 +331,7 @@ local function with_auto_menu(options, callback)
 				if child then return child, siblings, position end
 			end
 		end
-		local title = require("infra.i18n").get(options.find or options.label or "menu.llm.auto_raise_temp")
+		local title = require("core.i18n.engine.i18n").get(options.find or options.label or "menu.llm.auto_raise_temp")
 		local row, siblings, position = find(items, title)
 		callback(assert(row, "the actual automatic temperature control must exist"), settings, profiles, storage, observed, context, admission, siblings, position)
 	end, debug.traceback)
@@ -321,10 +342,10 @@ end
 --- Reads expectations captured independently of the declaration and native policy.
 --- @return table corpus
 local function auto_raise_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/auto_raise_temperature.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/auto_raise_temperature.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM reset-on-navigation check", function()
@@ -388,12 +409,12 @@ helpers.describe("LLM shared automatic temperature control", function()
 
 	helpers.it("uses the changed shared label and order before numeric providers (shared-auto-raise)", function()
 		with_auto_menu({selected = true, label = auto_raise_corpus().alternate_i18n, auto_first = true}, function(row, _, _, _, observed, _, _, siblings, position)
-			local count_label = string.format(require("infra.i18n").get("menu.llm.num_predictions_label"), "2")
+			local count_label = string.format(require("core.i18n.engine.i18n").get("menu.llm.num_predictions_label"), "2")
 			local count_position
 			for index, sibling in ipairs(siblings) do if sibling.title == count_label then count_position = index end end
 			helpers.assert_true(count_position ~= nil, "the actual numeric provider remains present")
 			helpers.assert_true(position < count_position, "the declaration moves the check before numeric values")
-			helpers.assert_eq(row.title, require("infra.i18n").get(auto_raise_corpus().alternate_i18n))
+			helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(auto_raise_corpus().alternate_i18n))
 			helpers.assert_eq(observed.writes, 0)
 			helpers.assert_eq(observed.redraws, 0)
 		end)
@@ -412,10 +433,19 @@ helpers.describe("LLM shared automatic temperature control", function()
 		end)
 	end)
 
-	helpers.it("refuses stale callbacks after pause or the live AI gate closes (shared-auto-raise)", function()
-		for _, gate in ipairs({ "pause", "master" }) do
-			with_auto_menu({selected = true}, function(row, settings, _, _, observed, context, admission)
-				if gate == "pause" then context.paused = true else admission.enabled = false end
+	helpers.it("commits while paused, read on resume (shared-auto-raise)", function()
+		with_auto_menu({selected = true}, function(row, settings, _, _, _, context)
+			-- A pause stops typing, not configuration (EDD-1).
+			context.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("auto_raise_temp"), false)
+		end)
+	end)
+
+	helpers.it("refuses stale callbacks after the live AI gate closes (shared-auto-raise)", function()
+		for _, gate in ipairs({ "master" }) do
+			with_auto_menu({selected = true}, function(row, settings, _, _, observed, _, admission)
+				admission.enabled = false
 				local result = row.fn()
 				helpers.assert_eq(settings.get("auto_raise_temp"), true)
 				helpers.assert_eq(observed.writes, 0)

@@ -4,12 +4,12 @@
 --- BRIDGE HANDLER: Error Window (Linux)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json), and
+--- passes the shared policy (_shared/diagnostics/data/error_policy.json), and
 --- serves the page's actions: report on GitHub, copy the report, open the file the error
 --- is logged in, close.
 --- Bridge name: "error_dialog"
 --- The host-independent half (policy load, Debug switch, report, first
---- message) is _shared/lua/error_dialog/core.lua, shared with the other host.
+--- message) is _shared/core/ui/engine/error_dialog_core.lua, shared with the other host.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The shared logger core hands every emitted ERROR to M.on_error
@@ -32,14 +32,14 @@
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "ui.error_dialog.bridge", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "ui.error_dialog.bridge", module = M })
 M.bridge_name = "error_dialog"
 
-local Logger      = require("logger.shim")
-local Policy      = require("diagnostics.error_policy")
-local DialogCore  = require("error_dialog.core")
-local Redact      = require("diagnostics.redact")
-local ConfigKeys = require("config_keys")
+local Logger      = require("core.logger.engine.shim")
+local Policy      = require("diagnostics.engine.reports.error_policy")
+local DialogCore  = require("core.ui.engine.error_dialog_core")
+local Redact      = require("diagnostics.engine.reports.redact")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "bridge.error_dialog"
 
@@ -85,10 +85,10 @@ local function cancel_action(session)
 end
 
 -- Seconds on a monotonic clock, replaceable by tests
-M.clock = function() return require("infra.monotonic").now_ms() / 1000 end
+M.clock = function() return require("core.logger.engine.monotonic").now_ms() / 1000 end
 
 -- Runs a callback later on the daemon's loop, replaceable by tests
-M.defer = function(fn, delay_ms) return require("adapters.event_loop").defer(fn, delay_ms) end
+M.defer = function(fn, delay_ms) return require("core.events.loop").defer(fn, delay_ms) end
 
 
 
@@ -106,7 +106,7 @@ M.defer = function(fn, delay_ms) return require("adapters.event_loop").defer(fn,
 function M.init()
 	if not _scope.admit_change() then return false end
 	return DialogCore.init(Logger, LOG, _policy ~= nil,
-		function() return require("infra.paths").shared("modules/diagnostics/error_policy.json") end,
+		function() return require("core.fs.engine.paths").shared("diagnostics/data/error_policy.json") end,
 		function(policy, decisions)
 			_policy, _decisions = policy, decisions
 			_enabled = M.is_enabled()
@@ -118,7 +118,7 @@ end
 --- @return boolean
 function M.is_enabled()
 	if _enabled ~= nil then return _enabled end
-	return DialogCore.stored_enabled(require("adapters.storage"),
+	return DialogCore.stored_enabled(require("core.fs.adapters.storage"),
 		function(path) return require("infra.manifest_reader").default_for(path) end, SETTING)
 end
 
@@ -155,7 +155,7 @@ local function build_report(record)
 	local Health = require("ui.healthcheck.bridge")
 	local HealthReport = require("ui.healthcheck.report")
 	local documents = Health.config()
-	local snapshot = Health.build_snapshot(require("ui.webview_manager").get_daemon_state(), false)
+	local snapshot = Health.build_snapshot(require("core.ui.ui.webview_manager").get_daemon_state(), false)
 	local composed = DialogCore.compose(record, snapshot, Health.DRIVER)
 	return {
 		report    = composed.report,
@@ -188,8 +188,8 @@ function M.report(record, complete, current)
 		if owned() then complete(false) end
 		return nil
 	end
-	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
-		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
+	local shared = require("diagnostics.engine.healthcheck.share").document(fields.snapshot, fields.documents.schema,
+		require("core.i18n.engine.i18n").get(fields.documents.schema.share_policy.notice_key))
 	if not owned() then return nil end
 	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
@@ -206,8 +206,8 @@ local function init_message(session)
 	local function redact(text) return Redact.apply(text, rules, session.context) end
 	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 	-- This pane promises the exact projected document used by Copy and Report.
-	message.text = require("healthcheck.share").document(session.snapshot, session.documents.schema,
-		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+	message.text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
+		require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key)).text
 	return message
 end
 
@@ -236,7 +236,7 @@ end
 --- @return boolean opened
 local function open_window()
 	Logger.start(LOG, "Opening the error window…")
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local record = _pending
 	local epoch = manager.current_epoch(APP)
 	-- A window left open (its close box raced this one) is replaced; its close
@@ -248,14 +248,14 @@ local function open_window()
 	-- The close hook normally clears the old request, but can admit a new one.
 	if (_pending ~= nil and _pending ~= record) or not M.is_enabled() then return false end
 	_busy, _pending = true, record
-	local opened = manager.show(APP, require("infra.i18n").get_locale())
+	local opened = manager.show(APP, require("core.i18n.engine.i18n").get_locale())
 	-- Native callbacks may close this request and open a successor before show returns.
 	if _pending ~= record then return false end
 	if not opened then
 		-- Without a window (no WebKitGTK, no display) the error is announced and
 		-- stays in the errors file
-		local I18n = require("infra.i18n")
-		require("adapters.application_notifier").send(record.message,
+		local I18n = require("core.i18n.engine.i18n")
+		require("platform.focus.application_notifier").send(record.message,
 			{ title = I18n.get("common.error_title"), level = "error" })
 		Logger.warn(LOG, "The error window could not open; the error was announced by a notification.")
 		return false
@@ -287,9 +287,9 @@ end
 --- @param message table
 --- @return boolean pushed
 local function push(message, expected)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if expected and (_session ~= expected or manager.current_epoch(APP) ~= expected.epoch) then return false end
-	local ok, json = pcall(require("json").encode, message)
+	local ok, json = pcall(require("core.text.engine.json").encode, message)
 	if not ok then
 		Logger.error(LOG, "An error window message could not be encoded: %s.", tostring(json))
 		return false
@@ -318,8 +318,8 @@ local function perform(name, context)
 	local action
 	local shared
 	if name == "copy" or name == "report" then
-		shared = require("healthcheck.share").document(session.snapshot, session.documents.schema,
-			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+		shared = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
+			require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key))
 	end
 	if name == "copy" then
 		action = { action = "copy", text = shared.text }
@@ -335,7 +335,7 @@ local function perform(name, context)
 	local inline, answer, completed = true, nil, false
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
-			and _scope.generation() == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
+			and _scope.generation() == token.generation and require("core.ui.ui.webview_manager").current_epoch(APP) == session.epoch
 	end
 	local request = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot, {
 		current = current,
@@ -367,7 +367,7 @@ function M.on_message(payload, _state, context)
 		local epoch = type(context) == "table" and context.epoch or nil
 		local function current()
 			return _pending == record and _session == previous
-				and (epoch == nil or require("ui.webview_manager").current_epoch(APP) == epoch)
+				and (epoch == nil or require("core.ui.ui.webview_manager").current_epoch(APP) == epoch)
 		end
 		local ok, fields = pcall(build_report, record)
 		if not current() then return nil end
@@ -403,7 +403,7 @@ end
 --- Frees the policy when the user closes the window with its close box.
 --- @param epoch number|nil
 function M.on_window_closed(epoch)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if epoch ~= nil and manager.current_epoch(APP) ~= nil and manager.current_epoch(APP) ~= epoch then return end
 	settle()
 end

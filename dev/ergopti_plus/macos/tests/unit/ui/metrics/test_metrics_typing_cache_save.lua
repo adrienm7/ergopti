@@ -15,7 +15,7 @@ local function with_save(mode, callback)
 	local previous_open, previous_rename, previous_remove = io.open, os.rename, os.remove
 	local ok, err = xpcall(function()
 		Scope.run(function()
-			package.loaded["adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
+			package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return nil, "absent" end }
 			package.loaded["modules.keystats.sqlite_reader"] = {}
 			local pending, warnings = {}, {}
 			local dashboard, window = load_dashboard({
@@ -34,7 +34,7 @@ local function with_save(mode, callback)
 				return self
 			end
 			package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
-			package.loaded["infra.logger"].warn = function(_, message, ...)
+			package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end
 			os.remove = function() state.unlinks = state.unlinks + 1; return true end

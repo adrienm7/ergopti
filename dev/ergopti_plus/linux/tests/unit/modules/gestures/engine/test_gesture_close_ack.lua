@@ -3,11 +3,11 @@
 local helpers = require("tests.helpers")
 
 local function with_reader(close, body)
-	local names = { "adapters.evdev_reader", "modules.gestures.manager", "ffi" }
+	local names = { "platform.input.evdev_reader", "modules.gestures.manager", "ffi" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, err = pcall(function()
-		local reader = helpers.load_module("adapters.evdev_reader")
+		local reader = helpers.load_module("platform.input.evdev_reader")
 		reader._set_backend({ open = function() return 7 end, close = close,
 			ioctl = function() return true end })
 		body(reader)

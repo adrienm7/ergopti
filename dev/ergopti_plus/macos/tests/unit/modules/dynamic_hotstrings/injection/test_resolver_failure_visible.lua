@@ -25,10 +25,10 @@ end
 --- Runs the failure scenario while restoring every process-global module.
 local function run_scenario()
 	local dependency_names = {
-		"adapters.timer_scheduler",
-		"dynamic_hotstrings",
-		"infra.logger",
-		"logger.shim",
+		"core.events.timer_scheduler",
+		"hotstrings.engine.dynamic.core",
+		"core.logger.engine.logger",
+		"core.logger.engine.shim",
 		"modules.diagnostics.hid_diagnostic_mailbox",
 		"modules.dynamic_hotstrings.rules_engine",
 		"modules.keystats",
@@ -50,13 +50,13 @@ local function run_scenario()
 	Logger.error = function(_log, format_string, ...)
 		errors[#errors + 1] = string.format(format_string, ...)
 	end
-	package.loaded["infra.logger"] = Logger
-	package.loaded["logger.shim"] = Logger
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.logger.engine.shim"] = Logger
 	-- The resolver test owns only the dynamic-rules consumer. Loading the full
 	-- keystats now arms its independent KC bridge poller during init, which would
 	-- consume this fixture's sole repeating-timer counter before the mailbox does
 	package.loaded["modules.keystats"] = { notify_synthetic = function() end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function()
 			after_calls = after_calls + 1
 			error("resolver diagnostics must not allocate a one-shot timer", 0)
@@ -75,6 +75,7 @@ local function run_scenario()
 		register_lua_group = function() end,
 		set_post_load_hook = function() end,
 		register_interceptor = function(fn) interceptor = fn end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function(fn) provider = fn end,
 		registry_transaction = function(_label, mutation) return mutation() end,
 		invalidate_hotstring_preview = function() return true end,
@@ -88,11 +89,11 @@ local function run_scenario()
 	}
 
 	local ok, err = xpcall(function()
-		package.loaded["dynamic_hotstrings"] = nil
+		package.loaded["hotstrings.engine.dynamic.core"] = nil
 		package.loaded["modules.dynamic_hotstrings.rules_engine"] = nil
 		local RulesEngine = helpers.load_with_stubs("modules.dynamic_hotstrings.rules_engine")
 		local Mailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
-		local SharedEngine = require("dynamic_hotstrings")
+		local SharedEngine = require("hotstrings.engine.dynamic.core")
 		helpers.assert_true(Mailbox.start())
 		helpers.assert_eq(pump_arm_calls, 1)
 		helpers.assert_true(RulesEngine.start(fake_keymap))

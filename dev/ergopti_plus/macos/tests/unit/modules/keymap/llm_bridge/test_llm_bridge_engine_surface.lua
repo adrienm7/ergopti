@@ -44,7 +44,7 @@ local function engine_calls(source)
 end
 
 helpers.describe("llm_bridge: every engine call exists on the real prediction engine", function()
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	local engine = helpers.load_with_stubs("modules.llm.prediction_engine")
 
 	helpers.it("the real engine exports every function the bridge calls", function()

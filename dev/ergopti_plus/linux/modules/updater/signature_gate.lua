@@ -7,7 +7,7 @@
 --- once the transfer has the archive's exact size and verified SHA-256. The
 --- verification itself is infra/asset_signature.lua; the policy (enforcement,
 --- key, record header) is the one shared file
---- _shared/modules/updater/asset_signing.json, which every verifier reads.
+--- _shared/updater/data/asset_signing.json, which every verifier reads.
 ---
 --- FEATURES & RATIONALE:
 --- 1. One source for enforcement. "off" (the shipped default) installs an unsigned

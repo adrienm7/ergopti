@@ -3,10 +3,10 @@
 --- Owns directly declared script rows under the existing ordinary-save fence.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Runtime = require("script_scope_runtime")
-local Transaction = require("config_scope_transaction")
-local Fenced = require("config_scope_fenced_transaction")
-local ConfigKeys = require("config_keys")
+local Runtime = require("settings.engine.scope.script_scope_runtime")
+local Transaction = require("settings.engine.scope.transaction")
+local Fenced = require("settings.engine.scope.fenced_transaction")
+local ConfigKeys = require("settings.engine.keys")
 
 --- Native settings alias of each directly declared script row.
 local ALIAS_NAMES = {
@@ -17,8 +17,8 @@ local ALIAS_NAMES = {
 
 --- Native field owner module of each directly declared script row.
 local NATIVE_OWNERS = {
-	[ConfigKeys.KEY.SCRIPT_LOCALE] = "infra.i18n",
-	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "infra.logger",
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
+	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "core.logger.engine.logger",
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog",
 }
 
@@ -48,11 +48,11 @@ function M.adopt_configured()
 	-- logger threshold, and init re-applies the level after it.
 	local adopted = M.alias_names()
 	adopted[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = nil
-	return require("script_config_authority").adopt({
+	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, platform = "hs",
-		aliases = adopted, storage = require("adapters.storage"),
-		logger = require("infra.logger"), log = "script_scope" })
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, platform = "hs",
+		aliases = adopted, storage = require("core.fs.adapters.storage"),
+		logger = require("core.logger.engine.logger"), log = "script_scope" })
 end
 
 --- Rewrites the config.toml row a menu or wizard change replaces, when the
@@ -62,11 +62,11 @@ end
 --- @return boolean committed
 function M.rewrite_configured(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	local committed, detail = require("script_config_authority").rewrite({
+	local committed, detail = require("settings.engine.scope.script_config_authority").rewrite({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, key = path, value = value })
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, key = path, value = value })
 	if committed ~= true then
-		require("infra.logger").error("script_scope", "%s was not changed: %s.", path, tostring(detail))
+		require("core.logger.engine.logger").error("script_scope", "%s was not changed: %s.", path, tostring(detail))
 	end
 	return committed == true
 end
@@ -74,17 +74,17 @@ end
 --- Rewrites one configured row and retains its exact inverse for its caller.
 function M.rewrite_configured_owned(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	return require("script_config_authority").rewrite_owned({
+	return require("settings.engine.scope.script_config_authority").rewrite_owned({
 		path = require("infra.config_paths").get("ConfigTomlPath"),
-		file_adapter = require("adapters.file_system"), manifest = Manifest, key = path, value = value })
+		file_adapter = require("core.fs.adapters.file_system"), manifest = Manifest, key = path, value = value })
 end
 
 function M.restore_configured_rewrite(receipt)
-	return require("script_config_authority").restore_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").restore_rewrite(receipt)
 end
 
 function M.verify_configured_rewrite(receipt)
-	return require("script_config_authority").verify_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").verify_rewrite(receipt)
 end
 
 --- Returns detached alias descriptors bound to the existing native field owners.
@@ -96,15 +96,17 @@ function M.native_aliases()
 end
 
 --- Creates the direct native participant with existing checkpoint/source owners.
---- @param options table Current menu persistence, pause, backup and writer ports.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Current menu persistence, backup and writer ports.
 --- @return table owner Apply/revert/release/pending/retry_restore.
 function M.new(options)
-	assert(type(options) == "table" and type(options.paused) == "function"
+	assert(type(options) == "table"
 		and type(options.storage_backup_path) == "function", "script scope requires current native menu owners")
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "hs", aliases = options.aliases or aliases(),
-		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
+		storage = options.storage or require("core.fs.adapters.storage"), token = token, files = options.files,
 		storage_backup_path = options.storage_backup_path })
 	local ports = {}
 	for key, value in pairs(options) do ports[key] = value end
@@ -130,7 +132,7 @@ function M.new(options)
 	local owner
 	owner = Fenced.new({ owner = {}, native_token = token, transaction = adapter, scope = "global",
 		fences = runtime.fences, available = function()
-			return options.paused() == false and require("config_migrate").read_only_reason(options.path) == nil
+			return require("settings.engine.migration.migrate").read_only_reason(options.path) == nil
 		end })
 	local release = owner.release
 	function owner.release()

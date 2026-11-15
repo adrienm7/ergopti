@@ -2,8 +2,8 @@
 
 --- Drives canonical recommendations through real keyboard, action and URL owners.
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 local CHORD = { key = "g", mods = { ctrl = true } }
 local SOURCE = '[shortcuts]\nenabled = true\nchatgpt_url = "https://initial.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
@@ -18,14 +18,14 @@ local function with_binding(body, options)
 		Sandbox.with_config(SOURCE, function(path)
 			local seen = { commands = {}, other = 0, queue = {} }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end,
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end,
 				set = function() error("canonical bindings must not write legacy storage") end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) seen.commands[#seen.commands + 1] = command; return true end,
 			}
-			package.loaded["adapters.evdev_reader"] = {
+			package.loaded["platform.input.evdev_reader"] = {
 				open = function() error("shortcut ownership must not acquire evdev") end,
 				close = function() error("shortcut ownership must not close evdev") end,
 			}
@@ -51,11 +51,11 @@ local function with_binding(body, options)
 				local combinations = require("modules.shortcuts.key_combinations")
 				if not options or options.initialize_pairs ~= false then
 					local Loader = require("platform.remap.tap_hold_loader")
-					local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+					local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 					local catalogue = Loader.load_document(defaults,
-						{ tap_hold = { enabled = false, inherit_defaults = true } }, nil, path .. ".tap_hold.toml")
+						{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 					helpers.assert_true(combinations.install({ keys = catalogue.catalog, hold_picker = catalogue.hold_picker,
-						files = require("adapters.file_system"), route = function() return path end,
+						files = require("core.fs.adapters.file_system"), route = function() return path end,
 						is_paused = function() return false end,
 						actions = { is_assignable = function(action)
 							return action ~= "one_shot_shift" and gestures.is_assignable(action) == true
@@ -80,7 +80,7 @@ local function with_binding(body, options)
 			body(owners, seen, path, reload)
 		end)
 	end)
-	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp") end
+	for _, path in ipairs(backups) do os.remove(path); os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path)) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end

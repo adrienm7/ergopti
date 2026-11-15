@@ -14,15 +14,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local ResetFailure = require("config_reset_failure")
+local ResetFailure = require("settings.engine.publication.reset_failure")
 
 --- Runs `body` with zenity recorded, answering every dialog.
 --- @param body function Clicks the rows under test.
 --- @return table shown Every zenity command.
 local function with_zenity(body)
 	local execute, shown = os.execute, {}
-	local previous_modal = package.loaded["ui.modal"]
-	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
+	local previous_modal = package.loaded["core.ui.ui.modal"]
+	package.loaded["core.ui.ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
 		if command:find("dialog_host.lua", 1, true) then
 			shown[#shown + 1] = command
@@ -32,7 +32,7 @@ local function with_zenity(body)
 	end
 	local ok, err = pcall(body)
 	os.execute = execute
-	package.loaded["ui.modal"] = previous_modal
+	package.loaded["core.ui.ui.modal"] = previous_modal
 	if not ok then error(err, 0) end
 	return shown
 end
@@ -42,7 +42,7 @@ end
 --- @param row_key string i18n key of the row label.
 --- @return table|nil row
 local function configuration_row(ctx, row_key)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	package.loaded["ui.menu.builder"] = nil
 	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string"
@@ -88,7 +88,7 @@ local function zenity_text(command)
 end
 
 helpers.describe("Configuration restore and clear failure reason (Linux)", function()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local cases = {
 		{ point = "rollback", kind = "rollback_pending", failed = "llm", reverted = false },
 		{ point = "finalize", kind = "release_refused", failed = "gestures" },

@@ -70,21 +70,21 @@ local function load_settings(options)
 	}
 
 	local previous = {
-		logger = package.loaded["logger.shim"],
+		logger = package.loaded["core.logger.engine.shim"],
 		manifest = package.loaded["infra.manifest_reader"],
-		storage = package.loaded["adapters.storage"],
+		storage = package.loaded["core.fs.adapters.storage"],
 		settings = package.loaded["infra.script_settings"],
 	}
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["infra.manifest_reader"] = manifest
-	package.loaded["adapters.storage"] = storage
+	package.loaded["core.fs.adapters.storage"] = storage
 	package.loaded["infra.script_settings"] = nil
 	local settings = require("infra.script_settings")
 	local original_set = settings.set
 	settings.set = function(value)
 		local saved_scope, saved_settings = package.loaded["infra.script_scope"], package.loaded["infra.script_settings"]
-		local saved_shim, saved_logger = package.loaded["logger.shim"], package.loaded["logger"]
-		package.loaded["infra.script_settings"], package.loaded["logger.shim"], package.loaded["logger"] = settings, logger, logger
+		local saved_shim, saved_logger = package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"]
+		package.loaded["infra.script_settings"], package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = settings, logger, logger
 		package.loaded["infra.script_scope"] = { retry_edit = function() return true end, edit_setting = function(key, level)
 			if not storage.set(key, level) then return false end
 			local token = { pending = function() return false end }
@@ -96,13 +96,13 @@ local function load_settings(options)
 		end }
 		local ok, result = pcall(original_set, value)
 		package.loaded["infra.script_scope"], package.loaded["infra.script_settings"] = saved_scope, saved_settings
-		package.loaded["logger.shim"], package.loaded["logger"] = saved_shim, saved_logger
+		package.loaded["core.logger.engine.shim"], package.loaded["core.logger.engine"] = saved_shim, saved_logger
 		if not ok then error(result, 0) end
 		return result
 	end
-	package.loaded["logger.shim"] = previous.logger
+	package.loaded["core.logger.engine.shim"] = previous.logger
 	package.loaded["infra.manifest_reader"] = previous.manifest
-	package.loaded["adapters.storage"] = previous.storage
+	package.loaded["core.fs.adapters.storage"] = previous.storage
 	package.loaded["infra.script_settings"] = previous.settings
 	return settings, storage, logger
 end
@@ -184,5 +184,50 @@ helpers.describe("script settings mutation", function()
 		helpers.assert_true(not settings.set("ALL"))
 		helpers.assert_eq(#storage.writes, 0)
 		helpers.assert_eq(#logger.levels, 0)
+	end)
+end)
+
+-- Each log-level, locale or error-window change wrote storage.edit-*.bak, a
+-- full copy of the store, and config.toml.edit-*.bak when the file held the
+-- row, and nothing removed them: the folder grew with ordinary use. Windows
+-- and macOS keep no copy per edit; a committed and released edit now removes
+-- its own rollback copies (CFL-002, script-edit-backups).
+helpers.describe("script settings edits (script-edit-backups)", function()
+	--- Names of the edit backups in the scratch configuration folder.
+	local function edit_backups(dir)
+		local found = {}
+		local listing = assert(io.popen("ls -1A " .. require("core.process.adapters.shell_runner").quote(dir) .. " 2>/dev/null"))
+		for name in listing:lines() do
+			if name:find("%.edit%-.*%.bak$") then found[#found + 1] = name end
+		end
+		listing:close()
+		return found
+	end
+
+	helpers.it("removes its rollback copies once an edit commits (script-edit-backups)", function()
+		local Paths = require("infra.config_paths")
+		local dir = Paths.default_config_dir()
+		helpers.assert_true(dir:find(os.getenv("HOME") or "\0", 1, true) == 1, "the runner's scratch home holds the folder")
+		local Settings = require("infra.script_settings")
+		local before = Settings.current()
+		local config = Paths.config("config.toml")
+		assert(os.execute("mkdir -p " .. require("core.process.adapters.shell_runner").quote(dir)))
+		local handle = assert(io.open(config, "w"))
+		handle:write('[script]\nlog_level = "INFO"\n')
+		handle:close()
+		local ok, err = pcall(function()
+			for _, level in ipairs({ "DEBUG", "WARNING", "ERROR" }) do
+				helpers.assert_true(Settings.set(level), "the menu change commits: " .. level)
+			end
+			helpers.assert_eq(Settings.current(), "ERROR")
+			local file = assert(io.open(config, "r"))
+			local text = file:read("*a")
+			file:close()
+			helpers.assert_true(text:find('log_level = "ERROR"', 1, true) ~= nil, "the row the file holds is rewritten")
+			helpers.assert_eq(edit_backups(dir), {}, "no copy of the store or the file is left behind")
+		end)
+		Settings.set(before)
+		os.remove(config)
+		if not ok then error(err, 0) end
 	end)
 end)

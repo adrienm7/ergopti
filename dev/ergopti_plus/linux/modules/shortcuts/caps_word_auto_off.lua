@@ -8,7 +8,7 @@
 --- 0 = never), `shortcuts.caps_word.terminators` (word delimiters of the
 --- hotstring catalogue) and `[shortcuts.caps_word.pointer]` (one switch per
 --- pointer kind). The rule itself is the shared policy
---- (_shared/lua/caps_word/auto_off.lua); this module reads and writes the
+--- (_shared/keyboard/engine/caps_word_auto_off.lua); this module reads and writes the
 --- settings and names the pointer kind of a native evdev event.
 ---
 --- FEATURES & RATIONALE:
@@ -25,18 +25,18 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local Manifest = require("infra.manifest_reader")
 local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigOutdated = require("config_outdated")
-local Policy = require("caps_word.auto_off")
-local EvdevCodes = require("infra.evdev_codes")
-local InputEvent = require("infra.input_event")
-local ConfigKeys = require("config_keys")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Policy = require("keyboard.engine.caps_word_auto_off")
+local EvdevCodes = require("platform.input.evdev_codes")
+local InputEvent = require("platform.input.event")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.caps_word_auto_off"
 
@@ -212,7 +212,7 @@ local function resolve_settings(document, mark)
 			settings.idle_timeout_seconds = idle
 			if mark then mark("shortcuts", "caps_word", ConfigKeys.LEAF.IDLE_TIMEOUT_SECONDS) end
 		else
-			ConfigOutdated.report(IDLE_PATH, "the value is not a non-negative number of seconds", Logger)
+			ConfigOutdated.report(IDLE_PATH, "the value is not a number of seconds in the declared range (0 = never)", Logger)
 		end
 	end
 

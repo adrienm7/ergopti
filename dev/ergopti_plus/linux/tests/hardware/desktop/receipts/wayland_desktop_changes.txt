@@ -1,0 +1,40 @@
+# Wayland desktop changes, container proof (2026-11-10)
+
+Command: TMPDIR=/tmp bash static/ergopti_plus/linux/tests/hardware/desktop/run_wayland_sessions.sh
+Base: origin/dev 1d5fe5941e. Ubuntu 24.04.5 container, root, headless, no /dev/dri.
+Compositors: sway 1.9 (WLR_BACKENDS=headless), KWin 5.27.11 (kwin_wayland --virtual,
+Plasma 5), GNOME Shell 46.0 (--headless --wayland --no-x11), each with its own
+XDG_RUNTIME_DIR and session bus.
+Path: workspace_switcher.current_workspace_source -> system_metrics.bind_desktop_source
+-> observe_desktop, switches through workspace_switcher.switch (swaymsg, KWin D-Bus),
+each switch at least 1.15 s from the previous read.
+
+SESSION mode=sway desktop=sway wayland_display=wayland-1
+BACKEND sway
+PASS switch 1 next 1 -> 2 space_switches=1
+PASS switch 2 next 2 -> 3 space_switches=2
+PASS switch 3 next 3 -> 1 space_switches=3
+PASS switch 4 prev 1 -> 3 space_switches=4
+PASS sub-second round trip missed space_switches=4
+PASS sway 4 switches counted, 4 space_change events
+CASE sway PASS
+KWIN kwin 5.27.11
+SESSION mode=kde desktop=kde wayland_display=wayland-kde
+BACKEND KWin
+PASS switch 1 next 1 -> 2 space_switches=1
+PASS switch 2 next 2 -> 3 space_switches=2
+PASS switch 3 next 3 -> 4 space_switches=3
+PASS switch 4 prev 4 -> 3 space_switches=4
+PASS sub-second round trip missed space_switches=4
+PASS kde 4 switches counted, 4 space_change events
+CASE kde PASS
+GNOME_SHELL (<'46.0'>,)
+SESSION mode=gnome desktop=gnome wayland_display=wayland-gnome
+PASS gnome unmeasured reason=platform_reason.desktop_changes_need_workspace_interface detect=unsupported
+CASE gnome PASS
+EXIT=0
+
+Open: Hyprland is not packaged by Ubuntu 24.04 and its sources are unreachable from
+this container (hyprctl stays covered by the unit fixtures only); Plasma 6 likewise
+(noble ships KWin 5.27, whose currentDesktop/setCurrentDesktop D-Bus calls the
+module uses unchanged).

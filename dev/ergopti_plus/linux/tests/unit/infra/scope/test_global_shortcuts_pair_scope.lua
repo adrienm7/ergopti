@@ -6,7 +6,7 @@
 -- Requiring it inside a fixture and erasing it on teardown reopens libuv state.
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Scope = require("infra.shortcuts_scope")
 local path, backup = "/controlled/config.toml", "/controlled/combination.bak"
 local pair, binding = "caps_lock_then_tab", "combination__caps_lock_then_tab"
@@ -46,12 +46,12 @@ local function with_owner(body, managed, prepare)
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
-			local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-			local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+			local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
+			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
-			package.loaded["adapters.file_system"]=files
+			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["infra.config_paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.refuse_native then return false end
@@ -65,7 +65,7 @@ local function with_owner(body, managed, prepare)
 			for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 			package.loaded["modules.shortcuts.key_combinations"]=nil
 			state.manager=require("platform.remap.tap_hold_manager")
-			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			state.pairs=require("modules.shortcuts.key_combinations")
 		else
 		state.pairs = PairOwner.new({ keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} },

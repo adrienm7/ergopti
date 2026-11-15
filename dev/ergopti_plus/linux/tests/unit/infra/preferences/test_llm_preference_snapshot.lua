@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 local Manifest = require("infra.manifest_reader")
-local Outdated = require("config_outdated")
+local Outdated = require("settings.engine.migration.outdated")
 
 local function with_preferences(body)
 	Sandbox.with_config('[llm]\nenabled = false\nagent_mode = "action"\n[llm.models]\nselected = "ollama"\n', function(path)

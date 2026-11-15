@@ -122,8 +122,8 @@ local function build_tray(observe_layout, catalogue)
 	end, { catalogue = catalogue, real_streaming_panel = true, real_trigger_panel = true })
 
 	local lines = {}
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	for _, level in ipairs({ "warn", "error" }) do
@@ -133,10 +133,10 @@ local function build_tray(observe_layout, catalogue)
 			return real_logger[level](module_name, fmt, ...)
 		end
 	end
-	package.loaded["infra.logger"] = spy
+	package.loaded["core.logger.engine.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	CaptionFixture.install(i18n)
 	LayoutFixture.install(i18n)
 	package.loaded["ui.menu.builder"] = nil
@@ -192,7 +192,7 @@ local function build_tray(observe_layout, catalogue)
 	local cleanup = observe_layout and observe_layout(require("infra.manifest_menu"), mods, ctx)
 	local ok, menu = pcall(builder.generate, ctx, mods, actions)
 	if cleanup then cleanup() end
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	if not ok then return nil, lines, tostring(menu) end
 	return menu, lines, nil
 end
@@ -213,13 +213,13 @@ local function walk(rows, visit, path, depth)
 	end
 end
 
-local RowText = require("test.menu_row_text")
+local RowText = require("tests.lua.menu.row_text")
 local SHARED_ROOT = helpers.driver_root() .. "/../_shared"
 -- The whole tray holds many more; fewer means a builder gave up.
 local MIN_TRAY_ROWS = 100
 
 helpers.describe("the real macOS tray reads as text", LayoutFixture.scoped(function()
-	local decode = require("json").decode
+	local decode = require("core.text.engine.json").decode
 
 	helpers.it("the walk itself refuses each shape of raw text", function()
 		local rows = { { title = "Disposition", menu = {
@@ -327,14 +327,14 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(found[1].depth, 2, "the config folder row belongs to the Configuration "
 			.. "submenu, not " .. found[1].where)
 		helpers.assert_true(found[1].where:find("menu.configuration.title", 1, true) ~= nil
-			or found[1].where:find(require("infra.i18n").get("menu.configuration.title"), 1, true) ~= nil,
+			or found[1].where:find(require("core.i18n.engine.i18n").get("menu.configuration.title"), 1, true) ~= nil,
 			"the config folder row must sit under Configuration, not " .. found[1].where)
 	end)
 
 	helpers.it("no clickable row is duplicated across two top-level submenus", function()
 		-- Restore and clear read one shared label in every section on purpose:
 		-- each row acts on its own section, and one wording is the decision.
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local shared_labels = {
 			[i18n.get("common.restore_recommended")] = true,
 			[i18n.get("common.clear_to_system")] = true,
@@ -362,7 +362,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	--- @param key string i18n key of the top-level row.
 	--- @return table|nil
 	local function top_submenu(key)
-		local text = require("infra.i18n").get(key)
+		local text = require("core.i18n.engine.i18n").get(key)
 		for _, row in ipairs(MENU or {}) do
 			if type(row.title) == "string" and row.title:sub(1, #text) == text then return row.menu end
 		end
@@ -381,7 +381,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_true(at ~= nil, "the French language pack row must be drawn")
 		helpers.assert_eq(rows[at].title:sub(1, #"🇫🇷 Français"), "🇫🇷 Français",
 			"the language row starts with the locale's flag, from the shared locale table")
-		helpers.assert_eq(rows[at - 1].title, require("infra.i18n").section("menu.hotstrings.header_languages"),
+		helpers.assert_eq(rows[at - 1].title, require("core.i18n.engine.i18n").section("menu.hotstrings.header_languages"),
 			"a « Hotstrings par langue » header must precede the language rows")
 		helpers.assert_eq(rows[at - 2].title, "-", "and a separator must precede that header")
 	end)
@@ -389,7 +389,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	helpers.it("configuration: the rows that rewrite the file come before the windows", function()
 		local rows = top_submenu("menu.configuration.title")
 		helpers.assert_true(type(rows) == "table", "the tray must carry the Configuration submenu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local drawn = {}
 		for index, row in ipairs(rows) do drawn[index] = row.title end
 		helpers.assert_eq(table.concat(drawn, " | "), table.concat({
@@ -412,7 +412,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 	helpers.it("about: Uninstall closes the submenu, after a separator", function()
 		local rows = top_submenu("menu.about.title")
 		helpers.assert_true(type(rows) == "table" and #rows >= 2, "the tray must carry the About submenu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local source_run = require("modules.updater").is_local_source()
 		local label = i18n.get("menu.global.uninstall")
 		if source_run then
@@ -483,5 +483,128 @@ helpers.describe("actual canonical Layout parent receives its completed module (
 		end)
 		helpers.assert_nil(err); helpers.assert_eq(calls, 0, "refusal precedes the real Layout module")
 		helpers.assert_nil(layout_row(menu, "menu.layout.title"))
+	end)
+end))
+
+--- Runs checks over the real tray modules, read through the branch decorator.
+--- @param run fun(builder, rows, mods, ctx, actions) The checks.
+local function with_branch_rows(run)
+	build_tray(function(_, mods, ctx)
+		local actions = setmetatable({}, { __index = function() return function() end end })
+		package.loaded["ui.menu.branch_rows"] = nil
+		local rows = require("ui.menu.branch_rows").new()
+		run(package.loaded["ui.menu.builder"], rows, rows.wrap(mods), ctx, actions)
+	end)
+end
+
+--- Builds the tree with one branch asked to rebuild alone.
+--- @return table rendered
+local function branch_build(builder, rows, mods, ctx, actions, key)
+	rows.request(key)
+	local rendered = builder.generate(ctx, mods, actions)
+	rows.settle()
+	return rendered
+end
+
+--- The visible shape of a rendered tree: titles, ticks, greying, nesting.
+--- @param rendered table Rendered rows.
+--- @return table shape
+local function shape(rendered)
+	local out = {}
+	for index, row in ipairs(rendered or {}) do
+		out[index] = { row.title, row.checked == true, row.disabled == true, row.menu and shape(row.menu) or false }
+	end
+	return out
+end
+
+--- Counts the calls of the original menu modules' build behind the decorator.
+--- @param originals table Original menu modules.
+--- @param keys table Module keys.
+--- @return table counts, function restore
+local function count_builds(originals, keys)
+	local counts, builds = {}, {}
+	for _, key in ipairs(keys) do
+		counts[key], builds[key] = 0, originals[key].build
+		originals[key].build = function(...) counts[key] = counts[key] + 1; return builds[key](...) end
+	end
+	return counts, function() for key, build in pairs(builds) do originals[key].build = build end end
+end
+
+helpers.describe("the real macOS tray: a toggle rebuilds its own branch alone", LayoutFixture.scoped(function()
+	helpers.it("(menu-branch-refresh) rebuilds only the asked branch and renders the full tree's rows", function()
+		build_tray(function(_, originals, ctx)
+			local counts, restore = count_builds(originals, { "tap_holds", "gestures", "shortcuts", "keystats" })
+			package.loaded["ui.menu.branch_rows"] = nil
+			local rows = require("ui.menu.branch_rows").new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
+			local full = builder.generate(ctx, mods, actions)
+			local branch = branch_build(builder, rows, mods, ctx, actions, "tap_holds")
+			restore()
+			helpers.assert_eq(counts, { tap_holds = 2, gestures = 1, shortcuts = 1, keystats = 1 })
+			helpers.assert_eq(shape(branch), shape(full), "the reused branches render as a full rebuild does")
+			full = builder.generate(ctx, mods, actions)
+			helpers.assert_eq(shape(full), shape(branch), "a settled request leaves the next build full")
+		end)
+	end)
+
+	helpers.it("(menu-branch-refresh) a new state in the rebuilt branch reaches the tree", function()
+		build_tray(function(_, originals, ctx)
+			local before = originals.gestures.build
+			package.loaded["ui.menu.branch_rows"] = nil
+			local rows = require("ui.menu.branch_rows").new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
+			builder.generate(ctx, mods, actions)
+			originals.gestures.build = function(...)
+				local row = before(...)
+				row.label = "Gestures, rebuilt"
+				return row
+			end
+			mods = rows.wrap(originals)
+			local branch = branch_build(builder, rows, mods, ctx, actions, "gestures")
+			originals.gestures.build = before
+			local seen = false
+			for _, row in ipairs(branch) do seen = seen or row.title == "Gestures, rebuilt" end
+			helpers.assert_true(seen, "the rebuilt branch is the one the tree shows")
+		end)
+	end)
+
+	helpers.it("(menu-branch-refresh-refused) a pause flip, no earlier build or a global branch rebuilds all", function()
+		build_tray(function(_, originals, ctx)
+			local counts, restore = count_builds(originals, { "tap_holds", "gestures" })
+			package.loaded["ui.menu.branch_rows"] = nil
+			local BranchRows = require("ui.menu.branch_rows")
+			local rows = BranchRows.new()
+			local mods = rows.wrap(originals)
+			local builder = package.loaded["ui.menu.builder"]
+			local actions = setmetatable({}, { __index = function() return function() end end })
+			branch_build(builder, rows, mods, ctx, actions, "tap_holds")
+			helpers.assert_eq(counts.gestures, 1, "no earlier build: everything is built")
+			ctx.paused = true
+			branch_build(builder, rows, mods, ctx, actions, "tap_holds")
+			helpers.assert_eq(counts.gestures, 2, "a pause flip greys every feature branch")
+			ctx.paused = nil
+			restore()
+			helpers.assert_eq(pcall(rows.request, "keyboard_layout"), false, "a layout choice reaches every branch")
+			helpers.assert_nil(BranchRows.BRANCH_LOCAL.llm)
+		end)
+	end)
+
+	helpers.it("(menu-branch-refresh) names the branch of a top-level title, none for a global one", function()
+		with_branch_rows(function(builder, rows, mods, ctx, actions)
+			local menu = builder.generate(ctx, mods, actions)
+			local found = {}
+			for _, row in ipairs(menu) do
+				if type(row.title) == "string" then found[row.title] = rows.branch_of(row.title) end
+			end
+			helpers.assert_eq(found["menu.tapholds.title"], "tap_holds")
+			helpers.assert_eq(found["menu.gestures.title"], "gestures")
+			helpers.assert_nil(found["menu.global.language"], "a language choice reaches every branch")
+			helpers.assert_nil(found["menu.layout.title"], "a layout choice reaches every branch")
+			helpers.assert_nil(rows.branch_of(nil))
+		end)
 	end)
 end))

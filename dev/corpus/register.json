@@ -1,0 +1,232 @@
+{
+	"_description": "Licence register of every text under static/corpus/original and every frequency list under static/corpus/frequency: what it is, where it comes from, its licence, the attribution it requires, and whether Ergopti ships its n-gram tables (status ship), waits for the maintainer (hold) or must not ship them (refused), with the evidence. The layout analysis codegen (tools/codegen/codegen-layout-analysis-data-js.cjs) reads the licence and attribution of a built-in corpus from here, refuses to build one whose status is not ship, and refuses a text with no entry here. Audit of 2026-11-14, decided by the agent, to review by the maintainer.",
+	"schema_version": 1,
+	"audited": "2026-11-14",
+	"files": {
+		"frequency/opensubtitles_2018/de_50k.txt": {
+			"title": "German word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/de/de_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/en_50k.txt": {
+			"title": "English word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/en/en_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/es_50k.txt": {
+			"title": "Spanish word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/es/es_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/fr_50k.txt": {
+			"title": "French word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/fr/fr_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"frequency/opensubtitles_2018/it_50k.txt": {
+			"title": "Italian word frequencies from subtitles (50,000 words)",
+			"source": "FrequencyWords by Hermit Dave, 2018 lists built from OpenSubtitles2018 (OPUS)",
+			"url": "https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/it/it_50k.txt",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Hermit Dave, FrequencyWords (CC BY-SA 4.0), from OpenSubtitles2018 via OPUS (P. Lison and J. Tiedemann, 2016)",
+			"status": "ship",
+			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
+		},
+		"original/code/corpus_johnix_prog.txt": {
+			"title": "Hello World programs in many languages",
+			"source": "« prog » of the bépo corpus by Johnix (a 2004 snapshot of the Hello World Collection)",
+			"url": "https://gitlab.com/wolframroesler/helloworld",
+			"licence": "MIT",
+			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
+			"status": "ship",
+			"note": "The collection's repository (gitlab.com/wolframroesler/helloworld) is MIT, « Copyright (c) 2017 Wolfram Rösler ». This 2004 snapshot predates that grant; rebuilding it from the MIT repository would remove the doubt (to review by the maintainer)."
+		},
+		"original/code/corpus_johnix_prog_epure.txt": {
+			"title": "Hello World programs, punctuation only",
+			"source": "« prog_epure » of the bépo corpus by Johnix (the « prog » file with its letters removed)",
+			"url": "https://gitlab.com/wolframroesler/helloworld",
+			"licence": "MIT",
+			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
+			"status": "ship",
+			"note": "Derived from corpus_johnix_prog.txt; same terms."
+		},
+		"original/code/lodash_4.17.21.js.txt": {
+			"title": "JavaScript: lodash 4.17.21",
+			"source": "lodash/lodash, tag 4.17.21, lodash.js",
+			"url": "https://github.com/lodash/lodash/blob/4.17.21/lodash.js",
+			"licence": "MIT",
+			"attribution": "Copyright OpenJS Foundation and other contributors (lodash, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE of the tag (fetched 2026-11-14) is MIT; the file keeps it at its top."
+		},
+		"original/code/rich_13.7.1.py.txt": {
+			"title": "Python: rich 13.7.1 (console, text, table, progress)",
+			"source": "Textualize/rich, tag v13.7.1, four modules of rich/ concatenated",
+			"url": "https://github.com/Textualize/rich/tree/v13.7.1/rich",
+			"licence": "MIT",
+			"attribution": "Copyright (c) 2020 Will McGugan (rich, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE of the tag (fetched 2026-11-14) is MIT; the file keeps it at its top."
+		},
+		"original/code/ripgrep_14.1.0.rs.txt": {
+			"title": "Rust: ripgrep 14.1.0 (three source files)",
+			"source": "BurntSushi/ripgrep, tag 14.1.0: crates/core/main.rs, crates/searcher/src/searcher/mod.rs, crates/core/flags/defs.rs",
+			"url": "https://github.com/BurntSushi/ripgrep/tree/14.1.0",
+			"licence": "MIT (ripgrep is dual MIT or Unlicense)",
+			"attribution": "Copyright (c) 2015 Andrew Gallant (ripgrep, MIT); its licence text heads the file",
+			"status": "ship",
+			"note": "LICENSE-MIT of the tag (fetched 2026-11-14); the file keeps it at its top."
+		},
+		"original/en/austen_pride_and_prejudice.txt": {
+			"title": "Pride and Prejudice (Jane Austen, 1813)",
+			"source": "Project Gutenberg ebook 1342",
+			"url": "https://www.gutenberg.org/ebooks/1342",
+			"licence": "Public domain",
+			"attribution": "Jane Austen",
+			"status": "ship",
+			"note": "Jane Austen died in 1817. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/en/don_quixote_ormsby.txt": {
+			"title": "Don Quixote (Cervantes, translated by John Ormsby, 1885)",
+			"source": "Project Gutenberg ebook 996, as kept by Ergo-L",
+			"url": "https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en.txt",
+			"licence": "Public domain",
+			"attribution": "Miguel de Cervantes, translated by John Ormsby",
+			"status": "ship",
+			"note": "Translation published in 1885, translator died in 1895; no Project Gutenberg boilerplate left."
+		},
+		"original/en/tatoeba_eng_30k.tsv": {
+			"title": "Tatoeba — 30,000 English sentences",
+			"source": "Tatoeba per-language export eng_sentences_detailed (2026-11-14)",
+			"url": "https://downloads.tatoeba.org/exports/per_language/eng/",
+			"licence": "CC BY 2.0 FR",
+			"attribution": "Tatoeba contributors; the author of each sentence is named in the file",
+			"status": "ship",
+			"note": "Tatoeba's terms of use (https://tatoeba.org/en/terms_of_use, read 2026-11-14): sentences use « the default Creative Commons Attribution 2.0 France license (CC-BY 2.0 FR) », whose one condition is to cite each sentence's author. The file keeps the first 30,000 sentences of the export (by sentence id) as « id<TAB>sentence<TAB>author »; « unknown » marks a sentence the export gives no author for. Short everyday sentences: a conversational register."
+		},
+		"original/en/wikipedia_en_20_articles.txt": {
+			"title": "English Wikipedia — 20 articles",
+			"source": "English Wikipedia, plain-text extracts of 20 articles through the MediaWiki API (2026-11-14), section headings removed",
+			"url": "https://en.wikipedia.org/",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "English Wikipedia contributors; the articles and revisions are listed in the note",
+			"status": "ship",
+			"note": "Wikipedia's text is licensed CC BY-SA 4.0; each article's authors are in its history at https://en.wikipedia.org/. Articles: United Kingdom (revision 1385707382); London (revision 1385705591); English language (revision 1385405086); French Revolution (revision 1384853060); William Shakespeare (revision 1383380297); Computer science (revision 1380596843); Mathematics (revision 1385556937); Classical music (revision 1385484715); Cuisine (revision 1385138448); Association football (revision 1384532641); Climate change (revision 1385272921); European Union (revision 1384741164); History of art (revision 1385167240); Chemistry (revision 1384268382); Biology (revision 1383003680); Astronomy (revision 1377879713); Internet (revision 1384979951); English literature (revision 1381089443); Film (revision 1384636104); Philosophy (revision 1385238382)."
+		},
+		"original/fr/corpus_johnix_autonomy.txt": {
+			"title": "Autonomie, la liberté de pensée (J.-M. Smith, French translation)",
+			"source": "« autonomy » of the bépo corpus by Johnix (corpus-johnix.zip), re-imported from its ISO-8859-1 original",
+			"url": "https://cdn.bepo.fr/donnees/corpus/corpus-johnix.zip",
+			"licence": "CC BY-SA 1.0",
+			"attribution": "Jean-Michel Smith; French translation by Thomas Tempé, Frédéric Henry, Thibaud Choné, Germain Chazot and Cédric Corazza",
+			"status": "ship",
+			"note": "Lines 9 and 1485–1500 grant CC BY-SA 1.0, on condition that Jean-Michel Smith's name is not used to promote a derived work. The n-gram tables are shipped in their own file under CC BY-SA 1.0. The earlier copy had lost every accent (9,945 U+FFFD)."
+		},
+		"original/fr/corpus_johnix_swann10.txt": {
+			"title": "Du côté de chez Swann (Marcel Proust, 1913)",
+			"source": "« swann10 » of the bépo corpus by Johnix (corpus-johnix.zip)",
+			"url": "https://cdn.bepo.fr/donnees/corpus/corpus-johnix.zip",
+			"licence": "Public domain",
+			"attribution": "Marcel Proust",
+			"status": "ship",
+			"note": "Proust died in 1922: public domain in France since about 1987 (50 years plus war extensions) and in the whole EU since 1 January 1993 at the latest."
+		},
+		"original/fr/corpus_nemolivier.txt": {
+			"title": "Balzac, Baudelaire, Lautréamont, Maupassant, Nerval, Roussel (anthology)",
+			"source": "Corpus compiled by Nemolivier, of the bépo community",
+			"url": "https://bepo.fr/wiki/Statistiques",
+			"licence": "Public domain",
+			"attribution": "Honoré de Balzac, Charles Baudelaire, Lautréamont, Guy de Maupassant, Gérard de Nerval (digitised by publie.net), Raymond Roussel",
+			"status": "ship",
+			"note": "Every author died by 1933 (Roussel: public domain in the EU since 1 January 2004; Locus Solus was published in 1914). Who compiled the file was not found online."
+		},
+		"original/fr/don_quichotte.txt": {
+			"title": "L'ingénieux chevalier Don Quichotte de la Manche (Cervantes, trad. Charles Furne)",
+			"source": "Project Gutenberg, as kept by Ergo-L",
+			"url": "https://github.com/Nuclear-Squid/ergol/tree/main/corpus",
+			"licence": "Public domain",
+			"attribution": "Miguel de Cervantes, translated by Charles Furne",
+			"status": "ship",
+			"note": "19th-century translation (the preface is signed « CH. FURNE. », line 243); no Project Gutenberg boilerplate left."
+		},
+		"original/fr/hugo_les_miserables_1.txt": {
+			"title": "Les Misérables, tome I : Fantine (Victor Hugo, 1862)",
+			"source": "Project Gutenberg ebook 17489 (produced by www.ebooksgratuits.com and Chuck Greif)",
+			"url": "https://www.gutenberg.org/ebooks/17489",
+			"licence": "Public domain",
+			"attribution": "Victor Hugo",
+			"status": "ship",
+			"note": "Victor Hugo died in 1885. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/fr/leipzig_fra_news_2023_10K-sentences.txt": {
+			"title": "10,000 sentences of French news, 2023",
+			"source": "Leipzig Corpora Collection (fra_news_2023_10K)",
+			"url": "https://wortschatz.uni-leipzig.de/en/download",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012)",
+			"status": "ship",
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14), kept after review because the project is not commercial. The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container (an anti-bot challenge answers automated clients); third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting."
+		},
+		"original/fr/leipzig_fra_wikipedia_2021_10K-sentences.txt": {
+			"title": "10,000 sentences of French Wikipedia, 2021",
+			"source": "Leipzig Corpora Collection (fra_wikipedia_2021_10K)",
+			"url": "https://wortschatz.uni-leipzig.de/en/download",
+			"licence": "CC BY 4.0",
+			"attribution": "Leipzig Corpora Collection; D. Goldhahn, T. Eckart, U. Quasthoff (LREC 2012); Wikipédia contributors (CC BY-SA)",
+			"status": "ship",
+			"note": "Shipped under CC BY 4.0 by the maintainer's choice (2026-11-14), kept after review because the project is not commercial. The licence page https://wortschatz.uni-leipzig.de/en/usage could not be read from the build container (an anti-bot challenge answers automated clients); third parties cite recent Leipzig releases as CC BY 4.0 and older ones as CC BY-NC 4.0. Lines are « number<TAB>sentence »: the numbers are removed before counting. The sentences come from Wikipédia, whose text is CC BY-SA: its contributors are credited too."
+		},
+		"original/fr/tatoeba_fra_30k.tsv": {
+			"title": "Tatoeba — 30,000 French sentences",
+			"source": "Tatoeba per-language export fra_sentences_detailed (2026-11-14)",
+			"url": "https://downloads.tatoeba.org/exports/per_language/fra/",
+			"licence": "CC BY 2.0 FR",
+			"attribution": "Tatoeba contributors; the author of each sentence is named in the file",
+			"status": "ship",
+			"note": "Tatoeba's terms of use (https://tatoeba.org/en/terms_of_use, read 2026-11-14): sentences use « the default Creative Commons Attribution 2.0 France license (CC-BY 2.0 FR) », whose one condition is to cite each sentence's author. The file keeps the first 30,000 sentences of the export (by sentence id) as « id<TAB>sentence<TAB>author »; « unknown » marks a sentence the export gives no author for. Short everyday sentences: a conversational register."
+		},
+		"original/fr/verne_tour_du_monde.txt": {
+			"title": "Le Tour du monde en quatre-vingts jours (Jules Verne, 1872)",
+			"source": "Project Gutenberg ebook 800",
+			"url": "https://www.gutenberg.org/ebooks/800",
+			"licence": "Public domain",
+			"attribution": "Jules Verne",
+			"status": "ship",
+			"note": "Jules Verne died in 1905. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		},
+		"original/fr/wikipedia_fr_20_articles.txt": {
+			"title": "Wikipédia en français — 20 articles",
+			"source": "Wikipédia en français, plain-text extracts of 20 articles through the MediaWiki API (2026-11-14), section headings removed",
+			"url": "https://fr.wikipedia.org/",
+			"licence": "CC BY-SA 4.0",
+			"attribution": "Wikipédia en français contributors; the articles and revisions are listed in the note",
+			"status": "ship",
+			"note": "Wikipedia's text is licensed CC BY-SA 4.0; each article's authors are in its history at https://fr.wikipedia.org/. Articles: France (revision 241340124); Paris (revision 241315985); Français (revision 241066198); Révolution française (revision 240610460); Victor Hugo (revision 240809344); Informatique (revision 240779412); Mathématiques (revision 240596364); Musique classique (revision 240100957); Cuisine française (revision 240239713); Football (revision 240704136); Changement climatique (revision 241147632); Union européenne (revision 241323769); Histoire de l'art (revision 240677724); Chimie (revision 241100540); Biologie (revision 240275686); Astronomie (revision 241063209); Internet (revision 241104224); Littérature française (revision 241142243); Cinéma français (revision 241337914); Philosophie (revision 241274565)."
+		},
+		"original/fr/zola_germinal.txt": {
+			"title": "Germinal (Émile Zola, 1885)",
+			"source": "Project Gutenberg ebook 5711",
+			"url": "https://www.gutenberg.org/ebooks/5711",
+			"licence": "Public domain",
+			"attribution": "Émile Zola",
+			"status": "ship",
+			"note": "Émile Zola died in 1902. Project Gutenberg text with the Project Gutenberg header and licence footer removed (the Project Gutenberg name and trademark are not used); the work itself is in the public domain."
+		}
+	}
+}

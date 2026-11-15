@@ -6,8 +6,8 @@
  * DESCRIPTION:
  * Builds the prefilled "new issue" URL of the repository's GitHub issue forms,
  * bounded to a byte budget. Pure: the caller passes the templates document
- * (_shared/modules/diagnostics/issue_templates.json) and the repository read
- * from _shared/modules/updater/defaults.json, so neither the owner nor the
+ * (_shared/diagnostics/data/issue_templates.json) and the repository read
+ * from _shared/updater/data/defaults.json, so neither the owner nor the
  * repository is ever typed here.
  *
  * FEATURES & RATIONALE:
@@ -24,7 +24,7 @@
  *    appended after the truncation marker and counted in the budget: the
  *    caller passes it only for the field that holds the complete report.
  * 5. One algorithm, three languages: the Lua port
- *    (_shared/lua/diagnostics/issue_link.lua) and the AHK port
+ *    (_shared/diagnostics/engine/reports/issue_link.lua) and the AHK port
  *    (windows/infra/issue_link.ahk) replay the same vectors
  *    (_shared/tests/corpus/diagnostics/issue_link_vectors.json).
  * ==============================================================================

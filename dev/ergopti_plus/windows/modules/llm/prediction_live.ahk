@@ -6,7 +6,7 @@
 ; Owns live mode, turned on and off by the llm_live_prompt_toggle action and
 ; the AI menu: while it is on, the automatic typing trigger asks for
 ; predictions with the prompt and count live mode was started with, after the
-; debounce and with the minimum word count of _shared/modules/llm/live.json.
+; debounce and with the minimum word count of _shared/ai/data/live.json.
 ;
 ; FEATURES & RATIONALE:
 ; 1. One pipeline: live mode only redirects the automatic trigger through the
@@ -42,7 +42,7 @@ LLM_Live_Config() {
 	static Config := ""
 	if (Config is Map)
 		return Config
-	Path := _SharedDir . "\modules\llm\live.json"
+	Path := _SharedDir . "\ai\data\live.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Live_ValidateConfig(Candidate, Path)
 	Config := Map(ConfigLeaf.DEBOUNCE_MS, Candidate[ConfigLeaf.DEBOUNCE_MS],

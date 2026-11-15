@@ -22,7 +22,7 @@
 --- WHAT IT DELIBERATELY DOES NOT DO:
 --- It does not resolve keysyms to characters. A keysym name is an X11 protocol
 --- constant, a character is Unicode, and the mapping between them belongs to
---- libxkbcommon — see infra/keysym.lua. Keeping the two apart is what lets this
+--- libxkbcommon — see platform/input/keysym.lua. Keeping the two apart is what lets this
 --- half be a pure function over text, testable from a fixture with no display
 --- server anywhere.
 ---
@@ -48,10 +48,11 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
+local Keysym = require("platform.input.keysym")
 
 local LOG = "infra.xkb_keymap"
 
@@ -224,6 +225,14 @@ end
 local function split_levels(list)
 	local levels = {}
 	for index, entry in ipairs(split_items(list) or {}) do
+		-- libxkbcommon 1.13 writes keysyms by number (`0x61`); the readers of
+		-- this table compare names, so a numeric keysym takes its canonical name
+		-- and stays numeric only where no name is known.
+		local numeric = entry:match("^0[xX](%x+)$")
+		if numeric then
+			local sym = tonumber(numeric, 16)
+			entry = sym == 0 and NO_SYMBOL or Keysym.name_of(sym) or entry
+		end
 		if entry == "" or entry == NO_SYMBOL or entry:sub(1, 1) == "{" then
 			levels[index] = false
 		else

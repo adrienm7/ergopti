@@ -178,7 +178,7 @@ helpers.describe("model selector test ownership", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "system", provider = "typesafe", model = "jev-latest", token = "test", base_url = "" }
 		state.entries = { entry }
-		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 		helpers.assert_eq(#state.tests, 1)
 		state.entries = {}
 		state.finish_test(true, "OK", 10)
@@ -191,7 +191,7 @@ helpers.describe("model selector test ownership", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
 		state.entries, state.active = { entry }, entry
-		find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+		find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 		helpers.assert_eq(#state.tests, 1)
 		state.active = { id = "chosen", provider = "cerebras", model = "other", token = "test" }
 		state.finish_test(true, "OK", 10)
@@ -208,7 +208,7 @@ helpers.describe("model selector test ownership", function()
 			if kind == "manual" then
 				local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "test" }
 				state.entries, state.active = { entry }, entry
-				find(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action()
+				find(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action()
 			else
 				state.answers = { "test-key", kind == "new chat" and "qwen" or "jev-latest" }
 				find(build(), kind == "new chat" and "➕ Cerebras" or "➕ TypeSafe").action()
@@ -308,7 +308,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		state.finish_test(false, "HTTP 401: Wrong API Key", 90)
 		restore()
 		helpers.assert_true(state.errors[1]:find("Wrong API Key", 1, true) ~= nil)
-		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_key_refused_title"),
+		helpers.assert_eq(state.error_titles[1], require("core.i18n.engine.i18n").get("menu.llm.api_key_refused_title"),
 			"a 401 proves the server answered, so the title names the refused key")
 	end)
 
@@ -318,7 +318,7 @@ helpers.describe("AI menu: adding and testing a Cerebras key", function()
 		find(build(), "➕ Cerebras").action()
 		state.finish_test(false, "connection refused", 90)
 		restore()
-		helpers.assert_eq(state.error_titles[1], require("infra.i18n").get("menu.llm.api_unreachable_title"))
+		helpers.assert_eq(state.error_titles[1], require("core.i18n.engine.i18n").get("menu.llm.api_unreachable_title"))
 	end)
 
 	helpers.it("adds nothing when the key prompt is cancelled", function()
@@ -483,7 +483,7 @@ helpers.describe("Local API optional-auth tray consumer", function()
 		local _, servers = require("modules.llm.local_server_catalogue").load({})
 		remote.providers = function() local list = providers(); list[#list + 1] = provider; return list end
 		remote.provider = function(id) return id == provider.id and provider or lookup(id) end
-		remote.token_allowed = function(id, token) return require("llm.local_server_auth").token_allowed(id, token, servers) end
+		remote.token_allowed = function(id, token) return require("ai.engine.local_servers.auth").token_allowed(id, token, servers) end
 		state.answers = { "", "fixture-model" }
 		local action = find(build(), "➕ LM Studio")
 		local ok, failure = xpcall(function() action.action() end, debug.traceback)
@@ -541,7 +541,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 				result = find(rows, "🗑️").action()
 				local read = assert(io.open(path, "rb")); after = read:read("*a"); assert(read:close())
 				count, active = #owner.list(), owner.active()
-				foreign = require("json").decode(after).future.kept
+				foreign = require("core.text.engine.json").decode(after).future.kept
 			end)
 			os.rename = rename
 			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
@@ -615,7 +615,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			helpers.assert_eq(result, not refused)
 			helpers.assert_eq(errors, refused and 1 or 0, "only a refused private selection reports an error")
 			helpers.assert_nil(staging, "the real writer retires its staging file")
-			local retained = require("json").decode(after)
+			local retained = require("core.text.engine.json").decode(after)
 			helpers.assert_eq(retained.future.kept, true)
 			helpers.assert_eq(retained.entries[1].future.retained, true)
 			if refused then
@@ -638,7 +638,7 @@ helpers.describe("AI active API commands: live selection", function()
 		local build, state, restore = setup("api")
 		local entry = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
 		state.entries, state.active = { entry }, entry
-		local held = exact(build(), require("infra.i18n").get("menu.llm.api_test_entry")).action
+		local held = exact(build(), require("core.i18n.engine.i18n").get("menu.llm.api_test_entry")).action
 		state.active = nil
 		local observed = held()
 		restore()

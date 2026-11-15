@@ -12,6 +12,7 @@ final class WindowTitlePolicyTests: XCTestCase {
 		let prefix: String
 		let separator: String
 		let expected: String
+		var productNames: [String] = []
 	}
 
 	private enum ProbeFailure: Error {
@@ -103,8 +104,13 @@ final class WindowTitlePolicyTests: XCTestCase {
 			PolicyCase(prefix: "Other ; product", separator: " ; ", expected: "Other ; product ; Navigation layer"),
 			PolicyCase(prefix: "Literal \\(1 + 1)", separator: " / ", expected: "Literal \\(1 + 1) / Navigation layer"),
 			PolicyCase(prefix: "Émoji 😀", separator: " / ", expected: "Émoji 😀 / Navigation layer"),
+			// A product name is the whole title (window-title-product-name).
+			PolicyCase(prefix: "ErgoptiPlus", separator: " — ", expected: "Navigation layer",
+				productNames: ["Navigation layer"]),
 		]
-		let policies = cases.map { ["prefix": $0.prefix, "separator": $0.separator] }
+		let policies: [[String: Any]] = cases.map {
+			["prefix": $0.prefix, "separator": $0.separator, "product_names": $0.productNames]
+		}
 		try JSONSerialization.data(withJSONObject: policies).write(to: root.appendingPathComponent("policies.json"))
 		let bootstrap = root.appendingPathComponent("generate.cjs")
 		try """
@@ -124,7 +130,7 @@ final class WindowTitlePolicyTests: XCTestCase {
 		""".write(to: bootstrap, atomically: true, encoding: .utf8)
 		let generator = Self.repositoryURL.appendingPathComponent("tools/codegen/codegen-window-titles.cjs")
 		XCTAssertEqual(try runChild("/usr/bin/env", arguments: ["node", bootstrap.path, generator.path, root.path], root: root),
-			"7", "The real generator must emit every private policy")
+			"\(cases.count)", "The real generator must emit every private policy")
 		for (index, policy) in cases.enumerated() {
 			let fixture = root.appendingPathComponent(String(index))
 			let artifact = fixture.appendingPathComponent("static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/WindowTitles.generated.swift")

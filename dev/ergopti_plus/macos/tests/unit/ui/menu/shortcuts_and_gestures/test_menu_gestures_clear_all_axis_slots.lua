@@ -20,9 +20,9 @@ local AXIS   = { "swipe_3_horiz", "swipe_4_horiz" }
 --- @param body function body(commands, assigned, saves)
 local function with_commands(body)
 	local names = {
-		"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "ui.action_picker",
-		"ui.menu.shortcut_utils", "infra.logger", "ui.menu.menu_gestures",
+		"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
+		"ui.menu.shortcut_utils", "core.logger.engine.logger", "ui.menu.menu_gestures",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do
@@ -54,8 +54,8 @@ local function with_commands(body)
 		},
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
-	package.loaded["infra.dialog_util"] = {}
-	package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
+	package.loaded["core.ui.engine.dialog_util"] = {}
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 	local render_ctx = nil
 	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
 		render_ctx = ctx
@@ -63,7 +63,7 @@ local function with_commands(body)
 	end }
 	package.loaded["ui.action_picker"] = {}
 	package.loaded["ui.menu.shortcut_utils"] = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local ok, err = xpcall(function()
 		local MenuGestures = require("ui.menu.menu_gestures")

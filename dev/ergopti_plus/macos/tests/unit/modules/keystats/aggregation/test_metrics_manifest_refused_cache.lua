@@ -12,8 +12,8 @@
 local helpers = require("tests.helpers")
 
 local OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
+	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json",
 }
 local PAST, TODAY, TOMORROW = "2026-10-17", "2026-10-18", "2026-10-19"
 
@@ -34,7 +34,7 @@ local function fixture()
 	logger.error = function(_, message, ...)
 		state.errors[#state.errors + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	local sqlite = { OK = 0 }
 	function sqlite.open()
 		local db = {}
@@ -139,11 +139,11 @@ helpers.describe("metrics-manifest-refused-cache", function()
 end)
 
 local APP_OWNERS = {
-	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "infra.paced_json",
-	"infra.logger", "hs.sqlite3", "hs.json", "json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
-	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "ui.ui_builder",
-	"infra.paths", "infra.i18n", "infra.dialog_util", "infra.deferred_work", "infra.config_paths",
-	"adapters.file_system", "adapters.timer_scheduler", "adapters.webview_result",
+	"modules.keystats.sqlite_reader", "ui.metrics_typing.projection", "core.timing.engine.paced_json",
+	"core.logger.engine.logger", "hs.sqlite3", "hs.json", "core.text.engine.json", "ui.metrics_apps", "tests.stubs.hs", "hs", "hs.fs",
+	"tests.support.metrics_delivery_fixture", "tests.support.dashboard_window_fixture", "core.ui.ui.builder",
+	"core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "infra.config_paths",
+	"core.fs.adapters.file_system", "core.events.timer_scheduler", "core.ui.adapters.webview_result",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 }
 

@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 local previous_destination = package.loaded["modules.keymap.utils"]
 local Destination = require("tests.support.text_destination_receipt")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.shared("tests/corpus/text_case/vectors.json")
 
@@ -75,10 +75,10 @@ local function transformed_by(action_name, selected)
 	}
 	_G.hs = hs_stub
 	package.loaded.hs = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.paths"] = nil
-	package.loaded["infra.timings"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.paths"] = nil
+	package.loaded["core.timing.engine.timings"] = nil
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function(_, _, _, tx)
 			helpers.assert_not_nil(tx.publication, "the copy must retain its destination receipt")
 			helpers.assert_eq(tx.publication.cached(), true)
@@ -101,7 +101,7 @@ local function transformed_by(action_name, selected)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["adapters.clipboard"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	local Text = require("modules.shortcuts.actions.text")

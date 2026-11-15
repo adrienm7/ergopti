@@ -78,7 +78,7 @@ function M.new(ports)
 		assert(type(ports[name]) == "function", "tap_copy.new: port '" .. name .. "' must be a function")
 	end
 	assert(type(ports.checker) == "table" and type(ports.checker.start) == "function",
-		"tap_copy.new: checker must be a tap_hold.copy_check checker")
+		"tap_copy.new: checker must be a tap_hold.engine.copy_check checker")
 	return setmetatable({ ports = ports, down = {}, candidate = nil, released = nil,
 		generation = 0, stats = M.empty_stats() }, Owner)
 end

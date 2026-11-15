@@ -20,11 +20,11 @@
 
 local M = {}
 
-local text_utils = require("infra.text_utils")
-local AppDirs    = require("app_dirs")
+local text_utils = require("core.text.engine.utils")
+local AppDirs    = require("core.fs.engine.app_dirs")
 local NetworkEnv = require("modules.llm.network_env")
-local NativePath = require("native_path")
-local Timings    = require("infra.timings")
+local NativePath = require("core.fs.engine.native_path")
+local Timings    = require("core.timing.engine.timings")
 
 -- The daemon appends to the same dated file the logger names, so the prefix
 -- and extension come from the one registry that names it.
@@ -65,7 +65,7 @@ local function managed_service(executable, port, log_dir)
 	local candidate, budgets = Binary.native_candidate()
 	if executable ~= candidate then return nil, "managed runtime selection is unavailable" end
 	local Python = require("modules.llm.managed_native_python")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local python = Python.resolve()
 	local source = debug.getinfo(1, "S").source:sub(2)
 	local driver = source:match("^(.*)/modules/llm/ollama_server_command%.lua$")

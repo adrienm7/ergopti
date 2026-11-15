@@ -23,11 +23,11 @@ local SHORTCUT_ID = "1B2C3D4E-5F60-4718-9A0B-C1D2E3F40516"
 --- timer layers.
 --- @param body function fn(Aux, world)
 local function with_aux(body)
-	helpers.with_fresh_modules({ "modules.gestures.actions_aux_owner", "adapters.shell_runner",
-		"adapters.timer_scheduler", "infra.logger" }, function()
+	helpers.with_fresh_modules({ "modules.gestures.actions_aux_owner", "core.process.adapters.shell_runner",
+		"core.events.timer_scheduler", "core.logger.engine.logger" }, function()
 		local world = { spawned = {}, timers = {} }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, fn)
 				local handle = { delay = delay, observers = {} }
 				-- A fired timer settles: its observers run after its callback
@@ -44,7 +44,7 @@ local function with_aux(body)
 			end,
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
-		package.loaded["adapters.shell_runner"] = { spawn = function(executable, args, on_done, on_chunk, env, private)
+		package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args, on_done, on_chunk, env, private)
 			local handle = { executable = executable, args = args, on_done = on_done, on_chunk = on_chunk,
 				env = env, private = private, observers = {} }
 			world.spawned[#world.spawned + 1] = handle
@@ -133,12 +133,12 @@ end)
 --- @param answers table { texts = {...}, choices = {...} } consumed in order.
 --- @param body function fn(ShortcutUtils, seen)
 local function with_editor(answers, body)
-	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "infra.dialog_util", "adapters.apple_shortcuts_cli",
-		"infra.i18n" }, function()
+	helpers.with_fresh_modules({ "ui.menu.shortcut_utils", "core.ui.engine.dialog_util", "adapters.apple_shortcuts_cli",
+		"core.i18n.engine.i18n" }, function()
 		local seen = { choices = {}, alerts = {} }
-		package.loaded["infra.i18n"] = { get = function(key) return key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 			format = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, initial, save)
 				seen.initial = initial
 				return save, table.remove(answers.texts, 1)
@@ -181,7 +181,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 		with_editor({ texts = { "  " }, choices = { 1, 1 } }, function(Utils)
 			local value = Utils.ask_parameter_value(GESTURES, "run_command", "command", "Title", "")
 			helpers.assert_eq(value, '{"version":1,"command":"  ","mode":"hidden","output":"none"}')
-			helpers.assert_eq(require("user_action_parameter").parse("command", value), nil)
+			helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("command", value), nil)
 		end)
 	end)
 
@@ -195,7 +195,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 		with_editor({ rows = { { id = SHORTCUT_ID, name = "Resize Image" } }, choices = { 1, 2, 2 } },
 			function(Utils, seen)
 				local value = Utils.ask_parameter_value(GESTURES, "run_apple_shortcut", "apple_shortcut", "Title", "")
-				helpers.assert_eq(require("user_action_parameter").parse("apple_shortcut", value),
+				helpers.assert_eq(require("shortcuts.engine.user_action_parameter").parse("apple_shortcut", value),
 					{ id = SHORTCUT_ID, name = "Resize Image", input = "selection", output = "type" })
 				helpers.assert_eq(seen.choices[1].labels, { "Resize Image" })
 			end)
@@ -213,7 +213,7 @@ helpers.describe("the user action editors store one canonical value (macOS)", fu
 	end)
 
 	helpers.it("the file-or-folder panel accepts both and the listing is bounded", function()
-		local Dialog = helpers.load_with_stubs("infra.dialog_util")
+		local Dialog = helpers.load_with_stubs("core.ui.engine.dialog_util")
 		local script = Dialog.path_picker_script("Message", "Title")
 		helpers.assert_true(script:find("setCanChooseFiles:true", 1, true) ~= nil, "files")
 		helpers.assert_true(script:find("setCanChooseDirectories:true", 1, true) ~= nil, "folders")

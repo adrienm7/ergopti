@@ -4,7 +4,7 @@
 --- MODULE: Regression — the dedup default must come from one place, not three
 --- DESCRIPTION:
 --- api_ollama and api_remote both read the deduplication default from ApiCommon,
---- which loads it from the shared _shared/modules/llm/inference.json. api_mlx_
+--- which loads it from the shared _shared/ai/data/inference.json. api_mlx_
 --- inference hardcoded `M.DEDUPLICATION_ENABLED = false` instead.
 ---
 --- ROOT CAUSE ENCODED:
@@ -22,7 +22,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 -- Neither true nor false: only a value read from ApiCommon can equal it.
 local SENTINEL = setmetatable({}, { __tostring = function() return "ApiCommon default" end })

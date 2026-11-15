@@ -204,7 +204,7 @@ if as_user "${LAUNCHER} --help" >/dev/null 2>&1; then
 else
 	fail "the launcher does not run: $(as_user "${LAUNCHER} --help" 2>&1 | tail -3)"
 fi
-if as_user "luajit ${LIB_ROOT}/linux/platform/network/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
+if as_user "luajit ${LIB_ROOT}/linux/core/network/adapters/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
 	ok "installed networking admits actual LuaJIT luv, GIO and resolver/schema prerequisites"
 else
 	fail "installed native networking prerequisites are unavailable"
@@ -212,7 +212,7 @@ fi
 
 # The installed wrapper's own LUA_PATH, replayed rather than re-typed, so a
 # check here cannot pass against a path the launcher does not set.
-INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/lua/?.lua;${LIB_ROOT}/_shared/lua/?/init.lua;;"
+INSTALLED_LUA_PATH="${LIB_ROOT}/linux/?.lua;${LIB_ROOT}/linux/?/init.lua;${LIB_ROOT}/_shared/?.lua;${LIB_ROOT}/_shared/?/init.lua;;"
 
 
 section "Runtime dependencies"

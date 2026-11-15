@@ -12,10 +12,10 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local LOG = "infra.metrics_preferences"
 local _scope_owner = nil
 

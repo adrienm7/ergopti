@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local HOME = "/Users/test/" .. AppDirs.macos.support_relative .. "/RemapRuntime/VirtualHIDDevice/8.5.0"
 local DIGEST = "d73d6d9428f0f80b87b8a8ba8a1031f2cbc3bc1fa6b74842d1f1b764b2916fc9"
@@ -53,6 +53,8 @@ local function fake(overrides)
 	}
 	for name, answer in pairs(overrides or {}) do answers[name] = answer end
 	local updater = Update.new({
+		-- The production port wraps curl behind the network route (NET-001).
+		network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 		exec = function(executable, args, timeout, callback)
 			local name = executable:match("[^/]+$")
 			world.commands[#world.commands + 1] = { executable = executable, name = name, args = args, timeout = timeout }
@@ -218,6 +220,8 @@ helpers.describe("VirtualHIDDevice driver update: named refusals", function()
 		local _, _, Update = fake()
 		local world = { count = 0 }
 		local updater = Update.new({
+			-- The production port wraps curl behind the network route (NET-001).
+			network_command = function(curl_args) return "/usr/bin/curl", curl_args end,
 			exec = function(_, _, _, callback)
 				world.count = world.count + 1
 				pending = callback

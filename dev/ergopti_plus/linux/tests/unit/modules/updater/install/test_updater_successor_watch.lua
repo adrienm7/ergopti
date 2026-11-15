@@ -129,6 +129,31 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		end
 	end)
 
+	helpers.it("(update-quit-kept) keeps the update and starts nothing when the new daemon is quit before it reports", function()
+		local s = scenario({})
+		helpers.assert_true(watch("relay", s, { launcher(s, "quit") }), "a Quit is no failed start")
+		helpers.assert_eq(read(s.root .. "/marker"), "new", "the update stays installed")
+		helpers.assert_eq(runs(s), 1, "the previous daemon is not started")
+		helpers.assert_contains(read(s.log) or "", "quit before it reported ready")
+		cleanup(s)
+	end)
+
+	helpers.it("(update-quit-kept) keeps the update when the new daemon is quit during its probation", function()
+		local s = scenario({})
+		local path = s.dir .. "/launcher"
+		write(path, table.concat({ "#!/bin/sh", "echo run >> " .. quote(s.runs), "[ -n \"$ERGOPTI_UPDATER_BOOT_READY\" ] || exit 0",
+			'echo $$ > "$ERGOPTI_UPDATER_BOOT_READY.tmp"; mv "$ERGOPTI_UPDATER_BOOT_READY.tmp" "$ERGOPTI_UPDATER_BOOT_READY"',
+			"sleep 0.2",
+			'echo quit > "$ERGOPTI_UPDATER_BOOT_READY.tmp"; mv "$ERGOPTI_UPDATER_BOOT_READY.tmp" "$ERGOPTI_UPDATER_BOOT_READY"',
+			"" }, "\n"))
+		assert(os.execute("chmod +x " .. quote(path)))
+		helpers.assert_true(watch("relay", s, { path }), "a Quit is no failed start")
+		helpers.assert_eq(read(s.root .. "/marker"), "new", "the update stays installed")
+		helpers.assert_eq(runs(s), 1, "the previous daemon is not started")
+		helpers.assert_contains(read(s.log) or "", "quit during its probation")
+		cleanup(s)
+	end)
+
 	helpers.it("(update-successor-watch) only starts an installation that predates the boot reporter", function()
 		local s = scenario({ reporter = false })
 		watch("relay", s, { launcher(s, nil) })
@@ -151,6 +176,26 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		cleanup(s)
 	end)
 
+	helpers.it("(update-failed-name) hands systemd-run the watcher with every $ escaped", function()
+		-- systemd turns `$$` into `$` in a unit's command line: unescaped, the
+		-- script's `$root.failed-$$` named every rollback `<root>.failed-$`.
+		local ran = {}
+		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
+			successor = { root = "/opt/ergo$pti/lib", log = "/tmp/watch.log" },
+			run = function(cmd) ran[#ran + 1] = cmd; return true end })
+		helpers.assert_eq(how, "systemd")
+		Restarter.cancel("systemd", { run = function() return true end })
+		local prefix = "systemd-run --user --collect --quiet --unit='"
+		helpers.assert_eq(ran[2]:sub(1, #prefix), prefix)
+		local handed = ran[2]:match("^systemd%-run [^']+'[^']+' (.*)$")
+		helpers.assert_true(handed ~= nil, ran[2])
+		local token = ran[1]:match("ERGOPTI_UPDATER_BOOT_READY=(.-)'$")
+		local expected = Restarter.watch_command("systemd",
+			{ root = "/opt/ergo$pti/lib", token = token, log = "/tmp/watch.log" }, { Restarter.UNIT })
+		helpers.assert_eq(handed:gsub("%$%$", "$"), expected, "systemd's unescaping must yield the script")
+		helpers.assert_true(handed:find("failed-$$$$", 1, true) ~= nil, "the script's own $$ reaches the shell")
+	end)
+
 	helpers.it("(update-successor-watch) arms the watcher outside the unit and hands the token through the manager", function()
 		local ran = {}
 		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
@@ -161,12 +206,34 @@ helpers.describe("updated daemon start watch (linux-update-successor-ready)", fu
 		helpers.assert_contains(ran[1], "systemctl --user set-environment 'ERGOPTI_UPDATER_BOOT_READY=")
 		helpers.assert_contains(ran[2], "systemd-run --user --collect --quiet --unit='ergopti-update-watch-")
 		helpers.assert_contains(ran[2], "update-watch systemd '/opt/ergopti/lib'")
-		helpers.assert_eq(ran[3], "systemctl --user --no-block restart " .. Restarter.UNIT)
+		helpers.assert_eq(ran[3], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. Restarter.UNIT)
 		-- A Quit replaces the restart: the watcher is stopped first, so it restores nothing.
 		local cancelled = {}
 		helpers.assert_eq(Restarter.cancel("systemd", { run = function(cmd) cancelled[#cancelled + 1] = cmd; return true end }), true)
 		helpers.assert_contains(cancelled[1], "systemctl --user stop 'ergopti-update-watch-")
-		helpers.assert_eq(cancelled[#cancelled], "systemctl --user --no-block stop " .. Restarter.UNIT)
+		helpers.assert_eq(cancelled[#cancelled], Restarter.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop " .. Restarter.UNIT)
+	end)
+
+	helpers.it("(update-successor-watch) keeps the watcher when systemd TERMs the restart's own client", function()
+		-- systemd stops this unit by TERMing its whole cgroup, the systemctl
+		-- client that queued the restart included; the stand-in does just that.
+		local s = scenario({})
+		assert(os.execute("mkdir -p " .. quote(s.dir .. "/bin")))
+		write(s.dir .. "/bin/systemctl", "#!/bin/sh\necho \"$*\" >> " .. quote(s.dir .. "/calls")
+			.. "\ncase \"$*\" in *--no-block*) kill -TERM $$ ;; esac\nexit 0\n")
+		assert(os.execute("chmod +x " .. quote(s.dir .. "/bin/systemctl")))
+		local function run(cmd)
+			if cmd:find("systemd-run", 1, true) then return true end
+			local ok = os.execute("PATH=" .. quote(s.dir .. "/bin") .. ":\"$PATH\"; export PATH; " .. cmd)
+			return ok == true or ok == 0
+		end
+		local how = Restarter.restart({ wrapper = "/opt/ergopti/bin/ergopti", args = {}, cgroup = UNIT_CGROUP,
+			successor = { root = s.root, log = s.log }, run = run })
+		helpers.assert_eq(how, "systemd", "a TERMed client still queued the restart")
+		helpers.assert_true(not (read(s.dir .. "/calls") or ""):find("unset-environment", 1, true),
+			"the watcher must stay armed")
+		helpers.assert_eq(Restarter.cancel("systemd", { run = run }), true, "a TERMed stop client still queued the stop")
+		cleanup(s)
 	end)
 
 	helpers.it("(update-successor-watch) stops the watcher of a restart systemd refused", function()

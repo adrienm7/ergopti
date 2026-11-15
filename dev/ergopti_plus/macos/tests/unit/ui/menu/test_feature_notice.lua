@@ -8,4 +8,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.feature_notice_contract")(helpers, require("json"), helpers.shared(""))
+require("tests.lua.menu.feature_notice_contract")(helpers, require("core.text.engine.json"), helpers.shared(""))

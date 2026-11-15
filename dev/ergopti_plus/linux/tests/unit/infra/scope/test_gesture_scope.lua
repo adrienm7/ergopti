@@ -1,9 +1,9 @@
 --- tests/unit/infra/scope/test_gesture_scope.lua
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 
 local SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[gesture_parameters]\ntap_3__open_url = "https://old.example"\nkeyboard__primary_j__open_url = "https://keyboard.example"\nunknown = "keep"\n[linux.gestures]\ntap_4 = "vol_up"\nunknown = "keep"\n[linux.action_parameters]\ntap_4__open_url = "https://legacy.example"\nkeyboard__primary_k__open_url = "https://keep.example"\n[other]\nvalue = 42\n'
 
@@ -11,9 +11,9 @@ local function with_scope(body)
 	Sandbox.with_config(SOURCE, function(path)
 		local manager_name = "modules.gestures.manager"
 		local original_manager = package.loaded[manager_name]
-		local original_reader = package.loaded["adapters.evdev_reader"]
+		local original_reader = package.loaded["platform.input.evdev_reader"]
 		package.loaded[manager_name] = nil
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
 		local backup = path .. ".scope-backup"
 		local controls = { backups = {} }
 		local ok, err = pcall(function()
@@ -46,7 +46,7 @@ local function with_scope(body)
 			body(owner, gestures, controls, path, backup)
 		end)
 		package.loaded[manager_name] = original_manager
-		package.loaded["adapters.evdev_reader"] = original_reader
+		package.loaded["platform.input.evdev_reader"] = original_reader
 		os.remove(backup)
 		os.remove(backup .. ".tmp")
 		for _, created in ipairs(controls.backups) do os.remove(created) os.remove(created .. ".tmp") end
@@ -57,7 +57,7 @@ end
 helpers.describe("Linux gesture scope transaction", function()
 	helpers.it("gesture-master-close: refused native stop preserves file and retains its inverse", function()
 		with_scope(function(_, gestures, _, path)
-			require("adapters.evdev_reader").close = function() return false end
+			require("platform.input.evdev_reader").close = function() return false end
 			helpers.assert_eq(gestures.set_enabled(false), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 			helpers.assert_true(gestures.is_enabled())
@@ -67,7 +67,7 @@ helpers.describe("Linux gesture scope transaction", function()
 
 	helpers.it("gesture-master-rollback: refused publication and reader restoration retain admission", function()
 		with_scope(function(_, gestures, controls, path)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local publish = writer.batch_write
 			local ok, err = pcall(function()
 				writer.batch_write = function()
@@ -86,7 +86,7 @@ helpers.describe("Linux gesture scope transaction", function()
 
 	helpers.it("gesture-scope-admission: retained compensation fences sibling mutations until exact restoration", function()
 		with_scope(function(_, gestures, controls, path)
-			local adapter = require("adapters.file_system")
+			local adapter = require("core.fs.adapters.file_system")
 			local publish = adapter.write_if_unchanged
 			local phase = 1
 			local ok, err = pcall(function()
@@ -162,7 +162,7 @@ helpers.describe("Linux gesture scope transaction", function()
 					_version = "scope-test", gestures = gestures,
 					on_menu_changed = function() refreshes = refreshes + 1 end,
 				})
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local submenu
 				for _, parent in ipairs(rows) do
 					if parent.title == i18n.get("menu.gestures.title") then submenu = parent.menu end
@@ -183,15 +183,12 @@ helpers.describe("Linux gesture scope transaction", function()
 					if command:find("dialog_host.lua", 1, true) then questions = questions + 1 end
 					return 0
 				end
-				-- A pause refuses the owner's publication; the file stays whole.
+				-- A pause stops typing, not configuration (EDD-1): the clear
+				-- commits while paused (edd1-paused-writes).
 				controls.paused = true
 				clear.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear")
-				helpers.assert_eq(refreshes, 0)
-				helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
 				controls.paused = false
-				clear.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear,clear")
+				helpers.assert_eq(table.concat(calls, ","), "clear")
 				helpers.assert_true(refreshes > 0)
 				helpers.assert_eq(gestures.is_enabled(), true, "the menu clear keeps the switch (gestures-clear-keeps-switch)")
 				local saved = Codec.decode(Sandbox.read_bytes(path))
@@ -200,7 +197,7 @@ helpers.describe("Linux gesture scope transaction", function()
 				helpers.assert_eq(Sandbox.read_bytes(controls.backups[#controls.backups]), SOURCE,
 					"the clear backs the file up before it rewrites it")
 				restore.fn()
-				helpers.assert_eq(table.concat(calls, ","), "clear,clear,recommended")
+				helpers.assert_eq(table.concat(calls, ","), "clear,recommended")
 				local recommended = require("infra.manifest_reader").recommended_for("gestures.enabled")
 				helpers.assert_eq(gestures.is_enabled(), recommended)
 				helpers.assert_eq(questions, 0, "neither scope row asks a question")
@@ -309,6 +306,21 @@ helpers.describe("Linux gesture scope revert", function()
 			helpers.assert_eq(owner.pending(), false)
 			owner.release()
 			helpers.assert_eq(owner.revert(), false, "one commit reverts once")
+		end)
+	end)
+
+	-- A pause stops typing, not configuration (EDD-1): the switch commits while
+	-- paused and the dispatch keeps every bound gesture inert until resume.
+	helpers.it("switches gestures while paused and keeps them inert (edd1-paused-writes)", function()
+		with_scope(function(_, gestures, controls, path)
+			controls.paused = true
+			helpers.assert_eq(gestures.set_enabled(false), true, "OFF commits while paused")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, false)
+			helpers.assert_eq(gestures.set_enabled(true), true, "ON commits while paused")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).gestures.enabled, true)
+			helpers.assert_true(gestures.is_enabled())
+			helpers.assert_eq(gestures.dispatch_gesture({ fingers = 3, tap = true }), false,
+				"a bound tap stays inert while paused")
 		end)
 	end)
 end)

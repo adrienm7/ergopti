@@ -12,7 +12,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_gvariant_proxy_settings%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local ffi = require("ffi")
 ffi.cdef([[
 	void *g_variant_new_string(const char *string);
@@ -21,8 +21,8 @@ ffi.cdef([[
 	void g_free(void *memory);
 ]])
 local glib = ffi.load(require("_generated.native_runtime").network_runtime.libraries.glib)
-local Shell = require("adapters.shell_runner")
-local Ports = require("adapters.network_check_ports")
+local Shell = require("core.process.adapters.shell_runner")
+local Ports = require("core.network.adapters.check_ports")
 local original_exec, original_has, original_load = Shell.exec_checked, Shell.has_command, ffi.load
 local variants, errors = {}, {}
 local acquired_variants, released_variants, acquired_errors, released_errors = 0, 0, 0, 0

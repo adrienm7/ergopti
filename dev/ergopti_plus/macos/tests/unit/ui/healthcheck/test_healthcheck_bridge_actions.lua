@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local HOME = "/Users/jdoe"
 
@@ -29,8 +29,8 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler",
-		"adapters.clipboard", "adapters.webview_result",
+		"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler",
+		"adapters.clipboard", "core.ui.adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -49,10 +49,10 @@ local function load_window(controls)
 	logger.session_issues = function() return { warn_count = 0, err_count = 0 } end
 	logger.ERRORS_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log"
 	logger.UNIFIED_LOG_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_2026-09-24.log"
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["core.i18n.engine.locale"] = { all = function() return { ["menu.debug.healthcheck"] = "Diagnostics" } end }
+	package.loaded["core.events.timer_scheduler"] = {
 		every = function() context.every = context.every + 1; return { timer = {} }, true end,
 		after = function() return { timer = {} }, true end,
 		cancel = function() return true end,
@@ -78,7 +78,7 @@ local function load_window(controls)
 			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
@@ -265,8 +265,8 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local focused_at_open = context.focused
 			context.effects = {}
 			-- /usr/bin/open: what revealing a file in Finder would run
-			local previous_shell = package.loaded["adapters.shell_runner"]
-			package.loaded["adapters.shell_runner"] = {
+			local previous_shell = package.loaded["core.process.adapters.shell_runner"]
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(bin, args, done)
 					context.spawned[#context.spawned + 1] = { bin = bin, args = args }
 					context.effects[#context.effects + 1] = "spawn"
@@ -294,8 +294,8 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 				return previous_open(path, mode)
 			end
 			-- The save owner creates its attachment through the exclusive file owner.
-			local previous_files = package.loaded["adapters.file_system"]
-			package.loaded["adapters.file_system"] = setmetatable({
+			local previous_files = package.loaded["core.fs.adapters.file_system"]
+			package.loaded["core.fs.adapters.file_system"] = setmetatable({
 				create_if_absent = function(path, text)
 					local fh = assert(io.open(path, "wb"))
 					assert(fh:write(text)); assert(fh:close())
@@ -305,9 +305,9 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local ok, approved = pcall(share_action, context, { action = "report",
 				text = "log at /Users/jdoe/Library/Logs by jdoe",
 				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
-			package.loaded["adapters.file_system"] = previous_files
+			package.loaded["core.fs.adapters.file_system"] = previous_files
 			io.open, hs.fs.attributes = previous_open, previous_attributes
-			package.loaded["adapters.shell_runner"] = previous_shell
+			package.loaded["core.process.adapters.shell_runner"] = previous_shell
 			helpers.assert_true(ok, tostring(approved))
 			helpers.assert_eq(context.copied, { approved })
 			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
@@ -400,7 +400,7 @@ helpers.describe("diagnostics user presentation admission", function()
 		helpers.it("diagnostics foreground refuses focus " .. mode, function()
 			as_jdoe(function()
 			local core, context = load_window()
-			package.loaded["ui.ui_builder"].force_focus = function()
+			package.loaded["core.ui.ui.builder"].force_focus = function()
 				if mode == "throw" then error("owned presentation failure") end
 				return false
 			end

@@ -15,8 +15,9 @@ local helpers = require("tests.helpers")
 --- Builds the About submenu of a packaged build and returns its check row with
 --- the recorded window opens and Sparkle requests.
 local function build(latest, pending)
-	local recorded = { opens = {}, requests = {}, completions = 0 }
+	local recorded = { opens = {}, requests = {}, completions = 0, opened = true, checked = {}, notices = {} }
 	local saved = {
+		notifications = package.loaded["core.ui.engine.notifications"],
 		window = package.loaded["ui.update_check"],
 		launcher = package.loaded["adapters.update_launcher"],
 		changelog = package.loaded["ui.changelog"],
@@ -29,7 +30,13 @@ local function build(latest, pending)
 		}
 	end
 	package.loaded["ui.update_check"] = {
-		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return true end,
+		open = function(opts) recorded.opens[#recorded.opens + 1] = opts; return recorded.opened end,
+	}
+	package.loaded["core.ui.engine.notifications"] = {
+		notify = function(title, body, kind)
+			recorded.notices[#recorded.notices + 1] = { title = title, body = body, kind = kind }
+			return true
+		end,
 	}
 	package.loaded["adapters.update_launcher"] = {
 		request_check = function(channel) recorded.requests[#recorded.requests + 1] = channel; return true end,
@@ -46,6 +53,10 @@ local function build(latest, pending)
 		interval = function() return 86400 end,
 		set_interval = function() return true end,
 		latest = function() return latest end,
+		check_now = function(channel, on_result)
+			recorded.checked[#recorded.checked + 1] = { channel = channel, on_result = on_result }
+			return true
+		end,
 	}
 	local refresh = function() end
 	local ok, rows = pcall(function()
@@ -58,13 +69,14 @@ local function build(latest, pending)
 	Updater.is_local_source = real_local
 	package.loaded["ui.menu.menu_about"] = nil
 	local function restore()
+		package.loaded["core.ui.engine.notifications"] = saved.notifications
 		package.loaded["ui.update_check"] = saved.window
 		package.loaded["adapters.update_launcher"] = saved.launcher
 		package.loaded["ui.changelog"] = saved.changelog
 	end
 	if not ok then restore(); error(rows, 0) end
 	recorded.owner, recorded.checks, recorded.refresh, recorded.restore = owner, checks, refresh, restore
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	for _, row in ipairs(rows) do
 		if row.title == i18n.get("menu.about.check_for_updates")
 			or (latest and type(row.title) == "string" and row.title:find(latest.tag, 1, true))
@@ -91,13 +103,36 @@ helpers.describe("menu_about: the check row (macOS)", function()
 		if not ok then error(err, 0) end
 	end)
 
+	-- A refused window used to leave the click with no answer at all (UPX-001).
+	helpers.it("without its window the check runs and its answer is notified (upx-001-check-without-window)", function()
+		local recorded = build(nil)
+		recorded.opened = false
+		local ok, err = pcall(function()
+			recorded.row.fn()
+			helpers.assert_eq(#recorded.opens, 1, "the window is tried first")
+			helpers.assert_eq(#recorded.checked, 1, "the check still runs")
+			helpers.assert_eq(recorded.checked[1].channel, "dev", "on the menu session's channel")
+			recorded.checked[1].on_result({ state = "up_to_date", channel = "dev", current = "1.2.3" })
+			local i18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(#recorded.notices, 1, "the answer is notified")
+			helpers.assert_eq(recorded.notices[1].title, i18n.get("updater.window_title"))
+			helpers.assert_eq(recorded.notices[1].body, (i18n.get("updater.up_to_date"):gsub("{1}", "1.2.3")))
+			helpers.assert_eq(recorded.notices[1].kind, "info")
+			recorded.checked[1].on_result({ state = "error", channel = "dev", current = "1.2.3",
+				reason_key = "updater.no_connection" })
+			helpers.assert_eq(recorded.notices[2].kind, "warning", "a failed check is a warning")
+		end)
+		recorded.restore()
+		if not ok then error(err, 0) end
+	end)
+
 	-- A release armed by Versions whose quit was refused had no completing
 	-- action anywhere but a retry the native lease refuses (MUR-001).
 	helpers.it("a release waiting for its restart turns the row into its completion (release-restart-pending)", function()
 		local recorded = build({ tag = "v0.0.0-dev.150", channel = "dev" }, { tag = "v0.0.0-dev.139" })
 		local ok, err = pcall(function()
 			helpers.assert_not_nil(recorded.row, "the row names the waiting release")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local wording = i18n.get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
 			helpers.assert_true(recorded.row.title:find(wording, 1, true) == 1, recorded.row.title)
 			helpers.assert_true(recorded.row.title:find("v0.0.0-dev.139", 1, true) ~= nil, recorded.row.title)
@@ -127,8 +162,8 @@ end)
 --- Exercises the actual source-only provider through its native-bound renderer.
 --- @param alternative boolean True to independently replace the declared label and reason.
 local function with_source_row(alternative, callback)
-	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"infra.logger", "adapters.json_codec", "modules.updater", "modules.updater.auto_check",
+	helpers.with_stub_scope({ "ui.menu.menu_about", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+		"core.logger.engine.logger", "core.fs.adapters.json_codec", "modules.updater", "modules.updater.auto_check",
 		"ui.changelog", "adapters.update_launcher", "ui.menu.start_at_login", "hs", "tests.stubs.hs" }, function()
 		local native = require("tests.stubs.hs")
 		native.__reset()
@@ -139,18 +174,18 @@ local function with_source_row(alternative, callback)
 		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
 			["common.restore_recommended"] = "Canonical alternate label",
 			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
-		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = { shared = helpers.shared }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 		package.loaded["modules.updater"] = {
 			is_local_source = function() return true end,
 			installed_channel = function() return "dev" end,
 			build_identity = function() return { kind = "local", version = "", commit = "known" } end,
 			releases_page_url = function() return "https://example.invalid/releases" end,
 		}
-		local defaults_file = assert(io.open(helpers.shared("modules/updater/defaults.json"), "rb"))
-		local defaults = assert(require("adapters.json_codec").decode(assert(defaults_file:read("*a"))))
+		local defaults_file = assert(io.open(helpers.shared("updater/data/defaults.json"), "rb"))
+		local defaults = assert(require("core.fs.adapters.json_codec").decode(assert(defaults_file:read("*a"))))
 		assert(defaults_file:close())
 		package.loaded["modules.updater.auto_check"] = { stored_interval = function()
 			return defaults.timing.default_check_interval_sec
@@ -400,16 +435,16 @@ helpers.describe("Packaged About check consumes the existing shared command", fu
 		end)
 	end)
 	helpers.it("consumes the existing shared label through the actual renderer in all21 locales", function()
-		local handle = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
-		local locales = assert(require("adapters.json_codec").decode(handle:read("*a"))).order; assert(handle:close())
+		local handle = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
+		local locales = assert(require("core.fs.adapters.json_codec").decode(handle:read("*a"))).order; assert(handle:close())
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			local file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
-			local labels = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+			local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
+			local labels = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			-- The native binding captures its catalogue object at construction.
 			-- Bind each real catalogue before the existing build helper resets stubs.
-			helpers.with_stub_scope({"infra.manifest_menu", "infra.i18n", "ui.menu.menu_about"}, function()
-				local native_i18n = require("infra.i18n")
+			helpers.with_stub_scope({"infra.manifest_menu", "core.i18n.engine.i18n", "ui.menu.menu_about"}, function()
+				local native_i18n = require("core.i18n.engine.i18n")
 				native_i18n.get = function(key) return labels[key] or key end
 				package.loaded["infra.manifest_menu"] = nil
 				local renderer = require("infra.manifest_menu")

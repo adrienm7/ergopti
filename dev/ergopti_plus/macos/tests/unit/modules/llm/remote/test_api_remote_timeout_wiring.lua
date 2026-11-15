@@ -14,15 +14,15 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 	helpers.it("passes the shared millisecond value to all four HTTP owners", function()
 		local module_names = {
 			"modules.llm.api_remote",
-			"adapters.http_client",
-			"infra.timings",
+			"core.network.adapters.http_client",
+			"core.timing.engine.timings",
 		}
 		local saved = {}
 		for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
 
 		local cancelled = {}
 		local timings_calls = 0
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 10 end,
 			ms = function(section, key)
 				timings_calls = timings_calls + 1
@@ -31,7 +31,7 @@ helpers.describe("HS-098 remote request timeout wiring", function()
 				return 60000
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function(options)
 				local client = {
 					timeout_ms = type(options) == "table" and options.timeout_ms or nil,

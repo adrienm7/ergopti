@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/sv.msg
-# AUTO-GENERATED from _shared/data/locales/sv.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/sv.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-nätverksmodul byggd från källkoden.
 build_luv.recipe_required=Det inbyggda luv-bygget behöver sitt källrecept.
 install.already_installed={1} — redan installerat
 install.archive_digest_unavailable=uppdateringar med kvarhållen deskriptor kräver en verklig OpenSSL3-körtid; funktionen förblir otillgänglig.
+install.bytecode_skipped=De förkompilerade modulerna kunde inte skapas — Ergopti startar från källkoden, lite långsammare.
 install.capability_verified={1} — funktion verifierad
 install.command_still_missing={1} installerades, men '{2}' hittas fortfarande inte.
 install.daemon_manual=Så startar du daemonen manuellt:
 install.daemon_running=Daemonen körs i bakgrunden. Så kontrollerar du dess status:
+install.focus_integration_enabled={1}-fokusintegration aktiverad
+install.focus_integration_failed=Det gick inte att aktivera {1}-fokusintegrationen — regler per program förblir inaktiva på det här skrivbordet.
+install.focus_integration_next_login={1}-fokusintegration installerad (gäller från nästa inloggning)
+install.focus_integration_updated={1}-fokusintegration uppdaterad
 install.gnome_extension_active=GNOME AppIndicator-tillägg — redan aktivt
 install.gnome_extension_enabled=GNOME AppIndicator-tillägg aktiverat
 install.gnome_extension_failed=Det gick inte att aktivera AppIndicator-tillägget — utan det visar GNOME inte ikonen.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — kontroll av beroenden
 install.section_deps_skipped=Beroenden överhoppade (--no-deps)
 install.section_done=Installationen är klar
 install.section_files=Installerar filer
+install.section_focus=Aktivt program under Wayland (GNOME, KDE)
 install.section_lua_deps=Valfria Lua-beroenden (händelseloop, timers, webbvyer, signaler)
 install.section_permissions=Inmatningsbehörigheter (kräver sudo)
 install.section_services=Skapar systemd-användartjänsterna
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ körs redan i den här sessionen ({1} är upptagen); den här starten avvisades.
 launch.authorization_failed=Auktoriseringen för inmatningsåtkomst avbröts eller misslyckades.
 launch.groups_unavailable=Sessionen kunde inte få sina konfigurerade inmatningsgrupper.
+launch.restarting=Ergopti+ körs redan i den här sessionen; den ombeds avsluta och startas sedan om.
 launch.session_lock_invalid=Mappen för sessionslåset måste vara en absolut sökväg.
 launcher.dependencies_installed=Beroenden installerade.
 launcher.driver_missing=Fel: katalogen för Linux-drivrutinen hittades inte: {1}

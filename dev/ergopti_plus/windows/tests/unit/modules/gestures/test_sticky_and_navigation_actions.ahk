@@ -4,7 +4,8 @@
 ; MODULE: Sticky and Navigation Actions
 ; DESCRIPTION:
 ; The catalogue rows Windows gained: Home, End, Page Up and Down, Alt+Escape and
-; the fourteen sticky combinations. Catalogue checks stay pure; native capture
+; the sixteen sticky combinations, AltGr and AltGr+Shift included (every one-shot
+; on every OS, decision of 2026-11-13). Catalogue checks stay pure; native capture
 ; probes confine synthetic keyboard delivery to a child-owned verified Edit.
 ; ==============================================================================
 
@@ -24,8 +25,8 @@ _SNA_Sticky() {
 		"sticky_option_shift", "Alt+Shift", "sticky_option_ctrl", "Alt+Ctrl", "sticky_ctrl_shift", "Ctrl+Shift",
 		"sticky_cmd_option_shift", "Win+Alt+Shift", "sticky_cmd_option_ctrl", "Win+Alt+Ctrl",
 		"sticky_cmd_shift_ctrl", "Win+Shift+Ctrl", "sticky_option_shift_ctrl", "Alt+Shift+Ctrl",
-		"sticky_hyper", "Ctrl+Alt+Shift+Win")
-	AssertEqual(14, Expected.Count)
+		"sticky_hyper", "Ctrl+Alt+Shift+Win", "sticky_altgr", "AltGr", "sticky_altgr_shift", "AltGr+Shift")
+	AssertEqual(16, Expected.Count)
 	for Id, Names in Expected {
 		AssertEqual(Names, _SNA_Names(Id), Id . " holds its modifiers")
 		AssertTrue(GESTURE_ACTIONS.Has(Id), Id . " has a handler")
@@ -62,10 +63,13 @@ Test("navigation actions: the emitted rows are offered on Windows (sticky-action
 _SNA_NativeChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	Owner := _DriverProductionFileForSymbol("SIHO_StartOwned")
-	AssertTrue(Owner != "", "The actual SIHO registry must have a canonical owner.")
-	Code .= "#Include " . Owner . "`n"
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
+	for Symbol in ["SIHO_StartOwned", "ValueCheckValue"] {
+		; The one-shot timeout rule reads the shared value schema through the value check.
+		Owner := _DriverProductionFileForSymbol(Symbol)
+		AssertTrue(Owner != "", "The actual dependency must have a canonical owner: " . Symbol)
+		Code .= "#Include " . Owner . "`n"
+	}
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "KS_AltGrKeyName", "KS_AltGrSendKey"] {
 		Body := _DriverFuncBody(Name)
 		AssertTrue(Body != "", "The complete actual sticky owner must exist: " . Name)
 		Code .= Body . "`n"
@@ -138,12 +142,12 @@ _SSM_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
 	Code .= "#Include " . _DriverDir . "\_generated\config_keys.ahk`n"
-	for Symbol in ["SIHO_StartOwned", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar"] {
+	for Symbol in ["SIHO_StartOwned", "HS_RunSyntheticInputTransaction", "_TextCompleteTailScalar", "ValueCheckValue"] {
 		Owner := _DriverProductionFileForSymbol(Symbol)
 		AssertTrue(Owner != "", "The real transaction dependency must exist: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
+	for Name in ["StickyModifierNames", "StickyModifierConfigureHook", "StickyModifier", "TapHoldOneShotHookTimeoutOption", "TapHoldValidOneShotTimeoutMs", "TapHoldOneShotTimeoutMs", "KS_AltGrKeyName", "KS_AltGrSendKey", "TextPressKey", "_TextSenderNormalizeModifierKey",
 		"_TextSenderModifierPrefix", "_TextSenderKeystroke", "_TextSenderModifierWords", "_TextSenderSustainedKey",
 		"_TextSenderSendInput", "_TextSenderAtSendLevel", "_SendVerdictSucceeded", "HSE_WordResetFlagCurrent",
 		"_PrefixHasIncompleteFragment", "TapHoldOwnsShortcut", "TapHoldTapInDispatch",

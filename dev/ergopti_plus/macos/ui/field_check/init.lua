@@ -19,8 +19,8 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local I18n = require("infra.i18n")
+local Logger = require("core.logger.engine.logger")
+local I18n = require("core.i18n.engine.i18n")
 local Engine = require("infra.field_check")
 
 local LOG = "ui.field_check"
@@ -46,11 +46,11 @@ local function native()
 	return {
 		ports = function() return require("adapters.field_check_ports").new() end,
 		notify = function(title, body, kind)
-			return require("adapters.application_notifier").send(title, { body = body, kind = kind })
+			return require("platform.focus.application_notifier").send(title, { body = body, kind = kind })
 		end,
-		alert = function(...) return require("infra.dialog_util").block_alert(...) end,
+		alert = function(...) return require("core.ui.engine.dialog_util").block_alert(...) end,
 		copy = function(text) return hs.pasteboard.setContents(text) end,
-		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
+		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
 	}
 end
 
@@ -72,7 +72,7 @@ function M.run(row_id, services)
 	return Engine.run(row.check, env.ports(), function(result)
 		local text = Engine.format_text(result, I18n.get)
 		-- A modal dialog is shown from a fresh turn, not from the port callback.
-		env.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+		env.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 			local copy_label, close_label = I18n.get("field_check.copy"), I18n.get("field_check.close")
 			local clicked = env.alert(I18n.get(row.title), text, copy_label, close_label)
 			if clicked == copy_label then

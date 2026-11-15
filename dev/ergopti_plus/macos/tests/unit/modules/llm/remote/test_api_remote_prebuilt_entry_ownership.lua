@@ -12,26 +12,26 @@ local helpers = require("tests.helpers")
 
 -- The shared logger keeps one process identity, as in the canonical runner.
 -- Native adapter fixtures below own their shim, never a fresh shared core.
-require("logger")
+require("core.logger.engine")
 
 local function with_remote(callback)
 	helpers.with_stub_scope({
 		"modules.llm.api_remote", "modules.llm.api_token_crypto", "modules.keystats",
-		"modules.shortcuts.script_control", "adapters.http_client",
-		"llm.remote_response_classifier", "modules.llm.local_servers",
+		"modules.shortcuts.script_control", "core.network.adapters.http_client",
+		"ai.engine.policy.remote_response_classifier", "modules.llm.local_servers",
 		"modules.llm.provider_uses", "modules.llm.progressive_reveal",
 		"modules.llm.api_common", "modules.llm.profiles", "modules.llm.parser",
-		"infra.logger", "adapters.timer_scheduler", "adapters.file_system",
-		"adapters.json_codec", "adapters.storage", "infra.manifest_reader",
-		"llm.provider_config_policy", "llm.remote_formats", "llm.profile_selector",
-		"llm.parser", "llm.prompt_builder", "llm.local_server_auth", "llm.local_server_discovery",
-		"compat.utf8", "config_defaults", "diagnostics.operation_reporter",
-		"hotstrings.personal_files", "infra.fs_dir", "infra.toml.reader",
-		"json", "lfs", "logger.shim", "text_utils", "toml_codec.basic_string",
-		"toml_codec.bom", "toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+		"core.logger.engine.logger", "core.events.timer_scheduler", "core.fs.adapters.file_system",
+		"core.fs.adapters.json_codec", "core.fs.adapters.storage", "infra.manifest_reader",
+		"ai.engine.policy.provider_config_policy", "ai.engine.api.remote_formats", "ai.engine.settings.profile_selector",
+		"ai.engine.api.parser_core", "ai.engine.prediction.prompt_builder_core", "ai.engine.local_servers.auth", "ai.engine.local_servers.discovery",
+		"core.lifecycle.engine.compat.utf8", "settings.engine.publication.defaults", "diagnostics.engine.operation_reporter",
+		"hotstrings.engine.catalogue.personal_files", "core.fs.engine.dir", "core.text.engine.toml.reader",
+		"core.text.engine.json", "lfs", "core.logger.engine.shim", "core.text.engine.utils_core", "core.text.engine.toml_codec.basic_string",
+		"core.text.engine.toml_codec.bom", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 	}, function()
 		local pending, posts = {}, {}
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end,
 			warn = function() end, error = function() end,
 			trace = function() end, done = function() end,
@@ -51,7 +51,7 @@ local function with_remote(callback)
 				return { cancel = function() return true end }
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					cancel = function() return true end,

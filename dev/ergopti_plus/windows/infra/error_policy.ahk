@@ -3,10 +3,10 @@
 ; ==============================================================================
 ; MODULE: Error Window Policy
 ; DESCRIPTION:
-; AHK port of _shared/lua/diagnostics/error_policy.lua: decides whether a
+; AHK port of _shared/diagnostics/engine/reports/error_policy.lua: decides whether a
 ; logged ERROR opens the error window (_shared/ui/error_dialog/), joins the one
 ; already open, or is only logged. The thresholds are data:
-; _shared/modules/diagnostics/error_policy.json. Both ports replay
+; _shared/diagnostics/data/error_policy.json. Both ports replay
 ; _shared/tests/corpus/diagnostics/error_policy_vectors.json.
 ;
 ; FEATURES & RATIONALE:

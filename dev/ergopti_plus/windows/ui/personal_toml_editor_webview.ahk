@@ -5,9 +5,9 @@
 ; DESCRIPTION:
 ; Renders the personal-hotstring editor with an embedded WebView2 control that
 ; loads the cross-driver frontend at _shared/ui/hotstring_editor/ — the SAME
-; HTML/JS/CSS the macOS driver uses — instead of the native AHK Gui in
-; personal_toml_editor.ahk. The native Gui remains as a graceful fallback: when
-; WebView2 is unavailable, OpenPersonalEditor falls through to it.
+; HTML/JS/CSS the macOS driver uses. It is the only editor: when WebView2
+; cannot open, OpenPersonalEditor refuses with the WebView2-required message
+; (maintainer decision 2026-11-11, docs/memory/maintainer-decisions.md).
 ;
 ; FEATURES & RATIONALE:
 ; 1. Shared UX: one editor frontend for both drivers — fixing a wording or a
@@ -16,10 +16,9 @@
 ;    carries the same four hard-won gotcha fixes (see docs/memory
 ;    project-webview2-bridge-gotchas): show-before-create, virtual-host origin,
 ;    stored WebMessageReceived subscription, and fire-and-forget ExecuteScript.
-; 2. Reuses the native I/O: ReadPersonalToml / WritePersonalToml /
-;    ReloadPersonalSection (personal_toml_editor.ahk) are the single source of
-;    truth for the on-disk format and the live re-registration, so the webview
-;    and native editors write byte-identical TOML and reload identically.
+; 2. Reuses the shared I/O: ReadPersonalToml / WritePersonalToml /
+;    ReloadPersonalSection (infra/hotstrings/personal_toml_io.ahk) are the single
+;    source of truth for the on-disk format and the live re-registration.
 ; 3. i18n via the shared i18n.js fetch model (like model_browser): the locale
 ;    base + active locale are seeded before page scripts run, and i18n.js fetches
 ;    the matching JSON over the same virtual host.
@@ -33,13 +32,13 @@
 ; are unique security origins and the chrome.webview JS->AHK channel does not
 ; reliably deliver from them (see docs/memory project-webview2-bridge-gotchas).
 ; One host covers the frontend (ui/hotstring_editor/), the shared i18n.js
-; (ui/i18n.js) and the locale JSON (data/locales/).
+; (ui/i18n.js) and the locale JSON (core/i18n/data/locales/).
 global HSED_VHOST := "ergopti.hotstrings"   ; -> _SharedDir
 ; COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW.
 global HSED_HOST_ACCESS_ALLOW := 1
 
 ; WebView2 host state. The editor is a singleton: re-opening focuses the live
-; window instead of spawning a second one (mirrors the native _PersonalEditorGui).
+; window instead of spawning a second one.
 global _HsEdWeb_Gui        := 0
 global _HsEdWeb_Controller := unset
 global _HsEdWeb_WebView    := unset
@@ -71,26 +70,31 @@ global _HsEdWeb_OpeningSource := false
 
 ; Returns true when the WebView2 runtime binding + loader DLL are present. Like
 ; onboarding (and unlike model_browser) the editor does not apply the low-RAM
-; native fallback: WebView2.create is still wrapped in a try/catch that degrades
-; to the native Gui if the control genuinely cannot be created.
+; native fallback: it has no native form, so a WebView2.create failure refuses
+; the opening instead.
 _HsEdWeb_Available() {
 	global _VendorDir
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 	return IsSet(WebView2) && FileExist(loader)
 }
 
-; Attempts to show the editor in a WebView2 window. Returns true on success (the
-; caller must NOT also build the native Gui), false to fall back. Singleton:
-; focuses an already-open editor instead of opening a second one.
+; Attempts to show the editor in a WebView2 window. Returns true once this
+; request is settled (shown, focused or superseded by a newer opening), false
+; when WebView2 could not open it. Singleton: focuses an already-open editor
+; instead of opening a second one.
 ; @param DefaultSection string Section to pre-select (currently advisory; the
 ;        frontend restores its own default-section preference).
-_HsEdWeb_TryOpen(DefaultSection := "") {
+; @param FailureReason string Receives what failed when the result is false.
+_HsEdWeb_TryOpen(DefaultSection := "", &FailureReason := "") {
 	global _HsEdWeb_Gui, _HsEdWeb_Controller, _HsEdWeb_WebView
 	global _HsEdWeb_MsgSub, _HsEdWeb_NavSub, _HsEdWeb_ResetDone, _HsEdWeb_SessionEpoch
 	global _VendorDir, _SharedDir
 
-	if !_HsEdWeb_Available()
+	FailureReason := ""
+	if !_HsEdWeb_Available() {
+		FailureReason := "the WebView2 binding or WebView2Loader.dll is missing from " . _VendorDir
 		return false
+	}
 
 	; Focus only the captured singleton; presentation may pump native events.
 	if (_HsEdWeb_Gui != 0) {
@@ -112,7 +116,7 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 		return true
 
 	g := Gui_Create("+Resize +MinSize720x520", t("editor.hotstrings.window_title"))
-	Installed := false, FactoryFailed := false, ResetForFallback := false
+	Installed := false, FactoryFailed := false, ResetForRefusal := false
 	try {
 		if !_HsEdWeb_OpeningCurrent(SessionEpoch)
 			return true
@@ -148,7 +152,8 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 		} catch as Err {
 			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
-			try LoggerError("HsEditor", "WebView2 create failed: {1} — falling back to native editor.", Err.Message)
+			try LoggerError("HsEditor", "WebView2 create failed: {1}.", Err.Message)
+			FailureReason := "WebView2 create failed: " . Err.Message
 			if !_HsEdWeb_StartupCurrent(SessionEpoch, g)
 				return true
 			FactoryFailed := true
@@ -227,7 +232,7 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 		if !Installed {
 			; Revoke only this opening before private unsubscribe/Close/Destroy
 			; can pump callbacks. A stale frame never Reset()s its successor.
-			ResetForFallback := _HsEdWeb_Reset(SessionEpoch, g)
+			ResetForRefusal := _HsEdWeb_Reset(SessionEpoch, g)
 			try MsgSub := unset
 			try NavSub := unset
 			if IsSet(Controller) {
@@ -239,8 +244,8 @@ _HsEdWeb_TryOpen(DefaultSection := "") {
 		}
 	}
 	; Only now have all private cleanup callouts completed. A later session
-	; cannot lend its authority to this failed opening's native fallback.
-	return !(FactoryFailed && ResetForFallback && _HsEdWeb_FallbackCurrent(SessionEpoch + 1))
+	; owns the editor; only this failed opening's own retired epoch refuses.
+	return !(FactoryFailed && ResetForRefusal && _HsEdWeb_RefusalCurrent(SessionEpoch + 1))
 }
 
 
@@ -267,23 +272,8 @@ _HsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 		return
 
 	Action := Payload.Has("action") ? Payload["action"] : ""
-	; WebMessageReceived is a COM callback: it bypasses native Suspend, which only
-	; disarms hotkeys. Without this a paused driver still lets a page click write
-	; config, re-register hotstrings or launch an elevated install.
-	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
-	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready") {
-		if (Action == "save") {
-			try SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_ShowSaveFailure), -1)
-			catch as Err {
-				try LoggerError("HsEditor",
-					"Could not defer the suspended save refusal: {1}.",
-					Err.Message)
-				_HsEdWeb_ShowSaveFailure()
-			}
-		}
-		return
-	}
+	; A pause stops typing, not configuration (EDD-1, maintainer decision
+	; 2026-11-12): a suspended driver still saves what the page sends.
 	Data   := Payload.Has("data") ? Payload["data"] : Map()
 	; Defer out of the COM callback, like every sibling editor host already does
 	; (paths_editor, personal_info_editor, prompt_editor). `save` does file I/O
@@ -298,7 +288,7 @@ _HsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	} else if (Action == "close") {
 		SetTimer(_HsEdWeb_SessionCall.Bind(SessionEpoch, _HsEdWeb_Close), -1)
 	}
-	; window_focus is intentionally ignored on Windows (the native editor has no
+	; window_focus is intentionally ignored on Windows (the host has no
 	; focus-driven behaviour to mirror).
 }
 
@@ -326,8 +316,8 @@ _HsEdWeb_StartupCurrent(SessionEpoch, Window) {
 	return _HsEdWeb_SessionCurrent(SessionEpoch) && !_HsEdWeb_ResetDone && _HsEdWeb_Gui == Window
 }
 
-; Only the failed opening's own retired epoch can admit a native fallback.
-_HsEdWeb_FallbackCurrent(SessionEpoch) {
+; Only the failed opening's own retired epoch may report its refusal.
+_HsEdWeb_RefusalCurrent(SessionEpoch) {
 	global _HsEdWeb_Gui, _HsEdWeb_ResetDone
 	return _HsEdWeb_SessionCurrent(SessionEpoch) && _HsEdWeb_ResetDone && _HsEdWeb_Gui == 0
 }
@@ -414,13 +404,7 @@ _HsEdWeb_DeferredSaveCompleted(OpeningSource, Added, CommitResult) {
 		return
 	global PERSONAL_TOML_COMMIT_FAILED
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
-		if A_IsSuspended {
-			try LoggerError("HsEditor",
-				"The deferred personal-hotstring save was refused after Suspend became active.")
-			_HsEdWeb_ShowSaveFailure()
-		} else {
-			_HsEdWeb_ReportSaveFailure()
-		}
+		_HsEdWeb_ReportSaveFailure()
 		return
 	}
 	try LoggerSuccess("HsEditor",
@@ -432,10 +416,6 @@ _HsEdWeb_Save(Data) {
 	global _HsEdWeb_OpeningSource
 	OpeningSource := _HsEdWeb_OpeningSource
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource) {
-		_HsEdWeb_ShowSaveFailure()
-		return
-	}
-	if A_IsSuspended {
 		_HsEdWeb_ShowSaveFailure()
 		return
 	}
@@ -457,12 +437,9 @@ _HsEdWeb_Save(Data) {
 	Added := HS_PersonalSectionsAdded(ReadPersonalToml(true)["sections_order"], order)
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
 	CommitResult := PersonalTomlCommitAndReload(WriteData,
-		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), 0, OpeningSource)
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
-		if A_IsSuspended
-			_HsEdWeb_ShowSaveFailure()
-		else
-			_HsEdWeb_ReportSaveFailure()
+		_HsEdWeb_ReportSaveFailure()
 		return
 	}
 	if (CommitResult == PERSONAL_TOML_COMMIT_DEFERRED) {
@@ -495,11 +472,9 @@ _HsEdWeb_EnableAdded(Added) {
 }
 
 ; Persists a single UI preference. The frontend uses its own key names
-; (compact_view / auto_close / default_section); map them onto the native
-; [personal_editor] keys so the native editor and the webview agree.
+; (compact_view / auto_close / default_section); map them onto the
+; [personal_editor] keys the tray menu also reads.
 _HsEdWeb_SavePref(Data) {
-	if A_IsSuspended
-		return false
 	if (!(Data is Map) || !Data.Has("key"))
 		return
 	key := Data["key"]
@@ -627,7 +602,7 @@ _HsEdWeb_TriggerChar() {
 _HsEdWeb_I18nSeed() {
 	global HSED_VHOST, _I18nLocale
 	loc := IsSet(_I18nLocale) ? _I18nLocale : "en"
-	return "window.__i18n_base='https://" . HSED_VHOST . "/data/locales/';"
+	return "window.__i18n_base='https://" . HSED_VHOST . "/core/i18n/data/locales/';"
 		. "window._i18n_locale='" . loc . "';"
 }
 

@@ -31,7 +31,7 @@ end
 
 --- Drains the real deferred programmable callback without changing its policy.
 local function drain()
-	local timer, uv = require("adapters.timer_scheduler"), require("luv")
+	local timer, uv = require("core.events.timer_scheduler"), require("luv")
 	for _ = 1, 16 do
 		uv.run("nowait")
 		if timer.activeCount() == 0 then return end
@@ -51,13 +51,12 @@ local function exercise(kind, dry_run, options)
 	local previous = {}
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	for name in pairs(previous) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.") or name == "logger.shim"
-			or name == "dynamic_hotstrings" or name:match("^dynamic_hotstrings%.") then package.loaded[name] = nil end
+		if h.is_driver_module(name) or name == "core.logger.engine.shim"
+			or name == "hotstrings.engine.dynamic.core" then package.loaded[name] = nil end
 	end
 	local directory = os.tmpname()
 	assert(os.remove(directory))
-	local made = os.execute("mkdir -m 700 " .. require("text_utils").shell_quote(directory))
+	local made = os.execute("mkdir -m 700 " .. require("core.text.engine.utils_core").shell_quote(directory))
 	assert(made == true or made == 0)
 	local info_path, source_path, marker = directory .. "/personal_info.toml",
 		directory .. "/personal_dynamic_hotstrings.lua", directory .. "/called"
@@ -133,17 +132,17 @@ local function exercise(kind, dry_run, options)
 				engine:load_mappings(dynamic.prefix_mappings())
 				local scripts = require("modules.shortcuts.script_actions").new({ reset = function() engine:reset() end,
 					reload = function() error("unexpected reload") end, quit = function() error("unexpected quit") end })
-				local gate = require("infra.input_capture_gate").new()
+				local gate = require("platform.input.capture_gate").new()
 				local native = require("infra.user_hotstring_runtime").new({ engine = engine, injector = injector,
 					magic = require("modules.hotstrings.magic_key"), detector = detector, focus_guard = guard,
 					capture_gate = gate, dynamic = dynamic, paused = scripts.is_paused,
 					window_info = { getFocused = function() return { appId = "owned-editor", windowTitle = "Document" } end },
 					keystats = policy, replay_input = function(queued) h.assert_eq(#queued, 0); return true end,
 				})
-				atspi = require("adapters.atspi_focus")
+				atspi = require("platform.focus.atspi_focus")
 				atspi._publish_resident_snapshot({ bus = state.bus, path = state.path, role = state.role })
 				atspi._set_command_runner_for_test(function()
-					return true, "FOCUS:" .. require("json").encode({ role = state.role, name = "Document", attributes = {},
+					return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = state.role, name = "Document", attributes = {},
 						native_bus_name = state.bus, native_object_path = state.path, active_scope = true })
 				end)
 				user = require("modules.dynamic_hotstrings.user_code")
@@ -158,11 +157,11 @@ local function exercise(kind, dry_run, options)
 				local environment = setmetatable({ secure_focus_guard = guard, script_actions = scripts,
 					-- Bare keys: the shared expansion delay reads the held modifiers per key.
 					keyboard_hook = { held_modifiers = function() return {} end },
-					Monotonic = require("infra.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
-					terminators_mod = require("keymap.terminators"), RepeatKey = repeat_key,
+					Monotonic = require("core.logger.engine.monotonic"), WordReset = require("modules.hotstrings.word_reset"),
+					terminators_mod = require("layouts.engine.layers.terminators"), RepeatKey = repeat_key,
 					MagicKey = require("modules.hotstrings.magic_key"), opts = { dry_run = dry_run },
 					_cached_app_id = "owned-editor", keystats = metrics, engine_mod = engine_mod, engine = engine,
-					dyn_hotstrings = dynamic, injector = injector, Logger = require("logger.shim"), user_hotstring_native = native,
+					dyn_hotstrings = dynamic, injector = injector, Logger = require("core.logger.engine.shim"), user_hotstring_native = native,
 					keyboard_hook = session.hook, tooltip_preview = options.preview,
 				}, { __index = _G })
 				if options.delay ~= nil then
@@ -186,7 +185,7 @@ local function exercise(kind, dry_run, options)
 				if loadstring then compiled = assert(loadstring(body)); setfenv(compiled, environment)
 				else compiled = assert(load(body, "original Main handle_char", "t", environment)) end
 				handler = gate.guard(compiled())
-				local read = require("adapters.file_system").read_with_status
+				local read = require("core.fs.adapters.file_system").read_with_status
 				-- LuaJIT calls no hook from a compiled trace, so a hot read or request
 				-- loop went uncounted on one Arch run (dyn-dry-run-hook-jit). The
 				-- interpreter alone runs while the calls are counted.

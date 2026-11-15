@@ -5,7 +5,12 @@
 --- DESCRIPTION:
 --- Handles all data loading and user configuration persistence for the
 --- Karabiner bridge: JSON data files (actions, keys, combos), default state
---- construction, and reading/writing config_karabiner.toml.
+--- construction, and reading/writing the shared tap_hold.toml (the keys, the
+--- global delay, the Karabiner integration) and the config.toml beside it (the
+--- manifest rows: the Tap-Holds switch, the one-shot and lone-tap timings and
+--- the key combinations, maintainer decision of 2026-11-11) through
+--- platform/remap/tap_hold_file.lua, which translates both to and from the
+--- Karabiner model this module merges (the layout config_karabiner.toml had).
 ---
 --- FEATURES & RATIONALE:
 --- 1. Driver-Local Data Files: platform/remap/data/ hosts actions.json,
@@ -18,7 +23,7 @@
 ---    and preserves every field it does not own; load_user_config() reads an
 ---    absent table, key, slot or timing as its neutral value and upgrades the
 ---    legacy bare-string combo shape.
---- 4. Corruption Safety: an unparseable config_karabiner.toml is never silently
+--- 4. Corruption Safety: an unparseable tap_hold.toml is never silently
 ---    replaced. The read path falls back to defaults without touching the file
 ---    and the write path refuses to publish over it, so the user keeps a file
 ---    they can still repair by hand. Only an explicit reset overrides that.
@@ -27,27 +32,147 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local Layout = require("modules.keymap.layout")
-local Paths  = require("infra.paths")
-local i18n   = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
-local StickyLabel = require("actions.sticky_label")
-local FileSystem = require("adapters.file_system")
-local JsonCodec  = require("adapters.json_codec")
+local Paths  = require("core.fs.engine.paths")
+local i18n   = require("core.i18n.engine.i18n")
+local KeyNames = require("platform.input.keycodes.key_names")
+local StickyLabel = require("shortcuts.engine.actions.sticky_label")
+local FileSystem = require("core.fs.adapters.file_system")
+local JsonCodec  = require("core.fs.adapters.json_codec")
 
 local Defaults = require("platform.remap.defaults")
 local ActionCatalogue = require("platform.remap.action_catalogue")
 local Manifest = require("infra.manifest_reader")
-local Outdated = require("config_outdated")
+local OutdatedEntries = require("settings.engine.migration.outdated")
 local KePaths = require("platform.remap.ke_paths")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
+local TapHoldFile = require("platform.remap.tap_hold_file")
+-- Resolved at use, as before: the shared writer binds its native admission when loaded.
+local function writer() return require("core.text.engine.toml_codec.writer") end
+-- Declared here, above the readers below: section 1 declares its own TomlCodec later.
+local ConfigCodec = require("core.text.engine.toml.codec")
 
 local LOG = "karabiner"
 
+--- Hands a published config.toml to the preferences owner. The menus' scopes
+--- check that config.toml still holds the bytes the preferences loaded, so a
+--- remap save that rewrote its rows (the tap-hold switch, timings and
+--- `[mod_combos]`) must move that acknowledged source along, or the next scope
+--- of a global restore refuses. A path the preferences never loaded is not
+--- theirs to follow.
+--- @param path string The config.toml path.
+--- @param previous table Exact classified bytes the publication replaced.
+--- @param content string Published bytes.
+local function adopt_config_publication(path, previous, content)
+	local Preferences = require("infra.preferences")
+	if Preferences.source_snapshot(path) == nil then return end
+	if Preferences.replace_source(path, previous, { status = "ok", content = content }) ~= true then
+		Logger.warn(LOG, "The preferences did not adopt the tap-hold rows written to '%s'.", path)
+	end
+end
+
+--- The config.toml that holds the manifest's tap-hold rows, beside tap_hold.toml
+--- (platform/remap/tap_hold_file.lua owns the rule).
+--- @param user_config_path string The tap_hold.toml path.
+--- @return string
+function M.config_toml_path_for(user_config_path)
+	return TapHoldFile.config_toml_path_for(user_config_path)
+end
+
+-- The model leaves under [tap_holds] that config.toml keeps; every [mod_combos]
+-- leaf is config.toml's too.
+local CONFIG_TAP_HOLD_LEAVES = { enabled = true, sticky_timeout_ms = true, lone_modifier_tap_max_ms = true }
+
+--- Whether a model path names a config.toml row.
+--- @param segments table Model path segments.
+--- @return boolean
+local function config_owned(segments)
+	return segments[1] == ConfigKeys.KEY.MOD_COMBOS
+		or (segments[1] == ConfigKeys.KEY.TAP_HOLDS and CONFIG_TAP_HOLD_LEAVES[segments[2]] == true)
+end
+
+-- Outdated entries are named where the user finds them: the merge below works
+-- on the Karabiner model, the files hold the shared layout and config.toml.
+local Outdated = {
+	report_in_file = function(path, segments, detail, logger)
+		if config_owned(segments) then
+			local file_segments = segments[1] == ConfigKeys.KEY.MOD_COMBOS and TapHoldFile.file_segments(segments) or segments
+			return OutdatedEntries.report_in_file(M.config_toml_path_for(path), file_segments, detail, logger)
+		end
+		return OutdatedEntries.report_in_file(path, TapHoldFile.file_segments(segments), detail, logger)
+	end,
+}
+
+--- One shape receipt for a model merged from tap_hold.toml and config.toml.
+--- @param left table|nil
+--- @param right table|nil
+--- @return table|nil
+local function merged_shapes(left, right)
+	if left == nil and right == nil then return nil end
+	local arrays = {}
+	for _, receipt in ipairs({ left or {}, right or {} }) do
+		for value, flag in pairs(receipt.arrays or {}) do arrays[value] = flag end
+	end
+	return { arrays = arrays, numbers = left and left.numbers or {}, strings = left and left.strings or {},
+		document = left and left.document or nil }
+end
+
+--- Reads the config.toml beside tap_hold.toml for its tap-hold rows. A module
+--- field, as _load_toml_file is, so a test can state both files' reads.
+--- @param user_config_path string The tap_hold.toml path.
+--- @return table|nil part What TapHoldFile.read_config() returns; nil when unsafe.
+--- @return table source `{ path, status, content? }`, the exact same-read bytes.
+--- @return table|nil shapes The shape receipt of config.toml.
+function M._read_config_part(user_config_path)
+	local path = M.config_toml_path_for(user_config_path)
+	local raw, status = FileSystem.read_with_status(path)
+	local source = { path = path, status = status, content = status == "ok" and raw or nil }
+	if status == "absent" then return {}, source, nil end
+	if status ~= "ok" then
+		Logger.error(LOG, "Cannot read '%s' for the tap-hold rows; treating the remap settings as unavailable.", path)
+		return nil, source
+	end
+	local ok, document, shapes = pcall(ConfigCodec.decode_with_shapes, raw)
+	if not ok or type(document) ~= "table" then
+		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing the tap-hold rows it holds.", path)
+		return nil, source
+	end
+	return TapHoldFile.read_config(document, shapes, path), source, shapes
+end
+
+--- A copy of a config part's value that keeps every decoded array itself: the
+--- shape receipt names arrays by identity.
+--- @param value any
+--- @param shapes table|nil The config.toml shape receipt.
+--- @return any
+local function copy_part(value, shapes)
+	if type(value) ~= "table" or (shapes and shapes.arrays[value]) then return value end
+	local out = {}
+	for key, item in pairs(value) do out[key] = copy_part(item, shapes) end
+	return out
+end
+
+--- Lays the config.toml rows over a model read from tap_hold.toml. The model
+--- gets copies: a save edits it and compares it with the part it read.
+--- @param model table The Karabiner model, edited in place.
+--- @param part table What M._read_config_part() returned, never edited here.
+--- @param shapes table|nil The config.toml shape receipt.
+local function overlay_config(model, part, shapes)
+	if part[ConfigKeys.KEY.TAP_HOLDS] ~= nil then
+		if model.tap_holds == nil then model.tap_holds = {} end
+		if type(model.tap_holds) == "table" then
+			for leaf, value in pairs(part[ConfigKeys.KEY.TAP_HOLDS]) do model.tap_holds[leaf] = copy_part(value, shapes) end
+		end
+	end
+	model.mod_combos = copy_part(part[ConfigKeys.KEY.MOD_COMBOS], shapes)
+end
+
+
 local TAP_HOLD_TIMEOUT_MS_DEFAULT       = Defaults.tap_hold_timeout_ms
-local LoneTap = require("tap_hold.lone_tap")
+local LoneTap = require("tap_hold.engine.lone_tap")
+local OneShotTimeout = require("tap_hold.engine.one_shot_timeout")
 -- How long a modifier key pressed alone still taps: the manifest's
 -- tap_holds.lone_modifier_tap_max_ms (0 = the strict tap-hold).
 M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
@@ -55,19 +180,51 @@ M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT = LoneTap.validate(
 local STICKY_TIMEOUT_MS_DEFAULT         = Defaults.sticky_timeout_ms
 local SIMULTANEOUS_THRESHOLD_MS_DEFAULT = Defaults.simultaneous_threshold_ms
 local COMBO_SYMMETRIC_DEFAULT           = Defaults.combo_symmetric
+-- The shared value schema declarations of the global and per-key delays.
+local ValueCheck = require("settings.engine.value_check")
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
 local OUTDATED_BINDING_REASON = "a binding is a table of actions; the neutral one is used"
 local OUTDATED_ARRAY_REASON = "a remap dictionary is not an array; the neutral state is used"
 
 --- Reads one timing leaf without treating obsolete data as a file failure.
+--- A leaf the shared value schema declares (`declaration`) is checked against
+--- it; the model holds milliseconds, so `scale` converts to the declared unit
+--- (0.001 for a delay the files store in seconds).
 --- @return number value The existing numeric policy or the canonical default.
 --- @return boolean outdated True when the raw leaf must survive ordinary saves.
-local function timing_leaf(section, key, default, path, section_name)
+local function timing_leaf(section, key, default, path, section_name, declaration, scale)
 	if section[key] == nil then return default, false end
-	local called, value = pcall(tonumber, section[key])
-	if called and require("number_policy").within_timer_ceiling(value)
+	local raw = section[key]
+	if declaration ~= nil then
+		local checked = ValueCheck.check_value(ValueCheck.declaration(declaration),
+			type(raw) == "number" and raw * (scale or 1) or raw)
+		-- The model is whole milliseconds: the generator writes integers.
+		if checked.ok and raw % 1 == 0 then return raw, false end
+		Outdated.report_in_file(path, { section_name, key }, string.format(
+			"%s is refused (%s, %s..%s); the canonical default is used", tostring(raw),
+			checked.ok and "not_integer" or checked.reason, tostring(checked.min), tostring(checked.max)), Logger)
+		return default, true
+	end
+	local called, value = pcall(tonumber, raw)
+	if called and require("core.text.engine.number_policy").within_timer_ceiling(value)
 		and value > 0 and value % 1 == 0 then return value, false end
 	Outdated.report_in_file(path, { section_name, key },
 		"a timing is a finite positive whole number of milliseconds; the canonical default is used", Logger)
+	return default, true
+end
+
+--- Reads the one-shot modifier timeout, where 0 (no time limit) is a choice;
+--- a negative or fractional timeout is obsolete (tap_hold.engine.one_shot_timeout).
+--- @return number value The existing timeout or the canonical default.
+--- @return boolean outdated True when the raw leaf must survive ordinary saves.
+local function one_shot_timeout_leaf(section, key, default, path, section_name)
+	if section[key] == nil then return default, false end
+	local value = section[key]
+	if OneShotTimeout.is_valid(value) then return value, false end
+	Outdated.report_in_file(path, { section_name, key },
+		"a one-shot timeout is 0 (no time limit) or a positive whole number of milliseconds; the canonical default is used",
+		Logger)
 	return default, true
 end
 
@@ -120,7 +277,7 @@ local function combinations_symmetric(section, path)
 end
 
 --- « Ergopti uses Karabiner »: `[karabiner] integration_enabled` in
---- config_karabiner.toml. On by default; off means no lease worker, no guardian
+--- tap_hold.toml. On by default; off means no lease worker, no guardian
 --- registration and no ErgoptiPlus rule left in karabiner.json. Karabiner
 --- itself is never touched.
 M.INTEGRATION_ENABLED_DEFAULT = true
@@ -176,7 +333,7 @@ end
 --- Loads and parses a JSON file. Logs an error and returns nil on any failure.
 --- @param path string Absolute path to the JSON file.
 --- @return table|nil Decoded table, or nil.
-local TomlCodec = require("infra.toml.codec")
+local TomlCodec = require("core.text.engine.toml.codec")
 
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,
@@ -201,7 +358,8 @@ function M._load_toml_file(path)
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
 		return nil, "parse_error"
 	end
-	return data, nil, { path = path, status = "ok", content = raw }, shapes
+	local file = TapHoldFile.read(data, shapes, path)
+	return file.model, nil, { path = path, status = "ok", content = raw }, file.model_shapes
 end
 
 local function load_json_file(path)
@@ -235,7 +393,7 @@ local _chord_catalogue = nil
 --- Replaces the hardcoded French label of any action that also exists in the one
 --- action registry with its translated one.
 ---
---- This catalogue's entries and the rows of _shared/modules/actions/actions.toml
+--- This catalogue's entries and the rows of _shared/shortcuts/data/actions/actions.toml
 --- are now ONE namespace: the 18 that always overlapped, plus the 32 merged on
 --- 2026-08-03, plus 4 that turned out to be Karabiner spellings of an action the
 --- registry already carried (`return`≡`enter`, `delete_fwd`≡`delete`, `cmd_tab`
@@ -262,10 +420,10 @@ local function localise_action_labels(actions)
 	for _, action in ipairs(actions) do
 		if type(action) == "table" and type(action.id) == "string" then
 			local key = "sg_actions." .. (aliases[action.id] or action.id)
-			local translated = i18n.get(key)
-			-- i18n.get answers with the KEY when it does not resolve, which is the
-			-- signal that this action has no registry row and no alias. Writing it
-			-- through would put "sg_actions.hyper" in the menu.
+			-- A missing key means this action has no registry row and no alias.
+			-- i18n.has answers it from the active catalogue: i18n.get decoded
+			-- en.json for the first miss of every boot only to miss again.
+			local translated = i18n.has(key) and i18n.get(key) or nil
 			if translated and translated ~= key and translated ~= "" then
 				if StickyLabel.is_sticky(action.id) then
 					translated = StickyLabel.label(action.id, key, "macos", i18n.get)
@@ -302,7 +460,7 @@ local function name_modifier_holds(actions)
 end
 
 --- Names the layer holds (those declaring `hold_layer`) by the label the shared
---- hold picker gives that layer on every driver (_shared/lua/tap_hold/
+--- hold picker gives that layer on every driver (_shared/tap_hold/engine/
 --- hold_options.lua: tap_hold.hold.<layer>_layer). The navigation layer hold
 --- read « Layer nav. — Actif tant que maintenu » in French in every locale.
 --- @param actions table The decoded action list, mutated in place.
@@ -361,7 +519,7 @@ local function name_categories(actions)
 end
 
 local function append_shared_modifier_chords(actions)
-	local catalogue_path = Paths.shared("modules/actions/modifier_chords.json")
+	local catalogue_path = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 	if not catalogue_path then return end
 	if _chord_catalogue == nil then
 		_chord_catalogue = load_json_file(catalogue_path) or false
@@ -441,9 +599,17 @@ function M.resolve_layout_actions(list, product)
 	-- One declaration owns every logical character in this generation. It names
 	-- the keycodes keys arrive as; the names are written for the deployed
 	-- virtual keyboard product, which passes the ISO pair through unswapped.
+	-- Two phases inside karabiner.layout_actions: the field's 230 ms there is
+	-- native work, and the registry snapshot and the per-character keycode
+	-- lookups are its two candidates (field report 2026-11-03); the next report
+	-- names the one to move before anything is changed.
+	local Phases = require("infra.phase_stats")
+	local stage_started = Phases.now()
 	local form = Layout.keyboard_form()
+	Phases.stop("karabiner.layout_actions.keyboard_form", stage_started)
 	product = product or Layout.default_virtual_keyboard_product()
 	local resolved = 0
+	stage_started = Phases.now()
 	for _, action in ipairs(list) do
 		if action.logical_char then
 			local key_code = Layout.key_code_for_char(action.logical_char, product)
@@ -456,6 +622,7 @@ function M.resolve_layout_actions(list, product)
 			resolved = resolved + 1
 		end
 	end
+	Phases.stop("karabiner.layout_actions.key_codes", stage_started)
 	-- One summary line, not one per action. DEBUG is this driver's default level
 	-- and every layout change re-runs this loop, so per-action lines were 548 log
 	-- writes for a fact the total already conveys.
@@ -642,12 +809,12 @@ end
 -- ==========================================
 -- ==========================================
 
---- Loads config_karabiner.toml.
+--- Loads tap_hold.toml as the Karabiner model.
 --- If the file is absent (first launch), builds and returns the default state.
 --- A sparse file is completed with neutral values; legacy combos are upgraded.
 --- @param tap_hold_keys table List from load_tap_hold_keys.
 --- @param mod_combos table List from load_mod_combos.
---- @param user_config_path string Absolute path to config_karabiner.toml.
+--- @param user_config_path string Absolute path to tap_hold.toml.
 --- @return table|nil state Full state, or nil when the persisted source is unsafe.
 --- @return string status One of "ok", "absent", or "error".
 --- @return table|nil source Optional exact same-read path/status/raw admission receipt.
@@ -661,9 +828,22 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 			-- run, but do NOT overwrite the corrupt file.
 			return nil, "error"
 		end
-		Logger.info(LOG, "No user config found — initializing from defaults.")
-		return M.build_default_state(tap_hold_keys, mod_combos), "absent", source
 	end
+	-- The manifest rows live in config.toml: an unsafe one refuses the state
+	-- like a corrupt tap_hold.toml, rather than read its rows as neutral.
+	local config_part, config_source, config_shapes = M._read_config_part(user_config_path)
+	if config_part == nil then return nil, "error" end
+	source.config = config_source
+	if not data then
+		if next(config_part) == nil then
+			Logger.info(LOG, "No user config found — initializing from defaults.")
+			return M.build_default_state(tap_hold_keys, mod_combos), "absent", source
+		end
+		Logger.info(LOG, "No tap_hold.toml yet — the config.toml rows apply over the defaults.")
+		data = {}
+	end
+	overlay_config(data, config_part, config_shapes)
+	shapes = merged_shapes(shapes, config_shapes)
 
 	-- The switch decides whether any lease or guardian may be acquired, so an
 	-- unreadable value is refused like a corrupt file rather than read as on.
@@ -791,18 +971,32 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	drop_outdated(tap_hold_config, tap_hold_keys, ConfigKeys.KEY.TAP_HOLDS, { "tap", "hold" })
 	drop_outdated(combos_config, mod_combos, ConfigKeys.KEY.MOD_COMBOS, { "tap", "hold", "combo" })
 
-	-- Reads one optional number; absence is the canonical default.
-	local function timing(section, key, default, label)
-		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
-		return timing_leaf(section, key, default, user_config_path, section_name)
+	-- A key's own delay the generator cannot deploy is named here, once: the key
+	-- follows the global delay, and the file keeps the value for the user.
+	for id, entry in pairs(tap_hold_config) do
+		local own = type(entry) == "table" and entry.timeout_ms or nil
+		local checked = own ~= nil and ValueCheck.check_value(ValueCheck.declaration(KEY_DELAY_KEY),
+			type(own) == "number" and own / 1000 or own)
+		if checked and not checked.ok then
+			Outdated.report_in_file(user_config_path, { ConfigKeys.KEY.TAP_HOLDS, "config", tostring(id), "timeout_ms" },
+				string.format("a key's delay is refused (%s, %s..%s s); the key follows the global delay",
+					checked.reason, tostring(checked.min), tostring(checked.max)), Logger)
+		end
 	end
-	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS)
-	local sticky_ms = timing(tap_holds, "sticky_timeout_ms", STICKY_TIMEOUT_MS_DEFAULT,
-		ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS)
+
+	-- Reads one optional number; absence is the canonical default.
+	local function timing(section, key, default, label, declaration, scale)
+		local section_name = assert(label:match("^([^.]+)%."), "a timing needs its owning section")
+		return timing_leaf(section, key, default, user_config_path, section_name, declaration, scale)
+	end
+	local timeout_ms = timing(tap_holds, "timeout_ms", TAP_HOLD_TIMEOUT_MS_DEFAULT, ConfigKeys.KEY.TAP_HOLDS_TIMEOUT_MS,
+		GLOBAL_DELAY_KEY, 0.001)
+	local sticky_ms = one_shot_timeout_leaf(tap_holds, ConfigKeys.LEAF.STICKY_TIMEOUT_MS, STICKY_TIMEOUT_MS_DEFAULT,
+		user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local lone_tap_ms = lone_tap_leaf(tap_holds, ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS,
 		M.LONE_MODIFIER_TAP_MAX_MS_DEFAULT, user_config_path, ConfigKeys.KEY.TAP_HOLDS)
 	local simultaneous_ms = timing(combos, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, SIMULTANEOUS_THRESHOLD_MS_DEFAULT,
-		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
+		ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS)
 
 	local combo_symmetric = combinations_symmetric(combos, user_config_path)
 
@@ -814,6 +1008,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 	local mod_combos_enabled = combinations_enabled(combos, user_config_path)
 
 	Logger.info(LOG, "User config loaded (Ergopti uses Karabiner: %s).", tostring(integration_enabled))
+	local status = source.status == "absent" and "absent" or "ok"
 	return {
 		enabled                   = integration_enabled,
 		runtime                   = runtime,
@@ -827,7 +1022,7 @@ function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
 		sticky_timeout_ms         = sticky_ms,
 		simultaneous_threshold_ms = simultaneous_ms,
 		combo_symmetric           = combo_symmetric,
-	}, "ok", source
+	}, status, source
 end
 
 -- The scalar leaves a menu setter can name as explicitly set by the user.
@@ -857,13 +1052,13 @@ function M.explicit_leaves(intent)
 	return leaves
 end
 
---- Persists the non-neutral state sparsely to config_karabiner.toml.
+--- Persists the non-neutral state sparsely to tap_hold.toml.
 --- Refuses to publish over a file that exists but cannot be decoded as TOML:
 --- load_user_config() already falls back to defaults without touching such a
 --- file, so the overwrite performed by the very next setter is where the user's
 --- still-recoverable tap/hold and combo configuration was actually destroyed.
 --- @param state table The current module state table.
---- @param user_config_path string Absolute path to config_karabiner.toml.
+--- @param user_config_path string Absolute path to tap_hold.toml.
 --- @param overwrite_corrupt boolean|nil True only for the explicit reset-to-defaults
 ---        action — the one case where clobbering an unparseable file is the intent.
 --- @param expected_source table|nil `{ status, content }` a scope transaction read
@@ -882,7 +1077,23 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 	assert(intent == nil or not overwrite_corrupt, "a reset already owns every remap leaf")
 	local document = {}
 	local document_shapes
+	-- The shared file the save started from, nil when it starts from none; a
+	-- reset's parsed source, whose other drivers' settings it keeps.
+	local shared_file, reset_base
 	local source, source_status
+	-- The config.toml rows read before the save, compared with the model after.
+	local config_part, config_source, config_shapes = M._read_config_part(user_config_path)
+	if config_part == nil then
+		Logger.error(LOG, "Refusing to save the remap settings: the config.toml beside '%s' is unsafe — settings NOT saved.",
+			user_config_path)
+		return false
+	end
+	if expected_source and expected_source.config and (expected_source.config.status ~= config_source.status
+		or (config_source.status == "ok" and expected_source.config.content ~= config_source.content)) then
+		Logger.error(LOG, "Refusing to overwrite '%s': it changed after its backup — settings NOT saved.",
+			config_source.path)
+		return false
+	end
 	if not overwrite_corrupt then
 		-- Re-reading before every save is cheap (a few KB, only on user action)
 		-- and is the only way to notice that the file went bad since boot.
@@ -911,6 +1122,16 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 				Logger.warn(LOG, "Rewriting the unparseable user config at '%s'; its exact bytes are in the scope backup.",
 					user_config_path)
 				decoded, shapes = {}, nil
+			else
+				shared_file = TapHoldFile.read(decoded, shapes, user_config_path)
+				-- The save edits these bytes line by line: comments and other drivers' text stay.
+				shared_file.source_text = source
+				if not shared_file.writable then
+					Logger.error(LOG, "Refusing to overwrite '%s': it was saved by a newer build or its version is unusable — settings NOT saved.",
+						user_config_path)
+					return false
+				end
+				decoded, shapes = shared_file.model, shared_file.model_shapes
 			end
 			document, document_shapes = decoded, shapes
 		elseif source_status ~= "absent" then
@@ -926,8 +1147,19 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			Logger.error(LOG, "Refusing to repair unreadable user config at '%s'.", user_config_path)
 			return false
 		end
+		-- The file is shared: a reset replaces what macOS owns and keeps the
+		-- other drivers' settings of a file that still parses.
+		if source_status == "ok" then
+			local decoded_ok, decoded, shapes = pcall(TomlCodec.decode_with_shapes, source)
+			if decoded_ok and type(decoded) == "table" then reset_base = { document = decoded, shapes = shapes } end
+		end
 	end
 
+	-- An ordinary save keeps every config.toml row it does not change, outdated
+	-- spellings included; a reset replaces what macOS owns there too.
+	if not overwrite_corrupt then overlay_config(document, config_part, config_shapes) end
+	document_shapes = merged_shapes(document_shapes, config_shapes)
+	local config_rows
 	local candidate_refusal = nil
 	local ok, payload = pcall(function()
 		local function table_at(parent, key)
@@ -940,8 +1172,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			if not overwrite_corrupt and value == neutral then value = nil end
 			target[key] = value
 		end
-		local function assign_timing(target, section, key, value, neutral, read_leaf)
-			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section)
+		local function assign_timing(target, section, key, value, neutral, read_leaf, declaration, scale)
+			local _, outdated = (read_leaf or timing_leaf)(target, key, neutral, user_config_path, section,
+				declaration, scale)
 			if not overwrite_corrupt and outdated and not explicit[section .. "." .. key] then
 				if value ~= neutral then
 					candidate_refusal = "candidate has no explicit repair owner for " .. section .. "." .. key
@@ -1044,8 +1277,15 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			local tap_holds = table_at(document, ConfigKeys.KEY.TAP_HOLDS)
 			assign_boolean(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "enabled", state.tap_holds_enabled,
 				Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_ENABLED), tap_holds_switch)
-			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms, TAP_HOLD_TIMEOUT_MS_DEFAULT)
-			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "sticky_timeout_ms", state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT)
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, "timeout_ms", state.tap_hold_timeout_ms,
+				TAP_HOLD_TIMEOUT_MS_DEFAULT, nil, GLOBAL_DELAY_KEY, 0.001)
+			-- 0 is no time limit, a choice of its own: only the default is elided.
+			if state.sticky_timeout_ms ~= nil and not OneShotTimeout.is_valid(state.sticky_timeout_ms) then
+				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS
+				error(candidate_refusal, 0)
+			end
+			assign_timing(tap_holds, ConfigKeys.KEY.TAP_HOLDS, ConfigKeys.LEAF.STICKY_TIMEOUT_MS,
+				state.sticky_timeout_ms, STICKY_TIMEOUT_MS_DEFAULT, one_shot_timeout_leaf)
 			-- 0 is the strict tap-hold, a choice of its own: only the default is elided.
 			if state.lone_modifier_tap_max_ms ~= nil and not pcall(LoneTap.validate, state.lone_modifier_tap_max_ms) then
 				candidate_refusal = "candidate has an invalid " .. ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS
@@ -1076,7 +1316,9 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			else
 				mod_combos.enabled = state.mod_combos_enabled
 			end
-			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS, state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT)
+			assign_timing(mod_combos, ConfigKeys.KEY.MOD_COMBOS, ConfigKeys.LEAF.SIMULTANEOUS_THRESHOLD_MS,
+				state.simultaneous_threshold_ms, SIMULTANEOUS_THRESHOLD_MS_DEFAULT, nil,
+				ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, 1)
 			assign_boolean(mod_combos, ConfigKeys.KEY.MOD_COMBOS, "symmetric", state.combo_symmetric,
 				COMBO_SYMMETRIC_DEFAULT, combinations_symmetric)
 			if not preserve_array(mod_combos.config, { ConfigKeys.KEY.MOD_COMBOS, "config" },
@@ -1086,10 +1328,11 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 			end
 			if next(mod_combos) == nil then document.mod_combos = nil end
 		end
+		config_rows = TapHoldFile.config_rows(config_part, document, document_shapes)
 		-- Only an ordinary valid-source read owns the parsed identities. Explicit
-		-- resets, absent files and backed corrupt repair keep their default encoder.
-		if document_shapes then return TomlCodec.encode_with_shapes(document, document_shapes) end
-		return TomlCodec.encode(document)
+		-- resets, absent files and backed corrupt repair start a new shared file.
+		if reset_base then return TapHoldFile.encode_reset(reset_base.document, reset_base.shapes, document) end
+		return TapHoldFile.encode(shared_file, document)
 	end)
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "User config candidate for '%s' refused: %s.", user_config_path,
@@ -1097,10 +1340,35 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		return false
 	end
 
+	-- config.toml first: its rows are what the menus show, and a tap_hold.toml
+	-- refused after it is reported with both publications in the receipt.
+	local companion
+	if #config_rows > 0 then
+		local config_expected = { status = config_source.status, content = config_source.content }
+		local prepared, prepare_detail, config_candidate, prepared_source = writer().prepare_batch(config_source.path,
+			config_rows, FileSystem, config_expected)
+		if prepared ~= true or type(config_candidate) ~= "string" then
+			Logger.error(LOG, "The tap-hold rows of '%s' cannot be prepared (%s) — settings NOT saved.",
+				config_source.path, tostring(prepare_detail))
+			return false
+		end
+		local called, published, publish_detail, config_cleanup = pcall(writer().publish_if_unchanged,
+			config_source.path, config_candidate, FileSystem, prepared_source or config_expected)
+		companion = { path = config_source.path, source = config_expected, candidate = config_candidate,
+			verify_absence = true }
+		if type(config_cleanup) == "function" then companion.publication_cleanup = config_cleanup end
+		if not called or published ~= true then
+			Logger.error(LOG, "Cannot publish the tap-hold rows to '%s' — settings NOT saved.", config_source.path)
+			return false, tostring(called and publish_detail or published),
+				type(config_cleanup) == "function" and companion or nil
+		end
+		adopt_config_publication(config_source.path, config_expected, config_candidate)
+	end
 	local publication_source = { status = source_status, content = source }
 	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
 		user_config_path, payload, publication_source)
-	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true }
+	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true,
+		companion = companion }
 	if type(retry_cleanup) == "function" then receipt.publication_cleanup = retry_cleanup end
 	if not write_ok or written ~= true then
 		Logger.error(LOG, "Cannot atomically publish user config to '%s' — settings NOT saved.",
@@ -1108,7 +1376,7 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 		-- A refusal can follow publication. Only its exact native receipt can
 		-- distinguish that inverse from a proven no-effect cleanup on retry.
 		return false, tostring(write_ok and detail or written),
-			type(retry_cleanup) == "function" and receipt or nil
+			(type(retry_cleanup) == "function" or companion ~= nil) and receipt or nil
 	end
 	Logger.debug(LOG, "User config saved.")
 	return true, nil, receipt
@@ -1118,17 +1386,25 @@ end
 --- Prepares only the chord leaves from an exact fresh settings source.
 --- Ordinary setters retain their existing save path and source policy.
 function M.prepare_copy_taps_to_chords(entries, actions, path)
-	local source, status = FileSystem.read_with_status(path)
+	-- The chords are config.toml rows; `path` (tap_hold.toml) stays the route identity.
+	local config_path = M.config_toml_path_for(path)
+	local source, status = FileSystem.read_with_status(config_path)
 	assert(status == "absent" or (status == "ok" and type(source) == "string"), "fresh chord source could not be read")
 	local expected = { status = status, content = source }
 	local known = {}; for _, action in ipairs(actions) do known[action.id] = true end
-	local plan = require("tap_hold.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
-		entries = entries, is_action = function(action) return known[action] == true end,
+	-- The shared file names a combination by its pair id.
+	local pairs_of = {}
+	for index, entry in ipairs(entries) do pairs_of[index] = { id = TapHoldFile.pair_of_combo(entry.id) } end
+	local plan = require("tap_hold.engine.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
+		entries = pairs_of, is_action = function(action) return known[action] == true end,
 		settings = { simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT, combo_symmetric = COMBO_SYMMETRIC_DEFAULT },
 	})
-	local prepared, detail, content, witnessed = require("toml_codec.writer").prepare_batch(path, plan.rows, FileSystem, expected)
+	local by_combo = {}
+	for pair, slots in pairs(plan.mod_combos_config) do by_combo[TapHoldFile.combo_of_pair(pair)] = slots end
+	plan.mod_combos_config = by_combo
+	local prepared, detail, content, witnessed = writer().prepare_batch(config_path, plan.rows, FileSystem, expected)
 	assert(prepared == true and type(content) == "string" and type(witnessed) == "table", detail or "chord source preparation refused")
-	plan.path, plan.expected_source, plan.candidate = path, expected, content
+	plan.path, plan.config_path, plan.expected_source, plan.candidate = path, config_path, expected, content
 	return plan
 end
 
@@ -1136,18 +1412,18 @@ end
 function M.publish_copy_taps_to_chords(plan, current_path, admission)
 	assert(type(plan) == "table" and plan.path == current_path, "chord copy route changed")
 	assert(admission == nil or type(admission) == "function", "chord copy admission must be a function")
-	local Writer = require("toml_codec.writer")
+	local Writer = writer()
 	local function admitted()
-		if Writer.write_refusal(plan.path) ~= nil then return false end
+		if Writer.write_refusal(plan.config_path) ~= nil then return false end
 		local accepted = admission == nil or admission() == true
-		return accepted and Writer.write_refusal(plan.path) == nil
+		return accepted and Writer.write_refusal(plan.config_path) == nil
 	end
 	-- The shared publisher owns session refusal and requires the same native
 	-- owner to run this captured admission after its final source observations.
 	-- A missing admitted capability refuses; the direct writer is no substitute.
 	local called, written, detail, cleanup = pcall(Writer.publish_if_unchanged,
-		plan.path, plan.candidate, FileSystem, plan.expected_source, nil, admitted)
-	local receipt = { path = plan.path, source = plan.expected_source, candidate = plan.candidate, verify_absence = true }
+		plan.config_path, plan.candidate, FileSystem, plan.expected_source, nil, admitted)
+	local receipt = { path = plan.config_path, source = plan.expected_source, candidate = plan.candidate, verify_absence = true }
 	if type(cleanup) == "function" then receipt.publication_cleanup = cleanup end
 	if not called or written ~= true then return false, called and detail or written, type(cleanup) == "function" and receipt or nil end
 	return true, nil, receipt

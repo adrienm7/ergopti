@@ -91,8 +91,8 @@ helpers.describe("shortcuts.actions.system: the tap-key tap (tap-keys)", functio
 				return function() ran = ran + 1 return true end
 			end)
 			local properties = spy.hs.eventtap.event.properties
-			local EventClock = require("adapters.event_clock")
-			local Health = require("infra.key_event_health")
+			local EventClock = require("core.events.clock")
+			local Health = require("core.logger.engine.key_event_health")
 			EventClock.reset()
 			Health.reset()
 			local host_ns = 3600 * 1e9
@@ -123,8 +123,8 @@ helpers.describe("shortcuts.actions.system: the tap-key tap (tap-keys)", functio
 			local ran = 0
 			sys.bind_tap_keys(nil, function() return function() ran = ran + 1; return true end end)
 			local properties = spy.hs.eventtap.event.properties
-			local EventClock = require("adapters.event_clock")
-			local Health = require("infra.key_event_health")
+			local EventClock = require("core.events.clock")
+			local Health = require("core.logger.engine.key_event_health")
 			EventClock.reset(); Health.reset()
 			local host_ns = 3600 * 1000000000
 			local saved = hs.timer.absoluteTime

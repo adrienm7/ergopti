@@ -30,9 +30,7 @@ const LAYOUT_MANAGER_ACTIONS = Object.freeze([
 	'select',
 	'open_homepage',
 	'close',
-	'composer_open',
-	'composer_save',
-	'composer_remove'
+	'open_editor'
 ]);
 
 // Failure codes the hosts report, each with its own explanation. Any other
@@ -45,7 +43,7 @@ const FAILURE_KEYS = Object.freeze({
 	python_missing: 'layouts.linux_needs_python'
 });
 
-// Catalogue error codes (_shared/lua/layouts/catalogue.lua and its AHK twin).
+// Catalogue error codes (_shared/layouts/engine/composer/catalogue.lua and its AHK twin).
 const CATALOGUE_ERROR_KEYS = Object.freeze({
 	offline: 'layout_manager.error_offline',
 	http: 'layout_manager.error_http'
@@ -413,7 +411,7 @@ function render() {
  * Posts one allowlisted action to the host.
  * @param {string} action
  * @param {string} [id] - Registry id the action applies to.
- * @param {Object} [extra] - More fields of the message (the composer's save).
+ * @param {Object} [extra] - More fields of the message.
  */
 function send(action, id, extra) {
 	if (!LAYOUT_MANAGER_ACTIONS.includes(action))
@@ -436,6 +434,9 @@ window.initData = function (data) {
 		_strings = data.strings;
 		applyDomStrings();
 	}
+	// Only a host that stores the editor's files offers it (all three drivers),
+	// in its own window (_shared/ui/layout_editor_window).
+	document.getElementById('btn-editor').hidden = data.source_editor !== true;
 	window.updateState(data.state);
 };
 
@@ -456,6 +457,11 @@ window.updateState = function (state) {
 
 document.getElementById('btn-refresh').addEventListener('click', function () {
 	send('refresh');
+});
+
+// The layout editor opens in its own window (_shared/ui/layout_editor_window).
+document.getElementById('btn-editor').addEventListener('click', function () {
+	send('open_editor');
 });
 
 document.getElementById('btn-close').addEventListener('click', function () {

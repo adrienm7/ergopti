@@ -1,5 +1,5 @@
 {
-	"description": "Cross-driver relative timer delay ceiling (2^53 ms, owned by _shared/lua/number_policy.lua MAX_TIMER_DELAY_MS). Replayed by _shared/lua/test/timer_delay_ceiling_contract.lua through the macOS and Linux suites: the policy, both TimerScheduler adapters and every Linux native timer and sleep boundary.",
+	"description": "Cross-driver relative timer delay ceiling (2^53 ms, owned by _shared/core/text/engine/number_policy.lua MAX_TIMER_DELAY_MS). Replayed by _shared/tests/lua/timer_delay_ceiling_contract.lua through the macOS and Linux suites: the policy, both TimerScheduler adapters and every Linux native timer and sleep boundary.",
 	"field_semantics": {
 		"milliseconds": "Delay in milliseconds. The strings \"inf\", \"-inf\" and \"nan\" stand for the values JSON cannot spell.",
 		"seconds": "Delay in seconds, as the TimerScheduler port receives it. Chosen so that seconds * 1000 is exact in a double and the verdict cannot depend on rounding.",

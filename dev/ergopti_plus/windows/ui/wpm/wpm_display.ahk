@@ -28,8 +28,8 @@
 
 class WPMWidgetConst {
     ; ── Loaded at runtime by WPMWidget_LoadSharedConst() ─────────────────────────
-    ; From _shared/modules/wpm_widget/constants.toml (the canon every driver
-    ; reads) and _shared/modules/timings/constants.toml. Zero here, never a
+    ; From _shared/metrics/data/wpm_widget/constants.toml (the canon every driver
+    ; reads) and _shared/core/timing/data/constants.toml. Zero here, never a
     ; copied default: a key missing from the canon keeps the widget off.
     ; [compact]
     static W                  := 0

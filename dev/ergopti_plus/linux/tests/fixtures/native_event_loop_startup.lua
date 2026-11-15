@@ -11,14 +11,14 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_event_loop_startup%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv = require("luv")
 local failures = 0
 local cases = { "idle nil", "idle raised", "idle start raised", "timer nil", "timer raised", "timer start raised", "timer invalidated" }
 
 for _, refusal in ipairs(cases) do
-	package.loaded["adapters.event_loop"] = nil
-	local loop = require("adapters.event_loop")
+	package.loaded["core.events.loop"] = nil
+	local loop = require("core.events.loop")
 	local new_idle, new_timer, idle_start, timer_start = uv.new_idle, uv.new_timer, uv.idle_start, uv.timer_start
 	local owned, receipt = {}, nil
 	local foreign = new_timer()

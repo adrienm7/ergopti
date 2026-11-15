@@ -34,18 +34,18 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Errors = require("adapter_errors")
-local Logger = require("logger.shim")
-local Perf = require("infra.perf_counters")
-local EvdevCodes = require("infra.evdev_codes")
+local Errors = require("diagnostics.engine.adapter_errors")
+local Logger = require("core.logger.engine.shim")
+local Perf = require("core.logger.engine.perf_counters")
+local EvdevCodes = require("platform.input.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
 local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
-local ModifierBroker = require("adapters.modifier_broker")
+local ModifierBroker = require("platform.input.modifier_broker")
 local broker_for_channel = ModifierBroker.for_channel
-local NumberPolicy = require("number_policy")
+local NumberPolicy = require("core.text.engine.number_policy")
 
 local LOG = "modules.hotstrings.injector"
 
@@ -81,6 +81,9 @@ local MODIFIER_CODES = EvdevCodes.LEVEL_MODIFIER_CODE
 -- on a delimiter it contains. One owner, set by the daemon.
 local _output_observer = nil
 local _mutation_observer = nil
+-- Answers whether the focused target needs the pause between an erase and the
+-- text (set_erase_pacing); nil until the daemon installs it, which pauses.
+local _erase_pacing = nil
 
 
 -- =========================================
@@ -108,7 +111,7 @@ end
 --- Exact layout-level modifier keycodes the user is physically holding.
 --- @return table Ordered evdev keycodes.
 local function held_text_modifier_codes()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_text_modifier_codes) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_text_modifier_codes)
 	return (ok_call and type(held) == "table") and held or {}
@@ -117,7 +120,7 @@ end
 --- Shortcut modifiers (Ctrl, Alt, Super) the user is holding.
 --- @return table Ordered evdev keycodes.
 local function held_shortcut_modifier_codes()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_shortcut_modifier_codes) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_shortcut_modifier_codes)
 	return (ok_call and type(held) == "table") and held or {}
@@ -126,7 +129,7 @@ end
 --- Non-modifier keys the hook forwarded as pressed and not yet released.
 --- @return table evdev keycodes.
 local function held_forwarded_keys()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_forwarded_keys) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_forwarded_keys)
 	return (ok_call and type(held) == "table") and held or {}
@@ -153,7 +156,7 @@ local _nanosleep = nil
 local function nanosleep()
 	if _nanosleep ~= nil then return _nanosleep or nil end
 	local ok_ffi, ffi = pcall(require, "ffi")
-	_nanosleep = require("infra.native_sleep").bind(ok_ffi and ffi or nil) or false
+	_nanosleep = require("core.timing.engine.native_sleep").bind(ok_ffi and ffi or nil) or false
 	return _nanosleep or nil
 end
 
@@ -202,12 +205,43 @@ end
 --- @param count integer Number of Backspace strokes to send.
 local require_publication
 
-local function send_backspaces(tx, count)
+--- @param paced boolean|nil True paces each stroke for a terminal (erase_paced).
+local function send_backspaces(tx, count, paced)
 	if count < 1 then return end
+	-- A terminal or TUI prompt may judge every Backspace against one stale
+	-- render: Windows (IsTerminalApp) and macOS (prepare_collected_paced) wait
+	-- [debounce] terminal_hotstring_key_delay_ms after each one (HSE-001).
+	local delay_ms = paced == true and require("core.timing.engine.timings").ms("debounce", "terminal_hotstring_key_delay_ms") or nil
 	for _ = 1, count do
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_DOWN, "backspace down")
 		must_emit(tx, EvdevCodes.KEY_BACKSPACE, EVDEV_VALUE_UP, "backspace up")
+		if delay_ms then sleep_ms(delay_ms) end
 	end
+end
+
+--- The pause between an erase and the text that replaces it. A terminal or TUI
+--- prompt may judge every Backspace against one stale render before the text
+--- arrives, which is the one case the Windows and macOS drivers pace
+--- ([debounce] terminal_hotstring_key_delay_ms); any other application reads
+--- the virtual keyboard's events in order, so the pause only delayed the text.
+--- Without a pacing port (tests, tools) every erase pauses once, as before.
+--- @return boolean|nil paced True for a target the erase must be paced for
+---   (a failing port included), false for one it need not be, nil without a port.
+local function erase_paced()
+	if not _erase_pacing then return nil end
+	local asked, wanted = pcall(_erase_pacing)
+	if not asked then
+		Logger.error(LOG, "The erase pacing port failed: %s; pacing.", tostring(wanted))
+		return true
+	end
+	return wanted ~= false
+end
+
+--- The pause after an erase without a pacing port: a paced erase already
+--- waited after its last stroke, an unpaced one needs none.
+--- @param paced boolean|nil From erase_paced.
+local function erase_pause(paced)
+	if paced == nil then sleep_ms(INTER_PHASE_DELAY_MS) end
 end
 
 --- Types a string as keystrokes, under the layout the session actually has.
@@ -399,7 +433,7 @@ end
 local function stop_after_failure(result, label)
 	Logger.error(LOG, "%s failed in %s — %s (cleanup_ok=%s).",
 		label, tostring(result.failed_phase), tostring(result.error), tostring(result.cleanup_ok))
-	local ok_hook, hook = pcall(require, "adapters.keyboard_hook")
+	local ok_hook, hook = pcall(require, "platform.input.keyboard_hook")
 	if ok_hook and type(hook.emergency_stop) == "function" then
 		pcall(hook.emergency_stop, label .. ": " .. tostring(result.error))
 	end
@@ -631,7 +665,8 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end
 	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	Perf.count("hotstring.expansions")
-	local transaction_started = Perf.clock()
+	local transaction_started = Perf.trace("hotstring.expand")
+	local transaction_events = 0
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
@@ -644,6 +679,7 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
 			Perf.count("output.uinput_events")
+			transaction_events = transaction_events + 1
 			local write_started = Perf.clock()
 			local accepted = native_tx.emit(code, value, phase)
 			Perf.span("output.uinput_write", write_started)
@@ -682,7 +718,9 @@ local function run_transaction(label, body, publication, prepared, data_attempt,
 	end)
 	if not ok and not tx.is_failed() then tx.fail(err, "unexpected exception") end
 	local result = tx.finish()
-	Perf.span("hotstring.expand", transaction_started)
+	-- The operation and its event count only: never the text.
+	Perf.done("hotstring.expand", transaction_started,
+		string.format("%s, %d event(s)%s", label, transaction_events, result.ok and "" or ", failed"))
 	if not result.ok then result.error = private_failure(result.error, is_private) end
 	if not result.ok and not (publication ~= nil and result.cleanup_ok == true
 		and result.error == Errors.PROGRAMMABLE_PUBLICATION_STALE) then stop_after_failure(result, label) end
@@ -796,7 +834,7 @@ end
 --- instead of grabbing a keyboard it has no way to give back.
 --- @return boolean True when the non-forking channel is live.
 function M.open_fast_channel()
-	local ok_mod, mod = pcall(require, "adapters.uinput_writer")
+	local ok_mod, mod = pcall(require, "platform.input.uinput_writer")
 	if not ok_mod or type(mod) ~= "table" then
 		Logger.error(LOG, "uinput_writer unavailable — there is no way to emit keys.")
 		return false
@@ -810,7 +848,7 @@ function M.open_fast_channel()
 		Logger.error(LOG, "uinput channel could not be opened — check /dev/uinput permissions.")
 		return false
 	end
-	local Broker = require("adapters.modifier_broker")
+	local Broker = require("platform.input.modifier_broker")
 	if not Broker.attach(mod) then
 		mod.close()
 		Logger.error(LOG, "The acknowledged output channel could not be reserved.")
@@ -824,7 +862,7 @@ end
 --- Returns the exact shared output owner installed before native input opens.
 --- @return table|nil broker
 function M.output_broker()
-	return _uinput and require("adapters.modifier_broker").for_channel(_uinput) or nil
+	return _uinput and require("platform.input.modifier_broker").for_channel(_uinput) or nil
 end
 
 --- Closes the non-forking channel, if one is open.
@@ -832,7 +870,7 @@ end
 function M.close_fast_channel()
 	local clipboard_closed = retire_clipboard()
 	if not _uinput then return clipboard_closed end
-	local Broker = require("adapters.modifier_broker")
+	local Broker = require("platform.input.modifier_broker")
 	local channel, broker = _uinput, Broker.for_channel(_uinput)
 	if broker then
 		local acknowledged = channel.close() == true
@@ -855,6 +893,21 @@ end
 --- @param mod table|nil A module exposing is_open() and emit(code, value).
 function M._set_uinput(mod)
 	_uinput = mod
+end
+
+--- Installs the port answering whether the focused target needs the pause
+--- between an erase and its text (true for a terminal); nil restores the
+--- pause for every target.
+--- @param fn function|nil fn() -> boolean.
+--- @return boolean accepted
+function M.set_erase_pacing(fn)
+	if fn ~= nil and type(fn) ~= "function" then
+		Logger.error(LOG, "set_erase_pacing(): a function or nil is required, got %s.", type(fn))
+		return false
+	end
+	_erase_pacing = fn
+	Logger.debug(LOG, "Erase pacing: %s.", fn and "terminals only" or "every target")
+	return true
 end
 
 --- Sets the one observer told of each successful injection's typed text.
@@ -944,9 +997,10 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
-			-- Brief pause to let the target process the deletions.
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
+			-- A terminal processes the deletions before the text arrives.
+			erase_pause(paced)
 		end
 
 		require_publication(publication, false)
@@ -1083,8 +1137,9 @@ function M.inject_fields(backspace_count, values, is_private, publication)
 		-- trigger was typed in; later fields are reached through the Tabs below.
 		require_publication(publication, false)
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
+			erase_pause(paced)
 		end
 		require_publication(publication, false)
 
@@ -1145,8 +1200,9 @@ function M.inject_tokens(backspace_count, tokens, is_private, replay_terminator,
 
 	local result = run_transaction("inject_tokens()", function(tx)
 		if backspace_count > 0 then
-			send_backspaces(tx, backspace_count)
-			sleep_ms(INTER_PHASE_DELAY_MS)
+			local paced = erase_paced()
+			send_backspaces(tx, backspace_count, paced)
+			erase_pause(paced)
 		end
 		require_publication(publication, false)
 		local field = 0
@@ -1185,7 +1241,7 @@ local KEY_LEFT = nil
 for code, name in pairs(EvdevCodes.CONTROL_NAME_OF) do
 	if name == "left" then KEY_LEFT = code end
 end
-if not KEY_LEFT then error("infra.evdev_codes names no Left arrow") end
+if not KEY_LEFT then error("platform.input.evdev_codes names no Left arrow") end
 
 -- Code point ranges that extend the character before them instead of starting
 -- a new one: combining marks, variation selectors, emoji skin tones and tag

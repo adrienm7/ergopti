@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The atomic writer seeds a staging inode in one forked command: the source's
 --- ACL listing, a NUL, the metadata-preserving copy and a second listing, joined
---- by " && " (adapters/file_system.lua, seed_staging_metadata). The hs.execute
+--- by " && " (core/fs/adapters/file_system.lua, seed_staging_metadata). The hs.execute
 --- doubles answer each segment with their single-command handler, in order, and
 --- stop at the first failure as the shell does, so the fixtures keep modelling
 --- one ls and one cp at a time.

@@ -37,10 +37,10 @@ function M.load_keystats()
 	-- require-time. This fixture deliberately uses the production instances, so it
 	-- owns their reload rather than making the generic helper erase intentional
 	-- adapter stubs installed by unrelated tests.
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
 	}
@@ -49,7 +49,7 @@ function M.load_keystats()
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,
 	}
-	package.loaded["infra.dialog_util"] = { alert = function() end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
 	package.loaded["modules.keystats.log_manager"] = {
 		init = function(core_state) state = core_state; return true end,
@@ -124,13 +124,13 @@ function M.load_keystats()
 		perform_maintenance = function() end,
 		caffeinate_cb = function() end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function(callback) return type(callback) == "function" end,
 		start = function() return true end,
 		stop = function() return true end,
 	}
 	local keyboard_event
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(opts) keyboard_event = opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
@@ -151,7 +151,7 @@ function M.load_keystats()
 		state = state,
 		flushes = flushes,
 		hs = _G.hs,
-		synthetic_input = require("adapters.synthetic_input"),
+		synthetic_input = require("platform.input.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 	}
 	--- Runs deferred keystats builders after the simulated eventtap returns.

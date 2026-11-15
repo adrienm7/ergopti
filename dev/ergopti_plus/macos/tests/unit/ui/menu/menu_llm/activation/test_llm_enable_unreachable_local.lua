@@ -259,11 +259,11 @@ end
 --- @param callback function Receives (world).
 local function with_startup(options, callback)
 	helpers.with_fresh_modules({
-		"infra.logger", "modules.llm", "adapters.timer_scheduler",
+		"core.logger.engine.logger", "modules.llm", "core.events.timer_scheduler",
 		"ui.menu.menu_llm.startup_controller", "modules.llm.ollama_endpoint",
 	}, function()
 		local logger, records = recording_logger()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.llm"] = {
 			BUILTIN_PROFILES = {},
 			DEFAULT_STATE = { llm_ollama_port = 11434, llm_ollama_owned_port = 11435 },
@@ -413,8 +413,8 @@ end)
 helpers.describe("The API backend has no local requirement (llm-enable-unreachable-local)", function()
 	helpers.it("a local OpenAI server's requirement holds without asking Ollama (llm-enable-unreachable-local)", function()
 		local modules = {
-			"adapters.json_codec",
-			"infra.logger", "infra.dialog_util", "infra.i18n", "infra.paths", "modules.llm",
+			"core.fs.adapters.json_codec",
+			"core.logger.engine.logger", "core.ui.engine.dialog_util", "core.i18n.engine.i18n", "core.fs.engine.paths", "modules.llm",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager",
 		}
@@ -434,10 +434,10 @@ helpers.describe("The API backend has no local requirement (llm-enable-unreachab
 					get_installed_models = function() return {} end,
 				}
 			end
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.paths"] = { shared_llm_path = function() return "/fixture/models.json" end }
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.fs.engine.paths"] = { shared_llm_path = function() return "/fixture/models.json" end }
 			package.loaded["modules.llm"] = { get_backend = function() return "api" end }
 			package.loaded["ui.menu.menu_llm.models_manager_mlx"] = { new = function() return backend_manager("mlx") end }
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = {

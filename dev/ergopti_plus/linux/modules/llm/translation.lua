@@ -4,9 +4,9 @@
 --- MODULE: Selection Translation Data (Linux)
 --- DESCRIPTION:
 --- Loads what the llm_translate_selection action and its llm_language parameter
---- need from the shared tree: _shared/modules/llm/translate.json (prompt, tag,
---- token budget) and the shipped locales (_shared/data/locale_names.json,
---- locale_order.json). The logic itself is the shared _shared/lua/llm/translate.lua;
+--- need from the shared tree: _shared/ai/data/translate.json (prompt, tag,
+--- token budget) and the shipped locales (_shared/core/i18n/data/locale_names.json,
+--- locale_order.json). The logic itself is the shared _shared/ai/engine/prediction/translate.lua;
 --- this module only reads the files and hands them to it.
 ---
 --- FEATURES & RATIONALE:
@@ -19,16 +19,16 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local Translate = require("llm.translate")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local Translate = require("ai.engine.prediction.translate")
 
 local LOG = "modules.llm.translation"
 
 -- The shared files this module reads, relative to _shared/
-local CONFIG_FILE = "modules/llm/translate.json"
-local NAMES_FILE = "data/locale_names.json"
-local ORDER_FILE = "data/locale_order.json"
+local CONFIG_FILE = "ai/data/translate.json"
+local NAMES_FILE = "core/i18n/data/locale_names.json"
+local ORDER_FILE = "core/i18n/data/locale_order.json"
 
 -- The decoded files, loaded once: { config, names, order }
 local _data = nil
@@ -87,9 +87,9 @@ end
 --- @param relative string Path under _shared/.
 --- @return string|nil text
 local function read_shared(relative)
-	local path = require("infra.paths").shared(relative)
+	local path = require("core.fs.engine.paths").shared(relative)
 	if not path then return nil end
-	local text, status = require("toml_codec.writer").read_classified(path)
+	local text, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 	return status == "ok" and text or nil
 end
 
@@ -130,7 +130,7 @@ end
 function M.choices()
 	local data = M.data()
 	if not data then error("the translation choices are unavailable: the shared files did not load") end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local current = Translate.language_name(i18n.get_locale(), data.names)
 	if not current then error("the interface locale '" .. tostring(i18n.get_locale()) .. "' has no native name") end
 	local template = i18n.get("llm.translate.ui_language")

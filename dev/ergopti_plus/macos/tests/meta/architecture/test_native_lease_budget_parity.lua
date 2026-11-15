@@ -85,7 +85,7 @@ local function launcher_timing(member, unit)
 	local per_ms = LAUNCHER_TIMING_UNITS[unit]
 	helpers.assert_not_nil(per_ms, "unsupported LauncherTimings unit: " .. unit)
 	local key = member:gsub("(%u)", function(c) return "_" .. c:lower() end) .. "_ms"
-	return require("infra.timings").ms("launcher", key) * per_ms
+	return require("core.timing.engine.timings").ms("launcher", key) * per_ms
 end
 
 --- Evaluates a sum of numeric literals and named constants.

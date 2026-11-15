@@ -30,12 +30,12 @@ LoggerInfo(*) => 0
 LoggerDebug(*) => 0
 LoggerError(Tag, Message, Values*) => _RelayOwnerErrors.Push(Tag . ": " . Message)
 
-#Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\proxy_override.ahk
+#Include ..\..\core\text\engine\json.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
+#Include ..\..\core\network\adapters\proxy_override.ahk
 #Include ..\..\modules\llm\ollama_runtime_owner.ahk
 
 _RelayOwnerMain(A_Args[1])

@@ -18,7 +18,7 @@
 ; DERIVED by walking each occurrence of the manifest path back to its enclosing
 ; function, so a fourth private decode fails here instead of quietly reappearing.
 ;
-; _MG_LoadSubCategories (infra/master_gates.ahk) is the one documented exception:
+; _MG_LoadSubCategories (core/lifecycle/engine/master_gates.ahk) is the one documented exception:
 ; its non-memoized re-read is a deliberate fail-fast contract -- an invalid
 ; canonical manifest must throw on EVERY call -- pinned by
 ; tests/unit/infra/config/persistence/test_master_gates.ahk, and it runs per live category toggle, never
@@ -57,7 +57,7 @@ _MM1D_EnclosingFunction(Src, Offset) {
 _MM1D_OnlyOneMenuLayerDecoder() {
 	global _MM1D_ALLOWED_OWNERS
 	Src    := _DriverSourceNoComments()
-	Needle := "\modules\menu\menu_manifest.json"
+	Needle := "\menu\data\menu_manifest.json"
 
 	Owners := Map()
 	Pos := 1

@@ -200,7 +200,7 @@ _WPMCO_RefusedConfig(Kind, Successor, SamePosition := false) {
 		Boot := ConfigMigrateBoot(Path)
 		AssertEqual("current", Boot["status"])
 		STORAGE_REG_BASE := RegistryPath
-		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		Canon := ParseTomlFile(_SharedDir . "\metrics\data\wpm_widget\constants.toml")
 		WPMWidgetConst.STORE_PAIR := Canon["position"]["storage_pair"]
 		AssertTrue(WPMWidgetConst.STORE_PAIR != "")
 		WPMWidget.show_graph := false, WPMWidget.use_colors := false
@@ -343,7 +343,7 @@ _WPMA_LocalStore(Mode) {
 		Owned := Status == 0 && Disposition == 1
 		AssertTrue(Owned, "the test must affirmatively own the newly created private key")
 		STORAGE_REG_BASE := "HKCU\" . Subkey
-		Canon := ParseTomlFile(_SharedDir . "\modules\wpm_widget\constants.toml")
+		Canon := ParseTomlFile(_SharedDir . "\metrics\data\wpm_widget\constants.toml")
 		WPMWidgetConst.STORE_PAIR := Canon["position"]["storage_pair"]
 		_WPMWidget_PositionAuthority({active: 0, published: 0})
 		AssertTrue(WPMWidget_SavePosition(10, 20, 0, (*) => 0))

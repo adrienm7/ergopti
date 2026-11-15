@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/de.msg
-# AUTO-GENERATED from _shared/data/locales/de.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/de.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-Netzwerkmodul aus dem Quellcode gebaut.
 build_luv.recipe_required=Der native luv-Build benötigt sein Quellrezept.
 install.already_installed={1} — bereits installiert
 install.archive_digest_unavailable=Aktualisierungen mit gehaltenem Dateideskriptor erfordern eine echte OpenSSL3-Laufzeit; die Funktion bleibt nicht verfügbar.
+install.bytecode_skipped=Die vorkompilierten Module konnten nicht erstellt werden — Ergopti startet aus dem Quellcode, etwas langsamer.
 install.capability_verified={1} — Funktion bestätigt
 install.command_still_missing={1} wurde installiert, aber '{2}' ist weiterhin nicht auffindbar.
 install.daemon_manual=So starten Sie den Daemon manuell:
 install.daemon_running=Der Daemon läuft im Hintergrund. So prüfen Sie seinen Status:
+install.focus_integration_enabled={1}-Fokusintegration aktiviert
+install.focus_integration_failed=Die {1}-Fokusintegration konnte nicht aktiviert werden — anwendungsspezifische Regeln bleiben auf diesem Desktop inaktiv.
+install.focus_integration_next_login={1}-Fokusintegration installiert (wirksam ab der nächsten Anmeldung)
+install.focus_integration_updated={1}-Fokusintegration aktualisiert
 install.gnome_extension_active=GNOME-AppIndicator-Erweiterung — bereits aktiv
 install.gnome_extension_enabled=GNOME-AppIndicator-Erweiterung aktiviert
 install.gnome_extension_failed=Die AppIndicator-Erweiterung konnte nicht aktiviert werden — ohne sie zeigt GNOME das Symbol nicht an.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — Abhängigkeiten prüfen
 install.section_deps_skipped=Abhängigkeiten übersprungen (--no-deps)
 install.section_done=Installation abgeschlossen
 install.section_files=Dateien werden installiert
+install.section_focus=Aktive Anwendung unter Wayland (GNOME, KDE)
 install.section_lua_deps=Optionale Lua-Abhängigkeiten (Ereignisschleife, Timer, Webviews, Signale)
 install.section_permissions=Eingabeberechtigungen (erfordert sudo)
 install.section_services=systemd-Benutzerdienste werden angelegt
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG-Autostart: {1}
 launch.already_running=Ergopti+ läuft bereits in dieser Sitzung ({1} ist belegt); dieser Start wurde abgelehnt.
 launch.authorization_failed=Die Freigabe des Eingabezugriffs wurde abgebrochen oder ist fehlgeschlagen.
 launch.groups_unavailable=Die Sitzung konnte ihre konfigurierten Eingabegruppen nicht erhalten.
+launch.restarting=Ergopti+ läuft bereits in dieser Sitzung; es wird zum Beenden aufgefordert und dann neu gestartet.
 launch.session_lock_invalid=Das Verzeichnis der Sitzungssperre muss ein absoluter Pfad sein.
 launcher.dependencies_installed=Abhängigkeiten installiert.
 launcher.driver_missing=Fehler: Verzeichnis des Linux-Treibers nicht gefunden: {1}

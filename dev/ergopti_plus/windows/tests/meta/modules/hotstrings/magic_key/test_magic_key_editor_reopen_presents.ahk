@@ -12,14 +12,14 @@
 ;
 ; SCOPE: source introspection. The editor blocks in InputHook.Wait and the
 ; helper focuses a real window, neither of which the headless runner may do;
-; the helper itself is exercised in tests/unit/ui/windows/test_window_manager_present_window.ahk.
+; the helper itself is exercised in tests/unit/core/ui/windows/test_manager_present_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 _MetaMagicKeyEditorReopenPresents() {
 	Body := _DriverFuncBody("MagicKeyEditor")
-	Assert(Body != "", "MagicKeyEditor must exist in ui/editors.ahk")
+	Assert(Body != "", "MagicKeyEditor must exist in core/ui/ui/editors.ahk")
 
 	LivePos := InStr(Body, "if !_MagicKeyEditorStopDebt {")
 	PresentPos := InStr(Body, "WMPresentWindow(_MagicKeyEditorGui)", , Max(LivePos, 1))

@@ -4,7 +4,7 @@
 --- MODULE: Keymap Utilities (Hammerspoon adapter)
 --- DESCRIPTION:
 --- Hammerspoon-specific keymap helpers layered on top of the shared pure-Lua
---- core from _shared/lua/keymap/utils.lua. Adds OS-level text emission
+--- core from _shared/layouts/engine/utils.lua. Adds OS-level text emission
 --- (simulated keystrokes and clipboard paste) and ignored-window detection,
 --- which depend on hs.eventtap, hs.pasteboard, hs.timer, and hs.window.
 ---
@@ -21,19 +21,19 @@
 local hs = hs
 local M  = {}
 
-local text_utils  = require("infra.text_utils")
-local shared_utils = require("keymap.utils")
-local Logger      = require("infra.logger")
-local Timings     = require("infra.timings")
+local text_utils  = require("core.text.engine.utils")
+local shared_utils = require("layouts.engine.utils")
+local Logger      = require("core.logger.engine.logger")
+local Timings     = require("core.timing.engine.timings")
 local Clipboard = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
-local TimerScheduler = require("adapters.timer_scheduler")
-local SyntheticInput = require("adapters.synthetic_input")
-local SecureFieldDetector = require("adapters.secure_field_detector")
+local TimerScheduler = require("core.events.timer_scheduler")
+local SyntheticInput = require("platform.input.synthetic_input")
+local SecureFieldDetector = require("platform.focus.secure_field_detector")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local FieldRunSelftest = require("infra.field_run_selftest")
 
-local LOG = "keymap.utils"
+local LOG = "layouts.engine.utils"
 
 -- Re-export pure-Lua functions from the shared module so callers that require
 -- this HS adapter keep working unchanged without needing to know about the split.
@@ -48,11 +48,11 @@ local _send_vocabulary = nil
 --- @return table
 local function send_vocabulary()
 	if _send_vocabulary then return _send_vocabulary end
-	local path = require("infra.paths").shared("modules/actions/send_keys.json")
-	local raw = require("adapters.file_system").read(path)
-	local decoded = raw and require("adapters.json_codec").decode(raw) or nil
+	local path = require("core.fs.engine.paths").shared("shortcuts/data/actions/send_keys.json")
+	local raw = require("core.fs.adapters.file_system").read(path)
+	local decoded = raw and require("core.fs.adapters.json_codec").decode(raw) or nil
 	if type(decoded) ~= "table" or type(decoded.keys) ~= "table" then
-		error("keymap.utils: the send-input vocabulary is unreadable at " .. tostring(path))
+		error("layouts.engine.utils: the send-input vocabulary is unreadable at " .. tostring(path))
 	end
 	_send_vocabulary = decoded
 	return decoded

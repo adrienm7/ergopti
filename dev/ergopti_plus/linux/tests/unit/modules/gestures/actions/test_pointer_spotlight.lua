@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
-local Display = require("infra.display_server")
+local Shell = require("core.process.adapters.shell_runner")
+local Display = require("core.ui.engine.display_server")
 
 local TWO_MONITORS = "Monitors: 2\n"
 	.. " 0: +*eDP-1 1920/344x1080/194+0+0  eDP-1\n"

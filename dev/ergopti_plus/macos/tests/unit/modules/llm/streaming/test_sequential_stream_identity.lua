@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local SharedParser = require("llm.parser")
+local SharedParser = require("ai.engine.api.parser_core")
 
 
 
@@ -52,7 +52,7 @@ local API_COMMON = {
 	end,
 	log_prediction_summary = function() end,
 	is_authentication_failure = function(failure)
-		return require("llm.failure_class").is_authentication_failure(failure)
+		return require("ai.engine.policy.failure_class").is_authentication_failure(failure)
 	end,
 	protected_call = function(callback, _label, ...)
 		if type(callback) == "function" then return callback(...) end
@@ -97,8 +97,8 @@ local function run_backend(backend, requested, fail_first)
 	local dispatches, partials = {}, {}
 	helpers.with_stub_scope({
 		backend.module_name, "modules.llm.api_common", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "adapters.http_client",
-		"adapters.timer_scheduler", "adapters.shell_runner",
+		"modules.llm.progressive_reveal", "core.network.adapters.http_client",
+		"core.events.timer_scheduler", "core.process.adapters.shell_runner",
 	}, function()
 		local module = helpers.load_with_stubs(backend.module_name)
 		local fetch = module.fetch_sequential
@@ -131,7 +131,7 @@ end
 local function build_handler()
 	local renders, warnings = {}, {}
 	local partial
-	helpers.with_stub_scope({ "modules.llm.parser", "modules.llm.streaming_handler", "infra.logger" }, function()
+	helpers.with_stub_scope({ "modules.llm.parser", "modules.llm.streaming_handler", "core.logger.engine.logger" }, function()
 		package.loaded["modules.llm.parser"] = {
 			new_thinking_filter = SharedParser.new_thinking_filter,
 			process_prediction = function(_, _, raw) return { to_type = raw, deletes = 0, chunks = {}, nw = raw } end,
@@ -141,7 +141,7 @@ local function build_handler()
 				return { title = function() return "Fixture" end }
 			end },
 		})
-		package.loaded["infra.logger"].warn = function(_, fmt, ...)
+		package.loaded["core.logger.engine.logger"].warn = function(_, fmt, ...)
 			warnings[#warnings + 1] = string.format(fmt, ...)
 		end
 		local tooltip = {
@@ -203,7 +203,10 @@ helpers.describe("sequential stream identity", function()
 			helpers.assert_eq(dispatches[2].kind, "plain",
 				"a retry would overwrite the growing preview with an unrelated completion")
 			helpers.assert_eq(dispatches[2].has_partial, false)
-			helpers.assert_eq(#partials, 1)
+			-- The failed stream is withdrawn before its retry (stream-retry-withdraw).
+			helpers.assert_eq(#partials, 2)
+			helpers.assert_eq(partials[2].raw, false)
+			helpers.assert_true(partials[2].identity == partials[1].identity, "the failed stream itself is withdrawn")
 		end)
 	end
 
@@ -214,6 +217,18 @@ helpers.describe("sequential stream identity", function()
 		helpers.assert_eq(#warnings, 0, table.concat(warnings, "; "))
 		helpers.assert_eq(#renders, 2, "the second variant must keep filling token by token")
 		helpers.assert_eq(renders[2], "second independent completion")
+	end)
+
+	helpers.it("(stream-retry-withdraw) handler ignores the withdrawal of a stream it no longer shows", function()
+		local partial, renders, warnings = build_handler()
+		local first, second = {}, {}
+		partial("first independent completion", first)
+		partial("second independent completion", second)
+		partial(false, first)
+		helpers.assert_eq(#renders, 2, "the second stream's rows stay as painted")
+		partial("second independent completion grows", second)
+		helpers.assert_eq(#renders, 3, "and keep streaming")
+		helpers.assert_eq(#warnings, 0, table.concat(warnings, "; "))
 	end)
 
 	helpers.it("(sequential-stream-identity) handler still rejects a broken prefix inside one stream", function()

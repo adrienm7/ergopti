@@ -58,13 +58,13 @@ local function scenario(options, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
+		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"modules.hotstrings.word_reset", "infra.hotstring_preferences", "adapters.keyboard_layout",
 			"modules.hotstrings.injector", "adapters.clipboard" }) do package.loaded[name] = nil end
 		local state = { text = "", caret = 0, wire = {}, held = {}, requests = {}, submissions = {},
 			cancelled = 0, offers = {}, overlay_showing = false, controls = 0, moves = 0, outputs = 0 }
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
-		logger.set_sink(function() end); package.loaded["logger.shim"] = logger
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
+		logger.set_sink(function() end); package.loaded["core.logger.engine.shim"] = logger
 		local preferences = require("tests.support.llm_preferences_fixture").new({ initial = {
 			["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 			["llm.profiles.active"] = "basic", ["llm.profiles.num_predictions"] = options.count or 1,
@@ -98,14 +98,14 @@ local function scenario(options, body)
 			invalidate = function() snapshot = nil; listener(nil) end }
 		local scheduler = require("tests.fakes").timer_scheduler()
 		guard = require("modules.keystats.focus_guard").new({ watch = watch,
-			detector = require("adapters.secure_field_detector"), keystats = policy, prediction = prediction,
+			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = prediction,
 			now_ms = function() return 1000 + scheduler.now * 1000 end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
 		})
-		package.loaded["infra.display_server"] = { is_x11 = function() return true end,
+		package.loaded["core.ui.engine.display_server"] = { is_x11 = function() return true end,
 			is_wayland = function() return false end, kind = function() return "x11" end }
-		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+		package.loaded["platform.input.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
 			-- The fixture's evdev A=30 and space=57 belong to this physical provider.
 			get_layout = function() return "qwerty" end,
@@ -142,7 +142,7 @@ local function scenario(options, body)
 		settings.arrow_resets_word = options.arrow_resets_word ~= false
 		if options.shortcut_resets_word ~= nil then settings.shortcut_resets_word = options.shortcut_resets_word end
 		assert(WordReset.restore_configuration(settings)); WordReset.forget_last_key()
-		local gate = require("infra.input_capture_gate").new()
+		local gate = require("platform.input.capture_gate").new()
 		local keyboard_identity = require("modules.shortcuts.keyboard_shortcuts").collision_identity
 		local environment = setmetatable({ engine = matcher, engine_mod = require("modules.hotstrings.engine"),
 			TapHold = { observe_copy_activity = function() end },
@@ -151,7 +151,7 @@ local function scenario(options, body)
 				is_caps_word_active = function() return false end } or nil,
 			script_actions = require("modules.shortcuts.script_actions").new({ reset = function() end,
 				reload = function() end, quit = function() end }),
-			keystats = policy, WordReset = WordReset, InputEvent = require("infra.input_event"),
+			keystats = policy, WordReset = WordReset, InputEvent = require("platform.input.event"),
 			Monotonic = { now_ms = function() return 1000 + scheduler.now * 1000 end }, _cached_app_id = "owned-editor",
 			terminators_mod = { is_terminator = function() return false end },
 			-- Main sizes the expansion delay from the physically held modifiers.
@@ -159,13 +159,16 @@ local function scenario(options, body)
 			RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false }, Logger = logger,
 			input_capture_gate = gate, MagicKeySource = { on_key = function() return false end },
 			script_chords = { on_key = function() return false end }, tap_keys = { on_key = function() return false end },
-			wrap_on_type = { on_key = function() return false end }, consume_bound_chord = function() return false end,
+			wrap_on_type = { on_key = function() return false end, end_selection_window = function() return true end },
+			consume_bound_chord = options.consume_bound_chord or function() return false end,
 			keyboard_shortcuts = { collision_identity = keyboard_identity, chord_name = function() return nil end,
 				dispatch = function()
 					if options.restart_prediction then return prediction.trigger_now() end
 					return false
 				end },
 		}, { __index = _G })
+		-- Main requires the emulation per key; a case may stand in for it.
+		if options.emulation then package.loaded["modules.keymap.layout_emulation"] = options.emulation end
 		local callbacks = main_callbacks(environment)
 		local overlay = { show = function(rows)
 			state.offers = rows; state.overlay_showing = #rows > 0; return true
@@ -197,8 +200,8 @@ local function scenario(options, body)
 			return false
 		end
 		function state.shortcut(vector)
-			local original_hook = package.loaded["adapters.keyboard_hook"]
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local original_hook = package.loaded["platform.input.keyboard_hook"]
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local events, modifiers, raw_held = {}, {}, {}
 			for _, pair in ipairs({ { "ctrl", 29 }, { "shift", 42 }, { "alt", 56 }, { "meta", 125 }, { "altgr", 100 } }) do
 				if vector.mods[pair[1]] then modifiers[#modifiers + 1] = pair[2] end
@@ -235,7 +238,7 @@ local function scenario(options, body)
 					callbacks.control(name, detail)
 				end,
 			}, true)
-			package.loaded["adapters.keyboard_hook"] = original_hook
+			package.loaded["platform.input.keyboard_hook"] = original_hook
 			if not driven then error(problem, 0) end
 			helpers.assert_true(forwarded, "the actual Hook must forward the unbound editing chord")
 			helpers.assert_eq(raw_held, {}, "all physical forwarded modifiers and keys must be released")
@@ -408,6 +411,39 @@ helpers.describe("Main retires AI at forwarded document controls", function()
 			helpers.assert_true(s.control("1", 2))
 			helpers.assert_eq(s.controls, 0); helpers.assert_eq(s.text, "hello" .. RESPONSE)
 			helpers.assert_eq(s.outputs, 1); helpers.assert_eq(s.prediction.has_suggestions(), false)
+		end)
+	end)
+
+	-- The layout emulation types every key it maps in the key's place. It once
+	-- ran first, so an emulated digit never reached the shown offer and a bound
+	-- keyboard slot never fired: Windows runs the slot first and macOS lets the
+	-- digit accept (ILL-001, ILL-002, emulation-consume-order).
+	local function emulating_everything(calls)
+		return { on_key = function(detail) calls[#calls + 1] = detail.key; return true end }
+	end
+
+	helpers.it("lets the validation digit accept the offer under the layout emulation (emulation-consume-order)", function()
+		local emulated = {}
+		scenario({ emulation = emulating_everything(emulated) }, function(s)
+			s.type("hello"); s.scheduler.test.advance(.5); s.respond(1, RESPONSE)
+			helpers.assert_true(s.control("1", 2), "the digit is the offer's")
+			helpers.assert_eq(s.text, "hello" .. RESPONSE)
+			helpers.assert_eq(emulated, {}, "the emulation never typed the digit")
+		end)
+	end)
+
+	helpers.it("fires a bound keyboard slot before the layout emulation (emulation-consume-order)", function()
+		local emulated, bound = {}, {}
+		local function consume_bound_chord(detail)
+			if detail.key == "u" and detail.mods.ctrl then bound[#bound + 1] = detail.key; return true end
+			return false
+		end
+		scenario({ emulation = emulating_everything(emulated), consume_bound_chord = consume_bound_chord }, function(s)
+			helpers.assert_eq(s.callbacks.consume({ code = 22, key = "u", mods = { ctrl = true } }), true)
+			helpers.assert_eq(bound, { "u" }, "the slot ran")
+			helpers.assert_eq(emulated, {}, "and the emulation never saw its chord")
+			helpers.assert_eq(s.callbacks.consume({ code = 30, key = "a", mods = {} }), true)
+			helpers.assert_eq(emulated, { "a" }, "an unbound key is still emulated")
 		end)
 	end)
 
@@ -603,7 +639,7 @@ end)
 -- Whole-Main regression fixture: configuration/desktop/input/transport ports are
 -- controlled. Main is loaded intact and initializes the actual AI/focus owners.
 do
-	local shared_engine = require("hotstring_engine")
+	local shared_engine = require("hotstrings.engine.matcher")
 	local shared_new = shared_engine.new
 
 	local function whole_main(options, body)
@@ -617,10 +653,10 @@ do
 				if name:match("^modules%.llm%.") or name:match("^modules%.keystats%.")
 					or name:match("^modules%.hotstrings%.") or name:match("^modules%.shortcuts%.") then package.loaded[name] = nil end
 			end
-			for _, name in ipairs({ "adapters.keyboard_hook", "adapters.evdev_reader", "adapters.modifier_broker",
-				"adapters.keyboard_layout", "adapters.secure_field_detector", "adapters.clipboard", "adapters.timer_scheduler",
-				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "infra.monotonic",
-				"infra.config_paths", "config_migrate", "toml_codec.writer",
+			for _, name in ipairs({ "platform.input.keyboard_hook", "platform.input.evdev_reader", "platform.input.modifier_broker",
+				"adapters.keyboard_layout", "platform.focus.secure_field_detector", "adapters.clipboard", "core.events.timer_scheduler",
+				"infra.hotstring_preferences", "infra.llm_preferences", "infra.metrics_preferences", "core.logger.engine.monotonic",
+				"infra.config_paths", "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer",
 				-- Main initialises these owners once; an earlier suite may have loaded them.
 				"modules.keymap.pause_layout_switch", "modules.keymap.layout_emulation" }) do package.loaded[name] = nil end
 			local root, key, phase, modifier = helpers.driver_root(), options.key or "u", options.phase or "late", options.modifier or "ctrl"
@@ -628,9 +664,9 @@ do
 			local action_mode = options.mode or "none"
 			local terminal = app == "gnome-terminal"
 			local role = terminal and 60 or 61
-			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-			require("compat.utf8").install()
-			local Json = require("json")
+			package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+			require("core.lifecycle.engine.compat.utf8").install()
+			local Json = require("core.text.engine.json")
 			local state = { requests = {}, cancellations = 0, text = "", caret = 0, output = 0, overlays = {}, chars = 0, controls = 0, forwarded = 0, read_frame = 1 }
 			fixture_state = state
 			local function noop() end
@@ -640,30 +676,30 @@ do
 			put("infra.config_paths", { config = function(name)
 			  local file = marker .. "." .. name; owned_paths[file] = true; return file
 			end, get_config_dir = function() return marker .. ".config-dir" end })
-			put("adapters.storage", require("tests.fakes").storage())
+			put("core.fs.adapters.storage", require("tests.fakes").storage())
 			local scheduler = require("tests.fakes").timer_scheduler()
-			put("adapters.timer_scheduler", scheduler)
-			put("infra.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
-			local logger = assert(dofile(root .. "/../_shared/lua/logger/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
-			put("logger.shim", logger)
-			put("infra.logger_sink", { install = yes })
-			put("infra.session_lock", { protect = yes, acquire = yes })
+			put("core.events.timer_scheduler", scheduler)
+			put("core.logger.engine.monotonic", { now_ms = function() return 1000 + scheduler.now * 1000 end, resolution_ms = function() return .001 end })
+			local logger = assert(dofile(root .. "/../_shared/core/logger/engine/init.lua")); logger.set_sink(function(line) state.last_log = tostring(line) end)
+			put("core.logger.engine.shim", logger)
+			put("core.logger.engine.sink", { install = yes })
+			put("core.lifecycle.engine.shutdown.session_lock", { protect = yes, acquire = yes })
 			put("infra.script_settings", { apply = yes, current = function() return "ERROR" end })
-			put("infra.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
+			put("core.logger.engine.boot_profiler", { begin = noop, stage = noop, stage_done = noop, complete = function() return 0 end })
 			put("infra.diagnostic_snapshot", { pid = function() return "controlled" end, prepare = function() return noop end })
 			put("modules.diagnostics.crash_reporter", { remove_legacy_dumps = function() return 0 end, protect = function(_, body)
 			  local ok, result = xpcall(body, debug.traceback)
 			  if not ok then io.stderr:write("MAIN_SETUP_FAILURE " .. tostring(result) .. "\n") end
 			  return ok, result
 			end })
-			put("infra.input_access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
-			put("infra.signal_handlers", { start = yes, stop = yes, is_settled = yes })
-			put("infra.restart_pause", { restore = yes })
+			put("platform.input.access", { is_denied = no, missing_program = function() return nil end, report = function() error("unexpected input access") end })
+			put("core.lifecycle.engine.shutdown.signal_handlers", { start = yes, stop = yes, is_settled = yes, reserve_webkit_gc_signal = yes })
+			put("core.lifecycle.engine.reload.restart_pause", { restore = yes })
 			put("infra.legacy_hotstring_storage", { import = yes })
 			local config = { init = noop, migrate_legacy_delays = yes, set_magic_key = yes, load_all = function() return 0, true, nil, { complete = true } end,
 			  parse_error_count = function() return 0 end, get_categories = function() return {} end }
 			put("modules.hotstrings.hotstrings_config", config)
-			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end,
+			put("platform.remap.tap_hold_manager", { init = yes, observe_copy_activity = function() end, user_path = function() return marker .. ".tap_hold.toml" end, config_path = function() return marker .. ".config.toml" end,
 			  reload = yes, is_tap_action = no, canonical_hold = function() return "none" end, is_active = no, keys = function() return {} end, set_paused = yes })
 			put("platform.remap.tap_hold_writer", { FILE_NAME = "tap_hold.toml", init = noop, migrate_file = noop })
 			-- Gesture/action sources have no configured bindings in this scope.
@@ -672,12 +708,12 @@ do
 			put("modules.shortcuts.wrap_on_type", { new = function() return { on_key = no, end_selection_window = yes, on_pointer_down = noop } end })
 			put("adapters.selection_transaction", { new = function() return { cancel = yes, stop = yes } end })
 			put("adapters.clipboard", { read_primary = function() error("no selection read is permitted") end })
-			put("infra.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
+			put("core.ui.engine.display_server", { is_x11 = yes, is_wayland = no, kind = function() return "x11" end })
 			local layout = put("adapters.keyboard_layout", require("tests.support.layout_cohort_fixture").layout(function() return 30 end))
 			layout.refresh, layout.is_ready, layout.publish_current_capture = yes, yes, yes
 			local injector = put("modules.hotstrings.injector", {
 			  _is_injecting = no, _queue_char = function() error("unexpected queued text") end,
-			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes,
+			  open_fast_channel = yes, close_fast_channel = yes, output_broker = function() return {} end, emit_key = yes, set_output_observer = yes, set_erase_pacing = yes,
 			  inject = function(deletes, text, _, _, publication)
 			    assert(publication.current() and publication.cached(), "real Main must admit original field")
 			    state.output = state.output + 1
@@ -695,7 +731,7 @@ do
 			put("infra.llm_preferences", preferences)
 			put("modules.llm.profiles", { init = yes, is_enabled = yes })
 			put("modules.llm.api_entries", { active = function() return { id = "owned", provider = "openai_compat", model = "fixture-model" } end,
-			  migrate_plaintext = yes })
+			  migrate_plaintext = yes, plaintext_keys = function() return {} end })
 			put("modules.llm.api_remote", { serves = yes, provider = function() return { default_model = "fixture-model" } end,
 			  chat = function(_, _, messages, _, stream, done) state.requests[#state.requests + 1] = { messages = messages, stream = stream, done = done }; return true end,
 			  cancel = function() state.cancellations = state.cancellations + 1; return true end })
@@ -709,7 +745,7 @@ do
 			local original_barrier, original_snapshot = watch.barrier, watch.snapshot
 			watch.barrier = function() local receipt = original_barrier(); receipt.role = role; return receipt end
 			watch.snapshot = function() local receipt = original_snapshot(); receipt.role = role; return receipt end
-			put("adapters.atspi_focus_watch", { new = function() return watch end })
+			put("platform.focus.atspi_focus_watch", { new = function() return watch end })
 			-- Main binds the metrics sources at boot; none is granted, as on Wayland.
 			local window = { getFocused = function() return { appId = app, windowTitle = "owned ordinary field" } end,
 			  metrics_sources = function() return {} end,
@@ -740,14 +776,14 @@ do
 			end
 			put("modules.hotstrings.engine", main_engine)
 			local prediction = require("modules.llm.prediction_engine"); fixture_prediction = prediction
-			local hook = require("adapters.keyboard_hook")
+			local hook = require("platform.input.keyboard_hook")
 			hook.start = function(options) state.callbacks = options; coroutine.yield("actual Hook.start callback capture"); return true end
 			hook.isRunning, hook.get_mode = yes, function() return "intercept" end
-			local optional = { ["modules.llm.prediction_engine"] = prediction, ["ui.tooltip.llm"] = overlay,
-			  ["adapters.window_info"] = window, ["adapters.secure_field_detector"] = require("adapters.secure_field_detector") }
-			put("infra.runtime_guard", { optional_require = function(name) return optional[name] end,
+			local optional = { ["modules.llm.prediction_engine"] = prediction, ["core.ui.ui.tooltip.llm"] = overlay,
+			  ["platform.focus.window_info"] = window, ["platform.focus.secure_field_detector"] = require("platform.focus.secure_field_detector") }
+			put("core.lifecycle.engine.runtime_guard", { optional_require = function(name) return optional[name] end,
 			  call = function(_, callback) return true, callback() end })
-			put("adapters.event_loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
+			put("core.events.loop", { run = function() error("probe must remain before actual event-loop launch") end, stop = yes, defer = function(fn) state.deferred = state.deferred or {}; state.deferred[#state.deferred + 1] = fn; return true end })
 			-- Selected keyboard bindings are absent; the classifier itself is the production module.
 			local keyboard_shortcuts = require("modules.shortcuts.keyboard_shortcuts")
 			local function start_successor(port)
@@ -769,11 +805,11 @@ do
 			local launch_args = { "--device", marker .. ".event-placeholder", "--config", marker .. ".config.toml" }
 			local main = assert(loadfile(root .. "/ergopti_hotstrings.lua"))
 			-- Migration/persistence is an explicit inert Main boundary; canonical writer imports stay real.
-			local migration = require("config_migrate")
+			local migration = require("settings.engine.migration.migrate")
 			local startup_migration = { REGISTRY_PATH = migration.REGISTRY_PATH, boot = function() return {} end,
 			  read_only_notice_key = function() return nil end }
 			local environment = setmetatable({ arg = launch_args, require = function(name)
-			  if name == "config_migrate" then return startup_migration end
+			  if name == "settings.engine.migration.migrate" then return startup_migration end
 			  -- The legacy folder move is an inert boundary too: no account folder moves.
 			  if name == "infra.legacy_folder_migration" then return require("tests.support.legacy_folder_migration_stub") end
 			  return require(name)

@@ -103,7 +103,9 @@ on load_ui(loc, locales_dir)
 		btn_close: my json_get(json_path, "common.close", "Close"), ¬
 		warn_overwrite: my json_get(json_path, "apps.encryptor.warn_overwrite", "A destination file already exists. Overwrite?"), ¬
 		btn_overwrite: my json_get(json_path, "apps.encryptor.btn_overwrite", "Overwrite"), ¬
-		lbl_file: my json_get(json_path, "apps.encryptor.lbl_file", "File:")}
+		lbl_file: my json_get(json_path, "apps.encryptor.lbl_file", "File:"), ¬
+		reason_destination_folder: my json_get(json_path, "apps.encryptor.reason_destination_folder", "The destination is a folder."), ¬
+		reason_cannot_write: my json_get(json_path, "apps.encryptor.reason_cannot_write", "The file could not be written in this folder.")}
 end load_ui
 
 -- Hardcoded English strings used only when the locales directory is unavailable.
@@ -128,7 +130,9 @@ on hardcoded_en_strings()
 		btn_close: "Close", ¬
 		warn_overwrite: "A destination file already exists. Overwrite?", ¬
 		btn_overwrite: "Overwrite", ¬
-		lbl_file: "File:"}
+		lbl_file: "File:", ¬
+		reason_destination_folder: "The destination is a folder.", ¬
+		reason_cannot_write: "The file could not be written in this folder."}
 end hardcoded_en_strings
 
 -- Resolve the absolute path to the locales directory.
@@ -264,11 +268,18 @@ on process_file(file_path, is_encrypt, s)
 		set dest_exists to true
 	end try
 	if dest_exists then
-		set overwrite_answer to button returned of ¬
-			(display alert (warn_overwrite of s) ¬
-				buttons {btn_cancel of s, btn_overwrite of s} ¬
-				default button btn_overwrite of s ¬
-				cancel button btn_cancel of s)
+		-- A cancel button raises error -128 instead of returning it: caught
+		-- here, it skips this file only, and the next dropped file is still
+		-- processed, as on Windows and Linux (BAP-003).
+		try
+			set overwrite_answer to button returned of ¬
+				(display alert (warn_overwrite of s) ¬
+					buttons {btn_cancel of s, btn_overwrite of s} ¬
+					default button btn_overwrite of s ¬
+					cancel button btn_cancel of s)
+		on error number -128
+			return
+		end try
 		if overwrite_answer is (btn_cancel of s) then return
 	end if
 
@@ -325,6 +336,7 @@ on process_file(file_path, is_encrypt, s)
 	set convert_mode to "decrypt"
 	if is_encrypt then set convert_mode to "encrypt"
 	set openssl_ok to false
+	set convert_status to 0
 	set pw_dir to ""
 	try
 		set pw_dir to do shell script "umask 077; d=$(mktemp -d) && : > \"$d/password\" && printf %s \"$d\""
@@ -337,6 +349,8 @@ on process_file(file_path, is_encrypt, s)
 			& " " & quoted form of dest_path ¬
 			& " " & quoted form of pw_file
 		set openssl_ok to true
+	on error number error_number
+		set convert_status to error_number
 	end try
 	if pw_dir is not "" then
 		try
@@ -345,13 +359,20 @@ on process_file(file_path, is_encrypt, s)
 	end if
 
 	if not openssl_ok then
-		if is_encrypt then
-			display alert (err_encrypt_failed of s) as critical ¬
-				buttons {btn_close of s} default button 1
-		else
-			display alert (err_decrypt_failed of s) as critical ¬
-				buttons {btn_close of s} default button 1
+		set failure_msg to err_decrypt_failed of s
+		if is_encrypt then set failure_msg to err_encrypt_failed of s
+		-- A refused write carries its reason, as Windows appends the system's
+		-- (BAP-007). Status 1 is OpenSSL's own refusal (a wrong password or a
+		-- corrupted file, which the message already names).
+		if convert_status is not 1 then
+			set failure_reason to reason_cannot_write of s
+			try
+				do shell script "test -d " & quoted form of dest_path
+				set failure_reason to reason_destination_folder of s
+			end try
+			set failure_msg to failure_msg & return & return & failure_reason
 		end if
+		display alert failure_msg as critical buttons {btn_close of s} default button 1
 		return
 	end if
 

@@ -10,28 +10,28 @@ local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
 local Fixture = require("tests.support.keystats_provenance_fixture")
 local OWNERS = {
-	"adapters.event_clock",
-	"infra.timings",
-	"infra.toml.reader",
-	"keystats.metrics",
+	"core.events.clock",
+	"core.timing.engine.timings",
+	"core.text.engine.toml.reader",
+	"metrics.engine.metrics",
 	"modules.keystats.privacy_context",
-	"error_description",
-	"number_policy",
-	"json",
-	"compat.utf8",
-	"toml_codec.reader",
-	"toml_codec.bom",
-	"toml_codec.basic_string",
-	"toml_codec.key_path",
-	"toml_codec.record_scanner",
-	"toml_codec.source_open",
-	"keystats.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "infra.logger", "infra.manifest_reader", "infra.config_paths",
-	"infra.dialog_util", "infra.teardown_transaction", "modules.keystats.init",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
+	"core.text.engine.json",
+	"core.lifecycle.engine.compat.utf8",
+	"core.text.engine.toml_codec.reader",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.record_scanner",
+	"core.text.engine.toml_codec.source_open",
+	"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock", "hs", "tests.stubs.hs", "core.logger.engine.logger", "infra.manifest_reader", "infra.config_paths",
+	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "adapters.process_lifecycle",
-	"adapters.keyboard_hook", "adapters.input_source_broker", "adapters.storage",
-	"adapters.timer_scheduler", "modules.keystats.aggregator.events",
+	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
+	"platform.input.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
+	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
 	"modules.keystats.aggregator.physical", "ui.metrics_typing.init", "ui.metrics_typing", "modules.keymap",
 }
@@ -50,7 +50,7 @@ helpers.describe("typing metrics warning native signature", function()
 	helpers.it("presents the unavailable metrics warning without a native signature error", function()
 		helpers.with_stub_scope(OWNERS, function()
 			local fixture = Fixture.load_keystats()
-			local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
+			local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
 			local prior_loader = package.preload["ui.metrics_typing"]
 			package.loaded["ui.metrics_typing"] = nil
 			package.preload["ui.metrics_typing"] = function() error("controlled metrics module unavailable", 0) end

@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Life = require("adapters.process_lifecycle")
+local Life = require("core.process.adapters.lifecycle")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-process-snapshot-XXXXXX"))
 local marker_a, marker_b = "epA" .. root:sub(-6), "epB" .. root:sub(-6)
 local marker_z = "epZ" .. root:sub(-6)

@@ -9,10 +9,10 @@
 --- ==============================================================================
 
 local M = {}
-local ShellRunner = require("adapters.shell_runner")
-local Scheduler = require("adapters.timer_scheduler")
-local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local Scheduler = require("core.events.timer_scheduler")
+local Logger = require("core.logger.engine.logger")
+local TableUtil = require("core.text.engine.table_util")
 local runtime = hs
 local LOG = "healthcheck.appleevents"
 local active = {}

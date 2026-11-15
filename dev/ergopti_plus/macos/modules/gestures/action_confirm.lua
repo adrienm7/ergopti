@@ -26,12 +26,12 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local i18n = require("infra.i18n")
-local Dialog = require("infra.dialog_util")
+local Logger = require("core.logger.engine.logger")
+local i18n = require("core.i18n.engine.i18n")
+local Dialog = require("core.ui.engine.dialog_util")
 local MouseControl = require("adapters.mouse_control")
-local WindowInfo = require("adapters.window_info")
-local WindowManager = require("adapters.window_manager")
+local WindowInfo = require("platform.focus.window_info")
+local WindowManager = require("platform.focus.window_manager")
 
 local LOG = "gestures.action_confirm"
 

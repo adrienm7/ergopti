@@ -32,9 +32,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Engine = require("dynamic_hotstrings")
-local TextUtils = require("text_utils")
+local Logger = require("core.logger.engine.shim")
+local Engine = require("hotstrings.engine.dynamic.core")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "modules.dynamic_hotstrings.prefix_rules"
 
@@ -42,9 +42,7 @@ local LOG = "modules.dynamic_hotstrings.prefix_rules"
 -- use so the menu counts them under one heading.
 local GROUP = "dynamichotstrings"
 
--- The French international dialling prefix. A phone number stored as "0750…"
--- is also wanted as "+3375…", which is the form every non-French form expects.
-local FRANCE_DIAL_PREFIX = "+33"
+local FRANCE_DIAL_PREFIX = Engine.FRANCE_DIAL_PREFIX
 
 -- How many characters of each value are enough to identify it. Below these, a
 -- prefix is short enough to collide with ordinary typing — three digits of a
@@ -142,13 +140,12 @@ function M.build(info, is_section_enabled, magic_key)
 	end
 
 	if magic_key == nil then
-		magic_key = require("infra.manifest_reader").default_for(require("config_keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
+		magic_key = require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.HOTSTRINGS_TRIGGER_CHAR)
 	end
 	local phone  = field(info, "phone_number")
 	local fphone = field(info, "phone_number_clean")
 	-- A national trunk zero is not dialled after the French country code.
-	local national_number = phone:sub(1, 1) == "0" and phone:sub(2) or phone
-	local international_phone = FRANCE_DIAL_PREFIX .. national_number
+	local international_phone = Engine.international_phone(phone)
 	local ssn    = field(info, "social_security_number")
 	local iban   = field(info, "iban")
 
@@ -168,8 +165,7 @@ function M.build(info, is_section_enabled, magic_key)
 		end
 		if TextUtils.utf8_len(phone) >= PHONE_MIN_FOR_PLAIN then
 			add(out, seen, "phoneprefixes", TextUtils.utf8_sub(phone, 1, PHONE_MIN_FOR_PLAIN), phone, true, "phone_number")
-			add(out, seen, "phoneprefixes",
-				FRANCE_DIAL_PREFIX .. TextUtils.utf8_sub(national_number, 1, PHONE_MIN_FOR_PLAIN - (phone:sub(1, 1) == "0" and 1 or 0)),
+			add(out, seen, "phoneprefixes", Engine.international_prefix(phone, PHONE_MIN_FOR_PLAIN),
 				international_phone, true, "phone_number")
 		end
 		if TextUtils.utf8_len(phone) >= PHONE_MIN_FOR_INNER then

@@ -30,27 +30,27 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local FencedTransaction = require("config_scope_fenced_transaction")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local KeyPath = require("toml_codec.key_path")
-local Codec = require("toml_codec")
-local Planner = require("hotstrings.scope_overrides")
-local PersonalFiles = require("hotstrings.personal_files")
+local Transaction = require("settings.engine.scope.transaction")
+local FencedTransaction = require("settings.engine.scope.fenced_transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Codec = require("core.text.engine.toml_codec")
+local Planner = require("hotstrings.engine.scope_overrides")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 
 -- The category personal.toml loads as (ui/hotstring_editor/bridge.lua).
 local PERSONAL_CATEGORY = "personal"
-local ScopeFile = require("config_scope_file")
-local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local ScopeFile = require("settings.engine.scope.file")
+local Shell = require("core.process.adapters.shell_runner")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "infra.hotstrings_scope"
 local REPEAT_PATH = ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED
-local BASE_DELAY_PATH = require("config_keys").KEY.HOTSTRINGS_EXPANSION_DELAY
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
+local BASE_DELAY_PATH = require("settings.engine.keys").KEY.HOTSTRINGS_EXPANSION_DELAY
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("hotstrings_scope", function() return _owner ~= nil and _owner.pending() == true end)
 
@@ -62,13 +62,15 @@ local function addressable(id)
 end
 
 --- Builds one transaction over the real owners.
---- @param options table path, backup_suffix, is_paused, and the runtime owners:
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table path, backup_suffix, and the runtime owners:
 ---   config, preferences, repeat_key, word_reset, magic_key, terminators, dynamic (optional),
 ---   preview_settings with preview (optional), files, remove.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
-	assert(type(options) == "table" and type(options.path) == "string" and type(options.is_paused) == "function"
-		and type(options.backup_suffix) == "string", "hotstrings scope requires its path and pause owner")
+	assert(type(options) == "table" and type(options.path) == "string"
+		and type(options.backup_suffix) == "string", "hotstrings scope requires its path and backup suffix")
 	local Config, Preferences = options.config, options.preferences
 	local RepeatKey, MagicKey = options.repeat_key, options.magic_key
 	local WordReset = options.word_reset
@@ -78,7 +80,7 @@ function M.new(options)
 		and type(WordReset) == "table"
 		and type(MagicKey) == "table" and type(PreviewSettings) == "table" and type(Terminators) == "table",
 		"hotstrings scope owners are incomplete")
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local remove = options.remove or function(target) return os.remove(target) == true end
 	local owner, current_mode = {}, nil
 	local source, secondary, owned_set = nil, nil, nil
@@ -203,7 +205,6 @@ function M.new(options)
 			return Writer.prepare_batch(path, LeafRows.prepare(source.content or "", operations), adapter, source)
 		end,
 		apply = function(decoded)
-			if options.is_paused() then return false end
 			local backed, detail = secondary.backup()
 			if backed ~= true then
 				Logger.error(LOG, "Override backup refused: %s.", tostring(detail))
@@ -240,7 +241,7 @@ function M.new(options)
 	return FencedTransaction.new({ owner = owner, transaction = transaction, scope = "hotstrings",
 		fences = { { acquire = Config.acquire, release = Config.release },
 			{ acquire = Preferences.acquire, release = Preferences.release } },
-		available = function() return not options.is_paused() end })
+		available = function() return true end })
 end
 
 --- Builds the single-leaf magic-key transaction on the same fenced owners as
@@ -251,7 +252,7 @@ function M.new_magic(options)
 	local owner, snapshot = {}, nil
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"),
+		files = options.files or require("core.fs.adapters.file_system"),
 		manifest = { scope_plan = function() return { presets = {}, operations = {} } end },
 		validate_update = function(scope, row)
 			return scope == "magic" and row.section == "hotstrings" and row.key == ConfigKeys.LEAF.TRIGGER_CHAR
@@ -318,20 +319,17 @@ end
 
 --- Applies a menu request with the daemon's owners, retaining a refused inverse.
 --- @param mode string "recommended" or "clear".
---- @param is_paused function Live pause getter.
 --- @param ports table|nil dynamic and preview runtime owners the daemon holds.
 --- @return boolean committed
 --- @return string|nil reason
-function M.apply(mode, is_paused, ports)
+function M.apply(mode, ports)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid hotstrings scope mode" end
-	if type(is_paused) ~= "function" or is_paused() then return false, "hotstrings configuration is paused" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "hotstrings rollback is pending" end
 	ports = type(ports) == "table" and ports or {}
 	_sequence = _sequence + 1
 	_owner = M.new({
 		path = require("infra.config_paths").config("config.toml"),
 		backup_suffix = ".hotstrings-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
-		is_paused = is_paused,
 		config = require("modules.hotstrings.hotstrings_config"),
 		preferences = require("infra.hotstring_preferences"),
 		repeat_key = require("modules.hotstrings.repeat_key"),
@@ -352,12 +350,11 @@ function M.apply(mode, is_paused, ports)
 end
 
 --- The hotstrings participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @param ports table|nil dynamic and preview runtime owners the daemon holds.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused, ports)
-	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused, ports) end,
+function M.participant(ports)
+	return require("settings.engine.scope.participant").synchronous({
+		apply = function(mode) return M.apply(mode, ports) end,
 		owner = function() return _owner end,
 	})
 end

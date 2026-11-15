@@ -16,9 +16,9 @@ local stopping, checking_shutdown = false, false
 local DEFAULT_DEPS = {
 	exepath = function() return require("luv").exepath() end,
 	update_time = function() return require("luv").update_time() end,
-	worker = function() return require("infra.paths").driver_root() .. "/adapters/desktop_opener_worker.lua" end,
-	timeout = function() return require("infra.timings").ms("ui", "desktop_open_timeout_ms") end,
-	start = function(...) return require("adapters.owned_process").start(...) end,
+	worker = function() return require("core.fs.engine.paths").driver_root() .. "/adapters/desktop_opener_worker.lua" end,
+	timeout = function() return require("core.timing.engine.timings").ms("ui", "desktop_open_timeout_ms") end,
+	start = function(...) return require("core.process.adapters.owned_process").start(...) end,
 }
 local deps = DEFAULT_DEPS
 
@@ -108,7 +108,7 @@ function M.open(target, on_done, authorized)
 		end
 		local timeout = deps.timeout()
 		if not current(record) then return end
-		assert(require("number_policy").within_timer_ceiling(timeout) and timeout > 0 and timeout % 1 == 0,
+		assert(require("core.text.engine.number_policy").within_timer_ceiling(timeout) and timeout > 0 and timeout % 1 == 0,
 			"desktop confirmation needs its canonical deadline within the timer ceiling")
 		assert(deps.update_time() ~= false, "desktop helper clock refresh refused")
 		if not current(record) then return end

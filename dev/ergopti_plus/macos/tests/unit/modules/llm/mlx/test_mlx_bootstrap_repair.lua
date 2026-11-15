@@ -33,15 +33,15 @@ local LAUNCHER_ENV = {
 }
 
 local OWNED = {
-	"infra.logger", "infra.i18n", "infra.locale", "locale.core",
-	"infra.dialog_util", "infra.notifications", "infra.deferred_work",
-	"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
+	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
+	"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 	"ui.download_window", "modules.llm.pty_process_group", "modules.llm.ollama_binary",
 	"modules.llm.ollama_deps_checker", "modules.llm.backend_detector",
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
-	"adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+	"core.fs.adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
 	"adapters.native_bootstrap_pty", "ui.menu.menu_llm",
 }
 
@@ -159,14 +159,14 @@ end
 --- Answers keys from the real locale files.
 --- @param locale string Locale code.
 local function speak(locale)
-	local Locale = require("infra.locale")
+	local Locale = require("core.i18n.engine.locale")
 	Locale.set_locale(locale)
 	local function get(key)
 		local text = Locale.get(key)
 		if text == nil or text == "" then return key end
 		return text
 	end
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = get,
 		format = function(key, ...)
 			local text = get(key)
@@ -190,9 +190,9 @@ local function load_world(world)
 		local ok, text = pcall(string.format, fmt, ...)
 		world.errors[#world.errors + 1] = ok and text or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	-- Only native boundaries are doubled: the policy bytes and parser remain real.
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		exists = function(path) return fake_fs(world).attributes(path, "mode") ~= nil end,
 		read = function(path)
 			helpers.assert_true(path:find("/_shared/", 1, true) ~= nil, "native fixture reads actual shared source data")
@@ -223,7 +223,7 @@ local function load_world(world)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	for _, name in ipairs({ "adapters.task_lifecycle", "adapters.timer_scheduler",
+	for _, name in ipairs({ "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
 		"modules.llm.backend_detector", "modules.llm.mlx_bootstrap_diagnosis" }) do
 		package.loaded[name] = nil
 	end
@@ -245,13 +245,13 @@ local function load_world(world)
 		if world.native_network_receipt ~= nil then
 			context = context or {}
 			context.network_receipt = world.native_network_receipt
-			local raw = package.loaded["adapters.file_system"].read(
-				require("infra.paths").shared("modules/network/managed_network.json"))
-			context.network_contract = require("network.failure").new(require("json").decode(raw))
+			local raw = package.loaded["core.fs.adapters.file_system"].read(
+				require("core.fs.engine.paths").shared("core/network/data/managed_network.json"))
+			context.network_contract = require("core.network.engine.failure").new(require("core.text.engine.json").decode(raw))
 		end
 		return classify(lines, exit_code, context)
 	end
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		-- The network failures' offer: its actions, then « Plus tard ».
 		choose = function(title, body, choices, cancel_label)
 			world.dialogs[#world.dialogs + 1] = {
@@ -274,19 +274,19 @@ local function load_world(world)
 			return secondary
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind, on_click)
 			world.notices[#world.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 			return true
 		end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback, label)
 			world.deferred[#world.deferred + 1] = { callback = callback, label = label }
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args)
 			world.spawns[#world.spawns + 1] = { executable = executable, args = args }
 			return { start = function() return true end }
@@ -323,7 +323,7 @@ local function scoped(scenario, env)
 			with_environment(env or LAUNCHER_ENV, scenario)
 			-- The scope restores the real module; releasing the stub here too
 			-- keeps the suite-wide shell_runner hygiene gate able to see it.
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 		end)
 	end
 end
@@ -937,11 +937,11 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		helpers.assert_eq(#world.dialogs, 2)
 		local failed = world.dialogs[2]
 		helpers.assert_eq(failed.title, "L’installation de MLX a échoué")
-		helpers.assert_true(failed.body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil, failed.body)
+		helpers.assert_true(failed.body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.unknown"), 1, true) ~= nil, failed.body)
 		helpers.assert_true(failed.body:find("Could not resolve host: astral.sh", 1, true) ~= nil,
 			"the dialog quotes the line that proves the cause")
 		helpers.assert_eq(failed.primary, "Réessayer")
-		helpers.assert_eq(failed.secondary, package.loaded["infra.i18n"].get("error_dialog.open_log"))
+		helpers.assert_eq(failed.secondary, package.loaded["core.i18n.engine.i18n"].get("error_dialog.open_log"))
 		helpers.assert_eq(#world.tasks, 2, "the repair button retries at once")
 		helpers.assert_true(world.tasks[2].command() ~= "", "retry owns a real native command")
 		helpers.assert_true(world.tasks[2].command():find("ERGOPTI_MLX_REPAIR=1", 1, true) == nil,
@@ -954,7 +954,7 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 3)
 		helpers.assert_eq(world.dialogs[3].primary, "Réessayer")
-		helpers.assert_true(world.dialogs[3].body:find(package.loaded["infra.i18n"].get("network.failure.unknown"), 1, true) ~= nil,
+		helpers.assert_true(world.dialogs[3].body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.unknown"), 1, true) ~= nil,
 			world.dialogs[3].body)
 		helpers.assert_eq(#world.tasks, 2, "« Plus tard » starts nothing")
 	end))
@@ -1112,7 +1112,7 @@ helpers.describe("A network failure names its class and its fixes (mlx-bootstrap
 		local dialog = world.dialogs[#world.dialogs]
 		helpers.assert_eq(dialog.choices[1], "Réessayer")
 		helpers.assert_eq(dialog.choices[2], "Ouvrir les réglages du proxy")
-		helpers.assert_true(dialog.body:find(package.loaded["infra.i18n"].get("network.failure.proxy"), 1, true) ~= nil, dialog.body)
+		helpers.assert_true(dialog.body:find(package.loaded["core.i18n.engine.i18n"].get("network.failure.proxy"), 1, true) ~= nil, dialog.body)
 		local spawn = world.spawns[#world.spawns]
 		helpers.assert_eq(spawn.executable, "/usr/bin/open")
 		helpers.assert_eq(spawn.args[1], "x-apple.systempreferences:com.apple.Network-Settings.extension")
@@ -1191,7 +1191,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		helpers.assert_true(offer.offer(first))
 		drain(world)
 		helpers.assert_eq(#world.dialogs, 1)
-		helpers.assert_eq(world.dialogs[1].primary, package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].primary, package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "normal retry reuses valid Python and fingerprint, rather than launching repair")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
 		helpers.assert_true(world.files[MLX_VENV .. "/.last_sync_hash"])
@@ -1209,7 +1209,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "primary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "typed download file failure never forces a valid runtime rebuild")
 		helpers.assert_eq(checker.get_state(), "ready")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
@@ -1223,7 +1223,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "primary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.tasks, 1, "typed download disk failure never forces a valid runtime rebuild")
 		helpers.assert_eq(checker.get_state(), "ready")
 		helpers.assert_true(world.files[MLX_VENV .. "/bin/python"])
@@ -1237,8 +1237,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 			calls = calls + 1
 			return original_select(...)
 		end
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())
@@ -1264,8 +1264,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 			calls = calls + 1
 			return original_select(...)
 		end
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())
@@ -1290,8 +1290,8 @@ helpers.describe("Managed network failure actions retain their native revision",
 	helpers.it("managed-network-alternative: a newer failure rejects the retained alternate choice", scoped(function()
 		local world, checker, _, offer, first = failed_world(false, host_policy_receipt(), "host_blocked")
 		offer.set_alternative(function() world.alternatives = world.alternatives + 1; return true end)
-		local original_choose = package.loaded["infra.dialog_util"].choose
-		package.loaded["infra.dialog_util"].choose = function(...)
+		local original_choose = package.loaded["core.ui.engine.dialog_util"].choose
+		package.loaded["core.ui.engine.dialog_util"].choose = function(...)
 			local selected = original_choose(...)
 			helpers.assert_true(checker.reset_bootstrap_state())
 			helpers.assert_true(checker.install_for_selection())
@@ -1302,7 +1302,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "secondary" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		helpers.assert_eq(world.dialogs[1].choices[2], package.loaded["infra.i18n"].get("mlx.use_ollama"))
+		helpers.assert_eq(world.dialogs[1].choices[2], package.loaded["core.i18n.engine.i18n"].get("mlx.use_ollama"))
 		helpers.assert_eq(world.alternatives, 0, "a stale alternate choice cannot borrow the successor failure revision")
 		helpers.assert_eq(#world.tasks, 2)
 		helpers.assert_true(checker.get_failure_cause().failure_revision > first.failure_revision)
@@ -1315,7 +1315,7 @@ helpers.describe("Managed network failure actions retain their native revision",
 		world.answers = { "later" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
-		local labels = package.loaded["infra.i18n"]
+		local labels = package.loaded["core.i18n.engine.i18n"]
 		helpers.assert_eq(#world.dialogs[1].choices, 3)
 		helpers.assert_eq(world.dialogs[1].choices[1], labels.get("network.action.retry"))
 		helpers.assert_eq(world.dialogs[1].choices[2], labels.get("network.action.open_proxy_settings"))
@@ -1325,12 +1325,12 @@ helpers.describe("Managed network failure actions retain their native revision",
 
 	helpers.it("managed-network-modal: unavailable diagnostics never creates an actionable row", scoped(function()
 		local world, _, _, offer, first = failed_world(false)
-		package.loaded["infra.logger"].today_log_path = function() return nil end
+		package.loaded["core.logger.engine.logger"].today_log_path = function() return nil end
 		world.answers = { "later" }
 		helpers.assert_true(offer.offer(first))
 		drain(world)
 		helpers.assert_eq(#world.dialogs[1].choices, 1)
-		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
+		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["core.i18n.engine.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.spawns, 0)
 	end))
 end)
@@ -1439,10 +1439,10 @@ helpers.describe("MLX native bootstrap admission", function()
 		helpers.assert_true(command:find("managed_bootstrap_http.py", 1, true) ~= nil,
 			"the native branch requires the actual installed staging helper")
 		local Network = package.loaded["modules.llm.network_env"]
-		local FileSystem = package.loaded["adapters.file_system"]
+		local FileSystem = package.loaded["core.fs.adapters.file_system"]
 		local exists = FileSystem.exists
 		FileSystem.exists = function(path)
-			if path:sub(-#"/platform/network/native_http.py") == "/platform/network/native_http.py" then return false end
+			if path:sub(-#"/core/network/adapters/native_http.py") == "/core/network/adapters/native_http.py" then return false end
 			return exists(path)
 		end
 		local prelude = Network.bootstrap_prelude("TEST", "/owned/python")

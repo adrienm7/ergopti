@@ -36,18 +36,18 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 -- Rebound rather than required: `infra.manifest_menu` captures the i18n MODULE
--- TABLE when it is loaded, and tests/unit/infra/i18n/test_i18n_persistence.lua wipes
--- `package.loaded["infra.i18n"]` nine times. Whichever of them ran first, the
+-- TABLE when it is loaded, and tests/unit/core/i18n/test_persistence.lua wipes
+-- `package.loaded["core.i18n.engine.i18n"]` nine times. Whichever of them ran first, the
 -- renderer would then be resolving labels against an i18n instance this file
 -- cannot see, and every comparison below would be between two different
 -- catalogues. Production is unaffected — `set_locale` mutates the module in
 -- place and nothing there ever wipes the cache — so this is the harness being
 -- made to agree with itself, not a defect being worked around.
 local ManifestMenu = helpers.load_module("infra.manifest_menu")
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 
 -- The platform token this driver is declared under in the manifest.
 local PLATFORM = "linux"
@@ -185,7 +185,7 @@ local function with_live_source(context, scenario)
 		descriptor = assert(io.open(path, "wb")); assert(descriptor:write(AGENT_ON_SOURCE)); assert(descriptor:close()); descriptor = nil
 		for _, name in ipairs(LIVE_SOURCE_MODULES) do rawset(package.loaded, name, nil) end
 		preferences = require("infra.llm_preferences")
-		local bytes, status = require("toml_codec.writer").read_classified(path)
+		local bytes, status = require("core.text.engine.toml_codec.writer").read_classified(path)
 		assert(status == "ok" and bytes == AGENT_ON_SOURCE)
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
@@ -230,8 +230,8 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
-		"infra.i18n", "infra.manifest_menu"}
+		"core.fs.adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
+		"core.i18n.engine.i18n", "infra.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
@@ -251,7 +251,7 @@ local function build_fixture_menu(context)
 			if name == "XDG_CONFIG_HOME" then return editor_directory end
 			return original_getenv(name)
 		end
-		rawset(package.loaded, "adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
+		rawset(package.loaded, "core.fs.adapters.storage", nil); rawset(package.loaded, "ui.hotstring_editor.bridge", nil)
 		helpers.assert_eq(require("ui.hotstring_editor.bridge").get_pref("default_section"), "",
 			"the real editor reads the independent neutral default-section source")
 		if context.magic_key_source == nil then
@@ -263,9 +263,9 @@ local function build_fixture_menu(context)
 			context.magic_key_source = helpers.load_module("modules.hotstrings.magic_key_source")
 			helpers.assert_eq(context.magic_key_source.get(), "auto", "whole-tray fixture owns the actual automatic source")
 		end
-		local Paths = require("infra.paths")
-		local file = assert(io.open(Paths.shared("tap_hold/defaults.toml"), "rb"))
-		local defaults = assert(require("toml_codec").decode(file:read("*a"))); assert(file:close())
+		local Paths = require("core.fs.engine.paths")
+		local file = assert(io.open(Paths.shared("tap_hold/data/defaults.toml"), "rb"))
+		local defaults = assert(require("core.text.engine.toml_codec").decode(file:read("*a"))); assert(file:close())
 		local Pair = helpers.load_module("modules.shortcuts.key_combinations")
 		context.is_paused = function() return false end
 		-- Layout on pause / resume: a desktop listing no layout, so only « No change ».
@@ -287,7 +287,7 @@ local function build_fixture_menu(context)
 		package.loaded["ui.menu.key_combinations"] = nil
 		-- Native delegates retain module tables. This fixture's new producer must
 		-- share the exact current locale/manifest cohort used by its assertions.
-		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		package.loaded["core.i18n.engine.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
 		helpers.load_module("ui.gesture_conflicts")
 		local built = with_live_source(context, function()
 			return with_api_source(function(builder) return builder.build(context) end)
@@ -425,12 +425,12 @@ local function full_context()
 			set_enabled   = noop,
 			keys          = function() return {} end,
 			-- The shared builder, so every hold picker holds at least « none ».
-			hold_options  = function() return require("tap_hold.hold_options").build({}) end,
+			hold_options  = function() return require("tap_hold.engine.hold_options").build({}) end,
 			tap_actions   = function() return {} end,
 			-- The shipped catalogue, so both hand lists have their rows.
 			key_catalog   = function()
-				return require("tap_hold.key_catalog").load(
-					require("infra.paths").shared("tap_hold/defaults.toml"), "linux")
+				return require("tap_hold.engine.key_catalog").load(
+					require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), "linux")
 			end,
 		},
 		dyn_hotstrings = {
@@ -514,7 +514,7 @@ local function with_agent_declaration(component, body)
 	local renderer, build, group_row, root, top, agent_index, public_agent, file
 	local ok, result = xpcall(function()
 		-- Use the same genuine locale/manifest cohort as all original assertions.
-		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		package.loaded["core.i18n.engine.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
 		renderer = require("infra.manifest_menu")
 		build, group_row = renderer.build, renderer.group_row
 		root = renderer.get_root(); top = root and root.top_level
@@ -532,7 +532,7 @@ local function with_agent_declaration(component, body)
 			file = assert(io.open(helpers.driver_root()
 				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "rb"))
 			local contents = assert(file:read("*a")); assert(file:close()); file = nil
-			local available = require("json").decode(contents)
+			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
 			helpers.assert_eq(available.greyed_when_paused, true, "the published pause policy is retained")
@@ -617,7 +617,7 @@ helpers.describe("menu certification: published available component rows are ren
 							and i18n.section(row.i18n)
 							or i18n.get(row.i18n)
 						if row.id == "magic_key_source_heading" then
-							label = require("locale.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
+							label = require("core.i18n.engine.label_value").compose(i18n.get, label, i18n.get("menu.layout.magic_key_source.auto"))
 						end
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
@@ -863,16 +863,16 @@ end)
 
 -- Actual inert absent-module projections, preserving the original whole-tray prefix.
 local function absent_module_corpus()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_absent_modules.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_absent_modules.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 local function with_absent_current(scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
-	local native = require("infra.i18n")
+	local native = require("core.i18n.engine.i18n")
 	helpers.assert_true(rawequal(native, i18n), "the original caption reader is the genuine current cohort")
 	helpers.assert_true(rawequal(require("infra.manifest_menu"), ManifestMenu))
 	local before = native.get_locale()
@@ -896,12 +896,12 @@ end
 -- Own a fresh, initialized native cohort for these new projections, then restore
 -- the exact predecessor modules and file-local readers even if construction raises.
 local function with_absent_english(scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local prior = {}; for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 	local prior_i18n, prior_manifest = i18n, ManifestMenu
 	local ok, result = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		local native = require("infra.i18n")
+		local native = require("core.i18n.engine.i18n")
 		native.init()
 		i18n = native
 		ManifestMenu = require("infra.manifest_menu")
@@ -983,12 +983,12 @@ helpers.describe("linux-absent-module templates: actual native branches", functi
 	helpers.it("projects exactly the true Linux-only status role through the genuine shared renderer", function()
 		with_absent_english(function()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({
+				local renderer = assert(require("menu.engine.renderer").new({
 					platform = platform,
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode,
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.text.engine.json").decode,
 					i18n = i18n,
-					logger = require("logger.shim"),
+					logger = require("core.logger.engine.shim"),
 				}))
 				for _, contract in ipairs(absent_module_corpus().owners) do
 					local rows = assert(renderer.template_rows(contract.section, {}, {}, {}))
@@ -1040,14 +1040,14 @@ end)
 
 
 local function control_boundary_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/llm_control_boundaries.json"), "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 --- Reuses the existing physical-source sandbox with genuine native preference/settings owners.
 local function with_control_trigger_source(scenario, source)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	Sandbox.with_config(source or ('# hand trigger source\n[llm]\nenabled = true\n[llm.models]\nselected = "api"\n'
 		.. '[llm.trigger]\ndebounce_ms = 500\nfuture = "keep exact" # retained\n'), function(path)
 		local names = { "infra.llm_preferences", "modules.llm.trigger_settings" }
@@ -1124,8 +1124,8 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 	-- Only user changes are stored, so at their shipped values neither filter nor
 	-- the backend is in the file. The macOS rows greyed exactly there.
 	helpers.it("keeps both privacy rows enabled over a sparse source and persists a click (shared-privacy-triggers)", function()
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
-		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+		local corpus = assert(require("core.text.engine.json").decode(file:read("*a"))); assert(file:close())
 		for _, expected in ipairs(corpus.rows) do
 			with_absent_english(function()
 				with_control_trigger_source(function(settings, path, Sandbox)
@@ -1154,9 +1154,9 @@ helpers.describe("llm-control-boundaries: actual Linux trigger provider", functi
 		with_absent_english(function()
 			local expected = control_boundary_corpus()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode, i18n = i18n, logger = require("logger.shim") }))
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = require("core.logger.engine.shim") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
 				end
@@ -1181,10 +1181,10 @@ end)
 
 
 helpers.describe("selection boundary fragments in the complete native tray", function()
-	local path = require("infra.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/linux_selection_boundaries.json")
 	local file = assert(io.open(path, "rb"))
 	local bytes = assert(file:read("*a")); assert(file:close())
-	local corpus = assert(require("json").decode(bytes))
+	local corpus = assert(require("core.text.engine.json").decode(bytes))
 
 	helpers.it("keeps the independently declared nine-row selection order without invoking an action", function()
 		with_absent_english(function()
@@ -1238,7 +1238,7 @@ helpers.describe("selection boundary fragments in the complete native tray", fun
 end)
 
 
-require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
+require("tests.lua.menu.native_child_rows").run(helpers, require("infra.manifest_menu"))
 
 helpers.describe("magic key source: actual complete tray provider", function()
 	helpers.it("(magic-key-source-family) native candidate rows preserve file-backed choices and declaration withdrawal", function()
@@ -1293,13 +1293,13 @@ helpers.describe("magic key source: actual complete tray provider", function()
 	end)
 end)
 
-require("test.menu_dynamic_caption_contract").register(helpers, "linux")
+require("tests.lua.menu.dynamic_caption_contract").register(helpers, "linux")
 
-require("test.menu_caption_layout_contract").register(helpers, "linux")
+require("tests.lua.menu.caption_layout_contract").register(helpers, "linux")
 
-require("test.menu_group_row_contract").register(helpers, "linux")
+require("tests.lua.menu.group_row_contract").register(helpers, "linux")
 
-require("test.menu_command_group_affix_contract").register(helpers, "linux")
+require("tests.lua.menu.command_group_affix_contract").register(helpers, "linux")
 
 
 helpers.describe("Whole LLM tray genuine live owner scope", function()
@@ -1349,21 +1349,21 @@ end)
 
 -- The actual initialized locale owner and root renderer, restored as one private cohort.
 local function language_parent_native(language, scenario)
-	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+	local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 	local previous_i18n, previous_manifest = i18n, ManifestMenu
 	local ok, detail = xpcall(function()
 		for _, name in ipairs(names) do rawset(package.loaded, name, nil) end
-		i18n = require("infra.i18n"); i18n.init()
+		i18n = require("core.i18n.engine.i18n"); i18n.init()
 		local owner = { pending = function() return false end }
 		assert(i18n.scope_acquire(owner))
 		local receipt = assert(i18n.scope_capture(owner))
 		assert(i18n.scope_apply(owner, receipt, language))
 		assert(i18n.scope_release(owner)); assert(i18n.scope_forget(owner, receipt))
 		ManifestMenu = require("infra.manifest_menu")
-		local path = require("infra.paths").shared("tests/corpus/menus/language_parent.json")
+		local path = require("core.fs.engine.paths").shared("tests/corpus/menus/language_parent.json")
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
-		local corpus = assert(require("json").decode(bytes))
+		local corpus = assert(require("core.text.engine.json").decode(bytes))
 		assert(i18n.get("menu.global.language") == corpus.parent[language], "genuine locale file is initialized")
 		-- The controlled native renderer collaborators belong to this scenario's
 		-- import cohort; acquire the actual builder only after they are installed.
@@ -1503,9 +1503,9 @@ helpers.describe("Language completed-child admission (linux)", function()
 	end
 end)
 
-require("test.menu_command_literal_prefix_contract").register(helpers, "linux")
+require("tests.lua.menu.command_literal_prefix_contract").register(helpers, "linux")
 
-require("test.menu_disabled_reasons_contract").register(helpers, "linux")
+require("tests.lua.menu.disabled_reasons_contract").register(helpers, "linux")
 
 helpers.describe("Complete-menu gesture status fixture owns its native cohort", function()
 	helpers.it("rebuilds the native producer against current locale and manifest despite a stale loaded producer", function()
@@ -1530,10 +1530,10 @@ helpers.describe("Complete-menu gesture status fixture owns its native cohort", 
 	end)
 end)
 
-require("test.menu_layout_caption_values_contract").register(helpers, "linux")
+require("tests.lua.menu.layout_caption_values_contract").register(helpers, "linux")
 
-require("test.menu_numbered_caption_contract").register(helpers, "linux")
-require("test.menu_row_order_contract").register(helpers, 8)
+require("tests.lua.menu.numbered_caption_contract").register(helpers, "linux")
+require("tests.lua.menu.row_order_contract").register(helpers, 8)
 
 -- Component coverage above uses the recorded declaration only during its build.
 -- Current public policy is checked separately with the genuine prediction owner.
@@ -1652,9 +1652,9 @@ helpers.describe("fixed feature-parent family: actual Linux builder (fixed-featu
 					-- Header projections delegate genuinely, while this counter keeps its
 					-- original feature-child meaning and exact zero-refusal assertion.
 					local feature_template, header_reads, header_label = ManifestMenu.template_rows, 0, nil
-					local oracle_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/linux_tray_header_original.json"), "rb"))
+					local oracle_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_tray_header_original.json"), "rb"))
 					local oracle_bytes = assert(oracle_file:read("*a")); assert(oracle_file:close())
-					local header_oracle = assert(require("json").decode(oracle_bytes))
+					local header_oracle = assert(require("core.text.engine.json").decode(oracle_bytes))
 					ManifestMenu.template_rows = function(key, ...)
 						if key == "linux_tray_active_header" or key == "linux_tray_paused_header" then
 							header_reads = header_reads + 1

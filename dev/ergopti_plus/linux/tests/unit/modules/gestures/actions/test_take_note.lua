@@ -9,9 +9,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Paths = require("infra.config_paths")
-local Files = require("adapters.file_system")
+local Files = require("core.fs.adapters.file_system")
 
 --- Isolates only desktop association, notifications and application launch.
 --- @param body function Receives note path, recorded launches and notices.
@@ -20,10 +20,10 @@ local function fixture(body, handler)
 	local folder = os.tmpname()
 	os.remove(folder)
 	assert(Shell.run("mkdir -p -- " .. Shell.quote(folder)))
-	local saved_data, saved_notifier = Paths.data, package.loaded["adapters.application_notifier"]
+	local saved_data, saved_notifier = Paths.data, package.loaded["platform.focus.application_notifier"]
 	local launches, notices = {}, {}
 	Paths.data = function(rel) helpers.assert_eq(rel, "notes"); return folder end
-	package.loaded["adapters.application_notifier"] = {
+	package.loaded["platform.focus.application_notifier"] = {
 		send = function(text) notices[#notices + 1] = text; return true end,
 	}
 	Shell._set_runner(function(command)
@@ -37,7 +37,7 @@ local function fixture(body, handler)
 	local function launch(command) launches[#launches + 1] = command; return true end
 	local ok, err = pcall(body, path, launches, notices, launch)
 	Shell._reset_runner()
-	Paths.data, package.loaded["adapters.application_notifier"] = saved_data, saved_notifier
+	Paths.data, package.loaded["platform.focus.application_notifier"] = saved_data, saved_notifier
 	os.remove(path)
 	assert(Shell.run("rmdir -- " .. Shell.quote(folder)))
 	if not ok then error(err, 0) end
@@ -54,8 +54,22 @@ helpers.describe("Linux daily notes (linux-take-note)", function()
 			helpers.assert_true(Files.append(path, "Private note\n"))
 			helpers.assert_true(handler({ run_background = launch }))
 			helpers.assert_eq(Files.read(path), "Private note\n")
-			helpers.assert_eq(launches, { "xdg-open " .. Shell.quote(path), "xdg-open " .. Shell.quote(path) })
+			local editor = "gtk-launch -- " .. Shell.quote("org.gnome.TextEditor.desktop") .. " " .. Shell.quote(path)
+			helpers.assert_eq(launches, { editor, editor })
 		end, "org.gnome.TextEditor.desktop\n")
+	end)
+
+	-- xdg-open and gio choose by content, and the day's first note is empty:
+	-- inode/x-empty went to a browser on generic desktops, application/x-zerosize
+	-- to nothing under gio. The registered editor is launched by its id instead.
+	helpers.it("linux-take-note: an empty note opens in the registered editor, never a content-sniffing opener", function()
+		fixture(function(path, launches, _, launch)
+			helpers.assert_true(require("modules.take_note").open(launch))
+			helpers.assert_eq(Files.read(path), "")
+			helpers.assert_eq(#launches, 1)
+			helpers.assert_eq(launches[1]:match("^xdg%-open ") or launches[1]:match("^gio open "), nil)
+			helpers.assert_eq(launches[1], "gtk-launch -- " .. Shell.quote("mousepad.desktop") .. " " .. Shell.quote(path))
+		end, "  mousepad.desktop  \n")
 	end)
 
 	helpers.it("linux-take-note: absent text handler reports the reason without creating a file", function()

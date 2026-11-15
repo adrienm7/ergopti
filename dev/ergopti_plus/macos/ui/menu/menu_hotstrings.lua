@@ -7,30 +7,23 @@
 --- ==============================================================================
 
 local M = {}
-local PersonalFiles = require("hotstrings.personal_files")
-local SectionOrder = require("hotstrings.section_order")
-local TableUtil = require("table_util")
-local Logger        = require("infra.logger")
-local DeferredWork  = require("infra.deferred_work")
-local ShellRunner   = require("adapters.shell_runner")
-local dialog        = require("infra.dialog_util")
-local notifications = require("infra.notifications")
-local i18n          = require("infra.i18n")
-local Labels        = require("menu.labels")
-local Extensions    = require("hotstrings.extensions")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local SectionOrder = require("hotstrings.engine.section_order")
+local TableUtil = require("core.text.engine.table_util")
+local Logger        = require("core.logger.engine.logger")
+local DeferredWork  = require("core.timing.engine.deferred_work")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local dialog        = require("core.ui.engine.dialog_util")
+local notifications = require("core.ui.engine.notifications")
+local i18n          = require("core.i18n.engine.i18n")
+local Labels        = require("menu.engine.labels")
+local Extensions    = require("hotstrings.engine.extensions")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local ManifestMenu = require("infra.manifest_menu")
-local PersonalInfoSource = require("menu.frames.personal_info_source")
+local PersonalInfoSource = require("menu.engine.frames.personal_info_source")
 -- Owns the « all sections » checkbox, which the personal submenu draws too.
 local Custom        = require("ui.menu.menu_hotstrings_custom")
 local LOG           = "menu_hotstrings"
-
---- Reject extension changes unless the live pause owner confirms they are safe.
-local function extension_paused(ctx)
-	if ctx.paused == true or type(ctx.is_paused) ~= "function" then return true end
-	local ok, paused = pcall(ctx.is_paused)
-	return not ok or paused ~= false
-end
 
 --- Resolves a description value that may be a plain string or a multilingual table.
 --- Falls back to the "fr" locale, then to an empty string.
@@ -52,11 +45,11 @@ local keymap       = require("modules.keymap")
 -- (persisted to hotstrings_config.toml, shared with the config window). The quick
 -- menu items below read/write through it so the two UIs never desync.
 local hotstrings_config = require("modules.hotstrings.hotstrings_config")
-local HotstringLanguages = require("hotstrings.languages")
-local BulkScope = require("hotstrings.bulk_scope")
+local HotstringLanguages = require("hotstrings.engine.languages")
+local BulkScope = require("hotstrings.engine.bulk_scope")
 local ManifestReader = require("infra.manifest_reader")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
-local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
+local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
 
 
 
@@ -118,7 +111,7 @@ end
 -- ====================================
 -- ====================================
 
--- Thousands separator formatting lives in _shared/lua/menu/labels.lua, so the
+-- Thousands separator formatting lives in _shared/menu/engine/labels.lua, so the
 -- three drivers render the same count the same way. This file used to carry its
 -- own byte-identical copy.
 local fmt_count = Labels.fmt_count
@@ -286,7 +279,7 @@ local function buildPersonalInfoItems(ctx, description)
 	local editor = template("personal_info_editor_frame", {
 		personal_info_editor_open = function()
 			if not current() then return false end
-			return DeferredWork.after(require("infra.timings").sec("ui", "editor_open_after_click_ms"),
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "editor_open_after_click_ms"),
 				function()
 					if not current() then return false end
 					pcall(ctx.personal_info.open_editor)
@@ -350,13 +343,13 @@ function M.build_bound_section_rows(ctx, bound)
 				rows[#rows + 1] = {
 					label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 					checked  = sec_on or nil,
-					action   = (enabled and not ctx.paused) and function()
-						if extension_paused(ctx)
-							or not groupEnabled(ctx, entry.group) then return false end
+					-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+					action   = enabled and function()
+						if not groupEnabled(ctx, entry.group) then return false end
 						local enable = not ctx.keymap.is_section_enabled(entry.group, entry.section)
 						return M.commit_extension_selection(ctx, {}, { entry }, enable)
 					end or nil,
-					disabled = not enabled or ctx.paused or nil,
+					disabled = not enabled or nil,
 				}
 				if enabled and sec_on and sec.count ~= nil then total = total + tonumber(sec.count) end
 			end
@@ -374,7 +367,6 @@ end
 --- @param enabled boolean Explicit choice.
 --- @return boolean committed
 function M.commit_extension_selection(ctx, groups, bound, enabled)
-	if extension_paused(ctx) then return false end
 	local km = ctx.keymap
 	if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
 	local inventory = {}
@@ -434,16 +426,13 @@ function M.build_extension_bulk_actions(ctx, groups, bound)
 		end
 	end
 	local rows = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-		[require("config_keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
+		[require("settings.engine.keys").COMMAND.EXTENSION_ALL_SECTIONS] = function()
 			return M.commit_extension_selection(ctx, groups, bound, not all_on)
 		end,
 	}, {
 		["extension_all_sections_enabled"] = function() return all_on end,
-		["extension_bulk_ready"] = function() return not ctx.paused end,
+		["extension_bulk_ready"] = function() return true end,
 	}, {})
-	if rows and ctx.paused then
-		for _, row in ipairs(rows) do row.action = nil end
-	end
 	return rows
 end
 
@@ -544,9 +533,8 @@ function M.build_groups(ctx, only, counts)
 						sec_menu[#sec_menu + 1] = {
 							label    = sec.count ~= nil and (lbl .. " (" .. fmt_count(sec.count) .. ")") or lbl,
 							checked  = sec_on or nil,
-							action       = (enabled and not ctx.paused)
-									   and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
-							disabled = not enabled or ctx.paused or nil,
+							action       = enabled and toggleSectionFn(ctx, name, sec.name, lbl) or nil,
+							disabled = not enabled or nil,
 						}
 						order_labels[sec.name] = sec_menu[#sec_menu].label
 						prev_was_sep = false
@@ -556,13 +544,18 @@ function M.build_groups(ctx, only, counts)
 			local order_rows = SectionOrder.menu(ManifestMenu.template_rows, order, order_labels, function(candidate)
 				if ctx.state.sections_order_overrides ~= saved_orders then return false end
 				local next_orders = TableUtil.shallow_copy(saved_orders or {})
-				next_orders[name] = candidate
+				-- A reset is an empty order, not an absent one: Preferences.save
+				-- keeps every stored order its state does not name (another
+				-- build's categories), and deletes a stored order only when the
+				-- state empties it. An absent key left the old order in
+				-- config.toml, so it came back at the next start.
+				next_orders[name] = candidate or {}
 				ctx.state.sections_order_overrides = next_orders
 				local called, committed = pcall(ctx.save_prefs)
 				if not called or committed ~= true then
 					ctx.state.sections_order_overrides = saved_orders
 					Logger.error(LOG, "Hotstring section order was not persisted.")
-					require("config_save_failure").present(i18n.get, function(message)
+					require("settings.engine.publication.save_failure").present(i18n.get, function(message)
 						notifications.notify(i18n.get("common.error_title"), message, "error")
 					end)
 					return false
@@ -570,7 +563,7 @@ function M.build_groups(ctx, only, counts)
 				ctx.updateMenu()
 				return true
 			end, function()
-				return not extension_paused(ctx) and ctx.state.sections_order_overrides == saved_orders
+				return ctx.state.sections_order_overrides == saved_orders
 			end)
 			for _, row in ipairs(order_rows) do sec_menu[#sec_menu + 1] = row end
 			if name == "dynamichotstrings" then
@@ -582,8 +575,8 @@ function M.build_groups(ctx, only, counts)
 			local render_ctx = { commands = {
 				-- The submenu's own sections: an extension's bound ones are drawn,
 				-- and switched, in that extension's submenu (2026-10-17).
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
-				[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
+				[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.
@@ -591,7 +584,7 @@ function M.build_groups(ctx, only, counts)
 				render_ctx, {
 					["hotstring_category_file"] = function()
 						if not toml_path then return {} end
-						local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
+						local row = ManifestMenu.command_row("hotstring_file_commands", require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN,
 							{ hotstring_file_open = function() return open_toml_path(toml_path) end },
 							{ hotstring_file_ready = function() return type(ShellRunner.open) == "function" end })
 						return row and { row } or {}

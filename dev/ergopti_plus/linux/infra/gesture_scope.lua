@@ -10,10 +10,10 @@
 
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Transaction = require("config_scope_transaction")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 
 --- Builds one recoverable gesture transaction with a unique backup destination.
 --- @param options table Path, backup_path, files and gestures owner.
@@ -21,7 +21,7 @@ local ConfigKeys = require("config_keys")
 function M.new(options)
 	assert(type(options) == "table" and type(options.gestures) == "table", "gesture scope requires its runtime owner")
 	local gestures = options.gestures
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local source, decoded
 	local function parameter_domain(path)
 		local key = path:match("^gesture_parameters%.(.+)$")

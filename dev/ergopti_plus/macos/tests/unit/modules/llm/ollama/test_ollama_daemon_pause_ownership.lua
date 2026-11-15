@@ -147,10 +147,10 @@ local function load_fixture()
 		return task
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() return true end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			return {
 				cancel = function() return true end,
@@ -162,15 +162,15 @@ local function load_fixture()
 			}
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["adapters.shell_runner"] = shell
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.events.timer_scheduler"] = scheduler
+	package.loaded["core.process.adapters.shell_runner"] = shell
+	package.loaded["core.fs.adapters.storage"] = {
 			-- The real adapter's read and write pair (api_remote's refused thinking fields)
 			get = function() return nil end,
 			read_exact = function() return true, nil end,
 			set = function() return true end,
 		}
-	package.loaded["adapters.json_codec"] = {
+	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function() return "{}" end,
 		decode = function() return {} end,
 	}
@@ -227,12 +227,12 @@ local function load_fixture()
 		execute_single = function() return true end,
 	}
 	package.loaded["adapters.event_provenance"] = {}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	local admission = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			if admission ~= nil then return nil end
@@ -248,7 +248,7 @@ local function load_fixture()
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-	package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)
 	return {
 		api = api,

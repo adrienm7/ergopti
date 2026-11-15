@@ -35,18 +35,18 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local Json = require("json")
-local FileSystem = require("adapters.file_system")
-local ShellRunner = require("adapters.shell_runner")
-local Timer = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
+local Logger = require("core.logger.engine.logger")
+local Json = require("core.text.engine.json")
+local FileSystem = require("core.fs.adapters.file_system")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local Timer = require("core.events.timer_scheduler")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "adapters.field_run_ports"
 
 -- The personal files the configuration guard protects, by config_paths key.
 local GUARDED_FILES = {
-	"ConfigTomlPath", "KarabinerConfigPath", "MlxActiveModelPath", "PersonalTomlPath", "PersonalInfoTomlPath",
+	"ConfigTomlPath", "TapHoldConfigPath", "MlxActiveModelPath", "PersonalTomlPath", "PersonalInfoTomlPath",
 }
 
 -- The guarded files the running driver holds in memory once loaded: putting
@@ -106,7 +106,7 @@ end
 --- @return table snapshot
 local function config_snapshot()
 	local ConfigPaths = require("infra.config_paths")
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	local snapshot = { files = {}, settings = {}, runtime_keys = runtime_setting_keys() }
 	for _, key in ipairs(GUARDED_FILES) do
 		local path = ConfigPaths.get(key)
@@ -125,7 +125,7 @@ end
 --- @param snapshot table From config_snapshot().
 --- @return table outcome { restored = { names }, failed = { names }, reload = boolean }
 local function config_restore(snapshot)
-	local Storage = require("adapters.storage")
+	local Storage = require("core.fs.adapters.storage")
 	local outcome = { restored = {}, failed = {}, reload = false }
 	local function note(ok, name)
 		local list = ok and outcome.restored or outcome.failed
@@ -226,7 +226,7 @@ local function run_diagnostics(finish)
 	local schema = Core.config().schema
 	local snapshot = Core.run({ complete_local = true })
 	local issues = type(snapshot.sections) == "table" and snapshot.sections.issues or {}
-	local safe = require("healthcheck.share").snapshot(snapshot, schema)
+	local safe = require("diagnostics.engine.healthcheck.share").snapshot(snapshot, schema)
 	local verdict, codes = M.diagnostics_codes(issues, Core.last_phase_a())
 	finish(verdict, codes, safe)
 end
@@ -297,7 +297,7 @@ local function ollama_runtime(finish)
 		end)
 	end
 	local accepted
-	if path and require("core.llm.ollama_runtime_choice").classify(source) == "foreign" then
+	if path and require("core.lifecycle.engine.core.ollama_runtime_choice").classify(source) == "foreign" then
 		accepted = Deps.check_and_install_deps(settle)
 	else
 		accepted = require("ui.menu.menu_llm.runtime_install_offer").install_ollama(settle)
@@ -472,11 +472,11 @@ end
 -- ==========================
 
 --- Builds the ports of a developer runtime.
---- @param root string Clone root (infra/dev_source.lua).
+--- @param root string Clone root (core/lifecycle/engine/dev_source.lua).
 --- @return table ports
 function M.new(root)
 	assert(type(root) == "string" and root:sub(1, 1) == "/", "field run ports need the clone root")
-	local declaration = root .. require("infra.dev_source").DRIVER_SUBPATH .. "/data/field_run.json"
+	local declaration = root .. require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH .. "/data/field_run.json"
 	return {
 		read_declaration = function() return FileSystem.read(declaration) end,
 		read = function(path) return FileSystem.read_with_status(path) end,
@@ -494,7 +494,7 @@ function M.new(root)
 		log_ring = Logger.ring_buffer_snapshot,
 		config_snapshot = config_snapshot,
 		config_restore = config_restore,
-		reload_driver = function(reason) return require("infra.termination_coordinator").request_reload(reason) end,
+		reload_driver = function(reason) return require("core.lifecycle.engine.shutdown.termination_coordinator").request_reload(reason) end,
 		run_step = run_step,
 	}
 end

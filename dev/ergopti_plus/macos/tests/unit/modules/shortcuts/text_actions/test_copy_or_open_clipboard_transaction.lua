@@ -14,8 +14,8 @@ local helpers = require("tests.helpers")
 local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.apps", "adapters.window_info",
-		"adapters.synthetic_input", "adapters.timer_scheduler", "adapters.clipboard", "infra.logger",
+		"modules.shortcuts.actions.apps", "platform.focus.window_info",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
 		["public.utf8-plain-text"] = "ORIGINAL",
@@ -28,8 +28,8 @@ local function load_fixture(options)
 	local restore_calls = 0
 	local copies = 0
 	local snapshots = 0
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.window_info"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = "TextEdit" } end,
 	}
 	local function complete(tx, status)
@@ -38,7 +38,7 @@ local function load_fixture(options)
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)
@@ -78,7 +78,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]

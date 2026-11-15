@@ -85,7 +85,7 @@ helpers.describe("category submenu: its rows", function()
 		helpers.it("offers the explicit category scope command " .. tostring(enabled), function()
 			local config, log = fake_config({})
 			local row = rolls_row(config)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(row.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
 			helpers.assert_eq(row.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
 			helpers.assert_nil(row.menu[enabled and 1 or 2].checked)
@@ -107,7 +107,7 @@ helpers.describe("category submenu: its rows", function()
 					if outcome == "nil" then return nil end
 					return outcome == "true"
 				end
-				local execute, modal = os.execute, require("ui.modal")
+				local execute, modal = os.execute, require("core.ui.ui.modal")
 				local run, asked, modals = modal.run, {}, 0
 				modal.run = function(callback) modals = modals + 1; return callback() end
 				local called, result = pcall(function()
@@ -127,8 +127,8 @@ helpers.describe("category submenu: its rows", function()
 				helpers.assert_eq(modals, notices, "the failure dialog uses the keyboard-release boundary")
 				if notices > 0 then
 					helpers.assert_true(asked[1]:find("--error", 1, true) ~= nil)
-					helpers.assert_true(asked[1]:find("--text=" .. require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
+					helpers.assert_true(asked[1]:find("--text=" .. require("core.process.adapters.shell_runner").quote(
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
 				end
 			end)
 		end
@@ -265,7 +265,7 @@ helpers.describe("personal category scope parity", function()
 				end
 				find(mb.build({ config = config, _version = "9.9.9", paused = false }))
 				helpers.assert_true(captured ~= nil, "the actual personal provider must render its category")
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				helpers.assert_eq(captured.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
 				helpers.assert_eq(captured.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
 				helpers.assert_nil(captured.menu[enabled and 1 or 2].checked)
@@ -365,7 +365,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		error("the native hc section row was not rendered")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -398,8 +398,8 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
-				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+				helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
+					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
 	end
@@ -408,8 +408,8 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local directory = os.tmpname()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -422,10 +422,10 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			package.loaded["modules.hotstrings.loader"] = nil
 			local paths = {}
-			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			for key, value in pairs(require("core.fs.engine.paths")) do paths[key] = value end
 			-- The private fixture has no external installed layout roots.
 			paths.extension_roots = function() return {} end
-			package.loaded["infra.paths"] = paths
+			package.loaded["core.fs.engine.paths"] = paths
 			local loader = require("modules.hotstrings.loader")
 			local native_find = loader.find_toml_files
 			package.loaded["modules.hotstrings.loader"] = {
@@ -440,7 +440,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))
@@ -451,7 +451,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
 		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
@@ -470,7 +470,7 @@ helpers.describe("category section callbacks: exact publication acknowledgement"
 				local action = section_action(c.config)
 				local rename, publications = os.rename, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						publications = publications + 1
 						if outcome == "throw" then error("inert owned publication refusal") end
 						if outcome == "nil" then return nil, "inert owned publication refusal" end
@@ -524,7 +524,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local getter = config.get_category
 		config.get_category = function(id) if id == "rolls" then return category end; return getter(id) end
 		local mb = helpers.load_module("ui.menu.builder")
-		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -540,7 +540,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		error("the extension provider did not draw the direct bound hc section")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -573,8 +573,8 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
 			if #notices > 0 then
 				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
-				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+				helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
+					require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 			end
 		end)
 	end
@@ -583,8 +583,8 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local directory = os.tmpname()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-section-ack"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
 			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
@@ -597,10 +597,10 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			package.loaded["modules.hotstrings.loader"] = nil
 			local paths = {}
-			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			for key, value in pairs(require("core.fs.engine.paths")) do paths[key] = value end
 			-- The private fixture has no external installed layout roots.
 			paths.extension_roots = function() return {} end
-			package.loaded["infra.paths"] = paths
+			package.loaded["core.fs.engine.paths"] = paths
 			local loader = require("modules.hotstrings.loader")
 			local native_find = loader.find_toml_files
 			package.loaded["modules.hotstrings.loader"] = {
@@ -615,7 +615,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))
@@ -626,7 +626,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
 		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
@@ -645,7 +645,7 @@ helpers.describe("extension-bound section callbacks: exact publication acknowled
 				local action = section_action(c.config)
 				local rename, publications = os.rename, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						publications = publications + 1
 						if outcome == "throw" then error("inert owned publication refusal") end
 						if outcome == "nil" then return nil, "inert owned publication refusal" end

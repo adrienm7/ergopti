@@ -106,11 +106,11 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			return true
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = nil
-		package.loaded["infra.timings"] = nil
-		package.loaded["adapters.synthetic_input"] = synthetic
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = nil
+		package.loaded["core.timing.engine.timings"] = nil
+		package.loaded["platform.input.synthetic_input"] = synthetic
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"] = nil
 		local actions = require("modules.shortcuts.actions.text")
 

@@ -4,7 +4,8 @@
 --- MODULE: Metrics The Session Cannot Measure (Linux)
 --- DESCRIPTION:
 --- Under Wayland no client reads the cursor position or the current desktop,
---- so pointer distance and desktop changes are not measured. The Metrics
+--- so pointer distance and desktop changes are not measured, and a desktop
+--- that does not report its tap-to-click setting leaves taps uncounted. The Metrics
 --- submenu names each one with its reason, so an empty dashboard column reads
 --- as unmeasured rather than as a zero; on X11 nothing is listed.
 --- ==============================================================================
@@ -15,14 +16,16 @@ local helpers = require("tests.helpers")
 --- @param pointer table Pointer distance availability.
 --- @param desktop function Binds the system sampler's desktop source.
 --- @return table rows The submenu rows.
-local function metrics_rows(pointer, desktop)
+--- @param taps table|nil Touchpad tap availability.
+local function metrics_rows(pointer, desktop, taps)
 	local System = require("modules.keystats.system_metrics")
 	System._reset()
 	desktop(System)
 	local keystats = { is_enabled = function() return true end, get_privacy_state = function() return {} end,
-		pointer_distance_availability = function() return pointer end }
+		pointer_distance_availability = function() return pointer end,
+		tap_click_availability = function() return taps or { measured = true } end }
 	local rows = helpers.load_module("ui.menu.builder").build({ keystats = keystats })
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	for _, row in ipairs(rows) do
 		if row.title == i18n.get("menu.metrics.title") then return row.menu end
 	end
@@ -31,7 +34,7 @@ end
 
 --- Titles of the inert rows that start with a metric's name.
 local function unmeasured(rows, name_key)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local prefix = string.format(i18n.get("menu.metrics.not_measured"), i18n.get(name_key), "")
 	local found = {}
 	for _, row in ipairs(rows) do
@@ -47,12 +50,23 @@ end
 helpers.describe("metrics menu: what this session cannot measure", function()
 	helpers.it("linux-metrics-availability: names each unmeasured metric with its reason", function()
 		local rows = metrics_rows({ measured = false, reason = "platform_reason.pointer_distance_needs_cursor_position" },
-			function(System) System.bind_desktop_source(nil, "platform_reason.desktop_changes_need_x11") end)
-		local i18n = require("infra.i18n")
+			function(System) System.bind_desktop_source(nil, "platform_reason.desktop_changes_need_workspace_interface") end)
+		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.pointer_distance"), { string.format(i18n.get("menu.metrics.not_measured"),
 			i18n.get("menu.metrics.pointer_distance"), i18n.get("platform_reason.pointer_distance_needs_cursor_position")) })
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.space_changes"), { string.format(i18n.get("menu.metrics.not_measured"),
-			i18n.get("menu.metrics.space_changes"), i18n.get("platform_reason.desktop_changes_need_x11")) })
+			i18n.get("menu.metrics.space_changes"), i18n.get("platform_reason.desktop_changes_need_workspace_interface")) })
+	end)
+
+	helpers.it("(tap-click) names the touchpad taps when the desktop's tap setting is unreadable", function()
+		local reason = "platform_reason.tap_to_click_setting_unreadable"
+		local rows = metrics_rows({ measured = true, unit = "px" },
+			function(System) System.bind_desktop_source(function() return 0 end) end, { measured = false, reason = reason })
+		local i18n = require("core.i18n.engine.i18n")
+		helpers.assert_eq(unmeasured(rows, "menu.metrics.touchpad_taps"), { string.format(i18n.get("menu.metrics.not_measured"),
+			i18n.get("menu.metrics.touchpad_taps"), i18n.get(reason)) })
+		helpers.assert_true(i18n.get(reason) ~= reason, "the reason is a real string")
+		require("modules.keystats.system_metrics")._reset()
 	end)
 
 	helpers.it("linux-metrics-availability: lists nothing when both are measured", function()
@@ -60,6 +74,7 @@ helpers.describe("metrics menu: what this session cannot measure", function()
 			function(System) System.bind_desktop_source(function() return 0 end) end)
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.pointer_distance"), {})
 		helpers.assert_eq(unmeasured(rows, "menu.metrics.space_changes"), {})
+		helpers.assert_eq(unmeasured(rows, "menu.metrics.touchpad_taps"), {})
 		require("modules.keystats.system_metrics")._reset()
 	end)
 end)

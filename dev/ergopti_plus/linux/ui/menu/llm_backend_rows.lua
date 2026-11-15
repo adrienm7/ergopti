@@ -16,24 +16,24 @@
 ---    private entries file, selects it, then tests it at once so a wrong key is
 ---    reported while the user is still looking, with the provider's own reason.
 --- 3. Dialogs are handed in by the menu builder, so this module never opens a
----    window the keyboard grab would starve (ui/modal.lua).
+---    window the keyboard grab would starve (core/ui/ui/modal.lua).
 --- 4. A provider that is no chat model (Jev, for the agent's System 1 only) is
 ---    offered for its key like any other, but its entry never becomes the
 ---    predictions' one: it is listed with its own test and removal, and adding
 ---    it keeps the entry predictions already use.
 --- 5. Every entry reads <provider>/<model>, told apart by host then order when
----    two share it (_shared/lua/llm/api_entry_names.lua), on every driver. The
+---    two share it (_shared/ai/engine/api/entry_names.lua), on every driver. The
 ---    label an entry stores is written for older builds and never read.
 --- ==============================================================================
 
 local M = {}
-local SaveFailure = require("config_save_failure")
-local TextUtils = require("text_utils")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger = require("logger.shim")
-local EntryNames = require("llm.api_entry_names")
-local ApiModelListing = require("llm.api_model_listing")
-local UrlTemplate = require("llm.api_url_template")
+local Logger = require("core.logger.engine.shim")
+local EntryNames = require("ai.engine.api.entry_names")
+local ApiModelListing = require("ai.engine.api.model_listing")
+local UrlTemplate = require("ai.engine.api.url_template")
 local BackendBrands = require("modules.llm.backend_brands")
 
 local LOG = "ui.menu.llm_backend_rows"
@@ -44,7 +44,7 @@ local TEST_REPLY_PREVIEW = 120
 --- @param key string
 --- @return string
 local function tr(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	local value = ok and type(i18n.get) == "function" and i18n.get(key) or nil
 	return type(value) == "string" and value ~= "" and value or key
 end
@@ -450,8 +450,42 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 	local function queue(row)
 		if row.alternative or row.typed then later[#later + 1] = row else push(row) end
 	end
+	--- The row of an entry restored without its key: greyed, saying the key
+	--- must be entered again, with that action and the removal.
+	--- @param entry table
+	--- @param label string
+	local function key_missing_row(entry, label)
+		push({ name = label, provider = entry.provider, installed = true, available = false,
+			hint_key = "model_browser.hint_api_key_reenter", actions = {
+				{ id = "set_key", text = tr("menu.llm.local_servers.api_key"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					local token = dialogs.prompt(label, tr("menu.llm.api_prompt_token"), "", true)
+					if type(token) ~= "string" or token == "" or not page_owned()
+						or not entry_retained(entries, entry) then return false end
+					if entries.set_token(entry.id, token) ~= true then
+						save_failed(dialogs, entries, tr("common.error_title"))
+						return false
+					end
+					changed()
+					return true
+				end },
+				{ id = "remove", text = tr("menu.llm.api_remove_entry"), run = function()
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return label end))
+					if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
+					if not page_owned() or not entry_retained(entries, entry) then return false end
+					if entries.remove(entry.id) ~= true then return report_save_failure() end
+					changed()
+					return true
+				end },
+			} })
+	end
 	for _, entry in ipairs(list) do
 		local label = names[entry.id]
+		if type(entries.key_missing) == "function" and entries.key_missing(entry.id) then
+			key_missing_row(entry, label)
+			goto continue
+		end
 		local chat = remote.serves(entry.provider, "chat")
 		local is_active = chat and active ~= nil and entry.id == active.id
 		local actions = {}
@@ -544,6 +578,7 @@ function M.api_page(llm, dialogs, on_changed, context, listings, page_current)
 				end } },
 			})
 		end
+		::continue::
 	end
 	for _, row in ipairs(later) do push(row) end
 	for _, provider in ipairs(remote.providers()) do

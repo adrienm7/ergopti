@@ -746,7 +746,7 @@ _OnbWeb_FlagUrl(Code) {
 ; the file or key is absent so the language list still renders (sans flag).
 _OnbWeb_LocaleFlag(Code) {
 	global _SharedDir
-	path := _SharedDir . "\data\locales\" . Code . ".json"
+	path := _SharedDir . "\core\i18n\data\locales\" . Code . ".json"
 	if !FileExist(path)
 		return ""
 	try {
@@ -762,7 +762,7 @@ _OnbWeb_LocaleFlag(Code) {
 ; frontend renders keys verbatim rather than crashing on a missing file.
 _OnbWeb_LocaleStringsJson(Code) {
 	global _SharedDir
-	path := _SharedDir . "\data\locales\" . Code . ".json"
+	path := _SharedDir . "\core\i18n\data\locales\" . Code . ".json"
 	if FileExist(path) {
 		try return FileRead(path, "UTF-8")
 	}

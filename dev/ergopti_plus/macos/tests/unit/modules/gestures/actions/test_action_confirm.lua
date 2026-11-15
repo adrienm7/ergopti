@@ -25,12 +25,12 @@ local helpers = require("tests.helpers")
 
 local CONFIRM_OWNED = {
 	"modules.gestures.action_confirm",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"adapters.mouse_control",
-	"adapters.window_info",
-	"adapters.window_manager",
-	"infra.i18n",
-	"infra.logger",
+	"platform.focus.window_info",
+	"platform.focus.window_manager",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 }
 
 --- Loads the confirmation module over a recording alert.
@@ -42,24 +42,24 @@ local function with_confirm(body, frame, focus)
 	focus.activated = {}
 	helpers.with_fresh_modules(CONFIRM_OWNED, function()
 		local alerts = {}
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			frontmost_application = function() return focus.front end,
 		}
-		package.loaded["adapters.window_manager"] = {
+		package.loaded["platform.focus.window_manager"] = {
 			activate = function(spec)
 				focus.activated[#focus.activated + 1] = spec
 				return focus.activates
 			end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key, value) return key .. ":" .. tostring(value) end,
 		}
 		package.loaded["adapters.mouse_control"] = {
 			screen_frame_under_cursor = function() return frame end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			alert = function(...)
 				alerts[#alerts + 1] = table.pack(...)
 				return true
@@ -170,8 +170,8 @@ end)
 -- =====================================================
 -- =====================================================
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil

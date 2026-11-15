@@ -31,7 +31,7 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 
 local LOG = "healthcheck.probes"
 
@@ -60,7 +60,7 @@ local AI_LOCAL_BACKEND = "ollama"
 --- Milliseconds, for durations.
 --- @return number
 local function now_ms()
-	return require("infra.monotonic").now_ms()
+	return require("core.logger.engine.monotonic").now_ms()
 end
 
 --- A refused dispatch may still own a started native process. Defer the
@@ -101,7 +101,7 @@ end
 --- @return table|nil
 local function decode(body)
 	if type(body) ~= "string" or body == "" then return nil end
-	local ok, data = pcall(require("json").decode, body)
+	local ok, data = pcall(require("core.text.engine.json").decode, body)
 	return (ok and type(data) == "table") and data or nil
 end
 
@@ -109,7 +109,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("infra.regular_file_reader").read_source(path)
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 --- The answer of a failed HTTP request.
@@ -137,7 +137,7 @@ end
 --- @return function
 local function github_api(config, run)
 	return function(done)
-		local HttpClient = require("adapters.http_client")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not HttpClient.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -168,13 +168,13 @@ end
 --- @return function
 local function proxy_pac(config, run)
 	return function(done)
-		local Shell = require("adapters.shell_runner")
-		local HttpClient = require("adapters.http_client")
+		local Shell = require("core.process.adapters.shell_runner")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not Shell.HAS_ASYNC or not HttpClient.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
 		end
-		local PacCheck = require("network.pac_check")
+		local PacCheck = require("core.network.engine.pac_check")
 		local function none() done({ state = "ok" }, { network = { proxy_pac = "No PAC configured" } }) end
 		local function fetch(url)
 			run.cancellers[#run.cancellers + 1] = function() HttpClient.cancel(PAC_OWNER) end
@@ -225,7 +225,7 @@ local function ai_health(config, state, run)
 		end
 		local read, backend = pcall(function() return type(llm.get_backend) == "function" and llm.get_backend() end)
 		local path = read and type(backend) == "string" and config.paths[backend] or nil
-		local HttpClient = require("adapters.http_client")
+		local HttpClient = require("core.network.adapters.http_client")
 		if not path or backend ~= AI_LOCAL_BACKEND or not HttpClient.HAS_ASYNC or type(llm.get_base_url) ~= "function" then
 			done({ state = "unsupported" })
 			return
@@ -253,7 +253,7 @@ end
 --- @return function
 local function system_details(config, logs_dir, run)
 	return function(done)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		if not Shell.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -325,7 +325,7 @@ end
 --- @return function
 local function cpu_load(config, run)
 	return function(done)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		if not Timers.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
@@ -361,14 +361,14 @@ end
 --- @return function
 local function configuration(schema, run, overrides)
 	return function(done)
-		local Timers = require("adapters.timer_scheduler")
+		local Timers = require("core.events.timer_scheduler")
 		if not Timers.HAS_ASYNC then
 			done({ state = "unsupported" })
 			return
 		end
-		local handle = Timers.after(require("infra.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
+		local handle = Timers.after(require("core.timing.engine.timings").sec("ui", "healthcheck_probe_defer_ms"), function()
 			local context = require("ui.healthcheck.bridge").configuration_context(schema, overrides)
-			local ok, result, sections = pcall(require("healthcheck.configuration").probe, context)
+			local ok, result, sections = pcall(require("diagnostics.engine.healthcheck.configuration").probe, context)
 			if not ok then
 				done({ state = "error", cleanup = "settled", detail = tostring(result):match("^[^\n]*") })
 				return

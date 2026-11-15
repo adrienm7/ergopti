@@ -15,7 +15,7 @@ local M = {}
 
 local Fakes = require("tests.fakes")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 -- The key the user stored for Cerebras
@@ -33,8 +33,8 @@ local RELOADED = {
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
-	"modules.llm.profiles", "modules.llm.api_ollama", "adapters.shell_runner",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
+	"modules.llm.profiles", "modules.llm.api_ollama", "core.process.adapters.shell_runner",
 }
 
 -- The preferences every scenario starts from: the menu's predictions go to the
@@ -70,12 +70,12 @@ function M.run(opts, body)
 			window = opts.window or { app = "Mail", title = "Re: devis" }, secure = false, preview = false,
 			base_url = "http://127.0.0.1:11434",
 		}
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return world.secure end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, headers, options, callback)
 				world.probes[#world.probes + 1] = { url = url, options = options, callback = callback }
 				return true
@@ -134,14 +134,14 @@ function M.run(opts, body)
 		})
 
 		if opts.native_model_dialog then
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(command) return command == "zenity" end,
 				quote = function(value) return "'" .. value:gsub("'", "'\"'\"'") .. "'" end,
 				exec_checked = function(command)
 					world.model_offers[#world.model_offers + 1] = { command = command }
 					if type(opts.on_model_confirm) == "function" then opts.on_model_confirm(world) end
 					return opts.download_choice == true, "", opts.download_choice == true and nil or "command exited with status 1",
-						opts.download_choice == true and nil or require("adapter_errors").COMMAND_EXITED_NONZERO,
+						opts.download_choice == true and nil or require("diagnostics.engine.adapter_errors").COMMAND_EXITED_NONZERO,
 						opts.download_choice == true and nil or 1
 				end,
 			}
@@ -188,6 +188,10 @@ function M.run(opts, body)
 			context = { text = function() return world.buffer end, replaced = function() end },
 			is_paused = function() return world.paused end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
+			on_agent_mode_change = function(mode)
+				world.mode_redraws = world.mode_redraws or {}
+				world.mode_redraws[#world.mode_redraws + 1] = mode
+			end,
 			overlay = {
 				show = function(candidates, meta)
 					world.shown = { candidates = candidates, meta = meta }
@@ -307,7 +311,7 @@ end
 --- @param args table|nil
 --- @return string
 function M.text(key, args)
-	local template = require("infra.i18n").get(key)
+	local template = require("core.i18n.engine.i18n").get(key)
 	return (template:gsub("{(%d+)}", function(index) return tostring((args or {})[tonumber(index)]) end))
 end
 

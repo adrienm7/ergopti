@@ -14,19 +14,19 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Codec = require("core.text.engine.toml_codec")
 
 local GESTURE_SOURCE = '[gestures]\nenabled = true\ntap_3 = "enter"\n[other]\nvalue = 42\n'
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- Runs `body` with zenity answering No to every question.
 --- @param body function Clicks the rows under test.
 --- @return table asked Every zenity question command.
 local function with_zenity_answering_no(body)
 	local execute, asked = os.execute, {}
-	local previous_modal = package.loaded["ui.modal"]
-	package.loaded["ui.modal"] = { run = function(callback) return callback() end }
+	local previous_modal = package.loaded["core.ui.ui.modal"]
+	package.loaded["core.ui.ui.modal"] = { run = function(callback) return callback() end }
 	os.execute = function(command)
 		if command:find("dialog_host.lua", 1, true) then
 			asked[#asked + 1] = command
@@ -36,7 +36,7 @@ local function with_zenity_answering_no(body)
 	end
 	local ok, err = pcall(body)
 	os.execute = execute
-	package.loaded["ui.modal"] = previous_modal
+	package.loaded["core.ui.ui.modal"] = previous_modal
 	if not ok then error(err, 0) end
 	return asked
 end
@@ -47,7 +47,7 @@ end
 --- @param row_key string i18n key of the row label.
 --- @return table|nil row
 local function tray_row(ctx, section_key, row_key)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	package.loaded["ui.menu.builder"] = nil
 	for _, section in ipairs(require("ui.menu.builder").build(ctx)) do
 		if type(section.title) == "string" and section.title:find(i18n.get(section_key), 1, true) == 1 then
@@ -63,10 +63,10 @@ end
 --- @param body function Receives the manager, the config path and the backups list.
 local function with_gestures(body)
 	Sandbox.with_config(GESTURE_SOURCE, function(path)
-		local names = { "modules.gestures.manager", "adapters.evdev_reader", "ui.menu.builder" }
+		local names = { "modules.gestures.manager", "platform.input.evdev_reader", "ui.menu.builder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
 		local backups = {}
 		local ok, err = pcall(function()
 			local gestures = require("modules.gestures.manager")
@@ -133,9 +133,7 @@ local function with_tap_holds(body)
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local user_path = os.tmpname()
-	local fh = assert(io.open(user_path, "w"))
-	fh:write(require("tests.support.tap_hold_fixture").with_preset(nil))
-	fh:close()
+	local config_path = require("tests.support.tap_hold_fixture").write(user_path, nil)
 	local ok, err = pcall(function()
 		local Manager = require("platform.remap.tap_hold_manager")
 		Manager.init({
@@ -144,6 +142,7 @@ local function with_tap_holds(body)
 				held_shortcut_modifier_codes = function() return {} end },
 			execute_action = function() end, on_text_injected = function() end,
 			action_names = function() return {} end, defaults_path = DEFAULTS, user_path = user_path,
+			config_path = config_path,
 		})
 		local calls = {}
 		package.loaded["infra.tap_hold_scope"] = {
@@ -153,6 +152,7 @@ local function with_tap_holds(body)
 		Manager._reset_for_test()
 	end)
 	os.remove(user_path)
+	os.remove(config_path)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end

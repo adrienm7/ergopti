@@ -24,8 +24,8 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local i18n   = require("infra.i18n")
+local Logger = require("core.logger.engine.logger")
+local i18n   = require("core.i18n.engine.i18n")
 
 local LOG = "legacy_rules_cleanup"
 
@@ -66,8 +66,8 @@ end
 --- @param message string Localized result.
 --- @return boolean scheduled
 local function show_report(message)
-	local committed = require("infra.deferred_work").after(0, function()
-		require("infra.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
+	local committed = require("core.timing.engine.deferred_work").after(0, function()
+		require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), message,
 			i18n.get("common.ok"))
 	end, "legacy_rules_cleanup.report")
 	if committed ~= true then
@@ -124,7 +124,7 @@ local function present(remap, trigger)
 	local body = count == 1 and i18n.format("karabiner.legacy_cleanup.body_one", list)
 		or i18n.format("karabiner.legacy_cleanup.body_other", count, list)
 	local remove_label = i18n.get("karabiner.legacy_cleanup.remove")
-	local clicked = require("infra.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), body,
+	local clicked = require("core.ui.engine.dialog_util").block_alert(i18n.get("karabiner.legacy_cleanup.title"), body,
 		remove_label, i18n.get("common.later"), "warning")
 	if clicked ~= remove_label then
 		Logger.info(LOG, "Removal of %d legacy Karabiner rule(s) postponed (%s).", count, trigger)

@@ -27,10 +27,10 @@ if package.config:sub(1, 1) == "\\" then native_path = native_path:gsub("\\", "/
 local driver_root = assert(native_path:match("^(.*)/tests/run%.lua$"), "the unit runner is outside its driver root")
 
 -- The _shared/ Lua libraries live one level above the HS driver root
--- (i.e. in static/ergopti_plus/_shared/lua/). The shims in infra/ need this
+-- (i.e. in static/ergopti_plus/_shared/). The shims in infra/ need this
 -- entry to resolve lib.toml.codec, lib.toml.reader, and lib.toml.writer modules.
 local drivers_root  = driver_root:match("^(.*)/[^/]+$") or driver_root
-local shared_lua    = drivers_root .. "/_shared/lua"
+local shared_lua    = drivers_root .. "/_shared"
 
 -- Search the driver root first (so `require("infra.x")` resolves), then the
 -- shared Lua libraries, then tests/ and stubs/. Order matters: hs.lua stub
@@ -50,17 +50,17 @@ package.path = table.concat({
 
 -- Never let a suite touch the developer's own config.toml, logs or caches: a
 -- real HOME is replaced by a scratch directory for this process (see
--- _shared/lua/test/runner_home.lua). Done before any module resolves a path.
-require("test.runner_home").isolate()
+-- _shared/tests/lua/core/runner_home.lua). Done before any module resolves a path.
+require("tests.lua.core.runner_home").isolate()
 
 local helpers = require("tests.helpers")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 helpers.initialize_timing()
 helpers.warm_timings()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 local ModuleGroups = require("tests.support.module_groups")
-local Discovery = require("test.runner_discovery")
+local Discovery = require("tests.lua.core.runner_discovery")
 
 -- --only accepts an exact test module path/name or a historical case-name
 -- substring, so one file or behaviour can be re-run from a red message

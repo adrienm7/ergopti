@@ -8,27 +8,27 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- Restores every replaced module and private source after one isolated case.
 --- @param body function Receives servers, entries, HTTP calls and the actual loop.
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "adapters.event_loop", "modules.llm.local_server_ports" }
+		"core.network.adapters.http_client", "core.events.loop", "modules.llm.local_server_ports" }
 	local previous, calls = {}, {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	-- Every catalogue server runs at its catalogue address (test_local_server_ports covers the scan)
 	-- The four servers these cases drive run; every other catalogue server is
 	-- stopped, so a longer catalogue changes no case.
 	local stopped = {}
-	local catalogue = Json.decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"), "rb")):read("*a"))
+	local catalogue = Json.decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 	local driven = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 	for _, id in ipairs(catalogue.server_order) do
 		if not driven[id] then stopped[id] = { running = false, pids = {} } end
 	end
 	require("tests.support.modules.llm.local_server_scan_fake").install(stopped)
 	local path = os.tmpname(); os.remove(path)
-	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)
+	package.loaded["core.network.adapters.http_client"] = { get_owned = function(url, headers, options, callback)
 		local call = { url = url, headers = headers, options = options, callback = callback, listeners = {}, cancelled = 0 }
 		local operation = { started = true }
 		function operation:is_settled() return call.settled == true end
@@ -50,7 +50,7 @@ local function isolated(body)
 	entries._set_private_create_for_test(function(stage, text)
 		local out = assert(io.open(stage, "wb")); out:write(text); out:close(); return true
 	end)
-	local servers, loop = require("modules.llm.local_servers"), require("adapters.event_loop")
+	local servers, loop = require("modules.llm.local_servers"), require("core.events.loop")
 	local ok, err = pcall(body, servers, entries, calls, loop, path)
 	servers.shutdown()
 	for _, call in ipairs(calls) do if not call.settled then call.finish() end end

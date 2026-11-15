@@ -15,9 +15,9 @@ import tomllib
 # The driver's cache folder under XDG_CACHE_HOME, read from the one declaration;
 # boot creates it and the updater only sends conditional requests when it exists.
 FOLDER = tomllib.loads(
-    (pathlib.Path(__file__).resolve().parents[3] / "_shared/modules/paths/app_dirs.toml").read_text(
-        encoding="utf-8"
-    )
+    (
+        pathlib.Path(__file__).resolve().parents[3] / "_shared/core/fs/data/paths/app_dirs.toml"
+    ).read_text(encoding="utf-8")
 )["app"]["linux_folder_name"]
 
 
@@ -60,16 +60,25 @@ def main():
         origin = "https://127.0.0.1:" + str(listener.getsockname()[1])
         responses = []
         for index in range(1, 12):
-            assets = [
-                {
-                    "name": "ergopti-plus-linux.tar.gz",
-                    "browser_download_url": origin + "/never-requested-bundle",
-                },
-                {
-                    "name": "ergopti-plus-linux.tar.gz.sha256",
-                    "browser_download_url": origin + "/never-requested-checksum",
-                },
-            ]
+
+            def assets_for(tag):
+                # The updater admits an asset only under the release page's own /download/<tag>/ path (UPX-002).
+                return [
+                    {
+                        "name": "ergopti-plus-linux.tar.gz",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz",
+                    },
+                    {
+                        "name": "ergopti-plus-linux.tar.gz.sha256",
+                        "browser_download_url": origin
+                        + "/releases/download/"
+                        + tag
+                        + "/ergopti-plus-linux.tar.gz.sha256",
+                    },
+                ]
 
             def release(tag):
                 return {
@@ -78,7 +87,7 @@ def main():
                     "draft": False,
                     "prerelease": False,
                     "published_at": "2026-10-01T00:00:00Z",
-                    "assets": assets,
+                    "assets": assets_for(tag),
                 }
 
             ordinary, nested = release("v1.2.0"), release("v9.9.9")

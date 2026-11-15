@@ -24,7 +24,7 @@
 local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 
-local Agent = require("llm.agent")
+local Agent = require("ai.engine.agent.agent")
 
 local CONFIG = World.CONFIG
 local SENTENCE = "Rappelle-moi d'appeler Paul demain à 9h"
@@ -200,7 +200,7 @@ helpers.describe("AI agent learning (macOS)", function()
 		world.learning.record(CONFIG, "Notes", "mail", true)
 		world.learning.record(CONFIG, "Mail", "mail", false)
 		helpers.assert_eq(world.learning.flush(), true)
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local ok, stored = Storage.read_exact(world.learning.STORAGE_KEY)
 		helpers.assert_eq(ok, true)
 		helpers.assert_eq(type(stored), "table", "the map is in the storage adapter")
@@ -216,7 +216,7 @@ helpers.describe("AI agent learning (macOS)", function()
 		local saved = world.learning.threshold(CONFIG, "Notes", "mail")
 		local changed = world.learning.record(CONFIG, "Notes", "mail", false)
 		helpers.assert_true(changed ~= saved, "the pending change must be observable in memory")
-		local Storage = require("adapters.storage")
+		local Storage = require("core.fs.adapters.storage")
 		local ok, stored = Storage.read_exact(world.learning.STORAGE_KEY)
 		helpers.assert_eq(ok, true)
 		helpers.assert_eq(stored.apps.Notes.intents.mail, saved,

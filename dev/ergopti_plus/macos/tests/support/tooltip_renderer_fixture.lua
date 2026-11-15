@@ -9,32 +9,32 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"compat.utf8",
-	"adapters.json_codec",
-	"infra.logger", "infra.i18n", "infra.paths", "infra.text_utils", "text_utils",
-	"infra.toml.reader", "toml_codec.reader", "toml_codec.basic_string", "toml_codec.bom",
-	"toml_codec.key_path", "toml_codec.record_scanner",
+	"core.lifecycle.engine.compat.utf8",
+	"core.fs.adapters.json_codec",
+	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "core.text.engine.utils", "core.text.engine.utils_core",
+	"core.text.engine.toml.reader", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.record_scanner",
 	-- The real TOML reader opens its source through this shared owner.
-	"toml_codec.source_open",
+	"core.text.engine.toml_codec.source_open",
 	-- The record scanner memoizes one text's scans through this owner.
-	"toml_codec.source_memo",
+	"core.text.engine.toml_codec.source_memo",
 	-- The real logger records its phase counters into this owner.
 	"infra.phase_stats",
 	-- The phase counters' bookkeeping, shared with the Linux driver.
-	"phase_stats_core",
+	"metrics.engine.perf.phase_stats_core",
 	-- The renderer configuration and the paths walk split paths through this pure owner.
-	"native_path",
+	"core.fs.engine.native_path",
 	-- The renderer asks it which applications answer Accessibility; it
 	-- captures hs at require time, so each scenario loads it afresh.
 	"adapters.accessibility_permission",
-	"infra.vscode_bridge", "tooltip.layout", "tooltip.llm_line", "tooltip.tint", "ui.tooltip.config", "ui.tooltip.renderer",
+	"core.network.engine.vscode_bridge", "core.ui.engine.tooltip.layout", "core.ui.engine.tooltip.llm_line", "core.ui.engine.tooltip.tint", "core.ui.ui.tooltip.config", "core.ui.ui.tooltip.renderer",
 	-- The configuration names the shortcut column's modifiers through the key
 	-- name table, which it loads with its data and sorting helper.
-	"keycodes.key_names", "keycodes.key_names_data", "table_util",
+	"platform.input.keycodes.key_names", "platform.input.keycodes.key_names_data", "core.text.engine.table_util",
 	-- The configuration resolves tint colors through the shared CSS hex parser.
-	"color.hex",
+	"core.ui.engine.color_hex",
 	-- text_utils builds its case tables from this generated data at require time.
-	"unicode_case.data",
+	"core.text.engine.unicode_case.data",
 }
 
 --- Loads a fresh production renderer with an observable file-logger surface.
@@ -47,12 +47,12 @@ function M.load()
 		local ok, message = pcall(string.format, tostring(fmt), ...)
 		errors[#errors + 1] = ok and message or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["ui.tooltip.config"] = nil
-	package.loaded["toml_codec.reader"] = nil
-	package.loaded["infra.toml.reader"] = nil
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.ui.tooltip.config"] = nil
+	package.loaded["core.text.engine.toml_codec.reader"] = nil
+	package.loaded["core.text.engine.toml.reader"] = nil
 	package.loaded["adapters.accessibility_permission"] = nil
-	return helpers.load_with_stubs("ui.tooltip.renderer"), errors
+	return helpers.load_with_stubs("core.ui.ui.tooltip.renderer"), errors
 end
 
 --- Registers a complete renderer scenario with exact predecessor restoration.

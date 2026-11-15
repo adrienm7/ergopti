@@ -22,13 +22,13 @@ local helpers = require("tests.helpers")
 local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_inverse)
 	helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts",
-		"infra.logger",
-		"infra.deferred_work",
-		"infra.fs_dir",
-		"infra.dialog_util",
+		"core.logger.engine.logger",
+		"core.timing.engine.deferred_work",
+		"core.fs.engine.dir",
+		"core.ui.engine.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"ui.menu.menu_utils",
 		"infra.manifest_menu",
 		"ui.menu.shortcut_utils",
@@ -61,10 +61,10 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			resume_bindings = function() return true end,
 			pause_bindings = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
@@ -72,7 +72,7 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,
@@ -176,15 +176,15 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		"ui.menu.menu_gestures",
 		"modules.gestures",
 		"ui.menu.menu_utils",
-		"infra.dialog_util",
-		"infra.i18n",
+		"core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n",
 		"infra.manifest_menu",
-		"menu.renderer",
-		"json",
+		"menu.engine.renderer",
+		"core.text.engine.json",
 		"ui.action_picker",
 		"ui.menu.shortcut_utils",
-		"infra.logger",
-		"infra.deferred_work",
+		"core.logger.engine.logger",
+		"core.timing.engine.deferred_work",
 	}, function()
 		local sensitivity = 3.5
 		local mode = "incremental"
@@ -219,18 +219,18 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 			SINGLE_SLOTS = { "swipe_2_left" },
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
 		-- Forward the child-template port to the actual shared renderer; the
 		-- fixture still captures provider data for its original mutation assertions.
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode,
-			i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode,
+			i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,
@@ -244,8 +244,8 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 		}
 		package.loaded["ui.action_picker"] = { open = function() return true end }
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 
 		local Menu = require("ui.menu.menu_gestures")
 		local item = Menu.build({

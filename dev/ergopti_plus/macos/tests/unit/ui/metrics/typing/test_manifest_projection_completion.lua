@@ -8,7 +8,7 @@
 
 local helpers = require("tests.helpers")
 local Fixture = require("tests.support.ui.metrics.typing.manifest_completion_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function project(state, reader, projection)
 	return projection.session(reader, "/fixture/db.sqlite", Fixture.TODAY, state.pacer).manifest()

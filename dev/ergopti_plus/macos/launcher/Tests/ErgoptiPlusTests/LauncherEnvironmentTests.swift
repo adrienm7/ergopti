@@ -524,24 +524,31 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(fatalMessages, [])
 	}
 
-	/// A first-launch clean exit before logger readiness receives one bounded retry.
+	/// A first-launch clean exit before logger readiness receives one bounded retry,
+	/// with MJConfigFile seeded again first: another launcher may have rewritten it
+	/// meanwhile, and the retry booted that copy's Lua (MLC-001).
 	func testPrematureCleanExitRetriesBootstrapExactlyOnce() {
 		var childStartCount = 0
 		var cleanTerminationCount = 0
 		var fatalMessages: [String] = []
+		var seeded: [(path: String, startsBefore: Int)] = []
 		let loggerWorker = TestLoggerDatagramServer()
 		let delegate = AppDelegate(
 			launcherIdentityReader: { _ in (device: "11", inode: "22") },
 			applicationLauncher: { _, _, _ in childStartCount += 1 },
 			fatalReporter: { fatalMessages.append($0) },
 			applicationTerminator: { _ in cleanTerminationCount += 1 },
-			loggerWorkerFactory: { loggerWorker }
+			loggerWorkerFactory: { loggerWorker },
+			hammerspoonConfigSeeder: { seeded.append((path: $0, startsBefore: childStartCount)) }
 		)
 
 		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
 		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
 
 		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(seeded.count, 1, "the retry seeds MJConfigFile once")
+		XCTAssertEqual(seeded.first?.startsBefore, 1, "before the retried runtime starts")
+		XCTAssertTrue(seeded.first?.path.hasSuffix("/init.lua") == true)
 		XCTAssertEqual(cleanTerminationCount, 0)
 		XCTAssertEqual(fatalMessages, [])
 
@@ -597,6 +604,34 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(fatalMessages, [
 			"Embedded Hammerspoon exit-status monitoring could not attach to process 42424.",
 		])
+	}
+
+	/// A quit from outside asks the booted runtime for its controlled exit and is
+	/// answered only once the runtime has exited: a plain terminate skipped the
+	/// teardown and the logger stopped under it (MLC-002, launcher-quit-request).
+	func testQuitFromOutsideWaitsForTheRuntimesControlledExit() {
+		var requested: [pid_t] = []
+		var replies: [Bool] = []
+		var terminations = 0
+		let delegate = AppDelegate(
+			fatalReporter: { XCTFail("unexpected fatal: \($0)") },
+			applicationTerminator: { _ in terminations += 1 },
+			quitRequestPoster: { requested.append($0) },
+			terminationReplier: { replies.append($0) }
+		)
+		XCTAssertEqual(delegate.applicationShouldTerminate(NSApplication.shared), .terminateNow,
+			"no booted runtime: nothing to wait for")
+		XCTAssertEqual(requested, [])
+
+		XCTAssertEqual(delegate.beginQuitHandshake(runtimePid: 42_424), .terminateLater)
+		XCTAssertEqual(requested, [42_424], "the runtime is asked for its controlled exit")
+		XCTAssertEqual(delegate.beginQuitHandshake(runtimePid: 42_424), .terminateLater)
+		XCTAssertEqual(requested, [42_424], "once")
+		XCTAssertEqual(replies, [], "the quit waits for the runtime")
+
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+		XCTAssertEqual(replies, [true], "the runtime's exit answers the deferred quit")
+		XCTAssertEqual(terminations, 0, "without a second terminate request")
 	}
 
 	/// AppKit teardown revokes the exact kernel monitor before terminating the child.

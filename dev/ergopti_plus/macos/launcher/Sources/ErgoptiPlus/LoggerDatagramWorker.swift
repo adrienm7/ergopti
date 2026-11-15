@@ -46,7 +46,7 @@ let kLoggerDatagramPortEnvironment = "ERGOPTI_LOG_PORT"
 let kLoggerDatagramTokenEnvironment = "ERGOPTI_LOG_TOKEN"
 
 /// A datagram or retention pass slower than this is reported to launcher.log.
-/// Registry: _shared/modules/timings/constants.toml [logger] native_slow_batch_ms,
+/// Registry: _shared/core/timing/data/constants.toml [logger] native_slow_batch_ms,
 /// pinned by tools/test/test-logger-scalars-single-source.cjs.
 let kLoggerSlowBatchThresholdMilliseconds = 500
 

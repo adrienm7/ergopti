@@ -25,13 +25,13 @@ local function choose(parameter, clicked, refusal, picked)
 		return result
 	end
 	local names = {
-		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
-		"infra.logger", "infra.deferred_work", "adapters.storage", "ui.gesture_conflict_notice",
-		"menu.renderer", "json",
+		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
+		"core.logger.engine.logger", "core.timing.engine.deferred_work", "core.fs.adapters.storage", "ui.gesture_conflict_notice",
+		"menu.engine.renderer", "core.text.engine.json",
 	}
 	local saved, observed = {}, { queue = {}, opened = {}, dialogs = 0, refreshed = 0, settings = 0, prompts = 0 }
-	local saved_shell = package.loaded["adapters.shell_runner"]
+	local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local gestures = {
 		DEFAULT_STATE = { gestures = true }, get_action = function() return assigned end,
@@ -75,20 +75,20 @@ local function choose(parameter, clicked, refusal, picked)
 	}
 	package.loaded["modules.gestures"] = gestures
 	package.loaded["ui.menu.menu_utils"] = { section = function(label) return { label = label } end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() observed.prompts = observed.prompts + 1; return "button.save", "https://example.com" end,
 		block_alert = function() observed.dialogs = observed.dialogs + 1; return clicked end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if key == "gestures.system.conflicts" then return "{1} conflicts" end
 		if key == "gestures.system.conflicts_caption" then return "%s conflicts" end
 		return key
 	end, section = function(key) return key end }
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-		json_decode = require("json").decode,
-		i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+		json_decode = require("core.text.engine.json").decode,
+		i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		group_receiver = renderer.group_receiver,
@@ -100,10 +100,10 @@ local function choose(parameter, clicked, refusal, picked)
 		end,
 	}
 	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.storage"] = { get = function() return false end }
-	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
-	package.loaded["adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.adapters.storage"] = { get = function() return false end }
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
+	package.loaded["core.process.adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
 	local ok, err = xpcall(function()
 		-- Keep the prompt and retained writer owner genuine; dialog/native ports
 		-- remain controlled by this UI-boundary fixture.
@@ -121,7 +121,7 @@ local function choose(parameter, clicked, refusal, picked)
 		while #observed.queue > 0 do table.remove(observed.queue, 1)() end
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved_shell
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell
 	for name in pairs(package.loaded) do
 		if original_modules[name] == nil then package.loaded[name] = nil end
 	end
@@ -174,27 +174,27 @@ end)
 -- Exercise the real status provider and renderer; status probes and platform
 -- ports remain controlled so menu construction cannot hide native work.
 local refresh_modules = {
-	"json", "menu.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
-	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
+	"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function refresh_json(path)
 	local file = assert(io.open(path, "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return require("json").decode(bytes)
+	return require("core.text.engine.json").decode(bytes)
 end
 local function with_status_refresh(options, callback)
 	return helpers.with_fresh_modules(refresh_modules, function()
 		options = options or {}
 		local corpus = refresh_json(helpers.shared("tests/corpus/menus/gesture_system_refresh.json"))
-		local strings = refresh_json(helpers.shared("data/locales/" .. (options.locale or "en") .. ".json"))
+		local strings = refresh_json(helpers.shared("core/i18n/data/locales/" .. (options.locale or "en") .. ".json"))
 		local i18n = { get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end }
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = options.platform or "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = i18n, logger = helpers.make_logger_stub(),
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = helpers.make_logger_stub(),
 		}))
 		local fixture = { corpus = corpus, strings = strings, renderer = renderer, root = renderer.get_root(),
 			refreshes = 0, settings = 0, updates = 0, pinch = true,
@@ -212,13 +212,13 @@ local function with_status_refresh(options, callback)
 			end,
 		}
 		package.loaded["modules.gestures"] = fixture.gestures
-		package.loaded["infra.i18n"] = i18n
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = i18n
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.menu_utils"] = { section = function(title) return { title = title } end }
-		package.loaded["infra.dialog_util"] = {}
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["ui.action_picker"] = {}
 		package.loaded["ui.menu.shortcut_utils"] = {}
-		package.loaded["infra.deferred_work"] = {}
+		package.loaded["core.timing.engine.deferred_work"] = {}
 		package.loaded["infra.manifest_menu"] = {
 			group_receiver = renderer.group_receiver,
 			template_rows = renderer.template_rows,
@@ -249,7 +249,7 @@ helpers.describe("Gestures: declared cached-status refresh and actual native cal
 				local group = f.build()[1]
 				helpers.assert_eq(#group.menu, 3)
 				helpers.assert_eq(group.menu[1].title, "Existing native conflict")
-				helpers.assert_eq(group.menu[2].title, require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings["menu.common.enabled"]))
+				helpers.assert_eq(group.menu[2].title, require("core.i18n.engine.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings["menu.common.enabled"]))
 				helpers.assert_eq(group.menu[3].title, f.corpus.captions[locale])
 				helpers.assert_type(group.menu[3].fn, "function")
 				helpers.assert_eq(f.refreshes, 0)
@@ -351,7 +351,7 @@ helpers.describe("Gestures: declared cached-status refresh and actual native cal
 				local group = f.build()[1]
 				helpers.assert_eq(group.title, f.strings["gestures.system.clear"])
 				helpers.assert_eq(#group.menu, 2)
-				helpers.assert_eq(group.menu[1].title, require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings[pinch[3]]))
+				helpers.assert_eq(group.menu[1].title, require("core.i18n.engine.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gestures.system.pinch"], f.strings[pinch[3]]))
 				helpers.assert_eq(group.menu[2].title, f.corpus.captions.en)
 				helpers.assert_eq(f.refreshes, 0)
 			end)

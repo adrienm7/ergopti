@@ -27,12 +27,12 @@ local OWNED = {
 	"modules.gestures.actions_aux_owner",
 	"adapters.clipboard",
 	"adapters.mouse_control",
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.tcc_grant",
-	"adapters.window_info",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.logger",
+	"platform.focus.window_info",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 }
 
 local PARENT = "shortcut_bindings"
@@ -45,9 +45,9 @@ local function with_system(body, options)
 	options = options or {}
 	helpers.with_fresh_modules(OWNED, function()
 		local record = { runs = {}, notices = {}, cleared = {}, moved = {}, created = {}, listeners = {} }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message, body_text, kind)
 				record.notices[#record.notices + 1] = { message = message, body = body_text, kind = kind }
 				return true
@@ -78,7 +78,7 @@ local function with_system(body, options)
 			end,
 		}
 		local statuses = options.create_statuses or { "created" }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				record.created[#record.created + 1] = { path = path, content = content }
 				local status = statuses[#record.created] or "created"
@@ -87,7 +87,7 @@ local function with_system(body, options)
 		}
 		package.loaded["adapters.tcc_grant"] = { bundle_id = function() return OWN_BUNDLE end }
 		local running = options.running or {}
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			application_bundle_id = function(pid) return running[pid] end,
 		}
 		local System = require("modules.gestures.system_actions")

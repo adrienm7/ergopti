@@ -181,7 +181,8 @@ PauseLayoutSwitch_MenuRows(ChoicesFn := 0, SetFn := 0) {
 	Rows := MenuRenderer_TemplateRows("layout_switching_frame",
 		Map(MenuCommand.LAYOUT_SWITCH_TOGGLE, (*) => SetFn.Call(PAUSE_SWITCH_POLICY_PATHS["enabled"], !Enabled)),
 		Map("layout_switch_checked", () => Enabled,
-			"layout_switch_ready", () => Enabled && !A_IsSuspended,
+			; A setting: the pickers run while paused (EDD-1), as on macOS and Linux.
+			"layout_switch_ready", () => Enabled,
 			"layout_pause_caption", () => LabelFor(Settings[ConfigLeaf.ON_PAUSE]),
 			"layout_resume_caption", () => LabelFor(Settings[ConfigLeaf.ON_RESUME])),
 		Map("layout_pause_picker", (*) => Picker(ConfigLeaf.ON_PAUSE),

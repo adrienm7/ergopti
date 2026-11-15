@@ -22,7 +22,7 @@ local helpers = require("tests.helpers")
 local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local output_fixture = require("tests.support.toml_output_fixture")
 
-local Answers = require("onboarding_answers")
+local Answers = require("onboarding.engine.answers")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -42,7 +42,7 @@ local MENU_MODULES = {
 --- The generated wizard catalogue, read through the driver's path owner.
 --- @return string
 local function catalogue_text()
-	local path = require("infra.paths").shared(Answers.CATALOGUE_PATH)
+	local path = require("core.fs.engine.paths").shared(Answers.CATALOGUE_PATH)
 	local fh = assert(io.open(path, "r"), "the onboarding catalogue is missing: " .. tostring(path))
 	local text = fh:read("*a")
 	fh:close()
@@ -208,7 +208,7 @@ local function hotstrings_row(world)
 	local actions = setmetatable({}, { __index = function() return function() end end })
 	local ok, tray = pcall(Builder.generate, ctx, mods, actions)
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(tray))
-	local title = require("infra.i18n").get("menu.hotstrings.title")
+	local title = require("core.i18n.engine.i18n").get("menu.hotstrings.title")
 	for _, row in ipairs(tray) do
 		if type(row.title) == "string" and row.title:sub(1, #title) == title then return row end
 	end
@@ -220,14 +220,14 @@ end
 --- @param scenario function Receives the fixture world.
 local function with_wizard(answer, scenario)
 	helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.fs_dir",
+		"infra.preferences", "core.fs.adapters.file_system", "core.fs.engine.dir",
 		"ui.menu.menu_state", "ui.menu.builder", "ui.menu.menu_hotstrings", "ui.menu.keymap_lifecycle",
-		"infra.notifications", "infra.i18n", "infra.manifest_menu",
+		"core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.manifest_menu",
 	}, function()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 		local Preferences = helpers.load_with_stubs("infra.preferences")
 		local Manifest = require("infra.manifest_reader")
-		local TomlWriter = require("toml_codec.writer")
+		local TomlWriter = require("core.text.engine.toml_codec.writer")
 		local index = Answers.load(catalogue_text(), "macos")
 		local page = page_of(index, "hotstrings")
 		local groups, hotfiles = inventory(page)
@@ -241,7 +241,7 @@ local function with_wizard(answer, scenario)
 				local fh = assert(io.open(path, "w"))
 				fh:close()
 			end
-			CaptionFixture.install(require("infra.i18n"))
+			CaptionFixture.install(require("core.i18n.engine.i18n"))
 			package.loaded["ui.menu.builder"] = nil
 			local world = {
 				path = path, hotfiles = hotfiles, groups = groups,
@@ -273,7 +273,7 @@ end
 --- @return table
 local function switch_of(parent)
 	local first = parent.menu and parent.menu[1]
-	helpers.assert_eq(first and first.title, require("infra.i18n").get("menu.hotstrings.enable"),
+	helpers.assert_eq(first and first.title, require("core.i18n.engine.i18n").get("menu.hotstrings.enable"),
 		"the Hotstrings submenu opens with its switch")
 	return first
 end

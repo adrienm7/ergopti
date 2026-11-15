@@ -45,8 +45,8 @@ local OUTDATED_KEYS = table.concat({
 local MENU_STATE_MODULES = {
 	"ui.menu.menu_state",
 	"ui.menu.keymap_lifecycle",
-	"adapters.storage",
-	"infra.deferred_work",
+	"core.fs.adapters.storage",
+	"core.timing.engine.deferred_work",
 	"modules.keystats.text_cipher",
 }
 
@@ -59,7 +59,7 @@ local function sync(bindings, shortcuts_on, keys)
 	return helpers.with_fresh_modules(MENU_STATE_MODULES, function()
 		-- Deferred warm-up work is irrelevant to the replay and must not outlive
 		-- the fixture that owns the Bindings registry.
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
 		local menu_state = helpers.load_with_stubs("ui.menu.menu_state")
 		local facade = {
 			pause_bindings = bindings.pause,
@@ -124,16 +124,16 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 	end)
 
 	helpers.it("warns once about a removed saved key and never refuses the boot (config-outdated-at-hash)", function()
-		helpers.with_fresh_modules({ "logger.shim", "config_outdated", "infra.preferences" }, function()
+		helpers.with_fresh_modules({ "core.logger.engine.shim", "settings.engine.migration.outdated", "infra.preferences" }, function()
 		Fixture.with_bindings(function(bindings, ctx)
 			local warnings = {}
 			local shim = helpers.make_logger_stub()
 			shim.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 			shim.error = function(_, message, ...) ctx.errors[#ctx.errors + 1] = string.format(message, ...) end
-			package.loaded["logger.shim"] = shim
-			helpers.load_with_stubs("config_outdated")
+			package.loaded["core.logger.engine.shim"] = shim
+			helpers.load_with_stubs("settings.engine.migration.outdated")
 			local Preferences = helpers.load_with_stubs("infra.preferences")
-			local decoded = require("toml_codec").decode(OUTDATED_KEYS)
+			local decoded = require("core.text.engine.toml_codec").decode(OUTDATED_KEYS)
 
 			-- The loader is the gate: the removed id never reaches the replay.
 			local saved = Preferences.flatten_document(decoded)
@@ -147,7 +147,7 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 			helpers.assert_eq(bindings.is_enabled(DISABLED_ID), false)
 
 			-- One WARNING per outdated entry, however often the file is read.
-			Preferences.flatten_document(require("toml_codec").decode(OUTDATED_KEYS))
+			Preferences.flatten_document(require("core.text.engine.toml_codec").decode(OUTDATED_KEYS))
 			table.sort(warnings)
 			helpers.assert_eq(#warnings, 2, table.concat(warnings, " | "))
 			helpers.assert_true(warnings[1]:find("'shortcuts.keys.at_hash'", 1, true) ~= nil, warnings[1])
@@ -155,7 +155,7 @@ helpers.describe("menu_state: [shortcuts.keys] replay behind the fence (shortcut
 			helpers.assert_true(warnings[2]:find("'shortcuts.keys.retired_off'", 1, true) ~= nil, warnings[2])
 
 			-- Warned is offered: the cleanup lists exactly the outdated entries.
-			local scan = require("config_unused_keys").find_in_source(OUTDATED_KEYS, Preferences.mark_config_reads)
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(OUTDATED_KEYS, Preferences.mark_config_reads)
 			local offered = {}
 			for _, key in ipairs(scan.keys) do offered[#offered + 1] = key.section .. "." .. key.key end
 			table.sort(offered)

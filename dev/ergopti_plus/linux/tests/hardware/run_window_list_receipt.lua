@@ -10,10 +10,10 @@
 --- `wmctrl -lp` answers and that `/proc/<pid>/comm` names the owner.
 --- ==============================================================================
 
-require("compat.utf8").install()
-local DisplayServer = require("infra.display_server")
+require("core.lifecycle.engine.compat.utf8").install()
+local DisplayServer = require("core.ui.engine.display_server")
 assert(DisplayServer.is_x11(), "the window list receipt needs an X11 display")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 
 local windows = WindowInfo.getAll()
 assert(type(windows) == "table" and #windows > 0, "getAll() listed no window on a managed display")

@@ -30,7 +30,7 @@ local function load_fixture(opts)
 	package.loaded["modules.keymap.terminator_replay"] = nil
 
 	local expander = helpers.load_with_stubs("modules.keymap.expander")
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local state = {
 		buffer = opts.buffer or "ab★",
 		magic_key = opts.magic_key or "★",
@@ -174,7 +174,7 @@ helpers.describe("keymap expander: the shared repeat_key_vectors.json corpus", f
 end)
 
 helpers.describe("keymap expander: the shared idle_reset_vectors.json corpus", function()
-	local Core = require("hotstring_engine")
+	local Core = require("hotstrings.engine.matcher")
 	for _, vector in ipairs(corpus_vectors("idle_reset_vectors.json")) do
 		helpers.it(vector.id .. " (idle-reset-corpus)", function()
 			-- A JSON null decodes to nil or a sentinel: only a number is a keystroke time.

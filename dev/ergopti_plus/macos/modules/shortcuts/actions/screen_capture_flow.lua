@@ -60,9 +60,9 @@ local _permission_reset_pending = false
 -- ===================================
 -- ===================================
 
-local function capture_adapter() return require("adapters.screen_capture") end
-local function file_system() return require("adapters.file_system") end
-local function logger() return require("infra.logger") end
+local function capture_adapter() return require("platform.system.screen_capture") end
+local function file_system() return require("core.fs.adapters.file_system") end
+local function logger() return require("core.logger.engine.logger") end
 
 --- Sends one notification; a notifier failure is logged, never raised.
 --- @param title string Notification title or message.
@@ -71,7 +71,7 @@ local function logger() return require("infra.logger") end
 --- @param on_click function|nil What a click on the notification does.
 local function notify(title, body, kind, on_click)
 	local ok, err = pcall(function()
-		return require("infra.notifications").notify(title, body, kind, on_click)
+		return require("core.ui.engine.notifications").notify(title, body, kind, on_click)
 	end)
 	if not ok then
 		logger().error(LOG, "Screen capture notification failed: %s.", tostring(err))
@@ -82,7 +82,7 @@ end
 --- @param key string Locale key.
 --- @return string text
 local function text(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 

@@ -1,0 +1,14 @@
+{
+	"_comment": "Every locale key the layout editor window shows itself (index.html data-i18n); the editor's own layout_editor.* labels reach it through window._i18n_strings or sourceData. The three hosts send exactly these strings with initData; tools/test/test-layout-manager-page.cjs keeps this list equal to what the page uses.",
+	"keys": [
+		"layout_editor.title",
+		"layout_editor.studio.tab.edit",
+		"layout_editor.studio.tab.compare",
+		"layout_editor.studio.keystats.load",
+		"layout_editor.studio.keystats.privacy",
+		"layout_editor.studio.keystats.loading",
+		"layout_editor.studio.keystats.loaded",
+		"layout_editor.studio.keystats.keystats_absent",
+		"layout_editor.studio.keystats.keystats_unreadable"
+	]
+}

@@ -3,15 +3,15 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"adapters.task_environment", "infra.launcher_environment", "error_description",
-	"number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
-	"infra.paths", "infra.timings",
-	"ui.ui_builder",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment", "diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy", "platform.focus.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.fs.engine.paths", "core.timing.engine.timings",
+	"core.ui.ui.builder",
 	"ui.menu.menu_llm.models_manager_mlx_hf",
 }
 
@@ -149,9 +149,9 @@ local function with_fixture(options, callback)
 			return task
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function()
 				fixture.notifications = fixture.notifications + 1
 				if fixture.pause_on_notify == true then
@@ -163,7 +163,7 @@ local function with_fixture(options, callback)
 			end,
 		}
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(path)
 				if options.boundary_throw == "paths" then
 					error("HF paths boundary failure")
@@ -172,7 +172,7 @@ local function with_fixture(options, callback)
 			end,
 		}
 		fixture.title_receipt = {}
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			prepare_app_window_title = function(app_id, presentation_id)
 				fixture.title_request = { app_id, presentation_id }
 				return fixture.title_receipt
@@ -266,7 +266,7 @@ local function with_fixture(options, callback)
 		-- that same captured table here so the live prompt crosses the hostile path
 		-- boundary instead of a pre-load stand-in that production never observes.
 		if options.boundary_throw == "paths" then
-			package.loaded["infra.paths"].shared = function()
+			package.loaded["core.fs.engine.paths"].shared = function()
 				error("HF paths boundary failure")
 			end
 		end

@@ -176,10 +176,10 @@ TestHsCache_IndexChangeInvalidatesCache() {
 	Directory := _LCT_TempDir()
 	try {
 		_SharedDir := Directory
-		DirCreate(Directory . "\modules\hotstrings")
-		IndexPath := Directory . "\modules\hotstrings\_index.toml"
+		DirCreate(Directory . "\hotstrings\data\catalogue")
+		IndexPath := Directory . "\hotstrings\data\catalogue\_index.toml"
 		FileAppend('[menu]`ncategories_order = ["magickey"]`n[languages]`norder = []`n', IndexPath, "UTF-8")
-		SourcePath := Directory . "\modules\hotstrings\magickey.toml"
+		SourcePath := Directory . "\hotstrings\data\catalogue\magickey.toml"
 		AssertTrue(FSWriteCreateDurable(SourcePath,
 			'[[ct]]`n"indexprobe" = { output = "Index", is_word = true, auto_expand = false, is_case_sensitive = false, final_result = true }`n'))
 		TsvPath := Directory . "\cache.tsv"
@@ -225,11 +225,11 @@ _HsCacheCommonReference() {
 ; The independently frozen pre-split input retains its original reader routes.
 _HsCacheLegacyRoot() {
 	Root := A_Temp . "\ergopti-legacy-common-" . A_TickCount . "-" . Random(100000, 999999)
-	DirCreate(Root . "\modules\hotstrings")
+	DirCreate(Root . "\hotstrings\data\catalogue")
 	FileCopy(_HsCacheTestSharedDir() . "\tests\corpus\hotstrings\common_autocorrection_legacy\autocorrection.toml",
-		Root . "\modules\hotstrings\autocorrection.toml")
+		Root . "\hotstrings\data\catalogue\autocorrection.toml")
 	FileAppend('[menu]`ncategories_order = ["autocorrection"]`n[languages]`norder = []`n',
-		Root . "\modules\hotstrings\_index.toml", "UTF-8")
+		Root . "\hotstrings\data\catalogue\_index.toml", "UTF-8")
 	return Root
 }
 
@@ -306,13 +306,15 @@ _HsCacheCommonReferenceNative(UseCache, SourceOrdered := false) {
 		else
 			LoadHotstringsSection("autocorrection", "caps", { Enabled: true })
 		Assert(HSE_RegistryByGroup.Has(Key), "the real loader must publish the historical group")
-		Registered := HSE_RegistryByGroup[Key]
+		Registered := _HsCacheWithoutSpaceVariants(HSE_RegistryByGroup[Key])
 		AssertEqual(140, Registered.Length, "every historical rule registers once")
 		for Index, Row in Reference["entries"] {
 			Spec := Registered[Index]
 			Assert(Spec.Trigger == Row["trigger"], "the native registration order remains historical")
 			Assert(Spec.Replacement == Row["output"], "the native replacement remains exact")
-			AssertEqual(Row["ordinal"], Spec.Seq, "equal-priority collisions keep their insertion precedence")
+			AssertEqual(Row["ordinal"], Index, "the reference lists the rules in their insertion order")
+			if Index > 1
+				Assert(Spec.Seq > Registered[Index - 1].Seq, "equal-priority collisions keep their insertion precedence")
 			AssertEqual(Row["is_word"], Spec.IsWord)
 			AssertEqual(Row["auto_expand"], Spec.Auto)
 			AssertEqual(Row["final_result"], Spec.FinalResult)
@@ -544,7 +546,7 @@ Test("common autocorrection: missing bound caps owner cannot use bundled cached 
 ; The reviewed editorial map, independently authored before the source split.
 _HsCacheCommonAssignment() {
 	Classification := JsonParse(FileRead(_HsCacheTestSharedDir()
-		. "\data\hotstrings\common_autocorrection_sections.json", "UTF-8"))
+		. "\hotstrings\data\autocorrection\common_autocorrection_sections.json", "UTF-8"))
 	Assignment := Map()
 	for Section in Classification["sections"]
 		for Trigger in Section["triggers"] {
@@ -591,14 +593,19 @@ _HsCacheCommonSplitNative(Selection, ThroughTsv := false, ThroughRegistrar := fa
 			_HS_RegisterAutocorrection()
 		} else
 			LoadHotstringsCategory("autocorrection", Sections)
-		Observed := Map(), RegisteredCount := 0
+		Selected := []
 		for Key, Specs in HSE_RegistryByGroup
 			for Spec in Specs {
 				if ThroughRegistrar && !RegExMatch(Key, "^autocorrection\.(names|abbreviations|technical_terms)$")
 					continue
-				Observed[Spec.Seq] := Spec
-				RegisteredCount += 1
+				Selected.Push(Spec)
 			}
+		; The rules in insertion order, ranked 1..N without their no-break variants.
+		Observed := Map(), RegisteredCount := 0
+		for Spec in _HsCacheSortBySeq(_HsCacheWithoutSpaceVariants(Selected)) {
+			RegisteredCount += 1
+			Observed[RegisteredCount] := Spec
+		}
 		AssertEqual(Selection == "all" ? 140 : ExpectedCounts[Selection], RegisteredCount)
 		Index := 0
 		for Row in Reference["entries"] {
@@ -720,9 +727,9 @@ _HSCI_CurrentOwner(Mode) {
 	Root := A_Temp . "\ergopti_cache_inventory_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1, 999999)
 	FSCreateDirectoryExclusiveStrict(Root)
 	try {
-		DirCreate(Root . "\modules\hotstrings")
-		Index := Root . "\modules\hotstrings\_index.toml"
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		Index := Root . "\hotstrings\data\catalogue\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Index)
 		_SharedDir := Root
 		; Retain original memo contents independently; fixture reads still enter
 		; the genuine ReadTomlFile owner and generate their own native receipts.
@@ -902,10 +909,10 @@ _HSCI_EnsureWriteCallout(Mode) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		RegistryScope := _PECASE_RegistryScope()
-		DirCreate(Root . "\modules\hotstrings")
-		Index := Root . "\modules\hotstrings\_index.toml"
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Index)
+		RegistryScope := _HotstringRegistryScope()
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		Index := Root . "\hotstrings\data\catalogue\_index.toml"
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Index)
 		_SharedDir := Root
 		_TomlFileCache := _TomlFileCache.Clone()
 		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
@@ -984,7 +991,7 @@ _HSCI_EnsureWriteCallout(Mode) {
 			CloseFailure := Err
 		if IsObject(RegistryScope) {
 			HSE_TestReset()
-			_PECASE_RegistryScope(RegistryScope)
+			_HotstringRegistryScope(RegistryScope)
 		}
 		_SharedDir := Saved[1], _HS_CACHE_ROWS := Saved[2], _HS_CACHE_LOADED := Saved[3]
 		_GENERATED_HOTSTRINGS := Saved[4], _HotstringsOverrides := Saved[5], HotstringGroupConfig := Saved[6]
@@ -1051,8 +1058,8 @@ _HCOW_PublicEnsure(Collision, TruncateStage := false) {
 		Creation := FSCreateDirectoryExclusiveStrict(Root)
 		Created := (Creation is Integer) && Creation == 1
 		AssertTrue(Created)
-		DirCreate(Root . "\modules\hotstrings")
-		FileCopy(_HsCacheTestSharedDir() . "\modules\hotstrings\_index.toml", Root . "\modules\hotstrings\_index.toml")
+		DirCreate(Root . "\hotstrings\data\catalogue")
+		FileCopy(_HsCacheTestSharedDir() . "\hotstrings\data\catalogue\_index.toml", Root . "\hotstrings\data\catalogue\_index.toml")
 		_SharedDir := Root
 		_TomlFileCache := _TomlFileCache.Clone()
 		_TomlFileSectionCounts := _TomlFileSectionCounts.Clone()
@@ -1122,3 +1129,35 @@ _HCOW_PublicEnsure(Collision, TruncateStage := false) {
 for _HCOW_Collision in [true, false]
 	Test("hotstrings cache stage: public Ensure collision=" . _HCOW_Collision
 		. " (hotstrings-cache-stage-ownership)", _HCOW_PublicEnsure.Bind(_HCOW_Collision))
+
+; HSE-003 registers a no-break and a narrow no-break variant beside each trigger
+; with an inner space. The historical reference counts rules, so a variant whose
+; space form is registered too is set aside; the rules keep their own order.
+; @param Specs {Array} Registered specs.
+; @returns {Array} The specs without their no-break space variants.
+_HsCacheWithoutSpaceVariants(Specs) {
+	Triggers := Map()
+	for Spec in Specs
+		Triggers[Spec.Trigger] := true
+	Kept := []
+	for Spec in Specs {
+		Spaced := StrReplace(StrReplace(Spec.Trigger, Chr(0xA0), " "), Chr(0x202F), " ")
+		if (Spaced != Spec.Trigger) && Triggers.Has(Spaced)
+			continue
+		Kept.Push(Spec)
+	}
+	return Kept
+}
+
+; @param Specs {Array} Registered specs.
+; @returns {Array} The same specs by ascending insertion sequence.
+_HsCacheSortBySeq(Specs) {
+	Sorted := []
+	for Spec in Specs {
+		Position := Sorted.Length + 1
+		while Position > 1 && Sorted[Position - 1].Seq > Spec.Seq
+			Position -= 1
+		Sorted.InsertAt(Position, Spec)
+	}
+	return Sorted
+}

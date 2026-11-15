@@ -12,11 +12,11 @@
 --- ==============================================================================
 
 local helpers    = require("tests.helpers")
-local Contract   = require("test.config_unused_keys_contract")
-local Engine     = require("config_unused_keys")
-local TomlCodec  = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local ProfileRegistry = require("llm.profile_registry_codec")
+local Contract   = require("tests.lua.settings.unused_keys_contract")
+local Engine     = require("settings.engine.migration.unused_keys")
+local TomlCodec  = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 
 local Sandbox = Contract.sandbox
 
@@ -108,19 +108,19 @@ local IoAdapter = {
 }
 
 local MODULES = {
-	"adapters.storage", "adapters.file_system", "infra.config_overrides",
+	"core.fs.adapters.storage", "core.fs.adapters.file_system", "infra.config_overrides",
 	"infra.preferences", "ui.onboarding", "ui.menu.unused_keys_cleanup", "ui.menu.builder",
 }
 
 helpers.with_stub_scope(MODULES, function()
 	local stored = {}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		set = function(key, value) stored[key] = value; return true end,
 		get = function(key) return stored[key] end,
 		delete = function(key) stored[key] = nil; return true end,
 		keys = function() return {} end,
 	}
-	package.loaded["adapters.file_system"] = IoAdapter
+	package.loaded["core.fs.adapters.file_system"] = IoAdapter
 	local Overrides   = helpers.load_with_stubs("infra.config_overrides")
 	local Preferences = helpers.load_with_stubs("infra.preferences")
 	local Onboarding  = helpers.load_with_stubs("ui.onboarding")
@@ -288,19 +288,19 @@ helpers.with_stub_scope(MODULES, function()
 			-- An unknown leaf or section was dropped at load without a word: only
 			-- the cleanup's list ever showed it, unlike the Windows loader.
 			local source = "[hotstrings]\nstale_toggle = false\n[shortcuts.keys]\nat_hash = true\n[stale.section]\nlabel = \"old\"\n"
-			local saved_logger = package.loaded["logger.shim"]
+			local saved_logger = package.loaded["core.logger.engine.shim"]
 			local warnings = {}
 			local recorder = helpers.make_logger_stub()
 			recorder.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
-			package.loaded["logger.shim"] = recorder
-			require("config_outdated").reset_for_tests()
+			package.loaded["core.logger.engine.shim"] = recorder
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local ok, err = pcall(function()
 				Sandbox.with_config(source, function(path)
 					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2)
 					helpers.assert_eq(Cleanup.warn_unused(path, IoAdapter), 2, "the same entries are listed again…")
 				end)
 			end)
-			package.loaded["logger.shim"] = saved_logger
+			package.loaded["core.logger.engine.shim"] = saved_logger
 			if not ok then error(err, 0) end
 			local text = table.concat(warnings, "\n")
 			helpers.assert_eq(#warnings, 3, "…but each is named once, the owner's own report included: " .. text)
@@ -582,7 +582,7 @@ helpers.with_stub_scope(MODULES, function()
 		helpers.it("unused keys: the Configuration submenu offers and dispatches the row", function()
 			local fired = 0
 			local builder = helpers.load_with_stubs("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			i18n.get = function(key) return key end
 			i18n.build_language_menu_items = function() return {} end
 			local noop = function() end
@@ -763,13 +763,13 @@ helpers.with_stub_scope(MODULES, function()
 end)
 
 helpers.with_stub_scope(MODULES, function()
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function() end, set = function() return true end,
 		delete = function() return true end, keys = function() return {} end,
 	}
-	package.loaded["adapters.file_system"] = IoAdapter
+	package.loaded["core.fs.adapters.file_system"] = IoAdapter
 	local cleanup = helpers.load_with_stubs("ui.menu.unused_keys_cleanup")
-	require("test.config_cleanup_roots_contract").register(helpers, {
+	require("tests.lua.settings.cleanup_roots_contract").register(helpers, {
 		driver = "macos", collect = cleanup.collect, file_adapter = IoAdapter,
 		find = function(path) return cleanup.find(path, IoAdapter) end,
 	})

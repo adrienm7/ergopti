@@ -9,13 +9,13 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"adapters.http_client",
+	"core.network.adapters.http_client",
 	"ui.menu.menu_llm.ollama_enable_probe",
-	"llm.enable_admission",
-	"infra.logger",
+	"ai.engine.settings.enable_admission_core",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.i18n",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
 	"ui.menu.shortcut_utils",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
@@ -41,35 +41,35 @@ local OWNED_MODULES = {
 	"ui.menu.menu_llm.mlx_repair_offer",
 	"modules.llm.mlx_bootstrap_diagnosis",
 	"modules.llm.backend_detector",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"ui.menu.menu_llm.activation_pause_owner",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"infra.keycodes",
+	"platform.input.synthetic_input",
+	"platform.input.keycodes",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.llm.warmup_controller",
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.shortcuts.script_control",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.profile_label",
-	"infra.dialog_util",
-	"adapters.shell_runner",
-	"infra.deferred_work",
+	"core.ui.engine.dialog_util",
+	"core.process.adapters.shell_runner",
+	"core.timing.engine.deferred_work",
 	"ui.menu.menu_llm.local_server_panel",
 	"ui.menu.menu_llm.unreachable_backend_offer",
 	"modules.llm.local_servers",
 	"modules.llm.ollama_endpoint",
 }
 
--- The local OpenAI-compatible servers of _shared/modules/llm/local_servers.json
+-- The local OpenAI-compatible servers of _shared/ai/data/local_servers.json
 local LOCAL_SERVER_ORDER = { "omlx", "lmstudio", "llamacpp", "jan" }
 local LOCAL_SERVERS = {
 	omlx = { label = "oMLX", base_url = "http://localhost:8000/v1" },
@@ -153,7 +153,7 @@ local function build_fixture(backend, save_results, options)
 		return strict_result(mode, "backend setter")
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = noop, info = noop, warn = noop, error = noop, done = noop,
 		start = noop, success = noop,
 		callback = function(_, _, callback, ...)
@@ -163,7 +163,7 @@ local function build_fixture(backend, save_results, options)
 	calls.runtime_notices = {}
 	calls.offers = 0
 	calls.notices = {}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, body, kind, on_click)
 			calls.notices[#calls.notices + 1] = { title = message, body = body, kind = kind, on_click = on_click }
 			if message == "notify.llm_enabled" or message == "notify.llm_disabled" then
@@ -179,7 +179,7 @@ local function build_fixture(backend, save_results, options)
 	-- The unreachable-backend error picks through options.offer_pick(dialog),
 	-- which returns the chosen index, or nil to keep the AI off.
 	calls.offer_dialogs = {}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function()
 			calls.offers = calls.offers + 1
 			return options.ollama_offer_choice or "ollama.native_offer_keep"
@@ -194,15 +194,15 @@ local function build_fixture(backend, save_results, options)
 			return options.offer_pick(dialog)
 		end,
 	}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 		return key
 	end
 	-- format keeps its arguments visible: "key|arg1|arg2"
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = fixture_caption,
 		format = function(key, ...)
 			local parts = { key }
@@ -430,12 +430,12 @@ local function build_fixture(backend, save_results, options)
 		row_disabled = function() return false end,
 		title_health_dot = function() return nil end,
 	}
-	local presentation_renderer = assert(require("menu.renderer").new({
+	local presentation_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-		json_decode = require("adapters.json_codec").decode,
-		i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
-		logger = package.loaded["infra.logger"],
+		manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+		json_decode = require("core.fs.adapters.json_codec").decode,
+		i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
+		logger = package.loaded["core.logger.engine.logger"],
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		check_row = native_renderer.check_row,
@@ -544,7 +544,7 @@ local function build_fixture(backend, save_results, options)
 			return receipt
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, callback)
 			local handle = { timer = {}, callback = callback, observers = {} }
 			calls.resume_timers[#calls.resume_timers + 1] = handle
@@ -580,7 +580,7 @@ local function build_fixture(backend, save_results, options)
 			mark = function() return true end,
 			is_synthetic = function() return false end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -594,7 +594,7 @@ local function build_fixture(backend, save_results, options)
 			end,
 			defer_after_callback = function(_, callback) return callback() end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -609,7 +609,7 @@ local function build_fixture(backend, save_results, options)
 			SG_NAMES = {},
 			AX_NAMES = {},
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
@@ -642,7 +642,7 @@ local function build_fixture(backend, save_results, options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.shortcuts.script_control"] = nil
@@ -659,7 +659,7 @@ local function build_fixture(backend, save_results, options)
 	end
 
 	package.loaded["modules.llm"].configuration_idle = function() return true end
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			local active = false
 			local observers = {}

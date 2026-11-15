@@ -10,8 +10,8 @@
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
-	"adapters.keyboard_layout", "adapters.xkb_capture", "adapters.shell_runner", "infra.display_server",
-	"logger.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "input.modifier_custody", "adapters.uinput_writer" }
+	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+	"core.logger.engine.shim", "platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.modifier_custody", "platform.input.uinput_writer" }
 
 local function fixture(options, callback)
 	options = options or {}
@@ -22,15 +22,15 @@ local function fixture(options, callback)
 	local original_destination = world.destination
 	local function record(value) world.calls[#world.calls + 1] = value end
 	local function retire() world.destination = {} end
-	package.loaded["logger.shim"] = setmetatable({}, { __index = function() return function() end end })
-	package.loaded["infra.display_server"] = { is_wayland = function() return false end, is_x11 = function() return true end }
+	package.loaded["core.logger.engine.shim"] = setmetatable({}, { __index = function() return function() end end })
+	package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end, is_x11 = function() return true end }
 	package.loaded["adapters.keyboard_layout"] = {
 		is_ready = function() return false end, plan = function() error("the controlled layout cannot type the payload") end,
 		plan_current = function() return false end, plan_view = function() return nil end,
 		shortcut_keycode = function(_, fallback) return fallback end,
 	}
 	package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 		held_forwarded_keys = function() return {} end, emergency_stop = function()
 			world.stops = world.stops + 1
@@ -61,7 +61,7 @@ local function fixture(options, callback)
 		end
 		return true
 	end
-	package.loaded["adapters.shell_runner"] = Shell
+	package.loaded["core.process.adapters.shell_runner"] = Shell
 	local Output = require("modules.hotstrings.output_transaction")
 	local new_transaction = Output.new
 	Output.new = function(...)
@@ -74,7 +74,7 @@ local function fixture(options, callback)
 		if options.constructor_throws then error("independent transaction constructor exception") end
 		return new_transaction(...)
 	end
-	local Codes = require("infra.evdev_codes")
+	local Codes = require("platform.input.evdev_codes")
 	local channel = { is_open = function() return true end, close = function() record("channel_close"); return true end }
 	function channel.emit(code, value)
 		record("key:" .. code .. ":" .. value)
@@ -91,10 +91,10 @@ local function fixture(options, callback)
 	local Injector = require("modules.hotstrings.injector")
 	local writer, writer_path
 	if options.real_writer then
-		local Input, Broker = require("infra.input_event"), require("adapters.modifier_broker")
+		local Input, Broker = require("platform.input.event"), require("platform.input.modifier_broker")
 		writer_path = os.tmpname()
 		assert(assert(io.open(writer_path, "wb")):close())
-		writer = helpers.load_module("adapters.uinput_writer")
+		writer = helpers.load_module("platform.input.uinput_writer")
 		writer._set_path_for_test(writer_path)
 		writer._set_backend({ open = function() return 7 end, ioctl = function() return true end,
 			close = function() return true end, write = function(_, bytes)
@@ -119,7 +119,7 @@ local function fixture(options, callback)
 		local last = assert(hook_source:find("\n--- Runs a blocking modal", first, true))
 		local hook_body = hook_source:sub(first, last - 1)
 		assert(#hook_body > 500, "the actual emergency-stop body must be present")
-		local env = setmetatable({ M = {}, Logger = package.loaded["logger.shim"], _broker = broker,
+		local env = setmetatable({ M = {}, Logger = package.loaded["core.logger.engine.shim"], _broker = broker,
 			_number_row = { retire = function() return true end }, _locks = { end_word = function() end },
 			_emit_raw = writer.emit, _forwarded_down = {}, _output_owners = {}, _devices = {}, _pointer_devices = {},
 			_close_paths = function(paths) assert(next(paths) == nil, "no native input source is admitted by this fixture") end,

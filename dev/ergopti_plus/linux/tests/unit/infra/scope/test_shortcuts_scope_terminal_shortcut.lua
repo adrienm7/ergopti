@@ -236,13 +236,14 @@ helpers.describe("Linux terminal shortcut scope", function()
 	end)
 
 
-	helpers.it("refuses a pause raised after backup and releases all owners", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("commits a clear when a pause is raised after backup (edd1-paused-writes)", function()
 		with_scope(function(scope, owners, controls, path)
 			controls.before_publish = function(target) if target ~= path then controls.paused = true end end
-			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(scope.apply("clear"), true)
 			helpers.assert_eq(#controls.backups, 1)
-			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
-			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_true(Sandbox.read_bytes(path) ~= SOURCE)
+			helpers.assert_eq(owners.manager.is_enabled(), false)
 			helpers.assert_true(owners.manager.configuration_admitted())
 		end)
 	end)
@@ -303,7 +304,8 @@ helpers.describe("Linux terminal shortcut scope", function()
 
 	-- The declared rows of the first group, not injected ones: the switch, the
 	-- restore, the clear, a separator. Neither scope row asks (the maintainer
-	-- retired the clear's question on 2026-09-30); a pause refuses the owner.
+	-- retired the clear's question on 2026-09-30); a pause does not refuse it
+	-- (EDD-1, edd1-paused-writes).
 	for _, mode in ipairs({ "clear", "recommended", "paused" }) do
 		helpers.it("routes the actual rendered " .. mode .. " request to the public terminal", function()
 			with_scope(function(_, owners, controls, path)
@@ -311,7 +313,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 				local root = renderer.get_root()
 				local top, execute = root.top_level, os.execute
 				local selected = mode == "recommended" and "recommended" or "clear"
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					root.top_level = declared_parent(top, "shortcuts")
@@ -337,11 +339,9 @@ helpers.describe("Linux terminal shortcut scope", function()
 					helpers.assert_eq(type(action), "function")
 					if mode == "paused" then controls.paused = true end
 					action()
-					local expected = mode ~= "paused"
-					helpers.assert_eq(changed, expected and 1 or 0)
+					helpers.assert_eq(changed, 1)
 					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
-					helpers.assert_eq(owners.manager.is_enabled(), mode ~= "clear")
-					if not expected then helpers.assert_eq(Sandbox.read_bytes(path), SOURCE) end
+					helpers.assert_eq(owners.manager.is_enabled(), selected ~= "clear")
 				end)
 				root.top_level, os.execute = top, execute
 				if not passed then error(err, 0) end
@@ -372,7 +372,7 @@ helpers.describe("Linux Shortcuts restore row", function()
 				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end,
 					on_menu_changed = function() changed = changed + 1 end })
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local action
 				for _, item in ipairs(menu) do
 					if item.title == i18n.get("menu.shortcuts.title") then
@@ -411,7 +411,7 @@ helpers.describe("Linux Shortcuts wrap group", function()
 				root.top_level = declared_parent(top, "shortcuts")
 				local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end })
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local submenu
 				for _, item in ipairs(menu) do
 					if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
@@ -528,7 +528,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 					if command:find("dialog_host.lua' --question", 1, true) then questions = questions + 1; return 1 end
 					return execute(command)
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local function group()
 					local menu = require("ui.menu.builder").build({ shortcuts = owners.manager, paused = false,
 						is_paused = function() return controls.paused end,

@@ -44,7 +44,7 @@ local function with_config(body, source, reject_candidate)
 		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		Choices.with_file(Config, source, function(path)
 			local published, attempts = {}, 0
-			local engine = require("hotstring_engine").new()
+			local engine = require("hotstrings.engine.matcher").new()
 			local load = engine.load_mappings
 			engine.load_mappings = function(self, mappings)
 				attempts = attempts + 1
@@ -82,7 +82,7 @@ helpers.describe("explicit hotstring category selection", function()
 				helpers.assert_eq(Config.is_group_enabled("french_magickey"), true)
 				helpers.assert_eq(Config.is_section_checked("french_magickey", "text_expansion"), true)
 				helpers.assert_eq(#published[#published], enabled and 2 or 1)
-				local decoded = require("toml_codec").decode(Choices.read(path))
+				local decoded = require("core.text.engine.toml_codec").decode(Choices.read(path))
 				helpers.assert_eq(decoded.category_enabled.hotstrings, false, "the independent master stays disabled")
 				helpers.assert_eq(decoded.private.credential, "retain-fixture-value")
 				helpers.assert_eq(Config.refresh_choices(), true, "the canonical reread must commit")
@@ -94,7 +94,7 @@ helpers.describe("explicit hotstring category selection", function()
 		for _, refusal in ipairs({ "false", "nil", "throw", "runtime" }) do
 			helpers.it("(hotstring-category-owner) rolls back " .. tostring(enabled) .. "/" .. refusal, function()
 				with_config(function(Config, path, published)
-					local writer = require("toml_codec.writer")
+					local writer = require("core.text.engine.toml_codec.writer")
 					local previous = writer.batch_write
 					local writes = 0
 					writer.batch_write = function(...)
@@ -176,13 +176,13 @@ helpers.describe("hotstrings config: sections are opt-in", function()
 			helpers.assert_eq(Config.is_section_checked("french_autocorrection", "minus"), true)
 			helpers.assert_eq(Config.is_section_checked("french_magickey", "text_expansion"), true)
 			helpers.assert_eq(#published[#published], 2, "both activated sections reach the engine")
-			local decoded = require("toml_codec").decode(Choices.read(path))
+			local decoded = require("core.text.engine.toml_codec").decode(Choices.read(path))
 			helpers.assert_eq(decoded.hotstrings.groups.french_autocorrection, true)
 			helpers.assert_eq(decoded.hotstrings.modules.french_autocorrection, { accents = true, minus = true })
 			helpers.assert_true(Config.set_categories_sections({ "french_autocorrection", "french_magickey" }, false))
 			helpers.assert_eq(Config.is_section_checked("french_autocorrection", "accents"), false)
 			helpers.assert_eq(Config.is_section_checked("french_magickey", "text_expansion"), false)
-			decoded = require("toml_codec").decode(Choices.read(path))
+			decoded = require("core.text.engine.toml_codec").decode(Choices.read(path))
 			for category, sections in pairs(decoded.hotstrings.modules or {}) do
 				helpers.assert_eq(next(sections), nil, category .. " sections return to neutral absence")
 			end
@@ -195,7 +195,7 @@ helpers.describe("hotstrings config: sections are opt-in", function()
 	-- manifest's Linux file_path and section_path: this runtime must read them
 	-- there, or a Yes is saved and reported while every section stays off.
 	helpers.it("(hs-opt-in-linux) the wizard's config.toml answers are the choices in force", function()
-		local Answers = require("onboarding_answers")
+		local Answers = require("onboarding.engine.answers")
 		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/" .. Answers.CATALOGUE_PATH, "r"))
 		local index = Answers.load(handle:read("*a"), "linux")
 		handle:close()

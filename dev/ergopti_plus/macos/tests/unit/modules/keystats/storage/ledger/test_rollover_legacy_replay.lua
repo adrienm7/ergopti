@@ -7,7 +7,7 @@ if arg and arg[0] and arg[0]:match("test_rollover_legacy_replay%.lua$") then
  require("tests.support.keystats.rollover_marker_process")(); return
 end
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
 helpers.describe("legacy rollover replays durable source after restart", function()
  for _, case in ipairs({ "legacy_open", "legacy_already_reset" }) do

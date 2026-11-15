@@ -8,8 +8,8 @@
 local helpers = require("tests.helpers")
 
 local NATIVE_CONSUMERS = {
-	"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-	"infra.deferred_work", "infra.fs_dir",
+	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
+	"core.timing.engine.deferred_work", "core.fs.engine.dir",
 }
 
 local function refresh_native_consumers()
@@ -30,14 +30,14 @@ local function with_fixture(callback)
 	return helpers.with_stub_scope({
 		"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 		"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-		"modules.gestures", "infra.keycodes", "infra.logger", "infra.notifications",
-		"adapters.event_provenance", "adapters.file_system", "adapters.key_state",
-		"adapters.shell_runner", "adapters.synthetic_input", "adapters.timer_scheduler",
-		"adapters.storage", "adapters.task_lifecycle", "adapters.mouse_control",
-		"infra.deferred_work", "infra.fs_dir", "modules.keymap.utils",
-		"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
+		"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+		"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+		"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
+		"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
+		"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
+		"modules.keymap.terminator_replay", "platform.input.text_sender", "adapters.clipboard",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.gestures"] = {}
 		return callback()
 	end)
@@ -106,12 +106,12 @@ end
 
 local function load_capslock_fixture(toggle_impl)
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
-	package.loaded["adapters.key_state"] = {
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
+	package.loaded["platform.input.key_state"] = {
 		toggle_capslock = toggle_impl,
 	}
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 
 	local logs = { debug = {}, error = {} }
 	local logger = helpers.make_logger_stub()
@@ -124,10 +124,10 @@ local function load_capslock_fixture(toggle_impl)
 	logger.error = function(_, format, ...)
 		logs.error[#logs.error + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local raw_key_attempts = 0
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function()
 			raw_key_attempts = raw_key_attempts + 1
 			return true
@@ -168,23 +168,23 @@ end
 -- updating an upvalue after the function returns cannot be seen by the caller).
 -- window_override: optional `window` stub table (defaults to a window with id=42).
 local function make_sys_screenshot_spies(window_override)
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
 	-- lib.notifications uses hs.notify under the hood — stub it so the deferred
 	-- screencapture callback (and the nil-id guard branch) don't crash in headless tests.
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	-- The capture goes through adapters.shell_runner, which captures `local hs = hs`
 	-- at require-time. Cached from an earlier test file it stays bound to THAT file's
 	-- hs stub, so the module under test spawns correctly while the assertions below
 	-- read a different stub's records and see nothing. Cleared here rather than in
 	-- load_with_stubs: several tests install their own adapter doubles into
 	-- package.loaded before calling it, and a blanket adapter sweep wipes those.
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 
 	local spy = { captured_cb = nil, do_after_calls = {}, exec_calls = {}, tasks = {} }
 	local contract = fresh_hs_contract()
@@ -308,7 +308,7 @@ end
 
 -- Regression: bind_wrap_text_if_selected's eventtap callback called text_acts.read_ax_selection()
 -- (two synchronous cross-process AX calls) on every keystroke matching a wrap symbol, with zero
--- caching. infra/vscode_bridge.lua documents this exact failure mode and mitigates it with a
+-- caching. core/network/engine/vscode_bridge.lua documents this exact failure mode and mitigates it with a
 -- short-lived TTL cache; this call site had none — a slow AX call risks
 -- kCGEventTapDisabledByTimeout, killing the tap. The fix mirrors vscode_bridge's cache pattern.
 
@@ -329,23 +329,23 @@ local SyntheticInputStack = require("tests.support.synthetic_input_stack")
 local function load_h01_system(options)
 	options = options or {}
 	refresh_native_consumers()
-	package.loaded["adapters.key_state"] = nil
-	package.loaded["infra.notifications"] = nil
-	local previous_logger = package.loaded["infra.logger"]
+	package.loaded["platform.input.key_state"] = nil
+	package.loaded["core.ui.engine.notifications"] = nil
+	local previous_logger = package.loaded["core.logger.engine.logger"]
 	package.loaded["modules.shortcuts.actions.system"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
 	package.loaded["modules.gestures"] = options.gestures or {}
-	package.loaded["adapters.shell_runner"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["modules.shortcuts.actions.screenshot_save"] = nil
-	if options.logger then package.loaded["infra.logger"] = options.logger end
+	if options.logger then package.loaded["core.logger.engine.logger"] = options.logger end
 	if options.text_actions then
 		package.loaded["modules.shortcuts.actions.text"] = options.text_actions
 	end
 	local system, synthetic = SyntheticInputStack.load(
 		"modules.shortcuts.actions.system", options.hs_overrides)
-	if options.logger then package.loaded["infra.logger"] = previous_logger end
+	if options.logger then package.loaded["core.logger.engine.logger"] = previous_logger end
 	return { system = system, synthetic = synthetic, hs = _G.hs }
 end
 

@@ -56,6 +56,7 @@ local function flush_expansion(is_private)
 	local fake_writer = {
 		open_db = function() return true end,
 		ensure_token_encoding = function() return true end,
+		ensure_awake_definition = function() return true end,
 		register_device = function() return true end,
 		read_open_walk = function() return nil, true end,
 		upsert_open_walk = function() return true end,
@@ -191,6 +192,7 @@ helpers.describe("private mapping: the synthetic character record", function()
 		package.loaded[writer_name] = {
 			open_db = function() return true end,
 			ensure_token_encoding = function() return true end,
+			ensure_awake_definition = function() return true end,
 			register_device = function() return true end,
 			read_open_walk = function() return nil, true end,
 			upsert_open_walk = function() return true end,
@@ -264,7 +266,7 @@ end)
 --- @return string
 local function injector_log(is_private)
 	local injector = helpers.load_module("modules.hotstrings.injector")
-	local logger   = require("logger.shim")
+	local logger   = require("core.logger.engine.shim")
 
 	local lines = {}
 	local originals = {}
@@ -299,7 +301,7 @@ helpers.describe("private mapping: the 14-day log", function()
 
 	helpers.it("names the type, not the value, when the arguments are wrong", function()
 		local injector = helpers.load_module("modules.hotstrings.injector")
-		local logger   = require("logger.shim")
+		local logger   = require("core.logger.engine.shim")
 		local original = logger.error
 		local lines = {}
 		logger.error = function(_tag, fmt, ...)

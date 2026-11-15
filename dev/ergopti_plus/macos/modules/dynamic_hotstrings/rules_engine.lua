@@ -6,7 +6,7 @@
 --- Hammerspoon-specific shim that wires the shared pure-Lua dynamic hotstrings
 --- rules engine into the HS keymap module. Handles hs.eventtap injection and
 --- hs.timer scheduling — the matching logic itself lives in the shared module at
---- _shared/lua/dynamic_hotstrings/init.lua.
+--- _shared/hotstrings/engine/dynamic/core.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Thin shim: all suffix-matching and rule-registration logic is delegated to
@@ -23,16 +23,16 @@ if not ok_utils then km_utils = nil end
 local ok_kl, keystats = pcall(require, "modules.keystats")
 if not ok_kl then keystats = nil end
 
-local SharedEngine = require("dynamic_hotstrings")
-local Terminators = require("keymap.terminators")
-local SyntheticInput = require("adapters.synthetic_input")
+local SharedEngine = require("hotstrings.engine.dynamic.core")
+local Terminators = require("layouts.engine.layers.terminators")
+local SyntheticInput = require("platform.input.synthetic_input")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
-local Logger = require("infra.logger")
-local text_utils = require("infra.text_utils")
+local Logger = require("core.logger.engine.logger")
+local text_utils = require("core.text.engine.utils")
 local LOG    = "dynamic_hotstrings.rules"
 
-local ok_locale, locale = pcall(require, "infra.locale")
+local ok_locale, locale = pcall(require, "core.i18n.engine.locale")
 if not ok_locale then locale = nil end
 
 
@@ -264,6 +264,13 @@ local function interceptor(event, km_buffer, ctx)
 
 	local rule   = match.rule
 	local result = match.result
+	-- The magic key must follow the suffix within the family's delay, as on
+	-- Windows and Linux; an expired rule fires nothing and the key goes on.
+	if not _km.dynamic_rule_within_delay(rule.section, ctx and ctx.elapsed) then
+		Logger.debug(LOG, "Dynamic rule '%s' expired before the magic key (section=%s).",
+			rule.suffix, tostring(rule.section))
+		return nil
+	end
 	local len_ok, n_back = pcall(utf8.len, rule.suffix)
 	if not len_ok or type(n_back) ~= "number" or n_back < 1 then
 		Logger.error(LOG, "Dynamic rule suffix is not valid UTF-8; output refused.")
@@ -523,14 +530,14 @@ local function register_prefix_entries()
 			local fphone_opts = opts_for("phone_number_clean")
 			-- A national trunk zero is not dialled after the French country code,
 			-- matching the Windows and Linux international output.
-			local international_phone = "+33" .. (phone:sub(1, 1) == "0" and phone:sub(2) or phone)
+			local international_phone = SharedEngine.international_phone(phone)
 			if text_utils.utf8_len(phone) >= 2 then
 				add_mapping(text_utils.utf8_sub(phone, 1, 2) .. _trigger, phone, phone_magic_opts)
-				add_mapping("+33" .. text_utils.utf8_sub(phone, 1, 2), international_phone, phone_opts)
+				add_mapping(SharedEngine.FRANCE_DIAL_PREFIX .. text_utils.utf8_sub(phone, 1, 2), international_phone, phone_opts)
 			end
 			if text_utils.utf8_len(phone) >= 4 then
 				add_mapping(text_utils.utf8_sub(phone, 1, 4), phone, phone_opts)
-				add_mapping("+33" .. text_utils.utf8_sub(phone, 2, 4), international_phone, phone_opts)
+				add_mapping(SharedEngine.international_prefix(phone, 4), international_phone, phone_opts)
 			end
 			if text_utils.utf8_len(phone) >= 6 then
 				add_mapping(text_utils.utf8_sub(phone, 2, 5), phone, phone_opts)

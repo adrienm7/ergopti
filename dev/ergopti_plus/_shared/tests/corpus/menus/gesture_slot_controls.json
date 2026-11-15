@@ -5,21 +5,15 @@
 			{
 				"type": "section_header",
 				"id": "gesture_sensitivity_heading",
-				"i18n": "menu.gestures.sensitivity_label",
-				"platforms": ["hs", "linux"],
-				"unavailable": "hide"
+				"i18n": "menu.gestures.sensitivity_label"
 			},
 			{
 				"type": "label",
 				"id": "gesture_sensitivity_hint",
-				"i18n": "menu.gestures.sensitivity_hint",
-				"platforms": ["hs", "linux"],
-				"unavailable": "hide"
+				"i18n": "menu.gestures.sensitivity_hint"
 			},
 			{
-				"type": "---",
-				"platforms": ["hs", "linux"],
-				"unavailable": "hide"
+				"type": "---"
 			}
 		],
 		"gesture_change_action": [
@@ -28,7 +22,7 @@
 				"id": "gesture_slot_change_action",
 				"i18n": "menu.gestures.change_action",
 				"disabled_when": ["gesture_slot_choice_ready"],
-				"platforms": ["hs"],
+				"platforms": ["ahk", "hs"],
 				"unavailable": "hide"
 			}
 		]
@@ -45,8 +39,8 @@
 	},
 	"platform_rows": {
 		"ahk": {
-			"sensitivity_head": 0,
-			"change_action": 0
+			"sensitivity_head": 3,
+			"change_action": 1
 		},
 		"hs": {
 			"sensitivity_head": 3,

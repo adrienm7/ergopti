@@ -12,15 +12,15 @@
 --- ==============================================================================
 
 local M = {}
-local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local hs         = hs
-local Logger     = require("infra.logger")
-local ParentSource = require("menu.frames.parent_source")
+local Logger     = require("core.logger.engine.logger")
+local ParentSource = require("menu.engine.frames.parent_source")
 local PhaseStats = require("infra.phase_stats")
-local Paths      = require("infra.paths")
+local Paths      = require("core.fs.engine.paths")
 local LOG        = "builder"
-local i18n       = require("infra.i18n")
-local COMMAND    = require("config_keys").COMMAND
+local i18n       = require("core.i18n.engine.i18n")
+local COMMAND    = require("settings.engine.keys").COMMAND
 -- The single reader of menu_manifest.json. See load_manifest below for why this
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
@@ -96,12 +96,12 @@ end
 local HotCounter  = require("ui.menu.hotstring_counter")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local CanvasBadge = require("ui.menu.canvas_badge")
-local Labels      = require("menu.labels")
+local Labels      = require("menu.engine.labels")
 
 
-local Languages   = require("hotstrings.languages")
-local Extensions  = require("hotstrings.extensions")
-local TomlCodec   = require("toml_codec.codec")
+local Languages   = require("hotstrings.engine.languages")
+local Extensions  = require("hotstrings.engine.extensions")
+local TomlCodec   = require("core.text.engine.toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
 local _top_level_cache = nil
@@ -196,7 +196,7 @@ end
 --- @return table Array of { id, locale, categories }.
 local function load_language_packs()
 	if _language_packs_cache then return _language_packs_cache end
-	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local path = Paths.shared("hotstrings/data/catalogue/_index.toml")
 	local fh = io.open(path, "r")
 	if not fh then error("[builder] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")
@@ -222,8 +222,8 @@ end
 --- tray in its old order — and a missing anchor emptied the tail, taking
 --- Reload, Quit and Debug with it.
 ---
---- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
---- pause greys, declared once for the three trays.
+--- Each entry keeps the manifest's `greyed_when_paused` mark, which only the
+--- AHK tray still honours (EDD-1).
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of projected entries retaining their exact canonical source records.
 local function load_top_level()
@@ -495,7 +495,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		-- parent row's `action`, which AppKit never sends for an item that
 		-- opens a submenu, so the Hotstrings master could not be switched from
 		-- the menu bar at all.
-		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
+		[require("settings.engine.keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			if ctx.paused then
 				Logger.warn(LOG, "Hotstrings switch refused: the script is paused.")
 				return false
@@ -506,9 +506,10 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- « Restore recommended » and « Clear » run the Hotstrings scope owner, which
 	-- asks first and changes config.toml and the override file as one
 	-- transaction; the ordinary save path never writes them.
+	-- A pause does not refuse them: a pause stops typing, not configuration (EDD-1).
 	for command, mode in pairs({ scope_restore = "recommended", scope_clear = "clear" }) do
 		hs_ctx.commands[command] = function()
-			if ctx.paused or type(ctx.apply_preference_scope) ~= "function" then return false end
+			if type(ctx.apply_preference_scope) ~= "function" then return false end
 			return ctx.apply_preference_scope("hotstrings", mode) == true
 		end
 	end
@@ -698,55 +699,45 @@ function M.generate(ctx, menu_mods, actions)
 		end,
 		["tap_holds"]       = function() return module_rows("tap_holds") end,
 		["gestures"]        = function() return module_rows("gestures") end,
+		-- Ergopti Studio opens the layout editor window, the same one as the
+		-- layout submenu's « Create or edit a layout… » row.
+		[require("settings.engine.keys").COMMAND.ERGOPTI_STUDIO] = function()
+			local command = require("settings.engine.keys").COMMAND.ERGOPTI_STUDIO
+			local row = ManifestMenu.command_row("top_level", command, {
+				-- Required on click: the window module is not loaded to draw the tray.
+				[command] = function() return require("ui.layout_manager").editor_menu_command()() end,
+			})
+			return row and { row } or {}
+		end,
 		["apps"]            = function() return module_rows("apps") end,
 		["configuration"]   = function()
 			local root, top, section, parent, fields = configuration_source(ManifestMenu, "hs")
 			if root == nil then return {} end
 			-- Every row is `type = "command"` in the manifest: labels, order and
 			-- the separators are declared, and this file supplies only what each
-			-- row does. Read once, so the pause gate below can tell the rows apart
-			-- by the handler they carry. The global scope's restore and clear open
-			-- the menu, like every settings menu's.
+			-- row does. The global scope's restore and clear open the menu, like
+			-- every settings menu's.
 			local restore = actions.reset_defaults
 			local clear = actions.clear_to_system
 			local clean = actions.clean_unused_keys
 			local cfg_ctx = {}
 			for key, value in pairs(ctx or {}) do cfg_ctx[key] = value end
 			cfg_ctx.commands = {
-				[require("config_keys").COMMAND.SCOPE_RESTORE]       = restore,
-				[require("config_keys").COMMAND.SCOPE_CLEAR]         = clear,
-				[require("config_keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
-				[require("config_keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
-				[require("config_keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
+				[require("settings.engine.keys").COMMAND.SCOPE_RESTORE]       = restore,
+				[require("settings.engine.keys").COMMAND.SCOPE_CLEAR]         = clear,
+				[require("settings.engine.keys").COMMAND.CLEAN_UNUSED_KEYS]   = clean,
+				[require("settings.engine.keys").COMMAND.CONFIG_FOLDER]       = actions.open_paths,
+				[require("settings.engine.keys").COMMAND.SETUP_WIZARD]        = actions.show_setup_wizard,
 				-- Self-contained: the shared edit flow reads and writes its own setting.
-				[require("config_keys").COMMAND.PROXY_OVERRIDE]      = function() require("ui.proxy_override").run() end,
+				[require("settings.engine.keys").COMMAND.PROXY_OVERRIDE]      = function() require("core.network.proxy_override").run() end,
 			}
 			cfg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
-			-- Pause owns the bindings axis for the whole pause window: pause_all()
-			-- snapshots what was running and resume_all() restores that snapshot.
-			-- A row that rewrites the configuration in between is either discarded
-			-- on resume or breaks the « pause = tout éteint » invariant, so those
-			-- three are greyed AND stripped of their handler: a disabled row whose
-			-- fn survives still fires the moment the greying is rendered wrong
-			-- somewhere else. The rows that only open a window stay live.
-			local pause_gated = {}
-			-- pairs, not ipairs: an unregistered command is nil, and ipairs would
-			-- stop there and leave the rows after it ungated.
-			for _, fn in pairs({ restore = restore, clear = clear, clean = clean }) do
-				-- An unregistered command draws no row, so it has nothing to gate.
-				if type(fn) == "function" then pause_gated[fn] = true end
-			end
+			-- A pause stops typing, not configuration (EDD-1, maintainer decision
+			-- 2026-11-12): every row stays live while paused, the restore, the
+			-- clear and the unused-key clean included.
 			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
 			if not configuration_dense(rows, true) then return {} end
-			if ctx.paused then
-				for _, row in ipairs(rows) do
-					if row.fn ~= nil and pause_gated[row.fn] then
-						row.disabled = true
-						row.fn = nil
-					end
-				end
-			end
 			local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "hs")
 			if not rawequal(root, current_root) or not rawequal(top, current_top)
 				or not rawequal(section, current_section) or not rawequal(parent, current_parent)
@@ -810,10 +801,10 @@ function M.generate(ctx, menu_mods, actions)
 			for key, value in pairs(ctx or {}) do dbg_ctx[key] = value end
 			dbg_ctx.commands = {
 				["console"]        = actions.open_console,
-				[require("config_keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
-				[require("config_keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
-				[require("config_keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
-				[require("config_keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
+				[require("settings.engine.keys").LEAF.LOG_LEVEL]      = actions.set_log_level,
+				[require("settings.engine.keys").COMMAND.OPEN_LOGS]      = actions.open_logs,
+				[require("settings.engine.keys").COMMAND.OPEN_TODAY_LOG] = actions.open_today_log,
+				[require("settings.engine.keys").COMMAND.OPEN_ERROR_LOG] = actions.open_error_log,
 				["healthcheck"]    = function() healthcheck.show_window({ state = ctx.state }) end,
 				[COMMAND.FIELD_CHECK_LEASE] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LEASE) end,
 				[COMMAND.FIELD_CHECK_OWNED_RUNTIME] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_OWNED_RUNTIME) end,
@@ -822,13 +813,13 @@ function M.generate(ctx, menu_mods, actions)
 				[COMMAND.FIELD_CHECK_LOGIN_ITEMS] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_LOGIN_ITEMS) end,
 				[COMMAND.FIELD_CHECK_KEY_ACCOUNTING] = function() require("ui.field_check").run(COMMAND.FIELD_CHECK_KEY_ACCOUNTING) end,
 				[COMMAND.COMPOSER_CHECK] = function() require("ui.field_check").run(COMMAND.COMPOSER_CHECK) end,
-				[require("config_keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
-				[require("config_keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
-				[require("config_keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
+				[require("settings.engine.keys").COMMAND.REPORT_BUG]      = function() require("ui.healthcheck.report").report_bug({ state = ctx.state }) end,
+				[require("settings.engine.keys").COMMAND.SUGGEST_FEATURE] = function() require("ui.healthcheck.report").suggest_feature() end,
+				[require("settings.engine.keys").LEAF.SHOW_ERROR_DIALOG] = actions.toggle_error_dialog,
 			}
 			dbg_ctx.state_getters = {}
 			for key, value in pairs(ctx.state_getters or {}) do dbg_ctx.state_getters[key] = value end
-			dbg_ctx.state_getters[require("config_keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
+			dbg_ctx.state_getters[require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL] = function() return active_level_name end
 			dbg_ctx.state_getters["error_dialog_enabled"] = function()
 				return require("ui.error_dialog").is_enabled()
 			end
@@ -875,19 +866,10 @@ function M.generate(ctx, menu_mods, actions)
 			item_timings[#item_timings + 1] = { id = id, ms = item_ms }
 			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 			for _, row in ipairs(children) do
-				-- « Pause = tout éteint »: every row the manifest marks as a feature
-				-- is greyed and stripped of its handler in one place. Each builder
-				-- used to decide this for itself, so Shortcuts and Gestures greyed
-				-- while Hotstrings, AI, Metrics and Tap-Holds stayed live (Metrics
-				-- could even be toggled mid-pause). The unmarked rows (configuration,
-				-- language, about, reload, quit, debug) and the title row that
-				-- resumes the script stay live: they are how the user inspects,
-				-- resumes or leaves a paused script.
-				if ctx.paused == true and entry.greyed_when_paused and type(row) == "table" and row.separator ~= true then
-					row.disabled = true
-					row.action = nil
-					row.fn = nil
-				end
+				-- A pause stops typing, not configuration (EDD-1, maintainer
+				-- decision 2026-11-12): the feature rows stay live while paused.
+				-- The manifest's `greyed_when_paused` is read by the AHK tray alone
+				-- until its Suspend gates go.
 				table.insert(items, row)
 			end
 		end

@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 local SOURCE = '[shortcuts]\nchatgpt_url = "https://old.example/chat"\nunknown = "keep"\n[other]\nvalue = 42\n'
 
@@ -25,11 +25,11 @@ local function with_subject(source, body)
 		Sandbox.with_config(source, function(path)
 			local controls = { commands = {}, legacy_writes = 0, legacy_url = "https://legacy.example" }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return controls.legacy_url or default end,
 				set = function() controls.legacy_writes = controls.legacy_writes + 1; return true end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
 				run = function(command) controls.commands[#controls.commands + 1] = command; return true end,
@@ -89,7 +89,9 @@ helpers.describe("Canonical ChatGPT shortcut preference", function()
 
 	helpers.it("refuses invalid setter values without changing the configuration", function()
 		with_subject(SOURCE, function(subject, controls, path)
-			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url" }) do
+			-- The last one passes the declared 2048 characters.
+			for _, value in ipairs({ false, 4, "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+				"https://example.invalid/" .. string.rep("a", 2048) }) do
 				helpers.assert_eq(subject.set_url(value), false)
 			end
 			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)

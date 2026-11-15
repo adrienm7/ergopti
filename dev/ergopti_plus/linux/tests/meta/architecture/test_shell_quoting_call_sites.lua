@@ -26,7 +26,7 @@
 --- clipboard and the tooltip both decided their tool was absent and no-opped.
 
 local helpers = require("tests.helpers")
-local Shell   = helpers.load_module("adapters.shell_runner")
+local Shell   = helpers.load_module("core.process.adapters.shell_runner")
 
 -- Every metacharacter class at once: command substitution (both spellings),
 -- a command separator, and a quote that would close the word.
@@ -77,18 +77,18 @@ end
 
 helpers.describe("shell quoting at the call sites", function()
 
-	helpers.describe("crypto.sha256()", function()
+	helpers.describe("core.crypto.engine.sha256()", function()
 		helpers.it("quotes the data it pipes into openssl", function()
 			-- Exercise the retained CLI branch explicitly; native hashing has no argv.
-			local previous_provider = package.loaded["infra.openssl_digest"]
-			local previous_crypto = package.loaded["adapters.crypto"]
-			package.loaded["infra.openssl_digest"] = { available = false }
-			local crypto = helpers.load_module("adapters.crypto")
+			local previous_provider = package.loaded["core.network.engine.openssl_digest"]
+			local previous_crypto = package.loaded["core.crypto.crypto"]
+			package.loaded["core.network.engine.openssl_digest"] = { available = false }
+			local crypto = helpers.load_module("core.crypto.crypto")
 			local ok, cmds = pcall(capture, function() crypto.sha256(PAYLOAD) end)
-			package.loaded["infra.openssl_digest"] = previous_provider
-			package.loaded["adapters.crypto"] = previous_crypto
+			package.loaded["core.network.engine.openssl_digest"] = previous_provider
+			package.loaded["core.crypto.crypto"] = previous_crypto
 			if not ok then error(cmds, 0) end
-			assert_posix_quoted(find_command(cmds, "openssl"), "crypto.sha256")
+			assert_posix_quoted(find_command(cmds, "openssl"), "core.crypto.engine.sha256")
 		end)
 	end)
 

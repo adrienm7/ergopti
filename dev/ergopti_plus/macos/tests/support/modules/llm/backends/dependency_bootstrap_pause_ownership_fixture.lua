@@ -146,9 +146,9 @@ local function load_fixture(options)
 		return task
 	end
 
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.llm.ollama_binary"] = {
 		-- These existing daemon-ready cases model a native-owned source.
 		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
@@ -230,7 +230,7 @@ local function load_fixture(options)
 		and "modules.llm.mlx_deps_checker"
 		or "modules.llm.ollama_deps_checker"
 	if options.backend == "mlx" then
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function()
 				return "/repo/modules/llm/ensure-mlx-deps.sh"
 			end,
@@ -277,8 +277,8 @@ local function load_fixture(options)
 
 	local control
 	if options.real_script_control == true then
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -288,7 +288,7 @@ local function load_fixture(options)
 		}
 		package.loaded["adapters.event_provenance"] = {}
 		local admission_fence = nil
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback) callback(); return true end,
 			acquire_admission_fence = function()
 				if admission_fence ~= nil then return nil end
@@ -305,7 +305,7 @@ local function load_fixture(options)
 				return callback() == true
 			end,
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
@@ -329,7 +329,7 @@ local function load_fixture(options)
 		package.loaded["platform.remap.onboarding"] = {
 			stop = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			hide_forced = function() return true end,
 		}
 		package.loaded["modules.keystats"] = {

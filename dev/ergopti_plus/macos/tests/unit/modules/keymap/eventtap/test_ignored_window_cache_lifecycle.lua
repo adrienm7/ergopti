@@ -75,11 +75,11 @@ end
 
 local function new_fixture()
 	package.loaded["modules.keymap.utils"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local scheduler = make_scheduler()
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	local state = {
 		now = 100,
 		window_id = 42,
@@ -102,7 +102,7 @@ local function new_fixture()
 		title_watcher_active = false,
 		secure_watcher_active = false,
 	}
-	package.loaded["adapters.secure_field_detector"] = {
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
 		inspectFocusedElementWithReceipt = function()
 			state.secure_reads = state.secure_reads + 1

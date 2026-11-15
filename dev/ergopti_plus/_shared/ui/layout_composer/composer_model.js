@@ -289,14 +289,16 @@ var LayoutComposer = (function () {
 	/**
 	 * Reads the text of a .keylayout into the maps the readers walk.
 	 * @param {string} text - The file content.
-	 * @returns {object} Name, mapSet, defaultIndex, selects, keyMapSets, bases,
-	 *   actions and terminators.
+	 * @returns {object} Name, layouts, mapSet, defaultIndex, selects, keyMapSets,
+	 *   bases, actions and terminators.
 	 * @throws {ComposerError} When a part every reader needs is missing.
 	 */
 	function parseModel(text) {
 		const body = stripComments(text);
 		const model = {
 			name: '',
+			keyboardId: '',
+			layoutCount: 0,
 			mapSet: '',
 			defaultIndex: 0,
 			selects: [],
@@ -340,6 +342,7 @@ var LayoutComposer = (function () {
 			const attrs = readAttributes(match[3]);
 			if (tag === 'keyboard') {
 				model.name = attrs.name || '';
+				model.keyboardId = attrs.id || '';
 			} else if (tag === 'layout') {
 				layouts.push(attrs);
 			} else if (tag === 'modifierMap') {
@@ -350,11 +353,15 @@ var LayoutComposer = (function () {
 				});
 			} else if (tag === 'keyMapSelect') {
 				if (currentModifierMap !== '') {
-					currentSelect = { index: parseInt(attrs.mapIndex, 10), modifiers: [] };
+					// `keys` keeps the unfolded tokens: the source import tells left from right.
+					currentSelect = { index: parseInt(attrs.mapIndex, 10), modifiers: [], keys: [] };
 					modifierMaps.get(currentModifierMap).selects.push(currentSelect);
 				}
 			} else if (tag === 'modifier') {
-				if (currentSelect) currentSelect.modifiers.push(readModifierKeys(attrs.keys || ''));
+				if (currentSelect) {
+					currentSelect.modifiers.push(readModifierKeys(attrs.keys || ''));
+					currentSelect.keys.push(attrs.keys || '');
+				}
 			} else if (tag === 'keyMapSet') {
 				currentSet = attrs.id;
 				if (!model.keyMapSets.has(currentSet)) model.keyMapSets.set(currentSet, new Map());
@@ -395,6 +402,10 @@ var LayoutComposer = (function () {
 				inTerminators = true;
 			}
 		}
+		model.layoutCount = layouts.length;
+		// Every hardware layout as declared (first, last, mapSet, modifiers), for the
+		// structured import of a file with several (Bépo's ISO and ANSI maps).
+		model.layouts = layouts.map((layout) => Object.assign({}, layout));
 		const first = layouts.find((candidate) => candidate.first === '0');
 		if (!first) throw new ComposerError('keylayout_no_layout');
 		model.mapSet = first.mapSet || '';
@@ -545,7 +556,7 @@ var LayoutComposer = (function () {
 	 * @param {string} id - Its registry id.
 	 * @param {string} text - The .keylayout content.
 	 * @param {string} convention - Its keycode_convention ("iso" | "ansi").
-	 * @param {object} table - Parsed _shared/modules/layouts/mac_keycodes.json.
+	 * @param {object} table - Parsed _shared/layouts/data/mac_keycodes.json.
 	 * @returns {object} The source.
 	 * @throws {ComposerError} On a malformed layout or an unknown convention.
 	 */
@@ -769,7 +780,7 @@ var LayoutComposer = (function () {
 	// ======================================
 	// ======= 4b/ Number-row options =======
 	// ======================================
-	// The same rule as the Windows policy (_shared/modules/features/number_row_policy.ahk),
+	// The same rule as the Windows policy (_shared/settings/data/features/number_row_policy.ahk),
 	// held to the same corpus (_shared/tests/corpus/layouts/number_row_policy.json).
 
 	/** What one level of a row key holds: "d" its own digit, "s" another character or a dead key, "n" nothing. */
@@ -1093,15 +1104,18 @@ var LayoutComposer = (function () {
 	// ======= 6/ Serialization =======
 	// ================================
 
+	// The XML specials as numeric references, the only form Apple's own layouts
+	// use: macOS's keylayout loader leaves a named entity (&lt;) unread, so a key
+	// whose output was written that way typed nothing (native bundle receipt,
+	// CI run 43111697646: < and > on the ISO key typed "").
+	const XML_SPECIALS = new Set(['&', '<', '>', '"']);
+
 	function escapeAttribute(text) {
 		let out = '';
 		for (const c of text) {
-			if (c === '&') out += '&amp;';
-			else if (c === '<') out += '&lt;';
-			else if (c === '>') out += '&gt;';
-			else if (c === '"') out += '&quot;';
-			else if (c.codePointAt(0) < 0x20 || c.codePointAt(0) === 0x7f)
-				out += '&#x' + c.codePointAt(0).toString(16).toUpperCase().padStart(4, '0') + ';';
+			const code = c.codePointAt(0);
+			if (XML_SPECIALS.has(c) || code < 0x20 || code === 0x7f)
+				out += '&#x' + code.toString(16).toUpperCase().padStart(4, '0') + ';';
 			else out += c;
 		}
 		return out;
@@ -1309,8 +1323,14 @@ var LayoutComposer = (function () {
 		ROW_EDGE_CODES,
 		LEVELS,
 		MAX_OUTPUT_CODE_POINTS,
+		OTHER_KEYS,
+		KEYBOARD_GROUP,
 		ComposerError,
 		parseModel,
+		keyEntry,
+		isPrintable,
+		escapeAttribute,
+		keyboardId,
 		keyMapIndex,
 		resolve,
 		step,

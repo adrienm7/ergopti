@@ -4,11 +4,11 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local TableUtil = require("table_util")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local TableUtil = require("core.text.engine.table_util")
 local LOG = "infra.llm_preferences"
 local _scope_owner = nil
 local _detached = nil
@@ -103,6 +103,8 @@ local function lookup(document, path)
 	end
 	if value == nil then return nil, "absent" end
 	local definition = Manifest.find_entry_by_path(path)
+	-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+	value = ConfigOutdated.canonical_enum_value(definition, value)
 	if definition and not pcall(validate, definition, value) then
 		ConfigOutdated.report(path, "the value no longer fits its " .. tostring(definition.type) .. " setting", Logger)
 		return nil, "invalid"

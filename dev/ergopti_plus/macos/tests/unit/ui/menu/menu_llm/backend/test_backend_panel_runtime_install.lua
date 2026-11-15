@@ -14,12 +14,12 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
-	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
-	"infra.deferred_work", "modules.llm.backend_detector",
+	"core.timing.engine.deferred_work", "modules.llm.backend_detector",
 }
 
 local ROW = { mlx = 1, ollama = 2, api = 3 }
@@ -108,19 +108,19 @@ local function with_rows(opts, scenario)
 			end,
 			load_api_entries = function() return true end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key) return key end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body)
 				record.notices[#record.notices + 1] = { title = title, body = body }
 				return true
 			end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				record.dialogs = record.dialogs + 1
 				return opts.dialog_choice or "ollama.native_offer_install"
@@ -297,10 +297,10 @@ helpers.describe("The MLX row explains an unsupported Mac and offers Ollama (mlx
 			helpers.assert_true(mlx_row.label:find("(menu.llm.backend_mlx_unsupported)", 1, true) ~= nil,
 				"the disabled row must say why: " .. mlx_row.label)
 
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(_, callback) callback(); return true end,
 			}
-			package.loaded["infra.dialog_util"].block_alert = function(_, _, primary)
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, _, primary)
 				record.dialogs = record.dialogs + 1
 				return primary
 			end
@@ -378,7 +378,7 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 	local modules = {}
 	for _, name in ipairs(OWNED_MODULES) do modules[#modules + 1] = name end
 	for _, name in ipairs({ "ui.menu.menu_llm.model_switcher", "ui.menu.menu_llm.prediction_lock_registry",
-		"ui.menu.menu_llm.profile_label", "adapters.timer_scheduler", "llm.tone" }) do
+		"ui.menu.menu_llm.profile_label", "core.events.timer_scheduler", "ai.engine.prediction.tone" }) do
 		modules[#modules + 1] = name
 	end
 	local function fixture(target, rejects_menu, scenario)
@@ -388,10 +388,10 @@ helpers.describe("provider checkmark owns its publication (backend-checkmark)", 
 				llm_num_predictions = 1, llm_model = "old", llm_model_mlx = "candidate",
 				llm_model_ollama = "candidate" }
 			local observed = { backend = source, menus = {}, model_setters = 0 }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
-			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = { llm_num_predictions = 1, llm_model_mlx = "candidate", llm_model_ollama = "candidate" },

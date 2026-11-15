@@ -25,11 +25,11 @@ local function declared_parent(top, id)
 	return { selected }
 end
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local Manifest = require("infra.manifest_reader")
 
@@ -57,16 +57,16 @@ local function with_scope(body, source, options)
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0, pair_changes = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
 			}
-			package.loaded["adapters.evdev_reader"] = {
+			package.loaded["platform.input.evdev_reader"] = {
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
@@ -94,16 +94,16 @@ local function with_scope(body, source, options)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			-- The global shortcut scope now includes the daemon's canonical pair
 			-- owner. Build its actual policy from the physical catalogue; only
 			-- native retirement/installation acknowledgements are controlled here.
 			local combinations = require("modules.shortcuts.key_combinations")
 			if not options or options.initialize_pairs ~= false then
 				local Loader = require("platform.remap.tap_hold_loader")
-				local defaults = require("infra.paths").shared("tap_hold/defaults.toml")
+				local defaults = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 				local loaded_pairs = Loader.load_document(defaults,
-					{ tap_hold = { enabled = false, inherit_defaults = true } }, nil, path .. ".tap_hold.toml")
+					{ tap_hold = { inherit_defaults = true } }, nil, path .. ".tap_hold.toml", nil, { tap_holds = { enabled = false } })
 				helpers.assert_true(combinations.install({ keys = loaded_pairs.catalog, hold_picker = loaded_pairs.hold_picker,
 					files = files, route = function() return path end, is_paused = function() return controls.paused end,
 					actions = { is_assignable = function(action)
@@ -164,7 +164,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			if navigation_text ~= nil then
 				navigation_dir = os.tmpname()
 				assert(os.remove(navigation_dir))
-				local made = os.execute("mkdir " .. require("text_utils").shell_quote(navigation_dir))
+				local made = os.execute("mkdir " .. require("core.text.engine.utils_core").shell_quote(navigation_dir))
 				assert(made == true or made == 0)
 				navigation_made = true
 				tap_path = navigation_dir .. "/tap_hold.toml"
@@ -180,7 +180,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			else
 				tap_path = os.tmpname()
 			end
-			Sandbox.write_bytes(tap_path, require("tests.support.tap_hold_fixture").with_preset(tap_config))
+			require("tests.support.tap_hold_fixture").write(tap_path, tap_config)
 			hook = { calls = 0 }
 			function hook.set_remapper(engine) hook.calls = hook.calls + 1; hook.engine = engine; return true end
 			function hook.key_text() return nil end
@@ -190,12 +190,15 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 			Manager = require("platform.remap.tap_hold_manager")
 			helpers.assert_true(Manager.init({ keyboard_hook = hook, execute_action = function() error("no action during collision validation") end,
 				action_names = owners.gestures.get_executable_action_names, on_text_injected = function() error("no output during validation") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			controls.source_reads, controls.intentional_hook_changes = 0, 0
 			-- This fixture acknowledges initial readiness solely to reach preflight.
-			-- Restore the genuine false getter before any existing outcome assertion.
-			local native_delivery = owners.keyboard.physical_delivery_available
-			helpers.assert_eq(native_delivery(), false)
+			-- The genuine getter answers true since 2026-11-11 (LIN-004); outside an
+			-- edit these refusal cases run against a getter answering false, the
+			-- safety refusal every delivery still passes.
+			helpers.assert_eq(owners.keyboard.physical_delivery_available(), true)
+			local native_delivery = function() return false end
+			owners.keyboard.physical_delivery_available = native_delivery
 			local edit = scope.edit
 			scope.edit = function(rows, receipt)
 				controls.delivery_available = true
@@ -232,13 +235,14 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 		end)
 		if Manager then Manager._reset_for_test() end
 		if tap_path then
+			os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path))
 			local removed, detail = os.remove(tap_path)
 			if navigation_made and removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Tap fixture cleanup refused: " .. tostring(detail) end
 		end
 		if navigation_made then
 			local removed, detail = os.remove(navigation_dir .. "/layers.toml")
 			if removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused: " .. tostring(detail) end
-			local removed = os.execute("rmdir " .. require("text_utils").shell_quote(navigation_dir))
+			local removed = os.execute("rmdir " .. require("core.text.engine.utils_core").shell_quote(navigation_dir))
 			if removed ~= true and removed ~= 0 then
 				ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused"
 			end
@@ -252,7 +256,7 @@ local COLLISION_BASE = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic
 
 local NO_TAP_HOLDS = '[tap_hold]\nenabled = false\ninherit_defaults = false\n'
 
-local magic_collision_file_read = require("adapters.file_system").read
+local magic_collision_file_read = require("core.fs.adapters.file_system").read
 
 --- Uses the real replacement owner and its actual cached preference document.
 local function with_magic_source(scope, owners, controls, path, state, body)

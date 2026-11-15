@@ -21,7 +21,7 @@ local function load_gate(options)
 	package.loaded["hs"] = hs_stub
 
 	for _, name in ipairs({
-		"adapters.timer_scheduler", "adapters.synthetic_input", "adapters.event_provenance",
+		"core.events.timer_scheduler", "platform.input.synthetic_input", "adapters.event_provenance",
 		"modules.keymap.terminator_replay",
 	}) do
 		package.loaded[name] = nil
@@ -58,12 +58,12 @@ local function load_gate(options)
 		end
 		return event
 	end
-	local SyntheticInput = require("adapters.synthetic_input")
+	local SyntheticInput = require("platform.input.synthetic_input")
 	local timers = {}
 	local awake_time = 0
 	local timer_calls = 0
 	local fail_send = false
-	package.loaded["adapters.text_sender"] = {
+	package.loaded["platform.input.text_sender"] = {
 		pressKey = function(key, _mods, delay)
 			if fail_send then return false end
 			return SyntheticInput.emit_key_stroke({}, key, delay or 0)
@@ -91,7 +91,7 @@ local function load_gate(options)
 		end
 		return handle, true
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		awake_time = function() return awake_time end,
 		after = function(delay, callback)
 			return schedule_timer(delay, callback, false)
@@ -177,7 +177,7 @@ end
 
 
 local function capture_replay_errors(callback)
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(Logger)
 	local original_error = Logger.error
 	local errors = {}
@@ -255,8 +255,8 @@ helpers.describe("terminator replay: real transaction ordering", function()
 					helpers.assert_eq(control.is_paused(), false)
 					helpers.assert_true(control.is_pause_transition_pending())
 				else
-					package.loaded["infra.termination_coordinator"] = nil
-					control = require("infra.termination_coordinator")
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = nil
+					control = require("core.lifecycle.engine.shutdown.termination_coordinator")
 					helpers.assert_true(control.init({
 						request_lease = function(_, callback) callback(true); return true end,
 						drain_input = fixture.synthetic.when_idle,
@@ -297,7 +297,7 @@ helpers.describe("terminator replay: real transaction ordering", function()
 				else
 					helpers.assert_true(committed)
 					helpers.assert_true(deadline.stopped, "a completed reload retires its deadline")
-					package.loaded["infra.termination_coordinator"] = nil
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = nil
 				end
 			end, debug.traceback)
 			local added = {}
@@ -962,8 +962,8 @@ helpers.describe("terminator replay: malformed requests fail closed", function()
 end)
 
 
-package.loaded["adapters.text_sender"] = nil
-package.loaded["adapters.timer_scheduler"] = nil
-package.loaded["adapters.synthetic_input"] = nil
+package.loaded["platform.input.text_sender"] = nil
+package.loaded["core.events.timer_scheduler"] = nil
+package.loaded["platform.input.synthetic_input"] = nil
 package.loaded["adapters.event_provenance"] = nil
 package.loaded["modules.keymap.terminator_replay"] = nil

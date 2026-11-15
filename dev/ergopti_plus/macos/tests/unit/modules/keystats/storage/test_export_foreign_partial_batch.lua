@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local ContentDigest = require("tests.support.content_digest")
 local RunloopTimers = require("tests.support.runloop_timers")
 
-package.loaded["infra.i18n"] = { get = function(k) return k end, t = function(k) return k end }
+package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end, t = function(k) return k end }
 local Export = helpers.load_with_stubs("modules.keystats.export")
 
 local BATCH = "\nBEGIN TRANSACTION;\nINSERT OR IGNORE INTO events VALUES (1);\nCOMMIT;\n"
@@ -104,7 +104,7 @@ end)
 helpers.describe("keystats-export-log-privacy", function()
 	for _, phase in ipairs({ "invalid", "partial", "derived", "success", "watermark", "rollback" }) do
 		helpers.it("keystats-export-log-privacy: " .. phase .. " preserves sync outcome without logging device identity", function()
-			helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+			helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 				local previous_open = io.open
 				local ok, err = xpcall(function()
 					local identity = "private-foreign-device"
@@ -115,8 +115,8 @@ helpers.describe("keystats-export-log-privacy", function()
 					for _, level in ipairs({ "warn", "debug" }) do
 						logger[level] = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 					end
-					package.loaded["infra.logger"] = logger
-					package.loaded["infra.fs_dir"] = {
+					package.loaded["core.logger.engine.logger"] = logger
+					package.loaded["core.fs.engine.dir"] = {
 						try_entries = function(path)
 							helpers.assert_eq(path, "/owned-metrics/by_device/")
 							return { "local-device", identity }, true
@@ -211,8 +211,8 @@ end)
 helpers.describe("foreign sync database ownership", function()
 	for _, outcome in ipairs({ "refuse", "accept", "raise" }) do
 		helpers.it("stops before the next device when the callback retires its database: " .. outcome, function()
-			helpers.with_stub_scope({ "infra.fs_dir", "adapters.foreign_ledger_snapshot", "modules.keystats.export" }, function()
-				package.loaded["infra.fs_dir"] = { try_entries = function() return { "first", "second" }, true end }
+			helpers.with_stub_scope({ "core.fs.engine.dir", "adapters.foreign_ledger_snapshot", "modules.keystats.export" }, function()
+				package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "first", "second" }, true end }
 				local closes = 0
 				local snapshot_stub = {
 					open = function() return { handle = {} } end,

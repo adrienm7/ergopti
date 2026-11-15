@@ -15,11 +15,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 --- The real French catalogue, so titles are checked against the shipped template.
 local function french()
-	local handle = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+	local handle = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
@@ -50,7 +50,7 @@ local function build(owner)
 	Updater.is_local_source = function() return false end
 	local About = helpers.load_with_stubs("ui.menu.menu_about")
 	local catalogue = french()
-	require("infra.i18n").get = function(key) return catalogue[key] or key end
+	require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 	local ok, item = pcall(About.build, { channel_owner = owner }, {
 		start_at_login = function() error("Building About must not change startup.") end,
 		uninstall = function() error("Building About must not uninstall the application.") end,
@@ -182,7 +182,7 @@ local function channel_corpus()
 	local handle = assert(io.open(helpers.shared("tests/corpus/menus/update_channel_rows.json"), "rb"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("macOS published About channel choices", function()
@@ -190,7 +190,7 @@ helpers.describe("macOS published About channel choices", function()
 		local renderer = require("infra.manifest_menu")
 		local root = renderer.get_root()
 		local previous = root.about_update_channel_menu
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local previous_get = i18n.get
 		local expected, choices = channel_corpus(), {}
 		for _, value in ipairs(expected.reordered_values) do
@@ -289,7 +289,7 @@ helpers.describe("macOS About channel durable receipts", function()
 			local names = {"modules.updater.channel", "adapters.update_launcher"}
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local real_write = writer.batch_write
 			local path = os.tmpname()
 			local original = "[updater]\nchannel = \"main\"\nfuture_channel_option = 42\n"
@@ -350,7 +350,7 @@ helpers.describe("macOS About channel post-publication refusal", function()
 		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local updater = require("modules.updater")
 		local previous_source = updater.is_local_source
-		local writer = require("toml_codec.writer")
+		local writer = require("core.text.engine.toml_codec.writer")
 		local path = os.tmpname()
 		local file = assert(io.open(path, "wb"))
 		assert(file:write('[updater]\nchannel = "main"\nfuture_channel_option = 42\n')); assert(file:close())
@@ -400,7 +400,7 @@ end
 helpers.describe("About version separator shared fragment (macOS)", function()
 	helpers.it("retains actual rendered version-separator-channel order", function()
 		local handle = assert(io.open(helpers.shared("tests/corpus/menus/about_version_separator.json"), "rb"))
-		local expected = assert(require("adapters.json_codec").decode(handle:read("*a"))); assert(handle:close())
+		local expected = assert(require("core.fs.adapters.json_codec").decode(handle:read("*a"))); assert(handle:close())
 		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
 		local rows, labels = build((fake_owner("dev")))
 		helpers.assert_not_nil(rows[expected.version_index])

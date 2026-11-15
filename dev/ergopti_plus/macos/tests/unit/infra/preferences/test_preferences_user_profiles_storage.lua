@@ -5,15 +5,15 @@
 --- DESCRIPTION:
 --- macOS kept the user's prompt profiles in its own [llm.profiles]
 --- user_profiles array while Windows and Linux store them in llm.user_profiles,
---- the versioned envelope of _shared/lua/llm/profile_registry_codec.lua. A
+--- the versioned envelope of _shared/ai/engine/settings/profile_registry_codec.lua. A
 --- config.toml carried between machines lost its profiles on the way. These
 --- tests pin the shared key and envelope on the macOS save and load.
 --- ==============================================================================
 
 local helpers   = require("tests.helpers")
-local Contract  = require("test.config_unused_keys_contract")
-local TomlCodec = require("toml_codec")
-local ProfileRegistry = require("llm.profile_registry_codec")
+local Contract  = require("tests.lua.settings.unused_keys_contract")
+local TomlCodec = require("core.text.engine.toml_codec")
+local ProfileRegistry = require("ai.engine.settings.profile_registry_codec")
 
 local Sandbox = Contract.sandbox
 
@@ -57,9 +57,9 @@ helpers.describe("user prompt profiles are stored at the key every OS reads (par
 		end)
 	end)
 
-	-- The array an older build stored at [llm.profiles] user_profiles reaches the
-	-- envelope through the boot migration (step v16_to_v17, corpus
-	-- shipped_user_profiles_*), so this reader has nothing to import.
+	-- The array an older build stored at [llm.profiles] user_profiles reached the
+	-- envelope through the boot migration (step v16_to_v17, squashed since: a file
+	-- that old is now refused), so this reader has nothing to import.
 	helpers.it("imports nothing from the older array: the boot migration owns it", function()
 		local source = "[llm]\nenabled = true\n[llm.profiles]\n"
 			.. "user_profiles = [{ id = \"user_first\", label = \"First Profile\", system_single = \"first\" }]\n"

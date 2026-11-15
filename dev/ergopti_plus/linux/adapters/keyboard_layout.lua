@@ -37,13 +37,13 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger = require("logger.shim")
-local Shell = require("adapters.shell_runner")
-local DisplayServer = require("infra.display_server")
+local Logger = require("core.logger.engine.shim")
+local Shell = require("core.process.adapters.shell_runner")
+local DisplayServer = require("core.ui.engine.display_server")
 local XkbKeymap = require("infra.xkb_keymap")
-local Keysym = require("infra.keysym")
+local Keysym = require("platform.input.keysym")
 local XkbCapture = require("adapters.xkb_capture")
 local inverse_table, inverse_current = XkbCapture.inverse_table, XkbCapture.inverse_current
 local inverse_republish = XkbCapture.inverse_republish
@@ -51,8 +51,9 @@ local inverse_retarget = XkbCapture.inverse_retarget
 local retarget_is_x11 = DisplayServer.is_x11
 local XkbRmlvo = require("infra.xkb_rmlvo")
 local ConfigPaths = require("infra.config_paths")
-local EvdevCodes = require("infra.evdev_codes")
-local Utf8 = require("compat.utf8")
+local EvdevCodes = require("platform.input.evdev_codes")
+local Timings = require("core.timing.engine.timings")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 local LOG = "adapters.keyboard_layout"
 
@@ -70,9 +71,16 @@ local LOG = "adapters.keyboard_layout"
 --     Every LTS distribution shipped such a libxkbcommon when this was written
 --     (Ubuntu 24.04: 1.6), and without these two fallbacks the daemon refused
 --     the keyboard and exited on their default Wayland session.
-local WAYLAND_DUMP = "xkbcli dump-keymap-wayland 2>/dev/null"
+-- Bounded: the dump waits for a wl_keyboard keymap event, which a seat with no
+-- keyboard never sends, and an unbounded wait hung the daemon's start-up
+-- (libxkbcommon 1.13, sway headless). `timeout` takes whole seconds everywhere,
+-- BusyBox included.
+local WAYLAND_DUMP = string.format("timeout %d xkbcli dump-keymap-wayland 2>/dev/null",
+	math.ceil(Timings.ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000))
 local X11_DUMP     = "xkbcli dump-keymap-x11 2>/dev/null"
 local X11_FALLBACK = "xkbcomp -xkb \"$DISPLAY\" - 2>/dev/null"
+-- The log name of the in-process X11 dump (adapters/xkb_source_probe.dump_keymap).
+local NATIVE_X11_DUMP = "libxkbcommon-x11 (in process)"
 
 -- Where each desktop keeps the layout names, read in this order. GNOME's most
 -- recently used source is the active one; `sources` is only its fallback when
@@ -165,8 +173,11 @@ local function publish(built, receipt)
 end
 
 
--- Only new typing requests may renew a different native X11 group. Existing
--- plan checks, readiness and explicit overrides keep their old refusal contract.
+-- New typing requests and readiness may renew the inverse after a native X11
+-- source change: a different group, or the same group with an identical
+-- server keymap (a slave-keyboard switch's new-keyboard notify, decided by the
+-- maintainer on 2026-11-11). Existing plan checks and explicit overrides keep
+-- their old refusal contract.
 local typing_lookup = false
 local function typing_cohort()
 	if typing_lookup then return nil end
@@ -178,7 +189,7 @@ local function typing_cohort()
 			and rawequal(_base, base) and _selection_override == selection
 			and previous ~= nil and rawequal(_table, previous.built)
 			and rawequal(package.loaded["adapters.xkb_capture"], XkbCapture)
-			and rawequal(package.loaded["infra.display_server"], DisplayServer)
+			and rawequal(package.loaded["core.ui.engine.display_server"], DisplayServer)
 			and rawequal(DisplayServer.is_x11, retarget_is_x11)
 			and rawequal(XkbCapture.inverse_retarget, inverse_retarget)
 			and rawequal(XkbCapture.inverse_table, inverse_table) and rawequal(XkbCapture.inverse_current, inverse_current)
@@ -218,7 +229,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	local fh = require("infra.regular_file_reader").open_source(path)
+	local fh = require("core.fs.engine.regular_file_reader").open_source(path)
 	if not fh then return nil end
 	local text = fh:read("*a")
 	local closed = fh:close()
@@ -269,6 +280,16 @@ end
 --- @return string|nil The keymap text, or nil when nothing could produce one.
 --- @return string|nil The command that produced it, for the log.
 local function dump_keymap()
+	-- X11 first in process: the source probe serializes the server keymap
+	-- through libxkbcommon-x11, the text `xkbcli dump-keymap-x11` prints,
+	-- without forking a dump tool (about 40 ms a resolve through xkbcomp,
+	-- which Ubuntu 24.04's libxkbcommon 1.6 left as the only X11 dump). The
+	-- commands below remain the route when the native libraries are absent.
+	if DisplayServer.is_x11() then
+		local text, reason = require("adapters.xkb_source_probe").dump_keymap()
+		if text and text:find("xkb_keymap", 1, true) then return text, NATIVE_X11_DUMP end
+		Logger.debug(LOG, "In-process X11 keymap dump unavailable (%s); trying the dump tools.", tostring(reason))
+	end
 	local candidates = {}
 	if DisplayServer.is_wayland() then
 		candidates[#candidates + 1] = WAYLAND_DUMP
@@ -490,6 +511,22 @@ function M.refresh(override_path)
 	return true
 end
 
+--- Resolves the layout again unless the published one is provably current.
+--- Current means bound to the desktop's XKB source (X11's native probe), whose
+--- keymap and group notifications revoke it, and still live by that check. Any
+--- other source (a Wayland dump, an override file) cannot prove it and is
+--- dumped again, as refresh() always did.
+--- @param override_path string|nil The same override refresh() takes.
+--- @return boolean True when a usable table is loaded.
+function M.refresh_unless_current(override_path)
+	local cohort = override_path == nil and _source ~= "override" and current_cohort() or nil
+	if cohort and cohort.receipt and XkbCapture.inverse_receipt_watched(cohort.receipt) then
+		Logger.debug(LOG, "Layout still current on the desktop source; not dumped again.")
+		return true
+	end
+	return M.refresh(override_path)
+end
+
 --- What produced the loaded keymap, or nil when none is loaded.
 --- @return string|nil
 function M.source()
@@ -533,7 +570,7 @@ end
 --- True when a layout table is loaded.
 --- @return boolean
 function M.is_ready()
-	return current_cohort() ~= nil
+	return current_cohort() ~= nil or typing_cohort() ~= nil
 end
 
 --- Resolves one character to the keystroke that produces it.

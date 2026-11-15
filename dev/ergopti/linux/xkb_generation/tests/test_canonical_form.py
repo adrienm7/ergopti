@@ -2,7 +2,7 @@
 
 The shared corpus (_shared/tests/corpus/keylayout) pins what every parser must
 produce for a set of hand-checked fixtures and for the composer layout; the macOS
-and Linux Lua suites replay it against _shared/lua/layouts/keylayout.lua. This
+and Linux Lua suites replay it against _shared/layouts/engine/composer/keylayout.lua. This
 module replays it against this converter's parser and proves the converter
 reads the canonical form: converting a layout through the form gives the same
 XKB and XCompose text as converting its .keylayout directly, for every layout of

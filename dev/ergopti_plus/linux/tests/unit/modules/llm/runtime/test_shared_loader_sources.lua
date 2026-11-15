@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local CHILD_TIMEOUT_MS = 3000
-local TIMINGS_SOURCE = require("timings").REGISTRY_REL_PATH
+local TIMINGS_SOURCE = require("core.timing.engine.timings_core").REGISTRY_REL_PATH
 local SOURCES = {
 	{ "local", "local_servers.json" }, { "local", "api_providers.json" },
 	{ "environment", "managed_ollama_environment.json" },
@@ -43,31 +43,35 @@ end
 
 --- Runs one actual loader in an isolated, admitted installed child layout.
 local function observe(family, target, mode)
-	local uv, Json = require("luv"), require("json")
+	local uv, Json = require("luv"), require("core.text.engine.json")
 	local root = helpers.driver_root()
 	local base = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-shared-loader-XXXXXX"))
 	local operation, result
 	local ok, err = xpcall(function()
 		local driver = base .. "/driver"
-		for _, dir in ipairs({ driver, driver .. "/infra", driver .. "/_shared", driver .. "/_shared/data",
-			driver .. "/_shared/data/locales", driver .. "/_shared/modules", driver .. "/_shared/modules/llm",
-			driver .. "/_shared/" .. require("native_path").dirname(TIMINGS_SOURCE) }) do
+		for _, dir in ipairs({ driver, driver .. "/infra", driver .. "/_shared", driver .. "/_shared/core", driver .. "/_shared/core/i18n", driver .. "/_shared/core/i18n/data", driver .. "/_shared/core/i18n/data/locales", driver .. "/_shared/ai", driver .. "/_shared/ai/data", driver .. "/core", driver .. "/core/fs", driver .. "/core/fs/engine" }) do
 			assert(uv.fs_mkdir(dir, 448))
 		end
-		write(driver .. "/infra/paths.lua", read(root .. "/infra/paths.lua"))
-		write(driver .. "/_shared/data/locales/en.json", read(root .. "/../_shared/data/locales/en.json"))
+		-- The timings owner names its own place; each missing folder of it is made.
+		local timings_dir = driver .. "/_shared"
+		for part in require("core.fs.engine.native_path").dirname(TIMINGS_SOURCE):gmatch("[^/]+") do
+			timings_dir = timings_dir .. "/" .. part
+			if not uv.fs_stat(timings_dir) then assert(uv.fs_mkdir(timings_dir, 448)) end
+		end
+		write(driver .. "/core/fs/engine/paths.lua", assert(helpers.read_module_source("core.fs.engine.paths")))
+		write(driver .. "/_shared/core/i18n/data/locales/en.json", read(root .. "/../_shared/core/i18n/data/locales/en.json"))
 		-- The environment loader's shared timings owner reads this installed resource.
 		write(driver .. "/_shared/" .. TIMINGS_SOURCE, read(root .. "/../_shared/" .. TIMINGS_SOURCE))
 		for _, source in ipairs(SOURCES) do
-			write(driver .. "/_shared/modules/llm/" .. source[2], read(root .. "/../_shared/modules/llm/" .. source[2]))
+			write(driver .. "/_shared/ai/data/" .. source[2], read(root .. "/../_shared/ai/data/" .. source[2]))
 		end
-		local path = driver .. "/_shared/modules/llm/" .. target
+		local path = driver .. "/_shared/ai/data/" .. target
 		if mode == "symlink" then
 			assert(uv.fs_rename(path, path .. ".regular")); assert(uv.fs_symlink(path .. ".regular", path))
 		elseif mode == "fifo" or mode == "symlink-fifo" then
 			assert(uv.fs_unlink(path))
 			local fifo = mode == "fifo" and path or (path .. ".fifo")
-			local status = os.execute("mkfifo -- " .. require("text_utils").shell_quote(fifo))
+			local status = os.execute("mkfifo -- " .. require("core.text.engine.utils_core").shell_quote(fifo))
 			assert(status == true or status == 0)
 			if mode == "symlink-fifo" then assert(uv.fs_symlink(fifo, path)) end
 		elseif mode == "eacces" then
@@ -76,7 +80,7 @@ local function observe(family, target, mode)
 			assert(uv.fs_unlink(path)); assert(uv.fs_mkdir(path, 448))
 		end
 		local receipt = base .. "/receipt.json"
-		operation = require("adapters.owned_process").start(assert(uv.exepath()), {
+		operation = require("core.process.adapters.owned_process").start(assert(uv.exepath()), {
 			root .. "/tests/fixtures/native_shared_loader.lua", root, driver, family, target, mode, receipt,
 		}, { owner = base, timeout_ms = CHILD_TIMEOUT_MS }, function() end)
 		local deadline = uv.hrtime() + CHILD_TIMEOUT_MS * 2 * 1000000
@@ -113,12 +117,12 @@ if package.config:sub(1, 1) == "/" then
 					elseif source[1] == "environment" then
 						if permitted then
 							helpers.assert_eq(result.rows, assert(require("modules.llm.managed_ollama_environment").decode(
-								read(helpers.driver_root() .. "/../_shared/modules/llm/managed_ollama_environment.json"))))
+								read(helpers.driver_root() .. "/../_shared/ai/data/managed_ollama_environment.json"))))
 						else
 							helpers.assert_eq(result.rows, false); helpers.assert_eq(result.reason, "managed_environment_unreadable")
 						end
 					else
-						local policy = require("json").decode(read(helpers.driver_root() .. "/../_shared/modules/llm/inference.json")).profile_recommendation
+						local policy = require("core.text.engine.json").decode(read(helpers.driver_root() .. "/../_shared/ai/data/inference.json")).profile_recommendation
 						local expected = permitted and require("modules.llm.model_profile").recommend_from("unlisted:999b", {}, policy) or "basic"
 						helpers.assert_eq(result.profile, expected, "source refusal retains the existing unavailable-profile contract")
 					end
@@ -129,23 +133,23 @@ if package.config:sub(1, 1) == "/" then
 end
 
 for _, case in ipairs({
-	{ name = "remote provider catalogue", module = "modules.llm.api_remote", path = "modules/llm/api_providers.json",
+	{ name = "remote provider catalogue", module = "modules.llm.api_remote", path = "ai/data/api_providers.json",
 		invoke = function(owner) return owner.provider("openai") ~= nil end, returns_false = true },
-	{ name = "reasoning policy", module = "modules.llm.api_remote", path = "modules/llm/thinking_off.json",
+	{ name = "reasoning policy", module = "modules.llm.api_remote", path = "ai/data/thinking_off.json",
 		invoke = function(owner) return owner.ollama_think("gpt-oss:20b") end, returns_false = true },
-	{ name = "inference", module = "modules.llm.inference", path = "modules/llm/inference.json",
+	{ name = "inference", module = "modules.llm.inference", path = "ai/data/inference.json",
 		invoke = function(owner) return owner.variant_temperature(0.5, 1) end, raises = true },
-	{ name = "backend brands", module = "modules.llm.backend_brands", path = "modules/llm/backends.json",
+	{ name = "backend brands", module = "modules.llm.backend_brands", path = "ai/data/backends.json",
 		invoke = function(owner) return owner.brand("ollama") end, raises = true },
-	{ name = "translation prompt", module = "modules.llm.translation", path = "modules/llm/translate.json",
+	{ name = "translation prompt", module = "modules.llm.translation", path = "ai/data/translate.json",
 		invoke = function(owner) return owner.data() end },
-	{ name = "translation names", module = "modules.llm.translation", path = "data/locale_names.json",
+	{ name = "translation names", module = "modules.llm.translation", path = "core/i18n/data/locale_names.json",
 		invoke = function(owner) return owner.data() end },
-	{ name = "translation order", module = "modules.llm.translation", path = "data/locale_order.json",
+	{ name = "translation order", module = "modules.llm.translation", path = "core/i18n/data/locale_order.json",
 		invoke = function(owner) return owner.data() end },
 }) do
 	helpers.it("shared config refuses FIFO in " .. case.name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original_shared, original_module = Paths.shared, package.loaded[case.module]
 		local source = assert(original_shared(case.path))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-llm-config-XXXXXX"))

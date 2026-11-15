@@ -10,9 +10,9 @@
 
 local helpers = require("tests.helpers")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Shared = require("keymap.magic_key_source")
+local Shared = require("layouts.engine.layers.magic_key_source")
 
 local PATH = "hotstrings.magic_key_source"
 
@@ -21,13 +21,13 @@ local KEY_J = 36
 local KEY_C = 46
 
 local function registry()
-	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json", "rb"))
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json", "rb"))
 	local decoded = Json.decode(handle:read("*a"))
 	handle:close()
 	return decoded
 end
 
-require("test.magic_key_source_contract")(helpers, Shared, {
+require("tests.lua.layouts.magic_key_source_contract")(helpers, Shared, {
 	entry = require("infra.manifest_reader").find_entry_by_path(PATH),
 	registry = registry(),
 	field = "evdev",
@@ -189,8 +189,8 @@ assert(native_caption_closed and native_caption_close ~= nil and native_caption_
 
 local native_caption_corpus = assert(Json.decode(native_caption_bytes))
 
-local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "adapters.application_notifier",
-	"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }
+local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "platform.focus.application_notifier",
+	"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 
 -- A caller catching an expected primary must also consume cleanup_failures.
 -- Normal positive subjects fail on any cleanup refusal after all attempts finish.
@@ -206,13 +206,13 @@ local function with_magic_notice(body, cleanup_failures)
 	-- Protection starts before the first owned cache edit, including setup imports.
 	local ok, failure = pcall(function()
 		for _, name in ipairs(magic_notice_module_names) do rawset(cache, name, nil) end
-		Locale, I18n = require("infra.locale"), require("infra.i18n")
+		Locale, I18n = require("core.i18n.engine.locale"), require("core.i18n.engine.i18n")
 		previous_locale = Locale.current_locale()
 		locale_captured = true
-		policy = require("window_titles")
+		policy = require("core.ui.engine.window_titles")
 		lookup_owner, lookup_captured = policy.native_presentation, true
 		local notices = {}
-		rawset(cache, "adapters.application_notifier", { send = function(message, options)
+		rawset(cache, "platform.focus.application_notifier", { send = function(message, options)
 			notices[#notices + 1] = { message = message, title = options.title, level = options.level }
 			return true
 		end })

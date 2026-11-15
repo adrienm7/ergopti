@@ -19,12 +19,12 @@ local hs          = hs
 local text_acts   = require("modules.shortcuts.actions.text")
 local sys_acts    = require("modules.shortcuts.actions.system")
 local app_acts    = require("modules.shortcuts.actions.apps")
-local Logger      = require("infra.logger")
-local i18n        = require("infra.i18n")
+local Logger      = require("core.logger.engine.logger")
+local i18n        = require("core.i18n.engine.i18n")
 local Manifest    = require("infra.manifest_reader")
 local TapKeys     = require("modules.shortcuts.tap_keys")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.bindings"
@@ -1139,8 +1139,20 @@ end
 --- so the action always reflects config.toml (the SSoT) instead of the hardcoded
 --- manifest default. No re-arm is needed: the action reads M.get_chatgpt_url()
 --- on every run rather than capturing the value once.
+--- A URL its shared value schema declaration refuses (another scheme, a
+--- space or control character, past 2048 characters) fails fast with a log
+--- line and leaves the current one in place.
 --- @param url string|nil The configured URL, or nil to fall back to the default.
+--- @return boolean applied
 function M.set_chatgpt_url(url)
+	if url ~= nil and url ~= "" then
+		local ValueCheck = require("settings.engine.value_check")
+		local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.SHORTCUTS_CHATGPT_URL), url)
+		if not checked.ok then
+			Logger.error(LOG, "ChatGPT URL refused by its value schema declaration (%s).", checked.reason)
+			return false
+		end
+	end
 	_chatgpt_url = (type(url) == "string" and url ~= "") and url or nil
 	Logger.debug(LOG, "ChatGPT URL updated.")
 	return true

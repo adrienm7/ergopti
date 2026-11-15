@@ -27,8 +27,8 @@ helpers.describe("modules.updater.manager", function()
 
 	local function release(tag, prerelease)
 		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_ASSET_NAME .. '"},'
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_CHECKSUM_ASSET_NAME .. '"}]}',
 			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
 	end
 
@@ -48,14 +48,14 @@ helpers.describe("modules.updater.manager", function()
 		)
 		helpers.assert_eq(package_install.kind, "package",
 			".deb, RPM, Flatpak, AppImage and Nix layouts must keep their update owner")
-		helpers.assert_eq(package_install.reason, require("adapter_errors").UPDATER_PACKAGE_OWNED,
+		helpers.assert_eq(package_install.reason, require("diagnostics.engine.adapter_errors").UPDATER_PACKAGE_OWNED,
 			"a package refusal names its closed reason id, not a sentence")
 		helpers.assert_eq(Installer.resolve(nil, function() return true end).reason,
-			require("adapter_errors").UPDATER_SOURCE_PATH_RELATIVE)
+			require("diagnostics.engine.adapter_errors").UPDATER_SOURCE_PATH_RELATIVE)
 	end)
 
 	helpers.it("linux-native-cwd: updater shares the actual cwd owner for a relative source", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local installer = helpers.load_module("modules.updater.installer")
 		local real_cwd, real_getenv = Paths.current_directory, os.getenv
 		Paths.current_directory = function() return "/synthetic/prefix/lib/ergopti" end
@@ -94,23 +94,23 @@ helpers.describe("modules.updater.manager", function()
 		local archive = base .. "/release.tar.gz"
 		helpers.assert_true(command_ok("mkdir -p " .. shell_quote(install_root .. "/linux/infra")
 			.. " " .. shell_quote(install_root .. "/linux/install")
-			.. " " .. shell_quote(install_root .. "/_shared/lua")
+			.. " " .. shell_quote(install_root .. "/_shared")
 			.. " " .. shell_quote(prefix .. "/bin")
 			.. " " .. shell_quote(payload .. "/linux/infra")
 			.. " " .. shell_quote(payload .. "/linux/install")
-			.. " " .. shell_quote(payload .. "/_shared/lua")
-			.. " " .. shell_quote(payload .. "/_shared/data/locales")
+			.. " " .. shell_quote(payload .. "/_shared")
+			.. " " .. shell_quote(payload .. "/_shared/core/i18n/data/locales")
 			.. " " .. shell_quote(payload .. "/bin")))
 
 		write_file(install_root .. "/linux/ergopti_hotstrings.lua", "print('old-driver')\n")
 		write_file(install_root .. "/linux/infra/version.lua", "return {}\n")
 		write_file(install_root .. "/_shared/build_stamp.txt", "commit=" .. string.rep("a", 40) .. "\nversion=3.0.0\n")
-		write_file(install_root .. "/_shared/lua/sentinel.lua", "return 'old-shared'\n")
+		write_file(install_root .. "/_shared/sentinel.lua", "return 'old-shared'\n")
 		write_file(payload .. "/linux/ergopti_hotstrings.lua", "print('new-driver')\n")
 		write_file(payload .. "/linux/infra/version.lua", "return {}\n")
 		write_file(payload .. "/_shared/build_stamp.txt", "commit=" .. string.rep("b", 40) .. "\nversion=4.0.0\n")
-		write_file(payload .. "/_shared/lua/sentinel.lua", "return 'new-shared'\n")
-		write_file(payload .. "/_shared/data/locales/en.json", "{}\n")
+		write_file(payload .. "/_shared/sentinel.lua", "return 'new-shared'\n")
+		write_file(payload .. "/_shared/core/i18n/data/locales/en.json", "{}\n")
 		write_file(payload .. "/bin/ergopti-hotstrings", "#!/usr/bin/env bash\nexit 0\n")
 		write_file(payload .. "/install.sh", "#!/usr/bin/env bash\nexit 0\n")
 		-- The target need not ship the running updater's receipt implementation.
@@ -120,7 +120,7 @@ helpers.describe("modules.updater.manager", function()
 			assert(read_file(helpers.driver_root() .. "/install/ownership_schema.sh")))
 		write_file(wrapper, "#!/usr/bin/env bash\nset -euo pipefail\n"
 			.. "grep -q 'version=4.0.0' " .. shell_quote(install_root .. "/_shared/build_stamp.txt") .. "\n"
-			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/lua/sentinel.lua") .. "\n"
+			.. "grep -q 'new-shared' " .. shell_quote(install_root .. "/_shared/sentinel.lua") .. "\n"
 			.. "test ! -e " .. shell_quote(install_root .. "/linux/linux") .. "\n"
 			.. "exec bash " .. shell_quote(install_root .. "/bin/ergopti-hotstrings") .. "\n")
 		helpers.assert_true(command_ok("chmod +x " .. shell_quote(wrapper)
@@ -141,7 +141,7 @@ helpers.describe("modules.updater.manager", function()
 		end
 		M._test_set_cached_release({ tag = "v4.0.0", prerelease = false })
 		M._test_set_verified_archive(archive)
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local real_error = logger.error
 		local errors = {}
 		logger.error = function(_tag, fmt, ...)
@@ -152,7 +152,7 @@ helpers.describe("modules.updater.manager", function()
 		logger.error = real_error
 
 		local new_version = read_file(install_root .. "/_shared/build_stamp.txt")
-		local new_shared = read_file(install_root .. "/_shared/lua/sentinel.lua")
+		local new_shared = read_file(install_root .. "/_shared/sentinel.lua")
 		local old_version = read_file(install_root .. ".old/_shared/build_stamp.txt")
 		local nested = read_file(install_root .. "/linux/linux/ergopti_hotstrings.lua")
 		local archive_left = read_file(archive)
@@ -363,12 +363,12 @@ helpers.describe("updater bounded pagination", function()
 	end
 
 	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
-		local real_fs = require("adapters.file_system")
+		local real_fs = require("core.fs.adapters.file_system")
 		local controlled_fs = setmetatable({ exists = function(path)
 			if path == require("infra.config_paths").cache() or path:match("/updater_etag_[^/]+%.txt$") then return true end
 			return real_fs.exists(path)
 		end }, { __index = real_fs })
-		local M = helpers.load_module_with_dependency("modules.updater.manager", "adapters.file_system", controlled_fs)
+		local M = helpers.load_module_with_dependency("modules.updater.manager", "core.fs.adapters.file_system", controlled_fs)
 		local requests, completions, result = 0, 0, nil
 		local cached = false
 		M._http_client = { get = function(url, _, options, cb)
@@ -376,7 +376,7 @@ helpers.describe("updater bounded pagination", function()
 			local index = tonumber(url:match("&page=(%d+)$"))
 			helpers.assert_true(index ~= nil, "requests carry an explicit page")
 			helpers.assert_contains(url, "per_page=20")
-			helpers.assert_eq(options.max_body_bytes, require("infra.timings").count("limits", "release_list_body_bytes"))
+			helpers.assert_eq(options.max_body_bytes, require("core.timing.engine.timings").count("limits", "release_list_body_bytes"))
 			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
 			etag_response(response, "https://etag-fixture.invalid/releases/page-" .. index, '"PAGE-' .. index .. '"', cached)
 			if cached then helpers.assert_true(options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end
@@ -460,7 +460,7 @@ end)
 helpers.describe("installer-backup-ownership native receipts", function()
 	local NativeFixture = require("tests.support.modules.updater.installer_native_fixture")
 	local uv = require("luv")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local function receipt(fixture)
 		assert(uv.fs_rename(fixture.installed .. "/old.marker", fixture.installed .. "/linux/old.marker"))
 		NativeFixture.write(fixture.installed .. "/linux/binary.marker", "\0owned binary\255\n")
@@ -475,7 +475,7 @@ helpers.describe("installer-backup-ownership native receipts", function()
 		for _, role in ipairs({ "wrapper", "unit", "autostart" }) do
 			local source = role == "wrapper" and fixture.context.wrapper or fixture.root .. "/external-" .. role
 			if role ~= "wrapper" then NativeFixture.write(source, "external " .. role .. " bytes\n") end
-			rows[role] = assert(require("adapters.crypto").sha256(assert(NativeFixture.read(source)))) .. "\t@" .. role .. "\n"
+			rows[role] = assert(require("core.crypto.crypto").sha256(assert(NativeFixture.read(source)))) .. "\t@" .. role .. "\n"
 			content = content .. rows[role]
 		end
 		NativeFixture.write(manifest, content)
@@ -557,6 +557,32 @@ helpers.describe("installer-backup-ownership native receipts", function()
 			helpers.assert_true(type(owner.verify(backup, fixture.installed)) == "string")
 			assert(uv.fs_mkdir(backup .. "/foreign-empty", 448))
 			helpers.assert_nil(owner.verify(backup, fixture.installed), "unlisted root siblings do not belong to the payload trees")
+		end)
+		NativeFixture.remove(fixture.root)
+		if not ok then error(failure, 0) end
+	end)
+
+	-- The bytecode package is compiled after the receipt (core/lifecycle/engine/bytecode_package.lua):
+	-- an update must still rotate a backup that carries one.
+	helpers.it("(installer-backup-ownership) admits the derived bytecode tree by name, never as a link", function()
+		local installer = helpers.load_module("modules.updater.installer")
+		local owner = helpers.load_module("modules.updater.ownership_receipt")
+		local fixture = NativeFixture.create(installer)
+		local backup = fixture.installed .. ".old"
+		local ok, failure = pcall(function()
+			receipt(fixture); clone_backup(fixture)
+			assert(uv.fs_mkdir(backup .. "/.bytecode", 493))
+			NativeFixture.write(backup .. "/.bytecode/bundle", "derived bytes\n")
+			local identity, detail = owner.verify(backup, fixture.installed)
+			helpers.assert_true(type(identity) == "string", "a real derived tree is admitted: " .. tostring(detail))
+			assert(uv.fs_unlink(backup .. "/.bytecode/bundle"))
+			assert(uv.fs_rmdir(backup .. "/.bytecode"))
+			assert(uv.fs_symlink(fixture.installed .. "/linux", backup .. "/.bytecode"))
+			helpers.assert_nil(owner.verify(backup, fixture.installed), "a link named like the derived tree is refused")
+			assert(uv.fs_unlink(backup .. "/.bytecode"))
+			assert(uv.fs_mkdir(backup .. "/linux/.bytecode", 493))
+			NativeFixture.write(backup .. "/linux/.bytecode/bundle", "misplaced\n")
+			helpers.assert_nil(owner.verify(backup, fixture.installed), "only the root's derived tree is admitted")
 		end)
 		NativeFixture.remove(fixture.root)
 		if not ok then error(failure, 0) end
@@ -766,7 +792,7 @@ helpers.describe("installer rollback capture admission", function()
 					else
 						-- A copied valid receipt cannot authorize deleting a different
 						-- native generation, even when every payload hash still matches.
-						local Shell = require("adapters.shell_runner")
+						local Shell = require("core.process.adapters.shell_runner")
 						assert(Shell.run("cp -a -- " .. Shell.quote(fixture.root .. "/displaced-candidate") .. " " .. Shell.quote(source)))
 						marker = "/linux/new.marker"; foreign_bytes = assert(Fixture.read(source .. marker))
 					end

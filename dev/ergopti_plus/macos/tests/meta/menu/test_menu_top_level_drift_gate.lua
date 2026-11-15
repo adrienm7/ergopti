@@ -34,6 +34,7 @@ local native_hotstrings_caption = nil
 -- table does not know fails the gate: it has to be named here to be compared.
 local TITLE_KEYS = {
 	keyboard_layout = "menu.layout.title",
+	ergopti_studio  = "menu.studio.title",
 	hotstrings      = "menu.hotstrings.title",
 	llm             = "menu.llm.title",
 	agent           = "menu.agent.title",
@@ -51,7 +52,7 @@ local TITLE_KEYS = {
 }
 
 local SEPARATOR = "---"
-local MANIFEST_RELATIVE = "modules/menu/menu_manifest.json"
+local MANIFEST_RELATIVE = "menu/data/menu_manifest.json"
 
 
 
@@ -155,7 +156,7 @@ end
 --- @return table row
 local function stub_row(key)
 	return {
-		label = require("infra.i18n").get(key),
+		label = require("core.i18n.engine.i18n").get(key),
 		submenu = { { title = "row", fn = function() end } },
 	}
 end
@@ -165,12 +166,12 @@ end
 --- @return function The actual initialized language-row provider.
 local function native_language_provider()
 	return helpers.with_stub_scope({
-		"infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
-		"adapters.storage", "adapters.timer_scheduler",
+		"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
+		"core.fs.adapters.storage", "core.events.timer_scheduler",
 	}, function()
-		helpers.load_with_stubs("infra.i18n")
-		rawset(package.loaded, "infra.i18n", nil)
-		local native = require("infra.i18n")
+		helpers.load_with_stubs("core.i18n.engine.i18n")
+		rawset(package.loaded, "core.i18n.engine.i18n", nil)
+		local native = require("core.i18n.engine.i18n")
 		native.init()
 		assert(type(native.build_language_menu_items) == "function", "actual native locale provider exists")
 		assert(#native.get_sorted_locales() == 21, "actual generated locale catalogue is complete")
@@ -190,9 +191,9 @@ local function render_root(manifest_text, paused, command_actions)
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
 		-- The renderer retains this actual dependency table; the next native loader
 		-- replaces the public cache entry with another controlled i18n cohort.
-		local renderer_captions = require("infra.i18n")
+		local renderer_captions = require("core.i18n.engine.i18n")
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local captions = require("infra.i18n")
+		local captions = require("core.i18n.engine.i18n")
 		local previous_get, previous_language = captions.get, captions.build_language_menu_items
 		local previous_renderer_get = renderer_captions.get
 		-- The typed parent consumes its real translated base. Other controlled
@@ -270,7 +271,7 @@ end
 local function id_of(row)
 	if row.title == "-" then return SEPARATOR end
 	local title = without_symbol(tostring(row.title))
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	for id, key in pairs(TITLE_KEYS) do
 		local captions = {key, without_symbol(i18n.get(key))}
 		if id == "hotstrings" and type(native_hotstrings_caption) == "function" then
@@ -353,35 +354,54 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 		assert_same_order(rows, expected, "shuffled manifest")
 	end)
 
-	helpers.it("a pause greys exactly the rows the manifest marks, wherever they sit", function()
-		-- The mark moves from Metrics to Language here. A driver that keeps its
-		-- own list of the feature ids keeps greying Metrics and leaves Language
-		-- live, so it fails even while its list matches the shipped manifest.
+	helpers.it("the Ergopti Studio row opens the layout editor window (ergopti-studio-menu-row)", function()
+		local saved = package.loaded["ui.layout_manager"]
+		local opened = 0
+		package.loaded["ui.layout_manager"] = {
+			editor_menu_command = function() return function() opened = opened + 1 end end,
+		}
+		local ok, err = pcall(function()
+			local rows = render_root(raw)
+			local studio, studio_index, layout_index
+			for index, row in ipairs(rows) do
+				local id = id_of(row)
+				if id == "ergopti_studio" then studio, studio_index = row, index end
+				if id == "keyboard_layout" then layout_index = index end
+			end
+			helpers.assert_true(type(studio) == "table", "the Ergopti Studio row reaches the tray root")
+			helpers.assert_eq(studio_index, layout_index + 1, "the row follows the keyboard layout group")
+			helpers.assert_nil(studio.menu, "the row is a command, not a submenu")
+			helpers.assert_eq(opened, 0, "drawing the tray opens no window")
+			studio.fn()
+		end)
+		package.loaded["ui.layout_manager"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(opened, 1, "a click runs the layout editor window's menu command")
+	end)
+
+	helpers.it("a paused tray greys no row the manifest marks (edd1-paused-writes)", function()
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision
+		-- 2026-11-12): `greyed_when_paused` is the AHK tray's alone. Moving the
+		-- mark onto Language must grey nothing either.
 		local marked = 0
 		local moved = {}
 		for index, row in ipairs(top_level) do
 			local copy = {}
 			for key, value in pairs(row) do copy[key] = value end
 			if copy.greyed_when_paused == true then marked = marked + 1 end
-			if copy.id == "metrics" then copy.greyed_when_paused = nil end
 			if copy.id == "language" then copy.greyed_when_paused = true end
 			moved[index] = copy
 		end
-		helpers.assert_true(marked >= 7,
-			"the manifest must mark the feature rows a pause greys, got " .. marked)
-		local expected = {}
-		for _, id in ipairs(project_for_hs(moved)) do
-			for _, row in ipairs(moved) do
-				if row.id == id and row.greyed_when_paused == true then expected[#expected + 1] = id end
+		helpers.assert_true(marked >= 7, "the manifest still carries the AHK tray's mark, got " .. marked)
+		local function greyed(paused)
+			local ids = {}
+			for _, row in ipairs(render_root(with_top_level(raw, moved), paused)) do
+				if row.title ~= "-" and row.disabled == true then ids[#ids + 1] = id_of(row) end
 			end
+			return table.concat(ids, ", ")
 		end
-		local rows = render_root(with_top_level(raw, moved), true)
-		local greyed = {}
-		for _, row in ipairs(rows) do
-			if row.title ~= "-" and row.disabled == true then greyed[#greyed + 1] = id_of(row) end
-		end
-		helpers.assert_eq(table.concat(greyed, ", "), table.concat(expected, ", "),
-			"a pause must grey the rows the manifest marks, and only those")
+		-- A row this fixture cannot build (no AI handler) is unavailable either way.
+		helpers.assert_eq(greyed(true), greyed(false), "a paused tray greys exactly what a running one does")
 	end)
 end)
 
@@ -457,8 +477,8 @@ end)
 
 helpers.describe("topology fixture owns genuine native Language data", function()
 	helpers.it("retains all original native locale rows and restores its private reader cohort", function()
-		local names = { "infra.i18n", "infra.locale", "locale.core", "menu.labels", "_generated.locale_table",
-			"adapters.storage", "adapters.timer_scheduler", "infra.paths", "infra.logger" }
+		local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "menu.engine.labels", "_generated.locale_table",
+			"core.fs.adapters.storage", "core.events.timer_scheduler", "core.fs.engine.paths", "core.logger.engine.logger" }
 		local saved, old_hs = {}, rawget(_G, "hs")
 		for _, name in ipairs(names) do saved[name] = rawget(package.loaded, name) end
 		local provider = native_language_provider()
@@ -468,7 +488,7 @@ helpers.describe("topology fixture owns genuine native Language data", function(
 		helpers.assert_true(rawequal(rawget(_G, "hs"), old_hs), "native fixture globals restored")
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a")); assert(file:close())
-		local corpus = assert(require("adapters.json_codec").decode(raw))
+		local corpus = assert(require("core.fs.adapters.json_codec").decode(raw))
 		local rows = provider()
 		helpers.assert_eq(#rows, #corpus.locales, "a genuine complete catalogue is not an empty stand-in")
 		for index, expected in ipairs(corpus.locales) do
@@ -491,8 +511,8 @@ helpers.describe("Agent-only disabled macOS root composition", function()
 	helpers.it("does not build Agent actions and preserves neighboring provider model and prediction rows", function()
 		local source, detail = helpers.read_driver_unit("function M.generate(ctx, menu_mods, actions)")
 		helpers.assert_true(source ~= nil, "actual root source must exist: " .. tostring(detail))
-		local root = assert(require("json").decode(read_manifest_text()))
-		require("test.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
+		local root = assert(require("core.text.engine.json").decode(read_manifest_text()))
+		require("tests.lua.ai.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
 	end)
 end)
 
@@ -506,7 +526,7 @@ local function with_native_separator_root(body)
 	logger = recording_logger(lines)
 	return ManifestFixture.with_manifest(read_manifest_text(), logger, function(renderer)
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		require("infra.i18n").build_language_menu_items = language_provider
+		require("core.i18n.engine.i18n").build_language_menu_items = language_provider
 		local component = function(key) return {build = function() return stub_row(key) end} end
 		local mods = {
 			keyboard_layout = component("menu.layout.title"), hotstrings = {},

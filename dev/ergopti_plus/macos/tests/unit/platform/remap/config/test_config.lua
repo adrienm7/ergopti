@@ -10,15 +10,15 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- toml_codec is a native C library not available in the headless test runner;
 -- stub it out so the module loads without crashing. _load_toml_file is then
 -- monkey-patched per test where TOML parsing matters.
 local _toml_stub = { encode = function() return "" end, decode = function() return {} end }
-package.loaded["toml_codec"]     = _toml_stub
-package.loaded["infra.toml.codec"] = _toml_stub
+package.loaded["core.text.engine.toml_codec"]     = _toml_stub
+package.loaded["core.text.engine.toml.codec"] = _toml_stub
 
 local Config = helpers.load_with_stubs("platform.remap.config")
 
@@ -150,17 +150,77 @@ helpers.describe("Config.build_default_state", function()
 	end)
 end)
 
---- Loads config_karabiner.toml from one decoded document.
---- @param document table Decoded TOML document.
+-- The [tap_holds] leaves config.toml keeps beside tap_hold.toml.
+local CONFIG_TAP_HOLD_LEAVES = { enabled = true, sticky_timeout_ms = true, lone_modifier_tap_max_ms = true }
+
+--- States the reads of both files from one decoded Karabiner model: the
+--- manifest rows ([tap_holds] switch and timings, [mod_combos]) as the
+--- config.toml part, the rest as tap_hold.toml. Returns the restore function.
+--- @param model table|nil Decoded model; nil states two absent files.
+--- @return function restore
+local function stub_files(model)
+	local original_load, original_part = Config._load_toml_file, Config._read_config_part
+	local tap, part = {}, {}
+	for key, value in pairs(model or {}) do tap[key] = value end
+	if type(tap.tap_holds) == "table" then
+		local kept, rows = {}, {}
+		for leaf, value in pairs(tap.tap_holds) do
+			if CONFIG_TAP_HOLD_LEAVES[leaf] then rows[leaf] = value else kept[leaf] = value end
+		end
+		tap.tap_holds = kept
+		if next(rows) ~= nil then part.tap_holds = rows end
+	end
+	part.mod_combos, tap.mod_combos = tap.mod_combos, nil
+	Config._load_toml_file = function(path)
+		if model == nil then return nil, "absent", { path = path, status = "absent" } end
+		return tap, nil, { path = path, status = "ok", content = "" }
+	end
+	Config._read_config_part = function(path)
+		local config_path = Config.config_toml_path_for(path)
+		if model == nil then return {}, { path = config_path, status = "absent" }, nil end
+		return part, { path = config_path, status = "ok", content = "" }, nil
+	end
+	return function() Config._load_toml_file, Config._read_config_part = original_load, original_part end
+end
+
+--- Loads the pair of files one decoded model states.
+--- @param document table Decoded TOML document, in the Karabiner model.
 --- @return table|nil state
 --- @return string status
 local function load_document(document)
-	local original_load = Config._load_toml_file
-	Config._load_toml_file = function() return document end
-	local ok, state, status = pcall(Config.load_user_config, {}, {}, "/tmp/config_karabiner.toml")
-	Config._load_toml_file = original_load
+	local restore = stub_files(document)
+	local ok, state, status = pcall(Config.load_user_config, {}, {}, "/tmp/tap_hold.toml")
+	restore()
 	helpers.assert_true(ok, "load_user_config must not raise: " .. tostring(state))
 	return state, status
+end
+
+--- The config.toml rows one save of `state` over two absent files would write.
+--- The writer is stopped before any disk access.
+--- @param state table
+--- @return table|nil rows
+local function config_rows_of(state)
+	local restore = stub_files(nil)
+	local Writer = require("core.text.engine.toml_codec.writer")
+	local original_prepare = Writer.prepare_batch
+	local rows
+	Writer.prepare_batch = function(_, batch) rows = batch; return false, "stopped before the disk write" end
+	pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", true)
+	Writer.prepare_batch = original_prepare
+	restore()
+	return rows
+end
+
+--- The value one config.toml row sets, nil when no row names it.
+--- @param rows table|nil
+--- @param section string
+--- @param key string
+--- @return any
+local function row_value(rows, section, key)
+	for _, row in ipairs(rows or {}) do
+		if row.section == section and row.key == key then return row.value end
+	end
+	return nil
 end
 
 --- Captures the document save_user_config would encode, without a disk write.
@@ -170,7 +230,7 @@ end
 local function encoded_document(state, merge_existing)
 	-- The codec table config.lua captured at load time; stubs installed later
 	-- replace the package entry, not that table.
-	local codec = package.loaded["infra.toml.codec"]
+	local codec = package.loaded["core.text.engine.toml.codec"]
 	local encoded = nil
 	local original_encode = codec.encode
 	local original_decode_shapes, original_encode_shapes = codec.decode_with_shapes, codec.encode_with_shapes
@@ -188,7 +248,9 @@ local function encoded_document(state, merge_existing)
 		encoded = value
 		error("stop before the disk write")
 	end
-	pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
+	local restore = stub_files(nil)
+	pcall(Config.save_user_config, state, "/tmp/tap_hold.toml", merge_existing ~= true)
+	restore()
 	codec.encode = original_encode
 	codec.decode_with_shapes, codec.encode_with_shapes = original_decode_shapes, original_encode_shapes
 	return encoded
@@ -244,13 +306,13 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 			helpers.assert_true(type(encoded.karabiner) == "table", "the switch lives in [karabiner]")
 			helpers.assert_eq(encoded.karabiner.integration_enabled, value)
 			helpers.assert_nil(encoded.karabiner.enabled, "the legacy key is never written")
-			helpers.assert_true(type(encoded.tap_holds) == "table", "the tap-hold settings are still persisted")
+			helpers.assert_true(type(encoded.tap_hold) == "table", "the tap-hold settings are still persisted")
 		end
 	end)
 
 	helpers.it("preserves the retired enabled key and the rest of the file until explicit cleanup", function()
-		local file_system = package.loaded["adapters.file_system"]
-		local codec = package.loaded["infra.toml.codec"]
+		local file_system = package.loaded["core.fs.adapters.file_system"]
+		local codec = package.loaded["core.text.engine.toml.codec"]
 		local original_read, original_decode = file_system.read_with_status, codec.decode
 		file_system.read_with_status = function() return "[karabiner]\nenabled = false\n", "ok" end
 		codec.decode = function()
@@ -266,6 +328,7 @@ helpers.describe("Config: the « Ergopti uses Karabiner » switch", function()
 					"a retired key remains until explicit cleanup")
 				helpers.assert_eq(encoded, {
 					karabiner = { enabled = false, integration_enabled = switch }, personal = { kept = true },
+					_meta = { schema_version = 1 },
 				}, "the complete independently specified source model survives the ordinary save")
 				helpers.assert_eq(encoded.personal and encoded.personal.kept, true)
 			end
@@ -286,34 +349,23 @@ end)
 
 helpers.describe("Config: the Tap-Holds feature switch", function()
 	helpers.it("persists explicit activation and reads absence as neutral", function()
-		local codec = package.loaded["infra.toml.codec"]
-		local encoded = nil
-		local original_encode = codec.encode
-		codec.encode = function(value)
-			encoded = value
-			error("stop before the disk write")
-		end
 		local state = Config.build_default_state({}, {})
 		helpers.assert_eq(state.tap_holds_enabled, false, "a fresh install leaves Tap-Holds off")
 		state.tap_holds_enabled = true
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", merge_existing ~= true)
-		codec.encode = original_encode
-		helpers.assert_eq(encoded.tap_holds.enabled, true)
+		-- The switch is a config.toml row (_shared/tap_hold/data/SCHEMA.md).
+		helpers.assert_eq(row_value(config_rows_of(state), "tap_holds", "enabled"), true)
 
-		local original_load = Config._load_toml_file
 		for _, case in ipairs({ { stored = false, expected = false }, { stored = true, expected = true }, { expected = false } }) do
-			Config._load_toml_file = function()
-				return {
-					tap_holds = { enabled = case.stored, config = { escape = { tap = "escape", hold = "ctrl" } } },
-					mod_combos = { config = {} },
-				}
-			end
-			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/config_karabiner.toml")
+			local restore = stub_files({
+				tap_holds = { enabled = case.stored, config = { escape = { tap = "escape", hold = "ctrl" } } },
+				mod_combos = { config = {} },
+			})
+			local loaded = Config.load_user_config({ { id = "escape" } }, {}, "/tmp/tap_hold.toml")
+			restore()
 			helpers.assert_eq(loaded.tap_holds_enabled, case.expected)
 			helpers.assert_eq(loaded.tap_hold_config.escape.hold, "ctrl",
 				"the assignments load unchanged whatever the switch")
 		end
-		Config._load_toml_file = original_load
 	end)
 end)
 
@@ -322,34 +374,24 @@ end)
 -- neutral value (on); an explicit one is kept as written.
 helpers.describe("Config: the key-combinations switch", function()
 	helpers.it("persists [mod_combos] enabled when set and leaves it absent otherwise", function()
-		local codec = package.loaded["infra.toml.codec"]
-		local original_encode = codec.encode
-		local encoded = nil
-		codec.encode = function(value)
-			encoded = value
-			error("stop before the disk write")
-		end
 		local state = Config.build_default_state({}, {})
 		helpers.assert_nil(state.mod_combos_enabled, "a fresh install leaves the switch absent")
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
-		helpers.assert_nil(encoded.mod_combos.enabled, "an inherited switch is not written")
+		-- [mod_combos] is a config.toml section (_shared/tap_hold/data/SCHEMA.md).
+		local rows = config_rows_of(state)
+		helpers.assert_true(type(rows) == "table", "the save reaches the config.toml rows")
+		helpers.assert_nil(row_value(rows, "mod_combos", "enabled"), "an inherited switch is not written")
 		state.mod_combos_enabled = false
-		pcall(Config.save_user_config, state, "/tmp/config_karabiner.toml", true)
-		codec.encode = original_encode
-		helpers.assert_eq(encoded.mod_combos.enabled, false)
+		helpers.assert_eq(row_value(config_rows_of(state), "mod_combos", "enabled"), false)
 
-		local original_load = Config._load_toml_file
 		for _, case in ipairs({ { stored = false }, { stored = true }, {} }) do
-			Config._load_toml_file = function()
-				return {
-					tap_holds = { enabled = true, config = {} },
-					mod_combos = { enabled = case.stored, config = {} },
-				}
-			end
-			local loaded = Config.load_user_config({}, {}, "/tmp/config_karabiner.toml")
+			local restore = stub_files({
+				tap_holds = { enabled = true, config = {} },
+				mod_combos = { enabled = case.stored, config = {} },
+			})
+			local loaded = Config.load_user_config({}, {}, "/tmp/tap_hold.toml")
+			restore()
 			helpers.assert_eq(loaded.mod_combos_enabled, case.stored)
 		end
-		Config._load_toml_file = original_load
 	end)
 end)
 
@@ -409,17 +451,14 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 	helpers.it("seeds a new tap/hold key from Defaults when it is absent from the saved config", function()
 		-- Monkey-patch _load_toml_file to return a persisted config that only
 		-- knows about "escape" — "caps_lock" was added in a later release.
-		local original_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return {
-				tap_holds = {
-					timeout_ms           = 200,
-					sticky_timeout_ms    = 500,
-					config               = { escape = { tap = "escape", hold = "escape" } },
-				},
-				mod_combos = { simultaneous_threshold_ms = 50, config = {} },
-			}
-		end
+		local restore = stub_files({
+			tap_holds = {
+				timeout_ms           = 200,
+				sticky_timeout_ms    = 500,
+				config               = { escape = { tap = "escape", hold = "escape" } },
+			},
+			mod_combos = { simultaneous_threshold_ms = 50, config = {} },
+		})
 
 		local tap_hold_keys = {
 			{ id = "escape",    label = "Esc" },
@@ -428,8 +467,7 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 
 		local state = Config.load_user_config(tap_hold_keys, {}, "/fake/path.toml")
 
-		-- Restore original function
-		Config._load_toml_file = original_load
+		restore()
 
 		-- The saved key must still be intact
 		helpers.assert_eq(state.tap_hold_config.escape.tap, "escape")
@@ -453,20 +491,17 @@ helpers.describe("Config.load_user_config — new tap/hold key seeding (karabine
 	-- Per-key tap/hold timeout override (feat): a saved timeout_ms must survive the
 	-- load so a customised per-key delay is not silently dropped on reload.
 	helpers.it("preserves a persisted per-key timeout_ms override on load", function()
-		local original_load = Config._load_toml_file
-		Config._load_toml_file = function(_path)
-			return {
-				tap_holds = {
-					timeout_ms        = 200,
-					sticky_timeout_ms = 500,
-					config            = { escape = { tap = "escape", hold = "escape", timeout_ms = 333 } },
-				},
-				mod_combos = { simultaneous_threshold_ms = 50, config = {} },
-			}
-		end
+		local restore = stub_files({
+			tap_holds = {
+				timeout_ms        = 200,
+				sticky_timeout_ms = 500,
+				config            = { escape = { tap = "escape", hold = "escape", timeout_ms = 333 } },
+			},
+			mod_combos = { simultaneous_threshold_ms = 50, config = {} },
+		})
 
 		local state = Config.load_user_config({ { id = "escape", label = "Esc" } }, {}, "/fake/path.toml")
-		Config._load_toml_file = original_load
+		restore()
 
 		helpers.assert_eq(state.tap_hold_config.escape.timeout_ms, 333,
 			"a persisted per-key timeout_ms must be preserved on load (not dropped)")

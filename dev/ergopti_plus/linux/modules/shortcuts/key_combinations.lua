@@ -2,17 +2,18 @@
 
 --- Canonical config-backed ordered pairs. Runtime selection and publication
 --- retain separate exact leases; unknown/future pairs are never rewritten here.
-local Shared = require("tap_hold.key_combinations")
-local TableUtil = require("table_util")
-local Codec = require("toml_codec")
-local Files = require("adapters.file_system")
+local Shared = require("tap_hold.engine.key_combinations")
+local TableUtil = require("core.text.engine.table_util")
+local Codec = require("core.text.engine.toml_codec")
+local Files = require("core.fs.adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
-local Logger = require("logger.shim")
-local HoldOptions = require("tap_hold.hold_options")
+local Logger = require("core.logger.engine.shim")
+local HoldOptions = require("tap_hold.engine.hold_options")
 local Features = require("infra.manifest_reader")
-local ModuleSource = require("module_source_identity")
-local ModuleDirectory = require("module_source_directory")
-local ConfigKeys = require("config_keys")
+local ModuleSource = require("core.fs.engine.module_source_identity")
+local ModuleDirectory = require("core.fs.engine.module_source_directory")
+local ConfigKeys = require("settings.engine.keys")
+local Timings = require("core.timing.engine.timings")
 local original_debug_info = debug.getinfo
 local module_directory = ModuleDirectory.capture()
 local manager_source = ModuleSource.sibling(original_debug_info(1,"S").source,
@@ -62,7 +63,7 @@ function M.new(options)
 	local route = options.route or function() return ConfigPaths.config("config.toml") end
 	local key_ids, known, holds = {}, {}, { none = true }
 	local pair = Shared.pair
-	local original_policy = rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+	local original_policy = rawequal(rawget(package.loaded, "tap_hold.engine.key_combinations"), Shared)
 		and getmetatable(Shared) == nil and pair == original_pair
 		and rawget(Shared, "PAIR_SEPARATOR") == original_pair_separator
 	for _, key in ipairs(options.keys) do
@@ -78,12 +79,6 @@ function M.new(options)
 	local catalogue = options.actions or require("modules.gestures.manager")
 	local owner, state, lease, generation, busy = {}, nil, nil, 0, false
 	local delivery_fence
-	-- A paused inverse may settle only the exact retained delivery fence. This
-	-- authorizes source inspection, never ordinary edit or runtime delivery.
-	local function pause_allowed(value, token, restoring)
-		return value == false or restoring == true and value == true
-			and type(token) == "table" and rawequal(delivery_fence, token)
-	end
 	local function candidate(document, strict, shapes)
 		assert(type(document) == "table", "decoded canonical config required")
 		local function namespace(value)
@@ -119,6 +114,18 @@ function M.new(options)
 			local defaults=declared_settings()
 			if defaults then combos=namespace(combos) else assert(type(combos)=="table") end
 			local delay,symmetric=combos.simultaneous_threshold_ms,combos.symmetric
+			-- A stored delay the shared value schema refuses is reported once, never
+			-- dropped silently; the chords stay off (fail closed, as before), since a
+			-- malformed setting must not become a delay on the original holds.
+			if delay~=nil then
+				local ValueCheck=require("settings.engine.value_check")
+				local checked=ValueCheck.check_value(ValueCheck.declaration(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS),delay)
+				if not checked.ok then
+					require("settings.engine.migration.outdated").report(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS,
+						string.format("%s is refused (%s, %s..%s ms); the key chords stay off until it is fixed", tostring(delay),
+							checked.reason, tostring(checked.min), tostring(checked.max)))
+				end
+			end
 			if delay==nil and defaults then delay=defaults.simultaneous_threshold_ms end
 			if symmetric==nil and defaults then symmetric=defaults.combo_symmetric end
 			local settings = Shared.chord_settings({ simultaneous_threshold_ms=delay,combo_symmetric=symmetric })
@@ -130,8 +137,17 @@ function M.new(options)
 				local row=namespace(configured[pair])
 				local action=row.combo
 				if action==nil then action="none" end
-				assert(action=="none" or type(action)=="string" and action~="one_shot_shift"
-					and catalogue.is_assignable(action)==true,"invalid known chord slot")
+				local valid=action=="none" or type(action)=="string" and action~="one_shot_shift"
+					and catalogue.is_assignable(action)==true
+				assert(not strict or valid,"invalid known chord slot")
+				-- One action this driver lacks (another OS's, in the shared
+				-- tap_hold.toml) costs that pair only, as macOS drops one leaf:
+				-- every other chord stays (TCL-003).
+				if not valid then
+					Logger.warn("modules.shortcuts.key_combinations",
+						"The %s chord's action '%s' is not available here; that chord does nothing.", pair, tostring(action))
+					action="none"
+				end
 				chords[pair]=action; explicit=explicit or row.combo~=nil
 			end
 			assert(defaults or explicit)
@@ -202,27 +218,26 @@ function M.new(options)
 	function owner.get_hold(pair) return known[pair] and state.holds[pair] or Shared.NONE end
 	function owner.is_enabled() return state.enabled == true end
 	--- A private menu receipt; canonical bytes are never sent to the page.
-	function owner.capture_edit_source(token, restoring)
-		-- Paused compensation still owes exact source and private state ACKs.
-		-- Only its retained delivery token can inspect the settled native frame;
-		-- ordinary editors and runtime admission continue to require pause=false.
+	--- A pause does not refuse it: a pause stops typing, not configuration
+	--- (EDD-1, maintainer decision 2026-11-12). Runtime capture keeps the pause.
+	function owner.capture_edit_source(token)
+		-- Only a retained delivery token can inspect the settled native frame.
 		local function permitted() return delivery_fence == nil or type(token) == "table" and delivery_fence == token end
-		if busy or lease or not permitted() or not pause_allowed(options.is_paused(), token, restoring) then return nil end
+		if busy or lease or not permitted() then return nil end
 		local prior, path, bytes, status = safe_read()
 		if not prior then return nil end
 		if prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		local captured, revision = state, generation
 		local receipt = { path = path, status = status, content = status == "ok" and bytes or nil }
 		receipt.guard = function()
-			if busy or lease or not permitted() or state ~= captured or generation ~= revision or not pause_allowed(options.is_paused(), token, restoring) then return false end
+			if busy or lease or not permitted() or state ~= captured or generation ~= revision then return false end
 			local routed, current_path = pcall(route)
 			if not routed or current_path ~= path then return false end
 			local called, current, current_status = pcall(files.read_with_status,path)
-			local observed, paused = pcall(options.is_paused)
 			local final_route, final_path = pcall(route)
 			return called and current_status == status and (status ~= "ok" or current == bytes)
 				and final_route and final_path == path and not busy and not lease and permitted()
-				and state == captured and generation == revision and observed and pause_allowed(paused, token, restoring)
+				and state == captured and generation == revision
 		end
 		if receipt.guard() ~= true then return nil end
 		return receipt
@@ -252,6 +267,7 @@ function M.new(options)
 	end
 	function owner.engine_options(thresholds)
 		local configured = { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
+			tap_min_ms = Timings.ms("tap_hold", "tap_min_duration_ms"),
 			chords = state.chord_enabled and clone(state.chords) or nil, chord_settings = state.chord_settings and clone(state.chord_settings) or nil, capture_chord = owner.capture_chord,
 			enabled = state.enabled and lease == nil and options.is_paused() == false, revision = generation, capture = owner.capture_runtime, capture_action = owner.capture_action }
 		-- Only this actual config-reading owner issues pending settings. A copied
@@ -381,14 +397,12 @@ function M.new(options)
 	end
 	--- Reads a coherent source frame while the exact native lease is held.
 	--- @param token table Exact configuration owner.
-	--- @param restoring boolean|nil True permits a paused inverse under its retained delivery fence.
-	function owner.configuration_source(token, restoring)
-		if token ~= lease or busy or not pause_allowed(options.is_paused(), token, restoring) then return nil end
+	function owner.configuration_source(token)
+		if token ~= lease or busy then return nil end
 		local captured, revision = state, generation
 		local prior, path, bytes, status = safe_read()
-		local observed, paused = pcall(options.is_paused)
 		local routed, current_path = pcall(route)
-		if not prior or not routed or current_path ~= path or not observed or not pause_allowed(paused, token, restoring)
+		if not prior or not routed or current_path ~= path
 			or token ~= lease or busy or state ~= captured or generation ~= revision
 			or prior.enabled ~= state.enabled or not equal(prior.taps,state.taps) or not equal(prior.holds,state.holds) or not chords_equal(prior,state) then return nil end
 		return {path=path,status=status,content=status == "ok" and bytes or nil}
@@ -397,14 +411,12 @@ function M.new(options)
 	--- the candidate state to equal the previous unpublished runtime snapshot.
 	--- @param token table Exact configuration owner.
 	--- @param source table Exact canonical source frame.
-	--- @param restoring boolean|nil True permits a paused inverse under its retained delivery fence.
-	function owner.configuration_source_matches(token, source, restoring)
-		if token ~= lease or busy or type(source) ~= "table" or not pause_allowed(options.is_paused(), token, restoring) then return false end
+	function owner.configuration_source_matches(token, source)
+		if token ~= lease or busy or type(source) ~= "table" then return false end
 		local captured, revision = state, generation
 		local prior, path, bytes, status = safe_read()
-		local observed, paused = pcall(options.is_paused)
 		local routed, current_path = pcall(route)
-		return prior ~= nil and routed and current_path == path and observed and pause_allowed(paused, token, restoring)
+		return prior ~= nil and routed and current_path == path
 			and path == source.path and status == source.status and (status ~= "ok" or bytes == source.content)
 			and token == lease and not busy and state == captured and generation == revision
 	end
@@ -442,7 +454,7 @@ function M.instance_is_current(owner, keys)
 	local receipt = type(owner) == "table" and identity_receipts[owner] or nil
 	if not rawequal(instance, owner) or receipt == nil or type(keys) ~= "table" or getmetatable(keys) ~= nil
 		or receipt.original_policy ~= true
-		or not rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		or not rawequal(rawget(package.loaded, "tap_hold.engine.key_combinations"), Shared)
 		or getmetatable(Shared) ~= nil or rawget(Shared, "pair") ~= original_pair
 		or rawget(Shared, "PAIR_SEPARATOR") ~= original_pair_separator then return false end
 	local ids, count = {}, 0

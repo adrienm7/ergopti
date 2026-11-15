@@ -13,17 +13,17 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"hs",
 	"tests.stubs.hs",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.fs_dir",
-	"infra.dialog_util",
-	"infra.keycodes",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.fs.engine.dir",
+	"core.ui.engine.dialog_util",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"adapters.key_state",
-	"adapters.task_lifecycle",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"platform.input.key_state",
+	"core.process.adapters.task_lifecycle",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.keystats",
@@ -39,7 +39,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.requirement_operation_registry",
@@ -144,12 +144,12 @@ end
 --- Installs strict shared dependencies for ScriptControl and the real manager.
 --- @param native table Native-state record receiving server starts.
 local function install_subject_stubs(native)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() return true end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-	package.loaded["infra.dialog_util"] = { block_alert = function() return false end }
-	package.loaded["infra.keycodes"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,
@@ -212,7 +212,7 @@ local function install_subject_stubs(native)
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback)
 			callback()
 			return true
@@ -237,7 +237,7 @@ local function install_subject_stubs(native)
 		handle.settlement_observers = {}
 		for _, observer in ipairs(observers) do observer() end
 	end
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			local handle = {
 				timer = {},
@@ -276,7 +276,7 @@ local function install_subject_stubs(native)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
@@ -307,7 +307,7 @@ local function install_subject_stubs(native)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 	package.loaded["modules.keystats"] = {
 		resync_context = function() return true end,
 		log_shortcut = function() return true end,
@@ -320,7 +320,7 @@ end
 --- @return table manager Exact requirements manager.
 --- @return table module Manager module exposing the canonical GC root.
 local function build_manager(script_control, shared_system_check)
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 	local manager_module = require("ui.menu.menu_llm.models_manager_mlx")
 	local presets = {
 		{

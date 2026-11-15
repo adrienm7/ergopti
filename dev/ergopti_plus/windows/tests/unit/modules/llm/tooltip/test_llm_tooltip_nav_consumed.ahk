@@ -133,7 +133,7 @@ Test("LLM nav: the cycle chord is consumed while the owner routes a multi-slot p
 	_LTNC_ChordConsumedWhileTheOwnerCycles)
 
 _LTNC_ChordHotkeysSwallowTheKey() {
-	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	static Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Src := _StripFullLineComments(_DriverDirConcat("ui/menu/menu_llm"))
 	for Key in _LTNC_NavKeys() {
 		; Physical identity is independent of the production declaration.

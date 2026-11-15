@@ -18,7 +18,7 @@ local function with_download(scenario)
 	helpers.with_fresh_modules(SUBJECTS, function()
 		Fixture("ui.download_window", function(host, h)
 			assert(host.show({ kind = "mlx_model", model = "A" }))
-			local pending, errors, logger = {}, {}, require("infra.logger")
+			local pending, errors, logger = {}, {}, require("core.logger.engine.logger")
 			local previous = logger.error
 			logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 			function h.observe(view)

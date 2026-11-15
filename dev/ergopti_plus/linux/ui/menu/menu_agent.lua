@@ -9,8 +9,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local TextPrompt = require("ui.text_prompt")
+local Logger = require("core.logger.engine.shim")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 

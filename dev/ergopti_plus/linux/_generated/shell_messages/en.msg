@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/en.msg
-# AUTO-GENERATED from _shared/data/locales/en.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/en.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT networking module built from source.
 build_luv.recipe_required=The native luv build needs its source recipe.
 install.already_installed={1} — already installed
 install.archive_digest_unavailable=retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable.
+install.bytecode_skipped=Precompiled modules could not be built — Ergopti starts from source, a little slower.
 install.capability_verified={1} — capability verified
 install.command_still_missing={1} was installed, but '{2}' is still not found.
 install.daemon_manual=To start the daemon manually:
 install.daemon_running=The daemon runs in the background. To check its status:
+install.focus_integration_enabled={1} focus integration enabled
+install.focus_integration_failed=Could not enable the {1} focus integration — per-application rules stay inactive on this desktop.
+install.focus_integration_next_login={1} focus integration installed (effective at the next login)
+install.focus_integration_updated={1} focus integration updated
 install.gnome_extension_active=GNOME AppIndicator extension — already active
 install.gnome_extension_enabled=GNOME AppIndicator extension enabled
 install.gnome_extension_failed=Could not enable the AppIndicator extension — without it, GNOME does not show the icon.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — dependency check
 install.section_deps_skipped=Dependencies skipped (--no-deps)
 install.section_done=Installation complete
 install.section_files=Installing files
+install.section_focus=Focused application under Wayland (GNOME, KDE)
 install.section_lua_deps=Optional Lua dependencies (event loop, timers, webviews, signals)
 install.section_permissions=Input permissions (requires sudo)
 install.section_services=Creating the systemd user services
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG autostart: {1}
 launch.already_running=Ergopti+ is already running in this session ({1} is held); this launch was refused.
 launch.authorization_failed=Input permission authorization was cancelled or failed.
 launch.groups_unavailable=The session could not acquire its configured input groups.
+launch.restarting=Ergopti+ is already running in this session; asking it to quit, then restarting.
 launch.session_lock_invalid=The session lock root must be an absolute path.
 launcher.dependencies_installed=Dependencies installed.
 launcher.driver_missing=Error: Linux driver directory not found: {1}

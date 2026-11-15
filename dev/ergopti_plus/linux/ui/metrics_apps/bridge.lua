@@ -13,12 +13,12 @@
 local M = {}
 M.bridge_name = "metrics_apps_bridge"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.metrics_apps"
 local Flush = require("ui.metrics_flush_bridge")
 
 local function native_category_prompt(title, text, initial)
-	return require("ui.text_prompt").ask(title, require("ui.native_dialog").plain_markup(text), initial)
+	return require("core.ui.ui.text_prompt").ask(title, require("core.ui.ui.native_dialog").plain_markup(text), initial)
 end
 M._category_prompt = native_category_prompt
 
@@ -135,7 +135,7 @@ local function handle(payload, state, request)
 	if action == "edit" then
 		if (payload.app ~= nil and type(payload.app) ~= "string")
 			or (payload.cat ~= nil and type(payload.cat) ~= "string")
-			or (payload.score ~= nil and not require("keystats.app_category_store").score_valid(payload.score)) then
+			or (payload.score ~= nil and not require("metrics.engine.apps.category_store").score_valid(payload.score)) then
 			Logger.warn(LOG, "Application category edit refused invalid input.")
 			return with_payload({ saved = false })
 		end
@@ -144,24 +144,26 @@ local function handle(payload, state, request)
 		if state.keystats and type(state.keystats.set_app_category) == "function" then
 			local stats = state.keystats
 			local capture, setter = stats.capture_app_category_edit, stats.set_app_category
-			local function refused(key)
-				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key) end
+			local function refused(key, text)
+				if request.valid() and type(state.notify_error) == "function" then pcall(state.notify_error, key, text) end
 				return with_payload({ saved = false })
 			end
 			if type(capture) ~= "function" or app_name == "" then return refused("healthcheck.status.failed") end
 			local receipt = capture()
 			if not request.valid() then return nil end
 			if type(receipt) ~= "table" then return refused("healthcheck.status.failed") end
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local chosen = M._category_prompt(i18n.get("metrics_apps.new_category_title"),
 				string.format(i18n.get("metrics_apps.new_category_prompt"), app_name), category)
 			if chosen == nil or not request.valid() then return nil end
 			local score_text = M._category_prompt(i18n.get("metrics_apps.score_title"),
 				string.format(i18n.get("metrics_apps.score_prompt"), app_name), tostring(payload.score or 0))
 			if score_text == nil or not request.valid() then return nil end
-			local score = tonumber(score_text)
-			if not require("keystats.app_category_store").score_valid(score) then
-				return refused("metrics_apps.score_error")
+			-- The shared value schema owns the range and its localized refusal.
+			local score, refusal = require("metrics.engine.apps.category_store").parse_score_entry(score_text, i18n.get)
+			if score == nil then
+				Logger.warn(LOG, "Typed score for '%s' refused.", app_name)
+				return refused("dialog.value_check.title", refusal)
 			end
 			if not chosen:find("%S") then return refused("healthcheck.status.failed") end
 			if stats.capture_app_category_edit ~= capture or stats.set_app_category ~= setter or state.keystats ~= stats then return nil end

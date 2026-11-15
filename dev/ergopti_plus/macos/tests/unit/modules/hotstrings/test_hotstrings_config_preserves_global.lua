@@ -34,7 +34,7 @@ helpers.describe("hotstrings_config: a save preserves the [__global__] block", f
 	helpers.it("an old delimiter table survives a category-only save", function()
 		local path = os.tmpname()
 		local config_module = "modules.hotstrings.hotstrings_config"
-		local file_system_module = "adapters.file_system"
+		local file_system_module = "core.fs.adapters.file_system"
 		local saved_config = package.loaded[config_module]
 		local saved_file_system = package.loaded[file_system_module]
 		local ok, err = xpcall(function()
@@ -78,7 +78,7 @@ helpers.describe("hotstrings_config: a save preserves the [__global__] block", f
 				"the round trip must preserve the complete raw multiline record and its comments, "
 				.. "not only the first key/value line")
 
-			local codec = require("infra.toml.codec")
+			local codec = require("core.text.engine.toml.codec")
 			local decode_ok, decoded = pcall(codec.decode, content)
 			helpers.assert_true(decode_ok and type(decoded) == "table",
 				"preserving raw continuations must still produce valid TOML")

@@ -295,3 +295,210 @@ _KLRNul_TokenKeysStayDistinct() {
 }
 Test("Keystats reader: a NUL token stays a distinct JSON key (windows-reader-nul-json-keys)",
 	_KLRNul_TokenKeysStayDistinct)
+
+; Ergopti Studio counts only the keystrokes typed on the keyboard: the shared
+; fixture's shared-token (6 typed, 5 hotstring, 1 AI) and other-token (2 typed,
+; 2 synthetic) contribute nothing, a manual row counts in full, and a token of
+; another family never leaks in.
+_KLRSource_StudioCountsPhysicalKeystrokes() {
+	db := _KLRSource_OpenFixture()
+	try {
+		today := FormatTime(A_Now, "yyyy-MM-dd")
+		AssertTrue(SQLite_Exec(db, "INSERT INTO ngram_chars (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("e") . ",7," . SQLite_Q("{}") . ");"
+			. "INSERT INTO ngram_bigrams (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-b") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("es") . ",3," . SQLite_Q('{"llm":1}') . ");"
+			. "INSERT INTO ngram_words (device_id,date,app,token,c,esrc_json) VALUES ("
+			. SQLite_Q("device-a") . "," . SQLite_Q(today) . "," . SQLite_Q("other.exe") . ","
+			. SQLite_Q("est") . ",4," . SQLite_Q("{}") . ");"))
+		Contract := KLR_StudioContract()
+		Json := KLR_BuildStudioNgramsJson(db, Contract)
+		Payload := JsonParse(Json)
+		AssertEqual(Contract["schema"], Payload["schema"])
+		AssertEqual("keystats", Payload["source"])
+		AssertEqual(1, Payload["chars"].Count, "synthetic-only tokens are not keystrokes: " . Json)
+		AssertEqual(7, Payload["chars"]["e"])
+		AssertEqual(2, Payload["bigrams"]["es"], "the AI share of a bigram is subtracted")
+		AssertEqual(0, Payload["trigrams"].Count, "a word is not a trigram")
+		AssertEqual(7, Payload["total"])
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("Keystats reader: Ergopti Studio reads the physical keystrokes of three families (studio-keystats-bridge)",
+	_KLRSource_StudioCountsPhysicalKeystrokes)
+
+; The Ergopti Studio window answers keystats_ngrams: an absent keystats folder
+; and a failed worker read are refusals, a finished read pushes the staged JSON
+; as is, and the worker is the only reader of the store.
+_KLRSource_StudioWindowAnswers() {
+	global _LayEdWin_StudioCache
+	_LayEdWin_StudioCache := 0
+	Contract := KLR_StudioContract()
+	Pushed := []
+	Requests := []
+	Dir := A_Temp . "\ergopti_studio_test_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Outcome := Map("status", "ok", "stage", Dir . "\stage.json")
+		FileAppend('{"schema":1,"chars":{"e":7}}', Outcome["stage"], "UTF-8-RAW")
+		Stamp := Map("value", "rev-1")
+		Deps := Map(
+			"metrics_dir", Dir . "\absent",
+			"stamp", (MetricsDir) => Stamp["value"],
+			"request_studio", (MetricsDir, OnTerminal) => (Requests.Push(MetricsDir),
+				OnTerminal.Call(Outcome["status"], Outcome["stage"]), true),
+			"push_raw", (Name, Json) => (Pushed.Push(Name . " " . Json), true),
+			"read_stage", FSRead)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["absent"] . '"}', Pushed[1])
+		AssertEqual(0, Requests.Length, "an absent store starts no worker")
+		Deps["metrics_dir"] := Dir
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":true,"ngrams":{"schema":1,"chars":{"e":7}}}', Pushed[2])
+		AssertEqual(Dir, Requests[1])
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual(Pushed[2], Pushed[3], "an unchanged store answers from the cached projection")
+		AssertEqual(1, Requests.Length, "an unchanged store starts no second worker")
+		Stamp["value"] := "rev-2"
+		Outcome["status"] := "failed", Outcome["stage"] := ""
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "keystats_ngrams"), Deps))
+		AssertEqual('keystatsNgrams {"ok":false,"code":"' . Contract["codes"]["unreadable"] . '"}', Pushed[4])
+		AssertEqual(2, Requests.Length, "a changed store is read again")
+		AssertTrue(LAYOUT_EDITOR_WINDOW_ACTIONS.Has("keystats_ngrams"), "the page's action is allowlisted")
+	} finally {
+		_LayEdWin_StudioCache := 0
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: Ergopti Studio answers keystats_ngrams with the worker's read (studio-keystats-bridge)",
+	_KLRSource_StudioWindowAnswers)
+
+; The Studio stamp changes when a keystats file grows and stays put otherwise.
+_KLRSource_StudioStampFollowsTheStore() {
+	Dir := A_Temp . "\ergopti_studio_stamp_" . A_TickCount
+	DirCreate(Dir . "\device")
+	try {
+		AssertEqual("", KLR_StudioStoreStamp(Dir), "an empty folder has no stamp")
+		FileAppend("a", Dir . "\device\data.sql", "UTF-8-RAW")
+		First := KLR_StudioStoreStamp(Dir)
+		Assert(First != "", "a folder with a journal has a stamp")
+		AssertEqual(First, KLR_StudioStoreStamp(Dir), "an unchanged folder keeps its stamp")
+		FileAppend("b", Dir . "\device\data.sql", "UTF-8-RAW")
+		Assert(KLR_StudioStoreStamp(Dir) != First, "a grown journal changes the stamp")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Keystats reader: the Ergopti Studio stamp follows the keystats files (studio-keystats-bridge)",
+	_KLRSource_StudioStampFollowsTheStore)
+
+; The Studio window opens its analysis panels' « i » links in the system
+; browser, and only an https URL.
+_KLRSource_StudioOpensHttpsLinks() {
+	Opened := []
+	Deps := Map("open_url", (Url) => (Opened.Push(Url), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "https://ergopti.fr/studio"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "http://example.org"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link", "url", "https://a b"), Deps))
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "open_link"), Deps))
+	AssertEqual(1, Opened.Length, "only the https link is opened")
+	AssertEqual("https://ergopti.fr/studio", Opened[1])
+}
+Test("Layout editor window: Ergopti Studio opens only https links (studio-open-link)",
+	_KLRSource_StudioOpensHttpsLinks)
+
+; The analysis panels mounted in the Studio read their layout_analysis.* keys
+; from the strings the Windows host sends with sourceData, like the editor's.
+_KLRSource_StudioSendsAnalysisStrings() {
+	global _I18nCache
+	_I18nEnsureLoaded()
+	AssertFalse(_I18nCache.Has("layout_analysis.studio_probe"), "the probe key is the test's own")
+	_I18nCache["layout_analysis.studio_probe"] := "Probe"
+	try {
+		Strings := LayoutManager_EditorStrings()
+		AssertTrue(Strings.Has("layout_analysis.studio_probe"), "the analysis keys reach the Studio page")
+		AssertTrue(Strings.Has("layout_editor.title"), "the editor keys still do")
+		for Key in Strings
+			Assert(SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis.",
+				"only the editor's and the analysis panels' keys are sent: " . Key)
+	} finally {
+		_I18nCache.Delete("layout_analysis.studio_probe")
+	}
+}
+Test("Layout editor window: the Studio page receives the analysis panels' strings (studio-analysis-strings)",
+	_KLRSource_StudioSendsAnalysisStrings)
+
+; The Studio window answers the Comparer's store with the page's request numbers.
+_KLRSource_StudioLayoutMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_layout_save", "request", 3,
+		"id", "user_a", "text", '{"id":"user_a"}'), Deps))
+	AssertContains(Pushed[1], 'studioLayoutResult {')
+	AssertContains(Pushed[1], '"request":3')
+	AssertContains(Pushed[1], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_layouts", "request", 4), Deps))
+	AssertContains(Pushed[2], 'studioLayouts {')
+	AssertContains(Pushed[2], '"layouts":["{\"id\":\"user_a\"}"]')
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_layouts"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the Comparer's personal layouts (studio-layout-store)",
+	_KLRSource_StudioLayoutMessages)
+
+; The Studio window runs the chosen corpus's generated tables, then answers.
+_KLRSource_StudioCorpusMessages() {
+	Script := 'var LAYOUT_ANALYSIS_CORPORA = {};'
+	Files := Map("C:\shared\ui\layout_analysis\_generated\corpus_fr_swann.js", Script)
+	Events := []
+	Deps := Map("shared_dir", "C:\shared",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false),
+		"run_script", (Text) => (Events.Push("run " . Text), true),
+		"push", (Name, Payload) => (Events.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "request", 5, "id", "fr_swann"), Deps))
+	AssertEqual(2, Events.Length)
+	AssertEqual("run " . Script, Events[1], "the tables run as shipped, before the answer")
+	AssertContains(Events[2], 'studioCorpus {')
+	AssertContains(Events[2], '"request":5')
+	AssertContains(Events[2], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "request", 6, "id", "../x"), Deps))
+	AssertEqual(3, Events.Length, "a refused id runs nothing")
+	AssertContains(Events[3], '"ok":false')
+	AssertContains(Events[3], '"code":"studio_corpus_unavailable"')
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_corpus", "id", "fr_swann"), Deps),
+		"a request number is required")
+}
+Test("Layout editor window: Ergopti Studio runs a built-in corpus's tables on request (studio-corpus-tables)",
+	_KLRSource_StudioCorpusMessages)
+
+; The Studio window keeps the Comparer's fingering profile with the page's request numbers.
+_KLRSource_StudioProfileMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_save", "request", 2,
+		"text", '{"id":"mine"}'), Deps))
+	AssertContains(Pushed[1], 'studioProfileResult {')
+	AssertContains(Pushed[1], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load", "request", 3), Deps))
+	AssertContains(Pushed[2], 'studioProfile {')
+	AssertContains(Pushed[2], '"profile":"{\"id\":\"mine\"}"')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_save", "request", 4, "reset", true), Deps))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load", "request", 5), Deps))
+	AssertFalse(InStr(Pushed[4], '"profile"'), "reset restores the defaults")
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_profile_load"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the Comparer's fingering profile (studio-fingering-profile)",
+	_KLRSource_StudioProfileMessages)

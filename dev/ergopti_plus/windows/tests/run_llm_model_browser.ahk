@@ -16,11 +16,11 @@ SetWorkingDir(A_ScriptDir)
 
 #Include test_framework.ahk
 #Include ../vendor/Promise.ahk
-#Include ../infra/webview_script.ahk
+#Include ../core/ui/engine/webview/script.ahk
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
-#Include ../infra/json.ahk
-#Include ../adapters/timer_scheduler.ahk
-#Include ../adapters/window_manager.ahk
+#Include ../core/text/engine/json.ahk
+#Include ../core/events/timer_scheduler.ahk
+#Include ../platform/focus/window_manager.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")
@@ -102,7 +102,7 @@ class WebView2 {
 	}
 }
 
-#Include ../infra/external_url_policy.ahk
+#Include ../core/network/engine/external_url_policy.ahk
 #Include ../ui/model_browser/init.ahk
 
 ; Isolated suite: bail if a stale lock ever hangs RunTests.
@@ -136,7 +136,7 @@ _MBNum_NonNumber() {
 Test("LLM_MBW_Num: non-number defaults to 0", _MBNum_NonNumber)
 
 ; The page's own string helper is gone: every string goes through the shared
-; JsonStringLiteral (infra/json.ahk), defined once.
+; JsonStringLiteral (core/text/engine/json.ahk), defined once.
 
 class _MBSessionFakeWebView {
 	Executed := []

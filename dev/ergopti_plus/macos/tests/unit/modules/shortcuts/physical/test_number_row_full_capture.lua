@@ -18,13 +18,13 @@
 local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
-	"adapters.screen_capture",
-	"adapters.shell_runner",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"platform.system.screen_capture",
+	"core.process.adapters.shell_runner",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -41,7 +41,7 @@ local function with_screenshot(displays, scenario)
 		package.loaded["adapters.mouse_control"] = {
 			getMonitorCount = function() return displays end,
 		}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			expand_path = function(path) return path == "~" and "/Users/alice" or path end,
 			classify_no_follow = function(path)
 				if f.files[path] == nil then return nil, "absent" end
@@ -49,7 +49,7 @@ local function with_screenshot(displays, scenario)
 			end,
 			remove_exact = function(path) f.files[path] = nil return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local record = { executable = executable, args = args }
 				f.tasks[#f.tasks + 1] = record
@@ -70,15 +70,15 @@ local function with_screenshot(displays, scenario)
 				return handle
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key
 		end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end,
 			error = function(_, message, ...) f.errors[#f.errors + 1] = string.format(tostring(message), ...) end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, _, kind)
 				f.notifications[#f.notifications + 1] = { title = title, kind = kind }
 				return true
@@ -98,7 +98,7 @@ local function with_screenshot(displays, scenario)
 			scenario(require("modules.shortcuts.actions.screenshot_save"), f)
 		end, debug.traceback)
 		_G.hs = saved_hs
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not ok then error(err, 0) end
 	end)
 end

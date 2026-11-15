@@ -6,7 +6,7 @@
 --- Lets tools/dev/collect-linux-field-report.sh ask the running daemon to run
 --- its Debug field checks with no window and write one JSON result per step,
 --- so a maintainer's field report needs no click. The protocol is the one
---- every driver shares, _shared/data/field_run_protocol.json (macOS was first,
+--- every driver shares, _shared/diagnostics/data/field_run_protocol.json (macOS was first,
 --- macos/infra/field_run.lua): file names, verdicts, refusal reasons, the
 --- identifier rules, the folders and the keys each document carries are read
 --- from it, never repeated here. data/field_run_steps.json, the Linux steps file
@@ -14,7 +14,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. A request file in the declared folder, noticed by an inotify watcher: the
----    clone's build/field-run for a developer run (infra/dev_source.lua), else
+---    clone's build/field-run for a developer run (core/lifecycle/engine/dev_source.lua), else
 ---    $XDG_RUNTIME_DIR/ergopti/field-run, a folder only this user can
 ---    write. The work runs on a later turn, never inside the watcher callback,
 ---    and a request is consumed before it runs so it never runs twice.
@@ -29,10 +29,10 @@
 ---    the config_guard result, which then fails.
 --- 5. A "reload" step restarts the daemon on purpose, as macOS reloads its
 ---    driver: it writes the run's state to the resume file and asks the reload
----    owner (infra/reload_restart.lua) for the restart. The stop of a run whose
+---    owner (core/lifecycle/engine/reload/restart.lua) for the restart. The stop of a run whose
 ---    restart was accepted suspends it instead of closing it; the successor's
 ---    start reads the resume file once, records the step with the reload's
----    duration (infra/reload_timing.lua, request to boot complete), takes a
+---    duration (core/timing/engine/reload_timing.lua, request to boot complete), takes a
 ---    fresh config.toml snapshot for the guard and runs the next step. A
 ---    reload refused, or accepted and never started, fails by name; a run with
 ---    no usable resume file is closed as interrupted.
@@ -40,9 +40,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local Report = require("field_check_report")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local Report = require("diagnostics.engine.field_check.report")
 
 local LOG = "infra.field_run"
 local PRIVATE_MODE = 448 -- 0700
@@ -64,7 +64,7 @@ local MAX_STEPS = 98
 M.RELOAD_TRIGGER = "field run"
 
 -- The shared declaration, from the shared tree.
-M.PROTOCOL_PATH = "data/field_run_protocol.json"
+M.PROTOCOL_PATH = "diagnostics/data/field_run_protocol.json"
 
 -- The headless runner of each declared check.
 M.CHECK_RUNNERS = {
@@ -131,7 +131,7 @@ end
 
 --- Builds the Linux declaration from the shared protocol and the Linux steps.
 --- A malformed or unsupported declaration stops the caller.
---- @param protocol table Decoded _shared/data/field_run_protocol.json.
+--- @param protocol table Decoded _shared/diagnostics/data/field_run_protocol.json.
 --- @param linux table Decoded data/field_run_steps.json.
 --- @return table spec The protocol's names and rules, the steps, step_by_id and matchers.
 function M.declaration(protocol, linux)
@@ -227,7 +227,7 @@ end
 --- @param steps_file any The shared declaration's steps_file.linux, relative to the clone root.
 --- @return string relative
 function M.steps_relative(steps_file)
-	local prefix = require("infra.dev_source").DRIVER_SUBPATH:sub(2) .. "/"
+	local prefix = require("core.lifecycle.engine.dev_source").DRIVER_SUBPATH:sub(2) .. "/"
 	if type(steps_file) ~= "string" or steps_file:sub(1, #prefix) ~= prefix then
 		error("field run: steps_file.linux is not inside " .. prefix, 2)
 	end
@@ -240,7 +240,7 @@ end
 --- @return table spec
 function M.load(shared_root, driver_root)
 	local function decode(path)
-		local handle = require("infra.regular_file_reader").open_source(path)
+		local handle = require("core.fs.engine.regular_file_reader").open_source(path)
 		if not handle then error("field run: the declaration is unreadable: " .. path, 0) end
 		local read, text = pcall(handle.read, handle, "*a")
 		local closed, acknowledged = pcall(handle.close, handle)
@@ -349,7 +349,7 @@ Session.__index = Session
 
 --- Creates one session; it publishes nothing until start().
 --- @param opts table { spec, folder, pid, ports, reload_ms? }; reload_ms is the duration of the
----   reload this daemon's boot completed (infra/reload_timing.lua), nil when it follows none.
+---   reload this daemon's boot completed (core/timing/engine/reload_timing.lua), nil when it follows none.
 --- @return table session
 function M.new(opts)
 	assert(type(opts) == "table" and type(opts.spec) == "table", "field run needs its declaration")
@@ -824,7 +824,7 @@ M.Session = Session
 --- @return table ports
 local function native_ports()
 	local uv = require("luv")
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local function timer(ms, fn)
 		local handle = uv.new_timer()
 		handle:start(math.max(0, math.floor(ms)), 0, function()
@@ -876,12 +876,12 @@ end
 
 --- Starts the daemon's field run session; a failure is logged and the daemon runs on.
 --- @param opts table { pid, reload?, reload_ms?, spec?, ports?, folder? }; reload is the daemon's
----   reload owner (infra/reload_restart.lua perform), reload_ms the reload its boot completed.
+---   reload owner (core/lifecycle/engine/reload/restart.lua perform), reload_ms the reload its boot completed.
 --- @return table|nil session, string|nil error
 function M.start(opts)
 	Logger.start(LOG, "Starting the field run session…")
 	local ok, session_or_err = pcall(function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local spec = opts.spec
 		if spec == nil then
 			local shared = Paths.shared_root()
@@ -891,7 +891,7 @@ function M.start(opts)
 		local folder = opts.folder
 		if folder == nil then
 			local why
-			folder, why = M.folder(spec, os.getenv, require("infra.dev_source").root())
+			folder, why = M.folder(spec, os.getenv, require("core.lifecycle.engine.dev_source").root())
 			if not folder then error(why, 0) end
 		end
 		local ports = opts.ports

@@ -7,7 +7,7 @@
 --- layout with no logout (docs/design/layout-option-emulation.md, section 3.1).
 --- macOS keeps typing the cells it cached for a keyboard it has seen (probe M3),
 --- so every build is a NEW loose .keylayout under its own name and id
---- (layouts/keylayout_rows.lua): written, enabled through the enabled-sources
+--- (layouts/engine/composer/keylayout_rows.lua): written, enabled through the enabled-sources
 --- preference (the route the driver already proves, probe P5), selected, read
 --- back from a fresh process, and only then is the previous build retired.
 ---
@@ -27,8 +27,8 @@
 ---    replays the whole sequence and the field run reuses it with its own record.
 --- ==============================================================================
 
-local Logger = require("infra.logger")
-local Rows = require("layouts.keylayout_rows")
+local Logger = require("core.logger.engine.logger")
+local Rows = require("layouts.engine.composer.keylayout_rows")
 
 local M = {}
 
@@ -382,8 +382,8 @@ end
 --- @return table deps
 function M.default_deps(overrides)
 	overrides = overrides or {}
-	local FileSystem = require("adapters.file_system")
-	local Json = require("json")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local Json = require("core.text.engine.json")
 	local InputSources = require("modules.keymap.input_sources")
 	local LayoutFiles = require("adapters.keyboard_layout_files")
 	local deps = {
@@ -408,7 +408,7 @@ function M.default_deps(overrides)
 	}
 	-- Read once: the menu asks for these collaborators at every rebuild.
 	if _keycodes_table == nil then
-		local table_path = require("infra.paths").shared("modules/layouts/mac_keycodes.json")
+		local table_path = require("core.fs.engine.paths").shared("layouts/data/mac_keycodes.json")
 		local table_text = type(table_path) == "string" and FileSystem.read(table_path) or nil
 		_keycodes_table = type(table_text) == "string" and Json.decode(table_text) or nil
 	end

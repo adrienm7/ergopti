@@ -70,9 +70,7 @@ helpers.describe("native Karabiner lease uses the canonical CLI only", function(
 		package.loaded["platform.remap.ke_paths"] = nil
 		local paths = require("platform.remap.ke_paths")
 		paths.select_runtime("owned")
-		local file = assert(io.open(helpers.driver_root() .. "/platform/remap/lease_controller.lua", "r"))
-		local controller = file:read("*a")
-		file:close()
+		local controller = assert(helpers.read_module_source("platform.remap.lease_controller"))
 		-- Both spawn sites pass the runtime-selected tool and add no endpoint of
 		-- their own, so the Swift allowlist is the only second spelling.
 		local _, spawns = controller:gsub("KePaths%.CLI", "")

@@ -18,8 +18,8 @@
 
 local helpers = require("tests.helpers")
 local Pipeline = require("tests.support.prediction_pipeline")
-local Selector = require("llm.profile_selector")
-local Rewrite = require("llm.rewrite")
+local Selector = require("ai.engine.settings.profile_selector")
+local Rewrite = require("ai.engine.prediction.rewrite")
 
 --- Returns the shipped built-in profile with an id, labelled for the info bar.
 --- @param id string
@@ -48,7 +48,7 @@ local function load_fixture(options)
 	local fixture = Pipeline.load(options)
 	fixture.notices = {}
 	fixture.info_bars = {}
-	local tooltip = package.loaded["ui.tooltip"]
+	local tooltip = package.loaded["core.ui.ui.tooltip"]
 	tooltip.show = function(content)
 		fixture.notices[#fixture.notices + 1] = content
 		return true
@@ -124,7 +124,7 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 		helpers.assert_eq(logged(fixture, "warn", "custom_deleted"), 1, "the refusal is logged")
 		helpers.assert_eq(#fixture.notices, 1)
 		helpers.assert_eq(fixture.notices[1],
-			package.loaded["infra.i18n"].get("llm.prompt_prediction.unknown_prompt"))
+			package.loaded["core.i18n.engine.i18n"].get("llm.prompt_prediction.unknown_prompt"))
 	end)
 
 	helpers.it("refuses an invalid stored value with the same notice", function()
@@ -132,7 +132,7 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 		helpers.assert_eq(fixture.engine.request_prompt_prediction("rewrite|0"), false)
 		helpers.assert_eq(fixture.fetches, 0)
 		helpers.assert_eq(fixture.notices[1],
-			package.loaded["infra.i18n"].get("llm.prompt_prediction.unknown_prompt"))
+			package.loaded["core.i18n.engine.i18n"].get("llm.prompt_prediction.unknown_prompt"))
 	end)
 
 	helpers.it("keeps the manual refusals: nothing typed", function()
@@ -140,7 +140,7 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 		helpers.assert_eq(fixture.engine.request_prompt_prediction("advanced"), false)
 		helpers.assert_eq(fixture.fetches, 0)
 		helpers.assert_eq(fixture.notices[1],
-			package.loaded["infra.i18n"].get("llm.manual_prediction.empty_context"))
+			package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction.empty_context"))
 	end)
 
 	helpers.it("keeps the manual refusals: paused outranks an unknown prompt", function()
@@ -149,7 +149,7 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 		local ok, err = pcall(function()
 			helpers.assert_eq(fixture.engine.request_prompt_prediction("custom_deleted"), false)
 			helpers.assert_eq(fixture.notices[1],
-				package.loaded["infra.i18n"].get("llm.manual_prediction.paused"))
+				package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction.paused"))
 		end)
 		package.loaded["modules.shortcuts.script_control"] = nil
 		if not ok then error(err, 0) end
@@ -159,7 +159,7 @@ helpers.describe("prompt prediction request (llm-prompt-prediction)", function()
 		local fixture = load_fixture({ llm_enabled = false })
 		helpers.assert_eq(fixture.engine.request_prompt_prediction("advanced"), false)
 		helpers.assert_eq(fixture.notices[1],
-			package.loaded["infra.i18n"].get("llm.manual_prediction.disabled"))
+			package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction.disabled"))
 	end)
 end)
 
@@ -190,7 +190,7 @@ helpers.describe("rewrite requests (llm-prompt-prediction)", function()
 		helpers.assert_eq(fixture.engine.request_prompt_prediction("rewrite"), false)
 		helpers.assert_eq(fixture.fetches, 0)
 		helpers.assert_eq(fixture.notices[1],
-			package.loaded["infra.i18n"].get("llm.manual_prediction.empty_context"))
+			package.loaded["core.i18n.engine.i18n"].get("llm.manual_prediction.empty_context"))
 	end)
 
 	helpers.it("applies to the global rewrite profile on the automatic path too", function()
@@ -221,9 +221,9 @@ end)
 
 helpers.it("runs a per-binding free language through the current sentence pipeline", function()
 	local fixture = load_fixture({ buffer = "Bonjour Marc. On se voit demain ?" })
-	local Json = require("json")
-	local config_file = assert(io.open(helpers.shared("modules/llm/translate.json"), "r"))
-	local names_file = assert(io.open(helpers.shared("data/locale_names.json"), "r"))
+	local Json = require("core.text.engine.json")
+	local config_file = assert(io.open(helpers.shared("ai/data/translate.json"), "r"))
+	local names_file = assert(io.open(helpers.shared("core/i18n/data/locale_names.json"), "r"))
 	local config = assert(Json.decode(config_file:read("*a"))); config_file:close()
 	local names = assert(Json.decode(names_file:read("*a"))); names_file:close()
 	local previous = package.loaded["modules.llm.selection_translation"]

@@ -8,8 +8,8 @@
 
 local helpers = require("tests.helpers")
 local path = helpers.shared("tests/corpus/hotstrings/personal_file_adoption.json")
-local Json = require("adapters.json_codec")
+local Json = require("core.fs.adapters.json_codec")
 local file = assert(io.open(path, "r"))
 local content = assert(file:read("*a"))
 assert(file:close())
-require("test.personal_file_adoption_contract").run(helpers, assert(Json.decode(content)))
+require("tests.lua.hotstrings.personal_file_adoption_contract").run(helpers, assert(Json.decode(content)))

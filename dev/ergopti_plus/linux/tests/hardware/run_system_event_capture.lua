@@ -7,22 +7,31 @@
 --- ==============================================================================
 
 local root, receipt = assert(arg[1]), assert(arg[2])
-local shared = root .. "/../_shared/lua"
+local shared = root .. "/../_shared"
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Fixture = require("tests.support.keystats_native_fixture")
 local Consent = require("tests.support.metrics_consent_fixture")
-local Shell = require("adapters.shell_runner")
-local Clock = require("infra.monotonic")
+local Shell = require("core.process.adapters.shell_runner")
+local Clock = require("core.logger.engine.monotonic")
 local Calendar = require("modules.keystats.calendar")
 local System = require("modules.keystats.system_metrics")
 local original_has, original_line = Shell.has_command, Shell.exec_line
 local original_capture, original_now = Calendar.capture, Clock.now_ms
 -- Keep the actual Calendar coordinate contract: raw clock fractions can lose a
 -- millisecond when an exact observation gap reaches SQLite integer persistence.
-local wall, mono = os.time() * 1000, original_capture().mono_ms
+-- The scenarios advance the wall clock by several sample gaps (minutes). Started
+-- in the last minutes before local midnight, a gap crossed the day cut and the
+-- day read back held only its share of the sleep (86000 of 120000 ms on a run at
+-- 23:59:26). The wall origin is therefore held at 23:00 today at the latest: the
+-- same date, never in the future. ERGOPTI_FIXTURE_WALL_S replaces the real now
+-- for the regression case that starts just before midnight.
+local real_now_s = tonumber(os.getenv("ERGOPTI_FIXTURE_WALL_S") or "") or os.time()
+local today = os.date("*t", real_now_s)
+local latest_origin_s = os.time({ year = today.year, month = today.month, day = today.day, hour = 23, min = 0, sec = 0 })
+local wall, mono = math.min(real_now_s, latest_origin_s) * 1000, original_capture().mono_ms
 local elapsed, network, locked = 0, "allowed-initial-network", false
 local calls = { network = 0, lock = 0, mute = 0 }
 -- Existing documented sensor command boundaries return controlled software data.

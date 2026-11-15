@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/cs.msg
-# AUTO-GENERATED from _shared/data/locales/cs.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/cs.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Síťový modul LuaJIT sestaven ze zdrojových kódů.
 build_luv.recipe_required=Nativní sestavení luv vyžaduje svůj zdrojový recept.
 install.already_installed={1} — již nainstalováno
 install.archive_digest_unavailable=aktualizace s ponechaným deskriptorem vyžadují skutečné běhové prostředí OpenSSL3; funkce zůstává nedostupná.
+install.bytecode_skipped=Předkompilované moduly se nepodařilo vytvořit — Ergopti se spouští ze zdrojového kódu, o něco pomaleji.
 install.capability_verified={1} — funkce ověřena
 install.command_still_missing={1} byl nainstalován, ale '{2}' stále nelze najít.
 install.daemon_manual=Službu ručně spustíte příkazem:
 install.daemon_running=Služba běží na pozadí. Stav zjistíte příkazem:
+install.focus_integration_enabled=integrace fokusu {1} zapnuta
+install.focus_integration_failed=Integraci fokusu {1} se nepodařilo zapnout — pravidla pro jednotlivé aplikace zůstávají na tomto prostředí neaktivní.
+install.focus_integration_next_login=integrace fokusu {1} nainstalována (platí od příštího přihlášení)
+install.focus_integration_updated=integrace fokusu {1} aktualizována
 install.gnome_extension_active=rozšíření GNOME AppIndicator — již aktivní
 install.gnome_extension_enabled=rozšíření GNOME AppIndicator zapnuto
 install.gnome_extension_failed=Rozšíření AppIndicator nelze zapnout — bez něj GNOME ikonu nezobrazí.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — kontrola závislostí
 install.section_deps_skipped=Závislosti přeskočeny (--no-deps)
 install.section_done=Instalace dokončena
 install.section_files=Instalace souborů
+install.section_focus=Aktivní aplikace pod Waylandem (GNOME, KDE)
 install.section_lua_deps=Volitelné závislosti Lua (smyčka událostí, časovače, webview, signály)
 install.section_permissions=Oprávnění vstupu (vyžaduje sudo)
 install.section_services=Vytváření uživatelských služeb systemd
@@ -79,6 +85,7 @@ install.xdg_autostart=automatické spuštění XDG: {1}
 launch.already_running=Ergopti+ již v této relaci běží ({1} je obsazen); toto spuštění bylo odmítnuto.
 launch.authorization_failed=Autorizace přístupu ke vstupu byla zrušena nebo selhala.
 launch.groups_unavailable=Relace nemohla získat své nakonfigurované vstupní skupiny.
+launch.restarting=Ergopti+ už v této relaci běží; bude požádán o ukončení a poté znovu spuštěn.
 launch.session_lock_invalid=Adresář zámku relace musí být absolutní cesta.
 launcher.dependencies_installed=Závislosti nainstalovány.
 launcher.driver_missing=Chyba: adresář ovladače pro Linux nebyl nalezen: {1}

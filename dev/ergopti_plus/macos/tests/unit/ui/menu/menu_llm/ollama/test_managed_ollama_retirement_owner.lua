@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.ollama_pull_fixture").with_fixture
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local NONCE = "12345678-abcd-4321-abcd-123456789abc"
 
 local function proof(status, changes)
@@ -27,10 +27,10 @@ end
 --- @param callback function Exact-owner assertions.
 local function with_managed(options, callback)
 	local saved_adapter = package.loaded["adapters.managed_ollama_pull"]
-	local saved_fs = package.loaded["adapters.file_system"]
+	local saved_fs = package.loaded["core.fs.adapters.file_system"]
 	package.loaded["adapters.managed_ollama_pull"] = nil
 	local raw, removed, handle, adapter, cleanup_hook, reentry_result = "", false, nil, nil, nil, nil
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- No refused proxy sign-in left its receipt: the pull these cases own
 		-- goes ahead (modules/llm/proxy_relay_receipt.lua).
 		exists = function(path) return not path:find("proxy_relay_refusal", 1, true) end,
@@ -58,7 +58,7 @@ local function with_managed(options, callback)
 		local ready
 		handle, ready = adapter.prepare("owned/model:tiny", 11434, "/native/python")
 		helpers.assert_true(ready)
-		local lifecycle = package.loaded["adapters.task_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.task_lifecycle"]
 		local native = lifecycle.native
 		lifecycle.native = function(...)
 			local task = native(...)
@@ -90,7 +90,7 @@ local function with_managed(options, callback)
 		end)
 	end, debug.traceback)
 	package.loaded["adapters.managed_ollama_pull"] = saved_adapter
-	package.loaded["adapters.file_system"] = saved_fs
+	package.loaded["core.fs.adapters.file_system"] = saved_fs
 	if not ok then error(error_value, 0) end
 end
 

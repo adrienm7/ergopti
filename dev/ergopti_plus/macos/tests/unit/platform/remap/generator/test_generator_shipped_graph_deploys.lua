@@ -51,25 +51,25 @@ local EXISTING_WITH_TWIN_PROFILES = [[{
 --- @param layout_id string|nil Explicit registered input source; fixtures normally select Ergopti.
 local function with_generator(existing, json_codec, run, locale_code, layout_id)
 	helpers.with_fresh_modules({
-		"adapters.file_system",
-		"adapters.json_codec",
+		"core.fs.adapters.file_system",
+		"core.fs.adapters.json_codec",
 		"infra.config_paths",
-		"infra.keycodes",
-		"infra.logger",
-		"infra.toml.codec",
+		"platform.input.keycodes",
+		"core.logger.engine.logger",
+		"core.text.engine.toml.codec",
 		"platform.remap.config",
 		"platform.remap.generator",
 		"modules.keymap.layout_registry",
-		"infra.i18n",
-		"infra.locale",
-		"locale.core",
-		"toml_codec",
+		"core.i18n.engine.i18n",
+		"core.i18n.engine.locale",
+		"core.i18n.engine.core",
+		"core.text.engine.toml_codec",
 	}, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_test" end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			to_name                 = function(code) return "key_" .. tostring(code) end,
 			F13_KARABINER_RETURN    = 105,
 			F14_KARABINER_BACKSPACE = 107,
@@ -78,10 +78,10 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 			F19_LAYER_NAV_EXITED    = 80,
 		}
 		local toml_stub = { encode = function() return "" end, decode = function() return {} end }
-		package.loaded["toml_codec"] = toml_stub
-		package.loaded["infra.toml.codec"] = toml_stub
+		package.loaded["core.text.engine.toml_codec"] = toml_stub
+		package.loaded["core.text.engine.toml.codec"] = toml_stub
 		local file_state = { content = existing, writes = 0 }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = SourceFile.read,
 			read_with_status = function(path)
 				if path == KARABINER_OUT then
@@ -101,22 +101,23 @@ local function with_generator(existing, json_codec, run, locale_code, layout_id)
 				return true
 			end,
 		}
-		if json_codec then package.loaded["adapters.json_codec"] = json_codec end
+		if json_codec then package.loaded["core.fs.adapters.json_codec"] = json_codec end
 
 		package.loaded["modules.keymap.layout_registry"] = require("tests.support.active_layout_registry_fixture").new(
 			layout_id or "ergopti", layout_id == "ergol" and "ansi" or "iso")
 
 		local Config    = helpers.load_with_stubs("platform.remap.config")
-		local config_i18n = require("infra.i18n")
+		local config_i18n = require("core.i18n.engine.i18n")
 		local Generator = helpers.load_with_stubs("platform.remap.generator")
 		if locale_code then
 			-- Exercise the same lazy locale owner as the standalone native probe,
 			-- rather than the baseline helper's unresolved-key i18n double.
-			package.loaded["infra.i18n"] = nil
-			package.loaded["infra.locale"] = nil
-			local actual_i18n = require("infra.i18n")
-			require("infra.locale").set_locale(locale_code)
+			package.loaded["core.i18n.engine.i18n"] = nil
+			package.loaded["core.i18n.engine.locale"] = nil
+			local actual_i18n = require("core.i18n.engine.i18n")
+			require("core.i18n.engine.locale").set_locale(locale_code)
 			config_i18n.get = actual_i18n.get
+			config_i18n.has = actual_i18n.has
 		end
 		local keys      = assert(Config.load_tap_hold_keys(DATA_DIR .. "tap_hold_keys.json"))
 		local combos    = assert(Config.load_mod_combos(DATA_DIR .. "mod_combos.json"))
@@ -165,7 +166,7 @@ helpers.describe("the shipped rule graph deploys (json-shared-tables)", function
 						helpers.assert_eq(by_id.alt_tab_apps.karabiner_to[1].key_code, "f17")
 						local generated, detail, legacy, context = build(env, preset, tap_holds, combinations)
 						helpers.assert_not_nil(generated, detail)
-						local source = require("adapters.json_codec").decode(EXISTING_WITH_TWIN_PROFILES)
+						local source = require("core.fs.adapters.json_codec").decode(EXISTING_WITH_TWIN_PROFILES)
 						local merged, merge_error, snapshot = env.Generator.merge_into_existing_config(
 							generated, KARABINER_OUT, legacy, context)
 						helpers.assert_not_nil(merged, merge_error)
@@ -318,7 +319,7 @@ helpers.describe("Shipped graph declared input-source convention (iso-consumer-m
 				-- product swapped it on the maintainer's Apple ISO keyboard.
 				helpers.assert_eq(virtual, "ansi")
 				local snapshot = require("modules.keymap.layout_registry").snapshot()
-				local entry = assert(require("layouts.registry").find_entry(snapshot.index, scenario.id))
+				local entry = assert(require("layouts.engine.registry.registry_core").find_entry(snapshot.index, scenario.id))
 				local xml = SourceFile.read(helpers.shared("../../layouts/registry/" .. entry.file))
 				-- Independently authored, never the production tables: the usage the
 				-- keyboard of the layout's form reports (an ISO keyboard sends 0x64 left

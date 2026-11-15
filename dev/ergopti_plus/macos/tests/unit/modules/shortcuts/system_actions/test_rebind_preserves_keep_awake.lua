@@ -180,6 +180,18 @@ helpers.describe("shortcuts.bindings.rebind: keep-awake survives a layout re-arm
 		helpers.assert_eq(bindings.is_started(), false, "rebind must not start a stopped layer")
 	end)
 
+	-- The maintainer's decision of 2026-11-14: a pause stops keep-awake and the
+	-- resume gives it back as it was, on the three OS (paused-keepawake-restore).
+	helpers.it("(paused-keepawake-restore) a pause stops keep-awake and the resume restores it", function()
+		local options = {}
+		local bindings, spy = load_bindings_with_system_spy(options)
+		helpers.assert_eq(bindings.start(), true)
+		helpers.assert_eq(bindings.pause(), true)
+		helpers.assert_eq(spy.pause_awake, 1, "the pause stops keep-awake")
+		helpers.assert_eq(bindings.resume_after_pause(), true)
+		helpers.assert_eq(spy.resume_awake, 1, "the resume restores what ran at the pause")
+	end)
+
 	helpers.it("restores keep-awake when PAUSE re-enters the transient stopped rebind state", function()
 		local options = {}
 		local bindings, spy = load_bindings_with_system_spy(options)

@@ -2,22 +2,22 @@
 
 --- Canonical sources drive actual native acquisition and exact cleanup ownership.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local function with_subject(source, body)
-	local names = { "adapters.storage", "adapters.file_system", "adapters.hotkey_registrar", "infra.preferences",
-		"infra.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
+	local names = { "core.fs.adapters.storage", "core.fs.adapters.file_system", "platform.input.hotkey_registrar", "infra.preferences",
+		"core.fs.engine.paths", "infra.config_paths", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0, handles = {}, fired = {} }
 	local subject
 	local ok, err = pcall(function()
 		helpers.load_with_stubs("infra.preferences")
-		package.loaded["adapters.storage"] = setmetatable({}, { __index = function()
+		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical owner must not read legacy storage") end
 		end })
-		package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
 		package.loaded["infra.config_paths"] = { get = function() return "keyboard-config" end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local f = assert(io.open(path, "rb")); local raw = f:read("*a"); f:close(); return raw
 			end,
@@ -29,7 +29,7 @@ local function with_subject(source, body)
 				control.content, control.writes = candidate, control.writes + 1; return true
 			end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(chord, callback)
 				if control.refuse_bind then return nil end
 				local handle = { chord = chord, callback = callback, enabled = true }
@@ -76,7 +76,7 @@ helpers.describe("canonical keyboard shortcut ownership", function()
 			helpers.assert_eq(subject.get_owned_config_paths(), {
 				"shortcuts.keyboard.magic_editor", "shortcuts.keyboard.primary_a",
 			})
-			local scan = require("config_unused_keys").find_in_source(control.content,
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
 				require("ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(#scan.keys, 2)
 			for _, key in ipairs(scan.keys) do helpers.assert_true(key.key ~= "primary_a") end
@@ -196,6 +196,27 @@ helpers.describe("keyboard scope candidate admission", function()
 		end)
 	end)
 
+	-- EDD-1: a slot edited while paused is published at once and bound by the
+	-- resume, which reads the file. Before, the paused module refused the edit.
+	helpers.it("(paused-slot-change) publishes a paused edit and binds it on resume", function()
+		with_subject('[shortcuts.keyboard]\nprimary_a = "send_text"\n', function(subject, _, control)
+			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(subject.pause(), true)
+			local handles = #control.handles
+			helpers.assert_eq(subject.set_action("primary_b", "screen_capture"), true, "a paused edit is accepted")
+			helpers.assert_eq(control.writes, 1, "a paused edit is written at once")
+			helpers.assert_eq(#control.handles, handles, "a paused edit binds nothing")
+			helpers.assert_eq(subject.is_started(), false)
+			helpers.assert_eq(subject.resume_after_pause(), true)
+			helpers.assert_eq(subject.get_action("primary_b"), "screen_capture")
+			for index = handles + 1, #control.handles do
+				if control.handles[index].enabled then control.handles[index].callback() end
+			end
+			table.sort(control.fired)
+			helpers.assert_eq(control.fired, { "screen_capture", "send_text" }, "the resume binds the paused edit")
+		end)
+	end)
+
 	helpers.it("compensates a refused candidate acquisition by reapplying the captured source", function()
 		with_subject('[shortcuts.keyboard]\nprimary_a = "send_text"\n', function(subject, _, control)
 			helpers.assert_eq(subject.start(), true)
@@ -214,4 +235,4 @@ helpers.describe("keyboard scope candidate admission", function()
 	end)
 end)
 
-require("test.keyboard_native_publication_contract").register(helpers, "macos")
+require("tests.lua.layouts.keyboard_native_publication_contract").register(helpers, "macos")

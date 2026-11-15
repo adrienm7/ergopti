@@ -13,11 +13,11 @@ local helpers = require("tests.helpers")
 --- @param schedule table Mutable failure schedule.
 --- @param check function Assertions against the writer and observed native state.
 local function observe(schedule, check)
-	helpers.with_stub_scope({ "infra.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
+	helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keystats.sqlite_writer", "modules.keystats.text_cipher" }, function()
 		local state = { opens = 0, closes = 0, finalizes = 0, published_during_startup = false, logs = {} }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) state.logs[#state.logs + 1] = string.format(format, ...) end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local writer
 		local function phase(name)
 			if writer.get_db() ~= nil then state.published_during_startup = true end

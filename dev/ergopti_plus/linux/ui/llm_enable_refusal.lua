@@ -8,10 +8,10 @@
 --- ==============================================================================
 
 local M = {}
-local I18n = require("infra.i18n")
-local Shell = require("adapters.shell_runner")
-local Modal = require("ui.modal")
-local Logger = require("logger.shim")
+local I18n = require("core.i18n.engine.i18n")
+local Shell = require("core.process.adapters.shell_runner")
+local Modal = require("core.ui.ui.modal")
+local Logger = require("core.logger.engine.shim")
 local LOG = "ui.llm_enable_refusal"
 
 
@@ -32,14 +32,14 @@ local LOG = "ui.llm_enable_refusal"
 --- @return boolean retry Explicit choice after acknowledged native restoration.
 --- @return any replacement An opaque choice only after native restoration.
 function M.show(origin, replacements, modal_observer, runtime_note)
-	local title = require("window_titles").compose((I18n.get("llm.unreachable.title"):gsub("{1}", function() return "Ollama" end)))
+	local title = require("core.ui.engine.window_titles").compose((I18n.get("llm.unreachable.title"):gsub("{1}", function() return "Ollama" end)))
 	local body = (I18n.get("llm.unreachable.body_unconfirmed"):gsub("{1}", function() return "Ollama" end)
 		:gsub("{2}", function() return origin end))
 	if type(runtime_note)=='string' and runtime_note~='' then body=body .. '\n\n' .. runtime_note end
 	local keep_off = I18n.get("llm.unreachable.keep_off")
 	local retry = I18n.get("button.retry")
 	local choices = type(replacements) == "table" and #replacements > 0
-	local command = require("ui.native_dialog").command() .. " " .. (choices and "--list" or "--question")
+	local command = require("core.ui.ui.native_dialog").command() .. " " .. (choices and "--list" or "--question")
 		.. " --no-markup --title=" .. Shell.quote(title) .. " --text=" .. Shell.quote(body)
 	if choices then
 		command = command .. " --column='' --column='' --hide-column=1 --print-column=1"

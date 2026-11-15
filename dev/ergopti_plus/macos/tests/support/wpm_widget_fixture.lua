@@ -8,9 +8,9 @@ local helpers = require("tests.helpers")
 --- @param callback function Receives the widget and its native state.
 --- @param position table|nil Persisted coordinates keyed by storage setting.
 local function with_widget(callback, position)
-	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
-		"modules.keystats", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
-		"adapters.graphics_renderer", "adapters.storage" }, function()
+	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "core.ui.ui.tooltip",
+		"modules.keystats", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings", "core.events.timer_scheduler",
+		"core.ui.adapters.graphics_renderer", "core.fs.adapters.storage" }, function()
 		local state = { timers = {}, taps = {}, canvases = {}, logs = {}, now = 1, last_input = 1, preview = false }
 		local function phase(name)
 			if state.on_phase then state.on_phase(name) end
@@ -22,9 +22,9 @@ local function with_widget(callback, position)
 				phase(message)
 			end
 		end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = { shared = helpers.shared }
-		package.loaded["adapters.storage"] = { get = function(key) return position and position[key] end,
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+		package.loaded["core.fs.adapters.storage"] = { get = function(key) return position and position[key] end,
 			set = function() end, delete = function() end }
 		package.loaded["modules.keystats"] = { get_live_stats = function()
 			phase("stats")
@@ -33,8 +33,8 @@ local function with_widget(callback, position)
 		end }
 		package.loaded["ui.wpm.shared"] = { get_active_source = function() return "manual" end,
 			resolve_group_hex = function() return nil end, unit_label = function() return "WPM" end }
-		package.loaded["ui.tooltip"] = { is_visible = function() phase("tooltip"); return state.preview end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.ui.ui.tooltip"] = { is_visible = function() phase("tooltip"); return state.preview end }
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, run)
 				local handle = { run = run, active = true }
 				state.timers[#state.timers + 1] = handle
@@ -46,7 +46,7 @@ local function with_widget(callback, position)
 				return true
 			end,
 		}
-		package.loaded["adapters.graphics_renderer"] = { createWindow = function(frame)
+		package.loaded["core.ui.adapters.graphics_renderer"] = { createWindow = function(frame)
 			if state.canvas_failure == "zero" then return 0 end
 			if state.canvas_failure == "throw" then error("PRIVATE_DETAIL") end
 			local canvas = { current_frame = frame, deleted = false, shows = 0 }

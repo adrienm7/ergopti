@@ -114,7 +114,14 @@ _GPO_Source(Owners) {
 		AssertTrue(Found != 0, "the Quit route must use its genuine global initializer: " . Name)
 		Source .= Declaration[0] . "`n"
 	}
-	for Symbol in ["GestureDispatch", "GestureReleaseOwnedCarrierModifiers", "ActivateExitApp", "LifecycleNoteExitRequester",
+	; The shortcut route asks the raw touchpad owner first; this child starts none,
+	; so its genuine idle initializer answers.
+	RawOwner := FSReadStrict(_DriverProductionFileForSymbol("RawTouchpadClaimsShortcut"))
+	Found := RegExMatch(RawOwner, "m)^global _RawTouchpadOwner[ \t]*:=[^`r`n]+", &Declaration)
+	AssertTrue(Found != 0, "the raw touchpad route must use its genuine global initializer")
+	Source .= Declaration[0] . "`n"
+	for Symbol in ["GestureDispatch", "RawTouchpadClaimsShortcut", "GestureRunSlotAction",
+			"GestureReleaseOwnedCarrierModifiers", "ActivateExitApp", "LifecycleNoteExitRequester",
 			"_LifecycleQuitFacts", "_LifecycleQuitSchedule", "_LifecycleQuitRetryOwned", "NotifyQuitRefused"] {
 		Body := _DriverFuncBody(Symbol)
 		Path := _DriverProductionFileForSymbol(Symbol)

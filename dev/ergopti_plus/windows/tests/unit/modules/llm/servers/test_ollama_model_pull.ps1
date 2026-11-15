@@ -58,10 +58,10 @@ try {
 	}
 	# The literal is the product decision (local models only): the managed
 	# server must never contact ollama.com, whatever the parent environment says.
-	$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+	$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\ai\data\managed_ollama_environment.json'))
 	$environment = Read-OllamaServeEnvironment $declaration (Get-FileHash -LiteralPath $declaration -Algorithm SHA256).Hash.ToLowerInvariant()
 	Case 'managed serve child carries the shared OLLAMA_NO_CLOUD declaration' {
-		$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+		$declaration = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\_shared\ai\data\managed_ollama_environment.json'))
 		$digest = (Get-FileHash -LiteralPath $declaration -Algorithm SHA256).Hash.ToLowerInvariant()
 		$environment = Read-OllamaServeEnvironment $declaration $digest
 		Assert-Model ($environment['OLLAMA_NO_CLOUD'] -ceq '1') 'The shared declaration disables Ollama cloud contact.'

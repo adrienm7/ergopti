@@ -13,13 +13,13 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local ProfileSelector = require("llm.profile_selector")
+local Json = require("core.text.engine.json")
+local ProfileSelector = require("ai.engine.settings.profile_selector")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 --- The built-in profiles, by id, from the shared catalogue.
 local function builtin(id)
-	local fh = assert(io.open("../_shared/modules/llm/profiles.json", "r"))
+	local fh = assert(io.open("../_shared/ai/data/profiles.json", "r"))
 	local profiles = Json.decode(fh:read("*a"))
 	fh:close()
 	for _, profile in ipairs(profiles) do
@@ -37,13 +37,13 @@ local last_opts = nil
 
 local function messages_for(profile, context)
 	local names = {
-		"adapters.secure_field_detector", "modules.llm.api_ollama",
+		"platform.focus.secure_field_detector", "modules.llm.api_ollama",
 		"modules.llm.profiles", "modules.llm.profile_settings",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local sent
-	package.loaded["adapters.secure_field_detector"] = {
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 		isUrlBar = function() return false end,
@@ -150,7 +150,7 @@ helpers.describe("prediction messages: the word limits and language the prompt s
 	end)
 
 	helpers.it("falls back to the interface language, not always French", function()
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		local previous = I18n.get_locale
 		I18n.get_locale = function() return "de" end
 		local sent = messages_for(builtin("basic"), "Hallo zusammen")

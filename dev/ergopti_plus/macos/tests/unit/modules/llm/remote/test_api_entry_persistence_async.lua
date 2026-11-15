@@ -31,7 +31,7 @@ local function with_persistence_fixture(options, body)
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_ollama",
 		"modules.llm.api_mlx", "modules.llm.api_remote",
 		"modules.llm.api_token_crypto", "modules.llm.api_common",
-		"infra.logger", "infra.paths", "adapters.timer_scheduler", "adapters.storage",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.events.timer_scheduler", "core.fs.adapters.storage",
 	}
 	local saved = {}
 	for _, name in ipairs(module_names) do saved[name] = package.loaded[name] end
@@ -104,7 +104,7 @@ local function with_persistence_fixture(options, body)
 			return { cancel = function() return true end }
 		end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, info = function() end, warn = function() end,
 		start = function() end, success = function() end, done = function() end,
 		error = function(_, fmt, ...)
@@ -113,12 +113,12 @@ local function with_persistence_fixture(options, body)
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 	}
-	package.loaded["infra.paths"] = {
+	package.loaded["core.fs.engine.paths"] = {
 		shared = function(relative)
 			return "static/ergopti_plus/_shared/" .. relative
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { timer = true, committed = true }, true end,
 		cancel = function() return true end,
 		now = function() return 0 end,
@@ -137,7 +137,7 @@ local function with_persistence_fixture(options, body)
 		end,
 		clear = function(key) store[key] = nil end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		set = function(key, value)
 			local ok = pcall(settings.set, key, value)
 			return ok
@@ -242,9 +242,9 @@ helpers.describe("LLM API persistence transaction", function()
 			local foreign = { private_setting = "untouched", nested = { retained = true } }
 			with_persistence_fixture({ initial_store = { foreign_setting = foreign } }, function(llm, fixture)
 				local remote = fixture.api_remote
-				local file = assert(io.open(helpers.driver_root() .. "../_shared/modules/llm/api_providers.json", "rb"))
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/ai/data/api_providers.json", "rb"))
 				local raw = file:read("*a"); assert(file:close())
-				local catalogue = assert(require("adapters.json_codec").decode(raw))
+				local catalogue = assert(require("core.fs.adapters.json_codec").decode(raw))
 				remote.PROVIDER_ORDER = { provider_id }
 				remote.PROVIDERS = { [provider_id] = assert(catalogue.providers[provider_id]) }
 				remote.get_active_entry = function()
@@ -253,27 +253,27 @@ helpers.describe("LLM API persistence transaction", function()
 					end
 				end
 				remote.check_availability = function(_, callback) callback(); return true end
-				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "infra.dialog_util",
-					"infra.i18n", "infra.manifest_menu", "infra.notifications" }, function()
+				helpers.with_fresh_modules({ "ui.menu.menu_llm.api_panel", "core.ui.engine.dialog_util",
+					"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications" }, function()
 					local prompts, updates, warmups = 0, 0, 0
 					local notices = {}
-					package.loaded["infra.i18n"] = { get = function(key) return key end }
-					package.loaded["infra.dialog_util"] = {
+					package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+					package.loaded["core.ui.engine.dialog_util"] = {
 						text_prompt = function()
 							prompts = prompts + 1
 							return "button.ok", ({ "http://127.0.0.1:8000/v1", "inert-form-secret", "selected-model" })[prompts]
 						end,
 						block_alert = function() return "button.cancel" end,
 					}
-					package.loaded["infra.notifications"] = { notify = function(_, _, kind)
+					package.loaded["core.ui.engine.notifications"] = { notify = function(_, _, kind)
 						notices[#notices + 1] = kind
 						return true
 					end }
-					local renderer = assert(require("menu.renderer").new({
+					local renderer = assert(require("menu.engine.renderer").new({
 						platform = "hs",
-						manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-						json_decode = require("adapters.json_codec").decode,
-						i18n = { get = package.loaded["infra.i18n"].get, section = function() return {} end },
+						manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+						json_decode = require("core.fs.adapters.json_codec").decode,
+						i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = function() return {} end },
 						logger = helpers.make_logger_stub(),
 					}))
 					package.loaded["infra.manifest_menu"] = {

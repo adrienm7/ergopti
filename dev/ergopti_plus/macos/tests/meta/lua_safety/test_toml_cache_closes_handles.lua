@@ -24,8 +24,8 @@ helpers.describe("toml_cache.lua closes its handles", function()
 	-- ===================================================
 
 	helpers.it("toml_cache.lua M.store must close fh even when fh:write() panics", function()
-		local src = read_src("local function read_source_bytes") -- adapters/toml_cache.lua
-		assert(src, "adapters/toml_cache.lua must be readable")
+		local src = read_src("local function read_source_bytes") -- core/fs/adapters/toml_cache.lua
+		assert(src, "core/fs/adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around fh:write(body) with fh:close() outside.
 		assert(
 			src:find("write_ok", 1, true),
@@ -38,8 +38,8 @@ helpers.describe("toml_cache.lua closes its handles", function()
 	-- ==========================================================
 
 	helpers.it("toml_cache.lua content_fingerprint must close f even when f:read() panics", function()
-		local src = read_src("local function read_source_bytes") -- adapters/toml_cache.lua
-		assert(src, "adapters/toml_cache.lua must be readable")
+		local src = read_src("local function read_source_bytes") -- core/fs/adapters/toml_cache.lua
+		assert(src, "core/fs/adapters/toml_cache.lua must be readable")
 		-- The fix: inner pcall around f:read(...) with f:close() outside.
 		assert(
 			src:find("read_ok", 1, true),

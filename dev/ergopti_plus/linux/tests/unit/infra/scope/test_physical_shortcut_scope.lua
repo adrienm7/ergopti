@@ -7,9 +7,9 @@
 -- Requiring it inside a fixture and erasing it on teardown reopens libuv state.
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
 
 local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatgpt_url = "https://old.example"\nunknown = "keep"\n'
@@ -47,16 +47,16 @@ local function with_scope(body, source, chord_j_identity)
 			local prediction = require("modules.llm.prediction_engine")
 			prediction.init({ scheduler = require("tests.fakes").timer_scheduler() })
 			assert(prediction.shutdown_runtime() == true, "the idle original AI owner must actually close")
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,
 			}
-			package.loaded["adapters.evdev_reader"] = {
+			package.loaded["platform.input.evdev_reader"] = {
 				TOUCHPAD = "touchpad", close = function() controls.device_calls = controls.device_calls + 1; return false end,
 				open = function() controls.device_calls = controls.device_calls + 1; return false end,
 			}
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end }
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end,
 				run = function(command) controls.executed[#controls.executed + 1] = command; return true end,
@@ -109,7 +109,7 @@ local function with_scope(body, source, chord_j_identity)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			-- Keep this fixture's genuine pre-Magic-init phase while binding the
 			-- new observer to the same actual route, file ports and preference owner.
 			local magic_preferences = require("infra.hotstring_preferences")
@@ -145,7 +145,7 @@ local function with_scope(body, source, chord_j_identity)
 				execute_action = function() error("no output during edit admission") end,
 				action_names = gestures.get_executable_action_names,
 				on_text_injected = function() error("no text during edit admission") end,
-				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
+				defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"), user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path) }))
 			local Pair = require("modules.shortcuts.key_combinations")
 			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))
@@ -174,7 +174,7 @@ local function with_scope(body, source, chord_j_identity)
 			package.loaded["adapters.xkb_capture"] = controls.capture
 			local backup = path .. ".shortcuts-test-backup"
 			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
-				files = files, is_paused = function() return controls.paused end })
+				files = files })
 			controls.files = files
 			local owners = { manager = manager, keyboard = keyboard, taps = taps, url = url, gestures = gestures,
 				chords = chords }
@@ -186,7 +186,7 @@ local function with_scope(body, source, chord_j_identity)
 	end)
 	if magic_owner then magic_owner._reset_for_test() end
 	if tap_manager then tap_manager._reset_for_test() end
-	if tap_path then os.remove(tap_path) end
+	if tap_path then os.remove(tap_path); os.remove(require("tests.support.tap_hold_fixture").config_path(tap_path)) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end
@@ -404,9 +404,9 @@ end)
 helpers.describe('Actual shared physical editor to Linux native scope',function()
  helpers.it('(physical-editor-ui) Unicode Add publishes through exact actual source-return ACK',function()
   with_scope(function(scope,owners,controls,path)
-   local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json"));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    helpers.assert_eq(#editor.open().entries,0)
    helpers.assert_eq(editor.choose({code='KeyJ',mods={ctrl=true},request_id=1}),true);helpers.assert_eq(callback('send_text','★'),true)
    helpers.assert_eq(#controls.backups,0,'Draft never publishes scalar/assignment')
@@ -417,9 +417,9 @@ helpers.describe('Actual shared physical editor to Linux native scope',function(
  end)
  helpers.it('(physical-editor-ui) foreign canonical source refuses retained draft without backup',function()
   with_scope(function(scope,owners,controls,path)
-   local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/layouts/data/keycodes/physical_keys.json"));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    editor.open();editor.choose({code='KeyJ',mods={},request_id=1});helpers.assert_eq(callback('send_text','★'),true)
    local foreign=SOURCE..'# foreign editor\n';helpers.assert_true(Writer.publish_if_unchanged(path,foreign,nil,{status='ok',content=SOURCE}))
    helpers.assert_eq(editor.save(selected.token).committed,false);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),foreign)
@@ -432,44 +432,58 @@ helpers.describe('Retained Linux physical editor issuer factory',function()
   local created,opened,refused=0,0,0
   local paused,ready=false,true
   local host={physical_delivery_available=function()return true end,native_available=function()return ready end,available=function(owner)return owner~=nil end,open=function(options)helpers.assert_eq(options.scope.marker,'native');opened=opened+1;return true end}
-  local ports=require('shortcuts.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,paused=function()return paused end,refused=function()refused=refused+1 end})
+  local ports=require('shortcuts.engine.physical_editor_menu').new({scope=function()created=created+1;return{marker='native'}end,host=function()return host end,refused=function()refused=refused+1 end})
   helpers.assert_eq(ports.ready(),true);helpers.assert_eq(created,0);helpers.assert_eq(opened,0)
-  paused=true;helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0);helpers.assert_eq(refused,1)
-  paused=false;ready=false;helpers.assert_eq(ports.ready(),false);helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0)
+  ready=false;helpers.assert_eq(ports.ready(),false);helpers.assert_eq(ports.open(),false);helpers.assert_eq(created,0);helpers.assert_eq(refused,1)
   ready=true;helpers.assert_eq(ports.open(),true);helpers.assert_eq(created,1);helpers.assert_eq(opened,1)
  end)
  helpers.it('(physical-editor-ui) same native issuer survives window reopen and canonical edits',function()
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope');local paused=function()return controls.paused end
-   local owner=Scope.editor_owner(paused);helpers.assert_true(type(owner)=='table')
-   helpers.assert_eq(Scope.editor_owner(paused),owner,'Reopen retains exact receipt issuer')
+   local Scope=require('infra.shortcuts_scope')
+   local owner=Scope.editor_owner();helpers.assert_true(type(owner)=='table')
+   helpers.assert_eq(Scope.editor_owner(),owner,'Reopen retains exact receipt issuer')
    local inventory,receipt=owner.capture_editor_inventory();helpers.assert_true(type(inventory)=='table')
    helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}},receipt),true)
-   helpers.assert_eq(Scope.editor_owner(paused),owner)
+   helpers.assert_eq(Scope.editor_owner(),owner)
    local _,current=owner.capture_editor_inventory();helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',delete=true}},current),true)
    helpers.assert_eq(Codec.decode(Writer.read_classified(path)).shortcuts.keyboard.physical_none_KeyJ,nil)
-   local entered=false;helpers.assert_eq(Scope.editor_owner(function()if not entered then entered=true;helpers.assert_eq(Scope.editor_owner(paused),nil,'Reentrant factory cannot replace owner')end;return false end),owner)
-   controls.paused=true;helpers.assert_eq(Scope.editor_owner(paused),nil);controls.paused=false;helpers.assert_eq(Scope.editor_owner(paused),owner)
+   local Paths=package.loaded['infra.config_paths'];local config,entered=Paths.config,false
+   Paths.config=function(...)if not entered then entered=true;helpers.assert_eq(Scope.editor_owner(),nil,'Reentrant factory cannot replace owner')end;return config(...)end
+   local reentered=Scope.editor_owner();Paths.config=config;helpers.assert_true(entered);helpers.assert_eq(reentered,owner)
+   -- EDD-1 (maintainer, 2026-11-12): a paused daemon still opens the editor (edd1-paused-writes).
+   controls.paused=true;helpers.assert_eq(Scope.editor_owner(),owner);controls.paused=false
+  end)
+ end)
+ -- EDD-1 (maintainer, 2026-11-12): a pause stops typing, not configuration.
+ helpers.it('(edd1-paused-writes) an open physical shortcuts editor commits its edit after a pause',function()
+  with_scope(function(_,owners,controls,path)
+   local Scope=require('infra.shortcuts_scope')
+   local owner=Scope.editor_owner();helpers.assert_true(type(owner)=='table')
+   local _,receipt=owner.capture_editor_inventory()
+   controls.paused=true
+   helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}},receipt),true)
+   helpers.assert_eq(Codec.decode(Writer.read_classified(path)).shortcuts.keyboard.physical_none_KeyJ,'none')
+   controls.paused=false
   end)
  end)
  helpers.it('(physical-editor-ui) reopen cannot replace an owner whose actual child retirement is pending',function()
   local scalar='{"version":1,"executable":"/bin/sh","arguments":[]}'
   local initial='[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nphysical_none_KeyJ="run_program"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__run_program=\''..scalar..'\'\n'
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope');local paused=function()return controls.paused end;local owner=Scope.editor_owner(paused)
+   local Scope=require('infra.shortcuts_scope');local owner=Scope.editor_owner()
    helpers.assert_eq(owners.gestures.run_program('keyboard__physical_none_KeyJ'),true)
    local _,receipt=owner.capture_editor_inventory();helpers.assert_eq(owner.edit({{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}},receipt),false)
-   helpers.assert_eq(owner.pending(),true);helpers.assert_eq(Scope.editor_owner(paused),nil);helpers.assert_eq(owner.pending(),true);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),initial)
-   controls.finish_worker();helpers.assert_eq(Scope.editor_owner(paused),owner);helpers.assert_eq(owner.pending(),false)
+   helpers.assert_eq(owner.pending(),true);helpers.assert_eq(Scope.editor_owner(),nil);helpers.assert_eq(owner.pending(),true);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),initial)
+   controls.finish_worker();helpers.assert_eq(Scope.editor_owner(),owner);helpers.assert_eq(owner.pending(),false)
   end,initial)
  end)
- helpers.it('(physical-editor-ui) terminal pause callback cannot return a stale route owner',function()
+ helpers.it('(physical-editor-ui) a route changed during the owner check cannot return a stale owner',function()
   with_scope(function(_,owners,controls,path)
-   local Scope=require('infra.shortcuts_scope');local paused=function()return false end;local owner=Scope.editor_owner(paused)
-   local route,reads=path,0;package.loaded['infra.config_paths'].config=function()return route end
-   local result=Scope.editor_owner(function()reads=reads+1;if reads==2 then route=path..'.foreign' end;return false end)
+   local Scope=require('infra.shortcuts_scope');local owner=Scope.editor_owner()
+   local route,reads=path,0;package.loaded['infra.config_paths'].config=function()reads=reads+1;local current=route;if reads==1 then route=path..'.foreign' end;return current end
+   local result=Scope.editor_owner()
    helpers.assert_eq(reads,2);helpers.assert_eq(result,nil);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),SOURCE)
-   route=path;helpers.assert_eq(Scope.editor_owner(paused),owner,'Refused final callback never discards exact issuer')
+   route=path;helpers.assert_eq(Scope.editor_owner(),owner,'Refused final callback never discards exact issuer')
   end)
  end)
 end)
@@ -490,8 +504,8 @@ local function assert_legacy(document)
 end
 local function planner_for(actions)
  local root=helpers.driver_root():gsub('/$','')..'/../_shared/'
- local file=assert(io.open(root..'data/keycodes/physical_keys.json','rb'));local registry=require('json').decode(file:read('*a'));assert(file:close())
- return require('shortcuts.physical_entries').new(require('shortcuts.physical_slots').new(registry),actions,{parameter_section='gesture_parameters'})
+ local file=assert(io.open(root..'layouts/data/keycodes/physical_keys.json','rb'));local registry=require('core.text.engine.json').decode(file:read('*a'));assert(file:close())
+ return require('shortcuts.engine.physical_entries').new(require('shortcuts.engine.physical_slots').new(registry),actions,{parameter_section='gesture_parameters'})
 end
 helpers.describe('Linux explicit physical entries preserve unrelated legacy semantics',function()
  helpers.it('does not invent a Unicode/J entry from accent letters or legacy magic defaults',function()
@@ -547,7 +561,7 @@ helpers.describe("Linux unqualified physical delivery admission", function()
 	end
 	helpers.it("(partial-physical-admission) refuses native physical dispatch without a qualified output owner", function()
 		with_scope(function(scope, owners, controls)
-			helpers.assert_eq(controls.native_delivery_available(), false)
+			helpers.assert_eq(controls.native_delivery_available(), true, "the production getter")
 			controls.delivery_available=false
 			helpers.assert_eq(scope.physical_delivery_available(), false)
 			helpers.assert_eq(owners.keyboard.consume({physical=true,code=36,key="x",mods={}}, options(owners,controls)), false)
@@ -602,13 +616,13 @@ helpers.describe("Physical native host and menu capability admission", function(
 		with_scope(function(scope, _, controls)
 			controls.delivery_available=false
 			local native_queries, opened, captures=0,0,0
-			package.loaded["ui.webview_manager"]={native_available=function() native_queries=native_queries+1;return true end}
+			package.loaded["core.ui.ui.webview_manager"]={native_available=function() native_queries=native_queries+1;return true end}
 			package.loaded["ui.physical_shortcuts.bridge"]=nil
 			local host=require("ui.physical_shortcuts.bridge")
 			helpers.assert_eq(host.physical_delivery_available(),false)
 			helpers.assert_eq(host.available(scope),false)
-			local menu=require("shortcuts.physical_editor_menu").new({host=function()return host end,
-				scope=function()captures=captures+1;return scope end,paused=function()return false end,
+			local menu=require("shortcuts.engine.physical_editor_menu").new({host=function()return host end,
+				scope=function()captures=captures+1;return scope end,
 				refused=function()opened=opened+1 end})
 			helpers.assert_eq(menu.ready(),false)
 			helpers.assert_eq(menu.open(),false)
@@ -711,7 +725,7 @@ helpers.describe("Physical preflight preserves original admission and parameter 
 	end)
 	helpers.it("ready parameter-only edits retain the actual typed publisher without a new input query", function()
 		with_scope(function(scope, owners, controls, path)
-			helpers.assert_eq(controls.native_delivery_available(), false)
+			helpers.assert_eq(controls.native_delivery_available(), true, "the production getter")
 			local calls, original = 0, owners.keyboard.capture_collision_inventory
 			owners.keyboard.capture_collision_inventory = function() calls = calls + 1; return original() end
 			helpers.assert_true(scope.edit({{ section = "gesture_parameters", key = "keyboard__physical_none_KeyJ__send_text", value = "★" }}))

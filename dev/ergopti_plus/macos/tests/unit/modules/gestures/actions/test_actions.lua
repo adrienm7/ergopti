@@ -14,8 +14,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local Actions = helpers.load_with_stubs("modules.gestures.actions")
 
@@ -175,12 +175,23 @@ helpers.describe("gestures.actions: get_label", function()
 		helpers.assert_eq(Actions.get_label("totally_not_a_real_id"), "totally_not_a_real_id")
 	end)
 
+	-- An id from another OS has no conventional key: a probe, not a raw key shown.
+	helpers.it("probes the conventional keys of an undeclared id (i18n-miss-warned)", function()
+		local i18n = require("core.i18n.engine.i18n")
+		local saved, asked = i18n.get, {}
+		i18n.get = function(key) asked[#asked + 1] = key; return saved(key) end
+		local ok, err = pcall(Actions.get_label, "totally_not_a_real_id")
+		i18n.get = saved
+		assert(ok, err)
+		helpers.assert_eq(asked, {}, "a missing conventional key is never fetched for display")
+	end)
+
 	-- 2026-11-03: the chords read the catalogue's English names (« Shift »,
 	-- « Enter ») in every locale; each key is now named in the user's language.
 	helpers.it("names shared modifier chords in the user's language", function()
-		local i18n = require("infra.i18n")
-		local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
-		local french = assert(require("adapters.json_codec").decode(assert(file:read("*a"))))
+		local i18n = require("core.i18n.engine.i18n")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
+		local french = assert(require("core.fs.adapters.json_codec").decode(assert(file:read("*a"))))
 		file:close()
 		local saved = i18n.get
 		i18n.get = function(key) return french[key] or key end
@@ -206,7 +217,7 @@ helpers.describe("gestures.actions: get_label", function()
 		-- Headings are built from locale keys; test_action_catalogue_parity.lua
 		-- renders them in two real locales. Here: the H1 comes from its key and
 		-- every chord block opens under a level-2 group heading.
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		helpers.assert_true(contains(Actions.SG_NAMES,
 			"#" .. i18n.get("sg_actions.sg_order.header.modifier_chords")))
 		local groups = 0
@@ -283,7 +294,7 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 	-- win_app_next, which focus windows directly (test_app_switch_direct.lua);
 	-- the windows axis still posts Cmd+`, so its previous direction keeps Shift.
 	helpers.it("uses an explicit Shift modifier for previous-window navigation", function()
-		local SyntheticInput = require("adapters.synthetic_input")
+		local SyntheticInput = require("platform.input.synthetic_input")
 		local original_emit = SyntheticInput.emit_key_stroke
 		local calls = {}
 		SyntheticInput.emit_key_stroke = function(mods, key, delay)
@@ -369,8 +380,8 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 	-- an actual acquisition failure through the real action registry rather than a
 	-- synthetic stub action.
 	local function make_actions_with_real_logger_and_throwing_timer()
-		package.loaded["infra.logger"] = nil
-		local FreshLogger = helpers.load_with_stubs("infra.logger")
+		package.loaded["core.logger.engine.logger"] = nil
+		local FreshLogger = helpers.load_with_stubs("core.logger.engine.logger")
 		FreshLogger.set_level("DEBUG")
 
 		local previous_aux = package.loaded["modules.gestures.actions_aux_owner"]
@@ -471,7 +482,7 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 
 	helpers.it("logs a native false from the shared keystroke helper", function()
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
-		local SyntheticInput = require("adapters.synthetic_input")
+		local SyntheticInput = require("platform.input.synthetic_input")
 		local original_emit = SyntheticInput.emit_key_stroke
 		SyntheticInput.emit_key_stroke = function() return false end
 
@@ -599,7 +610,7 @@ helpers.describe("gestures.actions: published parameter binding identity", funct
 		with_actions(function(actions)
 			for _, binding in ipairs({ "keyboard__primary_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
 				local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-				local published = require("config_keyboard_publication").current(owner) ~= nil
+				local published = require("settings.engine.publication.keyboard_publication").current(owner) ~= nil
 				if binding == "keyboard__primary_k" and published then
 					helpers.assert_eq(actions.action_parameter_binding_fits(binding), true, "the actual published Mac Cmd+K is current")
 				else
@@ -726,15 +737,15 @@ end)
 local binding_vectors_path = helpers.shared("tests/corpus/config_binding_identity/vectors.json")
 local binding_vectors_file = assert(io.open(binding_vectors_path, "rb"))
 local binding_vectors_source = assert(binding_vectors_file:read("*a")); assert(binding_vectors_file:close())
-require("test.config_binding_identity_contract").register(helpers, assert(require("json").decode(binding_vectors_source)))
+require("tests.lua.settings.binding_identity_contract").register(helpers, assert(require("core.text.engine.json").decode(binding_vectors_source)))
 
 
-require("test.script_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.settings.script_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.tap_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.keyboard.tap_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
 
-require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
+require("tests.lua.layouts.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
 
-require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")
+require("tests.lua.settings.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")

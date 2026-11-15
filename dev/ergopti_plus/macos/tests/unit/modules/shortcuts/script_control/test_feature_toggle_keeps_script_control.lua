@@ -213,6 +213,37 @@ helpers.describe("shortcuts feature toggle keeps the script-control tap alive", 
 		cleanup()
 	end)
 
+	-- A pause stops typing, not configuration (EDD-1): the switch records its
+	-- intent under the global claim, and resume applies it.
+	helpers.it("records ON under a global PAUSE and starts it on resume (edd1-paused-writes)", function()
+		local Shortcuts, calls = load_with_counting_submodules()
+		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
+		helpers.assert_eq(Shortcuts.pause_bindings("script_control"), true)
+		local resumes_before = calls.bindings_resume
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before, "nothing binds under the pause")
+		helpers.assert_eq(calls.bindings_live, false)
+		helpers.assert_eq(Shortcuts.resume_bindings_after_pause("script_control"), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before + 1, "resume starts the recorded ON")
+		helpers.assert_eq(calls.bindings_live, true)
+		cleanup()
+	end)
+
+	helpers.it("records OFF under a global PAUSE and keeps it off on resume (edd1-paused-writes)", function()
+		local Shortcuts, calls = load_with_counting_submodules()
+		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
+		helpers.assert_eq(Shortcuts.pause_bindings("script_control"), true)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), true)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(false), true)
+		local resumes_before = calls.bindings_resume
+		helpers.assert_eq(Shortcuts.resume_bindings_after_pause("script_control"), true)
+		helpers.assert_eq(calls.bindings_resume, resumes_before, "an OFF switched back stays off")
+		helpers.assert_eq(calls.bindings_live, false)
+		helpers.assert_eq(Shortcuts.set_feature_intent_under_pause(true), false,
+			"without a pause the switch goes through resume_bindings")
+		cleanup()
+	end)
+
 	helpers.it("keeps nested claims admission-authoritative across start and stop", function()
 		local Shortcuts, calls = load_with_counting_submodules()
 		helpers.assert_eq(Shortcuts.pause_bindings("feature_toggle"), true)
@@ -284,10 +315,10 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			end,
 		}
 
-		helpers.load_with_stubs("infra.logger")
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {}
+		helpers.load_with_stubs("core.logger.engine.logger")
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+		package.loaded["core.ui.engine.dialog_util"] = {}
 		package.loaded["modules.shortcuts"] = {
 			DEFAULT_STATE = { chatgpt_url = "https://example.test", shortcuts = true },
 		}
@@ -295,7 +326,7 @@ helpers.describe("menu_shortcuts feature toggle is wired to the binding-only pai
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,

@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
-local Logger = helpers.load_with_stubs("infra.logger")
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 local function matching_errors(needle_a, needle_b)
 	local count = 0
@@ -39,14 +39,14 @@ local function fresh_manager()
 		errmsg = function() return "" end,
 	}
 
-	package.loaded["infra.logger"] = Logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function() return 1000 end,
 		sec = function() return 1 end,
 	}
-	package.loaded["infra.i18n"] = {}
-	package.loaded["adapters.file_system"] = {}
-	package.loaded["adapters.timer_scheduler"] = {}
+	package.loaded["core.i18n.engine.i18n"] = {}
+	package.loaded["core.fs.adapters.file_system"] = {}
+	package.loaded["core.events.timer_scheduler"] = {}
 	package.loaded["modules.keystats.sqlite_writer"] = {
 		get_db = function() return db end,
 		close_db = function() return true end,
@@ -61,7 +61,7 @@ local function fresh_manager()
 			return { "peer-device" }
 		end,
 	}
-	package.loaded["keystats.metrics"] = {}
+	package.loaded["metrics.engine.metrics"] = {}
 	package.loaded["modules.keystats.log_manager"] = nil
 	return EmptyLedger.load()
 end

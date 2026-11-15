@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Local Server Port Scan (Linux)
 --- DESCRIPTION:
---- Reads the machine for the shared port policy (_shared/lua/llm/
+--- Reads the machine for the shared port policy (_shared/ai/engine/
 --- local_server_ports.lua): the command lines of the catalogue's processes
 --- from /proc, the servers' settings files, and ss for the listening TCP ports
 --- of a running server that gave no port by its command line or settings
@@ -30,16 +30,16 @@
 --- ==============================================================================
 
 local M = {}
-local Json = require("json")
-local Logger = require("logger.shim")
-local Timings = require("infra.timings")
-local Monotonic = require("infra.monotonic")
-local ProcessRunner = require("adapters.process_runner")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
+local Timings = require("core.timing.engine.timings")
+local Monotonic = require("core.logger.engine.monotonic")
+local ProcessRunner = require("core.process.adapters.runner")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ConfigPaths = require("infra.config_paths")
-local Policy = require("llm.local_server_ports")
+local Policy = require("ai.engine.local_servers.ports_core")
 
-local LOG = "llm.local_server_ports"
+local LOG = "ai.engine.local_servers.ports_core"
 -- A settings file larger than this is not a server's port setting
 local MAX_SETTINGS_BYTES = 1048576
 -- Bytes of a command line read: ports and names sit well inside this
@@ -171,7 +171,7 @@ end
 M._now_ms = function() return Monotonic.now_ms() end
 M._defer = function(fn) return TimerScheduler.after(0, fn).fired ~= true end
 M._read_file = function(path)
-	local file = require("infra.regular_file_reader").open_source(path)
+	local file = require("core.fs.engine.regular_file_reader").open_source(path)
 	return read_bounded(file, MAX_SETTINGS_BYTES, true)
 end
 -- The account home only: a server's settings file is never looked for in the
@@ -369,7 +369,7 @@ function M.scan_owned(entries, on_done, admission)
 	return scope
 end
 
-M._owned_process = function(...) return require("adapters.owned_process").start(...) end
-M._owned_timer = function(...) return require("infra.managed_http_deadline").start(...) end
+M._owned_process = function(...) return require("core.process.adapters.owned_process").start(...) end
+M._owned_timer = function(...) return require("core.network.engine.managed_http_deadline").start(...) end
 
 return M

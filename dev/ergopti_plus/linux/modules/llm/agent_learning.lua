@@ -19,13 +19,13 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local LearningStore = require("llm.agent_learning_store")
-local CorruptAside = require("infra.corrupt_aside")
-local RegularFileReader = require("infra.regular_file_reader")
-local RegularFileWriter = require("infra.regular_file_writer")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local LearningStore = require("ai.engine.agent.learning_store")
+local CorruptAside = require("core.fs.engine.corrupt_aside")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
+local RegularFileWriter = require("core.fs.engine.regular_file_writer")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "modules.llm.agent_learning"
 
@@ -161,7 +161,7 @@ end
 --- Retains a timer when its cancellation has not been acknowledged.
 local function cancel_save_timer()
 	if not _save_timer then return true end
-	local scheduler = _scheduler or require("adapters.timer_scheduler")
+	local scheduler = _scheduler or require("core.events.timer_scheduler")
 	local called, cancelled = pcall(scheduler.cancel, _save_timer)
 	if not called or cancelled ~= true then return false end
 	_save_timer = nil
@@ -180,8 +180,8 @@ function M.flush()
 		return false
 	end
 	local dir = NativePath.dirname(path)
-	if dir and not require("adapters.shell_runner").run("mkdir -p "
-		.. require("adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
+	if dir and not require("core.process.adapters.shell_runner").run("mkdir -p "
+		.. require("core.process.adapters.shell_runner").quote(dir) .. " 2>/dev/null") then
 		Logger.error(LOG, "The agent's learning folder could not be created.")
 		return false
 	end
@@ -220,7 +220,7 @@ end
 
 --- Schedules a save.
 local function schedule_save()
-	local scheduler = _scheduler or require("adapters.timer_scheduler")
+	local scheduler = _scheduler or require("core.events.timer_scheduler")
 	if not cancel_save_timer() then return end
 	local timer
 	timer = scheduler.after(SAVE_DEBOUNCE_SEC, function()

@@ -16,7 +16,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths",
 	"platform.remap.lease_memory_snapshot" }
 
 --- Builds scripted ports; `world` records every command.
@@ -57,7 +57,7 @@ end
 local function run_on(runtime, name, ports)
 	local steps, result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["platform.remap.ke_paths"] = nil
 		if runtime then require("platform.remap.ke_paths").select_runtime(runtime) end
 		package.loaded["infra.field_check"] = nil
@@ -152,7 +152,7 @@ helpers.describe("lease check", function()
 	end)
 
 	helpers.it("decides whether karabiner.json must shrink from its write time (lease-deploy-verdict)", function()
-		local hold = require("infra.main_thread_hold").COUNT_MS
+		local hold = require("core.lifecycle.engine.main_thread_hold").COUNT_MS
 		local function verdict(write_ms)
 			local ports, world = make_ports({ deploy_facts = function() return { bytes = 760832, write_ms = write_ms } end })
 			world.existing[CLI] = true
@@ -259,7 +259,7 @@ helpers.describe("lease check", function()
 		local steps = run_on("owned", "lease", ports)
 		helpers.assert_eq(steps.config_present.value, "no", "the shared file says nothing of the owned runtime")
 		world.existing["/Users/jane/Library/Application Support/"
-			.. require("app_dirs").owned_runtime.macos_folder_name .. "/karabiner/karabiner.json"] = true
+			.. require("core.fs.engine.app_dirs").owned_runtime.macos_folder_name .. "/karabiner/karabiner.json"] = true
 		helpers.assert_eq(run_on("owned", "lease", ports).config_present.value, "yes")
 		helpers.assert_eq(run("lease", ports).config_present.value, "yes", "the shared runtime keeps its own file")
 	end)
@@ -366,7 +366,7 @@ helpers.describe("owned runtime check", function()
 
 	helpers.it("parses the driver listing", function()
 		helpers.with_stub_scope(MODULES, function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.field_check_checks"] = nil
 			local Checks = require("infra.field_check_checks")
 			helpers.assert_eq(Checks.parse_version("karabiner_cli 16.0.0 (x)"), "16.0.0")

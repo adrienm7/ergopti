@@ -23,25 +23,25 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
 local NetworkEnv    = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
-local i18n          = require("infra.i18n")
-local text_utils    = require("infra.text_utils")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
-local JsonCodec = require("adapters.json_codec")
-local FileSystem = require("adapters.file_system")
-local Json = require("json")
+local i18n          = require("core.i18n.engine.i18n")
+local text_utils    = require("core.text.engine.utils")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local FileSystem = require("core.fs.adapters.file_system")
+local Json = require("core.text.engine.json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 -- A backslash is a filename byte on macOS: only the host's separators split it.
 local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
 local _source_sep = "[" .. NativePath.separators() .. "]"
 local _native_network_directory = _module_source:match("^(.*)" .. _source_sep .. "ui" .. _source_sep
 	.. "menu" .. _source_sep .. "menu_llm" .. _source_sep .. "[^" .. NativePath.separators() .. "]+$")
-_native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
+_native_network_directory = _native_network_directory and (_native_network_directory .. "/core/network/adapters")
 
 --- Quotes the Python import directory without a table-only native JSON encoder.
 --- Invalid UTF-8 and quotation failures refuse before any helper is published.

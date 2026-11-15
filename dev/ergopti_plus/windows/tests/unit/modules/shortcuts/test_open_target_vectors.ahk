@@ -4,7 +4,7 @@
 ; MODULE: copy_selected_path open-target corpus (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/shortcuts/open_target_vectors.json, which the
-; macOS and Linux suites replay against _shared/lua/open_target too, through
+; macOS and Linux suites replay against _shared/shortcuts/engine too, through
 ; OpenTarget_Classify with the corpus's Windows environment, then checks that
 ; SearchPath (the copy_selected_path action outside Explorer) opens what the
 ; classifier names instead of searching for it.

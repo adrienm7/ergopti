@@ -40,9 +40,9 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = require("logger.shim")
-local DeviceNames = require("infra.device_names")
-local NativePath = require("native_path")
+local Logger = require("core.logger.engine.shim")
+local DeviceNames = require("platform.input.device_names")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "modules.hotstrings.device_finder"
 

@@ -43,7 +43,7 @@ function M.prefer_all(bindings)
 	end
 	-- Some lifecycle harnesses use real TapKeys, others inject its stateful double.
 	-- Configure either without allowing the real writer to reach the host config.
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	local paths = require("infra.config_paths")
 	local saved = { read = files.read_with_status, write = files.write,
 		conditional = files.write_if_unchanged, path = paths.get }
@@ -209,17 +209,17 @@ function M.with_bindings(callback)
 		factory_args = {}, wheel = { vertical = {}, horizontal = {} } }
 	return helpers.with_stub_scope({
 		"modules.shortcuts.bindings",
-		"adapters.hotkey_registrar",
+		"platform.input.hotkey_registrar",
 		"platform.remap.nav_layer",
 		"modules.shortcuts.actions.text",
 		"modules.shortcuts.actions.apps",
 		"modules.shortcuts.actions.system",
 		"modules.shortcuts.tap_keys",
 		"modules.gestures.actions",
-		"infra.i18n",
-		"infra.logger",
+		"core.i18n.engine.i18n",
+		"core.logger.engine.logger",
 	}, function()
-		package.loaded["adapters.hotkey_registrar"] = nil
+		package.loaded["platform.input.hotkey_registrar"] = nil
 		local facades = build_facades(ctx)
 		package.loaded["modules.shortcuts.actions.text"] = facades.text
 		package.loaded["modules.shortcuts.actions.apps"] = facades.apps
@@ -251,7 +251,7 @@ function M.with_bindings(callback)
 		logger.error = function(_, message, ...)
 			ctx.errors[#ctx.errors + 1] = string.format(message, ...)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		local bindings = helpers.load_with_stubs("modules.shortcuts.bindings", {
 			hotkey = {
 				bind = function(mods, key)

@@ -22,7 +22,7 @@
 local helpers = require("tests.helpers")
 
 local PLATFORM      = "linux"
-local MANIFEST_PATH = "../_shared/modules/menu/menu_manifest.json"
+local MANIFEST_PATH = "../_shared/menu/data/menu_manifest.json"
 
 -- The feature menus whose first row must be the category switch on Linux. The
 -- Linux tap-holds live under kanata and the layout has no emulation to switch,
@@ -33,7 +33,7 @@ local EXPECTED_MENUS = { "hotstrings_menu", "llm_menu", "metrics_menu", "shortcu
 --- @return table
 local function manifest_root()
 	local fh = assert(io.open(MANIFEST_PATH, "r"))
-	local root = require("json").decode(fh:read("*a"))
+	local root = require("core.text.engine.json").decode(fh:read("*a"))
 	fh:close()
 	return root
 end
@@ -75,11 +75,11 @@ end
 ---   false by default: it picks a greyed row's reason, never its state.
 --- @return table rendered, function command
 local function render(key, toggle, state, ready, newer, older)
-	package.loaded["menu.renderer"] = nil
-	local R = require("menu.renderer").new({
+	package.loaded["menu.engine.renderer"] = nil
+	local R = require("menu.engine.renderer").new({
 		platform      = PLATFORM,
 		manifest_path = function() return MANIFEST_PATH end,
-		json_decode   = require("json").decode,
+		json_decode   = require("core.text.engine.json").decode,
 		i18n          = { get = function(k) return k end, section = function(k) return k end },
 		logger        = helpers.make_logger_stub(),
 	})

@@ -13,14 +13,14 @@
 --- ==============================================================================
 
 local M = {}
-local BindingPublication = require("config_binding_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
 
 local hs            = hs
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
 local Manifest      = require("infra.manifest_reader")
-local Timings       = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
+local Timings       = require("core.timing.engine.timings")
+local TimerScheduler = require("core.events.timer_scheduler")
 local GestureFrameEvidence = require("infra.gesture_frame_evidence")
 local LOG           = "gestures"
 local GESTURE_ACTION_PARENT = "gestures"
@@ -45,9 +45,9 @@ local touchdevice = load_touchdevice_module()
 local Engine    = require("modules.gestures.engine")
 local Actions   = require("modules.gestures.actions")
 local Conflicts = require("modules.gestures.conflicts")
-local Sensitivity = require("gestures.sensitivity")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local Sensitivity = require("gestures.engine.sensitivity")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 
 
@@ -959,6 +959,32 @@ function M.resume()
 end
 function M.is_suspended() return CoreState.suspended end
 
+--- Records the feature switch while ScriptControl suspension is active. A pause
+--- stops typing, not configuration (EDD-1): OFF releases the native runtime at
+--- once (nothing fires under suspension either way), ON publishes only the
+--- feature flag and the start intent, so resume() acquires the runtime.
+--- @param desired boolean Requested feature posture.
+--- @return boolean committed
+function M.set_enabled_under_suspension(desired)
+	if type(desired) ~= "boolean" then
+		Logger.error(LOG, "Gesture switch under pause refused: the posture must be a boolean.")
+		return false
+	end
+	if CoreState.suspended ~= true then
+		Logger.error(LOG, "Gesture switch under pause refused: no suspension is active.")
+		return false
+	end
+	if desired == false then return M.disable_all() end
+	-- The same condition enable_all() uses to rebuild: a runtime that is not
+	-- live is started by resume(), never here.
+	if gesture_resume_start_required == true or (touchdevice and runtime_live ~= true) then
+		gesture_resume_start_required = true
+	end
+	CoreState.enabled = true
+	Logger.info(LOG, "Gestures switched on during the pause; they start on resume.")
+	return true
+end
+
 -- Startup-phase timing.
 --
 -- DESIGN NOTE (definitive, after deep reverse-engineering audit of every
@@ -1182,7 +1208,7 @@ local function schedule_emergency_recycle()
 	Logger.debug(LOG, "schedule_emergency_recycle: SCHEDULED in 20ms (first_frame=%s, watchers=%d)",
 		tostring(_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME), count_watchers())
 	local emergency_generation = discovery_generation
-	hs.timer.doAfter(require("infra.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
+	hs.timer.doAfter(require("core.timing.engine.timings").sec("gestures", "emergency_recycle_delay_ms"), function()
 		-- CoreState.enabled is the FEATURE flag; CoreState.suspended is the pause.
 		-- Checking only the first let kickstart_hid warp the cursor and post a
 		-- synthetic scroll while the script was paused, which the invariant

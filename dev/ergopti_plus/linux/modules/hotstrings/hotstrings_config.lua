@@ -25,34 +25,34 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local PrivateLabel = require("diagnostics.private_label")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local PrivateLabel = require("diagnostics.engine.private_label")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Loader = require("modules.hotstrings.loader")
-local Shell = require("adapters.shell_runner")
-local Writer = require("toml_codec.writer")
-local LeafRows = require("toml_codec.leaf_rows")
-local DelayResolver = require("hotstrings.delay_resolver")
-local Priority = require("hotstring_priority")
-local Extensions = require("hotstrings.extensions")
+local Shell = require("core.process.adapters.shell_runner")
+local Writer = require("core.text.engine.toml_codec.writer")
+local LeafRows = require("core.text.engine.toml_codec.leaf_rows")
+local DelayResolver = require("hotstrings.engine.delay_resolver")
+local Priority = require("hotstrings.engine.priority")
+local Extensions = require("hotstrings.engine.extensions")
 local ConfigPaths = require("infra.config_paths")
-local Paths = require("infra.paths")
-local RegularFile = require("infra.regular_file_reader")
-local TomlReader = require("infra.toml.reader")
-local TomlCodec = require("toml_codec")
-local Overrides = require("hotstrings.overrides")
-local KeyPath = require("toml_codec.key_path")
-local Languages = require("hotstrings.languages")
-local BulkScope = require("hotstrings.bulk_scope")
-local ChoiceCatalogue = require("hotstrings.choice_catalogue")
-local PersonalFiles = require("hotstrings.personal_files")
+local Paths = require("core.fs.engine.paths")
+local RegularFile = require("core.fs.engine.regular_file_reader")
+local TomlReader = require("core.text.engine.toml.reader")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Overrides = require("hotstrings.engine.overrides")
+local KeyPath = require("core.text.engine.toml_codec.key_path")
+local Languages = require("hotstrings.engine.languages")
+local BulkScope = require("hotstrings.engine.bulk_scope")
+local ChoiceCatalogue = require("hotstrings.engine.choice_catalogue")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local ManifestReader = require("infra.manifest_reader")
 local Preferences = require("infra.hotstring_preferences")
-local KEY = require("config_keys").KEY
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local KEY = require("settings.engine.keys").KEY
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.hotstrings.hotstrings_config"
 local _personal_sources = {}
@@ -337,14 +337,14 @@ local GLOBAL_DEFAULT_COLOR = nil
 local NEUTRAL_COLOR = nil
 local CATEGORY_DEFAULT_COLORS = {}
 
---- Loads _shared/modules/hotstrings/defaults.toml, or raises.
+--- Loads _shared/hotstrings/data/catalogue/defaults.toml, or raises.
 ---
 --- Fail-fast, deliberately and in agreement with the other two drivers: a
 --- missing file is a broken install, and a driver that silently substituted its
 --- own numbers would expand at a different speed from the one the user
 --- configured, with nothing in the log to say so.
 local function load_shared_defaults()
-	local path = Paths.shared("modules/hotstrings/defaults.toml")
+	local path = Paths.shared("hotstrings/data/catalogue/defaults.toml")
 	local parsed = TomlReader.parse(path)
 	local sections = type(parsed) == "table" and parsed.sections or nil
 	if type(sections) ~= "table" then
@@ -377,12 +377,19 @@ load_shared_defaults()
 --- The base expansion delay in seconds: what a hotstring waits when no rung
 --- of the cascade says otherwise, and what a delay override is an offset of.
 --- It is the user's `hotstrings.expansion_delay`, else the shared default. A
---- stored value the owner refuses is read as absent (and reported by the
---- configuration cleanup), never guessed.
+--- stored value its shared value schema declaration refuses is reported once
+--- and read as absent, never guessed.
 --- @return number
 local function base_delay()
 	local value = Preferences.get(BASE_DELAY_PATH)
-	if type(value) == "number" and value == value and value >= 0 and value < math.huge then return value end
+	if value == nil then return GLOBAL_DEFAULT_DELAY end
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), value)
+	if checked.ok then return value end
+	-- Reported once per process, never read silently as the default.
+	require("settings.engine.migration.outdated").report(BASE_DELAY_PATH, string.format(
+		"%s is refused (%s, %s..%s s); the default %s s applies", tostring(value), checked.reason,
+		tostring(checked.min), tostring(checked.max), tostring(GLOBAL_DEFAULT_DELAY)))
 	return GLOBAL_DEFAULT_DELAY
 end
 
@@ -460,7 +467,7 @@ local function load_overrides()
 	_common_override_admitted = false
 
 	local path = overrides_path()
-	local migration = require("hotstrings.common_autocorrection_migration")
+	local migration = require("hotstrings.engine.catalogue.common_autocorrection_migration")
 	local migrated = migration.run(path, Paths.shared(migration.POLICY_PATH))
 	local content, status = migrated.content, migrated.status
 	if status == "absent" then
@@ -761,7 +768,7 @@ end
 
 --- The effective delay, colour and preview setting for a category or section.
 ---
---- The cascade lives in _shared/lua/hotstrings/delay_resolver.lua and is shared
+--- The cascade lives in _shared/hotstrings/engine/delay_resolver.lua and is shared
 --- with macOS. What differs between the drivers is where the override file lives
 --- and how a TOML is parsed; what must not differ is the order of the rungs.
 --- @param category string
@@ -818,8 +825,10 @@ end
 --- @return boolean
 function M.set_base_delay(seconds)
 	if seconds == nil then seconds = GLOBAL_DEFAULT_DELAY end
-	if type(seconds) ~= "number" or seconds ~= seconds or seconds < 0 or seconds == math.huge then
-		Logger.error(LOG, "set_base_delay(): %s is not a non-negative number.", tostring(seconds))
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), seconds)
+	if not checked.ok then
+		Logger.error(LOG, "set_base_delay(): %s is refused (%s).", tostring(seconds), checked.reason)
 		return false
 	end
 	local stored, reason = Preferences.set(BASE_DELAY_PATH, seconds)
@@ -856,8 +865,19 @@ function M.set_override(category, section, field, value)
 		Logger.error(LOG, "set_override(): '%s' is not an overridable field.", tostring(field))
 		return false
 	end
-	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+	if field == "color" and value ~= nil and require("core.ui.engine.color_hex").parse(value) == nil then
 		Logger.error(LOG, "set_override(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
+		return false
+	end
+	-- The shared value schema's declarations, the same rule as the window and the
+	-- loader: a priority past the tier range silently reorders every source.
+	local Overrides = require("hotstrings.engine.overrides")
+	if field == "priority" and value ~= nil and not Overrides.is_priority(value) then
+		Logger.error(LOG, "set_override(): priority '%s' is refused by its shared declaration.", tostring(value))
+		return false
+	end
+	if field == "delay" and value ~= nil and not Overrides.is_delay(value) then
+		Logger.error(LOG, "set_override(): delay '%s' is refused by its shared declaration.", tostring(value))
 		return false
 	end
 
@@ -1065,7 +1085,7 @@ function M.init(engine, config_dir, on_change)
 		_config_dir = config_dir
 	else
 		local xdg = require("infra.config_paths").default_config_dir() .. "/hotstrings"
-		local kind, detail, code = require("infra.native_directory").target_kind(xdg)
+		local kind, detail, code = require("core.fs.engine.native_directory").target_kind(xdg)
 		if kind == "directory" then _config_dir = xdg
 		elseif kind ~= nil or code ~= "ENOENT" then
 			Logger.error(LOG, "Hotstring directory is unavailable: %s.", tostring(detail or kind))
@@ -1122,7 +1142,7 @@ end
 --- @param canonical string Shipped key embedded in canonical TOML triggers.
 --- @return boolean
 function M.set_magic_key(effective, canonical)
-	local Terminators = require("keymap.terminators")
+	local Terminators = require("layouts.engine.layers.terminators")
 	if Terminators.validate_magic_key(effective) ~= true
 		or Terminators.validate_magic_key(canonical) ~= true
 	then
@@ -1321,7 +1341,7 @@ end
 local _language_packs = nil
 function M.language_packs()
 	if _language_packs then return _language_packs end
-	local path = Paths.shared("modules/hotstrings/_index.toml")
+	local path = Paths.shared("hotstrings/data/catalogue/_index.toml")
 	local fh = RegularFile.open_source(path)
 	if not fh then error("[hotstrings_config] hotstring index is unreadable: " .. tostring(path)) end
 	local raw = fh:read("*a")
@@ -1386,7 +1406,7 @@ local function resolve_paths(cold_boot)
 	-- extension; loading only its common fragment would lose the native controls.
 	if _config_dir and _config_dir:match("%.toml$") then
 		local category = _config_dir:match("([^/]+)%.toml$")
-		local canonical = category and Paths.shared("modules/hotstrings/" .. category .. ".toml")
+		local canonical = category and Paths.shared("hotstrings/data/catalogue/" .. category .. ".toml")
 		if canonical and type(Loader.same_file) == "function" and Loader.same_file(_config_dir, canonical) then
 			local found = Extensions.category_bindings(M.discover_extensions(), category)
 			return M.route_bound_sources({ _config_dir }, found), personal_sources
@@ -1397,8 +1417,8 @@ local function resolve_paths(cold_boot)
 		return { descriptor and { path = _config_dir, personal_source = descriptor } or _config_dir }, personal_sources
 	end
 
-	local ok_paths, Paths = pcall(require, "infra.paths")
-	local bundled = ok_paths and Paths.shared("modules/hotstrings") or nil
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
+	local bundled = ok_paths and Paths.shared("hotstrings/data/catalogue") or nil
 	assert(bundled, "bundled hotstring root is unavailable")
 	-- Language folders are not overlaid by stem: french/autocorrection.toml is
 	-- its own group, not a second copy of the neutral autocorrection.toml.
@@ -1818,7 +1838,7 @@ local function commit_choices(changes, label)
 					value = operation.value, delete = operation.delete }
 			end
 		end
-		if not require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
+		if not require("hotstrings.engine.catalogue.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
 			return false, "ambiguous-personal-preference-owner"
 		end
 		local rows = LeafRows.prepare(source.content or "", operations)
@@ -1848,7 +1868,7 @@ local function commit_choices(changes, label)
 				if not binding or binding.current() ~= true then return false, "stale-personal-source" end
 			end
 		end
-		if not require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
+		if not require("hotstrings.engine.catalogue.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
 			return false, "ambiguous-personal-preference-owner"
 		end
 		local written, detail = Writer.batch_write(config_file(), rows, nil, source)
@@ -2059,7 +2079,7 @@ end
 function M.personal_metadata_controls(id)
 	local binding, record = M.personal_file_scope_binding(id), personal_adoption(id)
 	if not binding or binding.current() ~= true then return nil end
-	local Metadata = require("hotstrings.personal_metadata")
+	local Metadata = require("hotstrings.engine.catalogue.personal_metadata")
 	local active = _overrides[id] ~= nil and id or record.legacy_name
 	local legacy = active and _overrides[active] or {}
 	local result = { file = Metadata.readonly_fields(record.content, nil, legacy), sections = {} }
@@ -2129,7 +2149,7 @@ end
 --- Source metadata reaches the real engine before conditional source replacement.
 --- A recognized legacy override may be removed only within this held cohort.
 function M.set_personal_metadata(id, section, field, value)
-	if field == "color" and value ~= nil and require("color.hex").parse(value) == nil then
+	if field == "color" and value ~= nil and require("core.ui.engine.color_hex").parse(value) == nil then
 		Logger.error(LOG, "set_personal_metadata(): color must contain 3, 4, 6 or 8 hexadecimal digits.")
 		return false
 	end
@@ -2138,7 +2158,7 @@ function M.set_personal_metadata(id, section, field, value)
 	if not binding or binding.current() ~= true or _override_source.status == "error" then return false end
 	local active = _overrides[id] ~= nil and id or record.legacy_name
 	local legacy = active and _overrides[active] or {}
-	local plan = require("hotstrings.personal_metadata").prepare(record.content, section, field, value, legacy)
+	local plan = require("hotstrings.engine.catalogue.personal_metadata").prepare(record.content, section, field, value, legacy)
 	if not plan then return false end
 	local rows, candidate_overrides = {}, copy_overrides(_overrides)
 	local candidate_legacy = active and candidate_overrides[active]
@@ -2500,7 +2520,7 @@ end
 --- @return table Set of category ids.
 function M.bundled_categories()
 	local set = {}
-	local bundled = Paths.shared("modules/hotstrings")
+	local bundled = Paths.shared("hotstrings/data/catalogue")
 	for _, path in ipairs(Loader.find_toml_files(bundled)) do
 		local stem = path:match("([^/]+)%.toml$")
 		if stem and not in_language_folder(path, bundled) then set[stem] = true end
@@ -2641,10 +2661,10 @@ end
 function M.get_category_order()
 	local declared, seen, ordered = {}, {}, {}
 
-	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 	if ok_paths then
 		local ok_read, parsed = pcall(function()
-			return require("infra.toml.reader").parse(Paths.shared("modules/hotstrings/_index.toml"))
+			return require("core.text.engine.toml.reader").parse(Paths.shared("hotstrings/data/catalogue/_index.toml"))
 		end)
 		local menu = ok_read and type(parsed) == "table" and parsed.sections
 			and parsed.sections.menu or nil

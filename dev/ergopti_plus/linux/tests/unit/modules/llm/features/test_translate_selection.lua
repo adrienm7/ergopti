@@ -21,8 +21,8 @@
 local helpers = require("tests.helpers")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
-local Json = require("json")
-local Translate = require("llm.translate")
+local Json = require("core.text.engine.json")
+local Translate = require("ai.engine.prediction.translate")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local SELECTION = "On se voit demain ?"
@@ -35,7 +35,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.llm.translation",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -72,18 +72,18 @@ local function scenario(opts, body)
 		local previous = {}
 		for _, name in ipairs(RELOADED) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
-		local I18n = require("infra.i18n")
+		local I18n = require("core.i18n.engine.i18n")
 		local previous_locale = I18n.get_locale
 		local locale = opts.locale or "fr"
 		I18n.get_locale = function() return locale end
 		local world = { wire = {}, posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
 			focus = "editor\1Draft", selection = opts.selection }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
 				world.wire[#world.wire + 1] = "post"
@@ -150,10 +150,11 @@ local function scenario(opts, body)
 				return world.focus
 			end,
 			privacy_guard = opts.privacy_guard,
+			privacy_context = opts.privacy_context,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
-		world.config = read_shared_json("modules/llm/translate.json")
+		world.config = read_shared_json("ai/data/translate.json")
 
 		--- The remote server answers request `index` with `text`.
 		function world.respond(index, text)
@@ -183,7 +184,7 @@ end
 --- @param key string
 --- @return string
 local function notice(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 --- The candidate texts on offer.
@@ -398,13 +399,29 @@ helpers.it("translates a free language name without changing selection authority
 	end)
 end)
 
+helpers.describe("a selected translation in an app excluded from the AI", function()
+	helpers.it("(aix-001-excluded-app-selection) refuses before reading, as Windows' translate action", function()
+		local Trigger = require("modules.llm.trigger_settings")
+		scenario({ selection = SELECTION, privacy_context = function()
+			return { app_id = "org.example.Excluded", title = "Draft", native_identity = "n1" }
+		end }, function(world)
+			assert(Trigger.set_disabled_apps({ "org.example.Excluded" }))
+			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+			helpers.assert_eq(world.reads, 0, "the selection is never read")
+			world.wait_for(1)
+			helpers.assert_eq(#world.posts, 0, "nothing is sent to the provider")
+			assert(Trigger.set_disabled_apps({}))
+		end)
+	end)
+end)
+
 helpers.describe("selected translations require a known stable native focus", function()
 	helpers.it("explains a translation refusal when privacy cannot admit its text field (selection-native-focus)", function()
 		scenario({ selection = SELECTION, secure = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
 			helpers.assert_eq(world.reads, 0)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
 	helpers.it("a mashed translation shortcut cancels its request in flight before the next one leaves (mashed-shortcut)", function()
@@ -418,7 +435,7 @@ helpers.describe("selected translations require a known stable native focus", fu
 
 	helpers.it("a translation whose dispatch is refused retires its own loading offer (ll-002)", function()
 		scenario({ selection = SELECTION }, function(world)
-			local transport = package.loaded["adapters.http_client"]
+			local transport = package.loaded["core.network.adapters.http_client"]
 			local cancel = transport.cancel
 			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
 			transport.cancel = function() return false end
@@ -461,7 +478,7 @@ helpers.describe("selected translations require a known stable native focus", fu
 				helpers.assert_eq(world.engine.translate_selection("en"), false)
 				helpers.assert_eq(world.reads, 0)
 				helpers.assert_eq(#world.posts, 0)
-				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+				helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"),
 					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)

@@ -18,10 +18,10 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _      = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _      = helpers.load_with_stubs("core.logger.engine.logger")
 local State  = helpers.load_with_stubs("modules.keymap.state")
-local txt    = helpers.load_with_stubs("infra.text_utils")
+local txt    = helpers.load_with_stubs("core.text.engine.utils")
 
 local REGISTRY_OWNERSHIP = {
 	"modules.keymap.registry",
@@ -29,8 +29,8 @@ local REGISTRY_OWNERSHIP = {
 	"modules.keymap.registry_index",
 	"modules.keymap.terminators",
 	"modules.keymap.utils",
-	"infra.text_utils",
-	"text_utils",
+	"core.text.engine.utils",
+	"core.text.engine.utils_core",
 }
 
 local ENGINE_OWNERSHIP = {
@@ -41,9 +41,9 @@ local ENGINE_OWNERSHIP = {
 	"modules.keymap.expander",
 	"modules.keymap.terminator_replay",
 	"modules.keymap.utils",
-	"infra.text_utils",
-	"text_utils",
-	"ui.tooltip",
+	"core.text.engine.utils",
+	"core.text.engine.utils_core",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -188,7 +188,7 @@ end)
 -- so perform_text_replacement's side-effects never touch real UI/OS code.
 local function fresh_engine()
 	return helpers.with_fresh_modules(ENGINE_OWNERSHIP, function()
-		package.loaded["ui.tooltip"] = { hide = function() end, hide_forced = function() end }
+		package.loaded["core.ui.ui.tooltip"] = { hide = function() end, hide_forced = function() end }
 		package.loaded["modules.keystats"] = {
 			notify_synthetic = function() end,
 			set_buffer       = function() end,

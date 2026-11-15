@@ -2,10 +2,10 @@
 
 --- Presents the shared configuration cleanup session in an owned WebView.
 local M = {}
-local Logger = require("infra.logger")
-local ui_builder = require("ui.ui_builder")
-local Session = require("config_cleanup_session")
-local WebviewResult = require("adapters.webview_result")
+local Logger = require("core.logger.engine.logger")
+local ui_builder = require("core.ui.ui.builder")
+local Session = require("settings.engine.migration.cleanup_session")
+local WebviewResult = require("core.ui.adapters.webview_result")
 local LOG = "config_cleanup"
 local BRIDGE = "config_cleanup_bridge"
 local active, retiring
@@ -141,7 +141,7 @@ function M.open(options)
 			-- The factory names the window from the shared manifest and brands it once.
 			frame = frame, app_id = "config_cleanup",
 			style_masks = masks.titled + masks.closable + masks.resizable,
-			assets_dir = require("infra.paths").shared("ui/config_cleanup") .. "/",
+			assets_dir = require("core.fs.engine.paths").shared("ui/config_cleanup") .. "/",
 			usercontent = owner.controller, allow_new_windows = false,
 			is_current = function() return active == owner end,
 			on_webview_created = function(view)

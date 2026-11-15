@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local M = {}
-local Atspi = require("adapters.atspi_focus")
-local Timings = require("infra.timings")
-local Clock = require("infra.monotonic")
-local Logger = require("logger.shim")
-local Utf8 = require("compat.utf8")
+local Atspi = require("platform.focus.atspi_focus")
+local Timings = require("core.timing.engine.timings")
+local Clock = require("core.logger.engine.monotonic")
+local Logger = require("core.logger.engine.shim")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
 
 --- Creates one explicit-action selection owner without loading native libraries.
 --- @param options table Live focus, privacy and capture_text_owner callbacks.

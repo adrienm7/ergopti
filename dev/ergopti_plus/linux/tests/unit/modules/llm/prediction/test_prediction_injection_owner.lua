@@ -21,16 +21,16 @@ local function scenario(action, phase, body)
 		for name in pairs(package.loaded) do
 			if name:match("^modules%.llm%.") then package.loaded[name] = nil end
 		end
-		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "adapters.secure_field_detector",
+		for _, name in ipairs({ "modules.keystats.focus_guard", "modules.keystats.keystats", "platform.focus.secure_field_detector",
 			"adapters.clipboard", "adapters.keyboard_layout", "modules.hotstrings.injector" }) do package.loaded[name] = nil end
 		local state = { logs = {}, bus = ":1.23", path = "/field/original", role = 61, now = 1000,
 			rows = {}, held = {}, writes = {}, requests = {}, errors = {}, stopped = 0, resets = 0, output = 0, paused = false,
 			owner_captures = 0, apply_admissions = 0, clipboard_reads = 0 }
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace")
 		logger.set_sink(function(line) state.logs[#state.logs + 1] = line end)
 		logger.set_error_observer(function(_, template) state.errors[#state.errors + 1] = template end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local policy = require("modules.keystats.keystats")
 		local configuration = assert(policy.configuration_snapshot()); configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))
@@ -61,7 +61,7 @@ local function scenario(action, phase, body)
 			invalidate = function() receipt = nil; listener(nil) end,
 		}
 		guard = require("modules.keystats.focus_guard").new({ watch = watch,
-			detector = require("adapters.secure_field_detector"), keystats = policy, prediction = engine,
+			detector = require("platform.focus.secure_field_detector"), keystats = policy, prediction = engine,
 			now_ms = function() return state.now end,
 			capture_context = function() return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-window" } end,
 			publish_context = function(context) return true, policy.is_context_protected(context.app_id, context.title) end,
@@ -90,7 +90,7 @@ local function scenario(action, phase, body)
 		local commands = {}
 		-- A completed write is what the next read sees, as on a real clipboard.
 		local clipboard = "SAVED"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
@@ -113,10 +113,10 @@ local function scenario(action, phase, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_x11 = function() return true end, is_wayland = function() return false end, kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}

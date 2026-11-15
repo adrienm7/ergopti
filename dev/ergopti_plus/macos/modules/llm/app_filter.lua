@@ -22,10 +22,10 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local km_utils = require("modules.keymap.utils")
-local TextUtils = require("text_utils")
-local SecureFieldDetector = require("adapters.secure_field_detector")
+local TextUtils = require("core.text.engine.utils_core")
+local SecureFieldDetector = require("platform.focus.secure_field_detector")
 
 local LOG = "llm.app_filter"
 

@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 
 helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll-idle-gate)", function()
 	helpers.it("(layout-poll-idle-gate) reads after input, skips while idle, and still reads at the idle bound", function()
@@ -22,7 +22,7 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 			subscribe = function() return true end,
 			unsubscribe = function() return true end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, _, on_done)
 				spawns = spawns + 1
 				return {
@@ -35,11 +35,11 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 			end,
 			_active_tasks = {},
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() return { fired = false }, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.system_info"] = { input_idle_seconds = function() return idle end }
+		package.loaded["platform.system.info"] = { input_idle_seconds = function() return idle end }
 		package.loaded["platform.remap.watchers"] = nil
 		local watchers = helpers.load_with_stubs("platform.remap.watchers", {
 			timer = {
@@ -85,9 +85,9 @@ helpers.describe("karabiner.watchers: the layout poll is idle-gated (layout-poll
 			helpers.assert_eq(spawns, 3, "input since the last read makes the tick read")
 		end)
 		watchers.stop_input_source_watcher()
-		package.loaded["adapters.system_info"] = nil
-		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["platform.system.info"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["adapters.input_source_broker"] = nil
 		package.loaded["platform.remap.watchers"] = nil
 		if not ok then error(err, 0) end

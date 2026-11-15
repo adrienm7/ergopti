@@ -108,9 +108,9 @@ end
 -- ========================================
 
 local STARTUP_MODULES = {
-	"adapters.timer_scheduler",
-	"adapters.json_codec",
-	"infra.logger",
+	"core.events.timer_scheduler",
+	"core.fs.adapters.json_codec",
+	"core.logger.engine.logger",
 	"modules.llm",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.startup_controller",
@@ -123,9 +123,9 @@ local function with_startup(body)
 	with_modules(STARTUP_MODULES, function()
 		local logger, lines = recording_logger()
 		local scheduler, timers = counting_scheduler()
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = scheduler
-		package.loaded["adapters.json_codec"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = scheduler
+		package.loaded["core.fs.adapters.json_codec"] = {
 			decode = function() return { log_path = "/tmp/fixture.log" } end,
 		}
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = { { id = "basic" } } }
@@ -279,10 +279,10 @@ end)
 -- ==========================================
 
 local ORCHESTRATOR_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"modules.llm",
-	"chord",
-	"adapters.hotkey_registrar",
+	"keyboard.engine.chord",
+	"platform.input.hotkey_registrar",
 	"ui.menu.shortcut_utils",
 	"ui.menu.menu_llm.trigger_orchestrator",
 }
@@ -292,9 +292,9 @@ local ORCHESTRATOR_MODULES = {
 local function with_orchestrator(body)
 	with_modules(ORCHESTRATOR_MODULES, function()
 		local logger, lines = recording_logger()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.llm"] = { BUILTIN_PROFILES = { { id = "basic" }, { id = "advanced" } } }
-		package.loaded["chord"] = {
+		package.loaded["keyboard.engine.chord"] = {
 			format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 		}
 		package.loaded["ui.menu.shortcut_utils"] = {
@@ -305,7 +305,7 @@ local function with_orchestrator(body)
 		}
 		local bindings = {}
 		local next_token = 0
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(chord)
 				next_token = next_token + 1
 				local handle = "hotkey#" .. next_token
@@ -413,21 +413,21 @@ end)
 -- =========================================
 
 local OLLAMA_MODULES = {
-	"infra.notifications",
-	"infra.logger",
-	"infra.i18n",
-	"infra.text_utils",
+	"core.ui.engine.notifications",
+	"core.logger.engine.logger",
+	"core.i18n.engine.i18n",
+	"core.text.engine.utils",
 	"modules.llm.ollama_binary",
-	"core.llm.ollama_runtime_choice",
+	"core.lifecycle.engine.core.ollama_runtime_choice",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	"adapters.managed_ollama_pull",
 	"modules.llm.opaque_network_admission",
 	"modules.llm.ollama_endpoint",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"adapters.http_client",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
@@ -448,14 +448,14 @@ local function with_ollama_manager(enabled, body)
 			},
 			task = { new = function() hs_tasks = hs_tasks + 1; return nil end },
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.text_utils"] = {}
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.text.engine.utils"] = {}
 		package.loaded["modules.llm.ollama_binary"] = {
 			resolve = function() return "/opt/homebrew/bin/ollama", nil, "homebrew" end,
 		}
-		package.loaded["core.llm.ollama_runtime_choice"] = {}
+		package.loaded["core.lifecycle.engine.core.ollama_runtime_choice"] = {}
 		package.loaded["modules.llm.ollama_server_command"] = {}
 		package.loaded["modules.llm.network_env"] = {}
 		package.loaded["adapters.managed_ollama_pull"] = {}
@@ -463,11 +463,11 @@ local function with_ollama_manager(enabled, body)
 		package.loaded["modules.llm.ollama_endpoint"] = {
 			get_base_url = function() return "http://127.0.0.1:11435" end,
 		}
-		package.loaded["adapters.shell_runner"] = {}
-		package.loaded["adapters.http_client"] = {}
+		package.loaded["core.process.adapters.shell_runner"] = {}
+		package.loaded["core.network.adapters.http_client"] = {}
 		package.loaded["ui.download_window"] = {}
-		package.loaded["adapters.timer_scheduler"] = scheduler
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.events.timer_scheduler"] = scheduler
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, executable, on_done, args)
 				local task = { label = label, executable = executable, args = args, on_done = on_done }
 				function task:isRunning() return false end

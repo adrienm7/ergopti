@@ -37,7 +37,7 @@ from desktop_activation import LayoutSpec, libxkbcommon_version  # noqa: E402
 
 STATIC_DIR = INSTALLATION_DIR.parents[2]
 REGISTRY_DIR = STATIC_DIR / "layouts" / "registry"
-KEYCODES = STATIC_DIR / "ergopti_plus" / "_shared" / "modules" / "layouts" / "mac_keycodes.json"
+KEYCODES = STATIC_DIR / "ergopti_plus" / "_shared" / "layouts" / "data" / "mac_keycodes.json"
 
 
 def convert(layout_id: str, out_dir: Path) -> None:
@@ -72,6 +72,11 @@ class UserInstallerTests(unittest.TestCase):
         self.root = self.scratch / "config" / "xkb"
         self.home = self.scratch / "home"
         self.home.mkdir()
+        # A session with no input method and no IBus, unless a test says otherwise.
+        self.session = ({}, set(), None)
+        probe = mock.patch.object(installer, "probe_input_method", lambda: self.session)
+        probe.start()
+        self.addCleanup(probe.stop)
         self.sources = {}
         for layout_id in ("ergol", "ergopti"):
             out = self.scratch / "converted" / layout_id
@@ -148,11 +153,85 @@ class UserInstallerTests(unittest.TestCase):
         content = (self.home / ".XCompose").read_text(encoding="utf-8")
         self.assertTrue(content.startswith('<Multi_key> <a> <a> : "å"\n'))
         self.assertIn(installer.XCOMPOSE_MARKER + "\n", content)
-        include = installer.build_xcompose_block([self.root / "compose" / "ergol.XCompose"])[1]
-        self.assertTrue(
-            include.startswith('include "') and include.endswith('ergol.XCompose"'), include
+        installer.uninstall("ergol", self.root, self.home, deactivate=False)
+        self.assertEqual(
+            (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <a> <a> : "å"\n'
         )
-        self.assertIn(include, content.splitlines())
+
+    def test_gtk3_compose_enables_ibus_only_when_no_input_method_runs(self) -> None:
+        """gtk3-compose-ibus: GTK 3 composes multi-character outputs only through
+        IBus; an active fcitx5 is never replaced."""
+        config = self.root.parent
+        environment = config / "environment.d" / "90-ergopti-ibus.conf"
+        autostart = config / "autostart" / "ergopti-ibus.desktop"
+        state = self.root / installer.COMPOSE_STATE_NAME
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(
+            state.read_text(encoding="utf-8"), "no_ibus\n", "no IBus: the inline rules only"
+        )
+        self.assertFalse(environment.exists())
+        self.session = ({"XDG_CURRENT_DESKTOP": "KDE"}, set(), "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(state.read_text(encoding="utf-8"), "ibus_enabled\n")
+        self.assertIn("GTK_IM_MODULE=ibus\n", environment.read_text(encoding="utf-8"))
+        self.assertIn("exec ibus-daemon --daemonize", autostart.read_text(encoding="utf-8"))
+        self.assertNotIn(
+            "--replace", autostart.read_text(encoding="utf-8"), "a running IBus is kept"
+        )
+        self.session = ({"GTK_IM_MODULE": "ibus"}, {"fcitx5"}, "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        self.assertEqual(state.read_text(encoding="utf-8"), "other_active\n")
+        self.assertFalse(
+            environment.exists() or autostart.exists(), "fcitx5 runs: the setting is withdrawn"
+        )
+        self.session = ({}, set(), "/usr/bin/ibus-daemon")
+        self.install("ergol", "French (Ergo-L)")
+        installer.uninstall("ergol", self.root, self.home, deactivate=False)
+        self.assertFalse(
+            environment.exists() or autostart.exists() or state.exists(),
+            "no Compose block, no IBus",
+        )
+
+    def test_the_xcompose_block_repeats_single_character_rules_for_gtk3(self) -> None:
+        """gtk3-compose-inline: GTK 3's built-in input method ignores includes and
+        overflows on many multi-character outputs; libX11 and Qt read the include."""
+        legacy = installer.XCOMPOSE_MARKER + '\ninclude "/old/ergol.XCompose"\n'
+        (self.home / ".XCompose").write_text(
+            '<Multi_key> <a> <a> : "å"\n' + legacy, encoding="utf-8"
+        )
+        self.install("ergol", "French (Ergo-L)")
+        lines = (self.home / ".XCompose").read_text(encoding="utf-8").splitlines()
+        compose = self.root / "compose" / "ergol.XCompose"
+        rules = compose.read_text(encoding="utf-8").splitlines()
+        start = lines.index(installer.XCOMPOSE_MARKER)
+        self.assertEqual(
+            lines[:start], ['<Multi_key> <a> <a> : "å"'], "the user's rules stay first"
+        )
+        block = lines[start + 1 :]
+        self.assertEqual(block[0], 'include "%L"')
+        self.assertEqual(block[1], 'include "%s"' % compose, "libX11 and Qt read every rule")
+        self.assertEqual(block[-1], "# End of ErgoptiPlus managed layouts XCompose")
+        inline = block[2:-1]
+        self.assertTrue(inline, "GTK 3 gets the single-character rules")
+        self.assertEqual(
+            inline, [line for line in rules if line in set(inline)], "in the file's order"
+        )
+        for line in inline:
+            value = line.rsplit(":", 1)[1].strip()
+            self.assertEqual(
+                len(value.strip('"').replace('\\"', '"').replace("\\\\", "\\")), 1, line
+            )
+        multi = [
+            line
+            for line in rules
+            if line.rstrip().endswith('"') and len(line.rsplit('"', 2)[-2]) > 1
+        ]
+        self.assertTrue(
+            multi and not set(multi) & set(inline), "multi-character outputs stay in the include"
+        )
+        self.assertNotIn(
+            "/old/ergol.XCompose", "\n".join(lines), "the include-only block is replaced"
+        )
         installer.uninstall("ergol", self.root, self.home, deactivate=False)
         self.assertEqual(
             (self.home / ".XCompose").read_text(encoding="utf-8"), '<Multi_key> <a> <a> : "å"\n'
@@ -378,6 +457,11 @@ class X11LiveReplaceTests(unittest.TestCase):
         self.root = self.scratch / "config" / "xkb"
         self.home = self.scratch / "home"
         self.home.mkdir()
+        # A session with no input method and no IBus, unless a test says otherwise.
+        self.session = ({}, set(), None)
+        probe = mock.patch.object(installer, "probe_input_method", lambda: self.session)
+        probe.start()
+        self.addCleanup(probe.stop)
         self.sources = {}
         for layout_id in ("ergol", "ergopti"):
             out = self.scratch / "converted" / layout_id
@@ -515,6 +599,23 @@ class X11LiveReplaceTests(unittest.TestCase):
             desktop_activation.keymap_carries_layout(
                 held, expected.replace("ampersand", "7"), "ergol"
             )
+        )
+
+    def test_a_compositor_keymap_names_no_layout_and_is_read_by_content(self) -> None:
+        """gnome-unnamed-keymap: mutter gives XWayland an "(unnamed)" symbols section,
+        so the group was never found by name and every GNOME live apply ended
+        not_loaded and rolled back."""
+        held = 'xkb_symbols "(unnamed)" {\n key <AE01> { symbols[Group1]= [ 1, exclam ], symbols[Group2]= [ ampersand, 1 ] };'
+        expected = 'xkb_symbols "pc+ergol+inet(evdev)" {\n key <AE01> { type= "T", symbols[Group1]= [ ampersand, 1 ] };'
+        self.assertEqual(desktop_activation.keymap_held_group(held, expected, "ergol"), 2)
+        self.assertTrue(desktop_activation.keymap_carries_layout(held, expected, "ergol"))
+        other = expected.replace("ampersand", "7")
+        self.assertIsNone(desktop_activation.keymap_held_group(held, other, "ergol"))
+        self.assertFalse(desktop_activation.keymap_carries_layout(held, other, "ergol"))
+        named_elsewhere = held.replace("(unnamed)", "pc+us+fr:2+inet(evdev)")
+        self.assertIsNone(
+            desktop_activation.keymap_held_group(named_elsewhere, expected, "ergol"),
+            "a keymap that names its layouts is read by name only",
         )
 
     def test_an_uninstalled_layout_is_refused_before_any_tool_runs(self) -> None:

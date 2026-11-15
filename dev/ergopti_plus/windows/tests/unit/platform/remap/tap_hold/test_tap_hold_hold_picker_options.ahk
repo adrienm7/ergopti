@@ -33,7 +33,7 @@ _THPO_Flat(Value) {
 
 _THPO_EveryOptionOwned(TargetPath) {
 	global TapHold, _SharedDir, _THGT_Writes
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	Options := TapHoldHoldOptions()
 	Kinds := Map("none", 0, "modifier", 0, "layer", 0)
 	for HoldOpt in Options {

@@ -21,13 +21,13 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
-local Assignable = require("actions.assignable")
+local Assignable = require("shortcuts.engine.actions.assignable")
 local original_build = Assignable.build
 local build_observations = {}
 Assignable.build = function(catalogue, modifiers, platform)
@@ -46,8 +46,8 @@ local Catalogue = require("_generated.action_catalogue")
 -- The harness injects an i18n stub that echoes keys, and the actions module
 -- captured that very table when it loaded. The locale test below points the
 -- same table at the real shared locale core for its duration.
-local i18n = package.loaded["infra.i18n"]
-local Locale = require("infra.locale")
+local i18n = package.loaded["core.i18n.engine.i18n"]
+local Locale = require("core.i18n.engine.locale")
 
 --- Builds a set from a list.
 --- @param list table
@@ -181,7 +181,8 @@ helpers.describe("action picker headings (macOS)", function()
 						if sticky and sticky ~= "hyper" then
 							local names = {}
 							for token in sticky:gmatch("[^_]+") do
-								names[#names + 1] = Locale.get("key_name." .. token)
+								-- altgr names the key name table's alt_gr.
+								names[#names + 1] = Locale.get("key_name." .. (token == "altgr" and "alt_gr" or token))
 							end
 							expected = expected:gsub("{1}", function() return table.concat(names, " + ") end)
 						end

@@ -71,7 +71,7 @@ end
 --- requiring the timings at load would parse them for every reader of trust.
 --- @return number seconds
 function M.unanswered_cooldown_sec()
-	return require("infra.timings").sec("adapters", "unresponsive_ax_backoff_ms")
+	return require("core.timing.engine.timings").sec("adapters", "unresponsive_ax_backoff_ms")
 end
 
 -- A read that took this share of the messaging timeout waited it out: the
@@ -231,7 +231,7 @@ end
 --- Opens System Settings on the Accessibility list, without blocking.
 --- @return boolean started True when the pane opener was started.
 function M.open_settings()
-	return require("adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
+	return require("core.process.adapters.shell_runner").open(require("adapters.privacy_settings").url("accessibility")) == true
 end
 
 return M

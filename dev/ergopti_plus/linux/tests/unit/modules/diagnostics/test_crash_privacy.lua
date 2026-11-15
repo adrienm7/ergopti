@@ -11,8 +11,8 @@ local ENOENT, EACCES = 2, 13 -- Canonical Linux missing-source and permission re
 -- Actual policy admission and redactor, with explicit portable filesystem ports.
 -- Real file output is independently exercised by the native causal receipt.
 local function with_fixture(body, cold)
-	local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim", "infra.diagnostic_snapshot",
-		"infra.version", "infra.paths", "adapters.file_system", "infra.regular_file_reader", "infra.regular_file_writer" }
+	local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim", "infra.diagnostic_snapshot",
+		"infra.version", "core.fs.engine.paths", "core.fs.adapters.file_system", "core.fs.engine.regular_file_reader", "core.fs.engine.regular_file_writer" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local open, popen, execute, remove, stderr = io.open, io.popen, os.execute, os.remove, io.stderr
 	local state = { files = {}, notices = {}, stderr = {}, opened = 0, closed = 0, logger_opened = 0 }
@@ -22,7 +22,7 @@ local function with_fixture(body, cold)
 	Logger.enable_repeat_collapsing = function() end
 	Logger.disable_repeat_collapsing = function() end
 	Logger.error = function(_, fmt, ...) state.notices[#state.notices + 1] = string.format(fmt, ...) end
-	package.loaded["logger.shim"] = Logger
+	package.loaded["core.logger.engine.shim"] = Logger
 	local Sink
 	local ok, err = xpcall(function()
 		io.stderr = { write = function(_, text) state.stderr[#state.stderr + 1] = text; return true end }
@@ -58,7 +58,7 @@ local function with_fixture(body, cold)
 		end
 		-- Model the canonical logger acquisitions at their actual public ports.
 		-- Policy and other sources outside this owned root keep native read admission.
-		local Reader, Writer = require("infra.regular_file_reader"), require("infra.regular_file_writer")
+		local Reader, Writer = require("core.fs.engine.regular_file_reader"), require("core.fs.engine.regular_file_writer")
 		local reader_ports, writer_ports = {}, {}
 		for name, value in pairs(Reader) do reader_ports[name] = value end
 		for name, value in pairs(Writer) do writer_ports[name] = value end
@@ -90,8 +90,8 @@ local function with_fixture(body, cold)
 				return state.files[path] == expected
 			end
 		end
-		package.loaded["infra.regular_file_reader"], package.loaded["infra.regular_file_writer"] = reader_ports, writer_ports
-		Sink = require("infra.logger_sink")
+		package.loaded["core.fs.engine.regular_file_reader"], package.loaded["core.fs.engine.regular_file_writer"] = reader_ports, writer_ports
+		Sink = require("core.logger.engine.sink")
 		state.try_install = function(context)
 			return Sink.install(Logger, { log_dir = DIRECTORY, redaction_context = context or { home = HOME, user = USER } })
 		end
@@ -139,7 +139,7 @@ helpers.describe("crash privacy admission", function()
 			local dump = s.dumps(); helpers.assert_eq(#dump, 1); no_private(dump[1].text)
 			helpers.assert_contains(dump[1].text, "CRASH_SENTINEL")
 			helpers.assert_contains(dump[1].text, "stack traceback:")
-			local report = require("json").decode(dump[1].text)
+			local report = require("core.text.engine.json").decode(dump[1].text)
 			helpers.assert_eq(report.git_hash, "f1424d19"); helpers.assert_eq(report.commit_source, "build")
 			helpers.assert_eq(s.closed, 1); helpers.assert_eq(#s.notices, 1)
 		end)
@@ -194,7 +194,7 @@ helpers.describe("crash privacy admission", function()
 	for _, failure in ipairs({ "throw", "nil", "truthy" }) do
 		helpers.it("refuses redaction provider " .. failure .. " without raw fallback", function()
 			with_fixture(function(s)
-				local Redact = require("diagnostics.redact")
+				local Redact = require("diagnostics.engine.reports.redact")
 				local original = Redact.apply
 				Redact.apply = function()
 					if failure == "throw" then error(PAYLOAD) end
@@ -280,12 +280,12 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("acknowledges only a retained redacted report image (crash-published-image)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-image-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-			local Writer = require("infra.regular_file_writer")
+			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write, Sink, Logger = Writer.open
 			local ok, err = xpcall(function()
-				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				local Reporter = require("modules.diagnostics.crash_reporter")
 				for _, mode in ipairs({ "intact", "replaced", "removed" }) do
@@ -342,11 +342,11 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("native retention preserves a foreign undelimited timestamp file", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-retention-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local date, Sink, Logger = os.date
 			local ok, err = xpcall(function()
-				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				local reports = directory .. "/crash_reports"
 				assert(uv.fs_mkdir(reports, 448))
@@ -355,7 +355,7 @@ if package.config:sub(1, 1) == "/" then
 				end
 				local foreign = reports .. "/2025-01-01T00-00-00Z42.json"
 				write("2025-01-01T00-00-00Z42.json", "foreign bytes remain")
-				local policy = require("crash_report")
+				local policy = require("diagnostics.engine.reports.crash_report")
 				for i = 1, policy.MAX_REPORTS do write(string.format("2026-01-01T00-00-%02dZ.json", i), "old report") end
 				local Reporter = require("modules.diagnostics.crash_reporter")
 				os.date = function(format, ...)
@@ -389,14 +389,14 @@ if package.config:sub(1, 1) == "/" then
 		helpers.it("preserves same-second reports across reporter reloads (crash-exclusive-history)", function()
 			local uv = require("luv")
 			local directory = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-crash-history-XXXXXX"))
-			local names = { "infra.logger_sink", "modules.diagnostics.crash_reporter", "logger.shim" }
+			local names = { "core.logger.engine.sink", "modules.diagnostics.crash_reporter", "core.logger.engine.shim" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 			local date, Sink, Logger = os.date
-			local Writer = require("infra.regular_file_writer")
+			local Writer = require("core.fs.engine.regular_file_writer")
 			local native_write = Writer.open
 			local timestamp = "2026-10-25T12:00:00Z"
 			local ok, err = xpcall(function()
-				Logger, Sink = require("logger.shim"), require("infra.logger_sink")
+				Logger, Sink = require("core.logger.engine.shim"), require("core.logger.engine.sink")
 				assert(Sink.install(Logger, { log_dir = directory, redaction_context = { home = HOME, user = USER } }))
 				os.date = function(format, ...)
 					if format == "!%Y-%m-%dT%H:%M:%SZ" then return timestamp end
@@ -414,7 +414,7 @@ if package.config:sub(1, 1) == "/" then
 				Reporter = require("modules.diagnostics.crash_reporter")
 				helpers.assert_eq(Reporter.dump("engine", "RELOADED_HISTORY_MARKER " .. PAYLOAD), true)
 				local raced = false
-				local CrashReport = require("crash_report")
+				local CrashReport = require("diagnostics.engine.reports.crash_report")
 				-- Four reports already occupy this second; race its next free candidate.
 				local race_path = directory .. "/crash_reports/" .. CrashReport.file_name(CrashReport.stem(timestamp), 5)
 				Writer.open = function(path, mode)

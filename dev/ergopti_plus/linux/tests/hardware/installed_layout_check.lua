@@ -49,11 +49,11 @@
 -- One file from each tree the packagers copy in a separate stanza. Losing one
 -- stanza loses one of these and nothing else, so they are checked individually.
 local REQUIRED_SHARED_FILES = {
-	"data/locales/en.json",
-	"data/locales/fr.json",
-	"data/keycodes/evdev.json",
-	"modules/llm/defaults.json",
-	"modules/timings/constants.toml",
+	"core/i18n/data/locales/en.json",
+	"core/i18n/data/locales/fr.json",
+	"layouts/data/keycodes/evdev.json",
+	"ai/data/defaults.json",
+	"core/timing/data/constants.toml",
 }
 
 -- Twenty-one locales ship. The hardcoded fallback that masks a missing tree has
@@ -117,21 +117,21 @@ end
 
 -- The daemon installs this before its first shared require; mirror it so a
 -- module that expects utf8 under LuaJIT is not the thing that fails.
-local ok_compat, compat = pcall(require, "compat.utf8")
+local ok_compat, compat = pcall(require, "core.lifecycle.engine.compat.utf8")
 if ok_compat and type(compat) == "table" and type(compat.install) == "function" then
 	pcall(compat.install)
 end
 
-local ok_paths, Paths = pcall(require, "infra.paths")
+local ok_paths, Paths = pcall(require, "core.fs.engine.paths")
 if not ok_paths then
-	print("FAIL infra.paths could not be loaded: " .. tostring(Paths))
+	print("FAIL core.fs.engine.paths could not be loaded: " .. tostring(Paths))
 	print("     LUA_PATH = " .. tostring(os.getenv("LUA_PATH")))
 	os.exit(1)
 end
 
 local root = Paths.shared_root()
 if not root then
-	fail("infra.paths resolved no shared tree from the installed driver.")
+	fail("core.fs.engine.paths resolved no shared tree from the installed driver.")
 elseif normalise(root) ~= normalise(expected_root) then
 	fail("shared tree resolved to %s, expected %s — the packaged layout moved.",
 		normalise(root), normalise(expected_root))
@@ -150,9 +150,9 @@ for _, rel in ipairs(REQUIRED_SHARED_FILES) do
 	end
 end
 
-local ok_i18n, i18n = pcall(require, "infra.i18n")
+local ok_i18n, i18n = pcall(require, "core.i18n.engine.i18n")
 if not ok_i18n then
-	fail("infra.i18n could not be loaded: %s", tostring(i18n))
+	fail("core.i18n.engine.i18n could not be loaded: %s", tostring(i18n))
 else
 	local ok_list, locales = pcall(i18n.list_locales)
 	if not ok_list or type(locales) ~= "table" then

@@ -51,8 +51,10 @@ helpers.describe("detached recommendation source admission", function()
 				end
 				local called, detail = xpcall(function() body(path, fs, control, seed, fixture) end, debug.traceback)
 				io.open, os.rename = original_open, original_rename
+				-- The Tap-Holds switch publishes to the config.toml beside it.
+				local rows = dir .. "/config.toml"
 				for _, name in ipairs({ path, path .. ".backup", fixture.write_lock_path(path),
-					fixture.write_lock_path(path .. ".backup") }) do os.remove(name) end
+					fixture.write_lock_path(path .. ".backup"), rows, fixture.write_lock_path(rows) }) do os.remove(name) end
 				fixture.HOST_RMDIR(dir)
 				if not called then error(detail, 0) end
 			end)
@@ -69,11 +71,11 @@ helpers.describe("detached recommendation source admission", function()
 				local configured = package.loaded["platform.remap.config"]
 				configured.load_tap_hold_keys = function() return { { id = "left_shift" }, { id = "tab" } } end
 				package.loaded["infra.config_paths"].get = function() return path end
-				local captured = require("adapters.file_system")
+				local captured = require("core.fs.adapters.file_system")
 				for _, method in ipairs({ "read_with_status", "write_if_unchanged", "write", "remove_if_unchanged", "remove_exact" }) do
 					captured[method] = fs[method]
 				end
-				package.loaded["adapters.file_system"] = fs
+				package.loaded["core.fs.adapters.file_system"] = fs
 				package.loaded["platform.remap.config"] = nil
 				local actual = helpers.load_with_stubs("platform.remap.config")
 				-- A Mac on the shared runtime; Ergopti's own runtime is the product default.
@@ -93,7 +95,8 @@ helpers.describe("detached recommendation source admission", function()
 	end
 
 	local neutral = "# exact admitted neutral source\n[custom]\nkeep = 19\n[karabiner]\nintegration_enabled = false\n"
-	local personalized = neutral .. '[tap_holds.config.left_shift]\ntap = "paste"\nhold = "none"\n'
+	-- The shared tap_hold.toml layout (_shared/tap_hold/data/SCHEMA.md).
+	local personalized = neutral .. '[tap_hold.keys.left_shift]\ntap_action = "paste"\n'
 
 	--- Intercepts the actual loader's completed single read, forwarding its exact
 	--- optional receipt unchanged while injecting the next source generation.
@@ -122,7 +125,7 @@ helpers.describe("detached recommendation source admission", function()
 					if not absent then seed(path, neutral) end
 					helpers.assert_eq(remap.save_recommended_keys(request), false, "neutral source A cannot authorize overwriting personalized source B")
 					helpers.assert_eq(fs.read_with_status(path), personalized)
-					helpers.assert_eq(require("toml_codec").decode(fs.read_with_status(path)).tap_holds.config.left_shift.tap, "paste")
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "paste")
 					local _, backup_status = fs.read_with_status(request.backup_path)
 					helpers.assert_eq(backup_status, "absent", "a personalized successor is never backed up as recommendation authority")
 					helpers.assert_eq(control.writes, 0)
@@ -176,9 +179,11 @@ helpers.describe("detached recommendation source admission", function()
 			with_recommendation(nil, function(remap, _, fs, control, seed, path, _, request)
 				if not absent then seed(path, neutral) end
 				helpers.assert_eq(remap.save_recommended_keys(request), true)
-				local model = require("toml_codec").decode(fs.read_with_status(path))
-				helpers.assert_eq(model.tap_holds.config.left_shift.tap, "escape")
-				helpers.assert_eq(model.tap_holds.enabled, true)
+				local model = require("core.text.engine.toml_codec").decode(fs.read_with_status(path))
+				helpers.assert_eq(model.tap_hold.keys.left_shift.tap_action, "escape")
+				local rows = require("core.text.engine.toml_codec").decode(fs.read_with_status(path:match("^(.*)/") .. "/config.toml"))
+				helpers.assert_eq(rows.tap_holds.enabled, true, "the switch is the config.toml row")
+				helpers.assert_nil(model.tap_hold.enabled)
 				if not absent then
 					helpers.assert_eq(model.custom.keep, 19); helpers.assert_eq(model.karabiner.integration_enabled, false)
 					helpers.assert_eq(fs.read_with_status(request.backup_path), neutral)
@@ -210,7 +215,7 @@ helpers.describe("detached recommendation source admission", function()
 				return state, status
 			end
 			helpers.assert_eq(remap.save_recommended_keys(request), true)
-			helpers.assert_eq(require("toml_codec").decode(fs.read_with_status(path)).tap_holds.config.left_shift.tap, "escape")
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(fs.read_with_status(path)).tap_hold.keys.left_shift.tap_action, "escape")
 		end)
 	end)
 end)

@@ -13,7 +13,7 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
 	Assert(FSWriteDurable(TapPath, TapSource))
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Bundle := 0, Refusal := 0, Launches := 0, Backups := 0
 	Launch(_Success, Borrowed, Refused) {
 		Bundle := Borrowed, Refusal := Refused, Launches += 1
@@ -136,7 +136,7 @@ _TapHoldDetachedImage() {
 	Source := '[tap_hold.keys.space]`ntap_action = "open_url"`n[private]`ncredential = "keep"`n'
 	Assert(FSWriteDurable(Path, Source))
 	try {
-		Owner := TapHoldScopeOwner(Path, _SharedDir . "\tap_hold\defaults.toml", "clear")
+		Owner := TapHoldScopeOwner(Path, _SharedDir . "\tap_hold\data\defaults.toml", "clear")
 		Images := Owner.Build()
 		AssertEqual(1, Images.Length)
 		AssertEqual(Path, Images[1].path)
@@ -160,7 +160,7 @@ _TapHoldScopeLayerImport() {
 	Fixture := _ScopeOwnerFixture()
 	Path := Fixture.directory . "\tap_hold.toml"
 	LayersPath := Fixture.directory . "\layers.toml"
-	Defaults := _SharedDir . "\tap_hold\defaults.toml"
+	Defaults := _SharedDir . "\tap_hold\data\defaults.toml"
 	try {
 		AssertEqual(1, TapHoldScopeOwner(Path, Defaults, "clear", Fixture.directory).paths.Length,
 			"clear never owns the layer file")
@@ -173,7 +173,7 @@ _TapHoldScopeLayerImport() {
 		AssertEqual(2, Images.Length, "one candidate per owned path")
 		AssertEqual(LayersPath, Images[2].path)
 		AssertEqual(0, Images[2].image["source_present"])
-		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), Images[2].image["content"],
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\layouts\data\layers.recommended.toml"), Images[2].image["content"],
 			"an absent layers.toml becomes the recommended layer's exact bytes")
 		Assert(!FileExist(LayersPath), "building a candidate publishes nothing")
 		Own := "# the user's own layer`n"
@@ -196,7 +196,7 @@ _TapHoldScopeRestoreCreatesLayer() {
 	TapPath := Fixture.directory . "\tap_hold.toml"
 	LayersPath := Fixture.directory . "\layers.toml"
 	Fixture.options["tap_hold_path"] := TapPath
-	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\defaults.toml"
+	Fixture.options["tap_hold_defaults"] := _SharedDir . "\tap_hold\data\defaults.toml"
 	Fixture.options["layers_config_dir"] := Fixture.directory
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
@@ -210,7 +210,7 @@ _TapHoldScopeRestoreCreatesLayer() {
 		GestureActionParameters := Map()
 		Receipt := TapHoldScopeApply("recommended", Fixture.options)
 		AssertEqual("pending", Receipt["status"])
-		AssertEqual(FSReadUtf8Exact(_SharedDir . "\keymap\layers.recommended.toml"), FSReadUtf8Exact(LayersPath),
+		AssertEqual(FSReadUtf8Exact(_SharedDir . "\layouts\data\layers.recommended.toml"), FSReadUtf8Exact(LayersPath),
 			"the restore creates the recommended layer beside the preset")
 		Assert(!_ConfigWriteLeaseTryAcquire(LayersPath, "intruder"), "the layer file is held with the cohort")
 		Refusal.Call("native close refused")

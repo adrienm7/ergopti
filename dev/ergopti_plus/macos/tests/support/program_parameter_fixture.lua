@@ -2,15 +2,15 @@
 
 --- Real writer, preference checkpoint and global writer fence for picker fixtures.
 local helpers = require("tests.helpers")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 local Manifest = require("infra.manifest_reader")
-local Assignment = require("shortcuts.assignment")
+local Assignment = require("shortcuts.engine.assignment")
 
 return function(gestures, state, kind, read_action, save_attempt, controls)
 	local noop = function() return true end
 	controls = controls or {}
 	-- Exact focused discovery must not depend on another test priming Paths.
-	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local content = '[gestures]\ntap_3 = "none"\naction_parameters = { retained = "unrelated" }\n[shortcuts.keyboard]\nprimary_1 = "none"\n[shortcuts.tap_keys]\nnumber_row_left = "none"\n[shortcuts.script_control]\nscript_altgr_enter = "none"\n'
 	if controls.content ~= nil then content = controls.content end
 	if controls and controls.absent then content = nil end
@@ -51,7 +51,7 @@ return function(gestures, state, kind, read_action, save_attempt, controls)
 		if status ~= (files[path] and "ok" or "absent") or status == "ok" and files[path] ~= content then return false end
 		return files_port.write_if_unchanged(path, value, { status = status, content = content })
 	end
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	package.loaded["infra.preferences"] = nil
 	local preferences = require("infra.preferences")
 	preferences.load("config")

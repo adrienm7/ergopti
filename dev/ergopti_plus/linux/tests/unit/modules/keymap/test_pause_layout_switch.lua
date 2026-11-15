@@ -105,7 +105,7 @@ helpers.describe("pause layout switch", function()
 
 	helpers.it("is started by the daemon once the live pause state is restored", function()
 		local source = daemon_source()
-		local restored = source:find('require("infra.restart_pause").restore(script_actions)', 1, true)
+		local restored = source:find('require("core.lifecycle.engine.reload.restart_pause").restore(script_actions)', 1, true)
 		local started = source:find('require("modules.keymap.pause_layout_switch").start_safely(script_actions.is_paused())', 1, true)
 		helpers.assert_true(restored ~= nil and started ~= nil and restored < started,
 			"the start switch reads the pause state the restore settled")
@@ -143,18 +143,27 @@ helpers.describe("pause layout switch", function()
 		helpers.assert_true(listener ~= nil, "the pause listener is found")
 		helpers.assert_true(listener:find('require("modules.keymap.pause_layout_switch").on_pause_change(paused)', 1, true) ~= nil,
 			"a pause transition reaches the layout switch")
+		-- (pause-drops-dead-key) a dead key pending in the emulation must not
+		-- compose with the first key typed after the resume.
+		helpers.assert_true(listener:find('if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end',
+			1, true) ~= nil, "a pause drops the emulation's pending dead key")
+		helpers.assert_nil(listener:find('layout_emulation").reset(', 1, true),
+			"a full emulation reset at pause would drop a held modifier's release (pause-keeps-held-modifier)")
 		local _, quits = source:gsub('require%("modules%.keymap%.pause_layout_switch"%)%.quit_safely%(%)', "")
-		helpers.assert_eq(quits, 2, "the shortcut quit and the tray quit switch first")
-		-- The tray quit runs through infra/quit_request.lua, which applies the pause
+		-- The tray row, the shortcut and the gesture Quit share one owner (LCY-003).
+		helpers.assert_eq(quits, 1, "the user Quit owner switches first")
+		helpers.assert_true(source:find("quit = function(reason) return privacy_owners.user_quit(reason) end", 1, true) ~= nil,
+			"the shortcut quit reaches the user Quit owner")
+		-- The tray quit runs through core/lifecycle/engine/shutdown/quit_request.lua, which applies the pause
 		-- layout only once the shared admission accepted the quit.
 		helpers.assert_true(source:find("on_quit       = privacy_owners.tray_quit,", 1, true) ~= nil)
 		helpers.assert_true(source:find("apply_pause_layout = function() require", 1, true) ~= nil,
 			"the tray quit switches the layout")
 		-- infra/quit_request, selected by a declaration unique to it.
-		local handler = helpers.read_driver_unit('local LOG = "infra.quit_request"')
+		local handler = helpers.read_driver_unit('local LOG = "core.lifecycle.engine.shutdown.quit_request"')
 		helpers.assert_true(handler ~= nil, "the tray quit handler is found")
 		local switched = handler:find("pcall(ports.apply_pause_layout)", 1, true)
-		local requested = handler:find('ports.shutdown.request("tray quit")', 1, true)
+		local requested = handler:find("ports.shutdown.request(reason)", 1, true)
 		helpers.assert_true(switched ~= nil and requested ~= nil and switched < requested,
 			"the layout switches before the shutdown starts, and only after the admission")
 		local owner = source:match('name = "pause layout switch",(.-)\n\t\t},')
@@ -165,8 +174,8 @@ helpers.describe("pause layout switch", function()
 		local actions = source:match("local script_actions = ScriptActions%.new%(%{(.-)\n\t%}%)")
 		helpers.assert_true(actions ~= nil, "the script actions are found")
 		helpers.assert_true(actions:find("\n\t\treload = perform_reload,\n", 1, true) ~= nil, "a reload does not switch")
-		local quit = actions:match("\n\t\tquit = function%(reason%)(.-)\n\t\tend,")
-		helpers.assert_true(quit ~= nil and quit:find(".quit_safely()", 1, true) ~= nil, "the shortcut quit switches")
+		helpers.assert_true(actions:find("\n\t\tquit = function(reason) return privacy_owners.user_quit(reason) end,\n", 1, true) ~= nil,
+			"the shortcut quit switches through the user Quit owner")
 	end)
 end)
 

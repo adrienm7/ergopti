@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
 local SourceFile = require("tests.support.source_file")
 local ModuleIsolation = require("tests.support.module_isolation")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 local ROOT = helpers.driver_root()
 local DIRECTORY = ROOT .. "tests/meta"
 local INVENTORY_COMMAND = package.config:sub(1, 1) == "\\"
@@ -45,7 +45,7 @@ local function replay(path, fault, target, fixture)
 	local source = SourceFile.read(path)
 	local saved, previous_hs = {}, hs
 	for name, value in pairs(package.loaded) do saved[name] = value end
-	ModuleIsolation.purge(ROOT, helpers.shared("lua"))
+	ModuleIsolation.purge(ROOT, helpers.shared(""))
 	local facts = { accepted = false, opened = {}, closes = 0, faulted = 0 }
 	local streams = {}
 	local open = io.open
@@ -132,7 +132,7 @@ local function with_sources(callback)
 	end
 	local outcome = table.pack(pcall(function()
 		directory(root)
-		for _, name in ipairs({ "adapters", "infra", "modules", "platform", "ui" }) do
+		for _, name in ipairs({ "adapters", "infra", "modules", "platform", "ui", "core" }) do
 			directory(root .. "/" .. name)
 			write(root .. "/" .. name .. "/healthy.lua", "local safe = true\n")
 		end

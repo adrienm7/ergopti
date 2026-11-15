@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
 
@@ -37,7 +37,7 @@ end
 --- @return table remote, table http, table deferred
 local function load_remote()
 	local http, deferred = { gets = {}, posts = {} }, {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function(url, headers, options, callback)
 			http.gets[#http.gets + 1] = { url = url, headers = headers, options = options, callback = callback }
 			return true
@@ -48,7 +48,7 @@ local function load_remote()
 		end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.event_loop"] = {
+	package.loaded["core.events.loop"] = {
 		defer = function(fn, delay)
 			deferred[#deferred + 1] = { fn = fn, delay = delay }
 			return true
@@ -60,8 +60,8 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.event_loop"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
+	package.loaded["core.events.loop"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 	os.remove(REFUSED_FILE)
 end

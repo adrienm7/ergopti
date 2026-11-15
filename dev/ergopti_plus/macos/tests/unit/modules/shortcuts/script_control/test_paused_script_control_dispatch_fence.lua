@@ -13,14 +13,14 @@ local helpers = require("tests.helpers")
 local dispatched = 0
 local lifecycle_dispatches = { script_reload = 0, script_quit = 0 }
 
-package.loaded["infra.logger"] = helpers.make_logger_stub()
-package.loaded["infra.notifications"] = { notify = function() end }
-package.loaded["infra.keycodes"] = {
+package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+package.loaded["platform.input.keycodes"] = {
 	F13_KARABINER_RETURN = 0x6A,
 	F14_KARABINER_BACKSPACE = 0x6B,
 	F15_KARABINER_ESCAPE = 0x6C,
 	F18_KARABINER_DELETE = 0x4F,
-	SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+	SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 	BACKSPACE = 0x33,
 	RETURN = 0x24,
 	ESCAPE = 0x35,
@@ -60,10 +60,10 @@ package.loaded["ui.wpm.wpm_widget"] = {
 	is_running = function() return false end,
 }
 package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 
-package.loaded["adapters.synthetic_input"] = nil
-local SyntheticInput = helpers.load_with_stubs("adapters.synthetic_input")
+package.loaded["platform.input.synthetic_input"] = nil
+local SyntheticInput = helpers.load_with_stubs("platform.input.synthetic_input")
 SyntheticInput.when_idle = function(callback)
 	callback()
 	return true
@@ -95,19 +95,24 @@ local gestures = {
 	resume = function() return true end,
 }
 
---- Builds a genuine Karabiner-tagged F14 sentinel event.
+--- Builds a genuine Karabiner-tagged sentinel event.
+--- @param keycode number The slot's sentinel keycode (F14 by default).
 --- @return table event
-local function tagged_backspace_sentinel()
+local function tagged_sentinel(keycode)
 	return {
 		getProperty = function() return 0 end,
-		getKeyCode = function() return 0x6B end,
+		getKeyCode = function() return keycode or 0x6B end,
 		getFlags = function() return { ctrl = true, shift = true } end,
 	}
 end
 
 helpers.describe("audit pause fence: script control delivery", function()
 	helpers.it("audit pause fence: rejects an ordinary configured action while preserving the live tap", function()
+		-- Assigned before the pause: a change made while paused waits for the
+		-- resume (test_paused_chord_change_waits_for_resume).
 		ScriptControl.set_shortcut_action("script_altgr_backspace", "open_metrics_typing")
+		ScriptControl.set_shortcut_action("script_altgr_delete", "script_reload")
+		ScriptControl.set_shortcut_action("script_altgr_escape", "script_quit")
 		ScriptControl.start(keymap, shortcuts, gestures, nil)
 		ScriptControl.pause_all()
 
@@ -118,16 +123,14 @@ helpers.describe("audit pause fence: script control delivery", function()
 		helpers.assert_true(tap and tap.enabled and type(tap.fn) == "function",
 			"the dedicated script-control tap must remain live during pause")
 
-		local consumed = tap.fn(tagged_backspace_sentinel())
+		local consumed = tap.fn(tagged_sentinel())
 		helpers.assert_eq(consumed, true,
 			"a recognized script-control sentinel remains consumed while paused")
 		hs_stub.timer.__fire_all()
 
-		ScriptControl.set_shortcut_action("script_altgr_backspace", "script_reload")
-		tap.fn(tagged_backspace_sentinel())
+		tap.fn(tagged_sentinel(0x4F))
 		hs_stub.timer.__fire_all()
-		ScriptControl.set_shortcut_action("script_altgr_backspace", "script_quit")
-		tap.fn(tagged_backspace_sentinel())
+		tap.fn(tagged_sentinel(0x6C))
 		hs_stub.timer.__fire_all()
 		ScriptControl.stop()
 

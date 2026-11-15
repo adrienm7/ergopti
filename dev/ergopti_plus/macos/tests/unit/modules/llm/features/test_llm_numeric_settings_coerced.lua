@@ -38,8 +38,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 
 
@@ -77,6 +77,7 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model       = function() return "llama3" end,
 	get_backend             = function() return "ollama" end,
+	request_settings        = function() return { backend = "ollama" } end,
 	set_llm_model_mlx       = function(_) end,
 	set_llm_model_ollama    = function(_) end,
 	set_runtime_llm_enabled = function(_) end,
@@ -104,8 +105,6 @@ package.loaded["modules.llm.api_mlx"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) return true end,
-	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
 	cancel_streaming    = function() return true end,
 }
@@ -119,14 +118,14 @@ package.loaded["modules.llm.api_common"] = {
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 }
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
-package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,
@@ -160,8 +159,8 @@ package.loaded["modules.shortcuts.script_control"] = {
 -- THE point of this file: the REAL Hammerspoon shim over the REAL shared
 -- prompt_builder, not the arithmetic-free stub used by test_prediction_engine.
 package.loaded["modules.llm.prompt_builder"] = nil
-package.loaded["llm.prompt_builder"]         = nil
-local SharedPromptBuilder = require("llm.prompt_builder")
+package.loaded["ai.engine.prediction.prompt_builder_core"]         = nil
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 local HsPromptBuilder     = require("modules.llm.prompt_builder")
 
 local PE = require("modules.llm.prediction_engine")
@@ -183,7 +182,7 @@ PE.init({ buffer = "bonjour le mon", mappings = {}, DELAYS = { llm_prediction = 
 helpers.describe("numeric coercion regression exercises the real prompt_builder", function()
 	helpers.it("the shared prompt_builder is loaded, not a stub", function()
 		helpers.assert_true(type(SharedPromptBuilder.build_params) == "function",
-			"the REAL shared llm.prompt_builder must be loaded — a stub would make every assertion below meaningless")
+			"the REAL shared ai.engine.prediction.prompt_builder_core must be loaded — a stub would make every assertion below meaningless")
 		helpers.assert_eq(SharedPromptBuilder.GREEDY_TEMP_THRESHOLD, 0.15,
 			"shared prompt_builder constants must be the real ones")
 	end)

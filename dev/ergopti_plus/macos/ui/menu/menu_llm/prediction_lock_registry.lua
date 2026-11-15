@@ -4,7 +4,7 @@
 --- ordinary model switches may overlap; the runtime gate is restored only after
 --- the last lease settles, never when the first async operation happens to finish.
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local M = {}
 local LOG = "menu_llm.prediction_locks"

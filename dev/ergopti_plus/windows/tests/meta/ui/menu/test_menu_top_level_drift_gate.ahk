@@ -44,7 +44,7 @@ _TrayRootBuilderBodies() {
 _DG_ManifestTopLevel() {
 	SplitPath(A_ScriptDir, , &WinDir)
 	SplitPath(WinDir, , &EpDir)
-	ManifestPath := EpDir . "\_shared\modules\menu\menu_manifest.json"
+	ManifestPath := EpDir . "\_shared\menu\data\menu_manifest.json"
 	Root := JsonParse(FileRead(ManifestPath, "UTF-8"))
 	Assert((Root is Map) && Root.Has("top_level") && (Root["top_level"] is Array),
 		"menu_manifest.json must carry a top_level array")
@@ -188,6 +188,7 @@ _DG_ReorderedManifestReordersTheRoot() {
 ; a new builder has to say which row it stages.
 global _DG_BUILDER_TITLES := Map(
 	"keyboard_layout", 'MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
+	"ergopti_studio",  'MenuRenderer_CommandRow("top_level", "ergopti_studio"',
 	"hotstrings",      'MenuRenderer_GroupReceiver("top_level", "hotstrings")',
 	"llm",             'LLM_Menu_TrayTitle()',
 	"agent",           't("menu.agent.title")',
@@ -329,13 +330,16 @@ _DG_SourceJoin(Lines) {
 }
 _DG_DeclaredStageExpected() {
 	return _DG_SourceJoin([
-		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {',
 		'Published := false',
 		'try {',
 		'Row := Receiver.Call(Child, Getters)',
 		'if !(Row is Map) || Row.Get("submenu", false) != Child',
 		'throw Error("The canonical feature parent changed during native construction.")',
+		'if Feature',
 		'TrayMenuStage_AddFeature(Row["label"], Child)',
+		'else',
+		'TrayMenuStage_Add(Row["label"], Child)',
 		'Published := true',
 		'if Row.Get("checked", false)',
 		'TrayMenuStage_Check(Row["label"])',
@@ -355,6 +359,7 @@ _DG_DeclaredBuilderExpected(Id) {
 	if Id == "keyboard_layout"
 		return _DG_SourceJoin([
 			'_MI_StageLayout() {',
+			'global _MI_LayoutDeferred',
 			'Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
 			'if !Receiver',
 			'throw Error("The declared keyboard_layout feature parent was refused before native construction.")',
@@ -371,10 +376,10 @@ _DG_DeclaredBuilderExpected(Id) {
 			')',
 			'LayoutGroupBuilders := Map("layout_emulated_rows", () => MenuRenderer_Build("layout_emulated_rows_group", "Layout",',
 			'"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))',
-			'LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", LayoutGroupBuilders,',
-			'LayoutListProviders, _LAY_ScopeCommands(),',
-			'Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")',
-			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)',
+			'LayoutBuild := (Target) => _LAY_BuildLayoutMenu(Target, LayoutGroupBuilders, LayoutListProviders)',
+			'LayoutMenu  := MenuDeferOrBuild(LayoutBuild, "layout_menu")',
+			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true, false)',
+			'_MI_LayoutDeferred := Map("menu", LayoutMenu, "build", LayoutBuild)',
 			'BootProfile_Mark("MENU/initMenu: layout built+added")',
 			'}'])
 	if Id == "hotstrings"
@@ -635,7 +640,7 @@ _DG_DeclaredStageOriginalCaptions() {
 	Languages := 0
 	try {
 		for Code, Expected in Corpus["captions"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			_DG_CheckDeclaredStageLocale(Expected, Corpus)
 			Languages += 1

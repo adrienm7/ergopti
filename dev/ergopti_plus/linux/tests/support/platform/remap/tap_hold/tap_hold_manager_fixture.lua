@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 --- A keyboard hook double that records what is installed.
 local function fake_hook()
@@ -26,10 +26,10 @@ local function fake_hook()
 	return hook
 end
 
+--- Writes a scenario's tap_hold.toml and the config.toml beside it (the switch
+--- and the timings, tests/support/tap_hold_fixture.lua).
 local function write(path, text)
-	local fh = assert(io.open(path, "w"))
-	fh:write(require("tests.support.tap_hold_fixture").with_preset(text))
-	fh:close()
+	require("tests.support.tap_hold_fixture").write(path, text)
 end
 
 --- A fresh manager on the shared defaults and a temporary user file.
@@ -49,6 +49,7 @@ local function manager(user_text, opts)
 		on_text_injected = function(text) resets[#resets + 1] = text end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
+		config_path = require("tests.support.tap_hold_fixture").config_path(user_path),
 	})
 	return Manager, hook, actions, user_path, resets
 end

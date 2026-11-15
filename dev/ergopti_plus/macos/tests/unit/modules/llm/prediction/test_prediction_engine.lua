@@ -32,8 +32,8 @@ local helpers = require("tests.helpers")
 
 -- Reset the hs stub and package cache for a clean load.
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub modules.llm (core_llm) — only the surface prediction_engine uses at
 -- module-load time and in setters is needed.
@@ -59,6 +59,7 @@ package.loaded["modules.llm"] = {
 	},
 	get_current_model       = function() return "llama3" end,
 	get_backend             = function() return "ollama" end,
+	request_settings        = function() return { backend = "ollama", model = "llama3" } end,
 	get_runtime_llm_enabled = function() return true end,
 	set_llm_model_mlx       = function(_) return true end,
 	set_llm_model_ollama    = function(_) return true end,
@@ -148,8 +149,6 @@ package.loaded["modules.llm.prompt_builder"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                 = function(_cfg) return true end,
 	build_callbacks      = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog         = function(_cfg) return true end,
-	stop_watchdog        = function() return true end,
 	reset_failure_count  = function() end,
 	cancel_streaming     = function() return true end,
 }
@@ -169,19 +168,19 @@ package.loaded["modules.llm.api_common"] = {
 }
 
 -- Stub lib.i18n — perform_check uses i18n.get() for the loading label.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t   = function(key) return key end,
 	get = function(key) return key end,
 }
 
 -- Stub lib.keycodes.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 
 -- Stub ui.tooltip — set_navigate_callback and set_enter_validates are called
 -- at module load time (lines 879-881 of prediction_engine.lua).
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,
@@ -217,20 +216,20 @@ local function load_real_setting_bridge()
 	local replacements = {
 		["modules.keymap.utils"] = {},
 		["adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
-		["adapters.synthetic_input"] = {current_action_epoch = function() return 0 end},
-		["infra.text_utils"] = {},
-		["infra.keycodes"] = {
+		["platform.input.synthetic_input"] = {current_action_epoch = function() return 0 end},
+		["core.text.engine.utils"] = {},
+		["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			RETURN = 36,
 			F16_LLM_CHAIN_SIGNAL = 106,
 			to_name = function() return "f16" end,
 		},
 		["modules.keystats"] = {},
-		["ui.tooltip"] = {},
+		["core.ui.ui.tooltip"] = {},
 		["modules.keymap.registry"] = {},
 		["modules.hotstrings.hotstrings_config"] = {},
 		["modules.keymap.expander"] = {},
-		["adapters.timer_scheduler"] = {after = noop},
+		["core.events.timer_scheduler"] = {after = noop},
 		["infra.manifest_reader"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 		["modules.llm.prediction_engine"] = PE,
@@ -288,11 +287,11 @@ helpers.describe("prediction_engine — module surface", function()
 
 	helpers.it("calls tooltip.hide_forced immediately on reset (e.g. after prediction apply)", function()
 		local tt_hidden_forced = false
-		local old_hide_forced = package.loaded["ui.tooltip"].hide_forced
-		package.loaded["ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
+		local old_hide_forced = package.loaded["core.ui.ui.tooltip"].hide_forced
+		package.loaded["core.ui.ui.tooltip"].hide_forced = function() tt_hidden_forced = true; return true end
 		PE.reset()
 		helpers.assert_true(tt_hidden_forced, "tooltip.hide_forced must be called on reset")
-		package.loaded["ui.tooltip"].hide_forced = old_hide_forced
+		package.loaded["core.ui.ui.tooltip"].hide_forced = old_hide_forced
 	end)
 end)
 
@@ -375,7 +374,7 @@ end)
 helpers.describe("prediction_engine - Ollama daemon recovery", function()
 	helpers.it("restarts only the active runtime and parks recovery while paused", function()
 		local core = package.loaded["modules.llm"]
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local original_backend = core.get_backend
 		local original_runtime = core.get_runtime_llm_enabled
 		local original_after = scheduler.after
@@ -471,7 +470,7 @@ helpers.describe("prediction_engine - Ollama daemon recovery", function()
 	}) do
 		helpers.it("retains recovery cleanup debt when timer cancel returns " .. case.name, function()
 			local core = package.loaded["modules.llm"]
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local original_backend = core.get_backend
 			local original_after = scheduler.after
 			local original_cancel = scheduler.cancel
@@ -671,8 +670,8 @@ helpers.describe("prediction_engine — configuration setters", function()
 
 	-- F-M10: a wrong-typed config.toml / plist value (e.g. max_words = "five")
 	-- reached `<=`/`>` in the prompt_builder and `> 0` in the menu, crashing both.
-	-- The setters now coerce + fail closed to the numeric default.
-	helpers.it("min/max setters coerce runtime values without publishing hs.settings", function()
+	-- The setters now check the shared value schema and keep the value in force.
+	helpers.it("min/max setters keep numeric runtime values without publishing hs.settings", function()
 		local original_set = hs.settings.set
 		local writes = {}
 		hs.settings.set = function(key, value)
@@ -686,8 +685,11 @@ helpers.describe("prediction_engine — configuration setters", function()
 			PE.set_llm_min_words("seven")
 			local min_found, mn = PE.get_llm_runtime_setting("llm_min_words")
 
-			-- A genuine numeric string is still accepted (coerced).
-			PE.set_llm_max_words("12")
+			-- A numeric string is refused too (value-validation): the stored type is
+			-- a number, and the setter fails fast instead of coercing.
+			local string_refused = PE.set_llm_max_words("12") == false
+			local admitted = PE.set_llm_max_words(12) == true
+			local beyond_refused = PE.set_llm_max_words(10001) == false
 			local numeric_found, numeric_max = PE.get_llm_runtime_setting("llm_max_words")
 			return {
 				max_found = max_found,
@@ -696,6 +698,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 				min_value = mn,
 				numeric_found = numeric_found,
 				numeric_max = numeric_max,
+				string_refused = string_refused,
+				admitted = admitted,
+				beyond_refused = beyond_refused,
 			}
 		end, debug.traceback)
 		hs.settings.set = original_set
@@ -713,6 +718,9 @@ helpers.describe("prediction_engine — configuration setters", function()
 		helpers.assert_eq(type(values.min_value), "number")
 		helpers.assert_eq(values.numeric_found, true)
 		helpers.assert_eq(values.numeric_max, 12)
+		helpers.assert_true(values.string_refused, "a string is refused at the engine boundary")
+		helpers.assert_true(values.admitted, "a declared whole number is admitted")
+		helpers.assert_true(values.beyond_refused, "a value past the declared maximum is refused")
 		helpers.assert_eq(writes, {},
 			"SettingsManager is the sole native plist publisher for min/max words")
 	end)
@@ -920,7 +928,7 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 
 	helpers.it("app-profile: the profile mapped to the focused application is the one the backend runs", function()
 		local core = package.loaded["modules.llm"]
-		local Overrides = require("llm.app_profile_overrides")
+		local Overrides = require("ai.engine.policy.app_profile_overrides")
 		local previous_fetch, previous_find = core.fetch_llm_prediction, core.find_profile
 		local sent
 		core.find_profile = function(id) return id == "formal" and { id = "formal", label = "Formal" } or nil end
@@ -957,7 +965,7 @@ helpers.describe("prediction_engine — perform_check dispatch", function()
 
 	helpers.it("(no-model-runtime) ready MLX cannot render, fetch, or warm without an active model", function()
 		local core = package.loaded["modules.llm"]
-		local tooltip = package.loaded["ui.tooltip"]
+		local tooltip = package.loaded["core.ui.ui.tooltip"]
 		local warmup = package.loaded["modules.llm.warmup_controller"]
 		local previous_model = core.get_current_model
 		local previous_backend = core.get_backend
@@ -1012,7 +1020,7 @@ helpers.describe("prediction_engine — reset stays off the input I/O path", fun
 		local core = package.loaded["modules.llm"]
 		local streaming = package.loaded["modules.llm.streaming_handler"]
 		local keystats = package.loaded["modules.keystats"]
-		local scheduler = require("adapters.timer_scheduler")
+		local scheduler = require("core.events.timer_scheduler")
 		local previous_fetch = core.fetch_llm_prediction
 		local previous_build = streaming.build_callbacks
 		local previous_log = keystats.log_llm_dismissed
@@ -1123,7 +1131,7 @@ helpers.describe("prediction_engine: turning the AI preview off tears the state 
 
 	helpers.it("hides forcibly rather than with the soft hide the dismiss contract forbids", function()
 		local calls = {}
-		local tt = package.loaded["ui.tooltip"]
+		local tt = package.loaded["core.ui.ui.tooltip"]
 		local old_hide, old_forced = tt.hide, tt.hide_forced
 		tt.hide        = function() calls[#calls + 1] = "hide"; return true end
 		tt.hide_forced = function() calls[#calls + 1] = "hide_forced"; return true end
@@ -1171,12 +1179,12 @@ end)
 --- @param body function Assertions receiving the actual action and snapshots.
 local function with_backend_label_composition(target, refuse_menu, body)
 	local names = {
-		"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
+		"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
 		"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 		"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 		"ui.menu.menu_llm.mlx_repair_offer", "modules.llm.mlx_bootstrap_diagnosis",
-		"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
-		"infra.deferred_work", "modules.llm.backend_detector",
+		"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
+		"core.timing.engine.deferred_work", "modules.llm.backend_detector",
 	}
 	helpers.with_fresh_modules(names, function()
 		local previous_label = read_upvalue(PE.set_llm_backend_name, "llm_backend_label")
@@ -1193,10 +1201,10 @@ local function with_backend_label_composition(target, refuse_menu, body)
 				set_backend = function(value) record.runtime = value; return true end,
 				load_api_entries = accepted,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, message) record.errors[#record.errors + 1] = message end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
 			local checker = require("tests.support.runtime_checker_stub")({
 				check_and_install_deps = function() record.installs = record.installs + 1; return true end,

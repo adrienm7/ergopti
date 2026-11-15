@@ -666,16 +666,17 @@ _KCCE_ChordDelayCannotWrapBody(World, Ports) {
  Reloads := 0, Reload := () => (Reloads += 1, true)
  try {
   Before := FSReadUtf8Exact(Path)
-  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon"] {
+  ; Whole milliseconds from 1 to 1000 (the shared value schema); 3.5 is refused.
+  for Raw in ["18446744073709551619", "00018446744073709551619", "9223372036854775808", "0", "", "soon", "3.5", "1001"] {
    AssertFalse(KeyCombinationChordCommitDelay(Raw, Path, Reload), "The complete user magnitude must be refused before any config write")
    AssertEqual(Before, FSReadUtf8Exact(Path), "A rejected delay cannot change even private source bytes")
    AssertEqual(0, Reloads, "A rejected delay cannot reload")
   }
   AssertTrue(KeyCombinationChordCommitDelay("3", Path, Reload))
   AssertEqual(1, Reloads)
-  AssertTrue(KeyCombinationChordCommitDelay("3.5", Path, Reload), "The existing positive fractional grammar must stay accepted")
+  AssertTrue(KeyCombinationChordCommitDelay(" 1000 ", Path, Reload), "the declared maximum is accepted")
   AssertEqual(2, Reloads)
-  AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 3.5")
+  AssertContains(FSReadUtf8Exact(Path), "simultaneous_threshold_ms = 1000")
  } finally FileDelete(Path)
 }
 Test("Key combination chord delay rejects overflowing decimal aliases (chord-delay-numeric-domain)", _KCCE_ChordDelayCannotWrap)

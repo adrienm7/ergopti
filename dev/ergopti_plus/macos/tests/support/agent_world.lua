@@ -13,9 +13,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
 local M = {}
@@ -37,7 +37,7 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-M.CONFIG = read_json("modules/llm/agent.json")
+M.CONFIG = read_json("ai/data/agent.json")
 
 --- Returns one named closure upvalue.
 --- @param fn function Closure to inspect.
@@ -77,8 +77,7 @@ function M.build_world(options)
 		gets = {}, alerts = {}, alert_answer = nil, notifications = {}, installs = {}, logs = {},
 	}
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -92,7 +91,7 @@ function M.build_world(options)
 			world.logs[#world.logs + 1] = { level = level, text = ok and text or tostring(message) }
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local hs_stub = _G.hs
 	local front_app = {
@@ -112,14 +111,14 @@ function M.build_world(options)
 	}) do
 		package.loaded[name] = nil
 	end
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_info"] = {
 		focused_identity = function() return "7:101" end,
 		getFocused = function()
 			return { appId = "Notes", windowTitle = "Réunion devis", bundleId = "com.apple.Notes", executablePath = "" }
 		end,
 		getAll = function() return {} end,
 	}
-	package.loaded["adapters.system_info"] = { time_zone = function() return "Europe/Paris" end }
+	package.loaded["platform.system.info"] = { time_zone = function() return "Europe/Paris" end }
 	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keystats"] = {
@@ -134,7 +133,7 @@ function M.build_world(options)
 			return true
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function(title, message, default, ok_label, cancel_label)
 			world.dialogs[#world.dialogs + 1] = { title = title, message = message, default = default,
 				ok = ok_label, cancel = cancel_label }
@@ -147,7 +146,7 @@ function M.build_world(options)
 			return world.alert_answer == "first" and first or second
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind, on_click)
 			world.notifications[#world.notifications + 1] = { title = title, body = body, kind = kind,
 				on_click = on_click }
@@ -169,7 +168,7 @@ function M.build_world(options)
 			return true
 		end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -193,8 +192,8 @@ function M.build_world(options)
 	}
 	-- The harness's i18n stub echoes keys: the labels and notices are read from
 	-- the real French catalogue instead, so their arguments are compared too
-	local i18n = require("infra.i18n")
-	local Locale = require("infra.locale")
+	local i18n = require("core.i18n.engine.i18n")
+	local Locale = require("core.i18n.engine.locale")
 	Locale.set_locale("fr")
 	i18n.get_locale = function() return "fr" end
 	i18n.get = function(key)

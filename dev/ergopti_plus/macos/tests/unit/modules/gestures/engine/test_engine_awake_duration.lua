@@ -13,13 +13,13 @@ local helpers = require("tests.helpers")
 local OWNED_MODULES = {
 	"modules.gestures.engine",
 	"modules.gestures.geometry",
-	"adapters.timer_scheduler",
-	"infra.logger",
-	"infra.timings",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"adapters.accessibility_permission",
 	"adapters.mouse_control",
-	"error_description",
-	"number_policy",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 }
 
 
@@ -60,7 +60,7 @@ local function with_engine_scope(callback)
 				end,
 			},
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- Canonical gestures timings, in seconds, from the shared timing registry.
 		local seconds = {
 			tap_max_ms = 0.7,
@@ -73,7 +73,8 @@ local function with_engine_scope(callback)
 			pair_join_confirm_ms = 0.02,
 			scroll_momentum_guard_ms = 0.2,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
+			count = require("tests.support.registry_count"),
 			sec = function(group, key)
 				assert(group == "gestures" and seconds[key] ~= nil, "unexpected engine timing")
 				return seconds[key]
@@ -82,7 +83,7 @@ local function with_engine_scope(callback)
 		package.loaded["adapters.accessibility_permission"] = { is_trusted = function() return true end }
 		package.loaded["adapters.mouse_control"] = { any_button_down = function() return false end }
 		local Engine = require("modules.gestures.engine")
-		local Timer = require("adapters.timer_scheduler")
+		local Timer = require("core.events.timer_scheduler")
 		helpers.assert_eq(Engine.init({
 			enabled = true,
 			ga = { tap_2 = "mission_control", swipe_3_right = "word_next", swipe_3_left = "word_prev" },

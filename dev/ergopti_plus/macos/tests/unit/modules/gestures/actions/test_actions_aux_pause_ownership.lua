@@ -12,12 +12,12 @@ local helpers = require("tests.helpers")
 
 
 local function fresh_owner()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.gestures.actions_aux_owner",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
-		"infra.logger",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
+		"core.logger.engine.logger",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -132,7 +132,7 @@ local function fresh_owner()
 		if options.start_mode == "throw" then error("aux shell start exploded") end
 		return true, shell
 	end
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn_private = function(executable, arguments, terminal)
 			local accepted, handle = start_shell("program", { executable, arguments }, terminal)
 			handle.start = function() return accepted end
@@ -147,13 +147,13 @@ local function fresh_owner()
 	logger.error = function(_, format, ...)
 		fixture.errors[#fixture.errors + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.gestures.actions_aux_owner"] = nil
 	fixture.subject = require("modules.gestures.actions_aux_owner")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 

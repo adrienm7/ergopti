@@ -19,8 +19,8 @@ local helpers = require("tests.helpers")
 --- @return table context Captured native callbacks and side effects.
 local function load_healthcheck(scheduler, title_label)
 	for _, name in ipairs({
-		"ui.healthcheck.core", "ui.healthcheck.helpers", "healthcheck.snapshot",
-		"infra.logger", "infra.paths", "infra.i18n", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work",
+		"ui.healthcheck.core", "ui.healthcheck.helpers", "diagnostics.engine.healthcheck.snapshot",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.i18n.engine.i18n", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work",
 	}) do package.loaded[name] = nil end
 
 	package.loaded["tests.stubs.hs"] = nil
@@ -64,26 +64,26 @@ local function load_healthcheck(scheduler, title_label)
 
 	-- Focus tests control only their presentation schedule; retain close cleanup
 	-- separately, without synchronously invoking a native close continuation.
-	package.loaded["infra.deferred_work"] = { after = function(_, receive)
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, receive)
 		context.close_cleanup = context.close_cleanup or {}
 		context.close_cleanup[#context.close_cleanup + 1] = receive
 		return true
 	end }
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	local logger = helpers.make_logger_stub()
 	context.warnings = {}
 	logger.warn = function(_, message, ...)
 		context.warnings[#context.warnings + 1] = string.format(message, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["ui.healthcheck.helpers"] = {}
-	package.loaded["healthcheck.snapshot"] = {}
-	local compose_title = require("ui.ui_builder").window_title
-	package.loaded["infra.paths"] = { shared = function() return "/shared" end }
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["diagnostics.engine.healthcheck.snapshot"] = {}
+	local compose_title = require("core.ui.ui.builder").window_title
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "/shared" end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		return key == "menu.debug.healthcheck" and title_label or key
 	end }
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
@@ -110,17 +110,17 @@ end
 
 helpers.describe("healthcheck window focus ownership", function()
 	helpers.it("sends one localized product prefix to the native title owner in every locale", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local function read_json(relative)
 			local file = assert(io.open(helpers.shared(relative), "rb"))
 			local text = file:read("*a")
 			file:close()
 			return Json.decode(text)
 		end
-		local locales = read_json("data/locale_order.json").order
+		local locales = read_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			local label = read_json("data/locales/" .. locale .. ".json")["menu.debug.healthcheck"]
+			local label = read_json("core/i18n/data/locales/" .. locale .. ".json")["menu.debug.healthcheck"]
 			local healthcheck, context = load_healthcheck({ cancel = function() return true end }, label)
 			helpers.assert_true(healthcheck.show_window())
 			helpers.assert_eq(context.title, "ErgoptiPlus — " .. label, locale .. " native title")
@@ -132,7 +132,7 @@ helpers.describe("healthcheck window focus ownership", function()
 		local healthcheck, context = load_healthcheck({ cancel = function() return true end })
 		local view = hs.webview.new()
 		local presented = {}
-		package.loaded["ui.ui_builder"].force_focus = function(target, is_new, lifecycle)
+		package.loaded["core.ui.ui.builder"].force_focus = function(target, is_new, lifecycle)
 			presented[#presented + 1] = { target = target, is_new = is_new, lifecycle = lifecycle }
 			return true
 		end

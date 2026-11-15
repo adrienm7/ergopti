@@ -23,17 +23,17 @@ local function load_keymap_with_results(results)
 	}
 	local saved = {}
 	local stubs = {
-		["infra.text_utils"] = {},
+		["core.text.engine.utils"] = {},
 		["adapters.event_provenance"] = {},
-		["adapters.synthetic_input"] = {
+		["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return 0 end,
 		},
 		["modules.keymap.utils"] = {},
-		["adapters.text_sender"] = {},
+		["platform.input.text_sender"] = {},
 		["modules.llm.app_filter"] = {},
 		-- The real timing registry, read when the keymap loads, logs its path walk.
-		["infra.logger"] = helpers.make_logger_stub(),
-		["infra.keycodes"] = {},
+		["core.logger.engine.logger"] = helpers.make_logger_stub(),
+		["platform.input.keycodes"] = {},
 		["infra.manifest_reader"] = {
 			default_for = function() return true end,
 		},
@@ -61,8 +61,8 @@ local function load_keymap_with_results(results)
 			new = function() return {} end,
 		},
 		["modules.keymap.terminator_replay"] = {},
-		["keymap.terminators"] = {},
-		["infra.perf"] = {},
+		["layouts.engine.layers.terminators"] = {},
+		["core.logger.engine.perf"] = {},
 		["infra.hotpath_profiler"] = {},
 		["modules.diagnostics.hid_diagnostic_mailbox"] = {},
 	}

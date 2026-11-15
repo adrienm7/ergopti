@@ -19,14 +19,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Policy = require("llm.local_server_ports")
-local Timings = require("infra.timings")
+local Json = require("core.text.engine.json")
+local Policy = require("ai.engine.local_servers.ports_core")
+local Timings = require("core.timing.engine.timings")
 
 --- Builds the scan entries of the actual catalogue.
 --- @return table entries
 local function catalogue_entries()
-	local file = assert(io.open(helpers.shared("modules/llm/local_servers.json"), "rb"))
+	local file = assert(io.open(helpers.shared("ai/data/local_servers.json"), "rb"))
 	local root = assert(Json.decode(file:read("*a")))
 	file:close()
 	local entries = {}
@@ -40,9 +40,9 @@ end
 --- Runs a scenario over a fresh scanner with fake commands, files and timers.
 --- @param scenario function Receives (Scanner, world).
 local function with_scanner(scenario)
-	helpers.with_fresh_modules({ "modules.llm.local_server_ports", "adapters.timer_scheduler" }, function()
+	helpers.with_fresh_modules({ "modules.llm.local_server_ports", "core.events.timer_scheduler" }, function()
 		local world = { runs = {}, timers = {}, files = {}, terminated = 0, cancellations = {} }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				if world.raise_timer then error("controlled scheduler failure") end
 				local timer = { seconds = seconds, fn = fn }

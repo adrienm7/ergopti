@@ -60,9 +60,9 @@ end
 local function run_daemon(scratch)
 	local pid = uv.os_getpid()
 	append(scratch .. "/pids", tostring(pid))
-	local DaemonRestart = require("infra.daemon_restart")
+	local DaemonRestart = require("core.lifecycle.engine.reload.daemon_restart")
 	local session
-	session = assert(require("infra.driver_control").start({
+	session = assert(require("core.lifecycle.engine.driver_control").start({
 		pid = pid,
 		reload = function(reason)
 			local how, detail = DaemonRestart.restart({ reason = reason, args = {} })
@@ -180,7 +180,7 @@ local function alive(pid)
 	return status ~= nil and status:match("State:%s*(%u)") ~= "Z"
 end
 
-local session_path = scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/session.json"
+local session_path = scratch .. "/run/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/control/session.json"
 local function wait_generation(count)
 	for _ = 1, 400 do
 		local list = pids()
@@ -209,7 +209,7 @@ check((read("/proc/" .. first .. "/cgroup") or ""):find("/" .. UNIT, 1, true) ~=
 	"its /proc cgroup names the unit, as under systemd")
 
 local output, code = capture("sh " .. quote(tool) .. " " .. TOOL_TIMEOUT_SECONDS .. " 2>&1")
-local ok, result = pcall(require("json").decode, output:match("([^\n]*)\n?$") or "")
+local ok, result = pcall(require("core.text.engine.json").decode, output:match("([^\n]*)\n?$") or "")
 result = ok and type(result) == "table" and result or {}
 local second = wait_generation(2)
 check((read(scratch .. "/how") or ""):match("^systemd") ~= nil, "the restarter took the unit path, not the relay")

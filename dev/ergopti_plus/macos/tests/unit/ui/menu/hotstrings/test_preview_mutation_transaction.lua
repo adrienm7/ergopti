@@ -40,22 +40,22 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 		or (selected_key and "menu.hotstrings.tooltip_magic" or "menu.hotstrings.tooltip_colored")
 	local section = presence and "preview_presence_controls" or (selected_key and "preview_magic_control" or "preview_colored_control")
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config",
 		"ui.menu.preview_transaction", "ui.menu.preferences_transaction", "ui.menu.global_actions_transaction",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Preview = require("ui.menu.preview_transaction")
 		translate = translate or function(key) return key end
-		package.loaded["infra.i18n"] = { get = translate }
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		package.loaded["core.i18n.engine.i18n"] = { get = translate }
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
-				local decoded = require("adapters.json_codec").decode(raw)
+				local decoded = require("core.fs.adapters.json_codec").decode(raw)
 				if declaration_label and decoded[section] then
 					for _, item in ipairs(decoded[section]) do
 						if item.id == owned_key then item.i18n = declaration_label end
@@ -66,7 +66,7 @@ local function with_fixture(outcome, callback, translate, declaration_label, sel
 				end
 				return decoded
 			end, i18n = { get = translate, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return { delay = 0.1, has_override = false } end }
 		package.loaded["infra.manifest_menu"] = { command_row = renderer.command_row, check_row = renderer.check_row, native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, build = function(_, _, _, _, _, providers)
@@ -248,13 +248,13 @@ end)
 
 
 helpers.describe("declared coloured preview checkbox", function()
-	helpers.it("rechecks declared readiness on a retained row before entering the native owner", function()
+	-- A pause stops typing, not configuration (EDD-1).
+	helpers.it("commits a retained row while paused (edd1-paused-writes)", function()
 		with_fixture("ok", function(f)
 			f.set_context_paused(true)
-			helpers.assert_eq(f.action(), false)
-			helpers.assert_eq(f.calls.native, 0)
-			helpers.assert_eq(f.calls.writes, 0)
-			helpers.assert_eq(f.read(), SOURCE)
+			helpers.assert_eq(f.action(), true)
+			helpers.assert_eq(f.calls.native, 1)
+			helpers.assert_eq(f.calls.writes, 1)
 		end)
 	end)
 	helpers.it("takes its provider label from the declaration rather than the native label literal", function()
@@ -266,8 +266,8 @@ helpers.describe("declared coloured preview checkbox", function()
 		end, nil, "button.ok")
 	end)
 	helpers.it("keeps every existing locale, presence switch and separator in the real provider", function()
-		local Paths = require("infra.paths")
-		local Codec = require("adapters.json_codec")
+		local Paths = require("core.fs.engine.paths")
+		local Codec = require("core.fs.adapters.json_codec")
 		local function read_json(path)
 			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
 			return assert(Codec.decode(raw))
@@ -275,7 +275,7 @@ helpers.describe("declared coloured preview checkbox", function()
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_colored_control.json"))
 		local count = 0
 		for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			with_fixture("ok", function(f)
 				local function group(rows)
@@ -302,14 +302,13 @@ end)
 
 
 helpers.describe("declared magic preview checkbox", function()
-	helpers.it("refuses retained pause before entering the actual preview owner", function()
+	helpers.it("commits a retained row while paused (edd1-paused-writes)", function()
 		with_fixture("ok", function(f)
 			f.set_context_paused(true)
-			helpers.assert_eq(f.action(), false)
-			helpers.assert_eq(f.calls.native, 0)
-			helpers.assert_eq(f.calls.writes, 0)
-			helpers.assert_eq(f.state.preview_star_enabled, true)
-			helpers.assert_eq(f.read(), MAGIC_SOURCE)
+			helpers.assert_eq(f.action(), true)
+			helpers.assert_eq(f.calls.native, 1)
+			helpers.assert_eq(f.calls.writes, 1)
+			helpers.assert_eq(f.state.preview_star_enabled, false)
 		end, nil, nil, "preview_star_enabled")
 	end)
 	helpers.it("keeps the real global admission fence for the magic flag", function()
@@ -361,8 +360,8 @@ helpers.describe("magic preview shared label contract", function()
 		end, nil, "button.ok", "preview_star_enabled")
 	end)
 	helpers.it("uses every actual locale without changing the two other presence flags", function()
-		local Codec = require("adapters.json_codec")
-		local Paths = require("infra.paths")
+		local Codec = require("core.fs.adapters.json_codec")
+		local Paths = require("core.fs.engine.paths")
 		local function read_json(path)
 			local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
 			return assert(Codec.decode(raw))
@@ -370,7 +369,7 @@ helpers.describe("magic preview shared label contract", function()
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_magic_control.json"))
 		local observed = 0
 		for _, code in ipairs(corpus.locales) do
-			local catalog = read_json(Paths.shared("data/locales/" .. code .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. code .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			with_fixture("ok", function(f)
 				helpers.assert_eq(f.row.label, catalog[corpus.row.i18n])
@@ -388,16 +387,13 @@ end)
 
 helpers.describe("declared autocorrection and AI preview presence", function()
 	for _, key in ipairs({ "preview_autocorrect_enabled", "preview_ai_enabled" }) do
-		helpers.it("fences retained pause for " .. key .. " before native mutation", function()
+		helpers.it("commits " .. key .. " while paused (edd1-paused-writes)", function()
 			with_fixture("ok", function(f)
 				f.set_context_paused(true)
-				helpers.assert_eq(f.action(), false)
-				helpers.assert_eq(f.calls.native, 0)
-				helpers.assert_eq(f.calls.writes, 0)
-				helpers.assert_eq(f.calls.notices, 0)
-				helpers.assert_eq(f.calls.updates, 0)
-				helpers.assert_eq(f.state[key], true)
-				helpers.assert_eq(f.read(), PRESENCE_SOURCE)
+				helpers.assert_eq(f.action(), true)
+				helpers.assert_eq(f.calls.native, 1)
+				helpers.assert_eq(f.calls.writes, 1)
+				helpers.assert_eq(f.state[key], false)
 			end, nil, nil, key)
 		end)
 		for _, outcome in ipairs({ "native_false", "native_nil", "native_throw", "native_missing", "write_false", "write_throw" }) do
@@ -452,14 +448,14 @@ end)
 helpers.describe("ordered presence checkbox locale contract", function()
 	local function read_json(path)
 		local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
-		return assert(require("adapters.json_codec").decode(text))
+		return assert(require("core.fs.adapters.json_codec").decode(text))
 	end
 	helpers.it("uses both real labels and the actual declaration order in all twenty-one locales", function()
-		local Paths = require("infra.paths")
+		local Paths = require("core.fs.engine.paths")
 		local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
 		local observed = 0
 		for _, locale in ipairs(corpus.locales) do
-			local catalog = read_json(Paths.shared("data/locales/" .. locale .. ".json"))
+			local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"))
 			local function translate(key) return catalog[key] or key end
 			for _, reverse in ipairs({ false, true }) do
 				with_fixture("ok", function(f)

@@ -139,8 +139,8 @@ end)
 
 helpers.describe("onboarding commit() honours the retarget", function()
 	helpers.it("(onboarding-retarget-behavior) finish writes to the newly persisted resolver destination", function()
-		helpers.with_fresh_modules({ "infra.toml.writer", "adapters.file_system", "ui.menu.menu_paths",
-			"infra.notifications" }, function()
+		helpers.with_fresh_modules({ "core.text.engine.toml.writer", "core.fs.adapters.file_system", "ui.menu.menu_paths",
+			"core.ui.engine.notifications" }, function()
 			return require("tests.support.onboarding_finish_fixture").with_migration_reader(function()
 			local destination, persisted, writes, notified = OLD_CONFIG_PATH, 0, {}, 0
 			package.loaded["ui.menu.menu_paths"] = {
@@ -155,20 +155,20 @@ helpers.describe("onboarding commit() honours the retarget", function()
 					return destination
 				end,
 			}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return nil, "absent" end,
 			}
-			package.loaded["infra.toml.writer"] = {
+			package.loaded["core.text.engine.toml.writer"] = {
 				batch_write = function(path, updates)
 					helpers.assert_eq(persisted, 1, "the destination must be persisted before writing answers")
 					writes[#writes + 1] = { path = path, updates = updates }
 					return true
 				end,
 			}
-			package.loaded["infra.notifications"] = { notify = function() notified = notified + 1; return true end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() notified = notified + 1; return true end }
 			require("tests.support.dashboard_window_fixture")("ui.onboarding", function(onboarding, state)
 				require("tests.support.onboarding_shared_data").install()
-				package.loaded["infra.i18n"].persist_locale = function() return true end
+				package.loaded["core.i18n.engine.i18n"].persist_locale = function() return true end
 				helpers.assert_true(onboarding.run(OLD_CONFIG_PATH))
 				state.receiver({ body = { action = "finish", answers = {
 					locale = "en", config_dir = NEW_DIR,
@@ -216,9 +216,9 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 	local function fresh_menu_paths()
 		package.loaded["ui.menu.menu_paths"] = nil
 		package.loaded["infra.config_paths"] = nil
-		local saved_file_system = package.loaded["adapters.file_system"]
+		local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 		local bootstrap_content = nil
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function()
 				if bootstrap_content == nil then return nil, "absent" end
 				return bootstrap_content, "ok"
@@ -243,7 +243,7 @@ helpers.describe("menu_paths really retargets after persist_config_dir_for_wizar
 			},
 		})
 		local initialized = MP.init(make_real_base_dir(), function() end)
-		package.loaded["adapters.file_system"] = saved_file_system
+		package.loaded["core.fs.adapters.file_system"] = saved_file_system
 		helpers.assert_eq(initialized, true,
 			"the real menu_paths fixture must commit its bootstrap before retargeting")
 		return MP
@@ -286,15 +286,15 @@ helpers.describe("the controlled onboarding migration context retains no native 
 	local Context = require("tests.support.onboarding_finish_fixture")
 
 	helpers.it("uses the real registry and custom reader without admitting the virtual destination", function()
-		helpers.with_fresh_modules({ "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 			local reads, writes = 0, 0
 			local adapter = {
 				read_with_status = function() reads = reads + 1; return nil, "absent" end,
 				write_if_unchanged = function() writes = writes + 1; return true end,
 			}
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			Context.with_migration_reader(function()
-				local migration = require("config_migrate")
+				local migration = require("settings.engine.migration.migrate")
 				local registry = assert(migration.load_registry(helpers.shared(migration.REGISTRY_PATH)))
 				local options = { path = "/virtual/onboarding-context-absent.toml", driver = "hs",
 					file_adapter = adapter, registry = registry }
@@ -308,7 +308,7 @@ helpers.describe("the controlled onboarding migration context retains no native 
 				helpers.assert_eq(read_check(options.path, adapter), false, "no native read grant")
 				helpers.assert_eq(capture(options.path, { status = "absent" }, "x = true\n", "publish", adapter),
 					false, "no native write grant")
-				helpers.assert_eq(require("toml_codec.writer").batch_write(options.path,
+				helpers.assert_eq(require("core.text.engine.toml_codec.writer").batch_write(options.path,
 					{ { section = "metrics", key = "enabled", value = true } }, adapter), false)
 				helpers.assert_eq(writes, 0, "classification cannot reach a virtual publisher")
 			end)
@@ -316,16 +316,16 @@ helpers.describe("the controlled onboarding migration context retains no native 
 	end)
 
 	helpers.it("restores exact module entries and the real boot callback after success and throw", function()
-		helpers.with_fresh_modules({ "config_migrate", "toml_codec.writer" }, function()
+		helpers.with_fresh_modules({ "settings.engine.migration.migrate", "core.text.engine.toml_codec.writer" }, function()
 			for _, mode in ipairs({ "nil", "false", "existing" }) do
 				local saved_migration, saved_writer
 				if mode == "false" then saved_migration, saved_writer = false, false end
 				if mode == "existing" then saved_migration, saved_writer = {}, {} end
 				for _, throws in ipairs({ false, true }) do
-					package.loaded["config_migrate"], package.loaded["toml_codec.writer"] = saved_migration, saved_writer
+					package.loaded["settings.engine.migration.migrate"], package.loaded["core.text.engine.toml_codec.writer"] = saved_migration, saved_writer
 					local actual, overridden
 					local ok, result = pcall(Context.with_migration_reader, function()
-						actual = require("config_migrate")
+						actual = require("settings.engine.migration.migrate")
 						overridden = actual.boot
 						if throws then error("owned migration callback failed") end
 						return "accepted"
@@ -333,23 +333,23 @@ helpers.describe("the controlled onboarding migration context retains no native 
 					helpers.assert_eq(ok, not throws)
 					if throws then helpers.assert_true(result:find("owned migration callback failed", 1, true) ~= nil)
 					else helpers.assert_eq(result, "accepted") end
-					helpers.assert_true(rawequal(package.loaded["config_migrate"], saved_migration))
-					helpers.assert_true(rawequal(package.loaded["toml_codec.writer"], saved_writer))
+					helpers.assert_true(rawequal(package.loaded["settings.engine.migration.migrate"], saved_migration))
+					helpers.assert_true(rawequal(package.loaded["core.text.engine.toml_codec.writer"], saved_writer))
 					helpers.assert_true(actual.boot ~= overridden, "the retained genuine owner has its original boot callback")
-					helpers.assert_true(debug.getinfo(actual.boot, "S").source:find("/config_migrate.lua", 1, true) ~= nil)
+					helpers.assert_true(debug.getinfo(actual.boot, "S").source:find("/settings/engine/migration/migrate.lua", 1, true) ~= nil)
 				end
 			end
 		end)
 	end)
 
 	helpers.it("refuses a missing explicit reader and restores both prior constructors", function()
-		local prior_migration, prior_writer = package.loaded["config_migrate"], package.loaded["toml_codec.writer"]
+		local prior_migration, prior_writer = package.loaded["settings.engine.migration.migrate"], package.loaded["core.text.engine.toml_codec.writer"]
 		local ok, detail = pcall(Context.with_migration_reader, function()
-			return require("config_migrate").boot({ path = "/virtual/no-reader.toml", driver = "hs", file_adapter = {} })
+			return require("settings.engine.migration.migrate").boot({ path = "/virtual/no-reader.toml", driver = "hs", file_adapter = {} })
 		end)
 		helpers.assert_eq(ok, false)
 		helpers.assert_true(detail:find("the migration fixture needs its explicit reader", 1, true) ~= nil)
-		helpers.assert_true(rawequal(package.loaded["config_migrate"], prior_migration))
-		helpers.assert_true(rawequal(package.loaded["toml_codec.writer"], prior_writer))
+		helpers.assert_true(rawequal(package.loaded["settings.engine.migration.migrate"], prior_migration))
+		helpers.assert_true(rawequal(package.loaded["core.text.engine.toml_codec.writer"], prior_writer))
 	end)
 end)

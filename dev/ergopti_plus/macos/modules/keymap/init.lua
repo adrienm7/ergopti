@@ -18,21 +18,21 @@
 
 local hs         = hs
 local eventtap   = hs.eventtap
-local text_utils = require("infra.text_utils")
+local text_utils = require("core.text.engine.utils")
 local ComposedText = require("infra.composed_text")
 local LlmContext = require("modules.keymap.llm_context")
 local EventProvenance = require("adapters.event_provenance")
-local KeyboardGeometry = require("adapters.keyboard_geometry")
+local KeyboardGeometry = require("platform.input.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 local SelftestGate = require("modules.keymap.selftest_gate")
-local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TimerScheduler = require("core.events.timer_scheduler")
 local km_utils   = require("modules.keymap.utils")
-local Logger     = require("infra.logger")
-local Keycodes   = require("infra.keycodes")
+local Logger     = require("core.logger.engine.logger")
+local Keycodes   = require("platform.input.keycodes")
 local Manifest   = require("infra.manifest_reader")
 local HotstringCore = require("infra.hotstring_engine")
-local TextSender = require("adapters.text_sender")
+local TextSender = require("platform.input.text_sender")
 local AppFilter  = require("modules.llm.app_filter")
 
 local Registry   = require("modules.keymap.registry")
@@ -42,16 +42,16 @@ local CoreStateM = require("modules.keymap.state")
 local TerminatorReplay = require("modules.keymap.terminator_replay")
 local MagicKeySource = require("modules.keymap.magic_key_source")
 local LayoutEmulation = require("modules.keymap.layout_emulation")
-local Terminators = require("keymap.terminators")
-local Perf       = require("infra.perf")
+local Terminators = require("layouts.engine.layers.terminators")
+local Perf       = require("core.logger.engine.perf")
 local HotPath    = require("infra.hotpath_profiler")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
-local KeyEventHealth = require("infra.key_event_health")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
 local UnicodeCarrier = require("adapters.unicode_carrier")
-local EventClock = require("adapters.event_clock")
+local EventClock = require("core.events.clock")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local M   = {}
 local LOG = "keymap"
@@ -96,7 +96,7 @@ M.DELAY_KEY_TO_CATEGORY = {
 --- Canonical defaults exposed to menu modules (single source of truth).
 --- Menu modules MUST read from here instead of re-declaring their own values.
 --- The hotstring/preview values are sourced from the shared features manifest
---- (`_shared/modules/features/manifest.toml` -> `_generated/features_manifest.lua`) via
+--- (`_shared/settings/data/features/manifest.toml` -> `_generated/features_manifest.lua`) via
 --- `lib.manifest_reader`, so they stay in lock-step with the AHK driver (which
 --- builds its whole `Features` map from the same manifest). `default_for` fails
 --- fast if a path is missing, so a renamed feature never silently becomes nil.
@@ -105,7 +105,7 @@ M.DEFAULT_STATE = {
 	repeat_key_enabled          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_REPEAT_KEY_ENABLED),
 	expansion_delay             = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_EXPANSION_DELAY),
 	idle_reset_seconds          = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_IDLE_RESET_SECONDS),
-	cascade_max_arrows          = Manifest.default_for(require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
+	cascade_max_arrows          = Manifest.default_for(require("settings.engine.keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS),
 	click_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_CLICK_RESETS_WORD),
 	arrow_resets_word           = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_ARROW_RESETS_WORD),
 	shortcut_resets_word        = Manifest.default_for(ConfigKeys.KEY.HOTSTRINGS_SHORTCUT_RESETS_WORD),
@@ -144,13 +144,13 @@ local BUFFER_TRIM_BYTE_GATE = BUFFER_MAX_CHARS
 -- for them by this factor. Declared once for the three drivers in the shared
 -- timing registry ([hotstrings] complex_key_delay_multiplier, complex_key_carry_ms);
 -- the rule is the shared engine's complex_delay_multiplier.
-local COMPLEX_DELAY_MULT = require("infra.timings").ms("hotstrings", "complex_key_delay_multiplier")
+local COMPLEX_DELAY_MULT = require("core.timing.engine.timings").ms("hotstrings", "complex_key_delay_multiplier")
 
 -- How long after a complex keystroke the bonus multiplier still applies to
 -- the next keystroke — this covers the small lag between releasing Shift
 -- and pressing the next letter. Beyond this window the bonus is dropped so
 -- it cannot inadvertently stretch an expansion on an unrelated later key.
-local COMPLEX_CARRY_MS = require("infra.timings").ms("hotstrings", "complex_key_carry_ms")
+local COMPLEX_CARRY_MS = require("core.timing.engine.timings").ms("hotstrings", "complex_key_carry_ms")
 
 -- Central memory struct passed via reference to all sub-modules. The shape,
 -- invariants, and default seeding live in modules/keymap/state.lua; keeping
@@ -487,9 +487,20 @@ function M.on_base_delay_change(observer)
 end
 
 --- Sets the baseline inter-key delay threshold used for all unmapped groups.
---- @param secs number The new threshold in seconds (clamped to ≥ 0).
+--- A value its shared value schema declaration refuses (a string, a negative
+--- delay, past the maximum) fails fast with a log line: it was clamped to 0,
+--- which means « no time limit », without a word.
+--- @param secs number The new threshold in seconds.
+--- @return boolean applied
 function M.set_base_delay(secs)
-	local v = math.max(0, tonumber(secs) or M.DEFAULT_STATE.expansion_delay)
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY), secs)
+	if not checked.ok then
+		Logger.error(LOG, "Base delay '%s' refused (%s, %s..%s s).", tostring(secs), checked.reason,
+			tostring(checked.min), tostring(checked.max))
+		return false
+	end
+	local v = secs
 	if LLMBridge.invalidate_hotstring_preview() ~= true then
 		Logger.error(LOG, "Base-delay change refused because the active hotstring preview could not be revoked.")
 		return false
@@ -626,21 +637,76 @@ function M.set_tap_hold_resets_word(enabled)
 	return true
 end
 
+-- The modifiers that make shortcuts; Shift only types.
+local SHORTCUT_FLAGS = { "cmd", "ctrl", "alt" }
+
+--- The Cmd, Ctrl and Option flags of one event.
+--- @param flags table|nil Quartz modifier flags.
+--- @return table held Flag name → true.
+local function shortcut_flags_of(flags)
+	local held = {}
+	for _, flag in ipairs(SHORTCUT_FLAGS) do
+		if type(flags) == "table" and flags[flag] == true then held[flag] = true end
+	end
+	return held
+end
+
+--- Whether a tap-hold key's Ctrl, Cmd or Option hold is still down under these
+--- flags: one of them is beyond what the hand held at its marker. Once none is,
+--- the hold was released and the record is dropped, so the hand's own chords
+--- follow shortcut_resets_word again.
+--- @param flags table|nil Quartz modifier flags.
+--- @return boolean
+local function tap_hold_modifier_down(flags)
+	local hand = CoreState.tap_hold_modifier_hand
+	if hand == nil then return false end
+	for flag in pairs(shortcut_flags_of(flags)) do
+		if not hand[flag] then return true end
+	end
+	CoreState.tap_hold_modifier_hand = nil
+	return false
+end
+
+--- Follows a modifier edge for the tap-hold modifier record: the release of the
+--- hold's modifiers is the hold's end (Karabiner sends no marker for it).
+--- Runs inside the flagsChanged eventtap: in-memory work only.
+--- @param flags table|nil Quartz modifier flags after the edge.
+function M.observe_modifier_edge(flags)
+	tap_hold_modifier_down(flags)
+end
+
 --- Applies one Karabiner marker to the word state. A tap-hold command applies
 --- its option at once (its keys may be no shortcut at all) and lends it to the
 --- shortcut that carries it; the navigation layer lends it to every shortcut
---- struck while it is on. A Ctrl, Cmd or Option hold carries no marker (it
---- would lift the hand's modifiers), so its shortcuts follow shortcut_resets_word.
+--- struck while it is on. A Ctrl, Cmd or Option hold is led by the untagged
+--- context-menu key, whose flags are the hand's own modifiers: every shortcut
+--- carrying another one of them is the hold's until its modifiers go up.
 --- Runs inside the eventtap that claimed the marker: in-memory work only.
 --- @param signal string A control sentinel signal.
-function M.observe_tap_hold_signal(signal)
-	if signal == ControlSentinels.TAP_HOLD_COMMAND then
-		if CoreState.tap_hold_resets_word == true then
+--- @param flags table|nil The marker's modifier flags.
+function M.observe_tap_hold_signal(signal, flags)
+	if signal == ControlSentinels.TAP_HOLD_MODIFIER then
+		-- A second hold under the first: the hand holds at most what both saw.
+		local hand, previous = shortcut_flags_of(flags), CoreState.tap_hold_modifier_hand
+		if previous ~= nil then
+			for flag in pairs(hand) do
+				if not previous[flag] then hand[flag] = nil end
+			end
+		end
+		CoreState.tap_hold_modifier_hand = hand
+	elseif signal == ControlSentinels.TAP_HOLD_COMMAND then
+		local resets = CoreState.tap_hold_resets_word == true
+		if resets then
 			CoreState.buffer = ""
 			CoreState.start_is_word_boundary = true
 			CoreState.start_is_line_start = false
 		end
 		CoreState.tap_hold_command_pending = true
+		-- One line per marker, written after the eventtap returns, which the
+		-- field run counts: the tagged F20 reached Ergopti before its chord.
+		SyntheticInput.defer_after_callback("tap-hold marker log", function()
+			Logger.debug(LOG, "Tap-hold command marker received (word reset: %s).", resets and "yes" or "no")
+		end)
 	elseif signal == ControlSentinels.NAV_LAYER_ENTERED then
 		CoreState.nav_layer_active = true
 	elseif signal == ControlSentinels.NAV_LAYER_EXITED then
@@ -681,8 +747,9 @@ function M.arm_one_shot_shift()
 	local remap = package.loaded["platform.remap"]
 	assert(type(remap) == "table" and type(remap.get_sticky_timeout) == "function",
 		"one-shot Shift requires the initialized remap configuration")
+	-- The engine boundary: 0 is no time limit, anything else refused fails fast.
 	local timeout_ms = remap.get_sticky_timeout()
-	assert(type(timeout_ms) == "number" and timeout_ms > 0, "invalid one-shot Shift timeout")
+	assert(require("tap_hold.engine.one_shot_timeout").is_valid(timeout_ms), "invalid one-shot Shift timeout")
 	_one_shot_shift.arm(timeout_ms / 1000)
 	return true
 end
@@ -702,6 +769,8 @@ end
 function M.pause_processing()
 	_user_hotstring_lifecycle = {}
 	CoreState.processing_paused = true
+	-- A dead key pending in the emulation must not compose after the resume.
+	LayoutEmulation.drop_pending_dead_key()
 	discard_paused_text_context()
 	if pause_observed_context_reconcile() ~= true then
 		Logger.error(LOG, "Processing pause retained an exact context-reconcile timer.")
@@ -902,7 +971,7 @@ M.load_toml             = preview_fenced_registry_mutation(Registry.load_toml, t
 M.reload_toml           = preview_fenced_registry_mutation(Registry.reload_toml, true)
 M.replace_personal_source = preview_fenced_registry_mutation(Registry.replace_personal_source, true)
 -- Exposed so the hotstring editor can show the personal source default (the
--- single source kept in sync with _shared/modules/hotstrings/priority.json) instead of
+-- single source kept in sync with _shared/hotstrings/data/catalogue/priority.json) instead of
 -- hardcoding it in the UI.
 M.source_priority       = Registry.source_priority
 M.personal_file_scope_binding = Registry.personal_file_scope_binding
@@ -1123,11 +1192,22 @@ function M.capture_user_hotstring(rule)
 	local destination = km_utils.capture_text_destination()
 	if not destination or CoreState.buffer:sub(-#rule.suffix) ~= rule.suffix
 		or M.has_registered_magic_action(CoreState.buffer) then return nil end
-	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("config_keys").LEAF.USER_CODE },
+	if CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = require("settings.engine.keys").LEAF.USER_CODE },
 		_user_hotstring_elapsed, 1) ~= true then return nil end
 	return { lifecycle = _user_hotstring_lifecycle, input = _user_hotstring_input,
 		epoch = SyntheticInput.current_action_epoch(), buffer = CoreState.buffer,
 		destination = destination, magic = M.get_trigger_char() }
+end
+
+--- Whether a dynamic rule the magic key completes is within its expansion
+--- delay, as Windows (TimeActivationSeconds) and Linux (within_delay) gate the
+--- date hotstrings: the gap from the preceding physical key to the magic key,
+--- under the dynamic family's delay for the rule's section.
+--- @param section string The rule's section (date_fr, date, ...).
+--- @param elapsed number|nil Seconds since the preceding physical key; nil fails closed.
+--- @return boolean allowed
+function M.dynamic_rule_within_delay(section, elapsed)
+	return CoreState.mapping_delay_remaining({ group = "dynamichotstrings", section = section }, elapsed, 1) == true
 end
 
 --- Admits a deferred programmable action only for its original cursor context.
@@ -1292,7 +1372,7 @@ end
 
 -- ── Perf telemetry proxies ───────────────────────────────────────────────────
 -- Exposed on M so the Hammerspoon console can toggle sampling and read the
--- per-bucket p50/p99/max stats without having to `require("infra.perf")` by
+-- per-bucket p50/p99/max stats without having to `require("core.logger.engine.perf")` by
 -- hand. Sampling defaults to disabled so production typing pays no cost;
 -- `M.perf_enable(true)` arms it, `M.perf_report_all()` emits the summary.
 
@@ -1391,6 +1471,23 @@ local function run_trigger_checks()
 	-- matches) and the engine disagree, and the disagreement is what reaches the
 	-- screen.
 	local star_validated = Terminators.matches_magic_event(chars, CoreState.magic_key)
+	-- A letter magic key pressed with Shift completes an uppercase trigger, as on
+	-- Windows (HSE-004); it never repeats a letter, and when no mapping fires it
+	-- stays an ordinary typed capital.
+	local cased_magic = not star_validated and chars == Expander.cased_magic(CoreState.magic_key)
+	if cased_magic then
+		local before_magic = CoreState.buffer:sub(1, #CoreState.buffer - #chars)
+		local resolution = Expander.resolve_magic_action(before_magic, function(mapping)
+			if LLMBridge.owns_visible_magic_action(mapping, before_magic) then return true end
+			return mapping_fires(mapping)
+		end, chars)
+		for _, action in ipairs(resolution and resolution.attempts or {}) do
+			if action.kind ~= "autocorrect" and Expander.try_auto_expand(
+				action.mapping, text_utils.utf8_len(chars), false, before_magic .. chars) then
+				return true
+			end
+		end
+	end
 	if star_validated then
 		-- Ask the same prospective resolver the tooltip uses. It owns candidate
 		-- eligibility and cross-kind ordering, so pressing the advertised key cannot
@@ -1855,7 +1952,7 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- next to the ones that fall through to step 8 and read it anyway.
 	local chars = e:getCharacters(false)
 	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars,
-		start_is_word_boundary = CoreState.start_is_word_boundary }
+		start_is_word_boundary = CoreState.start_is_word_boundary, elapsed = dt }
 	local suppress_triggers = false
 	for idx, interceptor in ipairs(CoreState.interceptors) do
 		-- The already-fetched event fields are handed over as a third argument.
@@ -1902,10 +1999,12 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- Cmd+A outside a terminal and Cmd+L in a browser select the whole text of
 	-- the field: once a Backspace or a character replaces it the field is empty,
 	-- and a further Backspace deletes nothing (start_is_line_start).
-	-- A chord a tap-hold sent, or struck while the navigation layer is on,
-	-- follows hotstrings.tap_hold_resets_word instead, as on Windows and
-	-- Linux; Karabiner's markers say which (observe_tap_hold_signal).
+	-- A chord a tap-hold sent, struck under a tap-hold key's Ctrl, Cmd or
+	-- Option hold, or struck while the navigation layer is on, follows
+	-- hotstrings.tap_hold_resets_word instead, as on Windows and Linux;
+	-- Karabiner's markers say which (observe_tap_hold_signal).
 	local from_tap_hold = CoreState.tap_hold_command_pending == true or CoreState.nav_layer_active == true
+		or tap_hold_modifier_down(flags)
 	CoreState.tap_hold_command_pending = false
 	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
 		local resets = CoreState.shortcut_resets_word == true
@@ -2139,13 +2238,13 @@ end
 local AUTOREPEAT_PROPERTY = eventtap.event.properties.keyboardEventAutorepeat
 
 --- Feeds one physical key event to the session's pairing counters
---- (infra/key_event_health.lua) and to the held keys synthetic text avoids
+--- (core/logger/engine/key_event_health.lua) and to the held keys synthetic text avoids
 --- (adapters/unicode_carrier.lua). Never changes what the key does: every read
 --- is protected and both only write tables.
 --- @param e table Physical keyDown or keyUp event.
 --- @param phase string "down" or "up".
---- @param lateness_ms number|nil Callback lateness from adapters/event_clock.lua.
---- @param stamp integer|nil Raw event stamp from adapters/event_clock.lua.
+--- @param lateness_ms number|nil Callback lateness from core/events/clock.lua.
+--- @param stamp integer|nil Raw event stamp from core/events/clock.lua.
 --- @return any keycode The key code read, or nil when it could not be read.
 local function observe_key_health(e, phase, lateness_ms, stamp)
 	local ok_code, keycode = pcall(e.getKeyCode, e)
@@ -2376,6 +2475,17 @@ loopback_keyup_tap = eventtap.new({ eventtap.event.types.keyUp }, function(e)
 		local ok, keycode = true, observed_keycode
 		if keycode == nil then ok, keycode = pcall(e.getKeyCode, e) end
 		if ok and ControlSentinels.claim_key(keycode, false) then return true, fence_events end
+		-- The layout source emulation's held keys (custom modifiers, tap-holds) end
+		-- here, and a key-down it rewrote to another key releases that key.
+		if ok then
+			local settled, consumed = pcall(LayoutEmulation.key_up, e, keycode)
+			if not settled then
+				LayoutEmulation.reset()
+				SyntheticInput.defer_after_callback("layout emulation release failure", function()
+					Logger.error(LOG, "Layout emulation release failed: %s.", tostring(consumed))
+				end)
+			elseif consumed then return true, fence_events end
+		end
 		if ok and _one_shot_shift then
 			local settled, consumed = pcall(_one_shot_shift.key_up, e, keycode)
 			if not settled then
@@ -2442,11 +2552,14 @@ shift_tap = eventtap.new(
 			_shift_right_down = false
 			_shift_last_side = nil
 			update_shift_side()
+			-- An unread edge may be the hold's release: its shortcuts are no longer known.
+			CoreState.tap_hold_modifier_hand = nil
 			return false, fence_events
 		end
 		local ok, result = pcall(function()
 			local kc = e:getKeyCode()
 			local f  = e:getFlags()
+			M.observe_modifier_edge(f)
 			-- Its own pcall: a watch failure must never pass for a shift-side one.
 			if _tap_copy and CoreState.processing_paused ~= true and SyntheticInput.admission_open() then
 				local _, stamp = EventClock.lateness_ms(e)
@@ -2821,13 +2934,13 @@ end
 --- @return table watch modules/keymap/tap_copy.lua owner.
 local function build_tap_copy()
 	local TapCopy = require("modules.keymap.tap_copy")
-	local CopyCheck = require("tap_hold.copy_check")
+	local CopyCheck = require("tap_hold.engine.copy_check")
 	local Clipboard = require("adapters.clipboard")
 	local log_name = "keymap.tap_copy"
 	local function log(level, fmt, ...) Logger[level](log_name, fmt, ...) end
 	local function warn_user()
-		local ok, sent_or_err = pcall(require("infra.notifications").notify,
-			require("infra.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
+		local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
+			require("core.i18n.engine.i18n").get("notify.tap_hold.copy_failed"), nil, "warning")
 		if not ok or sent_or_err ~= true then
 			Logger.error(log_name, "Copy failure notice was not delivered: %s.", tostring(sent_or_err))
 		end
@@ -2835,7 +2948,7 @@ local function build_tap_copy()
 	local report = CopyCheck.reporter(log, warn_user)
 	local watch
 	local checker = CopyCheck.new({
-		verify_ms = require("infra.timings").ms("tap_hold", "copy_verify_ms"),
+		verify_ms = require("core.timing.engine.timings").ms("tap_hold", "copy_verify_ms"),
 		read_counter = function() return (Clipboard._change_count()) end,
 		send_copy = function() return SyntheticInput.emit_key_stroke({ "cmd" }, "c", 0) == true end,
 		after = function(delay_ms, callback)

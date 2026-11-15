@@ -31,7 +31,7 @@ local function fixture()
 		control.builders[#control.builders + 1] = builder
 		return true
 	end
-	package.loaded["infra.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
+	package.loaded["core.logger.engine.logger"].error = function(_, message) control.errors[#control.errors + 1] = message end
 	local source_path = os.tmpname()
 	assert(os.remove(source_path))
 	local _, source_status = require("infra.preferences").load(source_path)
@@ -64,7 +64,7 @@ local function fixture()
 		f.dispatch(event)
 	end
 	function control.tick()
-		local delay = require("infra.timings").sec("keystats", "maintenance_interval_ms")
+		local delay = require("core.timing.engine.timings").sec("keystats", "maintenance_interval_ms")
 		for _, timer in ipairs(f.hs.timer.__timers) do
 			if timer.running and timer.delay == delay then timer:fire() end
 		end
@@ -291,7 +291,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(select(2, prefs.load(path)), "ok")
 		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
 		c.key("fragment")
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		local read = files.read_with_status
 		files.read_with_status = function(name, ...)
 			if name ~= path then return read(name, ...) end
@@ -305,7 +305,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_eq(saved, {})
 		helpers.assert_eq(cipher.roi_text_enabled(), false)
 		local open = io.open
-		local rows = require("toml_codec.leaf_rows")
+		local rows = require("core.text.engine.toml_codec.leaf_rows")
 		local decode = rows.decode_source
 		io.open = function() error("input cannot read preferences") end
 		rows.decode_source = function() error("input cannot decode preferences") end
@@ -373,7 +373,7 @@ helpers.describe("macOS trigger ROI admission", function()
 		helpers.assert_true(f.keystats.set_options({ encrypt = false }))
 		local before = prefs.source_snapshot(path)
 		c.key("fragment")
-		local writer = require("toml_codec.writer")
+		local writer = require("core.text.engine.toml_codec.writer")
 		local previous = writer.batch_write
 		writer.batch_write = function()
 			local called, reason = pcall(prefs.load, path)

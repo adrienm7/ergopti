@@ -19,8 +19,8 @@
 --- no gate between them, and the drift such a list produces is silent in the
 --- worst direction: a field that stops being classified as a secret does not
 --- error, it starts being shown. So the answer lives in
---- _shared/modules/personal_info/fields.toml, and section 1 replays the shared
---- corpus at _shared/modules/personal_info/preview_vectors.toml unmodified — the
+--- _shared/hotstrings/data/personal_info/fields.toml, and section 1 replays the shared
+--- corpus at _shared/hotstrings/data/personal_info/preview_vectors.toml unmodified — the
 --- same file Linux and Windows are held to, so "identical on all three drivers"
 --- is measured rather than intended.
 ---
@@ -98,14 +98,14 @@ helpers.describe("preview masking: the shared cross-driver vectors", function()
 	-- same way in CI as on a dev checkout, and so the cached declaration is this
 	-- test's, not one an earlier file happened to warm.
 	local Fields = helpers.load_with_stubs("infra.personal_info_fields")
-	local Paths  = require("infra.paths")
-	local Codec  = require("infra.toml.codec")
+	local Paths  = require("core.fs.engine.paths")
+	local Codec  = require("core.text.engine.toml.codec")
 	Fields._reset()
 
 	--- Reads the vector file through the same resolver the driver uses.
 	--- @return table Array of { field, input, preview, why }.
 	local function load_vectors()
-		local path = Paths.shared("modules/personal_info/preview_vectors.toml")
+		local path = Paths.shared("hotstrings/data/personal_info/preview_vectors.toml")
 		helpers.assert_not_nil(path, "the shared tree must resolve or this asserts nothing")
 		local handle = io.open(path, "r")
 		helpers.assert_not_nil(handle, "preview_vectors.toml must be readable: " .. tostring(path))
@@ -172,7 +172,7 @@ end)
 helpers.describe("preview masking: what happens when it cannot decide", function()
 
 	local Fields = helpers.load_with_stubs("infra.personal_info_fields")
-	local Mask   = require("personal_info.mask")
+	local Mask   = require("hotstrings.engine.personal_info.mask")
 	Fields._reset()
 
 	helpers.it("masks everything when the policy is unusable", function()
@@ -247,7 +247,7 @@ local PREVIEW_OWNERSHIP = {
 	"modules.llm.prediction_engine",
 	"modules.llm.warmup_controller",
 	"modules.llm.streaming_handler",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 local function capture_rows(register, buf)
@@ -272,7 +272,7 @@ local function capture_rows(register, buf)
 
 		-- The REAL tooltip with exactly one method neutralised (trap 3). Patched
 		-- rather than replaced: a hand-written stub has to guess the whole surface.
-		local tooltip = require("ui.tooltip")
+		local tooltip = require("core.ui.ui.tooltip")
 		local real_show_stacked = tooltip.show_stacked
 		local captured = nil
 		tooltip.show_stacked = function(rows) captured = rows; return true end
@@ -415,6 +415,7 @@ helpers.describe("preview masking: display only", function()
 			register_lua_group        = function() end,
 			set_post_load_hook        = function() end,
 			register_interceptor      = function() end,
+			dynamic_rule_within_delay      = function() return true end,
 			register_preview_provider = function() end,
 			registry_transaction      = function(_, mutation) return mutation() == true end,
 		}
@@ -499,6 +500,7 @@ helpers.describe("preview masking: the @-tag provider", function()
 			add                       = function() end,
 			register_preview_provider = function(fn) provider = fn end,
 			register_interceptor      = function(fn) interceptor = fn end,
+			dynamic_rule_within_delay      = function() return true end,
 			inject_dynamic            = function(deletes, text)
 				rec.injects[#rec.injects + 1] = { deletes = deletes, text = text }
 				return true

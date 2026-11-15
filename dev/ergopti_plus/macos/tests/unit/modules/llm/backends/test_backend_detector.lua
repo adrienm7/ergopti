@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 local function fresh_detector(options)
 	options = options or {}
 	package.loaded["modules.llm.backend_detector"] = nil
-	package.loaded["infra.logger"] = options.logger
-	package.loaded["adapters.storage"] = options.storage
+	package.loaded["core.logger.engine.logger"] = options.logger
+	package.loaded["core.fs.adapters.storage"] = options.storage
 	package.loaded["hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
 	hs_stub.__reset()
@@ -27,7 +27,7 @@ helpers.describe("backend_detector.auto_default", function()
 		local ok, err = pcall(function()
 			local det
 			hs_stub, det = fresh_detector()
-			package.loaded["adapters.system_info"] = nil
+			package.loaded["platform.system.info"] = nil
 			hs_stub.processInfo = { processID = 7001, arch = "x86_64" }
 			package.loaded["modules.llm.backend_detector"] = nil
 			det = require("modules.llm.backend_detector")
@@ -40,7 +40,7 @@ helpers.describe("backend_detector.auto_default", function()
 			end
 		end)
 		hs_stub.processInfo = { processID = 7001 }
-		package.loaded["adapters.system_info"] = nil
+		package.loaded["platform.system.info"] = nil
 		package.loaded["modules.llm.backend_detector"] = nil
 		if not ok then error(err, 0) end
 	end)

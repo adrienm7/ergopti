@@ -11,10 +11,10 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"hs", "infra.logger", "infra.paths", "infra.manifest_reader",
-	"adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
-	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
-	"adapters.keyboard_geometry", "shortcuts.magic_editor",
+	"hs", "core.logger.engine.logger", "core.fs.engine.paths", "infra.manifest_reader",
+	"core.fs.adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
+	"platform.input.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
+	"platform.input.keyboard_geometry", "shortcuts.engine.magic_editor_core",
 }
 
 local function with_fixture(callback)
@@ -22,13 +22,13 @@ local function with_fixture(callback)
 		local native = dofile("tests/stubs/hs.lua")
 		native.keycodes.map = { a = 0, c = 8, b = 11, j = 38 }
 		_G.hs, package.loaded.hs = native, native
-		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = { shared = function() return "physical-registry.json" end }
+		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "physical-registry.json" end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return "open_hotstrings_editor" end,
 		}
-		package.loaded["adapters.file_system"] = { read = function()
+		package.loaded["core.fs.adapters.file_system"] = { read = function()
 			return '{"keys":{"KeyA":{"kind":"key","hs":0},"KeyC":{"kind":"key","hs":8},"KeyB":{"kind":"key","hs":11},"KeyJ":{"kind":"key","hs":38},"Backquote":{"kind":"key","hs":50,"macos_iso":{"hs":10}},"IntlBackslash":{"kind":"key","hs":10,"macos_iso":{"hs":50}}}}'
 		end }
 		local state = {
@@ -63,12 +63,12 @@ local function with_fixture(callback)
 				return retained.operation
 			end,
 		}
-		local policy = require("shortcuts.magic_editor")
-		package.loaded["shortcuts.magic_editor"] = setmetatable({ resolve = function(options)
+		local policy = require("shortcuts.engine.magic_editor_core")
+		package.loaded["shortcuts.engine.magic_editor_core"] = setmetatable({ resolve = function(options)
 			state.projections[#state.projections + 1] = options
 			return policy.resolve(options)
 		end }, { __index = policy })
-		local registrar = require("adapters.hotkey_registrar")
+		local registrar = require("platform.input.hotkey_registrar")
 		local subject = require("modules.shortcuts.magic_editor")
 		local spec = {
 			configuration_generation = 1,

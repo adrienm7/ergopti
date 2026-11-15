@@ -31,11 +31,11 @@
 --- the grab. Exit 0 = both verified; 1 = a failure; 2 = no environment.
 --- ==============================================================================
 
-local EvdevCodes = require("infra.evdev_codes")
-local EvdevReader = require("adapters.evdev_reader")
+local EvdevCodes = require("platform.input.evdev_codes")
+local EvdevReader = require("platform.input.evdev_reader")
 
 local TEST_KEYBOARD = "Ergopti E2E Keyboard"
-local DAEMON_OUTPUT = require("infra.device_names").VIRTUAL_KEYBOARD
+local DAEMON_OUTPUT = require("platform.input.device_names").VIRTUAL_KEYBOARD
 
 -- US evdev codes of the keys this harness types and decodes (Xvfb's default
 -- keymap is US, so the decode below is exact rather than assumed).
@@ -45,7 +45,7 @@ local LETTERS = {
 	[36] = "j", [37] = "k", [38] = "l", [44] = "z", [45] = "x", [46] = "c", [47] = "v", [48] = "b",
 	[49] = "n", [50] = "m", [53] = "/",
 }
-local KEY_OF = { [" "] = 57 }
+local KEY_OF = { [" "] = 57, ["\n"] = 28 }
 for code, char in pairs(LETTERS) do KEY_OF[char] = code end
 local KEY_LEFTALT, KEY_1 = 56, 2
 local KEY_CAPSLOCK, KEY_LEFTSHIFT, KEY_LEFTCTRL, KEY_ENTER, KEY_LEFT = 58, 42, 29, 28, 105
@@ -58,7 +58,7 @@ local LLM_REWRITE_REPLY = os.getenv("ERGOPTI_LIVE_LLM_REWRITE_REPLY")
 local KEY_LEFTMETA, KEY_SPACE = 125, 57
 local LLM_KEY = "live-test-key"
 
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 -- Once the daemon's output is open, every wait of this harness also reads it:
 -- the kernel keeps about 32 keystrokes for a reader, and an expansion typed
@@ -155,7 +155,7 @@ local log = home .. "/daemon.log"
 
 -- Select the probe's input features through the real owners in its private HOME.
 local interpreter = arg and arg[-1] or "luajit"
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local prepare = string.format("HOME=%s XDG_CONFIG_HOME=%s XDG_DATA_HOME=%s %s -e %s",
 	Shell.quote(home), Shell.quote(home .. "/.config"), Shell.quote(home .. "/.local/share"),
 	Shell.quote(interpreter), Shell.quote('require("tests.support.live_preferences").daemon()'))
@@ -164,7 +164,7 @@ assert(Shell.run(prepare), "the live daemon configuration must be prepared befor
 -- The AI configured as a user would leave it after "Add an API": enabled, the
 -- API backend selected, one entry in the private keys file.
 if LLM_PORT then
-	local config_dir = home .. "/.config/" .. require("app_dirs").linux.folder_name
+	local config_dir = home .. "/.config/" .. require("core.fs.engine.app_dirs").linux.folder_name
 	os.execute("mkdir -p '" .. config_dir .. "'")
 	local keys = io.open(config_dir .. "/api_keys.json", "w")
 	keys:write(string.format('{"version":1,"active_id":"live","entries":[{"id":"live","provider":"openai_compat",'
@@ -248,6 +248,28 @@ if not ready then
 	os.exit(1)
 end
 print("  ok   the daemon reported itself ready")
+-- The plaintext API key's move runs in the background against a secret-tool
+-- that blocks (run_daemon_live.sh): readiness never waited on it.
+local marker = os.getenv("ERGOPTI_LIVE_SECRET_TOOL_MARKER")
+if marker then
+	local moving = await(function()
+		local fh = io.open(log, "r")
+		if not fh then return nil end
+		local text = fh:read("*a")
+		fh:close()
+		local blocked = io.open(marker, "r")
+		if blocked then blocked:close() end
+		return (text:find("plaintext API key(s) to the desktop secret service in the background", 1, true)
+			and (blocked or text:find("the keyring is locked", 1, true))) and true or nil
+	end, 20)
+	if not moving then
+		dump_log()
+		stop_daemon()
+		print("  FAIL the background API key move did not run beside a ready daemon")
+		os.exit(1)
+	end
+	print("  ok   the daemon is ready while the API key move waits on a blocked secret service")
+end
 -- The secure-field probe settles after the first focus answer.
 sleep(1.5)
 
@@ -394,6 +416,28 @@ if got == " ADN " then
 	print("  ok   typing \" adn \" on the keyboard reached the desktop as \" ADN \"")
 else
 	failures[#failures + 1] = "expected \" ADN \""
+end
+
+-- Item 50, the cascade (_shared/tests/corpus/hotstrings/cascade_vectors.json,
+-- fb_space_three_arrows_keeps_the_space and fb_enter_keeps_the_end_character,
+-- at the shipped three arrows with Space and Enter not consumed): fb gives
+-- facebook, facebook gives Facebook, and the typed end character lands once
+-- after the final text, as one erase-and-type.
+type_text("fb ")
+local cascade, cascade_trail = read_output(3)
+print(string.format("  the desktop received %q for \"fb \"", cascade))
+if cascade == "Facebook " then
+	print("  ok   \"fb \" cascades to \"Facebook \" through the daemon (item 50)")
+else
+	failures[#failures + 1] = string.format("item 50: \"fb \" gave %q (%s)", cascade, cascade_trail)
+end
+type_text("fb\n")
+cascade, cascade_trail = read_output(3)
+print(string.format("  the desktop received %q for \"fb\" + Enter", cascade))
+if cascade == "Facebook<28>" then
+	print("  ok   \"fb\" + Enter cascades to \"Facebook\" then Enter (item 50)")
+else
+	failures[#failures + 1] = string.format("item 50: \"fb\" + Enter gave %q (%s)", cascade, cascade_trail)
 end
 
 
@@ -543,7 +587,7 @@ end
 -- sentence, so the TAIL is "bonjour <prediction> ok pr jd", not only the last
 -- words typed after it.
 if LLM_PORT and LLM_REWRITE_REPLY then
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	--- The user turn of the first rewrite request after `from`, if one arrived.
 	--- A typing trigger may have asked for a continuation meanwhile.
 	local function rewrite_turn(from)

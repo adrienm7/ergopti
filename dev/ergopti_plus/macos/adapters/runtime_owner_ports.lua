@@ -34,9 +34,9 @@
 
 local M = {}
 
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local FieldCheckPorts = require("adapters.field_check_ports")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 -- Seconds an observation may take before it is a failure rather than an answer.
 local COMMAND_TIMEOUT = 5
@@ -116,6 +116,9 @@ function M.fetch_artifact(callback)
 	end
 	fetcher = fetcher or require("platform.remap.runtime_artifact_fetch").new({
 		exec = FieldCheckPorts.exec,
+		network_command = function(curl_args)
+			return require("platform.remap.network_download").command("REMAP-RUNTIME", curl_args)
+		end,
 		exists = FileSystem.exists,
 		read = FileSystem.read,
 		write = function(path, content) return FileSystem.write(path, content) == true end,
@@ -144,10 +147,9 @@ end
 
 local runtime_installer
 
---- Installs the owned runtime through the signed launcher's install role, once
---- the user confirmed it (platform/remap/runtime_install.lua).
---- @param callback function fn(ok, reason|nil, detail|nil).
-function M.install_runtime(callback)
+--- The one owned runtime installer, created on first use.
+--- @return table installer { install, repair } (platform/remap/runtime_install.lua).
+local function installer()
 	runtime_installer = runtime_installer or require("platform.remap.runtime_install").new({
 		launcher = function() return require("platform.remap.lease_helper").resolve() end,
 		exec = FieldCheckPorts.exec,
@@ -156,11 +158,28 @@ function M.install_runtime(callback)
 			local Update = require("platform.remap.runtime_vhid_update")
 			local manifest = load_manifest()
 			if not manifest then return fetched(false, Update.REASON.UNPINNED, "the runtime manifest could not be read") end
-			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path })
+			vhid_updater = vhid_updater or Update.new({ exec = FieldCheckPorts.exec, expand = FileSystem.expand_path,
+				network_command = function(curl_args)
+					return require("platform.remap.network_download").command("VIRTUAL-HID", curl_args)
+				end })
 			vhid_updater.fetch(manifest.virtual_hid_device, fetched)
 		end,
 	})
-	runtime_installer.install(callback)
+	return runtime_installer
+end
+
+--- Installs the owned runtime through the signed launcher's install role, once
+--- the user confirmed it (platform/remap/runtime_install.lua).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.install_runtime(callback)
+	installer().install(callback)
+end
+
+--- Repairs the service of an already installed owned runtime through the
+--- signed launcher's repair role, once the user confirmed it (MRT-004).
+--- @param callback function fn(ok, reason|nil, detail|nil).
+function M.repair_runtime(callback)
+	installer().repair(callback)
 end
 
 --- The persisted record that Ergopti closed the user's own Karabiner.
@@ -178,8 +197,8 @@ end
 
 --- Tells the user that Ergopti closed their Karabiner and when it comes back.
 local function announce_closed()
-	local i18n = require("infra.i18n")
-	require("infra.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
+	local i18n = require("core.i18n.engine.i18n")
+	require("core.ui.engine.notifications").notify(i18n.get("notify.karabiner.user_closed"), nil, "info")
 end
 
 --- Builds the owner's state observer: the first block of a launch the user can
@@ -196,7 +215,7 @@ function M.block_notice(notify)
 	return function(state, reason)
 		if shown or (state ~= "unavailable" and state ~= "failed") or not blocks[reason] then return end
 		shown = true
-		notify(require("infra.i18n").get("notify.karabiner.owned_blocked"))
+		notify(require("core.i18n.engine.i18n").get("notify.karabiner.owned_blocked"))
 	end
 end
 
@@ -212,8 +231,8 @@ local function approval()
 			end)
 		end,
 		now = function() return hs.timer.absoluteTime() / 1e9 end,
-		after = function(seconds, fn) return require("adapters.timer_scheduler").after(seconds, fn) end,
-		cancel = function(handle) return require("adapters.timer_scheduler").cancel(handle) end,
+		after = function(seconds, fn) return require("core.events.timer_scheduler").after(seconds, fn) end,
+		cancel = function(handle) return require("core.events.timer_scheduler").cancel(handle) end,
 		open_settings = function(url) return hs.urlevent.openURL(url) end,
 		reload = function() hs.reload() end,
 		version = M.virtual_hid_extension_version,
@@ -233,14 +252,14 @@ function M.automatic_observer(notify)
 	local offered = false
 	-- A field run drives the install itself (infra/field_check_owned_activation.lua
 	-- install): a modal offer would hold the run, and the watch's reload would cut it.
-	local field_run = os.getenv(require("identifiers").field_report.environment) ~= nil
-		or require("infra.dev_source").is_active()
+	local field_run = os.getenv(require("core.text.engine.identifiers").field_report.environment) ~= nil
+		or require("core.lifecycle.engine.dev_source").is_active()
 	return function(state, reason)
 		if field_run then return notice(state, reason) end
 		if state == "unavailable" and not offered
 			and require("platform.remap").OWNED_INSTALL_REASONS[reason] == true then
 			offered = true
-			local committed = require("infra.deferred_work").after(0, function()
+			local committed = require("core.timing.engine.deferred_work").after(0, function()
 				require("ui.owned_runtime_install").open(require("platform.remap"))
 			end, "owned_runtime_install.offer")
 			if committed == true then return end
@@ -302,9 +321,9 @@ function M.new()
 			fetch = M.fetch_artifact,
 		},
 		capture = require("adapters.runtime_capture_port").new(),
-		timer = require("adapters.timer_scheduler"),
+		timer = require("core.events.timer_scheduler"),
 		observer = M.automatic_observer(function(text)
-			require("infra.notifications").notify(text, nil, "warning")
+			require("core.ui.engine.notifications").notify(text, nil, "warning")
 		end),
 	}
 end

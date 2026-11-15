@@ -19,9 +19,9 @@ local helpers = require("tests.helpers")
 local PortFakes = require("tests.support.port_fakes")
 
 local function load_fixture(cancel_result)
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local hs_stub = _G.hs
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local cancel_calls = 0
 	local core = {
 		DEFAULT_STATE = {
@@ -66,16 +66,15 @@ local function load_fixture(cancel_result)
 	package.loaded["modules.llm.prompt_builder"] = { build = function() return nil end }
 	package.loaded["modules.llm.streaming_handler"] = {
 		init = function() return true end,
-		stop_watchdog = function() return true end,
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip({
+	package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip({
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		mark_chain_complete = function() return true end,
@@ -304,7 +303,7 @@ helpers.describe("prediction_engine.reset() quiesces stream + deferred state", f
 	helpers.it("contains a debounce callback throw through the module logger", function()
 		local engine, _, hs_stub = load_fixture()
 		engine.set_llm_enabled(true)
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local original_error = logger.error
 		local messages = {}
 		logger.error = function(_, fmt, ...)

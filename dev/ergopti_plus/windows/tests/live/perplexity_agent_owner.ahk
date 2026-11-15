@@ -28,14 +28,14 @@ LoggerSuccess(*) => 0
 LoggerDebug(*) => 0
 t(Key) => Key
 
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\proxy_override.ahk
-#Include ..\..\adapters\http_client.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
+#Include ..\..\core\text\engine\json.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
+#Include ..\..\core\network\adapters\proxy_override.ahk
+#Include ..\..\core\network\adapters\http_client.ahk
 #Include ..\..\modules\llm\remote_formats.ahk
 
 _AgentOwnerMain(A_Args[1])

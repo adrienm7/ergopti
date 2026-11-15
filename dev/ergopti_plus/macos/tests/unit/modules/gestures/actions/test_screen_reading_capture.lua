@@ -20,13 +20,13 @@ local helpers = require("tests.helpers")
 local TEMP = "/tmp/lua_screen_reading"
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
-	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"core.fs.adapters.file_system",
+	"platform.system.screen_capture",
+	"core.process.adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 }
 
@@ -55,7 +55,7 @@ local function with_subject(scenario)
 	local saved_hs = _G.hs
 	local fixture = { tasks = {}, notifications = {}, removed = {}, infos = {}, file = nil }
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			fixture.file = ""
 			return TEMP
@@ -74,7 +74,7 @@ local function with_subject(scenario)
 			return true
 		end,
 	}
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,
@@ -84,20 +84,20 @@ local function with_subject(scenario)
 		encode_base64 = function(data) return "B64(" .. data .. ")" end,
 	}
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function(_, message, ...) fixture.infos[#fixture.infos + 1] = string.format(message, ...) end,
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, kind)
 			fixture.notifications[#fixture.notifications + 1] = { message = message, kind = kind }
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local record = { executable = executable, args = args }
 			fixture.tasks[#fixture.tasks + 1] = record
@@ -129,7 +129,7 @@ local function with_subject(scenario)
 	end, debug.traceback)
 	_G.hs = saved_hs
 	for _, name in ipairs(SUBJECT_MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

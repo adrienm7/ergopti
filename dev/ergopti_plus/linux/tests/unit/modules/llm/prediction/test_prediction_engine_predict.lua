@@ -23,12 +23,12 @@ local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function install_insecure_focus()
-	local previous = package.loaded["adapters.secure_field_detector"]
-	package.loaded["adapters.secure_field_detector"] = {
+	local previous = package.loaded["platform.focus.secure_field_detector"]
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 	}
-	return function() package.loaded["adapters.secure_field_detector"] = previous end
+	return function() package.loaded["platform.focus.secure_field_detector"] = previous end
 end
 
 
@@ -74,7 +74,7 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 
 	helpers.it("checks the secure field before loading request dependencies", function()
 		local names = {
-			"adapters.secure_field_detector",
+			"platform.focus.secure_field_detector",
 			"modules.llm.api_ollama",
 			"modules.llm.profiles",
 			"modules.llm.trigger_settings",
@@ -89,7 +89,7 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 
 		local detector_calls = 0
 		local request_dependency_loads = 0
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function()
 				detector_calls = detector_calls + 1
 				return true
@@ -189,7 +189,7 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
 
-		local logger    = require("logger.shim")
+		local logger    = require("core.logger.engine.shim")
 		local orig_warn = logger.warn
 		local warns     = {}
 		logger.warn = function(_t, fmt, ...)
@@ -221,7 +221,7 @@ end)
 helpers.describe("prediction_engine: durable logical-output callback", function()
 	helpers.it("withholds private text raised by the output observer", function()
 		local restore_focus = install_insecure_focus()
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local previous_warn, warnings = logger.warn, {}
 		local previous_ollama = package.loaded["modules.llm.api_ollama"]
 		local previous_profiles = package.loaded["modules.llm.profiles"]

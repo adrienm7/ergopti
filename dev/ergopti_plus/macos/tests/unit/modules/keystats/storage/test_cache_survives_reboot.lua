@@ -13,7 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local DEVICE_ID = "00000000-0000-4000-8000-0000000000b0"
 local HOST_SIGNATURE = "TEST-HOST-CACHE-REBOOT"
@@ -86,9 +86,9 @@ local function start(root, prepare, revision)
 			end
 		end,
 	}
-	package.loaded["infra.logger"] = nil
-	helpers.load_with_stubs("infra.logger")
-	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1 end,
+	package.loaded["core.logger.engine.logger"] = nil
+	helpers.load_with_stubs("core.logger.engine.logger")
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1 end,
 		count = function() return 4096 end }
 	package.loaded["modules.keystats.sqlite_writer"] = {
 		SYNCHRONOUS_PRAGMA = "PRAGMA synchronous = FULL;",
@@ -120,7 +120,7 @@ local function start(root, prepare, revision)
 	}
 	package.loaded["modules.keystats.export"] = { init = function() end, cleanup = function() return true end,
 		sync_foreign_data_sql = function() return {} end }
-	package.loaded["adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
+	package.loaded["core.fs.adapters.ledger_append"] = { recover = function() return true end, cleanup = function() return true end }
 	package.loaded["modules.keystats.rotation"] = {
 		init = function(options) seen.rotation_offset = options.today_log_offset end,
 		is_initialized = function() return seen.rotation_offset ~= nil end,

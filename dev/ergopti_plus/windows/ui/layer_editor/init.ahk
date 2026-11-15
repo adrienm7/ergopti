@@ -10,7 +10,7 @@
 ; text must load without an error on every OS
 ; (platform/remap/layers_loader.ahk), is published atomically, and the driver
 ; reloads so NavLayer_Init registers the edited layer. The macOS and Linux
-; hosts implement the same contract through _shared/lua/keymap/layer_editor.lua.
+; hosts implement the same contract through _shared/layouts/engine/layers/editor.lua.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The page offers only what exists on Windows; the host still refuses any
@@ -62,7 +62,7 @@ global LAYER_EDITOR_TAP_HOLD_KEY_CODES := Map(
 	"enter", "Enter", "backspace", "Backspace", "delete", "Delete"
 )
 
-; The OS calls a legend needs, all in adapters/key_state.ahk: the layout the
+; The OS calls a legend needs, all in platform/input/key_state.ahk: the layout the
 ; user types with now, a scan code's virtual key on it, and what that key types
 ; unshifted there, read without arming a dead key. The unit suite passes a fake.
 global _LayerEditorOsProbe := {

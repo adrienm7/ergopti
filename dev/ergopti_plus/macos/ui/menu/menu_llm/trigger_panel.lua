@@ -17,15 +17,15 @@ local M = {}
 
 local llm_mod      = require("modules.llm")
 local AppPickerLib = require("infra.app_picker")
-local i18n         = require("infra.i18n")
+local i18n         = require("core.i18n.engine.i18n")
 local ManifestMenu = require("infra.manifest_menu")
-local Logger       = require("infra.logger")
+local Logger       = require("core.logger.engine.logger")
 
-local PrivacyPolicy = require("llm.trigger_policy")
+local PrivacyPolicy = require("ai.engine.policy.trigger_policy")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local SettingsManager = require("ui.menu.menu_llm.settings_manager")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 local Manifest = require("infra.manifest_reader")
 
 local LOG = "menu_llm.trigger_panel"
@@ -203,9 +203,10 @@ function M.build(ctx)
 		items    = exclusion_menu,
 	}
 
+	-- A pause stops typing, not configuration (EDD-1): the rows commit while
+	-- paused and the engine reads them when typing resumes.
 	local function ready()
 		return state.llm_enabled == true and ctx.is_disabled ~= true
-			and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 	end
 	local shared_ctx = {
 		commands = {

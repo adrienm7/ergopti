@@ -2,8 +2,8 @@
 
 local helpers = require("tests.helpers")
 local MetricsState = require("infra.metrics_state_keys")
-local Codec = require("toml_codec")
-local FS = require("adapters.file_system")
+local Codec = require("core.text.engine.toml_codec")
+local FS = require("core.fs.adapters.file_system")
 local Manifest = require("infra.manifest_reader")
 
 local function clone(value)
@@ -27,7 +27,7 @@ local function fixture(demoted)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	local Preferences = helpers.load_with_stubs("infra.preferences")
 	package.loaded["ui.menu.metrics_scope"] = nil
 	Preferences.load("config")
@@ -167,7 +167,7 @@ helpers.describe("macOS complete Metrics scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FS
+package.loaded["core.fs.adapters.file_system"] = FS
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("Metrics scope provider", function()
@@ -189,9 +189,10 @@ helpers.describe("Metrics scope provider", function()
 			helpers.assert_eq(captured.commands.scope_restore(), true)
 			helpers.assert_eq(selected, "metrics")
 			helpers.assert_eq(mode, "recommended")
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			paused, mode = true, nil
-			helpers.assert_eq(captured.commands.scope_restore(), false)
-			helpers.assert_nil(mode, "a paused session runs no scope")
+			helpers.assert_eq(captured.commands.scope_restore(), true)
+			helpers.assert_eq(mode, "recommended", "a paused session still restores")
 		end, debug.traceback)
 		renderer.build = old
 		if not ok then error(err, 0) end

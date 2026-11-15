@@ -13,6 +13,8 @@ source "$SCRIPT_DIR/install/desktop_entry.sh"
 source "$SCRIPT_DIR/install/messages.sh"
 PREFIX="${HOME:+${HOME}/.local}"
 source "$SCRIPT_DIR/install/config_home.sh"
+# shellcheck source=install/ownership_schema.sh
+source "$SCRIPT_DIR/install/ownership_schema.sh"
 ergopti_resolve_config_home CONFIG_ROOT
 PACKAGE_NAME=ergopti
 CONFIRMED=false
@@ -54,7 +56,7 @@ while [ "$#" -gt 0 ]; do
 	esac
 done
 
-# The failure is shown in Ergopti's own dialog (ui/dialog_host.lua), run by the
+# The failure is shown in Ergopti's own dialog (core/ui/ui/dialog_host.lua), run by the
 # private runtime's LuaJIT when the package carries one, else the source
 # install's. The report runs after recovery, so the driver tree is back. When
 # the dialog cannot open the failure must still reach the user, so the last
@@ -62,8 +64,8 @@ done
 show_failure_dialog() {
 	local interpreter="$SCRIPT_DIR/runtime/bin/luajit"
 	[ -x "$interpreter" ] || interpreter="$(command -v luajit || true)"
-	if [ -n "$interpreter" ] && [ -f "$SCRIPT_DIR/ui/dialog_host.lua" ]; then
-		if "$interpreter" "$SCRIPT_DIR/ui/dialog_host.lua" --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
+	if [ -n "$interpreter" ] && [ -f "$SCRIPT_DIR/core/ui/ui/dialog_host.lua" ]; then
+		if "$interpreter" "$SCRIPT_DIR/core/ui/ui/dialog_host.lua" --error --no-markup --title="$GUI_TITLE" --text="$GUI_ERROR"; then
 			return 0
 		fi
 	fi
@@ -373,7 +375,7 @@ esac
 LIBRARY="$PREFIX/lib/ergopti"
 WRAPPER="$PREFIX/bin/ergopti-hotstrings"
 if [ -L "$LIBRARY" ] || [ -L "$WRAPPER" ] || [ ! -f "$LIBRARY/linux/ergopti_hotstrings.lua" ] \
-	|| [ ! -f "$LIBRARY/_shared/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
+	|| [ ! -f "$LIBRARY/_shared/core/i18n/data/locales/en.json" ] || [ ! -f "$WRAPPER" ]; then
 	ergopti_msg uninstall.incomplete_installation >&2
 	exit 1
 fi
@@ -514,8 +516,16 @@ fi
 if "$stopped_unit"; then
 	systemctl --user disable ergopti-hotstrings.service
 fi
+# The desktop focus integration lives in the XDG data folder, outside the
+# manifest; its helper removes only the folders it wrote. Run it while the
+# helper is still installed.
+bash "$LIBRARY/linux/install/compositor_focus.sh" remove || true
 UNINSTALL_REMOVAL_STARTED=true
 for owned in "${OWNED[@]}"; do rm -- "$owned"; done
+# The bytecode package is derived from the payload, never listed in the
+# receipt: removed whole, and only as the real directory the schema names.
+bytecode_tree="$LIBRARY/${OWNERSHIP_DERIVED_TREE:?}"
+if [ -d "$bytecode_tree" ] && [ ! -L "$bytecode_tree" ]; then rm -rf -- "$bytecode_tree"; fi
 rm -- "$MANIFEST"
 UNINSTALL_REMOVAL_COMMITTED=true
 finish_uninstall

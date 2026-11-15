@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 
 
@@ -36,7 +36,7 @@ local AppDirs = require("app_dirs")
 --- @param callback function Fixture body.
 local function with_fixture(module_names, hs_fixture, callback)
 	local saved_hs = _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(module_names, function()
 			_G.hs = hs_fixture
@@ -45,7 +45,7 @@ local function with_fixture(module_names, hs_fixture, callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 
@@ -54,9 +54,9 @@ end
 local function install_common_stubs()
 	local logger = helpers.make_logger_stub()
 	logger.today_log_path = function() return "/tmp/ergopti-hs007.log" end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = {get = function(key) return key end}
-	package.loaded["infra.notifications"] = {notify = function() end}
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+	package.loaded["core.ui.engine.notifications"] = {notify = function() end}
 	package.loaded["infra.config_paths"] = {
 		get = function(key)
 			helpers.assert_eq(key, "MlxActiveModelPath")
@@ -80,7 +80,7 @@ end
 --- @return table manager
 local function build_mlx_requirements_manager(task_records, start_records)
 	install_common_stubs()
-	package.loaded["infra.fs_dir"] = {entries = function() return {} end}
+	package.loaded["core.fs.engine.dir"] = {entries = function() return {} end}
 	package.loaded["modules.llm.api_mlx"] = {get_port = function() return 8080 end}
 	package.loaded["modules.llm.mlx_deps_checker"] = { import_probe = require("tests.support.modules.llm.mlx_import_probe").read }
 	package.loaded["ui.menu.menu_llm.models_manager_mlx_hf"] = {
@@ -105,7 +105,7 @@ local function build_mlx_requirements_manager(task_records, start_records)
 			end
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(label, _, on_done)
 			local task = {label = label, on_done = on_done}
 			task_records[#task_records + 1] = task
@@ -141,10 +141,10 @@ end
 helpers.describe("model manager generation fences", function()
 	helpers.it("(HS-007-backend-stale) delivers one stale handoff from a real MLX check", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
-			"adapters.task_lifecycle", "infra.dialog_util",
+			"core.process.adapters.task_lifecycle", "core.ui.engine.dialog_util",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_mlx_hf",
 			"ui.menu.menu_llm.models_manager_mlx_server",
@@ -169,7 +169,7 @@ helpers.describe("model manager generation fences", function()
 				set_llm_model_mlx = function() end,
 				set_llm_model_ollama = function() end,
 			}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return false end}
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
@@ -209,10 +209,10 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-a-b-order) prevents late A from reaching the server after B commits", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
 			"modules.llm.mlx_deps_checker", "modules.llm",
-			"adapters.task_lifecycle", "infra.dialog_util",
+			"core.process.adapters.task_lifecycle", "core.ui.engine.dialog_util",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_mlx_hf",
 			"ui.menu.menu_llm.models_manager_mlx_server",
@@ -237,7 +237,7 @@ helpers.describe("model manager generation fences", function()
 				set_llm_model_mlx = function() end,
 				set_llm_model_ollama = function() end,
 			}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return false end}
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
@@ -278,8 +278,8 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-dispatch-stale) deduplicates a stale handoff and false dispatch result", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.config_paths",
-			"modules.llm", "infra.dialog_util", "ui.menu.menu_llm.profile_label",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "infra.config_paths",
+			"modules.llm", "core.ui.engine.dialog_util", "ui.menu.menu_llm.profile_label",
 			"ui.menu.menu_llm.model_switcher",
 		}
 		with_fixture(modules, {}, function()
@@ -295,7 +295,7 @@ helpers.describe("model manager generation fences", function()
 				set_llm_model_mlx = function() end,
 				set_llm_model_ollama = function() end,
 			}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return false end}
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
@@ -332,11 +332,11 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-a-b-order) prevents late absent A from prompting or pulling after B commits", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.text.engine.utils",
 			"modules.llm", "modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.shell_runner", "adapters.task_lifecycle", "adapters.timer_scheduler",
-			"adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
-			"infra.dialog_util", "ui.download_window",
+			"core.process.adapters.shell_runner", "core.process.adapters.task_lifecycle", "core.events.timer_scheduler",
+			"core.network.adapters.http_client", "ui.menu.menu_llm.requirement_operation_registry",
+			"core.ui.engine.dialog_util", "ui.download_window",
 			"ui.menu.menu_llm.profile_label", "ui.menu.menu_llm.model_switcher",
 			"ui.menu.menu_llm.models_manager_ollama",
 		}
@@ -357,7 +357,7 @@ helpers.describe("model manager generation fences", function()
 		}
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}
@@ -367,7 +367,7 @@ helpers.describe("model manager generation fences", function()
 			package.loaded["ui.download_window"] = {
 				show = function() end, update = function() end, complete = function() end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(executable, args, on_done)
 					local task = {executable = executable, args = args, on_done = on_done}
 					function task.start() return true end
@@ -376,11 +376,11 @@ helpers.describe("model manager generation fences", function()
 					return task
 				end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() error("healthy readiness must not schedule a retry") end,
 				cancel = function() return true end,
 			}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {} }
 					function client.post(_, _, _, done)
@@ -413,7 +413,7 @@ helpers.describe("model manager generation fences", function()
 					return client
 				end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
 					local task = {label = label, on_done = on_done}
 					function task:start() return true end
@@ -438,7 +438,7 @@ helpers.describe("model manager generation fences", function()
 				set_llm_model_mlx = function() end,
 				set_llm_model_ollama = function() end,
 			}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return false end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return false end}
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
@@ -501,15 +501,15 @@ helpers.describe("model manager generation fences", function()
 				"the stale absent model must not dispatch a pull")
 			helpers.assert_eq(prediction_states, {},
 				"this Ollama path must emit no MLX enable transition")
-			package.loaded["adapters.shell_runner"] = nil
+			package.loaded["core.process.adapters.shell_runner"] = nil
 		end)
 	end)
 
 	helpers.it("(HS-007-invalidation-stale) invokes one stale callback after a native check expires", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.fs_dir",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.fs.engine.dir",
 			"modules.llm.api_common", "modules.llm.api_mlx",
-			"modules.llm.mlx_deps_checker", "adapters.task_lifecycle",
+			"modules.llm.mlx_deps_checker", "core.process.adapters.task_lifecycle",
 			"ui.menu.menu_llm.models_manager_mlx_hf",
 			"ui.menu.menu_llm.models_manager_mlx_server",
 			"ui.menu.menu_llm.models_manager_mlx_download",
@@ -547,8 +547,8 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-delayed-prompt-yield) drops a hardware prompt after its generation expires", function()
 		local modules = {
-			"hs", "adapters.shell_runner", "adapters.timer_scheduler", "infra.logger", "infra.i18n",
-			"infra.dialog_util", "infra.paths", "infra.timings",
+			"hs", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.logger.engine.logger", "core.i18n.engine.i18n",
+			"core.ui.engine.dialog_util", "core.fs.engine.paths", "core.timing.engine.timings",
 			"modules.llm", "ui.menu.menu_llm.models_manager_ollama",
 			"ui.menu.menu_llm.models_manager_mlx", "ui.menu.menu_llm.models_manager",
 		}
@@ -587,13 +587,13 @@ helpers.describe("model manager generation fences", function()
 			install_common_stubs()
 			local prompts, downloads, cancellations = 0, 0, 0
 			require("tests.support.ui.menu.menu_llm.system_probe_stub").install(16, 100)
-			package.loaded["infra.dialog_util"] = {block_alert = function()
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function()
 				prompts = prompts + 1
 				return "menu.llm.btn_download"
 			end}
 			helpers.provide_timings()
-			package.loaded["infra.paths"] = {
-				shared_llm_path = function() return helpers.shared("modules/llm/models.json") end,
+			package.loaded["core.fs.engine.paths"] = {
+				shared_llm_path = function() return helpers.shared("ai/data/models.json") end,
 			}
 			package.loaded["modules.llm"] = {get_backend = function() return "ollama" end}
 			package.loaded["ui.menu.menu_llm.models_manager_ollama"] = {
@@ -644,9 +644,9 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-freshness-fail-closed) rejects nil and throwing generation predicates", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.config_paths",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "infra.config_paths",
 			"modules.llm.api_common", "modules.llm.api_mlx",
-			"adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
+			"core.process.adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
 		local native_calls, execute_calls = 0, 0
 		local hs_fixture = {
@@ -663,7 +663,7 @@ helpers.describe("model manager generation fences", function()
 				set_active_server_pgid = function() end,
 				mark_load_failed = function() end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function()
 					native_calls = native_calls + 1
 					return nil
@@ -710,9 +710,9 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-readiness-yield) prevents stale readiness from publishing server state", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications",
 			"modules.llm.api_common", "modules.llm.api_mlx",
-			"adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
+			"core.process.adapters.task_lifecycle", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
 		local readiness_done
 		local server_task
@@ -732,7 +732,7 @@ helpers.describe("model manager generation fences", function()
 				set_active_server_pgid = function() end,
 				mark_load_failed = function() end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
 					local task = {running = false, terminate_calls = 0}
 					function task:start() self.running = true; return true end
@@ -779,14 +779,14 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-mlx-download-publication-yield) drops stale detached-download continuations", function()
 		local modules = {
-			"adapters.json_codec",
-			"hs", "infra.logger", "infra.i18n", "infra.notifications",
-			"adapters.task_lifecycle", "adapters.timer_scheduler", "ui.download_window",
+			"core.fs.adapters.json_codec",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications",
+			"core.process.adapters.task_lifecycle", "core.events.timer_scheduler", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_mlx_download", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			-- Storage captures hs too: the prelude reads the proxy override through it.
-			"adapters.storage",
+			"core.fs.adapters.storage",
 		}
 		local saved_io_open = io.open
 		local saved_os_execute = os.execute
@@ -830,10 +830,10 @@ helpers.describe("model manager generation fences", function()
 				local emitted_network_prelude = assert(network.managed_http_prelude("MLX"))
 				-- Preserve the admitted bundled receiver when the virtual filesystem
 				-- takes over below; this test controls publication, not native identity.
-				fake_files[helpers.driver_root() .. "platform/network/native_http.py"] = ""
+				fake_files[helpers.driver_root() .. "core/network/adapters/native_http.py"] = ""
 				local notifications = 0
 				local completions = 0
-				package.loaded["infra.notifications"] = {
+				package.loaded["core.ui.engine.notifications"] = {
 					notify = function() notifications = notifications + 1 end,
 				}
 				package.loaded["ui.download_window"] = {
@@ -841,7 +841,7 @@ helpers.describe("model manager generation fences", function()
 					update = function() end,
 					complete = function() completions = completions + 1 end,
 				}
-				package.loaded["adapters.task_lifecycle"] = {
+				package.loaded["core.process.adapters.task_lifecycle"] = {
 					native = function(label, executable, on_done, on_stream, args)
 						local task = {
 							label = label, executable = executable, args = args, on_stream = on_stream,
@@ -862,7 +862,7 @@ helpers.describe("model manager generation fences", function()
 					end,
 					start = function(task) return task:start() == true end,
 				}
-				package.loaded["adapters.timer_scheduler"] = {
+				package.loaded["core.events.timer_scheduler"] = {
 					after = function(delay, callback)
 						local handle = {timer = true}
 						local function fire()
@@ -1020,14 +1020,14 @@ helpers.describe("model manager generation fences", function()
 
 	helpers.it("(HS-007-ollama-pull-publication-yield) refuses a successor before UI and drops stale completion", function()
 		local modules = {
-			"hs", "infra.logger", "infra.i18n", "infra.notifications", "infra.text_utils",
+			"hs", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.text.engine.utils",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.task_lifecycle", "ui.download_window",
+			"core.process.adapters.task_lifecycle", "ui.download_window",
 			"ui.menu.menu_llm.models_manager_ollama", "modules.llm.network_env",
 			-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-			"adapters.file_system",
+			"core.fs.adapters.file_system",
 			-- Storage captures hs too: the prelude reads the proxy override through it.
-			"adapters.storage",
+			"core.fs.adapters.storage",
 		}
 		local pull_done
 		local pull_tasks, progress_shows = {}, 0
@@ -1050,10 +1050,10 @@ helpers.describe("model manager generation fences", function()
 		}
 		with_fixture(modules, hs_fixture, function()
 			install_common_stubs()
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function() notifications = notifications + 1 end,
 			}
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}
@@ -1069,7 +1069,7 @@ helpers.describe("model manager generation fences", function()
 				end,
 				update = function() end, complete = function() end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
 					local task = {}
 					function task:start() return true end

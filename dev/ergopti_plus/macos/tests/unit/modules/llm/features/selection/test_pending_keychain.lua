@@ -11,7 +11,7 @@
 
 local helpers = require("tests.helpers")
 local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 
 local FLOWS = {
 	{ name = "tone", start = function(w) return w.tone.step(Tone.MORE_FORMAL, false) end,
@@ -168,7 +168,7 @@ helpers.describe("selection authority survives pending native Keychain", functio
 	helpers.it("retains the original final-guard exception while cancelling remote raw HTTP", function()
 		with_keychain(function(world)
 			local failures, errors = {}, {}
-			require("infra.logger").error = function(_, template, ...)
+			require("core.logger.engine.logger").error = function(_, template, ...)
 				errors[#errors + 1] = string.format(template, ...)
 			end
 			world.core.api_remote.request_raw(nil, "system", "private selection", "", 0.1, 32,

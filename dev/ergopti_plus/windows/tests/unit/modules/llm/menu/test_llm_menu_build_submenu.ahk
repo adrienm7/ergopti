@@ -66,6 +66,44 @@ _LBMS_BuildSubmenuBehavior() {
 Test("llm menu: submenu builder has no publish side effects (llm-menu-build-submenu)",
 	_LBMS_BuildSubmenuBehavior)
 
+; llm-menu-built-at-first-open-2026-11-11: every root build, the boot's and each
+; full rebuild a toggle asks for, constructed the whole IA submenu although most
+; never show it. The root now publishes a one-row placeholder whose rows are
+; built into that same child when it opens, so the handle a narrow IA repaint
+; swaps is still the published one.
+_LBMS_SubmenuBuiltAtFirstOpen() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	Init := _DriverFuncBody("LLM_Menu_Init")
+	Assert(Init != "", "LLM_Menu_Init must exist")
+	Assert(InStr(Init, 'MenuDeferOrBuild(LLM_Menu_BuildSubmenu, "llm_menu")'),
+		"the root publishes the IA submenu through the first-open population")
+	Assert(!InStr(Init, "_IaSub := LLM_Menu_BuildSubmenu()"),
+		"the root must not construct the IA rows itself")
+	SavedMenu := _LBMS_Fixture()
+	SavedHandle := (IsSet(_LLM_Menu_Handle) && IsObject(_LLM_Menu_Handle)) ? _LLM_Menu_Handle : ""
+	Child := 0
+	try {
+		Child := MenuDeferred_Create(LLM_Menu_BuildSubmenu, "llm_menu")
+		_LLM_Menu_Handle := Child
+		AssertEqual(1, DllCall("GetMenuItemCount", "ptr", Child.Handle, "int"),
+			"before its first open the IA submenu holds only its placeholder")
+		AssertTrue(MenuDeferred_Build(Child.Handle, "test"), "the first open builds the rows")
+		Labels := _LBMS_Labels(Child)
+		AssertTrue(Labels.Length >= 10, "the opened child holds the full IA rows, got " . Labels.Length)
+		; The switch may carry the backend's availability after its label.
+		AssertEqual(1, InStr(Labels[1], t("menu.llm.enable")), "the rows land in the published child, switch first")
+		AssertTrue(ObjPtr(_LLM_Menu_Handle) == ObjPtr(Child),
+			"the published child stays the IA handle a repaint swaps")
+		AssertFalse(MenuDeferred_Build(Child.Handle, "test"), "a second open builds nothing again")
+	} finally {
+		_LLM_Menu := SavedMenu
+		if (SavedHandle != "")
+			_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("llm menu: the IA submenu is built at its first open (llm-menu-built-at-first-open)",
+	_LBMS_SubmenuBuiltAtFirstOpen)
+
 ; The text of every row of a native menu, top to bottom.
 _LBMS_Labels(TargetMenu) {
 	static MF_BYPOSITION := 0x400
@@ -320,16 +358,17 @@ _LBMS_BuildCallsExtractor() {
 Test("llm menu: build reuses the submenu extractor (llm-menu-build-submenu)",
 	_LBMS_BuildCallsExtractor)
 
-; LLM_Menu_Init (initMenu's LLM phase) builds IA inline instead of leaving
-; an empty parent for a second full pass; on failure the empty parent stays
-; staged and the boot projections recover it.
+; LLM_Menu_Init (initMenu's LLM phase) publishes IA through the extractor,
+; built at its first open, instead of leaving an empty parent for a second full
+; pass; on failure the empty parent stays staged and the boot projections
+; recover it.
 _LBMS_InitMenuBuildsInline() {
 	Body := _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
 	Assert(Body != "", "LLM_Menu_Init must remain source-visible")
-	Assert(InStr(Body, "LLM_Menu_BuildSubmenu(") > 0,
-		"LLM_Menu_Init must build the IA submenu inline in initMenu's LLM phase")
+	Assert(InStr(Body, "MenuDeferOrBuild(LLM_Menu_BuildSubmenu,") > 0,
+		"LLM_Menu_Init must publish the IA submenu through the extractor in initMenu's LLM phase")
 }
-Test("llm menu: initMenu builds IA inline (llm-menu-build-submenu)",
+Test("llm menu: initMenu publishes IA through the extractor (llm-menu-build-submenu)",
 	_LBMS_InitMenuBuildsInline)
 
 ; The boot projections arm only when the handle is still empty: an inline

@@ -10,9 +10,9 @@ local helpers = require("tests.helpers")
 local with_window = require("tests.support.dashboard_window_fixture")
 
 local function with_delivery(cached, callback)
-	helpers.with_fresh_modules({ "adapters.file_system", "modules.keystats.sqlite_reader",
+	helpers.with_fresh_modules({ "core.fs.adapters.file_system", "modules.keystats.sqlite_reader",
 		"modules.keystats.context_tracker" }, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				if path:find("ergopti_metrics_apps_cache_v3.json", 1, true) then
 					if cached then return "cache", "ok" end
@@ -47,7 +47,7 @@ local function with_delivery(cached, callback)
 				-- the zero-delay turns it arms, so one call still stands for one
 				-- refresh. Delayed retries and the fresh load stay queued.
 				local delivering, slices = false, nil
-				package.loaded["adapters.timer_scheduler"].after = function(delay, fn)
+				package.loaded["core.events.timer_scheduler"].after = function(delay, fn)
 					local handle = { timer = {} }
 					local entry = function() handle.timer = nil; fn() end
 					if delivering and delay == 0 then
@@ -77,7 +77,7 @@ local function with_delivery(cached, callback)
 					if state.submit then return state.submit(self, code, done) end
 					return self
 				end
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 				logger.success = function(_, message, ...) successes[#successes + 1] = string.format(message, ...) end
 				pending[#pending]()

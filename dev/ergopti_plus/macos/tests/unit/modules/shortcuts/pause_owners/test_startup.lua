@@ -457,9 +457,9 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 		hs_stub.__reset()
 		_G.hs = hs_stub
 		package.loaded["hs"] = hs_stub
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		hs_stub.timer.new = function(_, callback)
 			local running = false
 			local native = { callback = callback }
@@ -478,9 +478,9 @@ helpers.describe("HS-012 real reattached MLX work fence", function()
 			timers[#timers + 1] = native
 			return native
 		end
-		reset_module("adapters.timer_scheduler")
-		require("adapters.timer_scheduler")
-		package.loaded["adapters.task_lifecycle"] = {
+		reset_module("core.events.timer_scheduler")
+		require("core.events.timer_scheduler")
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(_, _, on_done, on_stream)
 				native_task = {
 					on_done = on_done,

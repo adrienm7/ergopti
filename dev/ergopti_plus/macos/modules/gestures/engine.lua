@@ -14,13 +14,15 @@
 local M = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
-local Timings  = require("infra.timings")
+local Logger   = require("core.logger.engine.logger")
+local Timings  = require("core.timing.engine.timings")
 local Geometry = require("modules.gestures.geometry")
+local ContactJoin = require("gestures.engine.contact_join")
+local Direction = require("gestures.engine.direction")
 local FrameClock = require("modules.gestures.frame_clock")
 local AccessibilityPermission = require("adapters.accessibility_permission")
 local MouseControl = require("adapters.mouse_control")
-local TimerScheduler = require("adapters.timer_scheduler")
+local TimerScheduler = require("core.events.timer_scheduler")
 local LOG      = "gestures.engine"
 
 local _state      = nil
@@ -42,7 +44,7 @@ local _any_touch_hook = nil
 -- =========================================
 
 -- Timing constants come from the shared cross-driver registry
--- (_shared/modules/timings/constants.toml [gestures]) so AHK and macOS stay in sync;
+-- (_shared/core/timing/data/constants.toml [gestures]) so AHK and macOS stay in sync;
 -- the spatial thresholds below it are driver-specific and stay local.
 local TAP_MAX_SEC    = Timings.sec("gestures", "tap_max_ms")   -- Capture slightly slow multi-finger taps
 -- Minimum centroid displacement (Manhattan distance) to confirm a swipe on commit.
@@ -274,6 +276,8 @@ local function resetGS()
 		contactsOrigin = nil,
 		contactsLast   = nil,
 		cohesive       = false,
+		-- Why the confirmed three contacts cannot be one hand's fingers, or nil.
+		contactRefusal = nil,
 		-- Gates that already logged a rejected candidate for this contact sequence.
 		rejections     = {},
 	}
@@ -299,6 +303,10 @@ local function snapshotContacts(touches)
 	}
 	gs.contactsLast = gs.contactsOrigin
 	gs.cohesive     = false
+	-- Three contacts that cannot be one hand's fingers (a resting thumb beside
+	-- a pair) never commit a three-finger tap; joins refuse them earlier.
+	local reason, detail = Geometry.joinRefusal(touches)
+	gs.contactRefusal = reason and (reason .. ": " .. detail) or nil
 end
 
 --- Tells whether a three-or-more-finger gesture may fire on this axis.
@@ -410,47 +418,72 @@ local function signedDist(pos)
 	return pos.x - gs.startPos.x
 end
 
+--- The direction a diagonal slot names (swipe_3_right_up gives right_up).
+--- @param slot string Resolved swipe slot.
+--- @return string name
+local function slotDiagonal(slot)
+	local name = type(slot) == "string" and slot:match("^swipe_%d+_(%a+_%a+)$") or nil
+	assert(name, "a diagonal swipe needs a diagonal slot, got " .. tostring(slot))
+	return name
+end
+
+--- Signed travel of a displacement along an axis ('horiz'|'vert'|'diag'); a
+--- diagonal is projected on its slot's own axis (shared with Linux), which
+--- signing it by dx + dy left to noise along right_up and left_down.
+--- @param dx number Horizontal displacement.
+--- @param dy number Vertical displacement.
+--- @param axis string Axis name.
+--- @param slot string Resolved swipe slot; read for a diagonal only.
+local function alongAxis(dx, dy, axis, slot)
+	if axis == "horiz" then return dx end
+	if axis == "vert" then return dy end
+	return Direction.along(slotDiagonal(slot), dx, dy)
+end
+
 --- Compute signed distance along a given axis ('horiz'|'vert'|'diag').
 --- @param pos table Position table.
 --- @param axis string Axis name.
-local function signedDistAxis(pos, axis)
+--- @param slot string Resolved swipe slot; read for a diagonal only.
+local function signedDistAxis(pos, axis, slot)
 	if not gs.startPos then return 0 end
-	if axis == "horiz" then
-		return pos.x - gs.startPos.x
-	elseif axis == "vert" then
-		return pos.y - gs.startPos.y
-	else
-		-- For diagonal, use Euclidean distance to represent true travel
-		local dx = pos.x - gs.startPos.x
-		local dy = pos.y - gs.startPos.y
-		local dist = math.sqrt(dx*dx + dy*dy)
-		local sign = (dx + dy > 0) and 1 or -1
-		return sign * dist
-	end
+	return alongAxis(pos.x - gs.startPos.x, pos.y - gs.startPos.y, axis, slot)
 end
 
 --- Resolves the slot a classified swipe runs. The explicit direction slot wins;
 --- a straight left or right swipe whose own slot is unbound runs the horizontal
 --- axis slot of its finger count, so one gesture never runs two actions. This is
---- the rule Linux applies (maintainer decision of 2026-11-06). Diagonals and
---- vertical swipes have no axis slot.
+--- the rule Linux applies (maintainer decision of 2026-11-06). Vertical swipes
+--- have no axis slot. A diagonal whose own slot is unbound runs the slot of its
+--- dominant straight direction (and that one's axis slot), as Linux does; a
+--- bound diagonal keeps its own (maintainer decision of 2026-11-11).
 --- @param mf number Finger count.
 --- @param dir string Axis the swipe travelled on: "horiz", "vert" or "diag".
 --- @param dx number Horizontal displacement.
 --- @param dy number Vertical displacement.
 --- @return string|nil slot The slot to fire, or the unbound direction slot.
+--- @return string axis The axis the slot answers on, the dominant one for a fallen-back diagonal.
 local function resolveSwipeSlot(mf, dir, dx, dy)
 	local slot = Geometry.slotForDir(mf, dir, dx, dy)
 	local action = slot and _state.ga[slot]
-	if action and action ~= "none" then return slot end
-	if dir ~= "horiz" then return slot end
+	if action and action ~= "none" then return slot, dir end
+	if dir == "diag" then
+		local straight = math.abs(dx) >= math.abs(dy) and "horiz" or "vert"
+		local answer, answer_axis = resolveSwipeSlot(mf, straight, dx, dy)
+		local answer_action = answer and _state.ga[answer]
+		if answer_action and answer_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: its dominant direction %s answers.", tostring(slot), answer)
+			return answer, answer_axis
+		end
+		return slot, dir
+	end
+	if dir ~= "horiz" then return slot, dir end
 	local axis_slot = AXIS_SLOT_HORIZ[math.min(mf, 5)]
 	local axis_action = axis_slot and _state.ga[axis_slot]
 	if axis_action and axis_action ~= "none" then
 		Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", tostring(slot), axis_slot)
-		return axis_slot
+		return axis_slot, dir
 	end
-	return slot
+	return slot, dir
 end
 
 --- Calls one action dispatcher and preserves its exact boolean contract.
@@ -506,12 +539,15 @@ local function triggerAction(action, sign, slot)
 	local single_status, single_detail = dispatchAction("execute_single", action, slot)
 	if single_status == "accepted" then
 		gs.dispatchRefusal = nil
+		-- One line per dispatched gesture, which the field run counts per slot
+		Logger.debug(LOG, "Gesture dispatched: slot=%s action=%s.", tostring(slot), action)
 		return true
 	end
 	if single_status ~= "refused" then return false end
 	local axis_status, axis_detail = dispatchAction("execute_axis", action, sign > 0)
 	if axis_status == "accepted" then
 		gs.dispatchRefusal = nil
+		Logger.debug(LOG, "Gesture dispatched: slot=%s action=%s.", tostring(slot), action)
 		return true
 	end
 	if axis_status == "refused" then
@@ -593,19 +629,8 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 		-- to come all the way back through the original origin. This makes reverse
 		-- swipes feel as responsive as fresh ones.
 		if gs.liveAxisSign and gs.lastFirePos then
-			local local_delta
-			if axis == "horiz" then
-				local_delta = pos.x - gs.lastFirePos.x
-			elseif axis == "vert" then
-				local_delta = pos.y - gs.lastFirePos.y
-			else
-				-- Diagonal: project movement along the 45° diagonal signed direction
-				-- (same convention as signedDistAxis) so reversal detection is axis-aware.
-				local ddx = pos.x - gs.lastFirePos.x
-				local ddy = pos.y - gs.lastFirePos.y
-				local mag = math.sqrt(ddx*ddx + ddy*ddy)
-				local_delta = ((ddx + ddy > 0) and 1 or -1) * mag
-			end
+			-- Same projection as signedDistAxis, so reversal detection is axis-aware.
+			local local_delta = alongAxis(pos.x - gs.lastFirePos.x, pos.y - gs.lastFirePos.y, axis, slot)
 			local local_sign = (local_delta > 0) and 1 or (local_delta < 0 and -1 or 0)
 			local reverse_min = Geometry.incrementalReverseMin(sensitivity, LIVE_AXIS_MIN)
 			if local_sign ~= 0 and local_sign ~= gs.liveAxisSign and math.abs(local_delta) >= reverse_min then
@@ -624,7 +649,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 			end
 		end
 
-		local sd = signedDistAxis(pos, axis)
+		local sd = signedDistAxis(pos, axis, slot)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 
@@ -652,7 +677,7 @@ local function triggerLiveAxisIfNeeded(slot, pos, now, axis)
 	end
 
 	-- x1 mode
-	local sd = signedDistAxis(pos, axis)
+	local sd = signedDistAxis(pos, axis, slot)
 	if math.abs(sd) < LIVE_AXIS_MIN then return end
 
 	local sign = (sd > 0) and 1 or -1
@@ -747,7 +772,11 @@ local function commitGesture(now)
 	if not had_live_fire and total_delta < TAP_MAX_DELTA then
 		Logger.debug(LOG, "commitGesture: classified as TAP candidate (lockedDir=%s, total_delta=%.2f < %.2f)",
 			tostring(gs.lockedDir), total_delta, TAP_MAX_DELTA)
-		if elapsed <= TAP_MAX_SEC and multiFingerAllowed(mf, nil, "tap_" .. tostring(mf)) then
+		local geometry_refused = mf == ContactJoin.JOINED_COUNT and gs.contactRefusal ~= nil
+		if geometry_refused then
+			rejectCandidate("finger geometry", "%s (tap_%d)", gs.contactRefusal, mf)
+		end
+		if elapsed <= TAP_MAX_SEC and not geometry_refused and multiFingerAllowed(mf, nil, "tap_" .. tostring(mf)) then
 			local slot = nil
 			if     mf == 2 then slot = "tap_2"
 			elseif mf == 3 then slot = "tap_3"
@@ -801,7 +830,9 @@ local function commitGesture(now)
 		return
 	end
 
-	local slot = resolveSwipeSlot(mf, dir, dx, dy)
+	local slot
+	-- An unbound diagonal's dominant slot answers along its own straight axis.
+	slot, dir = resolveSwipeSlot(mf, dir, dx, dy)
 	Logger.debug(LOG, "commitGesture: slotForDir(%d, %s, %.2f, %.2f) → %s", mf, dir, dx, dy, tostring(slot))
 	if not slot or _state.ga[slot] == "none" then
 		Logger.debug(LOG, "commitGesture: slot=%s action=%s — skip",
@@ -821,7 +852,7 @@ local function commitGesture(now)
 	Logger.debug(LOG, "commitGesture: slot=%s action=%s mode=%s sensitivity=%.2f", slot, action, mode, sensitivity)
 
 	if mode == "incremental" then
-		local sd = signedDistAxis(gs.endPos, dir)
+		local sd = signedDistAxis(gs.endPos, dir, slot)
 		local targetSteps = Geometry.incrementalSteps(math.abs(sd), sensitivity)
 		local diff = targetSteps - gs.stepsCommitted
 		if diff > 0 and not incrementalCountAdmitted(diff, slot) then return end
@@ -839,7 +870,7 @@ local function commitGesture(now)
 		end
 	else
 		-- x1 mode
-		local sd = signedDistAxis(gs.endPos, dir)
+		local sd = signedDistAxis(gs.endPos, dir, slot)
 		local sign = (sd > 0) and 1 or (sd < 0 and -1 or 0)
 		Logger.info(LOG, "commitGesture x1: dir=%s slot=%s sd=%.2f sign=%d prevLiveSlot=%s prevLiveSign=%s SWIPE_MIN=%.2f",
 			dir, slot, sd, sign, tostring(gs.liveAxisSlot), tostring(gs.liveAxisSign), SWIPE_MIN)
@@ -1222,6 +1253,17 @@ function M.process_frame(touches, frame_stamp)
 						snapshotContacts(touches)
 					end
 				end
+			elseif n > gs.maxFingers and n == ContactJoin.JOINED_COUNT and Geometry.joinRefusal(touches) then
+				-- A far or oversized third contact, a resting thumb beside the pair
+				-- (field report 2026-11-05): neither join path may take it. Judged
+				-- every frame, so no candidate is armed and the pair keeps its lock.
+				gs.tentativeLifting = false
+				local reason, detail = Geometry.joinRefusal(touches)
+				rejectCandidate("finger geometry", "%s, %s (%d -> %d), contacts %s", reason, detail,
+					gs.maxFingers, n, Geometry.describeContacts(touches))
+				gs.candidateFingers = nil
+				gs.candidateSince   = nil
+				gs.candidateFrames  = 0
 			elseif n > gs.maxFingers then
 				-- Reset tentative lifting if finger count is restored
 				gs.tentativeLifting = false
@@ -1330,7 +1372,7 @@ function M.process_frame(touches, frame_stamp)
 				if gs.lockedDir == nil and gs.candidateFingers == nil then
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local tentative = Geometry.computeDir(dx, dy, gs.maxFingers)
+					local tentative = Geometry.lockDir(dx, dy, gs.maxFingers)
 					if tentative ~= nil then
 						Logger.info(LOG, "LOCKED DIR=%s (dx=%.2f dy=%.2f maxFingers=%d)",
 							tentative, dx, dy, gs.maxFingers)
@@ -1342,7 +1384,8 @@ function M.process_frame(touches, frame_stamp)
 					local axis = gs.lockedDir
 					local dx = pos.x - gs.startPos.x
 					local dy = pos.y - gs.startPos.y
-					local slot = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
+					local slot
+					slot, axis = resolveSwipeSlot(gs.maxFingers, axis, dx, dy)
 
 					if slot and _state.ga[slot] and _state.ga[slot] ~= "none" then
 						triggerLiveAxisIfNeeded(slot, pos, now, axis)

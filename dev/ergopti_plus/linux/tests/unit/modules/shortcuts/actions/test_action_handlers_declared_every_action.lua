@@ -5,7 +5,7 @@
 --- MODULE: Regression — actions the shared catalogue declares for Linux must
 ---         actually do something (linux-declared-actions-unhandled)
 --- DESCRIPTION:
---- `_shared/modules/actions/actions.toml` declared 79 actions for Linux and the
+--- `_shared/shortcuts/data/actions/actions.toml` declared 79 actions for Linux and the
 --- driver implemented 40 of them. The other 39 were not broken in a way anyone
 --- could see: the picker offers every DECLARED action as bindable, so the user
 --- bound one, the assignment was stored, the chord fired — and `_execute_action`
@@ -65,7 +65,7 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 
 	helpers.it("warns, not in DEBUG, when an action has nothing to run", function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_warn, warned = Logger.warn, {}
 		Logger.warn = function(_, fmt, ...) warned[#warned + 1] = string.format(fmt, ...) end
 		local ok, err = pcall(Gestures.execute_action, "microsoft_bold", "tap_hold")
@@ -135,7 +135,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	helpers.it("today's log path comes from the sink, not from a second copy of the name", function()
 		with_recorded_shell(function(commands)
 			Gestures.execute_action("open_today_log", "test__slot")
-			local Sink = require("infra.logger_sink")
+			local Sink = require("core.logger.engine.sink")
 			local expected = Sink.main_log_path()
 			helpers.assert_true(joined(commands):find(expected, 1, true) ~= nil,
 				"the action must open exactly the file the sink is writing to. Rebuilding the name from a local copy of the 'ErgoptiPlus_' prefix opens the wrong file the day the constant changes — and xdg-open on a missing path fails silently")
@@ -181,25 +181,25 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 	end)
 
 	helpers.it("restores exact native owners after the controlled window fixture raises", function()
-		local previous_webview = package.loaded["ui.webview_manager"]
+		local previous_webview = package.loaded["core.ui.ui.webview_manager"]
 		local previous_lgi = package.loaded["lgi"]
 		local previous_preload = package.preload["lgi"]
 		local ok, err = pcall(with_unavailable_webview, function(Webview)
-			helpers.assert_eq(package.loaded["ui.webview_manager"], Webview,
+			helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], Webview,
 				"the callback must receive the exact acquired page owner")
 			error("Controlled window fixture callback refusal", 0)
 		end)
 		helpers.assert_eq(ok, false, "the callback refusal must reach its caller")
 		helpers.assert_eq(err, "Controlled window fixture callback refusal", "preserve the callback failure")
-		helpers.assert_eq(package.loaded["ui.webview_manager"], previous_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], previous_webview, "restore the exact page owner")
 		helpers.assert_eq(package.loaded["lgi"], previous_lgi, "restore the exact native SDK cache")
 		helpers.assert_eq(package.preload["lgi"], previous_preload, "restore the exact native SDK loader")
 	end)
 
 	helpers.it("the paths action opens the dedicated paths editor", function()
-		local previous_webview = package.loaded["ui.webview_manager"]
+		local previous_webview = package.loaded["core.ui.ui.webview_manager"]
 		local opened = nil
-		package.loaded["ui.webview_manager"] = {
+		package.loaded["core.ui.ui.webview_manager"] = {
 			toggle = function(app_name)
 				opened = app_name
 				return true
@@ -207,7 +207,7 @@ helpers.describe("linux actions: the driver's own surfaces", function()
 		}
 
 		local ok, err = pcall(Gestures.execute_action, "open_paths_editor", "test__slot")
-		package.loaded["ui.webview_manager"] = previous_webview
+		package.loaded["core.ui.ui.webview_manager"] = previous_webview
 
 		helpers.assert_true(ok, "opening the paths editor must not throw: " .. tostring(err))
 		helpers.assert_eq(opened, "paths_editor",
@@ -360,9 +360,9 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Every chord the shared catalogue declares for Linux, read from the
 	--- catalogue itself: { id, mods = {combo names}, key = key id }.
 	local function declared_chords()
-		local path = require("infra.paths").shared("modules/actions/modifier_chords.json")
+		local path = require("core.fs.engine.paths").shared("shortcuts/data/actions/modifier_chords.json")
 		local fh = assert(io.open(path, "r"), "the shared modifier chords must be readable")
-		local catalogue = require("json").decode(fh:read("*a"))
+		local catalogue = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()
 		local modifiers = catalogue.platforms.linux.modifiers
 		local chords = {}
@@ -384,14 +384,14 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Runs `body` with a fake open uinput device, a hook holding nothing and
 	--- a layout answering `shortcut_keycode`, and restores all three.
 	local function with_fake_device(shortcut_keycode, body)
-		local names = { "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout",
+		local names = { "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout",
 			"modules.gestures.combo_emitter", "modules.gestures.manager" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local writer = helpers.load_module("tests.fakes").uinput_writer()
 		writer.open()
-		package.loaded["adapters.uinput_writer"] = writer
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.uinput_writer"] = writer
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end,
 		}
@@ -440,15 +440,15 @@ helpers.describe("linux actions: modifier chords", function()
 	helpers.it("falls back to xdotool with keysym names it accepts (modifier-chord-uinput)", function()
 		-- Only when the uinput device cannot be written. `xdotool key ctrl+.`
 		-- fails: xdotool takes X keysym names, and "." is `period`.
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local real_error = Logger.error
 		Logger.error = function() end
 		-- One unopened device and one manager serve the whole sweep.
 		local writer = helpers.load_module("tests.fakes").uinput_writer()
-		local saved = package.loaded["adapters.uinput_writer"]
+		local saved = package.loaded["platform.input.uinput_writer"]
 		local saved_emitter = package.loaded["modules.gestures.combo_emitter"]
 		local saved_manager = package.loaded["modules.gestures.manager"]
-		package.loaded["adapters.uinput_writer"] = writer
+		package.loaded["platform.input.uinput_writer"] = writer
 		local ok, err = pcall(function()
 			helpers.load_module("modules.gestures.combo_emitter")
 			local Gestures = helpers.load_module("modules.gestures.manager")
@@ -470,7 +470,7 @@ helpers.describe("linux actions: modifier chords", function()
 		end)
 		package.loaded["modules.gestures.combo_emitter"] = saved_emitter
 		package.loaded["modules.gestures.manager"] = saved_manager
-		package.loaded["adapters.uinput_writer"] = saved
+		package.loaded["platform.input.uinput_writer"] = saved
 		Logger.error = real_error
 		if not ok then error(err, 0) end
 	end)
@@ -516,14 +516,14 @@ helpers.describe("linux actions: workspace switch", function()
 	--- @return table pressed The combos pressed on the virtual keyboard.
 	--- @return table commands Every other command run (xdotool fallbacks).
 	local function switch(action, listing, uinput_ok)
-		local Display = require("infra.display_server")
-		local Shell = require("adapters.shell_runner")
+		local Display = require("core.ui.engine.display_server")
+		local Shell = require("core.process.adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
-		local saved_writer = package.loaded["adapters.uinput_writer"]
+		local saved_writer = package.loaded["platform.input.uinput_writer"]
 		if not uinput_ok then
 			-- The false branch means a genuinely closed controlled Writer, not a
 			-- failed native send. Admit the issuer only after that actual owner.
-			package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer()
+			package.loaded["platform.input.uinput_writer"] = require("tests.fakes").uinput_writer()
 		end
 		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, switched, commands = {}, {}, {}
@@ -552,7 +552,7 @@ helpers.describe("linux actions: workspace switch", function()
 		Shell._reset_runner()
 		Display._set_for_test(nil, nil)
 		package.loaded["modules.gestures.combo_emitter"] = saved
-		package.loaded["adapters.uinput_writer"] = saved_writer
+		package.loaded["platform.input.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return switched, pressed, commands
 	end
@@ -648,8 +648,8 @@ helpers.describe("linux actions: media and brightness keys", function()
 	--- @return table pressed The combos pressed on the virtual keyboard.
 	local function run(action, tool_ok, uinput_ok)
 		local saved = package.loaded["modules.gestures.combo_emitter"]
-		local saved_writer = package.loaded["adapters.uinput_writer"]
-		if not uinput_ok then package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer() end
+		local saved_writer = package.loaded["platform.input.uinput_writer"]
+		if not uinput_ok then package.loaded["platform.input.uinput_writer"] = require("tests.fakes").uinput_writer() end
 		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, commands = {}, {}
 		package.loaded["modules.gestures.combo_emitter"] = {
@@ -671,7 +671,7 @@ helpers.describe("linux actions: media and brightness keys", function()
 		end)
 		os.execute = real
 		package.loaded["modules.gestures.combo_emitter"] = saved
-		package.loaded["adapters.uinput_writer"] = saved_writer
+		package.loaded["platform.input.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return commands, pressed
 	end

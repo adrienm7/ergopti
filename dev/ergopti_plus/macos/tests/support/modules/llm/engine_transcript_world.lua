@@ -6,7 +6,7 @@
 --- Builds the real macOS prediction engine (real gesture action registry,
 --- streaming handler, LLM core dispatcher, remote backend, shared parser and
 --- profile registry) on recording fakes of its three ports and exposes it to
---- the shared transcript runner (_shared/lua/test/llm_engine_transcript.lua):
+--- the shared transcript runner (_shared/tests/lua/ai/engine_transcript.lua):
 --- the TimerScheduler is the adapter the engine arms its debounce on, the
 --- HttpClient is the remote backend's inference client, the TooltipRenderer is
 --- the prediction tooltip behind adapters.prediction_tooltip_port. What each port is
@@ -14,9 +14,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local PromptBuilder = require("llm.prompt_builder")
-local InfoBar = require("llm.request_plan.info_bar")
+local json = require("core.text.engine.json")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local InfoBar = require("ai.engine.request_plan.info_bar")
 
 local M = {}
 
@@ -63,8 +63,7 @@ function M.with_world(config, body)
 	local world = { model_label = MODEL, clock = 1000, paused = false }
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -76,10 +75,10 @@ function M.with_world(config, body)
 		bundleID = function() return "test.e2e" end, path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	_G.hs.timer.secondsSinceEpoch = function() return world.clock end
 
 	for _, name in ipairs({
@@ -98,7 +97,7 @@ function M.with_world(config, body)
 		log_llm_suggested = function() end, log_llm_dismissed = function() end,
 	}
 	-- The TooltipRenderer port: only a render that is not a loading placeholder is recorded.
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end, set_enter_validates = function() end,
 		set_llm_timeout = function() end, set_chain_start = function() return true end,
 		show_loading = function() return true end,
@@ -128,8 +127,8 @@ function M.with_world(config, body)
 	}
 
 	-- The harness' i18n stub echoes keys: the labels the info bar shows are the real ones.
-	local i18n = package.loaded["infra.i18n"]
-	local Locale = require("infra.locale")
+	local i18n = package.loaded["core.i18n.engine.i18n"]
+	local Locale = require("core.i18n.engine.locale")
 	local saved_get = i18n.get
 	i18n.get = function(key) return Locale.get(key) or key end
 
@@ -152,7 +151,7 @@ function M.with_world(config, body)
 	debug.setupvalue(api.is_ready, ready_index, true)
 	local engine = require("modules.llm.prediction_engine")
 	-- The TimerScheduler port: the real adapter, recording the delays the engine arms.
-	local real_scheduler = require("adapters.timer_scheduler")
+	local real_scheduler = require("core.events.timer_scheduler")
 	local scheduler = {}
 	for key, value in pairs(real_scheduler) do scheduler[key] = value end
 	scheduler.after = function(delay_sec, fn)

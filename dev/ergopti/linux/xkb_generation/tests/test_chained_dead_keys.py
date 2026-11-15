@@ -9,7 +9,7 @@ a plain "^" and the circumflex dead key collided on one sequence inside a third
 dead key; and an action whose one-character id is not what it types was
 composed from its id. The expected sequences below are written by hand from the
 fixture, not taken from the converter, and the Lua converter replays the same
-vectors (_shared/lua/test/xkb_converter_contract.lua).
+vectors (_shared/tests/lua/layouts/xkb_converter_contract.lua).
 """
 
 from __future__ import annotations

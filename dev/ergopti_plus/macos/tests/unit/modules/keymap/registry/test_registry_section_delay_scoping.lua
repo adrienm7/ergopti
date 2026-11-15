@@ -10,8 +10,8 @@ local OWNED_MODULES = {
 	"modules.keymap.terminators",
 	"modules.keymap.state",
 	"modules.keymap.utils",
-	"infra.toml.reader",
-	"infra.timings",
+	"core.text.engine.toml.reader",
+	"core.timing.engine.timings",
 	"modules.hotstrings.hotstrings_config",
 }
 
@@ -31,14 +31,14 @@ end
 
 local function with_registry(data_by_path, callback)
 	return helpers.with_fresh_modules(OWNED_MODULES, function()
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(path) return data_by_path[path], true end,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			get_user_override = function() return nil end,
 		}
 		local State = helpers.load_with_stubs("modules.keymap.state")
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 0.01 end,
 		}
 		local Registry = require("modules.keymap.registry")
@@ -125,20 +125,20 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	local function fixture(source, callback, expected_init_admission)
 		local owned = {}
 		for _, name in ipairs(OWNED_MODULES) do owned[#owned + 1] = name end
-		owned[#owned + 1] = "adapters.file_system"
+		owned[#owned + 1] = "core.fs.adapters.file_system"
 		return helpers.with_fresh_modules(owned, function()
 			local State = helpers.load_with_stubs("modules.keymap.state")
-			local reader = require("infra.toml.reader")
+			local reader = require("core.text.engine.toml.reader")
 			local data = group_data("atrigger", 0.2)
 			data.meta.delay = 1.2
 			local other = group_data("btrigger", 3)
-			package.loaded["infra.toml.reader"] = { parse = function(path)
+			package.loaded["core.text.engine.toml.reader"] = { parse = function(path)
 				if path == "/virtual/group_a.toml" then return data, true end
 				if path == "/virtual/group_b.toml" then return other, true end
 				return reader.parse(path)
 			end }
 			local files, control = { overrides = source }, { writes = 0, refuse = false }
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					helpers.assert_eq(path, "overrides")
 					return files[path], files[path] and "ok" or "absent"
@@ -210,7 +210,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 		fixture('[group_a.rolls]\ndelay = 1\nfuture = { nested = { keep = [1, 2] } }\n[untouched.deep]\nvalue = "same"\n', function(_, _, Config, files)
 			helpers.assert_true(Config.set_override("group_a", "rolls", "delay", 2))
 			helpers.assert_true(Config.clear_override("group_a", "rolls", "delay"))
-			local data = require("toml_codec").decode(files.overrides)
+			local data = require("core.text.engine.toml_codec").decode(files.overrides)
 			helpers.assert_nil(data.group_a.rolls.delay)
 			helpers.assert_eq(data.group_a.rolls.future.nested.keep[2], 2)
 			helpers.assert_eq(data.untouched.deep.value, "same")
@@ -348,7 +348,7 @@ helpers.describe("canonical hotstring override delays reach the real runtime", f
 	helpers.it("uses the existing extension override owner for a colon/slash runtime category", function()
 		fixture("[ext.team.rolls]\ndelay = 4\n", function(state, Registry, Config, files, control)
 			helpers.assert_true(Registry.disable_group("group_a"))
-			local group = require("hotstrings.extensions").category_key("team", "snippets/work")
+			local group = require("hotstrings.engine.extensions").category_key("team", "snippets/work")
 			helpers.assert_true(Registry.load_toml(group, "/virtual/group_a.toml"))
 			helpers.assert_eq(state.resolve_mapping_delay(mapping_for(state, "atrigger")), 4)
 			helpers.assert_true(Config.set_override("ext.team", "rolls", "delay", 6))
@@ -383,7 +383,7 @@ helpers.describe("hotstring delay boot admission", function()
 				config_paths = { get_config_dir = function() return "/virtual" end },
 				require = function(name)
 					-- The fragment joins the override path through the pure shared path owner.
-					if name == "native_path" then return require(name) end
+					if name == "core.fs.engine.native_path" then return require(name) end
 					helpers.assert_eq(name, "modules.hotstrings.hotstrings_config")
 					return {
 						init = function(opts) selected = opts; return admitted end,

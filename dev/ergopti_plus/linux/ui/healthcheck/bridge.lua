@@ -4,7 +4,7 @@
 --- BRIDGE HANDLER: Diagnostics Window (Linux)
 --- DESCRIPTION:
 --- Serves the shared diagnostics page (_shared/ui/healthcheck/): the version 2
---- snapshot of _shared/modules/diagnostics/schema.json, the asynchronous
+--- snapshot of _shared/diagnostics/data/schema.json, the asynchronous
 --- probes that complete it, and the actions the page asks for (copy, save,
 --- report on GitHub, open a folder, refresh, close).
 --- Bridge name: "healthcheck"
@@ -23,17 +23,17 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 M.bridge_name = "healthcheck"
 
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.healthcheck"
 
 local Version = require("infra.version")
-local Snapshot = require("healthcheck.snapshot")
-local Actions = require("healthcheck.actions")
-local LoggerSink = require("infra.logger_sink")
+local Snapshot = require("diagnostics.engine.healthcheck.snapshot")
+local Actions = require("diagnostics.engine.healthcheck.actions")
+local LoggerSink = require("core.logger.engine.sink")
 
 M.DRIVER = "linux"
 
@@ -78,7 +78,7 @@ local _action_revision = 0
 --- @return table
 function M.config()
 	if not _config then
-		_config = Snapshot.load_config(function(rel) return require("infra.paths").shared(rel) end)
+		_config = Snapshot.load_config(function(rel) return require("core.fs.engine.paths").shared(rel) end)
 	end
 	return _config
 end
@@ -110,7 +110,7 @@ end
 --- @param path string
 --- @return string|nil
 local function read_file(path)
-	return require("infra.regular_file_reader").read_source(path)
+	return require("core.fs.engine.regular_file_reader").read_source(path)
 end
 
 --- The folder part of a path.
@@ -134,7 +134,7 @@ local function collect_paths(schema)
 		errors_today    = LoggerSink.errors_log_path(),
 		crash_dir       = require("modules.diagnostics.crash_reporter").get_crash_dir(),
 		diagnostics_dir = logs_dir and (logs_dir .. "/" .. schema.report.subdir) or nil,
-		app_dir         = require("infra.paths").driver_root(),
+		app_dir         = require("core.fs.engine.paths").driver_root(),
 	}
 end
 
@@ -235,12 +235,12 @@ end
 --- as an empty list, which would read as "nothing is open".
 --- @return table|nil Sorted process names, nil when the session cannot list windows.
 local function running_apps()
-	if not require("infra.display_server").is_x11() then
+	if not require("core.ui.engine.display_server").is_x11() then
 		Logger.info(LOG, "Open applications are not listed: this session is not X11 and Wayland exposes no window list.")
 		return nil
 	end
 	local list, seen = {}, {}
-	for _, info in ipairs(require("adapters.window_info").getAll()) do
+	for _, info in ipairs(require("platform.focus.window_info").getAll()) do
 		local app = type(info) == "table" and info.appId or nil
 		if type(app) == "string" and app ~= "" and info.windowTitle ~= "" and not seen[app] then
 			seen[app] = true
@@ -281,7 +281,7 @@ local function collect_input(state)
 	local input = {}
 	-- The pause belongs to the script actions, which the daemon hands over
 	if type(state.is_paused) == "function" then input.paused = state.is_paused() == true end
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	local held = Hook.held_modifiers()
 	for _, name in ipairs({ "shift", "ctrl", "alt", "altgr", "meta" }) do input[name] = held[name] == true end
 	local caps_lock, caps_err = Hook.caps_lock_on()
@@ -430,7 +430,7 @@ local function collect_permissions(ids)
 	end
 	local readers = {
 		input_devices = function() return event and device_access(event) or "unknown" end,
-		uinput        = function() return device_writable(require("adapters.uinput_writer").UINPUT_PATH) end,
+		uinput        = function() return device_writable(require("platform.input.uinput_writer").UINPUT_PATH) end,
 	}
 	local items = {}
 	for _, id in ipairs(ids) do
@@ -455,9 +455,9 @@ function M.configuration_context(schema, overrides)
 		driver   = M.DRIVER,
 		features = overrides.features or function() return require("infra.manifest_reader").features() end,
 		path_of  = overrides.path_of or function(id) return require("infra.config_paths").config(names[id]) end,
-		decode   = require("toml_codec").decode,
+		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
-		clock    = overrides.clock or function() return require("infra.monotonic").now_ms() end,
+		clock    = overrides.clock or function() return require("core.logger.engine.monotonic").now_ms() end,
 	}
 end
 
@@ -492,12 +492,12 @@ end
 --- newest entries of today's errors file (the ring before it exists).
 --- @return table
 local function collect_issues()
-	local lines = require("logger").ring_buffer_snapshot() or {}
-	local issues = require("logger").session_issues()
+	local lines = require("core.logger.engine").ring_buffer_snapshot() or {}
+	local issues = require("core.logger.engine").session_issues()
 	local recent, source = {}, "unavailable"
 	local ok, err = pcall(function()
 		local limits = Snapshot.load_recent_issue_limits(
-			require("infra.paths").shared("modules/diagnostics/recent_issues.json"))
+			require("core.fs.engine.paths").shared("diagnostics/data/recent_issues.json"))
 		recent, source = Snapshot.collect_recent_issues(LoggerSink.errors_log_path(), lines, limits)
 	end)
 	if not ok then Logger.error(LOG, "Recent issues could not be collected: %s.", tostring(err)) end
@@ -530,7 +530,7 @@ local function collect_developer(state)
 			ok_list[#ok_list + 1] = name
 		end
 	end
-	local logger = require("logger")
+	local logger = require("core.logger.engine")
 	local level = nil
 	for name, value in pairs(logger.LEVELS) do
 		if value == logger.get_level() then level = name end
@@ -557,7 +557,7 @@ end
 --- Milliseconds, for the collection's duration.
 --- @return number
 local function now_ms()
-	return require("infra.monotonic").now_ms()
+	return require("core.logger.engine.monotonic").now_ms()
 end
 
 --- Builds the synchronous (phase A) snapshot.
@@ -594,7 +594,7 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 		configuration_files = { items = {} },
 		configuration = { items = {} },
 		unavailable = collect_timed("platform_coverage", function()
-			return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
+			return require("diagnostics.engine.healthcheck.unavailable").collect(require("infra.manifest_reader"))
 		end),
 		ai          = collect_timed("ai", function() return collect_ai(state) end),
 		network     = {},
@@ -626,7 +626,7 @@ function M.build_snapshot(state, detailed, extensive, complete_local)
 			table.concat(undeclared, ", "))
 	end
 	if complete_local == true then
-		local err = require("healthcheck.configuration").complete(snapshot, M.configuration_context(schema))
+		local err = require("diagnostics.engine.healthcheck.configuration").complete(snapshot, M.configuration_context(schema))
 		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
 	end
 	return snapshot
@@ -648,9 +648,9 @@ end
 --- @return boolean pushed
 local function push(session, message)
 	if _session ~= session then return false end
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if manager.current_epoch("healthcheck") ~= session.epoch then return false end
-	local ok, json = pcall(require("json").encode, message)
+	local ok, json = pcall(require("core.text.engine.json").encode, message)
 	if not ok then
 		Logger.error(LOG, "A diagnostics message could not be encoded: %s.", tostring(json))
 		return false
@@ -763,17 +763,17 @@ local function perform(session, action, state, context)
 	local Report = require("ui.healthcheck.report")
 	local documents = M.config()
 	if action.action == "export_snapshot" then
-		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
+		if not require("diagnostics.engine.healthcheck.share").capture_page_checks(session.snapshot, action) then
 			return { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence }
 		end
 		return { type = "action", action = "export_snapshot", ok = true,
 			export_sequence = action.export_sequence, snapshot = session.snapshot,
-			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
-				require("infra.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
+			share_text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, documents.schema,
+				require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key), action.day_log == true).text }
 	end
 	if action.action == "day_log" then
 		-- Opt-in: ticking collects and redacts today's log; unticking drops it
-		local DayLogHost = require("healthcheck.day_log")
+		local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 		if not action.enabled then
 			DayLogHost.discard(session.snapshot)
 			return { type = "action", action = "day_log", ok = true, state = "off" }
@@ -829,7 +829,7 @@ local function perform(session, action, state, context)
 	local function current()
 		return _session == session and session.action_token == token and session.snapshot == token.snapshot
 			and session.snapshot.export_revision == token.revision
-			and require("ui.webview_manager").current_epoch("healthcheck") == session.epoch
+			and require("core.ui.ui.webview_manager").current_epoch("healthcheck") == session.epoch
 	end
 	local request = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot, {
 		current = current,
@@ -867,11 +867,11 @@ function M.on_message(payload, state, context)
 		}
 		_session = session
 		session.snapshot = M.build_snapshot(state, false)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		local message = init_message(session)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		start_probes(session, state)
-		if _session ~= session or require("ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
+		if _session ~= session or require("core.ui.ui.webview_manager").current_epoch("healthcheck") ~= epoch then return nil end
 		return message
 	end
 	if not _session or _session.epoch ~= epoch then
@@ -908,13 +908,13 @@ end
 --- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened
 function M.open()
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local epoch = manager.current_epoch("healthcheck")
 	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")
 		return false
 	end
-	return manager.show("healthcheck", require("infra.i18n").get_locale())
+	return manager.show("healthcheck", require("core.i18n.engine.i18n").get_locale())
 end
 
 return M

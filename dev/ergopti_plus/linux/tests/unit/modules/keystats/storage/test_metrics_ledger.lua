@@ -20,8 +20,8 @@ local HAS_SQLITE = (function()
 end)()
 
 local Ledger = require("modules.keystats.metrics_ledger")
-local Queries = require("keystats.queries")
-local quote = require("text_utils").shell_quote
+local Queries = require("metrics.engine.queries")
+local quote = require("core.text.engine.utils_core").shell_quote
 
 local DEVICE = "linux-ledger-host"
 
@@ -32,7 +32,7 @@ end
 
 local function schema_sql()
 	local root = helpers.driver_root()
-	local handle = assert(io.open(root .. "/../_shared/data/db/schema.sql", "rb"))
+	local handle = assert(io.open(root .. "/../_shared/metrics/data/db/schema.sql", "rb"))
 	local text = handle:read("*a")
 	handle:close()
 	return text
@@ -94,7 +94,7 @@ local function insert_rows(db, first_id, date)
 		{ "events.hotstring", { app = "kate", kind = "fired", trigger = "btw", replacement = "by the way", h_type = "user",
 			net_saved_chars = 7 } },
 		{ "events.session", { kind = "session_start", duration_ms = 0 } },
-		{ "events.roi", { app = "kate", kind = "new_trigger_candidate", meta_json = require("json").encode({ word = tricky, occurrences = 5 }) } },
+		{ "events.roi", { app = "kate", kind = "new_trigger_candidate", meta_json = require("core.text.engine.json").encode({ word = tricky, occurrences = 5 }) } },
 		{ "events.llm", { app = "kate", kind = "suggested", context = "ctx", predictions_json = "[]", prediction = "p",
 			all_predictions_json = "[]", chosen_index = 0, deletes = 0, deleted_text = "", net_saved_chars = 0, count = 1,
 			prompt_tokens = 1, completion_tokens = 1, total_tokens = 2, est_cost_usd = 0 } },
@@ -105,15 +105,21 @@ local function insert_rows(db, first_id, date)
 		params.device_id, params.id, params.ts, params.date = DEVICE, first_id + index - 1, TS, date
 		script[#script + 1] = Queries.render(entry[1], "cli_json", params)
 	end
+	-- events_clipboard is rendered by the shared clipboard module, outside the catalogue.
+	local clipboard_id = first_id + #rows
+	script[#script + 1] = require("metrics.engine.capture.clipboard_events").insert_sql({ device_id = DEVICE, id = clipboard_id,
+		ts = TS, date = date, kind = "clipboard_paste", app = "kate",
+		meta_json = require("core.text.engine.json").encode({ copy_lag_ms = 12, source_app = tricky }) })
 	assert(sqlite(db, table.concat(script, "\n")))
 	-- INSERT OR IGNORE drops a row a CHECK refuses: prove every family landed.
 	local count = assert(sqlite(db, "SELECT (SELECT count(*) FROM events_typing)"
 		.. "+(SELECT count(*) FROM events_app_switch)+(SELECT count(*) FROM events_window_switch)"
 		.. "+(SELECT count(*) FROM events_shortcut)+(SELECT count(*) FROM events_system)"
 		.. "+(SELECT count(*) FROM events_hotstring)+(SELECT count(*) FROM events_session)"
-		.. "+(SELECT count(*) FROM events_llm)+(SELECT count(*) FROM events_roi);"))
-	assert(tonumber(count) == first_id + #rows - 1, "a fixture row was refused by the schema")
-	return first_id + #rows - 1
+		.. "+(SELECT count(*) FROM events_llm)+(SELECT count(*) FROM events_roi)"
+		.. "+(SELECT count(*) FROM events_clipboard);"))
+	assert(tonumber(count) == clipboard_id, "a fixture row was refused by the schema")
+	return clipboard_id
 end
 
 local DUMP = "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'events_%' ORDER BY name;"
@@ -246,6 +252,43 @@ helpers.describe("Linux metrics ledger export", function()
 		helpers.assert_eq(reopened:status().rebuilding, false)
 	end)
 
+	it("linux-ledger-meta-once: a fresh process reads its recorded position in one query", function()
+		-- Each sqlite3 query is a process (about 4 ms at boot); the four meta
+		-- keys used to be four get_meta calls on the boot path.
+		local dir = temp_dir()
+		local db = dir .. "/metrics.sqlite"
+		local store = new_store(db)
+		insert_rows(db, 1, "2026-11-05")
+		local first = make_ledger(dir, store)
+		assert(first:prepare())
+		run_to_idle(first)
+		local counted, meta_reads, queries = {}, 0, 0
+		for name, fn in pairs(store) do counted[name] = fn end
+		counted.get_meta = function(...) meta_reads = meta_reads + 1; return store.get_meta(...) end
+		counted.query_rows = function(...) queries = queries + 1; return store.query_rows(...) end
+		local reopened = make_ledger(dir, counted)
+		assert(reopened:prepare())
+		helpers.assert_eq(reopened:status().rebuilding, false, "the recorded position was read back")
+		helpers.assert_eq(meta_reads, 0)
+		helpers.assert_eq(queries, 1)
+	end)
+
+	it("linux-ledger-meta-decode: values survive the line framing and junk is counted", function()
+		local Json = require("core.text.engine.json")
+		local recorded, malformed = Ledger.decode_meta({
+			Json.encode(Ledger.META.date) .. "\t" .. Json.encode("2026-11-05"),
+			Json.encode(Ledger.META.device) .. "\t" .. Json.encode("dev\0ice\nx"),
+			Json.encode("unrelated_key") .. "\t" .. Json.encode("v"),
+			"not a row",
+		})
+		helpers.assert_eq(recorded.date, "2026-11-05")
+		helpers.assert_eq(recorded.device, "dev\0ice\nx")
+		helpers.assert_eq(malformed, 2)
+		helpers.assert_eq(next((Ledger.decode_meta(nil))), nil, "a refused query records nothing")
+		local _, broken = Ledger.decode_meta(true)
+		helpers.assert_eq(broken, 1, "an answer that is not a list of lines is malformed, never iterated")
+	end)
+
 	it("linux-ledger-divergence: a size other than the recorded one regenerates the whole file", function()
 		local dir = temp_dir()
 		local db = dir .. "/metrics.sqlite"
@@ -287,7 +330,7 @@ helpers.describe("Linux metrics ledger export", function()
 		local store = new_store(dir .. "/metrics.sqlite")
 		local ledger = make_ledger(dir, store)
 		assert(ledger:prepare())
-		local identity = require("json").decode(read(dir .. "/metrics/by_device/" .. DEVICE .. "/device.json"))
+		local identity = require("core.text.engine.json").decode(read(dir .. "/metrics/by_device/" .. DEVICE .. "/device.json"))
 		helpers.assert_eq(identity.device_id, DEVICE)
 		helpers.assert_eq(identity.os, "linux")
 		helpers.assert_eq(identity.host_signature, "machine")

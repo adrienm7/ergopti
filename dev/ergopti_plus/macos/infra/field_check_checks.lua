@@ -31,13 +31,13 @@
 ---    once, so a hung launchctl never leaves a window waiting.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
-local Logger = require("infra.logger")
-local MainThreadHold = require("infra.main_thread_hold")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger = require("core.logger.engine.logger")
+local MainThreadHold = require("core.lifecycle.engine.main_thread_hold")
 local KePaths = require("platform.remap.ke_paths")
 local LeaseMemorySnapshot = require("platform.remap.lease_memory_snapshot")
 local RuntimeVhid = require("platform.remap.runtime_vhid")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
 
@@ -215,7 +215,7 @@ function M.lease_with_facts(ports, report, finish, remap, waited)
 	local losses = (counts.ups_without_down or 0) + (counts.downs_without_up or 0) + (counts.stuck or 0)
 	report.step("key_losses", losses == 0 and STATE.pass or STATE.fail, losses)
 	-- A key the driver consumed and never delivered: the dropped-letter owner
-	-- this driver can see (infra/keystroke_integrity.lua).
+	-- this driver can see (core/logger/engine/keystroke_integrity.lua).
 	local swallowed = ports.swallowed_keys()
 	report.step("swallowed_keys", swallowed == 0 and STATE.pass or STATE.fail, swallowed)
 	-- PONG and READY timeouts are the Apple silicon lease failures (117/140).
@@ -356,7 +356,7 @@ end
 --- The grammar is shared with the Linux and Windows checks.
 --- @param output any Helper stdout.
 --- @return table steps id → { state, value }
-M.parse_network_helper = require("network.field_check_network").parse_chain_lines
+M.parse_network_helper = require("core.network.engine.field_check_network").parse_chain_lines
 
 --- The managed download chain end to end: system proxy settings, the PAC
 --- download and verdict, then one HEAD request through the native transport.
@@ -364,8 +364,8 @@ M.parse_network_helper = require("network.field_check_network").parse_chain_line
 --- The steps are the shared ones (network.field_check_network); this function
 --- binds them to scutil, the PAC fetch and the native helper.
 function M.network(ports, report, finish)
-	local PacCheck = require("network.pac_check")
-	require("network.field_check_network").run({
+	local PacCheck = require("core.network.engine.pac_check")
+	require("core.network.engine.field_check_network").run({
 		proxy_settings = function(callback)
 			ports.exec(SCUTIL, { "--proxy" }, COMMAND_TIMEOUT, function(code, output)
 				if code ~= 0 then
@@ -898,7 +898,7 @@ end
 --- The composed layout: installs the shipped check composition through the
 --- composer's real path, verifies it, asks the system whether it is enabled and
 --- removes it again (a user's own composition is only read). The steps are the
---- shared ones (_shared/lua/layouts/composer_check.lua).
+--- shared ones (_shared/layouts/engine/composer/check_core.lua).
 function M.composer(ports, report, finish)
 	local env = ports.composer_env()
 	if not env then
@@ -906,7 +906,7 @@ function M.composer(ports, report, finish)
 		finish()
 		return
 	end
-	require("layouts.composer_check").run(env, report, finish)
+	require("layouts.engine.composer.check_core").run(env, report, finish)
 end
 
 -- The checks only the developer field run asks for (data/field_run.json)
@@ -949,10 +949,13 @@ M.checks = {
 	idle_cost = Session.idle_cost,
 	fifo_safety = Session.fifo_safety,
 	slow_lines = Session.slow_lines,
+	log_signals = require("infra.field_check_log_signals").log_signals,
 	pac_fallback = PacFallback.pac_fallback,
 	apple_shortcuts = require("infra.field_check_apple_shortcuts").apple_shortcuts,
 	tap_hold_thresholds = require("infra.field_check_tap_hold_thresholds").tap_hold_thresholds,
 	tap_copy = require("infra.field_check_tap_copy").tap_copy,
+	raw_telemetry = require("infra.field_check_raw_telemetry").raw_telemetry,
+	physical_shortcuts = require("infra.field_check_physical_shortcuts").physical_shortcuts,
 }
 
 --- The Debug menu checks the field run does not ask for, each with the

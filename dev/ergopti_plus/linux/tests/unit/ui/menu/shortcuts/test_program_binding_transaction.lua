@@ -2,10 +2,10 @@
 
 --- Exercises the actual picker callback, state owners and conditional file writer.
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Json = require("json")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Json = require("core.text.engine.json")
 
 local PRIOR = Json.encode({ version = 1, executable = "/private/prior-program", arguments = { "private-prior" } })
 local NEXT = Json.encode({ version = 1, executable = "/private/next-program", arguments = { "private-next" } })
@@ -84,12 +84,12 @@ local function with_case(spec, body)
 					controls.logs[#controls.logs + 1] = string.format(message, ...)
 				end
 			end
-			package.loaded["logger.shim"] = logger
+			package.loaded["core.logger.engine.shim"] = logger
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = { get = function(_, default) return default end }
+			package.loaded["core.fs.adapters.storage"] = { get = function(_, default) return default end }
 			package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
-			package.loaded["adapters.shell_runner"] = { has_command = function() return true end,
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() error("picker must not close input") end }
+			package.loaded["core.process.adapters.shell_runner"] = { has_command = function() return true end,
 				quote = function(value) return "'" .. value .. "'" end }
 			local gestures = require("modules.gestures.manager")
 			gestures.init({ persist = true, config_path = path, enabled = false })
@@ -148,7 +148,7 @@ local function with_case(spec, body)
 					return Writer.publish_if_unchanged(target, content, nil, expected)
 				end,
 			}
-			package.loaded["adapters.file_system"] = files
+			package.loaded["core.fs.adapters.file_system"] = files
 			local called, err = pcall(body, callback(logger), gestures, provider, controls, path, source)
 			for _, backup in ipairs(controls.backups) do os.remove(backup); os.remove(backup .. ".tmp") end
 			if not called then error(err, 0) end
@@ -177,10 +177,10 @@ local function with_configuration_picker(body)
 		for _, level in ipairs({ "error", "warn", "info", "debug", "trace", "start", "success", "done" }) do
 			logger[level] = function(_, message, ...) seen.logs[#seen.logs + 1] = string.format(message, ...) end
 		end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["ui.gesture_conflicts"] = { notify_boot = function() end, rows = function() return {} end }
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad" }
-		package.loaded["adapters.program_providers"] = {}
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad" }
+		package.loaded["core.process.adapters.program_providers"] = {}
 		local gestures = require("modules.gestures.manager")
 		gestures.init({ persist = true, config_path = f.paths.config("config.toml"), enabled = false })
 		local keyboard = require("modules.shortcuts.keyboard_shortcuts")
@@ -199,7 +199,7 @@ local function with_configuration_picker(body)
 			local slot = assert(find(rows, function(row)
 				return type(row.title) == "string" and row.title:sub(1, #prefix) == prefix
 			end), "the actual keyboard slot is rendered")
-			local title = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local title = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 			local command = assert(find(slot.menu, function(row) return row.title == title and type(row.fn) == "function" end))
 			command.fn()
 			assert(bridge.is_open() and f.host.is_visible("action_picker"), "the real picker session is open")
@@ -282,7 +282,7 @@ helpers.describe("Linux program picker transaction", function()
 				return true
 			end }
 			local rows = menu_rows(gestures, path)
-			local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+			local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 			local function open_current(tree)
 				for _, row in ipairs(tree) do
 					if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -387,7 +387,7 @@ helpers.describe("Linux program picker transaction", function()
 					return true
 				end }
 				local rows = menu_rows(gestures, path)
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local function open_current(tree)
 					for _, row in ipairs(tree) do
 						if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -589,7 +589,7 @@ helpers.describe("Linux program picker transaction", function()
 			helpers.assert_eq(pick({ is_paused = function() return false end }, gestures, "keyboard__primary_j", "run_program",
 				function() return provider.set_action("primary_j", "run_program") end, NEXT), false)
 			helpers.assert_eq(Sandbox.read_bytes(path), foreign)
-			local runner = require("adapters.program_runner")
+			local runner = require("core.process.adapters.program_runner")
 			local spawn, acquisitions = runner.spawn, 0
 			runner.spawn = function(...) acquisitions = acquisitions + 1; return spawn(...) end
 			local called, started = pcall(gestures.run_program, "keyboard__primary_j")
@@ -647,7 +647,7 @@ local function parameterized_confirmation(gestures, path)
 		return true
 	end }
 	local rows = menu_rows(gestures, path)
-	local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+	local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 	local function visit(tree)
 		for _, row in ipairs(tree) do
 			if row.title == picker_label and type(row.fn) == "function" then row.fn() end
@@ -736,7 +736,10 @@ helpers.describe("parameter transaction physical boundary", function()
 				helpers.assert_eq(provider.configuration_domain(spec.binding), "keyboard", "the genuine provider recognizes this physical registry slot")
 				helpers.assert_type(gestures.action_parameter_update(spec.binding, selected.action or "run_program", selected.scalar), "table",
 					"the actual central parameter constructor accepts this binding and scalar")
-				helpers.assert_eq(provider.physical_delivery_available(), false, "public physical delivery remains genuinely unavailable")
+				-- The production getter answers true since 2026-11-11 (LIN-004); the
+				-- transaction's refusal of an unqualified delivery is what this pins.
+				helpers.assert_eq(provider.physical_delivery_available(), true, "the production getter")
+				provider.physical_delivery_available = function() return false end
 				local prior_parameters = gestures.get_all_action_parameters()
 				local stopped, original_stop = 0, gestures.stop_programs
 				gestures.stop_programs = function() stopped = stopped + 1; return original_stop() end
@@ -784,7 +787,7 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 		helpers.it("(tap-key-magic-override) " .. case.why, function()
 			with_case(CASES[3], function(_, gestures, _, controls, path)
 				local Source, file = magic_source('[hotstrings]\nmagic_key_source = "' .. case.source .. '"\n')
-				local reason = " — " .. require("infra.i18n").get(Source.TAP_OVERRIDE_REASON)
+				local reason = " — " .. require("core.i18n.engine.i18n").get(Source.TAP_OVERRIDE_REASON)
 				helpers.assert_true(reason ~= " — " .. Source.TAP_OVERRIDE_REASON, "the reason is translated")
 				local selected
 				package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
@@ -798,7 +801,7 @@ helpers.describe("Linux tap key rows and the physical magic key", function()
 					if title:sub(-#reason) == reason then marked[#marked + 1] = title end
 				end
 				helpers.assert_eq(#marked, case.marked, table.concat(marked, " | "))
-				local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+				local picker_label = require("core.i18n.engine.i18n").get("dialog.action_picker.label") .. "…"
 				local function open_current(tree)
 					for _, row in ipairs(tree) do
 						if row.title == picker_label and type(row.fn) == "function" then row.fn() end

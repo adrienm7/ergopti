@@ -1,11 +1,11 @@
 --- modules/gestures/program_owner.lua
 
 --- Private user programs use the shared native worker lifecycle policy.
-local Runner = require("adapters.program_runner")
-local Worker = require("native_worker_owner")
-local Parameter = require("program_parameter")
-local Timings = require("infra.timings")
-local Logger = require("logger.shim")
+local Runner = require("core.process.adapters.program_runner")
+local Worker = require("core.lifecycle.engine.native_worker_owner")
+local Parameter = require("settings.engine.program_parameter")
+local Timings = require("core.timing.engine.timings")
+local Logger = require("core.logger.engine.shim")
 local loaded, Native = pcall(require, "luv")
 if not loaded then Native = nil end
 local M = {}

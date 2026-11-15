@@ -1,12 +1,12 @@
 --- tests/unit/ui/menu/gestures_and_apps/test_gesture_scope.lua
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 local Manifest = require("infra.manifest_reader")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	helpers.load_with_stubs("modules.gestures.actions")
@@ -45,7 +45,7 @@ local function fixture(source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -143,19 +143,19 @@ helpers.describe("macOS complete gesture scope", function()
 		end
 		local dialogs, opened, deferred = {}, 0, {}
 		local saved = {}
-		for _, name in ipairs({ "infra.dialog_util", "infra.deferred_work" }) do saved[name] = package.loaded[name] end
-		package.loaded["infra.dialog_util"] = { block_alert = function(_, message, first)
+		for _, name in ipairs({ "core.ui.engine.dialog_util", "core.timing.engine.deferred_work" }) do saved[name] = package.loaded[name] end
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, message, first)
 			dialogs[#dialogs + 1] = message
 			return first
 		end }
-		package.loaded["infra.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) deferred[#deferred + 1] = fn; return true end }
 		local ok, err = pcall(function()
 			gestures.system_slot_state = function(slot) return slot == claimed_slot and "taken" or "free" end
 			gestures.open_system_gestures = function() opened = opened + 1; return true end
 			helpers.assert_eq(menu_commands(owner, gestures, state).scope_restore(), true)
 			for _, fn in ipairs(deferred) do fn() end
 			helpers.assert_eq(#dialogs, 1, "one dialog names the macOS gesture still on")
-			helpers.assert_eq(dialogs[1], require("infra.i18n").get("menu.gestures.recommended_reason_macos"))
+			helpers.assert_eq(dialogs[1], require("core.i18n.engine.i18n").get("menu.gestures.recommended_reason_macos"))
 			helpers.assert_eq(opened, 1, "its first button opens the Trackpad settings")
 			dialogs, deferred = {}, {}
 			free_gestures.system_slot_state = function() return "free" end
@@ -167,15 +167,14 @@ helpers.describe("macOS complete gesture scope", function()
 		if not ok then error(err, 0) end
 	end)
 
-	helpers.it("a pause leaves every store untouched", function()
-		for _, mode in ipairs({ "clear", "recommended" }) do
-			local owner, gestures, files, _, controls, _, _, writes, original = fixture()
-			controls.paused = true
-			helpers.assert_eq(owner.apply(mode), false)
-			helpers.assert_eq(writes(), 0)
-			helpers.assert_eq(files.config, original)
-			helpers.assert_eq(gestures.get_action("tap_4"), "open_url")
-		end
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("clears while paused (edd1-paused-writes)", function()
+		local owner, gestures, files, _, controls, _, _, writes, original = fixture()
+		controls.paused = true
+		helpers.assert_eq(owner.apply("clear"), true)
+		helpers.assert_true(writes() > 0, "the paused clear writes its category")
+		helpers.assert_true(files.config ~= original)
+		helpers.assert_true(gestures.get_action("tap_4") ~= "open_url")
 	end)
 	helpers.it("refused publication restores native state and both preference baselines", function()
 		local owner, gestures, files, state, controls, prefs, save, _, original = fixture()
@@ -259,7 +258,7 @@ helpers.describe("macOS complete gesture scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 
@@ -273,7 +272,7 @@ package.loaded["infra.preferences"] = nil
 -- ========================================================
 
 local function actual_frame_fixture(source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	package.loaded["modules.gestures.engine"] = nil
 	package.loaded["modules.gestures.conflicts"] = nil
 	local recording = require("tests.support.synthetic_action_fixture").load("modules.gestures.actions")
@@ -315,7 +314,7 @@ local function actual_frame_fixture(source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = files_port
+	package.loaded["core.fs.adapters.file_system"] = files_port
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -375,13 +374,13 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 		local title = restore and "clear then recommended leaves every two-contact gesture to the OS"
 			or "an explicit custom two-contact binding remains unchanged and emits its tagged key"
 		helpers.it(title, function()
-			local previous_files = package.loaded["adapters.file_system"]
+			local previous_files = package.loaded["core.fs.adapters.file_system"]
 			helpers.with_stub_scope({
 				"modules.gestures", "modules.gestures.init", "modules.gestures.engine",
 				"modules.gestures.actions", "modules.gestures.conflicts", "modules.gestures.actions_click",
 				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
-				"adapters.file_system",
-				"adapters.synthetic_input", "adapters.event_provenance", "adapters.timer_scheduler",
+				"core.fs.adapters.file_system",
+				"platform.input.synthetic_input", "adapters.event_provenance", "core.events.timer_scheduler",
 				"infra.preferences", "ui.menu.gesture_scope", "ui.menu.scoped_preferences",
 				"ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
 			}, function()
@@ -465,7 +464,7 @@ helpers.describe("macOS two-finger neutral recommendations", function()
 				assert(engine.stop() == true, "the exact inert engine tap must retire")
 				if not ok then error(detail, 0) end
 			end)
-			helpers.assert_true(rawequal(package.loaded["adapters.file_system"], previous_files),
+			helpers.assert_true(rawequal(package.loaded["core.fs.adapters.file_system"], previous_files),
 				"the complete actual-owner case must restore the exact filesystem adapter")
 		end)
 	end

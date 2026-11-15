@@ -29,7 +29,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local LOG = "ui.menu.builder"
 
 -- Single source of the driver version and of the build identity. Every other
@@ -122,7 +122,7 @@ local function _build_header(ctx)
 			fields[name] = value
 		end
 		local expected_kind = key == "linux_tray_active_header" and "label" or "command"
-		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or require("config_keys").COMMAND.LINUX_TRAY_RESUME
+		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or require("settings.engine.keys").COMMAND.LINUX_TRAY_RESUME
 		if rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id
 			or type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""
 			or rawget(record, "caption_getter") ~= "linux_tray_version"
@@ -162,7 +162,7 @@ local function _build_header(ctx)
 	if not current() then return nil end
 	local ok, rows = pcall(function()
 		if is_paused then
-			return ManifestMenu.template_rows("linux_tray_paused_header", { [require("config_keys").COMMAND.LINUX_TRAY_RESUME] = function()
+			return ManifestMenu.template_rows("linux_tray_paused_header", { [require("settings.engine.keys").COMMAND.LINUX_TRAY_RESUME] = function()
 				if type(ctx.on_toggle_pause) ~= "function" then
 					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
 					return
@@ -191,21 +191,6 @@ local function _build_header(ctx)
 	return row, current
 end
 
---- Greys one feature row for a pause, and strips what would let it act.
----
---- Stripped, not merely greyed: a disabled row whose submenu or handler survives
---- still acts the moment a tray backend renders the greying differently.
---- @param row table Row data from a section builder.
---- @return table The same row, greyed.
-local function _grey_for_pause(row)
-	if type(row) ~= "table" or row.separator then return row end
-	row.disabled = true
-	row.submenu = nil
-	row.items = nil
-	row.action = nil
-	return row
-end
-
 --- Whether a manifest row is visible on this driver. A row with no ``platforms``
 --- restriction is visible everywhere.
 --- @param row table Manifest row.
@@ -219,6 +204,8 @@ local function _row_is_for_linux(row)
 end
 
 local _build_layouts = require("ui.menu.menu_layouts").build
+
+local _build_ergopti_studio = require("ui.menu.menu_ergopti_studio").build
 
 local _build_hotstrings = require("ui.menu.menu_hotstrings").build
 
@@ -271,7 +258,7 @@ local _build_debug = require("ui.menu.menu_debug").build
 --- @param key string i18n key.
 --- @return string The translation, or the key itself.
 function i18n_safe(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	if ok and i18n and type(i18n.get) == "function" then
 		local val = i18n.get(key)
 		if val and val ~= key then return val end
@@ -338,6 +325,7 @@ function M.build(ctx)
 	-- same array through its own loader all along.
 	local builders = {
 		["keyboard_layout"] = _build_layouts,
+		["ergopti_studio"]  = _build_ergopti_studio,
 		["hotstrings"]      = _build_hotstrings,
 		["llm"]             = _build_llm,
 		["agent"]           = _build_agent,
@@ -401,13 +389,11 @@ function M.build(ctx)
 						disabled_reason_key = row.reason_key }
 				elseif id == "quit" then
 					quit_row = build(ctx)
-				elseif ctx.paused == true and row.greyed_when_paused == true then
-					-- The rows the manifest marks as features, the same ones on the
-					-- three trays. The tail (updates, configuration, language, about,
-					-- reload, quit, debug) stays live: it is how the user inspects,
-					-- resumes or leaves a paused script.
-					rows[#rows + 1] = _grey_for_pause(build(ctx))
 				else
+					-- A pause stops typing, not configuration (EDD-1, maintainer
+					-- decision 2026-11-12): the feature rows stay live while paused.
+					-- The manifest's `greyed_when_paused` is read by the AHK tray
+					-- alone until its Suspend gates go.
 					rows[#rows + 1] = build(ctx)
 				end
 			end

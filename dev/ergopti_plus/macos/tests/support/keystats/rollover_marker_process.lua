@@ -12,9 +12,9 @@ return function()
 	local root, temporary = assert(arg[3]), assert(arg[2])
 	local driver = root .. "/static/ergopti_plus/macos"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	local Json = require("json")
+		.. root .. "/static/ergopti_plus/_shared/?.lua;"
+		.. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+	local Json = require("core.text.engine.json")
 	local Helpers = require("tests.helpers")
 	local Lfs = require("lfs")
 	local case = assert(os.getenv("ERGOPTI_ROLLOVER_CASE"))
@@ -193,11 +193,11 @@ return function()
 				timer = { new = new_timer, absoluteTime = function() return 1000000000 end,
 					secondsSinceEpoch = function() return 1792497600 end },
 			})
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			-- The actual modules and their normal shared data remain loaded. No
 			-- Rotation, writer, aggregator, export, or manager implementation is faked.
 			os.date = function(format, epoch)
@@ -210,7 +210,7 @@ return function()
 			manager = require("modules.keystats.log_manager")
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			-- Begin this physical recovery scenario with an existing user ignore.
 			local ignore = temporary .. "/metrics/.gitignore"
 			if not Lfs.symlinkattributes(ignore) then

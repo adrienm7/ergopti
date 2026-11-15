@@ -13,9 +13,9 @@ local helpers = require("tests.helpers")
 
 local function snapshot_modules()
 	return {
-		http_client = package.loaded["adapters.http_client"],
-		shell_runner = package.loaded["adapters.shell_runner"],
-		timer_scheduler = package.loaded["adapters.timer_scheduler"],
+		http_client = package.loaded["core.network.adapters.http_client"],
+		shell_runner = package.loaded["core.process.adapters.shell_runner"],
+		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		discovery = package.loaded["modules.llm.api_mlx_discovery"],
 		hs_module = package.loaded["hs"],
 		global_hs = rawget(_G, "hs"),
@@ -39,7 +39,7 @@ local function make_env(options)
 		tasks = {},
 	}
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now = function() return env.wall_now end,
 		awake_time = function() return env.awake_now end,
 		after = function(delay, callback)
@@ -81,7 +81,7 @@ local function make_env(options)
 		end,
 	}
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(_executable, _args, on_done)
 			local task = { on_done = on_done }
 			task.start = function()
@@ -101,7 +101,7 @@ local function make_env(options)
 		end,
 	}
 
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			return {
 				post = function(_url, _headers, _payload, callback)
@@ -150,9 +150,9 @@ end
 --- gate must be able to prove that the stub cannot leak into the next test file.
 --- @param saved table Snapshot returned by snapshot_modules().
 local function restore_modules(saved)
-	package.loaded["adapters.http_client"] = saved.http_client
-	package.loaded["adapters.shell_runner"] = saved.shell_runner
-	package.loaded["adapters.timer_scheduler"] = saved.timer_scheduler
+	package.loaded["core.network.adapters.http_client"] = saved.http_client
+	package.loaded["core.process.adapters.shell_runner"] = saved.shell_runner
+	package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 	package.loaded["modules.llm.api_mlx_discovery"] = saved.discovery
 	package.loaded["hs"] = saved.hs_module
 	_G.hs = saved.global_hs

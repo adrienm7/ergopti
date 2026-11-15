@@ -13,12 +13,12 @@ local MetricsState = require("infra.metrics_state_keys")
 local MODULES = {
 	"hs.fs",
 	"infra.app_picker",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.manifest_menu",
-	"infra.text_utils",
+	"core.text.engine.utils",
 	"modules.keystats",
 	"ui.menu.menu_metrics",
 }
@@ -94,9 +94,9 @@ local function with_filter(filter, options, callback)
 		observations.change_apps = on_change
 		return {}
 	end }
-	package.loaded["infra.dialog_util"] = {}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.logger"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {}
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = {
 		error = function(_, message, ...)
 			observations.errors[#observations.errors + 1] = string.format(message, ...)
 		end,
@@ -111,7 +111,7 @@ local function with_filter(filter, options, callback)
 		end,
 		resolve_disabled_when = function() return false end,
 	}
-	package.loaded["infra.text_utils"] = {}
+	package.loaded["core.text.engine.utils"] = {}
 	package.loaded["modules.keystats"] = keystats
 
 	local state = {

@@ -18,7 +18,7 @@
 ---    menus list it wherever its format serves (modules/llm/provider_uses.lua).
 ---    Backboard (a message on a new thread, naming the key's assistant, which
 ---    is created once per key and session) and decisions (TypeSafe's Jev, the
----    agent's System 1 only) take the shapes of _shared/lua/llm/remote_formats.lua.
+---    agent's System 1 only) take the shapes of _shared/ai/engine/api/remote_formats.lua.
 --- 2. Async non-streaming — every call goes through ``hs.http.asyncPost`` so
 ---    the main thread never blocks. Remote streaming is intentionally OFF:
 ---    the three popular streaming flavours (OpenAI SSE / Anthropic event
@@ -35,19 +35,19 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
-local text_utils = require("infra.text_utils")
-local Timings        = require("infra.timings")
-local PerfBudget     = require("perf_budget")
-local Paths          = require("infra.paths")
+local Logger         = require("core.logger.engine.logger")
+local text_utils = require("core.text.engine.utils")
+local Timings        = require("core.timing.engine.timings")
+local PerfBudget     = require("core.logger.engine.perf_budget")
+local Paths          = require("core.fs.engine.paths")
 local Profiles       = require("modules.llm.profiles")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
-local Ports = require("llm.request_plan.ports")
-local TokenBudget = require("llm.request_plan.token_budget")
-local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
+local Ports = require("ai.engine.request_plan.ports")
+local TokenBudget = require("ai.engine.request_plan.token_budget")
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")   -- single source for DEFAULT_MAX_TOKENS
 local TokenCrypto    = require("modules.llm.api_token_crypto")
-local _http_adapter  = require("adapters.http_client")
+local _http_adapter  = require("core.network.adapters.http_client")
 local REQUEST_TIMEOUT_MS = Timings.ms("llm", "request_timeout_ms")
 local _http_options = { timeout_ms = REQUEST_TIMEOUT_MS }
 local _infer_client  = _http_adapter.new(_http_options)   -- used for inference POST requests
@@ -57,33 +57,33 @@ local _warmup_client = _http_adapter.new(_http_options)   -- warmup has independ
 -- Screen reading (modules/llm/screen_answer.lua) names its own provider, which
 -- need not be the active entry: its requests never share the prediction owner
 local _vision_client = _http_adapter.new(_http_options)
--- The capability listings (llm/model_capabilities.lua): one client per
+-- The capability listings (ai/engine/local_servers/model_capabilities.lua): one client per
 -- provider, created at its first fetch, so a background fetch never cancels or
 -- waits for a prediction nor for another provider's listing
 local _capability_clients = {}
 -- The Test-API probe of an entry that is not the prediction backend (a
 -- decisions provider): it must cancel neither a prediction nor an agent request
 local _probe_client = _http_adapter.new(_http_options)
-local JsonCodec      = require("adapters.json_codec")
-local TimerScheduler = require("adapters.timer_scheduler")
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local TimerScheduler = require("core.events.timer_scheduler")
 local ProgressiveReveal = require("modules.llm.progressive_reveal")
-local ResponseClassifier = require("llm.remote_response_classifier")
-local Formats        = require("llm.remote_formats")
+local ResponseClassifier = require("ai.engine.policy.remote_response_classifier")
+local Formats        = require("ai.engine.api.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
 local LocalServers   = require("modules.llm.local_servers")
 local LocalServerPorts = require("modules.llm.local_server_ports")
-local AuthPolicy     = require("llm.local_server_auth")
-local LocalServerMenu = require("llm.local_server_menu")
-local ThinkingOff    = require("llm.thinking_off")
+local AuthPolicy     = require("ai.engine.local_servers.auth")
+local LocalServerMenu = require("ai.engine.local_servers.menu")
+local ThinkingOff    = require("ai.engine.policy.thinking_off")
 local ThinkingFamilies = require("modules.llm.thinking_families")
-local ModelCapabilities = require("llm.model_capabilities")
-local TableUtil = require("table_util")
-local Storage        = require("adapters.storage")
-local ProviderConfig = require("llm.provider_config_policy")
-local Json           = require("json")
-local ApiModelListing = require("llm.api_model_listing")
-local UrlTemplate    = require("llm.api_url_template")
-local TokenExchange  = require("llm.api_token_exchange")
+local ModelCapabilities = require("ai.engine.local_servers.model_capabilities")
+local TableUtil = require("core.text.engine.table_util")
+local Storage        = require("core.fs.adapters.storage")
+local ProviderConfig = require("ai.engine.policy.provider_config_policy")
+local Json           = require("core.text.engine.json")
+local ApiModelListing = require("ai.engine.api.model_listing")
+local UrlTemplate    = require("ai.engine.api.url_template")
+local TokenExchange  = require("ai.engine.api.token_exchange")
 local LOG            = "llm.api_remote"
 -- One probe client per local server, created at its first sweep with the
 -- registry's local_server_probe_timeout_ms and pinned for the life of the
@@ -104,7 +104,7 @@ if not ok_kl then keystats = nil end
 -- =======================================
 -- =======================================
 
---- Loaded from _shared/modules/llm/api_providers.json at require time (AHK twin loads the
+--- Loaded from _shared/ai/data/api_providers.json at require time (AHK twin loads the
 --- same file). Adding a provider = one entry in the JSON plus (optionally) a
 --- new format branch in build_payload / post_and_parse_resolved below.
 --- Returns (providers_table, order_array, prices_table) on success, or three
@@ -362,12 +362,37 @@ function M.is_local_server(provider_id)
 		and AuthPolicy.token_allowed(provider_id, "", LocalServers.SERVERS)
 end
 
+-- Keychain references a read found absent: an entry restored from a backup
+-- taken before its key was deleted with it (decided by the maintainer on
+-- 2026-11-11: deleting an entry keeps deleting its Keychain item, and the
+-- restored entry asks for its key again). Cleared when its token changes.
+local _absent_references = {}
+
+--- Remembers that the Keychain holds no key for a stored reference.
+--- @param stored string The entry's token field.
+--- @param reason any The read's refusal reason.
+local function note_absent(stored, reason)
+	if reason == "absent" and type(stored) == "string" and stored ~= "" and not _absent_references[stored] then
+		_absent_references[stored] = true
+		Logger.warn(LOG, "An API entry's Keychain key is absent; the entry asks for its key again.")
+	end
+end
+
+--- Whether an entry's stored key reference was read absent from the Keychain.
+--- @param entry table API entry.
+--- @return boolean absent
+function M.entry_key_absent(entry)
+	return type(entry) == "table" and type(entry.token) == "string" and _absent_references[entry.token] == true
+end
+
 --- Tells whether an entry cannot be sent without a key: every provider needs
---- one except a local server, which takes one only when the user gave it.
+--- one except a local server, which takes one only when the user gave it, and
+--- an entry whose Keychain key is absent.
 --- @param entry table API entry.
 --- @return boolean missing
 local function key_missing(entry)
 	if type(entry) ~= "table" then return true end
+	if M.entry_key_absent(entry) then return true end
 	local servers = M.is_local_server(entry.provider) and LocalServers.SERVERS or {}
 	return not AuthPolicy.entry_token_allowed(entry.provider, entry.token, entry.base_url, servers)
 end
@@ -395,7 +420,7 @@ function M.provider_serves(provider_id, use)
 end
 
 local DEDUPLICATION_ENABLED      = ApiCommon.DEFAULT_DEDUPLICATION_ENABLED
--- Retry policy from _shared/modules/llm/inference.json (api_common.lua) so the
+-- Retry policy from _shared/ai/data/inference.json (api_common.lua) so the
 -- remote backend tracks the same retry budget as Ollama / MLX.
 local _R_MAX_MULT, _R_TEMP_STEP, _R_EXTRA_TOKENS = ApiCommon.get_retry_policy()
 local RETRY_FAILED_PREDICTION    = (_R_MAX_MULT or 0) > 1
@@ -415,7 +440,7 @@ local RETRY_FAILED_MAX_MULT      = _R_MAX_MULT
 -- ``base_url`` overrides the provider default when present (empty string =
 -- inherit). ``label`` is the name a user typed in builds before 2026-10: it is
 -- kept as stored and never read, since every tray names an entry after its
--- provider and model (_shared/lua/llm/api_entry_names.lua).
+-- provider and model (_shared/ai/engine/api/entry_names.lua).
 local _entries = {}
 local _active_id = ""
 local _is_ready = false
@@ -891,6 +916,12 @@ function M.set_entries(entries)
 	for _, e in ipairs(entries) do
 		if type(e) == "table" then table.insert(_entries, e) end
 	end
+	-- An absent reference no entry still names is forgotten: a new key replaced it.
+	local named = {}
+	for _, e in ipairs(_entries) do if type(e.token) == "string" then named[e.token] = true end end
+	for stored in pairs(_absent_references) do
+		if not named[stored] then _absent_references[stored] = nil end
+	end
 	Logger.debug(LOG, "API entries set (%d entry/entries).", #_entries)
 	finish_listing(retired_listing, false, "stale_identity")
 	schedule_access_prewarm()
@@ -1271,6 +1302,7 @@ function M.resolve_active_entry(callback)
 		elseif ok == true and type(cleartext) == "string" and cleartext ~= "" then
 			_token_cache[cache_key] = cleartext
 		else
+			note_absent(record.stored, reason)
 			ok, cleartext, reason = false, nil, reason or "decrypt_failed"
 		end
 		for _, pending_waiter in ipairs(record.waiters) do
@@ -1565,7 +1597,7 @@ end
 --- Compute the per-provider auth headers. Gemini carries auth via the URL
 --- query string and has nothing to add here; OpenAI uses Bearer; Anthropic
 --- uses x-api-key + a fixed version pin; Backboard its own key header, with no
---- Bearer; a decisions provider a Bearer header (llm/remote_formats.lua).
+--- Bearer; a decisions provider a Bearer header (ai/engine/api/remote_formats.lua).
 local function build_headers(format, token)
 	local headers = { ["Content-Type"] = "application/json" }
 	if format == "backboard" then
@@ -1757,7 +1789,7 @@ local function thinking_refused()
 	return _thinking_refused
 end
 
--- The capability listings by provider id (llm/model_capabilities.lua cache)
+-- The capability listings by provider id (ai/engine/local_servers/model_capabilities.lua cache)
 local _capabilities = {}
 
 --- The capability check of one provider's model for the resolver: nil when
@@ -1839,7 +1871,7 @@ M.__capabilities_for_test = function() return _capabilities end
 
 --- Turns the model's reasoning off in a request body: its family's control
 --- (thinking_off.json) through the provider's thinking_dialect
---- (llm/thinking_off.lua). A field the body already sets wins.
+--- (ai/engine/policy/thinking_off.lua). A field the body already sets wins.
 --- @param provider_id string The provider id, for the log and the refusals.
 --- @param provider table The catalogue descriptor.
 --- @param model string The model the body names.
@@ -2488,7 +2520,7 @@ end
 -- The listing state of each entry's provider, by entry id: the model selector
 -- page shows one row per listed model, or the provider's known models and a
 -- typed-id row while it is pending, refused or unavailable
--- (_shared/lua/llm/api_model_listing.lua).
+-- (_shared/ai/engine/api/model_listing.lua).
 --- The ids the active entry's provider listed at its last successful listing.
 --- @param entry_id string Entry identifier.
 --- @return table|nil ids Nil before a listing succeeded for this entry.
@@ -3034,6 +3066,7 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	end
 	TokenCrypto.decrypt_async(stored_token, function(decrypted, token, token_reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			note_absent(stored_token, token_reason)
 			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
 				label, provider_id, tostring(entry.id), tostring(token_reason))
 			fail("missing_token")
@@ -3061,7 +3094,7 @@ end
 --- @param use string The use it serves (provider_status).
 --- @param provider_id string Provider id of api_providers.json.
 --- @param model string The model (Gemini puts it in the URL).
---- @param body table The request body (llm/vision.lua build_request).
+--- @param body table The request body (ai/engine/prediction/vision.lua build_request).
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param with_extras boolean|nil Merge the model's model_extras of
@@ -3175,7 +3208,7 @@ end
 --- provider with its stored API key.
 --- @param provider_id string Provider id of api_providers.json.
 --- @param model string The vision model.
---- @param body table The request body (llm/vision.lua build_request).
+--- @param body table The request body (ai/engine/prediction/vision.lua build_request).
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param current function|nil Must still return true after a pending key resolves.
@@ -3186,7 +3219,7 @@ function M.request_vision(provider_id, model, body, on_text, on_fail, current)
 		on_text, on_fail, true, current)
 end
 
---- Posts one prebuilt text chat body (llm/vision.lua build_request without an
+--- Posts one prebuilt text chat body (ai/engine/prediction/vision.lua build_request without an
 --- image) to a provider with its stored API key: the AI agent's System 1 and
 --- System 2 requests, which name their own backend whatever the AI menu uses.
 --- The model's model_extras apply, as they do to a prediction.
@@ -3366,6 +3399,7 @@ local function test_decisions(entry, provider, on_ok, on_fail)
 	if type(stored) ~= "string" or stored == "" then return fail("missing_token") end
 	TokenCrypto.decrypt_async(stored, function(decrypted, token, reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
+			note_absent(stored, reason)
 			fail("missing_token: " .. tostring(reason))
 			return
 		end
@@ -3579,7 +3613,10 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 						do_next()
 						return
 					end
-					if attempt < 2 then
+					-- The quick retry is an attempt of the budget, as on Windows and Linux:
+					-- outside it one prediction at multiplier 2 sent four requests, not two.
+					if attempt < 2 and attempt_index <= max_attempts then
+						attempt_index = attempt_index + 1
 						local retry_tokens = tokens + _R_EXTRA_TOKENS
 						local retry_temp   = math.min(1.30, (tonumber(temp) or ApiCommon.DEFAULT_TEMPERATURE) + _R_TEMP_STEP)
 						request_variant(attempt + 1, retry_tokens, retry_temp)

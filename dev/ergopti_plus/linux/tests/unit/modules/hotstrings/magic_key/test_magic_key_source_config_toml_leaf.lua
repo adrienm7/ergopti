@@ -236,14 +236,27 @@ helpers.describe("magic key source: choosing a key", function()
 		end)
 	end)
 
-	helpers.it("(magic-key-source) no capture while the driver is paused, as on macOS", function()
+	-- EDD-1, decided by the coordinator on 2026-11-14: the capture runs while
+	-- paused, the key is saved at once and stays inert until resume. Before,
+	-- a paused driver refused the capture (paused-magic-capture).
+	helpers.it("(paused-magic-capture) a paused capture saves the key, inert until resume", function()
 		with_source(nil, function(Source)
 			local state = { active = false, replace = true, typed_ok = true }
-			wire(Source, state)
-			helpers.assert_eq(Source.can_capture(), false, "the menu greys the row")
-			helpers.assert_eq(Source.capture({ on_chosen = function() end, on_refused = function() end }), false)
+			local calls = wire(Source, state)
+			local chosen = {}
+			helpers.assert_true(Source.can_capture(), "a paused driver captures")
+			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end,
+				on_refused = function() end }))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }), "the captured key reaches no application")
+			run_due(calls)
+			helpers.assert_eq(chosen, { "KeyJ" }, "the paused choice is saved at once")
+			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false, "the paused driver types nothing")
+			helpers.assert_eq(#calls.typed, 0)
 			state.active = true
-			helpers.assert_true(Source.can_capture(), "resumed, it captures again")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }), "resumed, the chosen key types the magic key")
+			helpers.assert_true(Source.capture({ on_chosen = function() end, on_refused = function() end }))
+			Source.cancel_capture()
+			helpers.assert_eq(Source.on_key({ code = KEY_C, mods = {} }), false, "a pause boundary cancels the capture")
 			Source._reset_for_test()
 		end)
 	end)
@@ -256,7 +269,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 	helpers.it("(magic-key-source) the tray lists the key in effect under the keyboard layout", function()
 		with_source("[hotstrings]\nmagic_key_source = \"KeyJ\"\n", function(Source)
 			wire(Source, { active = true, replace = true, typed_ok = true })
-			local I18n = require("infra.i18n")
+			local I18n = require("core.i18n.engine.i18n")
 			local builder = helpers.load_module("ui.menu.builder")
 			local ok, items = pcall(builder.build, { on_quit = function() end, magic_key_source = Source })
 			Source._reset_for_test()
@@ -266,7 +279,7 @@ helpers.describe("magic key source: the keyboard-layout menu", function()
 				if item.title == I18n.get("menu.layout.title") then layout = item.menu end
 			end
 			helpers.assert_type(layout, "table", "the tray has a keyboard-layout submenu")
-			local prefix = require("locale.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
+			local prefix = require("core.i18n.engine.label_value").compose(I18n.get, I18n.get("menu.layout.magic_key_source"), "")
 			local row
 			for _, item in ipairs(layout) do
 				if type(item.title) == "string" and item.title:sub(1, #prefix) == prefix then row = item end
@@ -427,7 +440,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 		local ok, err = pcall(function()
 			local Config = helpers.load_module(names[2])
 			Choices.with_file(Config, source, function(path)
-				local engine, attempts = require("hotstring_engine").new(), 0
+				local engine, attempts = require("hotstrings.engine.matcher").new(), 0
 				local load = engine.load_mappings
 				engine.load_mappings = function(self, mappings)
 					attempts = attempts + 1
@@ -440,7 +453,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 				local _, committed = Config.load_all()
 				helpers.assert_eq(committed, true, "the fixture catalogue must initialize")
 				local Builder = helpers.load_module(names[3])
-				local I18n = require("infra.i18n")
+				local I18n = require("core.i18n.engine.i18n")
 				local function row()
 					local items = Builder.build({ config = Config, on_quit = function() end,
 						paused = state.paused, is_paused = function() return state.paused end,
@@ -493,7 +506,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 			with_replace(SOURCE, function(Config, path, state, row)
 				local item = row()
 				helpers.assert_type(item, "table")
-				local Writer, Modal = require("toml_codec.writer"), require("ui.modal")
+				local Writer, Modal = require("core.text.engine.toml_codec.writer"), require("core.ui.ui.modal")
 				local previous_write, previous_modal = Writer.batch_write, Modal.run
 				local writes, notices = 0, 0
 				Writer.batch_write = function(...)
@@ -541,7 +554,7 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 				state.source = Source
 				local item, _, layout = row()
 				helpers.assert_type(item, "table", "replacement is in its extension")
-				local I18n = require("infra.i18n")
+				local I18n = require("core.i18n.engine.i18n")
 				local physical
 				for _, child in ipairs(layout.menu or {}) do
 					helpers.assert_true(child.title ~= I18n.get("menu.layout.replace"), "the old duplicate is removed")
@@ -567,18 +580,17 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 		end)
 	end)
 
-	helpers.it("(ergopti-magic-replace) strips paused actions and refuses an old callback", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("(ergopti-magic-replace) keeps the row and its callback live while paused (edd1-paused-writes)", function()
 		with_replace(SOURCE, function(_, path, state, row)
 			local before = row()
 			helpers.assert_type(before, "table")
 			state.paused = true
 			local paused, _, layout = row()
-			helpers.assert_eq(paused, nil, "the paused layout subtree is retired")
-			helpers.assert_eq(layout.disabled, true)
-			helpers.assert_eq(layout.menu, nil)
-			helpers.assert_eq(before.fn(), false)
-			helpers.assert_eq(Choices.read(path), SOURCE)
-			helpers.assert_eq(state.notified, 0)
+			helpers.assert_type(paused, "table", "the paused layout subtree stays reachable")
+			helpers.assert_true(layout.disabled ~= true)
+			helpers.assert_eq(before.fn(), true)
+			helpers.assert_true(Choices.read(path) ~= SOURCE, "the paused change is saved")
 		end)
 	end)
 end)
@@ -731,19 +743,19 @@ helpers.describe("magic key source: tap assignment admission", function()
 		with_source(nil, function(Source)
 			helpers.assert_nil(Source.tap_override_reason(41, "send_text"), "the automatic source owns no tap key")
 		end)
-		local en = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/en.json", "rb"))
+		local en = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local text = en:read("*a"); en:close()
 		helpers.assert_true(text:find('"' .. "menu.shortcuts.tap_keys.overrides_magic_key_source" .. '"', 1, true) ~= nil,
 			"the reason the menu shows is a declared locale key")
 	end)
 
 	helpers.it("(magic-key-tap-override) a press yielding to a tap action is logged once per yield", function()
-		local saved_logger = package.loaded["logger.shim"]
+		local saved_logger = package.loaded["core.logger.engine.shim"]
 		local warnings = {}
 		local recorder = setmetatable({ warn = function(_, message, ...)
 			warnings[#warnings + 1] = string.format(message, ...)
 		end }, { __index = function() return function() end end })
-		package.loaded["logger.shim"] = recorder
+		package.loaded["core.logger.engine.shim"] = recorder
 		local ok, err = pcall(with_source, '[hotstrings]\nmagic_key_source = "Backquote"\n', function(Source)
 			local state = { active = true, replace = true, typed_ok = true, blocked_code = 41 }
 			local calls = wire(Source, state)
@@ -759,7 +771,7 @@ helpers.describe("magic key source: tap assignment admission", function()
 			helpers.assert_eq(calls.typed, { "★" })
 			Source._reset_for_test()
 		end)
-		package.loaded["logger.shim"] = saved_logger
+		package.loaded["core.logger.engine.shim"] = saved_logger
 		if not ok then error(err, 0) end
 	end)
 end)

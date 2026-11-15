@@ -4,7 +4,7 @@
 --- MODULE: Healthcheck Collectors (macOS)
 --- DESCRIPTION:
 --- The synchronous half of the diagnostics snapshot (version 2 of
---- _shared/modules/diagnostics/schema.json): one collector per section, each
+--- _shared/diagnostics/data/schema.json): one collector per section, each
 --- returning that section's fields. The asynchronous probes (network, AI
 --- backend, sysctl, df) live in ui.healthcheck.probes.
 ---
@@ -25,7 +25,7 @@
 local H = {}
 
 local hs       = hs
-local Logger   = require("infra.logger")
+local Logger   = require("core.logger.engine.logger")
 
 local LOG = "healthcheck"
 
@@ -116,7 +116,7 @@ end
 --- The versions a bug report is triaged by.
 --- @return table
 function H.collect_versions()
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local commit, source = require("infra.diagnostic_snapshot").resolve_commit()
 	local runtime = SystemInfo.runtime_version()
 	return {
@@ -132,7 +132,7 @@ function H.collect_versions()
 		-- ships no version file to read
 		karabiner       = read("the Karabiner-Elements version", function()
 			local manifest = require("vendor.karabiner-elements.manifest")
-			local installed = require("adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
+			local installed = require("core.fs.adapters.file_system").exists(require("platform.remap.ke_paths").CLI)
 			return tostring(manifest.version) .. (installed and "" or " (not installed)")
 		end),
 	}
@@ -171,7 +171,7 @@ end
 --- The hardware section, without the facts only sysctl knows (a probe).
 --- @return table
 function H.collect_hardware()
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local stat = vm_stat()
 	local displays = read("the displays", function()
 		local main = hs.screen.mainScreen()
@@ -211,7 +211,7 @@ end
 --- @param uptime_sec number Seconds since the driver started.
 --- @return table
 function H.collect_system(detailed, uptime_sec)
-	local SystemInfo = require("adapters.system_info")
+	local SystemInfo = require("platform.system.info")
 	local stat = vm_stat()
 	local version = SystemInfo.os_version()
 	local ram_free = nil
@@ -245,7 +245,7 @@ end
 --- The keyboard state at this instant, and the remapping engine's phase.
 --- @return table
 function H.collect_input()
-	local KeyState = require("adapters.key_state")
+	local KeyState = require("platform.input.key_state")
 	local input = {
 		paused    = read("the pause state", function()
 			return require("modules.shortcuts.script_control").is_paused() == true
@@ -272,7 +272,7 @@ function H.collect_input()
 	-- The session's key-event counters: how the taps saw the keys pair up, how
 	-- late they came and how often the lease failed. Counts only, never a key.
 	local health = read("the key event counters", function()
-		return require("infra.key_event_health").counts()
+		return require("core.logger.engine.key_event_health").counts()
 	end)
 	if health then
 		local lease_failures = 0
@@ -350,7 +350,7 @@ function H.configuration_context(schema, overrides)
 		driver   = "macos",
 		features = overrides.features or function() return require("infra.manifest_reader").features() end,
 		path_of  = overrides.path_of or path_of,
-		decode   = require("toml_codec").decode,
+		decode   = require("core.text.engine.toml_codec").decode,
 		open_fn  = overrides.open_fn,
 		clock    = overrides.clock or function() return hs.timer.absoluteTime() / 1e6 end,
 	}
@@ -361,7 +361,7 @@ end
 --- names (no-network-identity); GitHub's reachability is a probe.
 --- @return table
 function H.collect_network()
-	local signal = require("adapters.network_info").getSignalStrength()
+	local signal = require("core.network.adapters.info").getSignalStrength()
 	return { wifi_signal = type(signal) == "number" and string.format("%d%%", signal) or nil }
 end
 
@@ -372,7 +372,7 @@ end
 --- translates each reason key.
 --- @return table { items = { { feature, platforms, reason } } }
 function H.collect_unavailable()
-	return require("healthcheck.unavailable").collect(require("infra.manifest_reader"))
+	return require("diagnostics.engine.healthcheck.unavailable").collect(require("infra.manifest_reader"))
 end
 
 --- The AI section: the switch, the backend, the model and the profile.
@@ -418,7 +418,7 @@ local PERMISSION_READERS = {
 		return permission_state("accessibility", require("adapters.accessibility_permission").is_trusted())
 	end,
 	screen_recording = function()
-		return permission_state("screen_recording", require("adapters.screen_capture").permission_state())
+		return permission_state("screen_recording", require("platform.system.screen_capture").permission_state())
 	end,
 	-- Hammerspoon has no query for Input Monitoring that does not prompt, and
 	-- the grant belongs to the Karabiner grabber rather than to this process

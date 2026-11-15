@@ -19,12 +19,12 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Model = require("wpm_widget.model")
-local Codec = require("toml_codec")
-local Paths = require("infra.paths")
-local LiveWpm = require("keystats.live_wpm")
+local Model = require("metrics.engine.wpm_widget_model")
+local Codec = require("core.text.engine.toml_codec")
+local Paths = require("core.fs.engine.paths")
+local LiveWpm = require("metrics.engine.wpm.live_wpm")
 
-local CANON_PATH = Paths.shared("modules/wpm_widget/constants.toml")
+local CANON_PATH = Paths.shared("metrics/data/wpm_widget/constants.toml")
 
 local function canon()
 	return assert(Model.load(CANON_PATH, Codec.decode))
@@ -325,7 +325,7 @@ helpers.describe("wpm readouts: the live speed", function()
 	helpers.it("(wpm-pointer-parity) orders a raw key and mouse inside the same millisecond", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local previous = clock.now_ms
 			clock.now_ms = function() return 10000.9 end
 			local ok, err = pcall(function()
@@ -347,7 +347,7 @@ helpers.describe("wpm readouts: the live speed", function()
 	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)
-			local hold = require("infra.timings").ms("ui", "wpm_color_hold_ms")
+			local hold = require("core.timing.engine.timings").ms("ui", "wpm_color_hold_ms")
 			local start = 10000
 			keystats.on_keydown("a", start, "app", 30)
 			keystats.record_synthetic_output("app", "AI", "llm", start, 0, 0)
@@ -410,12 +410,12 @@ end
 local _displaced = {}
 
 local function with_storage(initial, body)
-	_displaced.storage = package.loaded["adapters.storage"]
+	_displaced.storage = package.loaded["core.fs.adapters.storage"]
 	-- The previews other suites leave up would keep the readouts shown.
-	_displaced.preview = package.loaded["ui.tooltip.preview"]
-	_displaced.llm = package.loaded["ui.tooltip.llm"]
-	package.loaded["ui.tooltip.preview"] = { is_visible = function() return false end }
-	package.loaded["ui.tooltip.llm"] = { is_showing = function() return false end }
+	_displaced.preview = package.loaded["core.ui.ui.tooltip.preview"]
+	_displaced.llm = package.loaded["core.ui.ui.tooltip.llm"]
+	package.loaded["core.ui.ui.tooltip.preview"] = { is_visible = function() return false end }
+	package.loaded["core.ui.ui.tooltip.llm"] = { is_showing = function() return false end }
 	local store = Fakes.storage({ initial = initial or {} })
 	-- This fixture models the mandatory all-or-none position batch, including deletions.
 	function store.set_many(updates, deletions)
@@ -423,7 +423,7 @@ local function with_storage(initial, body)
 		for _, key in ipairs(deletions or {}) do store.values[key] = nil end
 		return true
 	end
-	package.loaded["adapters.storage"] = store
+	package.loaded["core.fs.adapters.storage"] = store
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
 	local ok, err = pcall(function()
@@ -431,9 +431,9 @@ local function with_storage(initial, body)
 			body(store, preferences)
 		end, { initial = initial })
 	end)
-	package.loaded["adapters.storage"] = _displaced.storage
-	package.loaded["ui.tooltip.preview"] = _displaced.preview
-	package.loaded["ui.tooltip.llm"] = _displaced.llm
+	package.loaded["core.fs.adapters.storage"] = _displaced.storage
+	package.loaded["core.ui.ui.tooltip.preview"] = _displaced.preview
+	package.loaded["core.ui.ui.tooltip.llm"] = _displaced.llm
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
 	if not ok then error(err, 0) end
@@ -505,6 +505,22 @@ helpers.describe("wpm readouts: the floating widget", function()
 		end)
 	end)
 
+	-- A paused script shows no speed, as on Windows and macOS (wpm-pause-hides).
+	helpers.it("(wpm-pause-hides) hides the widget while paused and draws nothing", function()
+		with_storage(compact(), function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			Widget.restore()
+			helpers.assert_true(Widget.start())
+			Widget.tick(stats(42, nil, nil, 10), 10)
+			helpers.assert_true(surface.visible)
+			helpers.assert_nil(Widget.tick(stats(42, nil, nil, 11), 11, true))
+			helpers.assert_eq(surface.visible, false, "the pause hides it")
+			helpers.assert_eq(#surface.draws, 1, "nothing is drawn while paused")
+		end)
+	end)
+
 	helpers.it("redraws at the shared rate, however often it is ticked", function()
 		with_storage({}, function()
 			local Widget = require("ui.wpm.widget")
@@ -530,10 +546,10 @@ helpers.describe("wpm readouts: the floating widget", function()
 			Widget.observe_pointer("motion", 1, 10.5)
 			Widget.tick(stats(42, "llm", "llm", 10), 10.5)
 			helpers.assert_true(not surface.visible)
-			package.loaded["ui.tooltip.preview"].is_visible = function() return true end
+			package.loaded["core.ui.ui.tooltip.preview"].is_visible = function() return true end
 			Widget.tick(stats(42, "llm", "llm", 10), 10.8)
 			helpers.assert_true(surface.visible)
-			package.loaded["ui.tooltip.preview"].is_visible = function() return false end
+			package.loaded["core.ui.ui.tooltip.preview"].is_visible = function() return false end
 			Widget.tick(stats(42, "llm", "llm", 10), 11.1)
 			helpers.assert_true(not surface.visible)
 			Widget.observe_pointer("motion", 1, 11.3)
@@ -752,7 +768,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 
 	helpers.it("hides its own window on stop, never the preview bubble", function()
 		with_storage({}, function()
-			local Renderer = require("adapters.graphics_renderer")
+			local Renderer = require("core.ui.adapters.graphics_renderer")
 			local preview_hidden = false
 			local real_hide = Renderer.hide
 			Renderer.hide = function() preview_hidden = true end
@@ -812,6 +828,20 @@ helpers.describe("wpm readouts: the tray readout", function()
 			helpers.assert_eq(tray.items[1].active, false, "the refused native update may have hidden it")
 			Readout.tick(stats(10), 30)
 			helpers.assert_eq(tray.items[1].active, true, "the visible frame must be republished")
+		end)
+	end)
+
+	-- A paused script shows no speed, as on Windows and macOS (wpm-pause-hides).
+	helpers.it("(wpm-pause-hides) hides the readout while paused and shows it again on resume", function()
+		with_storage({}, function()
+			local Readout, tray = setup()
+			assert(Readout.start())
+			Readout.tick(stats(10), 10)
+			helpers.assert_eq(tray.items[1].active, true)
+			Readout.tick(stats(10), 10.01, true)
+			helpers.assert_eq(tray.items[1].active, false, "the pause hides it at once")
+			Readout.tick(stats(10), 20)
+			helpers.assert_eq(tray.items[1].active, true)
 		end)
 	end)
 
@@ -909,7 +939,7 @@ helpers.describe("wpm readouts: the tray readout", function()
 			Readout.tick(stats(57), 10)
 			helpers.assert_eq(#tray.items, 1)
 			helpers.assert_eq(tray.items[1].active, true)
-			helpers.assert_eq(tray.items[1].title, "57 " .. require("infra.i18n").get("menu.metrics.wpm_unit"))
+			helpers.assert_eq(tray.items[1].title, "57 " .. require("core.i18n.engine.i18n").get("menu.metrics.wpm_unit"))
 			helpers.assert_eq(painted[1].frame.number, "57")
 			Readout.tick(stats(0), 11)
 			helpers.assert_eq(tray.items[1].active, false)

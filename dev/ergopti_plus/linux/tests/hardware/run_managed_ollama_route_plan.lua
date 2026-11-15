@@ -11,20 +11,20 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- The parent passes the launcher's LUA_PATH; a module resolved elsewhere would
 -- prove another tree than the installed one.
 local installed = assert(os.getenv("ERGOPTI_INSTALLED_ROOT"), "installed root required")
-for _, name in ipairs({ "network.route_plan", "infra.route_origins", "modules.llm.managed_ollama_proxy" }) do
+for _, name in ipairs({ "core.network.engine.route_plan", "core.network.engine.route_origins", "modules.llm.managed_ollama_proxy" }) do
 	local found = package.searchpath(name, package.path)
 	assert(found and found:sub(1, #installed + 1) == installed .. "/", "module outside the installed root: " .. name)
 end
 
-local policy = assert(require("infra.proxy_policy").load())
-local origins = assert(require("infra.route_origins").client("ollama"))
+local policy = assert(require("core.network.engine.proxy_policy").load())
+local origins = assert(require("core.network.engine.route_origins").client("ollama"))
 local Proxy = require("modules.llm.managed_ollama_proxy")
-local SystemProxy = require("adapters.system_proxy")
+local SystemProxy = require("core.network.adapters.system_proxy")
 
 -- Count the native lookups without changing their arguments or answers.
 local lookups, lookup_hosts = 0, {}
@@ -40,9 +40,9 @@ table.sort(environment_rows)
 
 -- The relay and the PAC list walk come from the same owners the runtime factory
 -- (modules/llm/runtime_factory.lua) gives the shipped stage.
-local Relay = require("infra.proxy_auth_relay")
+local Relay = require("core.network.engine.proxy_auth_relay")
 local relay_policy = assert(Relay.load())
-local TcpProbe = require("adapters.tcp_probe")
+local TcpProbe = require("core.network.adapters.tcp_probe")
 local port = Proxy.new({
 	policy = policy, lookup = lookup, owner = "ollama-runtime-proxy",
 	timeout_ms = 5000, origins = origins,
@@ -50,7 +50,7 @@ local port = Proxy.new({
 	relay = { policy = relay_policy, probe = Relay.probe, executable = Relay.executable,
 		timings = Relay.timings, timeout_ms = Relay.timings().probe_ms },
 	probe = TcpProbe.probe, relay_address = TcpProbe.relay_address,
-	probe_timeout_ms = require("infra.timings").ms("llm", "managed_proxy_probe_timeout_ms"),
+	probe_timeout_ms = require("core.timing.engine.timings").ms("llm", "managed_proxy_probe_timeout_ms"),
 })
 local deadline = uv.now() + 8000
 local budget = { remaining_ms = function() uv.update_time(); return deadline - uv.now() end }

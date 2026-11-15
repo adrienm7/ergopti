@@ -10,20 +10,20 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 
-local previous_renderer = package.loaded["adapters.graphics_renderer"]
-local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+local previous_renderer = package.loaded["core.ui.adapters.graphics_renderer"]
+local previous_scheduler = package.loaded["core.events.timer_scheduler"]
 
 local shown = 0
-package.loaded["adapters.graphics_renderer"] = {
+package.loaded["core.ui.adapters.graphics_renderer"] = {
 	is_available = function() return true end,
 	show = function() shown = shown + 1; return true end,
 	hide = function() end,
 	is_visible = function() return shown > 0 end,
 	destroy = function() end,
 }
-package.loaded["adapters.timer_scheduler"] = Fakes.timer_scheduler()
+package.loaded["core.events.timer_scheduler"] = Fakes.timer_scheduler()
 
-local Preview = helpers.load_module("ui.tooltip.preview")
+local Preview = helpers.load_module("core.ui.ui.tooltip.preview")
 local CANDIDATES = {
 	{ trigger = "btw", replacement = "by the way", group = "rolls", fires = true },
 }
@@ -64,6 +64,6 @@ helpers.describe("preview policy: unresolved state fails closed", function()
 	end)
 end)
 
-package.loaded["ui.tooltip.preview"] = nil
-package.loaded["adapters.graphics_renderer"] = previous_renderer
-package.loaded["adapters.timer_scheduler"] = previous_scheduler
+package.loaded["core.ui.ui.tooltip.preview"] = nil
+package.loaded["core.ui.adapters.graphics_renderer"] = previous_renderer
+package.loaded["core.events.timer_scheduler"] = previous_scheduler

@@ -226,7 +226,7 @@ helpers.describe("modules.gestures.manager", function()
   -- could never have caught that, and neither could it catch the raw key being
   -- echoed back, which is what i18n.get returns on a miss.
   helpers.it("labels come from the shared sg_actions catalogue, not from a local table", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     local label = M.get_action_label("vol_up")
     helpers.assert_eq(label, i18n.get("sg_actions.vol_up"),
       "the label must be whatever the shared catalogue says for the active locale")
@@ -235,7 +235,7 @@ helpers.describe("modules.gestures.manager", function()
   end)
 
   helpers.it("the workspace actions are the catalogue's desktop_* ids", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     -- This driver used private ws_prev / ws_next ids labelled through the
     -- catalogue's desktop_* keys, so no other driver's binding and no picker
     -- entry could name them. They are the shared ids now.
@@ -257,7 +257,7 @@ helpers.describe("modules.gestures.manager", function()
   -- 2026-11-03: the chords read the catalogue's English names (« Enter ») in
   -- every locale; each key is now named from the key name table.
   helpers.it("renders the complete shared modifier matrix in the user's language", function()
-    local i18n = require("infra.i18n")
+    local i18n = require("core.i18n.engine.i18n")
     local function name(id) return i18n.get("key_name." .. id) end
     helpers.assert_eq(M.get_action_label("ctrl_a"), name("ctrl") .. " + A")
     local label = M.get_action_label("ctrl_alt_super_enter")
@@ -406,8 +406,8 @@ helpers.describe("modules.gestures.manager", function()
   -- ==========================================================================
 
   helpers.it("derives SINGLE_SLOTS / AXIS_SLOTS from the shared actions.toml in order", function()
-    local codec = require("toml_codec")
-    local path = helpers.driver_root() .. "/../_shared/modules/actions/actions.toml"
+    local codec = require("core.text.engine.toml_codec")
+    local path = helpers.driver_root() .. "/../_shared/shortcuts/data/actions/actions.toml"
     local fh = io.open(path, "r")
     helpers.assert_true(fh ~= nil, "shared actions.toml must be readable")
     local content = fh:read("*a"); fh:close()
@@ -571,8 +571,8 @@ script__script_altgr_enter__open_url = "https://script.example"
 	end)
 	helpers.it("binding-identity: actual reporter and cleanup marks agree for both namespaces", function()
 		local manager = helpers.load_module("modules.gestures.manager")
-		local outdated = require("config_outdated"); outdated.reset_for_tests()
-		local logger = require("logger.shim"); local warn, messages = logger.warn, {}
+		local outdated = require("settings.engine.migration.outdated"); outdated.reset_for_tests()
+		local logger = require("core.logger.engine.shim"); local warn, messages = logger.warn, {}
 		logger.warn = function(tag, text, ...) messages[#messages + 1] = string.format(text, ...) end
 		local marks, reports
 		local okay, detail = pcall(function()
@@ -693,7 +693,7 @@ swipe_3_horiz__open_url = "https://current-axis.example"
 keyboard__primary_k__open_url = "https://other-owner.example"
 ]]
 		binding_source_fixture(source, function(manager, path, read)
-			local cleanup = require("config_unused_keys")
+			local cleanup = require("settings.engine.migration.unused_keys")
 			local scan = cleanup.find_in_source(source, function(decoded, mark) manager.mark_config_reads(decoded, mark) end)
 			helpers.assert_eq(scan.status, "ok"); helpers.assert_eq(#scan.keys, 2)
 			local paths = {}
@@ -718,11 +718,11 @@ end)
 do
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/config_binding_identity/vectors.json", "rb"))
 	local source = assert(handle:read("*a")); assert(handle:close())
-	require("test.config_binding_identity_contract").register(helpers, require("json").decode(source))
+	require("tests.lua.settings.binding_identity_contract").register(helpers, require("core.text.engine.json").decode(source))
 end
 
 
 
 
-require("test.script_binding_publication_contract").register(require("tests.helpers"), "linux")
+require("tests.lua.settings.script_binding_publication_contract").register(require("tests.helpers"), "linux")
 

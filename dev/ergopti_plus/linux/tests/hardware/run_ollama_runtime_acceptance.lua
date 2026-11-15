@@ -14,15 +14,15 @@ local repository, port = assert(arg[1]), assert(tonumber(arg[2]))
 -- packet paths are evidence/fixture locations, never an implementation override.
 package.path = repository .. "/static/ergopti_plus/linux/?.lua;"
 	.. repository .. "/static/ergopti_plus/linux/?/init.lua;"
-	.. repository .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. repository .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
+	.. repository .. "/static/ergopti_plus/_shared/?.lua;"
+	.. repository .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
 local action = "download"
 assert(action == "download" or action == "start", "explicit expected runtime choice")
 local uv = require("luv")
 assert(type(uv.getuid()) == "number" and uv.getuid() > 0, "actual non-root native user identity")
 assert(uv.fs_lstat("/").uid == 0, "actual trusted root inode owner")
 print("NATIVE_IDENTITY uid=" .. tostring(uv.getuid()) .. " root_uid=" .. tostring(uv.fs_lstat("/").uid))
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 for _, level in ipairs({ "error", "warn", "info" }) do
 	local original = Logger[level]
 	Logger[level] = function(tag, format, ...)
@@ -30,9 +30,9 @@ for _, level in ipairs({ "error", "warn", "info" }) do
 		return original(tag, format, ...)
 	end
 end
-local Http = require("adapters.http_client")
-local Native = require("adapters.owned_process")
-local Timings = require("infra.timings")
+local Http = require("core.network.adapters.http_client")
+local Native = require("core.process.adapters.owned_process")
+local Timings = require("core.timing.engine.timings")
 local Engine, Profiles
 local chronological, native_services = {}, {}
 -- Timestamped step lines name the step a stalled run is waiting on. They carry
@@ -43,7 +43,7 @@ local function trace(step)
 	io.stdout:flush()
 end
 local function host_of(url) return tostring(type(url) == "string" and url:match("^%a+://([^/]+)") or "?") end
-local SystemProxy = require("adapters.system_proxy")
+local SystemProxy = require("core.network.adapters.system_proxy")
 local original_lookup_owned = SystemProxy.lookup_owned
 SystemProxy.lookup_owned = function(url, options, callback)
 	trace("proxy-lookup-start " .. host_of(url))
@@ -88,10 +88,10 @@ Http.get_owned = function(url, headers, options, callback)
 	trace("http-start " .. host_of(url) .. (options.output_path and " archive" or ""))
 	local operation = original_get_owned(url, headers, options, function(result)
 		trace("http-end " .. host_of(url) .. " status=" .. tostring(type(result) == "table" and result.status or "?"))
-		local typed = require("llm.enable_admission").receipt(result)
+		local typed = require("ai.engine.settings.enable_admission_core").receipt(result)
 		if typed then
 			chronological[#chronological + 1] = { kind = "typed_version", engine = Engine.is_enabled(),
-				profile = Profiles.is_enabled(), version = require("json").decode(result.body).version }
+				profile = Profiles.is_enabled(), version = require("core.text.engine.json").decode(result.body).version }
 		end
 		return callback(result)
 	end)
@@ -113,7 +113,7 @@ Http.download_output_owned = function(url, headers, target, options, callback)
 	archive_operation = operation
 	return operation
 end
-local Digest, Archive = require("infra.fd_sha256"), require("infra.archive_output")
+local Digest, Archive = require("core.network.engine.fd_sha256"), require("infra.archive_output")
 local original_digest_native, original_artifact_new = Digest.native, Archive.native_ollama_artifact
 local observed_digest_workers, observed_artifact_factories = {}, {}
 -- Observe the real same-FD digest callback; never echo the expected asset hash.
@@ -157,7 +157,7 @@ package.loaded["ui.llm_enable_refusal"] = { show = function(origin, rows)
 	for _, row in ipairs(rows) do print("EXPLICIT_ROW " .. tostring(row.label)) end
 	local selected
 	for _, row in ipairs(rows) do
-		if row.label == require("infra.i18n").get(action == "download" and "ollama.offer_download" or "ollama.runtime_start") then selected = row.value end
+		if row.label == require("core.i18n.engine.i18n").get(action == "download" and "ollama.offer_download" or "ollama.runtime_start") then selected = row.value end
 	end
 	return true, false, selected
 end }
@@ -174,18 +174,18 @@ Engine.init({ is_paused = function() return false end })
 -- source provenance and subsequent publication remain the actual owners.
 Profiles.init({ port = port })
 local Config = require("infra.config_paths").config("config.toml")
-local Writer = require("toml_codec.writer")
+local Writer = require("core.text.engine.toml_codec.writer")
 -- Control only WebKit presentation: actual bridge retains session ownership.
 local window_calls = { show = 0, hide = 0, evaluate = 0 }
-package.loaded["ui.webview_manager"] = {
+package.loaded["core.ui.ui.webview_manager"] = {
 	show = function() window_calls.show = window_calls.show + 1; return true end,
 	hide = function() window_calls.hide = window_calls.hide + 1; return true end,
 	eval_js = function() window_calls.evaluate = window_calls.evaluate + 1; return true end,
 	bring_to_front = function() return true end,
 	is_visible = function() return true end,
 }
-local Json = require("json")
-local Policy = require("llm.local_model_policy")
+local Json = require("core.text.engine.json")
+local Policy = require("ai.engine.ollama.local_model_policy")
 local Api = require("modules.llm.api_ollama")
 local Download = require("modules.llm.model_download")
 local Offer = require("modules.llm.local_model_offer")
@@ -224,7 +224,7 @@ Offer._reset_for_test({ confirm = function()
 	model_consents = model_consents + 1
 	return true
 end })
-local EventLoop = require("adapters.event_loop")
+local EventLoop = require("core.events.loop")
 local expired = false
 local fixture_timer = assert(uv.new_timer())
 assert(fixture_timer:start(900000, 0, function()
@@ -335,7 +335,7 @@ EventLoop.stop = function()
 end
 local shutdown_ok, shutdown_error = xpcall(function()
 	assert(type(Engine.shutdown_runtime) == "function", "actual adopted terminal runtime shutdown owner")
-	local coordinator = require("infra.shutdown_coordinator").new({
+	local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({
 		pre_wait = { { name = "engine-runtime-acceptance", wait_for_ack = true, stop = Engine.shutdown_runtime } },
 		keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 		event_loop = EventLoop,

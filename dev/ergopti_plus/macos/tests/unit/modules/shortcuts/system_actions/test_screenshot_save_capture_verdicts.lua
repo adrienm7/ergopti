@@ -17,12 +17,12 @@ local SETTINGS_URL =
 	"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
-	"adapters.screen_capture",
-	"adapters.shell_runner",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"core.fs.adapters.file_system",
+	"platform.system.screen_capture",
+	"core.process.adapters.shell_runner",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
@@ -58,7 +58,7 @@ local function with_screenshot(options, scenario)
 			pasteboard = { count = 3, image = nil, writes = {} },
 		}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			expand_path = function(path)
 				if path == "~" then return "/Users/alice" end
 				return path
@@ -86,7 +86,7 @@ local function with_screenshot(options, scenario)
 				return { mode = "file", size = f.files[path] }, "ok"
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			open = function(target)
 				f.opened[#f.opened + 1] = target
 				return true
@@ -113,11 +113,11 @@ local function with_screenshot(options, scenario)
 				return handle
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			return key
 		end }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			info = function(_, message, ...)
 				f.infos[#f.infos + 1] = string.format(tostring(message), ...)
@@ -128,7 +128,7 @@ local function with_screenshot(options, scenario)
 				if f.on_error then f.on_error() end
 			end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind)
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind }
 				return true
@@ -187,7 +187,7 @@ local function with_screenshot(options, scenario)
 		_G.hs = saved_hs
 		-- with_fresh_modules restores the original entry; clearing the stub here
 		-- keeps the dangling-install scanner (test_shell_runner_stub_restore) exact.
-		package.loaded["adapters.shell_runner"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
 		if not ok then error(err, 0) end
 	end)
 end
@@ -450,7 +450,7 @@ end)
 
 helpers.describe("shared screenshot owner retains temporary cleanup debt", function()
 	helpers.it("retains a physical permission-denied capture until recovery (screenshot-physical-unlink-debt)", function()
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local command = "/usr/bin/mktemp -d " .. quote(helpers.temp_dir() .. "/ergopti-capture-cleanup.XXXXXX")
 		local process = assert(io.popen(command, "r"))
 		local output = process:read("a")

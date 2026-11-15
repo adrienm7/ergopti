@@ -17,9 +17,9 @@ helpers.describe("stream payload replacement", function()
 			end
 			write("original private request")
 			local original = assert(lfs.symlinkattributes(path))
-			local saved = package.loaded["adapters.file_system"]
+			local saved = package.loaded["core.fs.adapters.file_system"]
 			local refusal = true
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				remove_exact = function(target)
 					if refusal then return false end
 					return os.remove(target)
@@ -52,7 +52,7 @@ helpers.describe("stream payload replacement", function()
 				helpers.assert_eq(file:read("*a"), replacement)
 				assert(file:close())
 			end, debug.traceback)
-			package.loaded["adapters.file_system"] = saved
+			package.loaded["core.fs.adapters.file_system"] = saved
 			os.remove(path)
 			os.remove(old_path)
 			if not ok then error(failure, 0) end

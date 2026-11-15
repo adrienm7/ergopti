@@ -13,7 +13,7 @@
 ---    regardless of the user's setup.
 --- 2. Smart Copy/Open: Detects whether the frontmost app is a file manager to
 ---    decide between copying the current path vs. opening what the selection
----    names (_shared/lua/open_target: a URL, an IP address, a file, a folder)
+---    names (_shared/shortcuts/engine: a URL, an IP address, a file, a folder)
 ---    or searching the web for plain text.
 --- 3. Parent-scoped lifecycle: the fixed shortcuts run under the
 ---    "shortcut_bindings" parent and the gesture actions under "gestures", each
@@ -30,20 +30,20 @@ local hs            = hs
 local pasteboard    = hs.pasteboard
 local urlevent      = hs.urlevent
 local http          = hs.http
-local notifications = require("infra.notifications")
-local Logger        = require("infra.logger")
-local text_utils = require("infra.text_utils")
-local i18n          = require("infra.i18n")
+local notifications = require("core.ui.engine.notifications")
+local Logger        = require("core.logger.engine.logger")
+local text_utils = require("core.text.engine.utils")
+local i18n          = require("core.i18n.engine.i18n")
 local AppLauncher   = require("adapters.app_launcher")
-local WindowInfo    = require("adapters.window_info")
-local WindowManager = require("adapters.window_manager")
-local ShellRunner   = require("adapters.shell_runner")
-local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
-local FileSystem    = require("adapters.file_system")
+local WindowInfo    = require("platform.focus.window_info")
+local WindowManager = require("platform.focus.window_manager")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TimerScheduler = require("core.events.timer_scheduler")
+local FileSystem    = require("core.fs.adapters.file_system")
 local Clipboard     = require("adapters.clipboard")
 local ClipboardBorrowers = require("infra.clipboard_borrowers")
-local OpenTarget    = require("open_target")
+local OpenTarget    = require("shortcuts.engine.open_target")
 
 local LOG = "shortcuts.actions.apps"
 
@@ -753,7 +753,7 @@ local function open_url_target(kind, url)
 	return true
 end
 
---- Opens what a selected text names (_shared/lua/open_target: a URL, an IP
+--- Opens what a selected text names (_shared/shortcuts/engine: a URL, an IP
 --- address, localhost, a mail address, a file or a folder), or searches the
 --- web for plain text. A recognised target that cannot be opened here (a
 --- missing path, a bare file name, a registry key or a Windows path) is

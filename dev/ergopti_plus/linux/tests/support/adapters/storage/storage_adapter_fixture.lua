@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 --- Creates a throwaway XDG config root under the system temp directory and
 --- ensures its application subdirectory exists so the storage adapter can
@@ -41,13 +41,13 @@ local function storage_cohort_fixture(source, callback)
 		local bytes = assert(file:read("*a")); assert(file:close()); return bytes
 	end
 	if source ~= nil then write(path, source) end
-	local getenv, previous = os.getenv, package.loaded["adapters.storage"]
+	local getenv, previous = os.getenv, package.loaded["core.fs.adapters.storage"]
 	os.getenv = function(name) if name == "XDG_CONFIG_HOME" then return root end; return getenv(name) end
 	local okay, detail = xpcall(function()
-		callback(helpers.load_module("adapters.storage"), require("adapters.file_system"), path, root .. "/snapshot", write, read)
+		callback(helpers.load_module("core.fs.adapters.storage"), require("core.fs.adapters.file_system"), path, root .. "/snapshot", write, read)
 	end, debug.traceback)
-	os.getenv, package.loaded["adapters.storage"] = getenv, previous
-	local Shell = require("adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+	os.getenv, package.loaded["core.fs.adapters.storage"] = getenv, previous
+	local Shell = require("core.process.adapters.shell_runner"); assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
 	if not okay then error(detail, 0) end
 end
 

@@ -43,6 +43,7 @@ class _TNNU_Ops {
 		this.Effects.Push("is-active")
 		return true
 	}
+	SelectedTab(Hwnd) => ""
 	IsExactWindow(Hwnd, FileName) {
 		this.Effects.Push("is-exact")
 		return true

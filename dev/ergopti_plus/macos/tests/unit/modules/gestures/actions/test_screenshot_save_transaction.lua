@@ -12,14 +12,14 @@
 local helpers = require("tests.helpers")
 
 local SUBJECT_MODULES = {
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
-	"adapters.screen_capture",
-	"adapters.shell_runner",
+	"platform.system.screen_capture",
+	"core.process.adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.shortcuts.actions.screenshot_save",
 }
 
@@ -40,7 +40,7 @@ local function with_subject(options, scenario)
 	}
 	local modes = options or {}
 
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		expand_path = function(path)
 			if modes.home_throw then error("injected home resolution failure") end
 			if path == "~" then return modes.home or "/tmp/hs015-home" end
@@ -52,7 +52,7 @@ local function with_subject(options, scenario)
 	}
 	-- A whole-screen save names one file per display; this desk has one.
 	package.loaded["adapters.mouse_control"] = { getMonitorCount = function() return 1 end }
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,
@@ -61,14 +61,14 @@ local function with_subject(options, scenario)
 		copy_image_file_to_clipboard = function() return true end,
 	}
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key)
 			if key == "shortcuts.saved" then return "Saved %s" end
 			if key == "shortcuts.screenshot_failed" then return "Screenshot failed" end
 			return key
 		end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
@@ -76,7 +76,7 @@ local function with_subject(options, scenario)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(message), ...)
 		end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, body, kind)
 			if type(fixture.notify_hook) == "function" then fixture.notify_hook() end
 			fixture.notifications[#fixture.notifications + 1] = {
@@ -87,7 +87,7 @@ local function with_subject(options, scenario)
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done)
 			local role = executable == "/bin/mkdir" and "directory" or "capture"
 			fixture.role_counts[role] = fixture.role_counts[role] + 1
@@ -157,7 +157,7 @@ local function with_subject(options, scenario)
 
 	_G.hs = saved_hs
 	for _, name in ipairs(SUBJECT_MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

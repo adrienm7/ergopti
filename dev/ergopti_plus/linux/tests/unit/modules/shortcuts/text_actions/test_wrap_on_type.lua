@@ -309,7 +309,7 @@ end)
 
 helpers.describe("wrap on type (linux): the probe never types into the window", function()
 	helpers.it("reads PRIMARY with no key sent and no clipboard write", function()
-		local names = { shell = "adapters.shell_runner", display = "infra.display_server", clip = "adapters.clipboard" }
+		local names = { shell = "core.process.adapters.shell_runner", display = "core.ui.engine.display_server", clip = "adapters.clipboard" }
 		local previous = {}
 		for key, name in pairs(names) do previous[key] = package.loaded[name] end
 		local shell = { commands = {}, writes = 0 }
@@ -349,7 +349,7 @@ helpers.describe("wrap on type (linux): the tray row", function()
 		shortcuts.init({ enabled = true, persist = false })
 		local mb = helpers.load_module("ui.menu.builder")
 		local items = mb.build({ _version = "0.0.0-dev.12", shortcuts = shortcuts, on_quit = function() end })
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local title = i18n.get("menu.shortcuts.title")
 		local label = i18n.get("shortcuts.label_wrap_text")
 		local row = nil
@@ -383,9 +383,9 @@ end)
 local function with_wrap_feature(body)
 	local manager_name, builder_name = "modules.shortcuts.manager", "ui.menu.builder"
 	local previous_manager, previous_builder = package.loaded[manager_name], package.loaded[builder_name]
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	local original_batch = writer.batch_write
-	local sandbox = require("test.config_unused_keys_contract").sandbox
+	local sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local ok, err = pcall(function()
 		sandbox.with_config('[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[foreign]\nvalue = "keep"\n',
 			function(path)
@@ -406,7 +406,7 @@ local function with_wrap_feature(body)
 						on_quit = function() end,
 						on_menu_changed = function() observed.changed = observed.changed + 1 end,
 					})
-					local label = require("infra.i18n").get("shortcuts.label_wrap_text")
+					local label = require("core.i18n.engine.i18n").get("shortcuts.label_wrap_text")
 					for _, item in ipairs(rows) do
 						for _, child in ipairs(item.menu or {}) do
 							if child.title == label then return child end
@@ -428,7 +428,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(held(), true)
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
 			helpers.assert_eq(observed.changed, 1)
-			local parsed = require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			local parsed = require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 			helpers.assert_eq(parsed.shortcuts.wrap_text_if_selected, true)
 			helpers.assert_eq(parsed.foreign.value, "keep")
 			helpers.assert_eq(held(), true)
@@ -446,7 +446,7 @@ helpers.describe("wrap feature callback ownership", function()
 			helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
 			helpers.assert_eq(observed.desired, false)
 			helpers.assert_eq(observed.changed, 1)
-			helpers.assert_eq(require("toml_codec").decode(sandbox.read_bytes(observed.path))
+			helpers.assert_eq(require("core.text.engine.toml_codec").decode(sandbox.read_bytes(observed.path))
 				.shortcuts.wrap_text_if_selected, false)
 		end)
 	end)
@@ -580,20 +580,20 @@ end)
 --- Keeps the real source readers/decoder and controls only private file routing.
 local function with_wrap_inventory(body, options)
 	options = options or {}
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Routes, Paths = require("infra.config_paths"), require("infra.paths")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Routes, Paths = require("infra.config_paths"), require("core.fs.engine.paths")
 	local name = "modules.shortcuts.manager"
 	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
 	local catalogue_path = os.tmpname()
 	local release_source = function() end
-	local original = assert(open(shared("modules/wrap_symbols/wrap_symbols.json"), "rb"))
+	local original = assert(open(shared("keyboard/data/wrap_symbols/wrap_symbols.json"), "rb"))
 	local original_bytes = assert(original:read("*a")); assert(original:close() == true)
 	Sandbox.write_bytes(catalogue_path, original_bytes)
 	local passed, failure = pcall(function()
 		Sandbox.with_config(options.source or '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 			Routes.config = function(file) assert(file == "config.toml"); return path end
 			Paths.shared = function(relative)
-				if relative == "modules/wrap_symbols/wrap_symbols.json" then return catalogue_path end
+				if relative == "keyboard/data/wrap_symbols/wrap_symbols.json" then return catalogue_path end
 				return shared(relative)
 			end
 			if options.close_target then
@@ -772,7 +772,7 @@ local function with_daemon_wrap(body, options)
 			require = require, package = { loaded = {} },
 			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
 			opts = { dry_run = false }, shortcuts = shortcuts,
-			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
+			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("platform.input.capture_gate"),
 			keystats = { cancel_hold_intervals = noop, set_private_window = noop,
 				discard_roi = function() state.roi_discards = state.roi_discards + 1 end,
 				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
@@ -820,7 +820,7 @@ local function with_daemon_wrap(body, options)
 			"\n\t-- The script-management chords") .. "\nreturn wrap_on_type", env)
 		local focus = assert(source:match("process_lifecycle%.onFocusChange%((function%(appName, windowTitle%).-\n\t\tend)%)"))
 		state.focus = evaluate("return " .. focus, env)
-		state.click = evaluate(span("local function on_click()", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
+		state.click = evaluate(span("local function on_click(code)", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
 		state.consume = evaluate(span("local on_consume = input_capture_gate.guard(function(detail)",
 			"\n\t-- Bind the same privacy owner") .. "\nreturn on_consume", env)
 		state.wrap, state.actions, state.gate, state.shortcuts = env.wrap_on_type, env.script_actions, env.input_capture_gate, shortcuts
@@ -920,7 +920,7 @@ end)
 
 helpers.describe("wrap on type: committed shortcut context epochs", function()
 	local function with_persisted_wrap(body)
-		require("test.config_unused_keys_contract").sandbox.with_config(
+		require("tests.lua.settings.unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
 				with_daemon_wrap(body, { manager_init = { persist = true, config_path = path } })
 			end)
@@ -1007,7 +1007,7 @@ helpers.describe("wrap on type: committed shortcut context epochs", function()
 			local read_ok, current = pcall(state.shortcuts.wrap_selection_epoch)
 			io.open, io.popen = open_file, process
 			helpers.assert_true(read_ok); helpers.assert_eq(current, epoch)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local write = writer.batch_write
 			writer.batch_write = function() return false, "controlled durable refusal" end
 			local ok, err = pcall(function()

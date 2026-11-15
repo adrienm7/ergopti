@@ -8,7 +8,7 @@
 --- ROOT CAUSE ENCODED:
 --- A native Cancel must remain nil rather than an accepted empty string. Real
 --- LuaJIT pipe close acknowledgements can be true despite a non-zero child exit;
---- ui/text_prompt.lua delegates that distinction to the checked shell owner.
+--- core/ui/ui/text_prompt.lua delegates that distinction to the checked shell owner.
 --- This integration test retains the real rendered tap-hold delay callback:
 --- cancellation never writes, while a confirmed 300 ms answer writes 0.3 s.
 --- ==============================================================================
@@ -46,7 +46,7 @@ end
 --- @return table Commands handed to io.popen.
 local function with_zenity(read_body, close_status, fn)
 	local real_popen = io.popen
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local real_checked = shell.exec_checked
 	local commands = {}
 	shell.exec_checked = function(command)
@@ -95,7 +95,7 @@ end
 local function find_delay_row(mb, manager)
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = manager,
 		is_paused = function() return false end })
-	local title = require("infra.i18n").get("menu.tapholds.title")
+	local title = require("core.i18n.engine.i18n").get("menu.tapholds.title")
 	local section = nil
 	for _, item in ipairs(items) do
 		if item.title == title then section = item end
@@ -126,7 +126,11 @@ local function manager()
 	-- Tap-holds on over the shared defaults: with no file the category reads
 	-- off, and an off category greys every row of its submenu (category-off rule).
 	local file = assert(io.open(user_path, "wb"))
-	assert(file:write("[tap_hold]\nenabled = true\ninherit_defaults = true\n"))
+	assert(file:write("[tap_hold]\ninherit_defaults = true\n"))
+	assert(file:close())
+	-- The switch is a config.toml row beside the file.
+	file = assert(io.open(user_path .. ".config.toml", "wb"))
+	assert(file:write("[tap_holds]\nenabled = true\n"))
 	assert(file:close())
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
@@ -136,8 +140,9 @@ local function manager()
 		execute_action = function() end,
 		on_text_injected = function() end,
 		action_names = function() return {} end,
-		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
+		defaults_path = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),
 		user_path = user_path,
+		config_path = user_path .. ".config.toml",
 	})
 	return Manager
 end
@@ -150,7 +155,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local ok, err = pcall(function()
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
-			helpers.load_module("ui.text_prompt")
+			helpers.load_module("core.ui.ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil,
@@ -163,7 +168,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 				"Cancel is not an empty answer — it must change nothing")
 		end)
 		th._reset_for_test()
-		os.remove(last_user_path)
+		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)
@@ -174,7 +179,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 		local ok, err = pcall(function()
 			-- The builder captures TextPrompt at load time. Earlier adapter tests
 			-- reload Shell, so bind this public owner to the current authority.
-			helpers.load_module("ui.text_prompt")
+			helpers.load_module("core.ui.ui.text_prompt")
 			local mb = helpers.load_module("ui.menu.builder")
 			local delay = find_delay_row(mb, th)
 			helpers.assert_true(delay ~= nil, "a delay row must exist")
@@ -184,7 +189,7 @@ helpers.describe("menu_builder: zenity Cancel changes nothing (prompt-cancel)", 
 			helpers.assert_eq(writer_calls[1][2], 0.3, "300 ms is 0.3 s in the file")
 		end)
 		th._reset_for_test()
-		os.remove(last_user_path)
+		os.remove(last_user_path); os.remove(last_user_path .. ".config.toml")
 		package.loaded["platform.remap.tap_hold_writer"] = previous
 		if not ok then error(err, 0) end
 	end)

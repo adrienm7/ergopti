@@ -11,17 +11,17 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_agent_connector_shutdown%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
-local uv, Json = require("luv"), require("json")
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
+local uv, Json = require("luv"), require("core.text.engine.json")
 local scratch = assert(uv.fs_mkdtemp("/tmp/ergopti-agent-lifetime-XXXXXX"))
 for name, value in pairs({ XDG_CONFIG_HOME = scratch .. "/.config", XDG_DATA_HOME = scratch .. "/.local/share",
 	XDG_STATE_HOME = scratch .. "/.local/state", ERGOPTI_AGENT_SHUTDOWN_PROBE_DIR = scratch }) do
 	assert(uv.os_setenv(name, value))
 end
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Connectors = require("modules.llm.agent_connectors")
-local Loop, Coordinator = require("adapters.event_loop"), require("infra.shutdown_coordinator")
+local Loop, Coordinator = require("core.events.loop"), require("core.lifecycle.engine.shutdown.coordinator")
 local function read(path)
 	local file = io.open(path, "rb"); if not file then return nil end
 	local data = file:read("*a"); assert(file:close()); return data
@@ -71,10 +71,10 @@ end
 local watchdog, timed_out
 local ok, why = xpcall(function()
 	if arg[1] == "cold" then
-		assert(not package.loaded["adapters.owned_process"], "cold load initialized a native process owner")
+		assert(not package.loaded["core.process.adapters.owned_process"], "cold load initialized a native process owner")
 		assert(Connectors.shutdown())
 		assert(not Connectors.run({ max_tools = 4 }, { type = "shortcut", name = "absent" }, function() error("late callback") end))
-		assert(not package.loaded["adapters.owned_process"] and #children == 0)
+		assert(not package.loaded["core.process.adapters.owned_process"] and #children == 0)
 		print("PASS native cold agent shutdown: no process backend acquisition")
 		return
 	end
@@ -107,7 +107,7 @@ print('tool-finished',flush=True)
 	assert(uv.fs_chmod(tools .. "/held-tool", 448))
 	local callbacks, ready, completed_ok = 0, nil, nil
 	watchdog = assert(uv.new_timer())
-	require("infra.native_timer").start(uv, watchdog, 5000, 0, function() timed_out = true; Loop.stop() end)
+	require("core.timing.engine.native_timer").start(uv, watchdog, 5000, 0, function() timed_out = true; Loop.stop() end)
 	assert(Connectors.run({ max_tools = 4 }, { type = "shortcut", name = "held-tool", input = arg[1] == "normal" and "normal" or nil },
 		function(success)
 			callbacks = callbacks + 1
@@ -134,7 +134,7 @@ print('tool-finished',flush=True)
 		package = { loaded = { ["modules.llm.agent_connectors"] = Connectors } }, keystats = { stop = function() return true end }, privacy_owners = {},
 		dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false, webview_manager = false,
 		tooltip_preview = false, gestures = false, input_capture_gate = false, prediction_engine = false,
-		TimerScheduler = require("adapters.timer_scheduler"),
+		TimerScheduler = require("core.events.timer_scheduler"),
 		require = function(name)
 			if name == "modules.llm.agent_connectors" then return Connectors end
 			assert(name == "modules.llm.agent_learning", "unexpected Main dependency")

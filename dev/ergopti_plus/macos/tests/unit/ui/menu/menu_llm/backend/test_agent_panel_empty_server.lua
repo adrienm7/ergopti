@@ -37,7 +37,7 @@ local with_panel = Fixture.with_panel
 local function empty_status_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_empty_status.json"), "rb"))
 	local raw = file:read("*a"); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 --- Holds the real native data, renderer and locale owners over private bootstrap paths.
@@ -47,9 +47,9 @@ local function with_empty_server_owner(scenario)
 	local native, owner, receipt, acquired, scratch, fresh_bridge
 	local ok, err = pcall(function()
 		local driver = helpers.driver_root():gsub("/+$", "")
-		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname())
 		assert(os.remove(scratch))
 		assert(hs.fs.mkdir(scratch))
@@ -65,9 +65,9 @@ local function with_empty_server_owner(scenario)
 		local paths = require("infra.config_paths")
 		helpers.assert_eq(paths.init(scratch .. "/"), true)
 		helpers.assert_eq(paths.get_config_dir(), scratch .. "/")
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -100,8 +100,8 @@ local function with_empty_server_owner(scenario)
 	local cleanup_ok, cleanup_error = pcall(function()
 		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
 		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true)
 			helpers.assert_eq(scheduler.activeCount(), 0)
 		end
@@ -218,7 +218,7 @@ end)
 local function panel_frame_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_panel_frames.json"), "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("Agent complete declared presentation frames", function()
@@ -378,7 +378,7 @@ end
 local function agent_model_caption_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/agent_linux_system_frames.json"), "rb"))
 	local raw = assert(file:read("*a")); assert(file:close())
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 helpers.describe("Agent canonical model caption getter (agent-model-caption-getter)", function()

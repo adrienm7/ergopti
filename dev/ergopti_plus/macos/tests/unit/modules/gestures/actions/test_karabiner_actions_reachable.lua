@@ -102,7 +102,7 @@ local function fresh_registry(variable_write_result)
 		clear = function() end,
 		armed = function() return {} end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		isDown = function() return false end,
 		isUp = function() return true end,
 		set_capslock = function(on) seen.capslock = on end,
@@ -370,6 +370,10 @@ helpers.describe("Karabiner catalogue actions: sticky modifiers", function()
 	helpers.it("sticky_cmd_shift arms both", function() assert_sticky("sticky_cmd_shift", "cmd,shift") end)
 	helpers.it("sticky_option_shift_ctrl arms all three", function()
 		assert_sticky("sticky_option_shift_ctrl", "alt,ctrl,shift")
+	end)
+	helpers.it("sticky_altgr arms Option, Ergopti's AltGr level on macOS (one-shot-altgr)", function()
+		assert_sticky("sticky_altgr", "alt")
+		assert_sticky("sticky_altgr_shift", "alt,shift")
 	end)
 	helpers.it("sticky_hyper arms all four", function()
 		assert_sticky("sticky_hyper", "alt,cmd,ctrl,shift")

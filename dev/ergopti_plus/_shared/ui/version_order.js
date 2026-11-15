@@ -9,9 +9,9 @@
  * version » by comparing its tag with the installed build.
  *
  * FEATURES & RATIONALE:
- * 1. One vector table: the canonical order is _shared/modules/updater/
+ * 1. One vector table: the canonical order is _shared/updater/data/
  *    version.js, an ES module a page cannot load as a plain script. This port
- *    replays the same _shared/modules/updater/version_vectors.json in
+ *    replays the same _shared/updater/data/version_vectors.json in
  *    tools/test/test-version-compare-contract.cjs, like the Lua and AHK ports.
  * 2. Fail closed: a tag that is not semver orders as equal (0), so a page never
  *    calls a release older or newer on a guess.

@@ -16,7 +16,7 @@ helpers.describe("onboarding JavaScript delivery", function()
 		helpers.it("(onboarding-js-delivery) retained " .. action .. " retries cleanup without another commit", function()
 			with_delivery(function(_, state, pending, errors, evaluations, open)
 				local persists = 0
-				package.loaded["infra.i18n"].persist_locale = function() persists = persists + 1; return false end
+				package.loaded["core.i18n.engine.i18n"].persist_locale = function() persists = persists + 1; return false end
 				local old_receiver = state.receiver
 				state.refused = true
 				old_receiver({ body = { action = "finish", answers = { locale = "en", config_dir = "", operations = {} } } })
@@ -287,7 +287,7 @@ helpers.describe("onboarding initialization scheduling", function()
 	helpers.it("(onboarding-init-retry) early native navigation binds the accepted view after construction", function()
 		with_delivery(function(_, state, _, _, evaluations, open)
 			state.view.options.on_close()
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local original_show = builder.show_webview
 			builder.show_webview = function(options)
 				options.on_navigation("didFinishNavigation")
@@ -390,7 +390,7 @@ helpers.describe("onboarding captured initialization publication", function()
 			state.encode = function(payload)
 				state.encode = nil
 				helpers.assert_true(onboarding.run("/virtual/other/config.toml"))
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(state.read_paths[1], "/virtual/config.toml")
@@ -416,7 +416,7 @@ helpers.describe("onboarding active initialization reservation", function()
 			state.encode = function(payload)
 				state.encode = nil
 				helpers.assert_true(onboarding.run("/virtual/config.toml"))
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(state.timer_attempts, 1)
@@ -470,7 +470,7 @@ helpers.describe("onboarding active initialization reservation", function()
 				helpers.assert_true(onboarding.run("/virtual/other/config.toml"))
 				state.receiver({ body = { action = "ready" } })
 				attempts_during_encoding = state.timer_attempts
-				return require("json").encode(payload)
+				return require("core.text.engine.json").encode(payload)
 			end
 			state.fire_timer(1)
 			helpers.assert_eq(attempts_during_encoding, 1, "active submission cannot allocate a second timer inline")

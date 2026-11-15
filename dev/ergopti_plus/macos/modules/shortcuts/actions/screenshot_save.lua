@@ -16,13 +16,13 @@
 local M = {}
 
 local hs            = hs
-local ShellRunner   = require("adapters.shell_runner")
-local FileSystem    = require("adapters.file_system")
-local Logger        = require("infra.logger")
-local notifications = require("infra.notifications")
-local i18n          = require("infra.i18n")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local FileSystem    = require("core.fs.adapters.file_system")
+local Logger        = require("core.logger.engine.logger")
+local notifications = require("core.ui.engine.notifications")
+local i18n          = require("core.i18n.engine.i18n")
 local CaptureFlow   = require("modules.shortcuts.actions.screen_capture_flow")
-local NativePath = require("native_path")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "shortcuts.actions.screenshot_save"
 
@@ -604,7 +604,7 @@ end
 --- @return string|nil encoded Base64 PNG.
 --- @return string|nil detail Why the image cannot be encoded.
 local function encode_capture(data)
-	local encoded, encode_error = require("adapters.screen_capture").encode_base64(data)
+	local encoded, encode_error = require("platform.system.screen_capture").encode_base64(data)
 	if not encoded then return nil, "the capture could not be encoded: " .. tostring(encode_error) end
 	return encoded
 end

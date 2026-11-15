@@ -17,21 +17,21 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 	helpers.it("relabels a cached app after a language change", function()
 		local previous_hs = _G.hs
 		local ok, err = xpcall(function()
-			helpers.with_fresh_modules({ "ui.menu.menu_apps", "infra.logger", "infra.paths",
-				"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }, function()
+			helpers.with_fresh_modules({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths",
+				"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }, function()
 				local locale = "fr"
 				local texts = {
 					fr = { ["menu.apps.clone_desc"] = "Dupliquer une application" },
 					en = { ["menu.apps.clone_desc"] = "Duplicate an app" },
 				}
-				package.loaded["infra.logger"] = helpers.make_logger_stub()
-				package.loaded["infra.paths"] = {}
+				package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+				package.loaded["core.fs.engine.paths"] = {}
 				package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, _, providers)
 					return providers.apps_installed()
 				end }
-				package.loaded["adapters.task_lifecycle"] = {}
+				package.loaded["core.process.adapters.task_lifecycle"] = {}
 				local scans = 0
-				package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+				package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 					if directory:find("/Contents/Resources", 1, true) then return {}, true end
 					scans = scans + 1
 					return { "App Cloner.app" }, true
@@ -51,7 +51,7 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 				provider_view.group_row = binding.group_row
 				-- load_with_stubs installs its own i18n table and the module keeps that
 				-- reference, so the language switch is made on that very table.
-				package.loaded["infra.i18n"].get = function(key)
+				package.loaded["core.i18n.engine.i18n"].get = function(key)
 					return texts[locale][key] or key
 				end
 				local ctx = { base_dir = "/virtual/apps-fixture" }

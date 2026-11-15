@@ -46,7 +46,7 @@ local WORD_TOML = {
 --- @param effects table Mutable output capture.
 local function install_collaborators(effects)
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^adapters%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -77,7 +77,7 @@ local function install_collaborators(effects)
 		end,
 		set_buffer = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -98,12 +98,12 @@ local function install_collaborators(effects)
 		resolve = function() return nil end,
 		get_user_override = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 	-- Only the fixture's virtual file is answered here; every other TOML (the
 	-- shared timing constants, …) is still read by the real reader.
-	package.loaded["infra.toml.reader"] = nil
-	local RealReader = require("infra.toml.reader")
-	package.loaded["infra.toml.reader"] = setmetatable({
+	package.loaded["core.text.engine.toml.reader"] = nil
+	local RealReader = require("core.text.engine.toml.reader")
+	package.loaded["core.text.engine.toml.reader"] = setmetatable({
 		parse = function(path, ...)
 			if path == "/virtual/word_reset.toml" then return WORD_TOML, true end
 			return RealReader.parse(path, ...)
@@ -149,9 +149,12 @@ local function with_keymap(body)
 	local now = 100
 	hs_stub.timer.secondsSinceEpoch = function() return now end
 
-	local tap = nil
+	local tap, flags_tap = nil, nil
 	for _, candidate in ipairs(hs_stub.eventtap.__taps) do
 		if #candidate.types == 1 and candidate.types[1] == hs_stub.eventtap.event.types.keyDown then tap = candidate end
+		if #candidate.types == 1 and candidate.types[1] == hs_stub.eventtap.event.types.flagsChanged then
+			flags_tap = candidate
+		end
 	end
 	local properties = hs_stub.eventtap.event.properties
 
@@ -168,8 +171,25 @@ local function with_keymap(body)
 		})
 	end
 
+	--- Delivers one modifier edge to the real flagsChanged tap.
+	--- @param flags table Modifier flags after the edge.
+	--- @param keycode number|nil Modifier key code (left Command by default).
+	local function modifier_edge(flags, keycode)
+		now = now + 0.01
+		return flags_tap.fn({
+			getProperty = function(_self, property)
+				if property == properties.eventSourceUserData then return 0 end
+				return KARABINER_PID
+			end,
+			getFlags = function() return flags end,
+			getKeyCode = function() return keycode or 55 end,
+			rawFlags = function() return 0 end,
+		})
+	end
+
 	local ok, err = xpcall(function()
 		helpers.assert_not_nil(tap, "the real keymap must install one key-down eventtap")
+		helpers.assert_not_nil(flags_tap, "the real keymap must install one flagsChanged eventtap")
 		helpers.assert_not_nil(state, "the keymap must build its state through the state module")
 		helpers.assert_eq(Keymap.load_toml("word_reset", "/virtual/word_reset.toml"), true,
 			"the TOML-shaped entries register through the real loader")
@@ -186,6 +206,7 @@ local function with_keymap(body)
 		body({
 			keymap = Keymap, state = state, effects = effects,
 			press = press,
+			modifier_edge = modifier_edge,
 			pause = function(seconds) now = now + seconds end,
 			settle = function() drain_immediate_timers(hs_stub) end,
 		})
@@ -193,7 +214,7 @@ local function with_keymap(body)
 	pcall(Keymap.stop)
 	Utils.is_ignored_window, Utils.is_secure_field = original_ignored, original_secure
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:match("^modules%.keymap") or name == "infra.toml.reader") then
+		if type(name) == "string" and (name:match("^modules%.keymap") or name == "core.text.engine.toml.reader") then
 			package.loaded[name] = nil
 		end
 	end
@@ -404,7 +425,7 @@ local SHIFT = { cmd = false, ctrl = false, alt = false, shift = true }
 --- @param bundle string Bundle identifier.
 --- @param name string Application name.
 local function focus_app(bundle, name)
-	require("adapters.text_sender").focusedAppIdentity = function() return bundle, name, {} end
+	require("platform.input.text_sender").focusedAppIdentity = function() return bundle, name, {} end
 end
 
 --- Presses Backspace `count` times.
@@ -601,11 +622,15 @@ end)
 
 -- The tagged F20 Karabiner sends before a tap-hold's own command, and the
 -- untagged F20/F19 it sends when the navigation layer turns on and off
--- (_shared/lua/keymap/control_signals.lua, modules/keymap/control_sentinels.lua).
+-- (_shared/layouts/engine/layers/control_signals.lua, modules/keymap/control_sentinels.lua).
 local KEYCODE_F20 = 90
 local KEYCODE_F19 = 80
 local TAP_HOLD_TAG = { cmd = true, ctrl = true, alt = true, shift = true }
 local CMD_V = { cmd = true, ctrl = false, alt = false, shift = false }
+-- The untagged context-menu key Karabiner sends before a tap-hold key's Ctrl,
+-- Cmd or Option hold, with the flags the hand holds at that moment.
+local KEYCODE_CONTEXT_MENU = 110
+local CMD_CTRL_V = { cmd = true, ctrl = true, alt = false, shift = false }
 
 local TAP_HOLD_EVENTS = {
 	{ name = "a tap-hold's own Cmd+V", fn = function(f)
@@ -616,6 +641,20 @@ local TAP_HOLD_EVENTS = {
 		f.press("", NO_FLAGS, KEYCODE_F20, KARABINER_PID)
 		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
 		f.press("", NO_FLAGS, KEYCODE_F19, KARABINER_PID)
+	end },
+	{ name = "Cmd+V under a tap-hold key's Cmd hold", fn = function(f)
+		f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+		f.modifier_edge(CMD_V)
+		f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+		f.modifier_edge(NO_FLAGS)
+	end },
+	{ name = "Cmd+Ctrl+V under a tap-hold Ctrl hold over the hand's Cmd", fn = function(f)
+		f.modifier_edge(CMD_V)
+		f.press("", CMD_V, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+		f.modifier_edge(CMD_CTRL_V, 59)
+		f.press("v", CMD_CTRL_V, KEYCODE_V, KARABINER_PID)
+		f.modifier_edge(CMD_V, 59)
+		f.modifier_edge(NO_FLAGS)
 	end },
 }
 
@@ -658,6 +697,36 @@ helpers.describe("hotstrings.tap_hold_resets_word (macos-tap-hold-word-reset)", 
 	helpers.it("the marker never reaches the application", function()
 		with_keymap(function(f)
 			helpers.assert_eq(f.press("", TAP_HOLD_TAG, KEYCODE_F20, KARABINER_PID), true)
+			helpers.assert_eq(f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID), true,
+				"nor does the hold marker (macos-tap-hold-modifier-word-reset)")
+		end)
+	end)
+
+	-- The hold has no release marker: its modifiers going up end it, so the
+	-- hand's own chords follow the shortcut option again.
+	helpers.it("the user's own Cmd+V after a tap-hold Cmd hold follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.press("", NO_FLAGS, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+				f.modifier_edge(CMD_V)
+				f.modifier_edge(NO_FLAGS)
+				f.modifier_edge(CMD_V)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.modifier_edge(NO_FLAGS)
+			end), "", "the released hold no longer owns Cmd")
+		end)
+	end)
+
+	helpers.it("the hand's own Cmd+V under a tap-hold hold that added nothing follows the shortcut option", function()
+		with_keymap(function(f)
+			helpers.assert_eq(f.keymap.set_shortcut_resets_word(false), true)
+			helpers.assert_eq(a_event_then(f, function()
+				f.modifier_edge(CMD_V)
+				f.press("", CMD_V, KEYCODE_CONTEXT_MENU, KARABINER_PID)
+				f.press("v", CMD_V, KEYCODE_V, KARABINER_PID)
+				f.modifier_edge(NO_FLAGS)
+			end), "", "Cmd was the hand's before the marker")
 		end)
 	end)
 end)

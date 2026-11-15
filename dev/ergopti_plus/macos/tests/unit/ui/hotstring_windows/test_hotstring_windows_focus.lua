@@ -27,19 +27,19 @@ local function with_window(module_name, scenario)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local state = { views = {}, deferred = {}, focuses = 0 }
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end, info = function() end, warn = function() end, error = function() end,
 		}
-		package.loaded["infra.paths"] = { shared = function() return "/virtual" end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-		package.loaded["infra.deferred_work"] = { after = function(_, callback)
+		package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual" end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 			state.deferred[#state.deferred + 1] = callback
 			return true
 		end }
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
-		package.loaded["infra.toml.reader"] = { parse = function() return {}, true end }
-		package.loaded["infra.toml.writer"] = {}
+		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
+		package.loaded["core.text.engine.toml.reader"] = { parse = function() return {}, true end }
+		package.loaded["core.text.engine.toml.writer"] = {}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {}
 		package.loaded["hs.spaces"] = {}
 		_G.hs = {
@@ -50,9 +50,9 @@ local function with_window(module_name, scenario)
 				return { setCallback = function(self) return self end }
 			end } },
 		}
-		package.loaded["ui.ui_builder"] = nil
-		local real_builder = require("ui.ui_builder")
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = nil
+		local real_builder = require("core.ui.ui.builder")
+		package.loaded["core.ui.ui.builder"] = {
 			force_focus = real_builder.force_focus,
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end,

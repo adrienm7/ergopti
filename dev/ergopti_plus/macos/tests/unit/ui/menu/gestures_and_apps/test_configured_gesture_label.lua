@@ -8,15 +8,15 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger menu row", function()
 		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
-			"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "ui.action_picker",
-			"menu.renderer",
-			"ui.menu.shortcut_utils", "infra.logger", "infra.deferred_work" }, function()
-			local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
+			"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.action_picker",
+			"menu.engine.renderer",
+			"ui.menu.shortcut_utils", "core.logger.engine.logger", "core.timing.engine.deferred_work" }, function()
+			local file = assert(io.open(helpers.shared("core/i18n/data/locales/fr.json"), "rb"))
 			local strings = json.decode(file:read("*a"))
 			file:close()
 			local url = "https://apple.com/?q=[x]&part=50%"
@@ -32,13 +32,13 @@ helpers.describe("configured gesture menu label", function()
 			}
 			package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true }, DEFAULT_GESTURES = {}, SINGLE_SLOTS = { "tap_4" } }
 			package.loaded["ui.menu.menu_utils"] = {}
-			package.loaded["infra.dialog_util"] = {}
-			package.loaded["infra.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
-			local renderer = assert(require("menu.renderer").new({
+			package.loaded["core.ui.engine.dialog_util"] = {}
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
+			local renderer = assert(require("menu.engine.renderer").new({
 				platform = "hs",
-				manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 				json_decode = json.decode,
-				i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+				i18n = package.loaded["core.i18n.engine.i18n"], logger = helpers.make_logger_stub(),
 			}))
 			package.loaded["infra.manifest_menu"] = {
 				group_receiver = renderer.group_receiver,
@@ -48,8 +48,8 @@ helpers.describe("configured gesture menu label", function()
 			}
 			package.loaded["ui.action_picker"] = {}
 			package.loaded["ui.menu.shortcut_utils"] = {}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.deferred_work"] = {}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.timing.engine.deferred_work"] = {}
 			local menu = require("ui.menu.menu_gestures").build({ gestures = gestures, state = { gestures = true }, paused = false })
 			local prefix = assert(strings["sg_actions.open_url"]:match("^(.-)%[[^%[%]]*%]$"))
 			helpers.assert_true(menu.submenu[1].label:find(prefix .. "[" .. url .. "]", 1, true) ~= nil)

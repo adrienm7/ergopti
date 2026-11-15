@@ -192,32 +192,28 @@ _HSCS_ExtensionMenuOwner(Enabled, LateRefusal, Paused := false) {
 			if Paused
 				Suspend(true)
 			Receipt := Action.Call()
-			if Paused {
-				AssertEqual("refused", Receipt["status"])
-				AssertEqual(0, Launches, "a retained command cannot launch while paused")
-				AssertFalse(FSStrictExists(Receipt["backup"]))
-			} else {
-				AssertEqual(1, Launches, "one extension click admits one staged cohort")
-				if LateRefusal {
-					AssertEqual("pending", Receipt["status"])
-					Parsed := TOML_ParseFreshFile(Fixture.path)
-					for Name in ["replace", "repeat_corrections"]
-						_HSCS_AssertSparseSelection(Parsed, "hotstrings.magic_key." . Name, "enabled",
-							"hotstrings.magic_key." . Name . ".enabled", Enabled)
-					AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.replace")["enabled"],
-						"pending publication leaves the real runtime's desired feature map unchanged")
-					AssertTrue(Parsed["category_enabled"]["magic_key"], "closing bound leaves retains the category gate")
-					for Name in ["text_expansion_symbols", "text_expansion_symbols_typst"]
-						AssertTrue(Parsed["hotstrings.magic_key." . Name]["enabled"], "unrelated MagicKey symbols remain selected")
-					for Key in ["rolls", "distances_reduction", "sfbs_reduction", "french_distancesreduction"]
-						_HSCS_AssertSparseSelection(Parsed, "category_enabled", Key, "category_enabled." . Key, Enabled)
-					AssertFalse(Parsed["category_enabled"]["hotstrings"], "the engine master keeps its independent choice")
-					AssertEqual("retain-extension-fixture", Parsed["private"]["credential"])
-					Refusal.Call("native extension selection refused")
-				}
-				AssertEqual("refused", Receipt["status"])
-				AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
+			; A pause stops typing, not configuration (EDD-1): a retained command
+			; launches while suspended as it does otherwise (edd1-paused-writes).
+			AssertEqual(1, Launches, "one extension click admits one staged cohort")
+			if LateRefusal {
+				AssertEqual("pending", Receipt["status"])
+				Parsed := TOML_ParseFreshFile(Fixture.path)
+				for Name in ["replace", "repeat_corrections"]
+					_HSCS_AssertSparseSelection(Parsed, "hotstrings.magic_key." . Name, "enabled",
+						"hotstrings.magic_key." . Name . ".enabled", Enabled)
+				AssertEqual(!Enabled, ReadFeatureStateV2("hotstrings.magic_key.replace")["enabled"],
+					"pending publication leaves the real runtime's desired feature map unchanged")
+				AssertTrue(Parsed["category_enabled"]["magic_key"], "closing bound leaves retains the category gate")
+				for Name in ["text_expansion_symbols", "text_expansion_symbols_typst"]
+					AssertTrue(Parsed["hotstrings.magic_key." . Name]["enabled"], "unrelated MagicKey symbols remain selected")
+				for Key in ["rolls", "distances_reduction", "sfbs_reduction", "french_distancesreduction"]
+					_HSCS_AssertSparseSelection(Parsed, "category_enabled", Key, "category_enabled." . Key, Enabled)
+				AssertFalse(Parsed["category_enabled"]["hotstrings"], "the engine master keeps its independent choice")
+				AssertEqual("retain-extension-fixture", Parsed["private"]["credential"])
+				Refusal.Call("native extension selection refused")
 			}
+			AssertEqual("refused", Receipt["status"])
+			AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
 			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path), "refusal restores exact bytes for the entire extension")
 		}
 	}
@@ -226,7 +222,7 @@ for _HSCS_Enabled in [true, false]
 	for _HSCS_Late in [true, false]
 		Test("hotstring-extension-menu-owner: real shipped command " . _HSCS_Enabled . " rollback " . _HSCS_Late,
 			_HSCS_ExtensionMenuOwner.Bind(_HSCS_Enabled, _HSCS_Late))
-Test("hotstring-extension-menu-owner: retained native command refuses after pause",
+Test("hotstring-extension-menu-owner: retained native command runs after pause (edd1-paused-writes)",
 	_HSCS_ExtensionMenuOwner.Bind(true, true, true))
 
 _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
@@ -546,7 +542,7 @@ _HSCS_DefaultMenuTargetsAreIndependent() {
 Test("hotstring-personal-menu: default rendering creates independent native menus", _HSCS_DefaultMenuTargetsAreIndependent)
 
 
-#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+#Include %A_LineFile%\..\..\..\..\..\..\..\_shared\hotstrings\data\catalogue\personal_scope.ahk
 
 
 ; Cross-driver order vectors execute the native policy, not a source scan.
@@ -566,3 +562,88 @@ _HSCS_OrderVector(Vector) {
 }
 for _HSCS_OrderVectorValue in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\section_order_vectors.json", "UTF-8"))["vectors"]
 	Test("hotstring-section-order: " . _HSCS_OrderVectorValue["name"], _HSCS_OrderVector.Bind(_HSCS_OrderVectorValue))
+
+
+; Every menu category keeps its own stored order. French autocorrection loads
+; from french\autocorrection.toml, yet its order is not the neutral category's
+; list: both drivers in Lua key it by its group id, and so must the tray.
+; The categories come from their declarations (the manifest groups and the
+; language packs), the sources _HS_RegisterLanguageMenuCategories reads, not
+; from _FLAT_HOTSTRING_V1_CATS, which only a tray build fills.
+_HSCS_OrderMenuCategories() {
+	Names := ["DynamicHotstrings"]
+	Groups := MenuManifest_LoadHotstringGroups()
+	for Categories in [Groups.standard, Groups.ergopti]
+		for Name in Categories
+			Names.Push(Name)
+	for _, Pack in HotstringsLanguageCategories() {
+		for _, Cat in Pack["categories"]
+			Names.Push(Cat["v1"])
+	}
+	return Names
+}
+
+_HSCS_OrderCategoryVectors() {
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstrings\section_order_category_vectors.json", "UTF-8"))["vectors"]
+}
+
+_HSCS_OrderCategoryVector(Vector) {
+	Wanted := "\hotstrings\data\catalogue\" . (Vector["folder"] != "" ? Vector["folder"] . "\" : "") . Vector["stem"] . ".toml"
+	Matches := []
+	for Name in _HSCS_OrderMenuCategories() {
+		Path := _HotstringsPhysicalBundledTomlPath(Name)
+		if StrLen(Path) >= StrLen(Wanted) && SubStr(Path, -StrLen(Wanted)) = Wanted
+			Matches.Push(Name)
+	}
+	AssertTrue(Matches.Length >= 1, "a menu category loads from " . Wanted)
+	for Name in Matches
+		AssertEqual(Vector["id"], _HS_OrderCategoryId(Name), Name . " stores its order under its own id")
+}
+for _HSCS_OrderCategoryValue in _HSCS_OrderCategoryVectors()
+	Test("hotstring-section-order: category key: " . _HSCS_OrderCategoryValue["name"],
+		_HSCS_OrderCategoryVector.Bind(_HSCS_OrderCategoryValue))
+
+_HSCS_OrderCategoryIdsDistinct() {
+	Seen := Map(), Covered := Map()
+	for Vector in _HSCS_OrderCategoryVectors()
+		Covered[Vector["id"]] := true
+	for Name in _HSCS_OrderMenuCategories() {
+		Id := _HS_OrderCategoryId(Name)
+		AssertFalse(Seen.Has(Id) && Seen[Id] != Name, Name . " and " . (Seen.Has(Id) ? Seen[Id] : "") . " share the order key " . Id)
+		Seen[Id] := Name
+	}
+	for Id in HotstringsBundledCategories()
+		AssertTrue(Covered.Has(Id), "the shared corpus pins the order key of " . Id)
+}
+Test("hotstring-section-order: category key: no two menu categories share a stored order", _HSCS_OrderCategoryIdsDistinct)
+
+; The menu reads the stored list of the category it draws and nothing else.
+_HSCS_OrderRowsKeepTheirCategory() {
+	global ConfigurationFile
+	Rows() => [Map("label", "First", "section_order_id", "names"),
+		Map("label", "Second", "section_order_id", "accents")]
+	Labels(Result) {
+		Out := []
+		for Row in Result {
+			if Row.Has("label") && (Row["label"] == "First" || Row["label"] == "Second")
+				Out.Push(Row["label"])
+		}
+		return KL_JsonEncode(Out)
+	}
+	for Stored in ["autocorrection", "french_autocorrection"] {
+		Fixture := _ScopeOwnerFixture('[hotstrings.order_overrides]`n' . Stored . ' = ["accents", "names"]`n')
+		SavedPath := ConfigurationFile
+		try {
+			ConfigurationFile := Fixture.path
+			for Category in ["Autocorrection", "FrenchAutocorrection"] {
+				Owner := _HS_OrderCategoryId(Category) == Stored
+				AssertEqual(Owner ? '["Second","First"]' : '["First","Second"]', Labels(_HS_OrderRows(Category, Rows())),
+					Category . " with an order stored under " . Stored)
+			}
+		} finally {
+			ConfigurationFile := SavedPath
+			_ScopeOwnerCleanup(Fixture)
+		}
+	}
+}
+Test("hotstring-section-order: category key: the neutral and French orders never cross", _HSCS_OrderRowsKeepTheirCategory)

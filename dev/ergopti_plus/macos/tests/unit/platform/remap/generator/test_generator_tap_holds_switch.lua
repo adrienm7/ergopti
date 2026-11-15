@@ -11,10 +11,10 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	read = function() return nil end,
 	read_with_status = function() return nil, "absent" end,
 	write = function() return true end,
@@ -22,7 +22,7 @@ package.loaded["adapters.file_system"] = {
 package.loaded["infra.config_paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	to_name                 = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN    = 105,
 	F14_KARABINER_BACKSPACE = 107,

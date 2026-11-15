@@ -19,8 +19,8 @@
 local M = {}
 
 local hs = hs
-local Logger = require("infra.logger")
-local TableUtil = require("table_util")
+local Logger = require("core.logger.engine.logger")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "adapters.input_source_broker"
 

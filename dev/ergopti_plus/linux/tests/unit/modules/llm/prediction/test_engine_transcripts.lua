@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Transcript = require("test.llm_engine_transcript")
+local Transcript = require("tests.lua.ai.engine_transcript")
 local World = require("tests.support.llm_engine_transcript_world")
 
 Transcript.run(helpers,

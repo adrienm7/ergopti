@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.clipboard", "adapters.timer_scheduler", "adapters.synthetic_input",
-		"infra.logger", "infra.timings", "infra.text_utils",
+		"modules.keymap.utils", "adapters.clipboard", "core.events.timer_scheduler", "platform.input.synthetic_input",
+		"core.logger.engine.logger", "core.timing.engine.timings", "core.text.engine.utils",
 	}) do
 		package.loaded[name] = nil
 	end
@@ -65,7 +65,7 @@ local function load_fixture()
 			callback(tx, "complete")
 		end
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_transaction = function() return tx end,
 		begin = function()
 			assert(debt_tx == nil, "one clipboard owner must create one drain debt")
@@ -128,8 +128,8 @@ local function load_fixture()
 		end,
 		emit_key_strokes = function() return true end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
 			if key == "clipboard_paste_settle_ms" then return 0.05 end
 			return 0.15

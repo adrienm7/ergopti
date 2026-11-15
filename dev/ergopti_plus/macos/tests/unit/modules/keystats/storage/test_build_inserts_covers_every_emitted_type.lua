@@ -99,8 +99,8 @@ local function load_real_keystats()
 		get_sqlite_path = function() return "/tmp/test.sqlite" end,
 		get_db_rev = function() return 0 end, sync_foreign_data_sql = function() end,
 	}
-	package.loaded["infra.i18n"] = { t = function(k) return k end, get = function(k) return k end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.i18n.engine.i18n"] = { t = function(k) return k end, get = function(k) return k end }
+	package.loaded["core.timing.engine.timings"] = {
 		ms  = function(section, key) return (_TIMINGS_MS[section] or {})[key] or 1000 end,
 		sec = function() return 1.0 end,
 	}
@@ -113,7 +113,7 @@ local function load_real_keystats()
 			return true
 		end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function() end,
 		start = function() return true end,
 		stop = function() return true end,
@@ -122,7 +122,7 @@ local function load_real_keystats()
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function() return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
@@ -141,8 +141,8 @@ local function load_real_keystats()
 	}
 	package.loaded["modules.keystats.watchers"]    = nil
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-	package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+	package.loaded["core.fs.adapters.file_system"] = {
 		-- This non-IO scenario begins with an existing user metrics ignore.
 		path_status = function(path)
 			assert(path:sub(-#"/.gitignore") == "/.gitignore", "unexpected metadata inspection")
@@ -154,7 +154,7 @@ local function load_real_keystats()
 		read_with_status = function() return nil, "absent" end,
 	}
 	require("tests.support.keystats.absent_ledger_file_system").model_initial_header(
-		package.loaded["adapters.file_system"], false)
+		package.loaded["core.fs.adapters.file_system"], false)
 	local KL = helpers.load_with_stubs("modules.keystats.init", {
 		processInfo = { processID = 7001 },
 		application = {
@@ -213,7 +213,7 @@ local function load_real_keystats()
 		keycodes = { currentLayout = function() return "ABC" end },
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 
 	helpers.assert_eq(KL.start({ is_paused = function() return false end }), true,
 		"the coverage fixture must start the real producer before reflecting on it")
@@ -338,7 +338,7 @@ end)
 --- Parses `CHECK (<col> IN ('a','b'))` constraints out of the canonical schema.
 --- @return table Map of table name -> { column -> { allowed value -> true } }.
 local function parse_check_constraints()
-	local fh = io.open(helpers.shared("data/db/schema.sql"), "r")
+	local fh = io.open(helpers.shared("metrics/data/db/schema.sql"), "r")
 	helpers.assert_true(fh ~= nil, "schema.sql must be readable")
 	local schema = fh:read("*a"); fh:close()
 

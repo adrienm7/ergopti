@@ -14,17 +14,17 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local RESET_MODULES = {
 	"modules.keystats.physical_accounting_mode",
-	"modules.keystats", "modules.keystats.init", "adapters.ledger_append", "modules.keystats.log_manager",
+	"modules.keystats", "modules.keystats.init", "core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	"modules.keystats.rotation", "modules.keystats.sqlite_writer",
 	"modules.keystats.aggregator", "modules.keystats.export",
 	"modules.keystats.timestamp",
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
-	"modules.keystats.watchers", "adapters.process_lifecycle",
-	"adapters.keyboard_hook", "adapters.event_provenance",
-	"adapters.synthetic_input", "adapters.input_source_broker",
-	"infra.logger", "infra.timings",
-	"infra.manifest_reader", "infra.i18n", "infra.dialog_util",
-	"keystats.metrics", "modules.keymap",
+	"modules.keystats.watchers", "core.process.adapters.lifecycle",
+	"platform.input.keyboard_hook", "adapters.event_provenance",
+	"platform.input.synthetic_input", "adapters.input_source_broker",
+	"core.logger.engine.logger", "core.timing.engine.timings",
+	"infra.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
+	"metrics.engine.metrics", "modules.keymap",
 }
 
 
@@ -94,7 +94,7 @@ local function load_timer_allocation_failure_fixture()
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 
 	local appended = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats.rotation"] = {
 		init = noop,
 		is_initialized = function() return true end,
@@ -130,7 +130,7 @@ local function load_timer_allocation_failure_fixture()
 		get_sqlite_path = function() return nil end,
 		get_db_rev = function() return 0 end,
 	}
-	package.loaded["keystats.metrics"] = {
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,
 	}
 
@@ -166,8 +166,8 @@ local function load_timer_allocation_failure_fixture()
 		return handle
 	end
 
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -180,7 +180,7 @@ package.loaded["adapters.file_system"] = {
 		},
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	local hs_stub = _G.hs
 	hs_stub.keycodes.currentLayout = function() return "ABC" end
 	hs_stub.caffeinate = {
@@ -212,7 +212,7 @@ package.loaded["adapters.file_system"] = {
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["platform.input.synthetic_input"] = synthetic_stub
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
@@ -224,7 +224,7 @@ package.loaded["adapters.file_system"] = {
 	}
 
 	local handle_key = nil
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
 			return true
@@ -232,7 +232,7 @@ package.loaded["adapters.file_system"] = {
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api({
+	package.loaded["core.process.adapters.lifecycle"] = api({
 		start = function() return true end,
 		stop = function() return true end,
 	})
@@ -253,7 +253,7 @@ package.loaded["adapters.file_system"] = {
 		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,
@@ -274,8 +274,8 @@ package.loaded["adapters.file_system"] = {
 		metrics_cache_dir = function() return "/tmp/ergopti_timer_failure/cache" end,
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { alert = noop }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
 
 	local keystats = require("modules.keystats.init")
 	start_and_settle_context(keystats, { is_paused = function() return false end })
@@ -353,7 +353,7 @@ local function load_fixture()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["platform.input.synthetic_input"] = synthetic_stub
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
@@ -373,7 +373,7 @@ local function load_fixture()
 	}
 
 	local handle_key = nil
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
 			return true
@@ -381,7 +381,7 @@ local function load_fixture()
 		stop = function() return true end,
 		isRunning = function() return true end,
 	}
-	package.loaded["adapters.process_lifecycle"] = api({
+	package.loaded["core.process.adapters.lifecycle"] = api({
 		start = function() return true end,
 		stop = function() return true end,
 	})
@@ -421,12 +421,12 @@ local function load_fixture()
 		unsubscribe = function() return true end,
 	}
 	package.loaded["modules.keymap"] = { get_shift_side = function() return "none" end }
-	package.loaded["infra.logger"] = api({
+	package.loaded["core.logger.engine.logger"] = api({
 		pcall = function(_module_name, fn, ...)
 			return pcall(fn, ...)
 		end,
 	})
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_section, key)
 			local values = {
 				micro_idle_timeout_ms = 30000,
@@ -442,9 +442,9 @@ local function load_fixture()
 		sec = function() return 1 end,
 	}
 	package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.dialog_util"] = { alert = noop }
-	package.loaded["keystats.metrics"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = noop }
+	package.loaded["metrics.engine.metrics"] = {
 		compute_wpm_from_events = function() return 0 end,
 	}
 

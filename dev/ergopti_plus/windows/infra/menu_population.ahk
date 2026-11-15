@@ -49,6 +49,30 @@ MenuDeferred_Create(BuildFn, ListId) {
 }
 
 /**
+ * Publishes an attached submenu again: its rows are dropped and built at its
+ * next open, from the state of that moment. A pause or a resume uses it, since
+ * the tray root is not rebuilt under a pause and a live submenu must show which
+ * of its rows wait for the resume (EDD-1).
+ * @param {Menu} MenuObj The attached native submenu, kept as it is.
+ * @param {Func} BuildFn Fills the empty native Menu it receives.
+ * @param {String} ListId Closed list id for the counters and logs.
+ * @returns {Boolean} False when the submenu was still waiting for its build.
+ */
+MenuDeferred_Rearm(MenuObj, BuildFn, ListId) {
+	global _MenuDeferredChildren
+	if !(MenuObj is Menu) || !HasMethod(BuildFn, "Call")
+		throw TypeError("A deferred re-arm requires its native menu and builder")
+	if _MenuDeferredChildren.Has(MenuObj.Handle)
+		return false
+	MenuObj.Delete()
+	if IsSet(MenuDispatcher_PruneMenu)
+		MenuDispatcher_PruneMenu(MenuObj)
+	_MenuDeferred_AddPlaceholder(MenuObj)
+	_MenuDeferredChildren[MenuObj.Handle] := { MenuObj: MenuObj, BuildFn: BuildFn, ListId: ListId, Busy: false }
+	return true
+}
+
+/**
  * The submenu of one tray build: deferred inside a population build, built at
  * once for a caller with no owner, such as a unit test reading the rows.
  * @param {Func} BuildFn Fills the empty native Menu it receives.
@@ -87,6 +111,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 	if Entry.Busy
 		throw MenuPopulationReentryError("Deferred submenu build reentered")
 	Entry.Busy := true
+	HotPath_SpanTrace("tray.fill")
 	StartedAt := HotPath_Now()
 	PreviousBuilding := _MenuPopulationBuilding
 	; Nested pickers stay deferred under the published owner, finished at their open.
@@ -112,6 +137,7 @@ MenuDeferred_Build(Handle, Reason := "navigation") {
 		PerfCount("menu.deferred_open_us." . Entry.ListId, PerfElapsedUs(StartedAt))
 		PerfCount("menu.deferred_open_runs." . Entry.ListId)
 		HotPath_LogIfSlow("Menu.deferred_build", StartedAt, Format("{1}; list={2}", Reason, Entry.ListId))
+		HotPath_SpanDone("tray.fill", StartedAt, "list=" . Entry.ListId)
 	}
 	return true
 }

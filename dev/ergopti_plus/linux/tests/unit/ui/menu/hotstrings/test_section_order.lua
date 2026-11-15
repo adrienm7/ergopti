@@ -8,8 +8,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Order = require("hotstrings.section_order")
-local json = require("json")
+local Order = require("hotstrings.engine.section_order")
+local json = require("core.text.engine.json")
 
 helpers.describe("hotstring-section-order", function()
 	local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/section_order_vectors.json", "rb"))
@@ -75,6 +75,21 @@ helpers.describe("hotstring-section-order", function()
 			helpers.assert_eq(Order.menu(template, { "a", "b" }, { a = "A", b = "B" }, commit, ready), {})
 		end
 		helpers.assert_eq(writes, 0)
+	end)
+	helpers.it("hotstring-section-order: every category keeps its own stored order key", function()
+		local Languages = require("hotstrings.engine.languages")
+		local corpus = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/section_order_category_vectors.json", "rb"))
+		local categories = json.decode(corpus:read("*a")).vectors
+		corpus:close()
+		local seen = {}
+		for _, vector in ipairs(categories) do
+			-- The menu keys an order by the category id it loaded: a language file is
+			-- registered under its group id, a root file under its stem.
+			local id = vector.folder ~= "" and Languages.group_id(vector.folder, vector.stem) or vector.stem
+			helpers.assert_eq(id, vector.id, vector.name)
+			helpers.assert_nil(seen[id], "two categories share the order key " .. id)
+			seen[id] = true
+		end
 	end)
 
 end)

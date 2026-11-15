@@ -29,19 +29,47 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
-local Paths       = require("infra.paths")
-local KeyCatalog  = require("tap_hold.key_catalog")
-local CombinationLabels = require("tap_hold.combination_labels")
-local LoneTap     = require("tap_hold.lone_tap")
+local Paths       = require("core.fs.engine.paths")
+local KeyCatalog  = require("tap_hold.engine.key_catalog")
+local CombinationLabels = require("tap_hold.engine.combination_labels")
+local LoneTap     = require("tap_hold.engine.lone_tap")
 local Manifest    = require("infra.manifest_reader")
 local LOG         = "menu.tap_holds"
-local i18n        = require("infra.i18n")
-local text_utils  = require("infra.text_utils")
-local WindowTitles = require("window_titles")
-local ConfigKeys = require("config_keys")
+
+local i18n        = require("core.i18n.engine.i18n")
+local text_utils  = require("core.text.engine.utils")
+local WindowTitles = require("core.ui.engine.window_titles")
+local ConfigKeys = require("settings.engine.keys")
+
+local ValueCheck = require("settings.engine.value_check")
+
+-- The shared value schema declarations of the delays this menu asks for.
+local GLOBAL_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_TIME_ACTIVATION_SECONDS
+local KEY_DELAY_KEY = ValueCheck.KEY.TAP_HOLD_KEYS_ANY_TIME_ACTIVATION_SECONDS
+
+--- Reads typed text through the shared value check. A refusal is logged and
+--- shown with the localized text naming the accepted range; nothing is written.
+--- @param key string Declaration of the shared value schema.
+--- @param text any What the person typed.
+--- @return any|nil value The value in the stored unit, nil when refused.
+local function read_typed(key, text)
+	local result = ValueCheck.parse_entry(ValueCheck.declaration(key), text)
+	if result.ok then return result.value end
+	Logger.warn(LOG, "Typed value '%s' for %s refused (%s).", tostring(text), key, result.reason)
+	require("core.ui.engine.dialog_util").block_alert(i18n.get("dialog.value_check.title"),
+		ValueCheck.refusal_text(key, result, i18n.get), i18n.get("button.ok"))
+	return nil
+end
+
+--- Milliseconds of a delay the schema stores in seconds, typed in whole ms.
+--- @param seconds number
+--- @return integer
+local function whole_ms(seconds)
+	return math.floor(seconds * 1000 + 0.5)
+end
 
 
 
@@ -146,7 +174,7 @@ local SAVED_UNTIL_HELPER_KEY = "menu.tapholds.saved_until_helper"
 local function report_login_items_opened(opened, detail)
 	if opened == true then return end
 	Logger.warn(LOG, "Login Items settings could not be opened: %s.", tostring(detail))
-	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+	local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 		i18n.get("karabiner.guardian_settings_open_failed"), nil, "error")
 	if not ok or sent_or_err ~= true then
 		Logger.error(LOG, "Login Items failure notice was not delivered: %s.", tostring(sent_or_err))
@@ -172,7 +200,7 @@ local function announce_saved_until_guardian(karabiner, method_name, reason)
 			return karabiner.open_login_items(report_login_items_opened) == true
 		end
 	end
-	local ok, sent_or_err = pcall(require("infra.notifications").notify,
+	local ok, sent_or_err = pcall(require("core.ui.engine.notifications").notify,
 		i18n.get(key), nil, "info", on_click)
 	if not ok or sent_or_err ~= true then
 		Logger.error(LOG, "Saved-until-guardian notice was not delivered: %s.", tostring(sent_or_err))
@@ -283,7 +311,7 @@ local _scope_generation = 0
 local function run_scope(karabiner, mode, update_menu, scope)
 	scope = scope or ConfigKeys.KEY.TAP_HOLDS
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
+	local backup_path = require("infra.config_paths").get("TapHoldConfigPath") .. "." .. scope .. "-"
 		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
 	return run_bulk_menu_command(
 		karabiner,
@@ -429,7 +457,7 @@ end
 -- =========================================
 
 -- The macOS column of the shared key catalogue ([tap_hold.catalog] in
--- _shared/tap_hold/defaults.toml): which keys this submenu lists, in which
+-- _shared/tap_hold/data/defaults.toml): which keys this submenu lists, in which
 -- order, under which hand and with which label. Read once, on first use.
 --
 -- It replaces a reader of a `tap_hold_keys_catalog` menu-manifest key that
@@ -444,7 +472,7 @@ local _key_catalog = nil
 --- @return table Array of { id, key, hand, label_key } in tray order.
 local function key_catalog()
 	if _key_catalog == nil then
-		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/defaults.toml"), "hs")
+		_key_catalog = KeyCatalog.load(Paths.shared("tap_hold/data/defaults.toml"), "hs")
 	end
 	return _key_catalog
 end
@@ -504,13 +532,10 @@ local function build_one_tap_hold_item(karabiner, action_index, update_menu, ena
 			local call_ok, ok, result = pcall(hs.osascript.applescript, script)
 			if not call_ok or ok ~= true or type(result) ~= "table"
 				or type(result["text returned"]) ~= "string" then return false end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms) <= 0 then
-				Logger.warn(LOG, "Invalid per-key delay '%s' — ignored.", tostring(result["text returned"]))
-				return false
-			end
+			local seconds = read_typed(KEY_DELAY_KEY, result["text returned"])
+			if seconds == nil then return false end
 			return commit_menu_setting(karabiner, "Per-key tap/hold timeout", function()
-				return karabiner.set_tap_timeout(kid, math.floor(ms))
+				return karabiner.set_tap_timeout(kid, whole_ms(seconds))
 			end, update_menu)
 		end,
 		[ConfigKeys.COMMAND.TAP_HOLD_KEY_DELAY_USE_GLOBAL] = function()
@@ -773,13 +798,10 @@ local function build_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Delay input dialog: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
-				Logger.warn(LOG, "Invalid delay input '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			local seconds = read_typed(GLOBAL_DELAY_KEY, result["text returned"])
+			if seconds == nil then return end
 			commit_menu_setting(karabiner, "Tap/hold timeout", function()
-				return karabiner.set_tap_hold_timeout(math.floor(ms))
+				return karabiner.set_tap_hold_timeout(whole_ms(seconds))
 			end, update_menu)
 		end,
 	}
@@ -794,7 +816,8 @@ local function build_sticky_delay_item(karabiner, update_menu)
 	local timeout_ms = karabiner.get_sticky_timeout()
 
 	return {
-		label = string.format(i18n.get("menu.tapholds.sticky_title"), fmt_delay(timeout_ms)),
+		label = string.format(i18n.get("menu.tapholds.sticky_title"), timeout_ms == 0
+			and i18n.get("menu.tapholds.sticky_no_limit") or fmt_delay(timeout_ms)),
 		action    = function()
 			hs.focus()
 			local prompt = i18n.get("menu.tapholds.sticky_dialog_prompt")
@@ -806,13 +829,11 @@ local function build_sticky_delay_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Sticky delay input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
-				Logger.warn(LOG, "Invalid sticky delay '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			-- 0 is no time limit; a negative or fractional answer is refused.
+			local ms = read_typed(ValueCheck.KEY.TAP_HOLDS_STICKY_TIMEOUT_MS, result["text returned"])
+			if ms == nil then return end
 			commit_menu_setting(karabiner, "Sticky timeout", function()
-				return karabiner.set_sticky_timeout(math.floor(ms))
+				return karabiner.set_sticky_timeout(ms)
 			end, update_menu)
 		end,
 	}
@@ -877,13 +898,10 @@ local function build_simultaneous_threshold_item(karabiner, update_menu)
 			local ok, result = hs.osascript.applescript(script)
 			Logger.debug(LOG, "Simultaneous threshold input: ok=%s result=%s.", tostring(ok), hs.inspect(result))
 			if not ok or type(result) ~= "table" then return end
-			local ms = tonumber(result["text returned"])
-			if not ms or ms <= 0 then
-				Logger.warn(LOG, "Invalid threshold '%s' — ignored.", tostring(result["text returned"]))
-				return
-			end
+			local ms = read_typed(ConfigKeys.KEY.MOD_COMBOS_SIMULTANEOUS_THRESHOLD_MS, result["text returned"])
+			if ms == nil then return end
 			commit_menu_setting(karabiner, "Simultaneous threshold", function()
-				return karabiner.set_simultaneous_threshold(math.floor(ms))
+				return karabiner.set_simultaneous_threshold(ms)
 			end, update_menu)
 		end,
 	}
@@ -1130,12 +1148,13 @@ end
 --- the tap-holds were simply off, with nothing saying why.
 -- Literal template names, so the menu parity gate sees each publication.
 local NOT_INSTALLED = function() return ManifestMenu.template_rows("tap_hold_owned_not_installed_rows", {}) end
+local SERVICE_STOPPED = function() return ManifestMenu.template_rows("tap_hold_owned_service_stopped_rows", {}) end
 local CLOSE_FAILED = function() return ManifestMenu.template_rows("tap_hold_owned_close_failed_rows", {}) end
 local BLOCK_ROWS = {
 	virtual_hid_incompatible = function() return ManifestMenu.template_rows("tap_hold_vhid_incompatible_rows", {}) end,
 	virtual_hid_not_active = function() return ManifestMenu.template_rows("tap_hold_vhid_not_active_rows", {}) end,
 	runtime_not_installed = NOT_INSTALLED,
-	runtime_job_not_loaded = NOT_INSTALLED,
+	runtime_job_not_loaded = SERVICE_STOPPED,
 	virtual_hid_absent = NOT_INSTALLED,
 	other_karabiner_running = function() return ManifestMenu.template_rows("tap_hold_owned_other_running_rows", {}) end,
 	close_other_unsupported = CLOSE_FAILED,
@@ -1193,6 +1212,22 @@ local function owned_runtime_block_rows(karabiner)
 				end, debug.traceback)
 				if not shown_ok then
 					Logger.error(LOG, "The owned runtime install could not be shown: %s.", tostring(shown))
+					return false
+				end
+				return shown == true
+			end,
+		}) or {}) do rows[#rows + 1] = row end
+	end
+	if rows_fn == SERVICE_STOPPED and type(karabiner.repair_owned_runtime) == "function" then
+		-- « Réparer le service » (MRT-004): the row opens a confirmation, never the repair itself.
+		for _, row in ipairs(ManifestMenu.template_rows("tap_hold_owned_repair_rows", {
+			[ConfigKeys.COMMAND.TAP_HOLD_OWNED_REPAIR] = function()
+				Logger.info(LOG, "Showing the owned runtime service repair from the Tap-Holds menu.")
+				local shown_ok, shown = xpcall(function()
+					return require("ui.owned_runtime_install").open_repair(karabiner)
+				end, debug.traceback)
+				if not shown_ok then
+					Logger.error(LOG, "The owned runtime service repair could not be shown: %s.", tostring(shown))
 					return false
 				end
 				return shown == true

@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 local TapCopy = require("modules.keymap.tap_copy")
-local CopyCheck = require("tap_hold.copy_check")
+local CopyCheck = require("tap_hold.engine.copy_check")
 
 local LEFT_SHIFT, COMMAND, OPTION = 56, 55, 58
 

@@ -2,9 +2,9 @@
 
 --- Binds the shared cleanup session to the WebKit manager's exact page epoch.
 local M = { bridge_name = "config_cleanup_bridge" }
-local Logger = require("logger.shim")
-local Session = require("config_cleanup_session")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Session = require("settings.engine.migration.cleanup_session")
+local Json = require("core.text.engine.json")
 local APP = "config_cleanup"
 local LOG = "config_cleanup"
 local active
@@ -21,7 +21,7 @@ end
 --- @param options table Trusted configuration ownership and file ports.
 --- @return boolean opened
 function M.open(options)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	if active and active.opening then return false end
 	if active and manager.current_epoch(APP) == active.epoch then return manager.show(APP) == true end
 	if active then retire(active) end
@@ -53,7 +53,7 @@ end
 --- @return nil Responses use the shared receiveConfigCleanup callback.
 function M.on_message(payload, state, context)
 	local owner = active
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local epoch = type(context) == "table" and context.epoch or nil
 	if not owner or epoch == nil or manager.current_epoch(APP) ~= epoch then return nil end
 	-- WebKit can deliver ready while show() is still creating the native view.

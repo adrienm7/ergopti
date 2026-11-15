@@ -22,12 +22,12 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "llm.managed_pyobjc"
 
 --- The versionless link the installer publishes, as a tilde path.
-M.LINK = "~/" .. require("app_dirs").macos.support_relative .. "/native-bootstrap/app-cloner/python3"
+M.LINK = "~/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/native-bootstrap/app-cloner/python3"
 
 --- The installer, relative to the driver folder.
 M.INSTALLER = "modules/llm/ensure-managed-pyobjc.sh"
@@ -143,8 +143,8 @@ local default_owner
 --- @return table owner
 function M.default()
 	if default_owner then return default_owner end
-	local FileSystem = require("adapters.file_system")
-	local TaskLifecycle = require("adapters.task_lifecycle")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local TaskLifecycle = require("core.process.adapters.task_lifecycle")
 	local origin = debug.getinfo(1, "S").source
 	local driver = type(origin) == "string" and origin:match("^@(.*)/modules/llm/managed_pyobjc%.lua$")
 	assert(type(driver) == "string" and driver:sub(1, 1) == "/", "the driver folder of managed_pyobjc.lua is unknown")
@@ -152,7 +152,7 @@ function M.default()
 		expand = FileSystem.expand_path,
 		exists = FileSystem.exists,
 		driver_root = function() return driver end,
-		timeout_ms = function() return require("infra.timings").ms("llm", "dependency_bootstrap_timeout_ms") end,
+		timeout_ms = function() return require("core.timing.engine.timings").ms("llm", "dependency_bootstrap_timeout_ms") end,
 		prepare = function(source, environment, timeout_ms)
 			return require("adapters.native_bootstrap_pty").prepare(source, environment, timeout_ms)
 		end,

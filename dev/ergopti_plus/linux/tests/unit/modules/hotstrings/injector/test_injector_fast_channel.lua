@@ -69,10 +69,10 @@ helpers.describe("injector: unbrokered channel retirement", function()
 
 	helpers.it("does not detach a replacement broker installed during channel close", function()
 		local injector = helpers.load_module("modules.hotstrings.injector")
-		local previous = package.loaded["adapters.modifier_broker"]
+		local previous = package.loaded["platform.input.modifier_broker"]
 		local original, successor, detached = {}, {}, 0
 		local current = original
-		package.loaded["adapters.modifier_broker"] = {
+		package.loaded["platform.input.modifier_broker"] = {
 			for_channel = function() return current end,
 			detach = function() detached = detached + 1; current = nil end,
 		}
@@ -84,7 +84,7 @@ helpers.describe("injector: unbrokered channel retirement", function()
 			helpers.assert_eq(detached, 0)
 		end)
 		injector._set_uinput(nil)
-		package.loaded["adapters.modifier_broker"] = previous
+		package.loaded["platform.input.modifier_broker"] = previous
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -288,8 +288,8 @@ end
 --- @param body function
 local function output_fixture(capture, layout, state, body)
 	local rows, stopped = {}, 0
-	local old_hook = package.loaded["adapters.keyboard_hook"]
-	package.loaded["adapters.keyboard_hook"] = {
+	local old_hook = package.loaded["platform.input.keyboard_hook"]
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 		held_shortcut_modifier_codes = function() return {} end,
 		held_forwarded_keys = function() return {} end,
@@ -309,7 +309,7 @@ local function output_fixture(capture, layout, state, body)
 	local ok, err = pcall(body, injector, function() return table.concat(rows, ",") end,
 		function() return stopped end)
 	injector._set_uinput(nil)
-	package.loaded["adapters.keyboard_hook"] = old_hook
+	package.loaded["platform.input.keyboard_hook"] = old_hook
 	if not ok then error(err, 0) end
 end
 
@@ -320,8 +320,8 @@ helpers.describe("injector: source currency before new DOWN and owned cleanup UP
 			output_fixture(capture, layout, state, function(injector, rows)
 				local fixture = require("tests.support.modules.hotstrings.magic_key.magic_key_source_fixture")
 				fixture.with_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(source)
-					local previous = package.loaded["adapters.keyboard_hook"]
-					local hook = helpers.load_module("adapters.keyboard_hook")
+					local previous = package.loaded["platform.input.keyboard_hook"]
+					local hook = helpers.load_module("platform.input.keyboard_hook")
 					local raw, stopped, retired, dispatched = {}, false, false, 0
 				local emergency = hook.emergency_stop
 				hook.emergency_stop = function(...) stopped = true; return emergency(...) end
@@ -347,7 +347,7 @@ helpers.describe("injector: source currency before new DOWN and owned cleanup UP
 						helpers.assert_eq(raw, {}, "the retired session must not replay the physical key")
 						helpers.assert_eq(dispatched, 0)
 					end)
-					source._reset_for_test(); hook.emergency_stop = emergency; package.loaded["adapters.keyboard_hook"] = previous
+					source._reset_for_test(); hook.emergency_stop = emergency; package.loaded["platform.input.keyboard_hook"] = previous
 					if not ok then error(err, 0) end
 				end)
 			end)

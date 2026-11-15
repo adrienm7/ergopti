@@ -13,8 +13,8 @@
 local helpers = require("tests.helpers")
 
 local MUTATED = {
-	"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
-	"adapters.timer_scheduler", "infra.logger", "infra.paths", "infra.timings",
+	"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
+	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 }
 
 
@@ -24,9 +24,9 @@ local MUTATED = {
 local function fresh_fixture(options)
 	options = options or {}
 	for _, name in ipairs(MUTATED) do package.loaded[name] = nil end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.paths"] = { shared = function() return nil end }
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 
 	local emitted = {}
 	local dispatches = {}
@@ -131,7 +131,7 @@ local function fresh_fixture(options)
 		complete(tx, "cancelled")
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = synthetic
+	package.loaded["platform.input.synthetic_input"] = synthetic
 
 	local timer_calls = {}
 	local next_timer_mode = 0
@@ -186,7 +186,7 @@ local function fresh_fixture(options)
 		settle_timer(handle)
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 
 	return {
 		actions = helpers.load_with_stubs("modules.shortcuts.actions.text"),

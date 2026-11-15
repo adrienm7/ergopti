@@ -27,7 +27,7 @@ helpers.describe("api_mlx_discovery: paused means a non-reentrant refusal", func
 	helpers.it("does not probe while paused", function()
 		local D = load_gated(true)
 		local posts = 0
-		package.loaded["adapters.http_client"] = { new = function()
+		package.loaded["core.network.adapters.http_client"] = { new = function()
 			posts = posts + 1
 			return { post = function() end, get = function() end }
 		end }

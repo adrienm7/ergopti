@@ -25,7 +25,7 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 
 
@@ -77,8 +77,8 @@ local EXPECTED_DIR = TMP_HOME .. "/.local/state/" .. FOLDER .. "/logs/crash_repo
 --- @return table The freshly required crash_reporter module.
 local function load_crash_reporter()
 	-- Neutralise the logger require so dump()'s error log stays silent in CI.
-	local prev_shim = package.loaded["logger.shim"]
-	package.loaded["logger.shim"] = helpers.make_logger_stub()
+	local prev_shim = package.loaded["core.logger.engine.shim"]
+	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 
 	-- Redirect HOME only; every other variable falls through to the real env.
 	local saved_getenv = os.getenv
@@ -92,7 +92,7 @@ local function load_crash_reporter()
 
 	-- Always restore globals, even if the require itself raised.
 	os.getenv = saved_getenv
-	package.loaded["logger.shim"] = prev_shim
+	package.loaded["core.logger.engine.shim"] = prev_shim
 
 	if not ok then error(mod, 0) end
 	return mod
@@ -109,16 +109,16 @@ end
 --- @param fn function Body to run.
 local function with_resolution(fn)
 	local saved_getenv = os.getenv
-	local saved_storage = package.loaded["adapters.storage"]
+	local saved_storage = package.loaded["core.fs.adapters.storage"]
 	os.getenv = function(name)
 		if name == "HOME" then return TMP_HOME end
 		if name == "XDG_STATE_HOME" then return nil end
 		return REAL_GETENV(name)
 	end
-	package.loaded["adapters.storage"] = { get = function(_, fallback) return fallback end }
+	package.loaded["core.fs.adapters.storage"] = { get = function(_, fallback) return fallback end }
 	local ok, err = pcall(fn)
 	os.getenv = saved_getenv
-	package.loaded["adapters.storage"] = saved_storage
+	package.loaded["core.fs.adapters.storage"] = saved_storage
 	if not ok then error(err, 0) end
 end
 
@@ -132,7 +132,7 @@ local function with_sandbox(opts, fn)
 	return require("tests.support.modules.diagnostics.crash_admission").with_admission(function()
 		opts = opts or {}
 		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-		local Writer = require("infra.regular_file_writer")
+		local Writer = require("core.fs.engine.regular_file_writer")
 		local real_write = Writer.open
 		local cap = { path = nil, mode = nil, parts = {} }
 		Writer.open = function(path, mode)
@@ -229,7 +229,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_not_nil(cap.path, "dump opened a file")
 		helpers.assert_eq(cap.mode, "wx", "report acquisition must refuse to replace an earlier incident")
 		helpers.assert_true(cap.path:sub(1, #EXPECTED_DIR) == EXPECTED_DIR, "file under the crash dir")
-		local report = require("json").decode(cap.content)
+		local report = require("core.text.engine.json").decode(cap.content)
 		helpers.assert_not_nil(report, "the file is a JSON document")
 		helpers.assert_eq(report.driver, "linux")
 		helpers.assert_eq(report.module, "prediction_engine", "module name in the report")
@@ -242,7 +242,7 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		helpers.assert_not_nil(report.log_tail, "the log ring buffer field is present")
 		-- Same keys, same order as every other driver's report.
 		local last = 0
-		for _, field in ipairs(require("crash_report").FIELDS) do
+		for _, field in ipairs(require("diagnostics.engine.reports.crash_report").FIELDS) do
 			local at = cap.content:find('"' .. field[1] .. '":', 1, true)
 			helpers.assert_true(at ~= nil and at > last, "field " .. field[1] .. " is written in the shared order")
 			last = at
@@ -268,9 +268,9 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 
 	helpers.it("tells the user where the report landed, and says so when it cannot be saved", function()
 		local sent = {}
-		local saved = { package.loaded["adapters.notifier"], package.loaded["infra.i18n"] }
-		package.loaded["adapters.notifier"] = { send = function(text, opts) sent[#sent + 1] = { text = text, opts = opts }; return true end }
-		package.loaded["infra.i18n"] = { get = function(key) return "T:" .. key end }
+		local saved = { package.loaded["platform.system.notifier"], package.loaded["core.i18n.engine.i18n"] }
+		package.loaded["platform.system.notifier"] = { send = function(text, opts) sent[#sent + 1] = { text = text, opts = opts }; return true end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return "T:" .. key end }
 		local ok, err = pcall(function()
 			local cap = with_sandbox(nil, function() cr.dump("engine", "notice me") end)
 			helpers.assert_eq(sent[1].text, cap.path)
@@ -284,27 +284,27 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 			helpers.assert_nil(failed.path)
 			helpers.assert_eq(sent[2], { text = "T:crash.report.save_failed", opts = { level = "error" } })
 		end)
-		package.loaded["adapters.notifier"], package.loaded["infra.i18n"] = saved[1], saved[2]
+		package.loaded["platform.system.notifier"], package.loaded["core.i18n.engine.i18n"] = saved[1], saved[2]
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("keeps at most the shared cap of reports and never deletes another file", function()
-		local CrashReport = require("crash_report")
+		local CrashReport = require("diagnostics.engine.reports.crash_report")
 		local listing, deleted = { { name = "notes.txt", kind = "file" }, { name = "sub", kind = "directory" },
 			{ name = "2025-01-01T00-00-00Z42.json", kind = "file" } }, {}
 		for index = 1, CrashReport.MAX_REPORTS + 2 do
 			listing[#listing + 1] = { name = string.format("2026-10-24T10-00-%02dZ.json", index), kind = "file" }
 		end
-		local saved_directory, saved_delete = package.loaded["infra.native_directory"], require("adapters.file_system").delete
-		package.loaded["infra.native_directory"] = { entries = function() return listing end }
-		require("adapters.file_system").delete = function(path) deleted[#deleted + 1] = path; return true end
+		local saved_directory, saved_delete = package.loaded["core.fs.engine.native_directory"], require("core.fs.adapters.file_system").delete
+		package.loaded["core.fs.engine.native_directory"] = { entries = function() return listing end }
+		require("core.fs.adapters.file_system").delete = function(path) deleted[#deleted + 1] = path; return true end
 		local ok, err = pcall(function()
 			with_sandbox(nil, function() cr.dump("engine", "rotate") end)
 			helpers.assert_eq(#deleted, 2)
 			helpers.assert_eq(deleted[1], EXPECTED_DIR .. "/2026-10-24T10-00-01Z.json")
 			helpers.assert_eq(deleted[2], EXPECTED_DIR .. "/2026-10-24T10-00-02Z.json")
 		end)
-		package.loaded["infra.native_directory"], require("adapters.file_system").delete = saved_directory, saved_delete
+		package.loaded["core.fs.engine.native_directory"], require("core.fs.adapters.file_system").delete = saved_directory, saved_delete
 		if not ok then error(err, 0) end
 	end)
 
@@ -318,15 +318,15 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 	end)
 
 	helpers.it("get_crash_count counts report names only", function()
-		local saved = package.loaded["infra.native_directory"]
-		package.loaded["infra.native_directory"] = { entries = function()
+		local saved = package.loaded["core.fs.engine.native_directory"]
+		package.loaded["core.fs.engine.native_directory"] = { entries = function()
 			return { { name = "2026-10-24T10-00-01Z.json", kind = "file" }, { name = "2026-10-24T10-00-01Z-2.json", kind = "file" },
 				{ name = ".last_crash_notice", kind = "file" }, { name = "crash_old.txt", kind = "file" } }
 		end }
 		local ok, err = pcall(function()
 			with_resolution(function() helpers.assert_eq(cr.get_crash_count(), 2) end)
 		end)
-		package.loaded["infra.native_directory"] = saved
+		package.loaded["core.fs.engine.native_directory"] = saved
 		if not ok then error(err, 0) end
 	end)
 
@@ -345,9 +345,9 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 			{ name = "crash_2026-09-01T10-00-00_dir.txt", kind = "directory" },
 		}
 		local deleted = {}
-		local FileSystem = require("adapters.file_system")
-		local saved_directory, saved_delete = package.loaded["infra.native_directory"], FileSystem.delete
-		package.loaded["infra.native_directory"] = { entries = function() return listing end }
+		local FileSystem = require("core.fs.adapters.file_system")
+		local saved_directory, saved_delete = package.loaded["core.fs.engine.native_directory"], FileSystem.delete
+		package.loaded["core.fs.engine.native_directory"] = { entries = function() return listing end }
 		FileSystem.delete = function(path) deleted[#deleted + 1] = path; return true end
 		local ok, err = pcall(function()
 			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 2)
@@ -355,15 +355,15 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 			helpers.assert_eq(deleted[1], "/crash/crash_2026-09-01T10-00-00_ergopti_hotstrings.txt")
 			helpers.assert_eq(deleted[2], "/crash/crash_2026-09-02T11-30-05_engine.v2.txt")
 		end)
-		package.loaded["infra.native_directory"], FileSystem.delete = saved_directory, saved_delete
+		package.loaded["core.fs.engine.native_directory"], FileSystem.delete = saved_directory, saved_delete
 		if not ok then error(err, 0) end
 	end)
 
 	helpers.it("a refused legacy delete is a warning, and a missing folder is not an error (legacy-crash-cleanup)", function()
-		local FileSystem = require("adapters.file_system")
-		local saved_directory, saved_delete = package.loaded["infra.native_directory"], FileSystem.delete
+		local FileSystem = require("core.fs.adapters.file_system")
+		local saved_directory, saved_delete = package.loaded["core.fs.engine.native_directory"], FileSystem.delete
 		local attempts = 0
-		package.loaded["infra.native_directory"] = { entries = function()
+		package.loaded["core.fs.engine.native_directory"] = { entries = function()
 			return { { name = "crash_2026-09-01T10-00-00_a.txt", kind = "file" },
 				{ name = "crash_2026-09-01T10-00-01_b.txt", kind = "file" } }
 		end }
@@ -371,12 +371,12 @@ helpers.describe("linux: crash_reporter diagnostics", function()
 		local ok, err = pcall(function()
 			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 1)
 			helpers.assert_eq(attempts, 2, "a refusal must not stop the remaining deletions")
-			package.loaded["infra.native_directory"] = { entries = function() return nil, "no such folder" end }
+			package.loaded["core.fs.engine.native_directory"] = { entries = function() return nil, "no such folder" end }
 			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 0)
-			package.loaded["infra.native_directory"] = { entries = function() error("listing raised") end }
+			package.loaded["core.fs.engine.native_directory"] = { entries = function() error("listing raised") end }
 			helpers.assert_eq(cr.remove_legacy_dumps("/crash"), 0)
 		end)
-		package.loaded["infra.native_directory"], FileSystem.delete = saved_directory, saved_delete
+		package.loaded["core.fs.engine.native_directory"], FileSystem.delete = saved_directory, saved_delete
 		if not ok then error(err, 0) end
 	end)
 

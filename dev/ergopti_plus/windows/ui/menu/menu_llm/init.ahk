@@ -347,20 +347,21 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 	; who already know what the tray menu offers. Discovery now lives
 	; purely in the menu's "IA" submenu; no opt-in nag at startup.
 
-	; Build the IA submenu inline so the first tray already carries it: the
-	; deferred boot population then finds a populated handle and stands down
-	; instead of re-running this whole menu. Row construction itself measures
-	; ~0 ms; the old ~1.6 s stall came from the then-synchronous model-tags
-	; probe, since moved off the hot path (async installed-tags probe), so
-	; the deferral's original reason is gone. On failure the empty parent
-	; stays staged exactly as before and the boot projections recover it —
-	; a failed inline build must never fail the boot.
+	; Publish the IA submenu with its rows built at its first open, like the
+	; layout, hotstring and shortcut submenus (infra/menu_population.ahk): every
+	; root build, the boot's and each full rebuild a toggle asks for, otherwise
+	; paid the whole IA row construction (90-190 ms on a maintainer-sized
+	; setup) for a submenu most rebuilds never show. The rows then read the IA
+	; state of the moment they are opened. The handle is the published child
+	; itself, so a narrow IA repaint still swaps exactly this row. On failure the
+	; empty parent stays staged exactly as before and the boot projections
+	; recover it — a failed inline build must never fail the boot.
 	if !_LLM_Menu_InTray {
 		; initMenu may be constructing a detached replacement tree. Record the
 		; root insertion in that transaction instead of exposing a half-built
 		; tray while the rest of the menu is rendered.
 		try {
-			_IaSub := LLM_Menu_BuildSubmenu()
+			_IaSub := MenuDeferOrBuild(LLM_Menu_BuildSubmenu, "llm_menu")
 			_LLM_Menu_Handle := _IaSub
 			_IaTitle := LLM_Menu_TrayTitle()
 			TrayMenuStage_AddFeature(_IaTitle, _IaSub)
@@ -368,7 +369,7 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 			if _LLM_Menu["enabled"]
 				TrayMenuStage_Check(_IaTitle)
 			_LLM_Menu_InTray := true
-			BootProfile_Mark("MENU/initMenu: LLM IA submenu built inline")
+			BootProfile_Mark("MENU/initMenu: LLM IA submenu staged")
 		} catch as _IaErr {
 			try LoggerError("LLM",
 				"Inline IA submenu build failed, deferred population will recover: {1}.",

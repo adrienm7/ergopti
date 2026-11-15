@@ -31,7 +31,7 @@ local function load_fixture(legacy)
 	local bindings = {}
 	local bind_refused = false
 	local unbind_refusals = {}
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 
 	hs_stub.timer = {
 		new = function(_delay, callback)
@@ -47,14 +47,14 @@ local function load_fixture(legacy)
 		secondsSinceEpoch = function() return 100 end,
 	}
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = noop }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 
 	local state = {
@@ -129,10 +129,10 @@ local function load_fixture(legacy)
 		end,
 		destroy = function() return true end,
 	}
-	package.loaded["chord"] = {
+	package.loaded["keyboard.engine.chord"] = {
 		format = function(mods, key) return table.concat(mods, "+") .. "+" .. key end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord, callback)
 			if bind_refused then return nil end
 			next_handle = next_handle + 1
@@ -155,7 +155,7 @@ local function load_fixture(legacy)
 			return true
 		end,
 	}
-	package.loaded["infra.termination_coordinator"] = { request_exit = function() return true end }
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = { request_exit = function() return true end }
 
 	for _, module_name in ipairs({
 		"ui.menu.menu_gestures", "ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout",
@@ -178,7 +178,7 @@ local function load_fixture(legacy)
 	package.loaded["modules.gestures"] = { SINGLE_SLOTS = { "swipe_left" } }
 	package.loaded["infra.personal_shortcuts"] = { load = noop }
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["ui.menu.init"] = nil
 	local Menu = require("ui.menu.init")
 	local program_admission

@@ -35,7 +35,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 			-- Hotstrings take part like every config.toml category: a skipped one
 			-- left its choices, delays and engine switch outside the restore.
 			helpers.assert_eq(ids, { "gestures", "global", "hotstrings", "keyboard_layout", "llm", "metrics", "shortcuts" })
-			for _, name in ipairs({ "backup_path", "paused", "refresh" }) do
+			for _, name in ipairs({ "backup_path", "refresh" }) do
 				helpers.assert_type(requested.options[name], "function")
 			end
 			helpers.assert_nil(requested.options.confirm, "neither Configuration row asks")
@@ -52,7 +52,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				helpers.assert_eq(constructed, 1, "the factory retains the exact native cohort")
 				helpers.assert_type(native_options.path, "string")
 				helpers.assert_true(native_options.path ~= "")
-				for _, name in ipairs({ "backup_path", "storage_backup_path", "paused", "capture_preferences", "admission" }) do
+				for _, name in ipairs({ "backup_path", "storage_backup_path", "capture_preferences", "admission" }) do
 					helpers.assert_type(native_options[name], "function")
 				end
 				for _, name in ipairs({ "capture", "replace", "restore" }) do
@@ -80,7 +80,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 	-- The composition used to refuse in silence on macOS: the menu refreshed and
 	-- only the log said nothing had been restored.
 	helpers.it("shows the typed reset failure of a refused restore or clear", function()
-		local saved_scope, saved_dialog = package.loaded["ui.menu.global_scope"], package.loaded["infra.dialog_util"]
+		local saved_scope, saved_dialog = package.loaded["ui.menu.global_scope"], package.loaded["core.ui.engine.dialog_util"]
 		local alerts, requested = {}, {}
 		local ok, err = pcall(function()
 			local fixture = boot()
@@ -89,7 +89,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				requested.options = options
 				return { apply = function() return true end }
 			end }
-			package.loaded["infra.dialog_util"] = { block_alert = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(...)
 				alerts[#alerts + 1] = { ... }
 				return "ok"
 			end }
@@ -99,7 +99,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 			local report = { scope = "global", mode = "clear", point = "rollback", kind = "rollback_pending",
 				failed = "llm", reverted = false }
 			-- Templates that show which key filled which placeholder.
-			package.loaded["infra.i18n"].get = function(key) return "[" .. key .. "|{1}|{2}]" end
+			package.loaded["core.i18n.engine.i18n"].get = function(key) return "[" .. key .. "|{1}|{2}]" end
 			requested.options.refresh(false, report)
 			helpers.assert_eq(#alerts, 1)
 			helpers.assert_eq(alerts[1], { "[dialog.reset_defaults.failed_title|{1}|{2}]",
@@ -107,7 +107,7 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 				"[button.ok|{1}|{2}]", nil, "critical" })
 		end)
 		package.loaded["ui.menu.global_scope"] = saved_scope
-		package.loaded["infra.dialog_util"] = saved_dialog
+		package.loaded["core.ui.engine.dialog_util"] = saved_dialog
 		if not ok then error(err, 0) end
 	end)
 end)

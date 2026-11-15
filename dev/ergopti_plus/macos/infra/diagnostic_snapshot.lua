@@ -4,10 +4,10 @@
 --- MODULE: Diagnostic Snapshot Collector (macOS)
 --- DESCRIPTION:
 --- Gathers the environment facts of the cross-driver diagnostic snapshot
---- (_shared/modules/logger/diagnostic_snapshot.json) and logs them as one INFO
+--- (_shared/core/logger/data/diagnostic_snapshot.json) and logs them as one INFO
 --- line once per session, after boot. Formatting is shared with Linux through
---- _shared/lua/diagnostics/snapshot.lua; the OS probes live in
---- adapters/system_info.lua.
+--- _shared/diagnostics/engine/snapshot.lua; the OS probes live in
+--- platform/system/info.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Emitted once per Lua state. A second emission would make "which snapshot
@@ -18,9 +18,9 @@
 
 local M = {}
 
-local Logger      = require("infra.logger")
-local NativePath = require("native_path")
-local Snapshot    = require("diagnostics.snapshot")
+local Logger      = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
+local Snapshot    = require("diagnostics.engine.snapshot")
 
 M.DRIVER = "macos"
 
@@ -48,9 +48,9 @@ local SOURCE_DIR = NativePath.dirname((debug.getinfo(1, "S").source:gsub("^@", "
 --- The adapter is looked up per call: the crash reporter reaches this module
 --- late, and a reference bound at first load would outlive the adapter it named.
 local GIT_FS = {
-	exists = function(path) return require("adapters.file_system").exists(path) == true end,
+	exists = function(path) return require("core.fs.adapters.file_system").exists(path) == true end,
 	read = function(path)
-		local content, status = require("adapters.file_system").read_with_status(path)
+		local content, status = require("core.fs.adapters.file_system").read_with_status(path)
 		if status == "ok" then return content end
 		return nil
 	end,
@@ -66,7 +66,7 @@ local GIT_FS = {
 function M.resolve_commit(opts)
 	opts = opts or {}
 	local shared_root = opts.shared_root
-	if shared_root == nil then shared_root = require("infra.paths").shared_root() end
+	if shared_root == nil then shared_root = require("core.fs.engine.paths").shared_root() end
 	local commit, source, detail = Snapshot.resolve_commit(opts.fs or GIT_FS, shared_root,
 		opts.source_dir or SOURCE_DIR)
 	if source == Snapshot.COMMIT_SOURCE_UNKNOWN then
@@ -109,7 +109,7 @@ end
 --- @return table Field name to raw value.
 function M.collect(ctx, system)
 	ctx = ctx or {}
-	system = system or require("adapters.system_info")
+	system = system or require("platform.system.info")
 	local scale = system.main_screen_scale()
 	local enabled, total = count_features(ctx.state)
 	local commit = M.resolve_commit({

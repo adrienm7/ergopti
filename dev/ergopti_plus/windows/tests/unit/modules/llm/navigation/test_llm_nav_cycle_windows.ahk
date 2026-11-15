@@ -483,7 +483,7 @@ _LNCW_ForwardedCaretInput(Key, ShouldReset, Route) {
 		_LPP_Run(_LPP_Menu(), LPP_BUFFER, Body)
 	}
 	Body(Calls, Lines) {
-		global _LLM_Engine_RemoteTransport, _LLM_Engine, _LLM_Remote_Async, _PrefixInputHook
+		global _LLM_Engine, _LLM_Remote_Async, _PrefixInputHook
 		SavedHooks := [HookDispatcher._ih, _PrefixInputHook]
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord
 		SavedPresentation := [_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmTooltipText, _Stub_LlmPresentedRecord]
@@ -495,7 +495,7 @@ _LNCW_ForwardedCaretInput(Key, ShouldReset, Route) {
 			_Stub_LlmTooltipLoading := false
 			_Stub_LlmTooltipText := ""
 			_Stub_LlmPresentedRecord := 0
-			_LLM_Engine_RemoteTransport := 0
+			LLM_Engine_SetPort("http", 0)
 			if Route == "dispatcher" {
 				HookDispatcher._ih := InputHook("V I1 L0")
 				_PrefixInputHook := 0
@@ -583,7 +583,7 @@ _LNCW_IdleCaretContext(ResetOnNav, Entry) {
 		_LPP_Run(_LPP_Menu(), "", _Body)
 	}
 	_Body(Calls, Lines) {
-		global _LLM_Engine, _LLM_Bridge_Buffer
+		global _LLM_Engine, _LLM_Bridge_Buffer, _LLM_Bridge_ReadLiveFocus
 		global _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmPresentedRecord
 		Saved := [_Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading, _Stub_LlmPresentedRecord]
 		try {
@@ -593,6 +593,11 @@ _LNCW_IdleCaretContext(ResetOnNav, Entry) {
 			_LLM_Engine["reset_on_nav"] := ResetOnNav
 			for Key in ["Left", "Up", "Right", "Down", "Home", "End", "PgUp", "PgDn", "Insert", "Delete", "LShift"] {
 				LLM_Engine_StopGeneration()
+				; Bind the context to the live field first, as typing does: an
+				; earlier test's source would otherwise clear it at the next
+				; character, and the case passed only after its siblings.
+				AssertTrue(IsObject(_LLM_Bridge_BindTypingSource(_LLM_Bridge_ReadLiveFocus.Call(), true)),
+					"the live typing source must bind")
 				_LLM_Bridge_ApplyBufferEdit(, "OLD_LOCATION_ASCII_SENTINEL ")
 				AssertFalse(LLM_Bridge_HasActivePredictionWork(), "the captured typing context must genuinely be idle")
 				if Entry == "reset"

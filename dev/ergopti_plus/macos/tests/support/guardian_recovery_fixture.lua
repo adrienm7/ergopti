@@ -21,11 +21,11 @@ local TOKENS = {
 }
 
 local STUB_MODULES = {
-	"adapters.file_system",
-	"infra.fs_dir",
-	"infra.logger",
+	"core.fs.adapters.file_system",
+	"core.fs.engine.dir",
+	"core.logger.engine.logger",
 	"infra.config_paths",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"platform.remap.defaults",
 	"platform.remap.config",
 	"platform.remap.generator",
@@ -35,11 +35,11 @@ local STUB_MODULES = {
 	"platform.remap.lease_controller",
 	"platform.remap.onboarding",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
-	"adapters.system_info",
+	"platform.input.hotkey_registrar",
+	"core.events.timer_scheduler",
+	"platform.system.info",
 	"platform.remap.deploy_pacing",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -103,6 +103,8 @@ local function with_remap(options, body)
 
 	local calls = {
 		phase = options.initial_phase or "active",
+		lease_initialized = options.lease_uninitialized ~= true,
+		lease_status_calls = 0,
 		current_token = TOKENS[1],
 		token_index = 1,
 		order = {},
@@ -188,7 +190,7 @@ local function with_remap(options, body)
 			}
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- at start. The folder exists, as the product's does, so choosing the
 	-- layer hold imports the recommended layer the way a Mac would.
@@ -203,13 +205,13 @@ local function with_remap(options, body)
 		["debounce.layout_tis_settle_ms"] = 0.5,
 		["ui.onboarding_startup_delay_ms"] = 2,
 	}
-	package.loaded["infra.timings"] = nil
-	local RegistryTimings = require("infra.timings")
+	package.loaded["core.timing.engine.timings"] = nil
+	local RegistryTimings = require("core.timing.engine.timings")
 	timings_sec["ui.input_source_operation_timeout_ms"] = RegistryTimings.sec("ui", "input_source_operation_timeout_ms")
 	local timings_count = {
 		["limits.input_source_id_bytes"] = RegistryTimings.count("limits", "input_source_id_bytes"),
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(category, key)
 			local value = timings_sec[category .. "." .. key]
 			helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)
@@ -443,7 +445,16 @@ local function with_remap(options, body)
 			calls.phase_listener = listener
 			return true
 		end,
-		status = function()
+		status = function(options)
+			calls.lease_status_calls = calls.lease_status_calls + 1
+			if not calls.lease_initialized then
+				-- Mirrors the real controller: only a caller that declared it
+				-- expects an unstarted controller is answered without an ERROR.
+				if options == nil or options.before_init ~= "uninitialized" then
+					calls.logs[#calls.logs + 1] = { level = "error", message = "'status' called before M.init()" }
+				end
+				return "uninitialized", { phase = "uninitialized" }
+			end
 			if calls.status_failures_remaining > 0 then
 				calls.status_failures_remaining = calls.status_failures_remaining - 1
 				error("synthetic-lease-status-failure")
@@ -603,7 +614,7 @@ local function with_remap(options, body)
 		end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		unbind = function(handle)
 			if handle then handle.enabled = false end
 			return true
@@ -703,17 +714,17 @@ local function with_remap(options, body)
 		timer.timer = nil
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = timer_scheduler
+	package.loaded["core.events.timer_scheduler"] = timer_scheduler
 	-- Unknown input idle never delays a deploy; a case sets calls.input_idle_seconds.
 	calls.input_idle_seconds = options.input_idle_seconds
-	package.loaded["adapters.system_info"] = {
+	package.loaded["platform.system.info"] = {
 		input_idle_seconds = function() return calls.input_idle_seconds end,
 	}
 	-- The pacing owner captures its probe at require time.
 	package.loaded["platform.remap.deploy_pacing"] = nil
 	-- Recorded, never sent: a real notice would arm its own retention timer on
 	-- the scheduler above and read as a recovery delay.
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, detail, kind, on_click)
 			calls.notices[#calls.notices + 1] = {
 				message = message, detail = detail, kind = kind, on_click = on_click,
@@ -773,8 +784,8 @@ local function with_remap(options, body)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	package.loaded["platform.remap"] = nil
-	package.loaded["adapters.file_system"] = nil
-	package.loaded["infra.fs_dir"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
+	package.loaded["core.fs.engine.dir"] = nil
 	local remap = require("platform.remap")
 	remap.init({ expand_path = function(path) return path end })
 	local scenario_cancel_fails = calls.cancel_fails

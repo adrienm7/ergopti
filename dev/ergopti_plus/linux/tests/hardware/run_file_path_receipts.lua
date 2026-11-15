@@ -3,7 +3,7 @@
 --- Embedded NUL must be refused before C APIs silently select a pathname prefix.
 --- Positive controls retain literal POSIX names. No syscall is simulated.
 local uv = require("luv")
-local FS = require("adapters.file_system")
+local FS = require("core.fs.adapters.file_system")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-paths-XXXXXX"))
 local checks, failures = 0, 0
 local ORIGINAL, REPLACEMENT = "protected bytes", "replacement bytes"

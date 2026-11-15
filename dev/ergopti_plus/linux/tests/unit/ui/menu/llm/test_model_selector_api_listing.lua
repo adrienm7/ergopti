@@ -18,7 +18,7 @@
 local helpers = require("tests.helpers")
 
 local SAVED = { "modules.llm.api_remote", "modules.llm.api_entries", "ui.menu.llm_backend_rows",
-	"ui.menu.local_server_rows", "modules.llm.ollama_install_state", "adapters.http_client" }
+	"ui.menu.local_server_rows", "modules.llm.ollama_install_state", "core.network.adapters.http_client" }
 
 --- Runs a body with doubles of the API owners the page rows read.
 --- @param opts table { model, listings }
@@ -43,6 +43,9 @@ local function with_rows(opts, body)
 		list = function() return { opts.current or entry } end,
 		set_active = function(id) calls.set_active[#calls.set_active + 1] = id; return true end,
 		set_model = function(id, model) calls.set_model[#calls.set_model + 1] = id .. ":" .. model; return true end,
+		key_missing = function() return opts.key_missing == true end,
+		set_token = function(id, token) calls.set_token = id .. ":" .. token; return true end,
+		remove = function(id) calls.removed = id; return true end,
 	}
 	package.loaded["ui.menu.llm_backend_rows"] = nil
 	local ok, err = xpcall(function()
@@ -72,6 +75,22 @@ local function by_name(api)
 end
 
 helpers.describe("model selector API listing on Linux", function()
+	helpers.it("(linux-api-key-restored-missing) an entry restored without its key is one greyed row asking for it", function()
+		with_rows({ key_missing = true, typed = "sk-new" }, function(Rows, calls, dialogs, entry)
+			local api = Rows.api_page(engine(calls), dialogs, function() calls.changed = true end)
+			helpers.assert_eq(#api.rows, 1, "no model row: the entry cannot answer without its key")
+			local row = api.rows[1]
+			helpers.assert_eq(row.available, false)
+			helpers.assert_eq(row.hint_key, "model_browser.hint_api_key_reenter")
+			helpers.assert_eq(row.run, nil, "nothing to select")
+			helpers.assert_eq(row.actions[1].id, "set_key")
+			helpers.assert_eq(row.actions[1].run(), true)
+			helpers.assert_eq(calls.set_token, entry.id .. ":sk-new", "the typed key goes to the entry")
+			helpers.assert_eq(calls.changed, true)
+			helpers.assert_eq(row.actions[2].id, "remove")
+		end)
+	end)
+
 	helpers.it("(model-selector-local-owner) passes the page owner to local server rows", function()
 		with_rows({}, function(Rows, calls, dialogs)
 			local owner = function() return true end
@@ -186,10 +205,10 @@ helpers.describe("model selector API listing on Linux", function()
 	end)
 
 	helpers.it("(model-selector-api-listing) list_models maps answers and keeps the key out of the log", function()
-		local saved = package.loaded["adapters.http_client"]
+		local saved = package.loaded["core.network.adapters.http_client"]
 		local saved_remote = package.loaded["modules.llm.api_remote"]
 		local answers, requests = {}, {}
-		package.loaded["adapters.http_client"] = setmetatable({
+		package.loaded["core.network.adapters.http_client"] = setmetatable({
 			get = function(url, headers, options, callback)
 				requests[#requests + 1] = { url = url, headers = headers, owner = options.owner }
 				callback(table.remove(answers, 1))
@@ -220,7 +239,7 @@ helpers.describe("model selector API listing on Linux", function()
 			helpers.assert_eq(Remote.list_models({ id = "d", provider = "typesafe", token = "k", model = "jev" }, done), false)
 			helpers.assert_eq(got[5].reason, "unsupported")
 		end, debug.traceback)
-		package.loaded["adapters.http_client"] = saved
+		package.loaded["core.network.adapters.http_client"] = saved
 		package.loaded["modules.llm.api_remote"] = saved_remote
 		assert(ok, err)
 	end)

@@ -178,10 +178,14 @@ _LMT_SharedTriggerOwner() {
 				Features["llm"]["profiles"]["num_predictions"] := 1
 				AssertTrue(Callback.Call(), "variant count does not own a trigger switch")
 				AssertFalse(_LLM_Menu[Expected["native"]])
-				Writes := _LMT_WriterCalls
+				; A pause stops typing, not configuration (EDD-1).
 				Suspend(true)
-				AssertFalse(Callback.Call())
+				AssertTrue(Callback.Call(), "a paused trigger switch commits")
+				AssertTrue(_LLM_Menu[Expected["native"]])
+				AssertTrue(Callback.Call(), "and switches back while still paused")
 				Suspend(false)
+				AssertFalse(_LLM_Menu[Expected["native"]])
+				Writes := _LMT_WriterCalls
 				_LLM_Menu["enabled"] := false
 				Features["llm"]["enabled"] := false
 				AssertFalse(Callback.Call())

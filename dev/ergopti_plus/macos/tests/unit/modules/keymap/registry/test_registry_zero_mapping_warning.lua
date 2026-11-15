@@ -17,8 +17,8 @@ local OWNED_MODULES = {
 	"modules.keymap.terminators",
 	"modules.keymap.state",
 	"modules.keymap.utils",
-	"infra.toml.reader",
-	"infra.timings",
+	"core.text.engine.toml.reader",
+	"core.timing.engine.timings",
 	"modules.hotstrings.hotstrings_config",
 	"infra.config_paths",
 }
@@ -35,7 +35,7 @@ end
 
 local function with_registry(data_by_path, callback)
 	return helpers.with_fresh_modules(OWNED_MODULES, function()
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function(path) return data_by_path[path], true end,
 		}
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
@@ -43,12 +43,12 @@ local function with_registry(data_by_path, callback)
 		}
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return CONFIG_DIR end }
 		local State = helpers.load_with_stubs("modules.keymap.state")
-		package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 		local Registry = require("modules.keymap.registry")
 		local state = State.new({ trigger_char = "★", expansion_delay = 0.4 }, {})
 		helpers.assert_eq(Registry.init(state), true)
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		local warnings, infos = {}, {}
 		local original_warn, original_info = Logger.warn, Logger.info
 		Logger.warn = function(_, fmt, ...) table.insert(warnings, string.format(fmt, ...)) end
@@ -85,7 +85,7 @@ helpers.describe("Registry zero-mapping warning", function()
 			["/virtual/main.toml"] = one_section("main"),
 			["/virtual/off.toml"] = one_section("hiya"),
 		}, function(Registry, _, infos)
-			local Storage = require("adapters.storage")
+			local Storage = require("core.fs.adapters.storage")
 			Storage.set(require("modules.keymap.section_keys").current("zq_private_off", "greetings"), false)
 			helpers.assert_eq(Registry.load_toml("zq_private_main", "/virtual/main.toml"), true)
 			helpers.assert_eq(Registry.load_toml("zq_private_off", "/virtual/off.toml"), true)

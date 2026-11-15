@@ -15,12 +15,12 @@
 local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
-	"modules.llm", "infra.i18n", "infra.logger", "infra.manifest_menu",
-	"infra.dialog_util", "infra.notifications", "modules.llm.ollama_binary",
+	"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"core.ui.engine.dialog_util", "core.ui.engine.notifications", "modules.llm.ollama_binary",
 	"modules.llm.mlx_deps_checker", "modules.llm.ollama_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.backend_panel",
 	"ui.menu.menu_llm.backend_labels", "ui.menu.menu_llm.mlx_repair_offer",
-	"modules.llm.mlx_bootstrap_diagnosis", "infra.deferred_work",
+	"modules.llm.mlx_bootstrap_diagnosis", "core.timing.engine.deferred_work",
 	"modules.llm.backend_detector",
 }
 
@@ -50,16 +50,16 @@ local function build(backend, local_rows)
 			set_backend = function() return true end,
 			load_api_entries = function() return true end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			format = function(key) return key end,
 		}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, message) warnings[#warnings + 1] = message end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["infra.manifest_menu"] = { render_rows = function(items) return items end }
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["infra.dialog_util"] = { block_alert = function() return "" end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return "" end }
 		package.loaded["modules.llm.mlx_deps_checker"] = installed_checker()
 		package.loaded["modules.llm.ollama_deps_checker"] = installed_checker()
 		local previous_execute = os.execute

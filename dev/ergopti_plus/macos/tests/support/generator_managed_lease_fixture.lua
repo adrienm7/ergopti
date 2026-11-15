@@ -208,8 +208,8 @@ end
 --- @param callback function Receives the real generator and mutable filesystem fixture.
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"platform.remap.generator", "infra.logger", "adapters.file_system",
-		"infra.config_paths", "infra.keycodes",
+		"platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system",
+		"infra.config_paths", "platform.input.keycodes",
 	}, function()
 		local fixture = {}
 		fixture.file_data = {}
@@ -229,8 +229,8 @@ local function with_fixture(callback)
 			if hook then hook(path, content) end
 		end
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path) return fixture.file_data[path] end,
 			read_with_status = function(path)
 				fixture.file_reads[#fixture.file_reads + 1] = path
@@ -282,7 +282,7 @@ local function with_fixture(callback)
 		package.loaded["infra.config_paths"] = {
 			get_config_dir = function() return "/tmp/ergopti_generator_lease" end,
 		}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			to_name = function(code) return "key_" .. tostring(code) end,
 			F13_KARABINER_RETURN = 105,
 			F14_KARABINER_BACKSPACE = 107,

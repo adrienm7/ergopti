@@ -44,18 +44,18 @@ local function load_menu(options)
 	end
 	package.loaded["modules.keystats"] = keystats_module
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = nil
-	local renderer_i18n = require("infra.i18n")
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	local renderer = assert(require("menu.renderer").new({
+	package.loaded["core.i18n.engine.i18n"] = nil
+	local renderer_i18n = require("core.i18n.engine.i18n")
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function()
-			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 		end,
-		json_decode = require("adapters.json_codec").decode,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = renderer_i18n,
 		logger = helpers.make_logger_stub(),
 	}))
@@ -76,7 +76,7 @@ local function load_menu(options)
 	if options.mutate_source then options.mutate_source(renderer.get_root()) end
 	if options.source_throw then renderer.get_root = function() error("actual source read refused") end end
 	package.loaded["infra.manifest_menu"] = renderer
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	local menubar_start = options.menubar_start or function() return true end
 	local menubar_stop = options.menubar_stop or function() return true end

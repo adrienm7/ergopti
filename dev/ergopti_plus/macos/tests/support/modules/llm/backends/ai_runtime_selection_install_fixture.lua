@@ -150,7 +150,7 @@ local function load_api(state, daemon)
 	}
 	package.loaded["modules.llm.ollama_binary"] = nil
 	helpers.load_with_stubs("modules.llm.ollama_binary", { fs = fake_fs(state) })
-	package.loaded["adapters.http_client"] = { new = function()
+	package.loaded["core.network.adapters.http_client"] = { new = function()
 		local client = { settled = true, cancel_calls = 0 }
 		function client.isSettled() return client.settled end
 		function client.isActive() return false end
@@ -164,7 +164,7 @@ local function load_api(state, daemon)
 		state.http_clients[#state.http_clients + 1] = client
 		return client
 	end }
-	package.loaded["adapters.shell_runner"] = { spawn = function(program, args, done, chunk, environment, private, owned)
+	package.loaded["core.process.adapters.shell_runner"] = { spawn = function(program, args, done, chunk, environment, private, owned)
 		helpers.assert_eq(program, "/bin/sh")
 		helpers.assert_eq(private, true)
 		helpers.assert_eq(owned, true)
@@ -199,7 +199,7 @@ local function load_api(state, daemon)
 		helpers.assert_eq(actual_nonce, nonce)
 		return "exec /fixture/native-runtime --caller-nonce '" .. nonce .. "' --owned-stdin"
 	end }
-	package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+	package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 	package.loaded["modules.llm.parser"] = {}
 	package.loaded["modules.llm.profiles"] = {}
 	package.loaded["modules.llm.progressive_reveal"] = {}
@@ -234,8 +234,8 @@ local function load_ollama_checker(state, daemon)
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
@@ -251,14 +251,14 @@ local function load_mlx_checker(state)
 	-- A fresh checker must consume this fixture's filesystem, not a cached
 	-- policy admission bound to the preceding fake native table.
 	package.loaded["modules.llm.network_env"] = nil
-	package.loaded["adapters.file_system"] = nil
+	package.loaded["core.fs.adapters.file_system"] = nil
 	package.loaded["ui.download_window"] = state.window or WINDOW_STUB
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
 		remove = function() return true end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	return helpers.load_with_stubs("modules.llm.mlx_deps_checker", {
 		fs = fake_fs(state),
 		task = task_api(state),
@@ -281,20 +281,20 @@ end
 
 local STUBBED_MODULES = {
 	"ui.download_window", "modules.llm.ollama_binary", "modules.llm.api_ollama",
-	"modules.llm.pty_process_group", "adapters.task_lifecycle",
-	"adapters.timer_scheduler", "modules.llm.ollama_deps_checker",
-	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
+	"modules.llm.pty_process_group", "core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler", "modules.llm.ollama_deps_checker",
+	"modules.llm.mlx_deps_checker", "core.ui.engine.dialog_util", "core.ui.engine.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
-	"modules.llm.network_env", "adapters.file_system",
+	"modules.llm.network_env", "core.fs.adapters.file_system",
 	"adapters.managed_ollama_hint", "adapters.managed_ollama_daemon",
-	"adapters.http_client", "adapters.shell_runner", "adapters.json_codec",
+	"core.network.adapters.http_client", "core.process.adapters.shell_runner", "core.fs.adapters.json_codec",
 	"modules.llm.ollama_server_command", "modules.llm.parser", "modules.llm.profiles",
 	"modules.llm.progressive_reveal", "modules.llm.prediction_engine",
 	"ui.menu.menu_llm.models_manager_ollama", "modules.llm.api_common",
-	"modules.llm.ollama_endpoint", "adapters.storage", "adapters.owned_program_runner",
+	"modules.llm.ollama_endpoint", "core.fs.adapters.storage", "core.process.adapters.owned_program_runner",
 	"platform.remap.lease_helper", "modules.shortcuts.script_control", "modules.keystats",
-	"core.llm.ollama_runtime_choice", "core.llm.managed_ollama_daemon_lifecycle",
-	"core.llm.managed_ollama_daemon_receipt", "llm.local_model_policy",
+	"core.lifecycle.engine.core.ollama_runtime_choice", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
+	"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "ai.engine.ollama.local_model_policy",
 }
 
 local function scoped(callback)

@@ -3,11 +3,11 @@
 ; ==============================================================================
 ; MODULE: Updater / Configuration Backup
 ; DESCRIPTION:
-; The Windows port of _shared/lua/updater/config_backup.lua: the timestamped
+; The Windows port of _shared/updater/engine/config_backup_core.lua: the timestamped
 ; backup of the whole user configuration that a release install from the
 ; Versions window makes before anything is downloaded, and the restore of such
 ; a backup. The rules (which files, where, what name) are the config_backup
-; block of _shared/modules/updater/defaults.json, read at run time.
+; block of _shared/updater/data/defaults.json, read at run time.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The whole configuration: every file of the configuration folder whose
@@ -45,7 +45,7 @@ global CONFIG_BACKUP_SCHEMA_VERSION := 1
 ConfigBackup_Rules(Defaults := 0) {
 	global _SharedDir
 	if !IsObject(Defaults)
-		Defaults := JsonParse(FSReadStrict(_SharedDir . "\modules\updater\defaults.json"))
+		Defaults := JsonParse(FSReadStrict(_SharedDir . "\updater\data\defaults.json"))
 	if !(Defaults is Map) || !Defaults.Has("config_backup") || !(Defaults["config_backup"] is Map)
 		throw Error("updater defaults declare no config_backup block")
 	Block := Defaults["config_backup"]

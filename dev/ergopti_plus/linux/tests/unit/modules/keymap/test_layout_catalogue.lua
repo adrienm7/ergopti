@@ -4,15 +4,15 @@
 --- MODULE: Layout Catalogue Decisions (shared, replayed on Linux)
 --- DESCRIPTION:
 --- The Linux layout manager takes its catalogue decisions from the module the
---- macOS driver shares (_shared/lua/layouts/catalogue.lua). CI runs this suite
+--- macOS driver shares (_shared/layouts/engine/composer/catalogue.lua). CI runs this suite
 --- under LuaJIT, so replaying the shared vectors here proves the module loads
 --- and decides the same way on the interpreter the daemon runs
 --- (layout-catalogue).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Catalogue = require("layouts.catalogue")
+local Json = require("core.text.engine.json")
+local Catalogue = require("layouts.engine.composer.catalogue")
 
 local VECTORS_PATH = helpers.driver_root() .. "/../_shared/tests/corpus/layouts/catalogue_vectors.json"
 
@@ -28,7 +28,7 @@ end
 
 local vectors = Json.decode(read(VECTORS_PATH))
 
-require("test.layout_catalogue_local_contract")(helpers, Catalogue, Json,
+require("tests.lua.layouts.catalogue_local_contract")(helpers, Catalogue, Json,
 	{ max_file_bytes = vectors.max_bytes }, vectors.indexes.shipped)
 
 --- An empty vector string stands for none.
@@ -81,8 +81,8 @@ helpers.describe("layout catalogue (Linux): which index a refresh shows", functi
 	end)
 end)
 
-require("test.layout_installed_record_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_record_contract")(helpers, Catalogue, Json)
 
-require("test.layout_installed_update_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_update_contract")(helpers, Catalogue, Json)
 
-require("test.layout_installed_extension_contract")(helpers, Catalogue, Json)
+require("tests.lua.layouts.installed_extension_contract")(helpers, Catalogue, Json)

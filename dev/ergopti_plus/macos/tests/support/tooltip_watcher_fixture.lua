@@ -13,7 +13,7 @@ local IDLE_TIMEOUT_SEC = 10
 local CASES = {
 	{
 		label = "LLM",
-		module_name = "ui.tooltip.tooltip_llm",
+		module_name = "core.ui.ui.tooltip.llm",
 		watcher_count = 3,
 		render = function(tooltip)
 			return tooltip.show_predictions({ "prediction" }, 1, true)
@@ -21,7 +21,7 @@ local CASES = {
 	},
 	{
 		label = "hotstring",
-		module_name = "ui.tooltip.tooltip_hotstring",
+		module_name = "core.ui.ui.tooltip.hotstring",
 		watcher_count = 2,
 		render = function(tooltip)
 			return tooltip.show("expansion", false, true)
@@ -107,23 +107,23 @@ end
 
 local function with_fixture(callback)
 	return helpers.with_stub_scope({
-		"ui.tooltip.config",
-		"ui.tooltip.renderer",
-		"ui.tooltip.tooltip_llm",
-		"ui.tooltip.tooltip_hotstring",
-		"ui.tooltip",
+		"core.ui.ui.tooltip.config",
+		"core.ui.ui.tooltip.renderer",
+		"core.ui.ui.tooltip.llm",
+		"core.ui.ui.tooltip.hotstring",
+		"core.ui.ui.tooltip",
 		"modules.keymap.control_sentinels",
 		"adapters.event_provenance",
-		"adapters.key_state",
-		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
-		"adapters.storage",
+		"platform.input.key_state",
+		"platform.input.synthetic_input",
+		"core.events.timer_scheduler",
+		"core.fs.adapters.storage",
 		"infra.hotpath_profiler",
-		"infra.logger",
+		"core.logger.engine.logger",
 	}, function()
 		local restore_context = function() end
 		local outcome = table.pack(xpcall(function()
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- Facade-only cases also need fresh native capabilities before importing Config.
 			helpers.load_with_stubs("hs")
 			--- Loads one real tooltip module with observable renderer and eventtap ports.
@@ -132,7 +132,7 @@ local function with_fixture(callback)
 			--- @return table Test context.
 			local function load_tooltip(spec, faults)
 				restore_context()
-				local Config = helpers.load_with_stubs("ui.tooltip.config")
+				local Config = helpers.load_with_stubs("core.ui.ui.tooltip.config")
 				restore_context = TooltipContext.install()
 				-- Test deadlines use the fixture clock while production uses mach time.
 				hs.timer.absoluteTime = function() return math.floor(hs.timer.secondsSinceEpoch() * 1e9) end
@@ -143,10 +143,10 @@ local function with_fixture(callback)
 				-- different timer table and pass without ever draining the real queue.
 				package.loaded["modules.keymap.control_sentinels"] = nil
 				package.loaded["adapters.event_provenance"] = nil
-				package.loaded["adapters.key_state"] = nil
-				package.loaded["adapters.synthetic_input"] = nil
-				package.loaded["adapters.timer_scheduler"] = nil
-				package.loaded["adapters.storage"] = nil
+				package.loaded["platform.input.key_state"] = nil
+				package.loaded["platform.input.synthetic_input"] = nil
+				package.loaded["core.events.timer_scheduler"] = nil
+				package.loaded["core.fs.adapters.storage"] = nil
 				package.loaded["infra.hotpath_profiler"] = nil
 
 				local renderer
@@ -205,7 +205,7 @@ local function with_fixture(callback)
 						return true
 					end,
 				}
-				package.loaded["ui.tooltip.renderer"] = renderer
+				package.loaded["core.ui.ui.tooltip.renderer"] = renderer
 
 				local created = {}
 				local creation_calls = 0

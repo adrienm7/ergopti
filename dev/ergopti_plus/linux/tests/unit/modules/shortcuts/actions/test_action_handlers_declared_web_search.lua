@@ -5,7 +5,7 @@
 --- MODULE: Regression — actions the shared catalogue declares for Linux must
 ---         actually do something (linux-declared-actions-unhandled)
 --- DESCRIPTION:
---- `_shared/modules/actions/actions.toml` declared 79 actions for Linux and the
+--- `_shared/shortcuts/data/actions/actions.toml` declared 79 actions for Linux and the
 --- driver implemented 40 of them. The other 39 were not broken in a way anyone
 --- could see: the picker offers every DECLARED action as bindable, so the user
 --- bound one, the assignment was stored, the chord fired — and `_execute_action`
@@ -82,7 +82,7 @@ helpers.describe("linux actions: web search", function()
 	end)
 
 	helpers.it("search-web reads Wayland PRIMARY through the bounded native adapter", function()
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server" }
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local read_command

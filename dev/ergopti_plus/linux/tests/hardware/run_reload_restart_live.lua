@@ -6,8 +6,8 @@
 --- Proves the pending-record protocol of docs/design/driver-control-pending-record.md
 --- between real processes: the published POSIX tool (tools/control/
 --- request_driver_reload.sh) writes a request and rings SIGUSR1; the running
---- process, through the production infra/driver_control.lua and
---- infra/daemon_restart.lua, writes the pending record (successor null, deadline)
+--- process, through the production core/lifecycle/engine/driver_control.lua and
+--- core/lifecycle/engine/reload/daemon_restart.lua, writes the pending record (successor null, deadline)
 --- and arms the real detached relay of modules/updater/restarter.lua, then exits;
 --- the relay starts the launcher once that process has gone, and the successor,
 --- a new pid, claims the record and completes it, refuses it with the reason of
@@ -70,10 +70,10 @@ local function run_daemon(scratch)
 		uv.sleep((SHORT_TTL_SECONDS + 2) * 1000)
 	end
 	local declaration = exists(scratch .. "/short_ttl.json") and (scratch .. "/short_ttl.json") or nil
-	local DaemonRestart = require("infra.daemon_restart")
+	local DaemonRestart = require("core.lifecycle.engine.reload.daemon_restart")
 	local session
 	local exiting = false
-	session = assert(require("infra.driver_control").start({
+	session = assert(require("core.lifecycle.engine.driver_control").start({
 		pid = pid,
 		declaration = declaration,
 		reload = function(reason)
@@ -183,7 +183,7 @@ local function alive(pid)
 	return status ~= nil and status:match("State:%s*(%u)") ~= "Z"
 end
 
-local session_path = scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/session.json"
+local session_path = scratch .. "/run/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/control/session.json"
 local function session_pid() return tonumber(((read(session_path) or ""):match('"pid":(%d+)'))) end
 
 --- Waits until the session is published by the generation `count`.
@@ -200,7 +200,7 @@ end
 local function request()
 	local output, code = capture("sh " .. quote(tool) .. " " .. TOOL_TIMEOUT_SECONDS .. " 2>&1")
 	local last = output:match("([^\n]*)\n?$") or ""
-	local ok, decoded = pcall(require("json").decode, last)
+	local ok, decoded = pcall(require("core.text.engine.json").decode, last)
 	return ok and type(decoded) == "table" and decoded or {}, code, output
 end
 
@@ -235,10 +235,10 @@ check(code == 1 and result.state == "refused" and result.reason == "refused",
 check(third ~= nil and result.driver_pid == third, "the refusal comes from the successor")
 
 -- 3. A successor ready past the record's deadline reports a timeout, never completed.
-local spec = require("json").decode(read(require("infra.paths").shared("modules/control/driver_control.json")))
+local spec = require("core.text.engine.json").decode(read(require("core.fs.engine.paths").shared("diagnostics/data/control/driver_control.json")))
 spec.pending_ttl_seconds = SHORT_TTL_SECONDS
 handle = assert(io.open(scratch .. "/short_ttl.json", "wb"))
-handle:write(require("json").encode(spec))
+handle:write(require("core.text.engine.json").encode(spec))
 handle:close()
 -- The third generation read the shipped declaration; restart once so the
 -- replaced process writes the short deadline.
@@ -251,7 +251,7 @@ local fifth = wait_generation(5)
 check(code == 2 and result.state == "timeout" and result.reason == "deadline",
 	"a successor ready past the deadline: " .. tostring(result.state) .. "/" .. tostring(result.reason))
 check(fifth ~= nil, "the late successor still runs")
-local stored = read(scratch .. "/run/" .. require("app_dirs").linux.folder_name .. "/control/reload.result") or ""
+local stored = read(scratch .. "/run/" .. require("core.fs.engine.app_dirs").linux.folder_name .. "/control/reload.result") or ""
 check(stored:find('"state":"timeout"', 1, true) ~= nil and not stored:find('"completed"', 1, true),
 	"the record says timeout, never completed")
 

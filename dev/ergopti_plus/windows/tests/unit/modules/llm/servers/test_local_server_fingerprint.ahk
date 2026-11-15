@@ -25,7 +25,7 @@ _LSF_Corpus() {
 }
 
 _LSF_CatalogueRoot() {
-	return JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
+	return JsonParse(FileRead(_SharedDir . "\ai\data\local_servers.json", "UTF-8"))
 }
 
 _LSF_Joined(Values) {

@@ -20,6 +20,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 
 
 
@@ -204,6 +206,15 @@ _KLT_OptionsDecide(Press) {
 	; No hotkey exists for a key the layout table does not hold.
 	if !KLE_KeyCodes.Has(Sc)
 		return Pass
+	; Ctrl+AltGr+key: the AltGr hotkey catches the press, and _KLE_OnAltGr sends
+	; Ctrl and the logical key when a real Ctrl is held (ILD-2).
+	if Mods.Has("altgr") && Mods.Has("ctrl") {
+		if !_KLT_AltGrRowOnKanaFamily(_KLE_AltGrCriterion.Bind("SC138 & " . Sc))
+			return Pass
+		KeylayoutEmulation_ResetDeadKey()
+		Char := KeylayoutEmulation_ShortcutChar(Sc, _KLE_AltGrShortcutMods(true, Mods.Has("shift")))
+		return Char == "" ? Pass : Map("decides", "shortcut", "text", Char)
+	}
 	if Mods.Has("ctrl") || Mods.Has("alt") || Mods.Has("win") {
 		Prefix := _KLT_ChordPrefix(Mods)
 		if KLE_NATIVE_CHORD_KEYS.Has(Sc) || !_KLE_ShortcutCriterion(Prefix . Sc)
@@ -686,6 +697,7 @@ _KLT_PendingDisabledRowCase() {
 		Hkl := GetForegroundKeyboardLayout()
 		Plain := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, false, false)
 		Shifted := KS_KeyTextNoStateChange(KS_ScancodeToVk(0x12, Hkl), 0x12, Hkl, true, false)
+		TestRequireHostCapability(TestSc012NotOReceipt.Bind(Plain))
 		Assert(Plain.Count == 1 && Plain.Text != "o", "the proof needs an OS layout whose SC012 is not o")
 		Circumflex := KLE_Compositions["s1_circumflex"]
 		Assert(Circumflex.Has(Plain.Text) && Circumflex.Has(Shifted.Text),
@@ -982,7 +994,7 @@ _KLT_ReadNothing(Id, LocalDir) {
 	throw Error("The layout '" . Id . "' is not downloaded in " . LocalDir)
 }
 
-Test("keylayout emulation: boot registers first, then loads the local copy or downloads it (layout-registry-emulation)",
+Test("keylayout emulation: boot registers first, then loads the local copy and never downloads it (layout-registry-emulation)",
 	() => _KLT_WithEmulation(_KLT_BootCase))
 
 _KLT_BootCase() {
@@ -1002,34 +1014,28 @@ _KLT_BootCase() {
 	AssertEqual("register", _KLT_Join(Log), "a local copy is loaded without a download")
 	AssertEqual("ergol", KLE_Id)
 
-	; Missing locally: the hotkeys are still registered at boot, the layout
-	; arrives when the download reports success.
+	; Missing locally (an uninstalled layout, then the reload): the hotkeys are
+	; still registered, the layout stays chosen, and the boot never downloads it
+	; (decided on 2026-11-12, as macOS and Linux); the menu names it as failed.
 	KeylayoutEmulation_Unload()
 	Log := []
-	; An object, not a captured local: the download callback flips it.
-	Store := {Downloaded: false}
-	ReadAfterDownload := (Id, LocalDir) => Store.Downloaded ? _KLT_ReadRepoLocal(Id, LocalDir) : _KLT_ReadNothing(Id, LocalDir)
-	Fetch := (Id, LocalDir, OnDone, *) => (Log.Push("fetch " . Id . " into " . LocalDir),
-		Store.Downloaded := true, OnDone.Call(true, _KLT_Entry(Id)))
+	Fetch := (*) => Log.Push("fetch")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, ReadAfterDownload, Fetch)),
-			"the layout is not emulated yet when boot returns"))
-	AssertEqual("register; fetch ergol into C:\cfg\" . LayoutRegistry_Settings()["local_folder"] . "\", _KLT_Join(Log))
-	AssertEqual("ergol", KLE_Id, "the downloaded layout is loaded once the download succeeds")
-
-	; A failed download leaves the emulation inert.
-	KeylayoutEmulation_Unload()
-	Failing := (Id, LocalDir, OnDone, *) => OnDone.Call(false, "HTTP 404")
+		AssertFalse(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps(Log, _KLT_ReadNothing, Fetch)),
+			"an uninstalled layout is not emulated"))
+	AssertEqual("register", _KLT_Join(Log), "an uninstall then a reload never reinstalls the layout")
+	AssertFalse(IsObject(KLE_Model), "nothing is emulated")
+	AssertEqual("ergol", KeylayoutEmulation_FailedId(), "the menu is told the chosen layout is not emulated")
 	_KLT_WithLayoutFeatures(_KLT_BootLayout("ergol"), () =>
-		KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadNothing, Failing)))
-	AssertFalse(IsObject(KLE_Model), "nothing is emulated after a failed download")
+		AssertTrue(KeylayoutEmulation_Boot("C:\cfg\", _KLT_BootDeps([], _KLT_ReadRepoLocal, Fetch))))
+	AssertEqual("", KeylayoutEmulation_FailedId(), "installed again, the layout resumes and the failure clears")
 }
 
 ; Capture the actual registration boundary, including names built by concatenation.
 ; Resolve expectations independently from the shared physical-key registry.
 _KLT_ResetKeyCase(Code) {
 	global CategoryEnabled, LayerEnabled, KLE_Registered
-	static Registry := JsonParse(FileRead(_SharedDir . "\data\keycodes\physical_keys.json", "UTF-8"))
+	static Registry := JsonParse(FileRead(_SharedDir . "\layouts\data\keycodes\physical_keys.json", "UTF-8"))
 	Record := Registry["keys"][Code]
 	Saved := [CategoryEnabled, LayerEnabled, KLE_Registered]
 	try {
@@ -1076,3 +1082,42 @@ for Code in ["Backspace", "Escape", "Enter", "Tab", "Delete", "ArrowLeft", "Arro
 	"ArrowDown", "Home", "End", "PageUp", "PageDown"]
 	Test("keylayout emulation: " . Code . " cancels pending accents by physical identity (keylayout-dead-reset-identity)",
 		_KLT_WithEmulation.Bind(_KLT_ResetKeyCase.Bind(Code)))
+
+; ILD-2: only a Ctrl other than AltGr's own turns an AltGr press into a Ctrl
+; chord; the fake LCtrl of a standard AltGr layout never does.
+_KLT_RealCtrlHeldCase() {
+	global _ALTGR_KANA_FIXUP, _ALTGR_LAYOUT_PROBE
+	SavedKana := _ALTGR_KANA_FIXUP, SavedProbe := _ALTGR_LAYOUT_PROBE.Clone()
+	try {
+		_ALTGR_KANA_FIXUP := false
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := true
+		Down(Keys) => (Name) => InStr(" " . Keys . " ", " " . Name . " ") > 0
+		AssertTrue(_KLE_RealCtrlHeld(Down("RCtrl"), (Name) => 0), "a right Ctrl is a real Ctrl")
+		AssertFalse(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "AltGr's fake LCtrl is not")
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 1), "a left Ctrl the ledger knows as real is")
+		AssertFalse(_KLE_RealCtrlHeld(Down(""), (Name) => 1), "no Ctrl held, no chord")
+		_ALTGR_LAYOUT_PROBE["altgr_level"] := false
+		AssertTrue(_KLE_RealCtrlHeld(Down("LCtrl"), (Name) => 0), "without a fake LCtrl, a left Ctrl is real")
+		AssertEqual("^", _KLE_AltGrShortcutMods(true, false))
+		AssertEqual("^+", _KLE_AltGrShortcutMods(true, true))
+		AssertEqual("", _KLE_AltGrShortcutMods(false, true), "AltGr alone types its level")
+	} finally {
+		_ALTGR_KANA_FIXUP := SavedKana
+		_ALTGR_LAYOUT_PROBE := SavedProbe
+	}
+}
+Test("keylayout emulation: Ctrl+AltGr sends Ctrl and the logical key only with a real Ctrl (ILD-2)",
+	_KLT_RealCtrlHeldCase)
+
+; SCD-3: a Ctrl slot of the logical key fires for Ctrl+AltGr+key; with none
+; assigned, or set to none, the chord goes on as Ctrl and the key (ILD-2).
+_KLT_AltGrCtrlSlotCase() {
+	Slots := Map("primary_b", "select_line", "primary_shift_v", "paste_plain", "primary_x", "none")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("b", "^", Slots), "Ctrl+AltGr+b runs the ctrl_b slot")
+	AssertEqual("primary_b", _KLE_AltGrSlotFor("B", "^", Slots), "the slot follows the letter, whatever its case")
+	AssertEqual("primary_shift_v", _KLE_AltGrSlotFor("v", "^+", Slots), "with Shift, the Ctrl+Shift slot")
+	AssertEqual("", _KLE_AltGrSlotFor("x", "^", Slots), "a slot set to none sends the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("c", "^", Slots), "no slot, the chord")
+	AssertEqual("", _KLE_AltGrSlotFor("", "^", Slots), "no logical key, no slot")
+}
+Test("keylayout emulation: a Ctrl slot fires for Ctrl+AltGr+key (SCD-3)", _KLT_AltGrCtrlSlotCase)

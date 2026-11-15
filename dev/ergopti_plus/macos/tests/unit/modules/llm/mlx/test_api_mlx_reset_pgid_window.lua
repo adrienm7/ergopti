@@ -21,10 +21,10 @@
 local helpers = require("tests.helpers")
 
 local OWNED = {
-	"infra.logger", "infra.notifications", "infra.i18n", "infra.config_paths",
-	"infra.text_utils", "infra.timings", "infra.paths", "adapters.storage",
-	"adapters.http_client", "adapters.json_codec", "adapters.shell_runner",
-	"adapters.timer_scheduler", "modules.llm.profiles",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.config_paths",
+	"core.text.engine.utils", "core.timing.engine.timings", "core.fs.engine.paths", "core.fs.adapters.storage",
+	"core.network.adapters.http_client", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner",
+	"core.events.timer_scheduler", "modules.llm.profiles",
 	"modules.llm.api_common", "modules.llm.api_mlx_inference", "modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_discovery", "modules.llm.mlx_stream_retirement",
 	"modules.llm.api_mlx",
@@ -52,30 +52,30 @@ local function with_api(scenario)
 				runtime.lines[#runtime.lines + 1] = { level = level, text = text }
 			end
 		end
-		package.loaded["infra.logger"] = setmetatable({
+		package.loaded["core.logger.engine.logger"] = setmetatable({
 			debug = capture("debug"), info = capture("info"), warn = capture("warn"),
 			error = capture("error"),
 			callback = function(_, _, fn, ...) return pcall(fn, ...) end,
 		}, { __index = function() return noop end })
-		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = { get = function() return "/fixture/model.txt" end }
-		package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
-		package.loaded["infra.timings"] = { sec = function() return 1 end }
-		package.loaded["infra.paths"] = { shared = function() return nil end }
-		package.loaded["adapters.storage"] = { get = function() return nil end }
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
+		package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+		package.loaded["core.fs.adapters.storage"] = { get = function() return nil end }
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function() return { cancel = function() return true end } end,
 		}
-		package.loaded["adapters.json_codec"] = { decode = function() return nil end }
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.fs.adapters.json_codec"] = { decode = function() return nil end }
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_, args, callback)
 				local sweep = { script = args[2], callback = callback }
 				runtime.sweeps[#runtime.sweeps + 1] = sweep
 				return { start = function() return true end }
 			end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			awake_time = function() return 100 end,
 			after = function(delay, callback)
 				local handle = { timer = {}, delay = delay, callback = callback }

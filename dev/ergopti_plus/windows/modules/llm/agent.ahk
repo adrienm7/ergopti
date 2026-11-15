@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: AI Agent (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/agent.lua: the pure logic of the AI
+; AutoHotkey port of _shared/ai/engine/agent/agent.lua: the pure logic of the AI
 ; agent. System 1 (fast) tells whether a text implies an action, System 2
 ; (slow, smart) turns a text into actions of a closed schema, and the
 ; connectors (modules/llm/agent_connectors.ahk) carry out the one the user
@@ -11,7 +11,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Nothing a model writes is executed as is: every action is validated field
-;    by field against _shared/modules/llm/agent.json, dates must be real local
+;    by field against _shared/ai/data/agent.json, dates must be real local
 ;    times, addresses real addresses, and a shortcut must name one of the
 ;    user's own tools.
 ; 2. The file formats the connectors hand to the system (an iCalendar event or
@@ -77,7 +77,7 @@ LLM_Agent_Config() {
 	static Config := ""
 	if (Config is Map)
 		return Config
-	Path := _SharedDir . "\modules\llm\agent.json"
+	Path := _SharedDir . "\ai\data\agent.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Agent_ValidateConfig(Candidate, Path)
 	Config := Candidate

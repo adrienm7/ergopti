@@ -13,19 +13,19 @@
 
 local M = {}
 local hs          = hs
-local Logger      = require("infra.logger")
+local Logger      = require("core.logger.engine.logger")
 local git_status  = require("infra.git_status")
-local reload_gate = require("reload_gate")
-local Timings     = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
-local TableUtil   = require("table_util")
+local reload_gate = require("core.lifecycle.engine.reload.gate")
+local Timings     = require("core.timing.engine.timings")
+local TimerScheduler = require("core.events.timer_scheduler")
+local TableUtil   = require("core.text.engine.table_util")
 local LOG         = "menu_watchers"
 
 --- Whether a reload or quit is already under way, which makes a refused reload
 --- request expected rather than a fault.
 --- @return boolean terminating
 local function reload_already_terminating()
-	local loaded, coordinator = pcall(require, "infra.termination_coordinator")
+	local loaded, coordinator = pcall(require, "core.lifecycle.engine.shutdown.termination_coordinator")
 	if not loaded or type(coordinator) ~= "table" then return false end
 	local checked, in_progress = pcall(coordinator.terminal_in_progress)
 	return checked and in_progress == true

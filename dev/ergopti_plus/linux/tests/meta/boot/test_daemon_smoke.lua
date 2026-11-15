@@ -154,7 +154,7 @@ local function daemon_paths_callback(environment)
   local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
   local source = assert(file:read("*a")); assert(file:close())
   local restart_first = assert(source:find("local function restart_daemon(reason, paused)", 1, true))
-  local owner_first = assert(source:find("local perform_reload, reload_in_flight, abandon_reload = require(\"infra.reload_restart\")", restart_first, true))
+  local owner_first = assert(source:find("local perform_reload, reload_in_flight, abandon_reload = require(\"core.lifecycle.engine.reload.restart\")", restart_first, true))
   local restart_last = assert(source:find("\n\n\n--- Emits facts", owner_first, true))
   local wiring = assert(source:find("webview_manager.set_daemon_state({", 1, true))
   local callback = assert(source:sub(wiring):match(
@@ -182,7 +182,7 @@ local function with_paths_restart(mode, body)
         .. (id == "a" and "copy" or "none") .. "\"\n[hotstrings]\ngroups = { autocorrection = false }\n")
     end
     for _, name in ipairs({ "modules.gestures.manager", "modules.shortcuts.manager",
-      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "infra.restart_pause" }) do package.loaded[name] = nil end
+      "modules.shortcuts.keyboard_shortcuts", "modules.hotstrings.hotstrings_config", "core.lifecycle.engine.reload.restart_pause" }) do package.loaded[name] = nil end
     local gestures = require("modules.gestures.manager")
     gestures.init({ persist = true, enabled = false })
     local shortcuts = require("modules.shortcuts.manager"); shortcuts.init({ persist = true })
@@ -200,15 +200,15 @@ local function with_paths_restart(mode, body)
     state.controller = require("modules.shortcuts.script_actions").new({ reset = function() end,
       reload = function() end, quit = function() end })
     local actual_require = require
-    local restart = require("infra.daemon_restart")
+    local restart = require("core.lifecycle.engine.reload.daemon_restart")
     local restarter = require("modules.updater.restarter")
     local environment = {
       LOG = "test.paths_restart", gestures = gestures,
       privacy_owners = { script_actions = state.controller },
-      Logger = require("logger.shim"), arg = state.args,
+      Logger = require("core.logger.engine.shim"), arg = state.args,
       shutdown = { request = function(reason) state.shutdowns = state.shutdowns + 1; state.reason = reason; return true end },
       require = function(name)
-        if name ~= "infra.daemon_restart" then return actual_require(name) end
+        if name ~= "core.lifecycle.engine.reload.daemon_restart" then return actual_require(name) end
         return { restart = function(options)
           state.restart_calls = state.restart_calls + 1
           state.request_reason, state.request_args = options.reason, options.args
@@ -289,7 +289,7 @@ helpers.describe("paths restart live pause", function()
           local result = save()
           helpers.assert_eq(state.request_paused, paused, "the callback must sample the live controller")
           helpers.assert_eq({ result.saved, result.reloaded, result.hidden }, { true, true, true })
-          local file = assert(io.open(require("adapters.storage").path() .. ".restart-pause", "rb"))
+          local file = assert(io.open(require("core.fs.adapters.storage").path() .. ".restart-pause", "rb"))
           local marker = assert(file:read("*a")); assert(file:close())
           helpers.assert_contains(marker, "paused=" .. tostring(paused) .. "\n")
           helpers.assert_eq(f.paths.get_config_dir(), f.dirs.b)
@@ -307,7 +307,7 @@ helpers.describe("paths restart live pause", function()
     local installed = assert(source:find("\n\tprivacy_owners.script_actions = script_actions\n", created, true),
       "main must hand its controller to the Reload owner")
     for _, trigger in ipairs({ "install_signal_handlers()", 'perform_reload("the tray menu")',
-      "webview_manager.set_daemon_state({", 'require("infra.driver_control").start({' }) do
+      "webview_manager.set_daemon_state({", 'require("core.lifecycle.engine.driver_control").start({' }) do
       local at = assert(source:find(trigger, main, true), trigger .. " must be present in main")
       helpers.assert_true(installed < at, trigger .. " follows the controller installation")
     end
@@ -357,7 +357,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
 
-      helpers.assert_true(src:find('require("infra.monotonic")', 1, true) ~= nil,
+      helpers.assert_true(src:find('require("core.logger.engine.monotonic")', 1, true) ~= nil,
         "daemon must source its keystroke clock from lib.monotonic")
       helpers.assert_true(src:find("Monotonic.now_ms()", 1, true) ~= nil,
         "the per-keystroke timestamp must come from the monotonic wall clock")
@@ -414,7 +414,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
-      local click_start = assert(src:find("local function on_click()", 1, true))
+      local click_start = assert(src:find("local function on_click(code)", 1, true))
       local click_end = assert(src:find("\n\tend\n", click_start, true))
       helpers.assert_true(src:sub(click_start, click_end):find("secure_focus_guard.invalidate()", 1, true) ~= nil,
         "a pointer press must invalidate the privacy verdict")
@@ -475,7 +475,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local branch = body:find('if key_name == "backspace" then', 1, true)
       local record = body:find("keystats.record_correction(app_id,", 1, true)
       local privacy = branch and body:find("secure_focus_guard.blocks_text()", branch, true)
-      local undo = body:find("injector.inject(remaining - 1", 1, true)
+      local undo = body:find("pcall(injector.inject, remaining - 1", 1, true)
       helpers.assert_true(paused ~= nil and branch ~= nil and record ~= nil and undo ~= nil,
         "the control callback must route Backspace to the keystats")
       helpers.assert_true(paused < branch and branch < record,
@@ -629,13 +629,13 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       if ok then
         -- resolve_char, not new(). The reader instance this used to name had no
         -- production caller for its whole life; reading the device belongs to
-        -- adapters/evdev_reader.lua now, and what remains here is the layout.
+        -- platform/input/evdev_reader.lua now, and what remains here is the layout.
         helpers.assert_true(type(ir.resolve_char) == "function", "input_reader.resolve_char is a function")
       end
     end)
 
     helpers.it("evdev_reader can be required", function()
-      local ok, er = pcall(require, "adapters.evdev_reader")
+      local ok, er = pcall(require, "platform.input.evdev_reader")
       helpers.assert_true(ok, "evdev_reader module loads")
       if ok then
         helpers.assert_true(type(er.grab) == "function", "evdev_reader.grab is a function")
@@ -668,8 +668,8 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("utf8 compat shim", function()
     helpers.it("can be required", function()
-      local ok, utf8_mod = pcall(require, "compat.utf8")
-      helpers.assert_true(ok, "compat.utf8 module loads")
+      local ok, utf8_mod = pcall(require, "core.lifecycle.engine.compat.utf8")
+      helpers.assert_true(ok, "core.lifecycle.engine.compat.utf8 module loads")
       if ok then
         helpers.assert_true(type(utf8_mod.install) == "function",
           "utf8.install is a function")
@@ -677,7 +677,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
     end)
 
     helpers.it("install returns true (already installed or freshly installed)", function()
-      local ok, utf8_mod = pcall(require, "compat.utf8")
+      local ok, utf8_mod = pcall(require, "core.lifecycle.engine.compat.utf8")
       if ok and utf8_mod.install then
         local result = utf8_mod.install()
         helpers.assert_true(result == true or result == false,
@@ -692,7 +692,7 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("adapter modules", function()
     local adapters = {
-      "adapters.http_client",
+      "core.network.adapters.http_client",
       "adapters.tray_menu",
     }
     for _, name in ipairs(adapters) do
@@ -710,18 +710,18 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
 
   helpers.describe("shared modules (daemon dependencies)", function()
     local shared_mods = {
-      "logger.shim",
-      "compat.utf8",
-      "keymap.terminators",
-      "keystats.utils",
-      "keystats.metrics",
-      "keystats.aggregator_helpers",
-      "keycodes.evdev",
-      "json",
+      "core.logger.engine.shim",
+      "core.lifecycle.engine.compat.utf8",
+      "layouts.engine.layers.terminators",
+      "metrics.engine.utils",
+      "metrics.engine.metrics",
+      "metrics.engine.aggregator.helpers",
+      "platform.input.keycodes.evdev",
+      "core.text.engine.json",
       "tray.protocol",
-      "llm.prompt_builder",
+      "ai.engine.prediction.prompt_builder_core",
       "infra.llm_bridge",
-      "updater.version",
+      "updater.engine.version_core",
     }
     for _, name in ipairs(shared_mods) do
       helpers.it("require('" .. name .. "') loads", function()
@@ -773,7 +773,7 @@ helpers.describe("daemon startup-capture-publication", function()
 				end
 			end
 			local polls = 0
-			local shutdown = require("infra.shutdown_coordinator").new({
+			local shutdown = require("core.lifecycle.engine.shutdown.coordinator").new({
 				keyboard_hook = hook, event_loop = loop,
 				pre_wait = { { name = "controlled startup native owner", wait_for_ack = true, stop = function()
 					polls = polls + 1
@@ -909,7 +909,11 @@ for _, result in ipairs({ true, false }) do
     local notices = {}
     local env = setmetatable({
       BootProfiler = { stage = function() end, stage_done = function() end },
-      keystats = { init = function() return result end },
+      keystats = { init = function(opts)
+        helpers.assert_type(opts.defer, "function", "the background tasks wait for the event loop")
+        return result
+      end },
+      event_loop = { defer = function() return true end },
       RuntimeGuard = { optional_require = function() return { get = function(key) return key end } end },
       notifier = { send = function(message, opts) notices[#notices + 1] = { message, opts.level }; return true end },
     }, { __index = _G })
@@ -923,9 +927,9 @@ for _, result in ipairs({ true, false }) do
 end
 
 helpers.it("metrics storage warning explains blocked collection in every locale", function()
-  local json = require("json")
+  local json = require("core.text.engine.json")
   for _, lang in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-    local path = assert(require("infra.paths").shared("data/locales/" .. lang .. ".json"))
+    local path = assert(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. lang .. ".json"))
     local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close())
     local message = assert(json.decode(text))["dialog.metrics.storage_unavailable"]
     helpers.assert_true(type(message) == "string" and message:find("SQLite", 1, true) ~= nil)

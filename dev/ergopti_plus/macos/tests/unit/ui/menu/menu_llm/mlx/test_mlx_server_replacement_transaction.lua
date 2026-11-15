@@ -22,17 +22,17 @@
 --- =============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULE_NAMES = {
-	"adapters.json_codec",
-	"infra.notifications",
-	"infra.logger",
-	"infra.i18n",
+	"core.fs.adapters.json_codec",
+	"core.ui.engine.notifications",
+	"core.logger.engine.logger",
+	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
-	"adapters.task_lifecycle",
-	"adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.process.adapters.shell_runner",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -60,7 +60,7 @@ local function with_server_fixture(options, assertions)
 	local saved_modules = {}
 	for _, name in ipairs(MODULE_NAMES) do saved_modules[name] = package.loaded[name] end
 	local saved_hs = rawget(_G, "hs")
-	package.loaded["adapters.json_codec"] = nil
+	package.loaded["core.fs.adapters.json_codec"] = nil
 	local saved_os_execute = os.execute
 	local ok, err = xpcall(function()
 		local noop = function() end
@@ -130,7 +130,7 @@ local function with_server_fixture(options, assertions)
 
 		-- Quit/reload ("shutdown") dispatches the listener kill as an async task
 		-- instead of the synchronous os.execute proof (hs-quit-never-blocks).
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, arguments)
 				cleanup_commands[#cleanup_commands + 1] = executable .. " " .. table.concat(arguments, " ")
 				events[#events + 1] = "cleanup"
@@ -144,15 +144,15 @@ local function with_server_fixture(options, assertions)
 				}
 			end,
 		}
-		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		package.loaded["core.logger.engine.logger"] = {
 			today_log_path = function() return "/tmp/ergopti-test.log" end,
 			debug = noop,
 			info = noop,
 			warn = noop,
 			error = function(...) server_tasks.logged_error = { ... }; logged_errors[#logged_errors + 1] = { ... } end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["infra.config_paths"] = {
 			get = function(key)
 				helpers.assert_eq(key, "MlxActiveModelPath")
@@ -180,7 +180,7 @@ local function with_server_fixture(options, assertions)
 			set_active_server_pgid = noop,
 			mark_load_failed = noop,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			native = function(label, _, on_done, on_chunk, arguments)
 				local task = {
 					label = label,
@@ -291,7 +291,7 @@ local function with_server_fixture(options, assertions)
 	_G.hs = saved_hs
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved_modules[name] end
 	-- Explicit for the suite-wide shell_runner stub-restore ratchet
-	package.loaded["adapters.shell_runner"] = saved_modules["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved_modules["core.process.adapters.shell_runner"]
 	if not ok then error(err, 0) end
 end
 

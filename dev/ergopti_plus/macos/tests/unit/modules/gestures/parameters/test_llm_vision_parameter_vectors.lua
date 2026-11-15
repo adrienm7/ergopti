@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -27,8 +27,8 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
@@ -57,9 +57,9 @@ end)
 
 helpers.describe("llm_vision parameter: native prompt, picker choices and refusal", function()
 	helpers.it("lists the local server, then every vision provider in catalogue order", function()
-		local config = read_json("modules/llm/vision.json")
-		local catalogue = read_json("modules/llm/api_providers.json")
-		local i18n = package.loaded["infra.i18n"]
+		local config = read_json("ai/data/vision.json")
+		local catalogue = read_json("ai/data/api_providers.json")
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get = i18n.get
 		local ok, err = pcall(helpers.with_fresh_modules, { "modules.llm.api_remote" }, function()
 			package.loaded["modules.llm.api_remote"] = {
@@ -109,6 +109,6 @@ helpers.describe("llm_vision parameter: native prompt, picker choices and refusa
 
 	helpers.it("refuses with the llm_vision error text", function()
 		helpers.assert_eq(Actions.parameter_error("llm_screen_full"),
-			package.loaded["infra.i18n"].get("dialog.gestures.param_err_llm_vision"))
+			package.loaded["core.i18n.engine.i18n"].get("dialog.gestures.param_err_llm_vision"))
 	end)
 end)

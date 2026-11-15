@@ -43,14 +43,14 @@ local with_private_window_callback = Fixture.with_private_window_callback
 local function with_current_auth_policy_callback(vector, body)
 	Accounting.run(function(scenario)
 		local startup_tracker = package.loaded["modules.keystats.context_tracker"]
-		local lifecycle = package.loaded["adapters.process_lifecycle"]
+		local lifecycle = package.loaded["core.process.adapters.lifecycle"]
 		local manager = package.loaded["modules.keystats.log_manager"]
 		local previous_activation, previous_append = lifecycle.onAppActivate, manager.append_log
 		local ports = { "init", "app_watcher_cb", "update_private_status", "update_ax_observer",
 			"capture_frontmost_app", "resync_context" }
 		local previous_ports = {}
 		for _, name in ipairs(ports) do previous_ports[name] = startup_tracker[name] end
-		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "adapters.secure_field_detector" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.context_tracker", "platform.focus.secure_field_detector" }, function()
 			local native = _G.hs
 			local previous_app, previous_window = native.application, native.window
 			local previous_ax, previous_caffeinate = native.axuielement, native.caffeinate
@@ -171,7 +171,7 @@ end
 helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)", function()
 	local function with_policy_ports(body)
 		helpers.with_stub_scope({ "modules.keystats.text_cipher", "modules.keystats.text_migration",
-			"adapters.physical_observation_clock", "keystats.physical_configuration_observation" }, function()
+			"adapters.physical_observation_clock", "metrics.engine.capture.physical_configuration_observation" }, function()
 			local ports = { encrypted = false, available = true, migrating = false, accept_cipher = true }
 			package.loaded["modules.keystats.text_cipher"] = {
 				is_available = function() return ports.available end,
@@ -182,7 +182,7 @@ helpers.describe("HS-274 actual aggregate and disabled-app policy writers (wp3)"
 			}
 			package.loaded["modules.keystats.text_migration"] = { is_running = function() return ports.migrating end }
 			package.loaded["adapters.physical_observation_clock"] = nil
-			package.loaded["keystats.physical_configuration_observation"] = nil
+			package.loaded["metrics.engine.capture.physical_configuration_observation"] = nil
 			body(ports)
 		end)
 	end

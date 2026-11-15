@@ -14,20 +14,20 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
-	"infra.logger", "ui.healthcheck.probes", "adapters.timer_scheduler", "adapters.http_client",
-	"adapters.shell_runner", "adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
+	"core.logger.engine.logger", "ui.healthcheck.probes", "core.events.timer_scheduler", "core.network.adapters.http_client",
+	"core.process.adapters.shell_runner", "core.fs.adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
 --- Runs body with the real probes over recorded adapters.
 --- @param body function(Probes, world)
 local function with_probes(body)
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	helpers.with_stub_scope(FIXTURE_MODULES, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { timers = {}, requests = {}, tasks = {}, cancelled_requests = 0, terminated = 0, llm_on = false,
 			samplers = {}, stopped_samplers = 0, errors = {} }
 		local logger = helpers.make_logger_stub()
@@ -35,7 +35,7 @@ local function with_probes(body)
 			local ok, text = pcall(string.format, tostring(message), ...)
 			world.errors[#world.errors + 1] = ok and text or tostring(message)
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- The callback form, which samples on its own timer; the blocking form
 		-- (no callback) is never what a probe may call. Restored on the same
 		-- table, whichever runtime the scope installed. Shaped like hs.host's
@@ -62,7 +62,7 @@ local function with_probes(body)
 			world.samplers[#world.samplers + 1] = sampler
 			return sampler
 		end
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback }
 				world.timers[#world.timers + 1] = handle
@@ -90,7 +90,7 @@ local function with_probes(body)
 				end
 			end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function(options)
 				local client = {}
 				function client.get(url, headers, callback)
@@ -101,7 +101,7 @@ local function with_probes(body)
 				return client
 			end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(executable, args, on_done)
 				local task = { executable = executable, args = args, on_done = on_done }
 				world.tasks[#world.tasks + 1] = task
@@ -111,7 +111,7 @@ local function with_probes(body)
 				}
 			end,
 		}
-		package.loaded["adapters.json_codec"] = { decode = function(text) return hs.json.decode(text) end }
+		package.loaded["core.fs.adapters.json_codec"] = { decode = function(text) return hs.json.decode(text) end }
 		package.loaded["modules.llm"] = {
 			get_runtime_llm_enabled = function() return world.llm_on end,
 			get_backend = function() return "ollama" end,
@@ -123,7 +123,7 @@ local function with_probes(body)
 	end)
 	-- The scope already restored it; written out so the suite-wide stub hygiene
 	-- scan (tests/meta/harness/test_shell_runner_stub_restore.lua) sees the restore
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 end
 
 --- The probes of the real schema, started on a phase A snapshot with a recorder.
@@ -133,7 +133,7 @@ end
 --- @return table run, table answers
 local function start(Probes, paths, options)
 	options = options or {}
-	local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+	local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 	local answers = {}
 	local snapshot = {
 		detailed = options.detailed == true,
@@ -208,7 +208,7 @@ local function with_retained_actor(body)
 		}
 		local run, answers = start(Probes)
 		controls.watchdog = assert(run.watchdogs.appleevent_transport)
-		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local scheduler = package.loaded["core.events.timer_scheduler"]
 		local original_cancel = scheduler.cancel
 		scheduler.cancel = function(handle)
 			if handle == controls.watchdog then
@@ -284,10 +284,10 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(answer_of(answers, "github_api").result.state, "timeout")
 			helpers.assert_true(world.cancelled_requests >= 1, "a timed-out request must be stopped")
 			-- A probe the schema declares and nothing starts reads "checking…" forever
-			local schema = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+			local schema = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 			local declared = 0
 			for id, probe in pairs(schema.probes) do
-				if require("healthcheck.snapshot").applies(probe, "macos") then
+				if require("diagnostics.engine.healthcheck.snapshot").applies(probe, "macos") then
 					declared = declared + 1
 					helpers.assert_true(answer_of(answers, id) ~= nil, "the " .. id .. " probe never answered")
 				end
@@ -375,7 +375,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 	helpers.it("passes the original start clock to the separately controlled AppleEvent collaborator", function()
 		with_probes(function(Probes, world)
 			local timer = hs.timer
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local saved_clock, saved_after = timer.absoluteTime, scheduler.after
 			local now_ns, watchdog_starts = 12345 * 1e6, {}
 			timer.absoluteTime = function() return now_ns end
@@ -432,7 +432,7 @@ helpers.describe("diagnostics probes (macOS)", function()
 
 	helpers.it("Cancel retries archived cohort capabilities before releasing their cleanup owner", function()
 		with_retained_actor(function(run, answers, controls)
-			local Cleanup = require("healthcheck.cleanup")
+			local Cleanup = require("diagnostics.engine.healthcheck.cleanup")
 			local session = { probes = run, snapshot = { probes = run.results } }
 			Cleanup.archive(session)
 			helpers.assert_true(session.probes == nil)

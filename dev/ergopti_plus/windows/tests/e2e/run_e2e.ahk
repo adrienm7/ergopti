@@ -81,20 +81,20 @@ global _SharedDir := _StaticDir . "\ergopti_plus\_shared"
 global _DriverDir := _StaticDir . "\ergopti_plus\windows"
 
 ; Production engine dependencies (same order as run_all.ahk).
-#Include ../../infra/json.ahk
-#Include ../../infra/app_state.ahk
+#Include ../../core/text/engine/json.ahk
+#Include ../../core/lifecycle/engine/app_state.ahk
 #Include ../../_generated/window_titles.ahk
-#Include ../../infra/native_dialogs.ahk
-#Include ../../infra/ui_style.ahk
+#Include ../../core/ui/engine/native_dialogs.ahk
+#Include ../../core/ui/engine/style.ahk
 #Include ../../_generated/app_dirs.ahk
 #Include ../../infra/app_folders.ahk
 #Include ../../infra/legacy_folder_migration.ahk
-#Include ../../infra/wall_clock.ahk
-#Include ../../infra/logger.ahk
+#Include ../../core/logger/engine/wall_clock.ahk
+#Include ../../core/logger/engine/logger.ahk
 #Include ../../infra/hotpath_profiler.ahk
 
-#Include ../../infra/window_utils.ahk
-#Include ../../infra/text_utils.ahk
+#Include ../../core/ui/engine/window_utils.ahk
+#Include ../../core/text/engine/utils.ahk
 #Include ../../infra/hotstrings/hotstring_engine.ahk
 #Include ../../infra/hotstrings/hotstring_engine_main.ahk
 ; Project the same shipped terminator catalogue that production boot loads.
@@ -108,28 +108,28 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; tap-hold holds around the output (_HSE_SendWithAltGrUp). Without these files
 ; the call failed, the dispatch logged it and sent nothing, so the harness saw
 ; an empty expansion. They load in run_all.ahk's order.
-#Include ../../adapters/text_sender.ahk
-#Include ../../adapters/key_state.ahk
+#Include ../../platform/input/text_sender.ahk
+#Include ../../platform/input/key_state.ahk
 #Include ../../platform/remap/constants.ahk
 #Include ../../platform/remap/tap_hold_roll.ahk
 ; The number row (test_e2e_number_row.ahk): the modules the number-row hotkeys
 ; of modules/keymap/layout.ahk read and run, in run_all.ahk's order. None of
 ; them registers a hotkey at load; layout.ahk itself, which does, stays out.
-#Include ../../adapters/file_system.ahk
-#Include ../../infra/master_gates.ahk
+#Include ../../core/fs/adapters/file_system.ahk
+#Include ../../core/lifecycle/engine/master_gates.ahk
 #Include ../../_generated/features_manifest.ahk
 #Include ../../infra/manifest_reader.ahk
 #Include ../../modules/keymap/layout/layout_ergopti.ahk
 #Include ../../modules/keymap/layout/accented_shortcuts.ahk
-#Include ../../../_shared/modules/features/number_row_policy.ahk
-#Include ../../../_shared/modules/features/layout_rows_policy.ahk
+#Include ../../../_shared/settings/data/features/number_row_policy.ahk
+#Include ../../../_shared/settings/data/features/layout_rows_policy.ahk
 #Include ../../modules/keymap/layout/layout_shift_caps.ahk
 #Include ../../modules/keymap/layout/number_row_send.ahk
 #Include ../../modules/keymap/layout/digit_row_bindings.ahk
 #Include ../../modules/keymap/keylayout/keylayout_parser.ahk
 #Include ../../modules/keymap/keylayout/keylayout_tables.ahk
 #Include ../../modules/keymap/keylayout/keylayout_emulation.ahk
-#Include ../../adapters/crypto.ahk
+#Include ../../core/crypto/crypto.ahk
 #Include ../../modules/keymap/keylayout/layout_registry.ahk
 #Include ../../infra/magic_editor.ahk
 

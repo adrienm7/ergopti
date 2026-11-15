@@ -4,15 +4,15 @@
 --- MODULE: Error Window (macOS)
 --- DESCRIPTION:
 --- Opens the shared error window (_shared/ui/error_dialog/) when a logged ERROR
---- passes the shared policy (_shared/modules/diagnostics/error_policy.json):
+--- passes the shared policy (_shared/diagnostics/data/error_policy.json):
 --- what went wrong, where it is logged, and the buttons to report it on
 --- GitHub, copy the report, open the errors file or close the window.
 --- The host-independent half (policy load, Debug switch, report, first
---- message) is _shared/lua/error_dialog/core.lua, shared with the other host.
+--- message) is _shared/core/ui/engine/error_dialog_core.lua, shared with the other host.
 ---
 --- FEATURES & RATIONALE:
 --- 1. The logger hands every emitted ERROR here after its native ACK, from the
----    transport pump (infra/logger.lua), never from the event tap that may
+---    transport pump (core/logger/engine/logger.lua), never from the event tap that may
 ---    have logged it; the window itself opens present_delay_ms later on a
 ---    timer. It replaces the system notification every ERROR used to raise.
 --- 2. diagnostics.error_policy decides: one window per error signature per
@@ -39,21 +39,21 @@
 --- ==============================================================================
 
 local M = {}
-local _scope = require("scope_owner").new({ name = "ui.error_dialog", module = M })
+local _scope = require("settings.engine.scope.owner").new({ name = "ui.error_dialog", module = M })
 
 local hs             = hs
-local Logger         = require("infra.logger")
-local Paths          = require("infra.paths")
-local Policy         = require("diagnostics.error_policy")
-local DialogCore     = require("error_dialog.core")
-local Redact         = require("diagnostics.redact")
-local TimerScheduler = require("adapters.timer_scheduler")
-local DeferredWork = require("infra.deferred_work")
-local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
-local Storage        = require("adapters.storage")
-local WebviewResult  = require("adapters.webview_result")
-local ConfigKeys = require("config_keys")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local Logger         = require("core.logger.engine.logger")
+local Paths          = require("core.fs.engine.paths")
+local Policy         = require("diagnostics.engine.reports.error_policy")
+local DialogCore     = require("core.ui.engine.error_dialog_core")
+local Redact         = require("diagnostics.engine.reports.redact")
+local TimerScheduler = require("core.events.timer_scheduler")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local NativeClose = require("core.ui.ui.webview_close_owner").new(DeferredWork, Logger)
+local Storage        = require("core.fs.adapters.storage")
+local WebviewResult  = require("core.ui.adapters.webview_result")
+local ConfigKeys = require("settings.engine.keys")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 
 local LOG = "error_dialog"
 
@@ -106,7 +106,7 @@ M.clock = function() return TimerScheduler.now_ns() / 1e9 end
 function M.init()
 	if not _scope.admit_change() then return false end
 	return DialogCore.init(Logger, LOG, _policy ~= nil,
-		function() return Paths.shared("modules/diagnostics/error_policy.json") end,
+		function() return Paths.shared("diagnostics/data/error_policy.json") end,
 		function(policy, decisions)
 			_policy, _decisions = policy, decisions
 			_enabled = M.is_enabled()
@@ -271,8 +271,8 @@ local function init_message(session)
 	local message = DialogCore.init_message(session.record, session.report, session.log_path, _folded, redact)
 	-- The details pane promises the exact share document, not the local error
 	-- report. Build it from the same captured snapshot as Copy and Report.
-	message.text = require("healthcheck.share").document(session.snapshot, session.documents.schema,
-		require("infra.i18n").get(session.documents.schema.share_policy.notice_key)).text
+	message.text = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
+		require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key)).text
 	return message
 end
 
@@ -287,8 +287,8 @@ local function perform(session, name)
 	local action
 	local shared
 	if name == "copy" or name == "report" then
-		shared = require("healthcheck.share").document(session.snapshot, session.documents.schema,
-			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+		shared = require("diagnostics.engine.healthcheck.share").document(session.snapshot, session.documents.schema,
+			require("core.i18n.engine.i18n").get(session.documents.schema.share_policy.notice_key))
 	end
 	if name == "copy" then
 		action = { action = "copy", text = shared.text }
@@ -373,7 +373,7 @@ local function open_window(record)
 		Logger.error(LOG, "The error report could not be built: %s.", tostring(fields))
 		return false
 	end
-	local ui_builder = require("ui.ui_builder")
+	local ui_builder = require("core.ui.ui.builder")
 	local ok_html, html = pcall(ui_builder.build_injected_html, (Paths.shared("ui/error_dialog") or "") .. "/")
 	if not ok_html or type(html) ~= "string" then
 		Logger.error(LOG, "The error window page could not be built: %s.", tostring(html))
@@ -440,7 +440,7 @@ local function open_window(record)
 		local ok_step, step_err = pcall(step.apply)
 		if not ok_step then Logger.warn(LOG, "%s() failed: %s.", step.name, tostring(step_err)) end
 	end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	pcall(function() webview:windowTitle(ui_builder.window_title(i18n.get("common.error_title"))) end)
 	pcall(function() webview:allowTextEntry(true) end)
 	pcall(function() webview:allowGestures(false) end)
@@ -455,7 +455,7 @@ local function open_window(record)
 	pcall(function()
 		webview:navigationCallback(function(action)
 			if _session ~= session or action ~= "didFinishNavigation" then return end
-			local ok_strings, strings = pcall(function() return require("infra.locale").catalogue() end)
+			local ok_strings, strings = pcall(function() return require("core.i18n.engine.locale").catalogue() end)
 			local ok_enc, json = pcall(hs.json.encode, ok_strings and strings or {})
 			if not ok_strings or not ok_enc then
 				Logger.error(LOG, "The error window's strings could not be prepared.")
@@ -652,8 +652,8 @@ function M.report(record, complete, current)
 		if owned() then complete(false) end
 		return nil
 	end
-	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
-		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
+	local shared = require("diagnostics.engine.healthcheck.share").document(fields.snapshot, fields.documents.schema,
+		require("core.i18n.engine.i18n").get(fields.documents.schema.share_policy.notice_key))
 	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
 		fields.paths, fields.documents, fields.redaction.context, nil, fields.snapshot, {

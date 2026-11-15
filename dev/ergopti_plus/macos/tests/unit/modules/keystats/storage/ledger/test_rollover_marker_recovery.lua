@@ -15,7 +15,7 @@ if arg and arg[0] and arg[0]:match("test_rollover_marker_recovery%.lua$") then
 end
 
 local helpers = require("tests.helpers")
-local quote = require("text_utils").shell_quote
+local quote = require("core.text.engine.utils_core").shell_quote
 local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
 
 local function verify(case, strategy, cache)

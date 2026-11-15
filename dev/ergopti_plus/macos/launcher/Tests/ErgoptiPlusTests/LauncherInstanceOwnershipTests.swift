@@ -12,6 +12,7 @@
 // NOTE: This target requires the macOS Swift toolchain; it runs on macOS CI.
 // ==============================================================================
 
+import AppKit
 import Darwin
 import Foundation
 import XCTest
@@ -52,6 +53,64 @@ final class LauncherInstanceOwnershipTests: XCTestCase {
 		XCTAssertFalse(second.isHeld)
 		first.release()
 		XCTAssertEqual(second.acquire(), .acquired, "a released lock is free for the next launcher")
+		second.release()
+	}
+
+	/// A second launcher hands over without touching MJConfigFile: an early write
+	/// before the lock repointed the running copy's runtime at the second
+	/// launcher's bundle (MLC-001).
+	@MainActor
+	func testASecondLauncherSeedsNothingWhileTheFirstHoldsTheLock() {
+		let first = LauncherInstanceLock(path: lockPath)
+		XCTAssertEqual(first.acquire(), .acquired)
+		var seeded: [String] = []
+		let handedOver = expectation(description: "the second launcher exits")
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in XCTFail("a second launcher starts no runtime") },
+			fatalReporter: { XCTFail("unexpected fatal: \($0)") },
+			applicationTerminator: { _ in handedOver.fulfill() },
+			loggerWorkerFactory: { nil },
+			instanceLock: LauncherInstanceLock(path: lockPath),
+			runningApplicationsReader: { _ in [] },
+			hammerspoonConfigSeeder: { seeded.append($0) }
+		)
+		delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+		wait(for: [handedOver], timeout: 20)
+		XCTAssertEqual(seeded, [], "only the lock holder writes MJConfigFile")
+		first.release()
+	}
+
+	/// A second launch restarts the running app, as Windows' #SingleInstance Force
+	/// does: it asks the running launcher to quit once and takes the lock that
+	/// launcher releases (MLC-003, decided by the maintainer on 2026-11-11).
+	@MainActor
+	func testASecondLauncherAsksTheRunningOneToQuitAndTakesOver() {
+		let first = LauncherInstanceLock(path: lockPath)
+		XCTAssertEqual(first.acquire(), .acquired)
+		var asked = 0
+		let tookOver = expectation(description: "the second launcher holds the lock")
+		let second = LauncherInstanceLock(path: lockPath)
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { XCTFail("unexpected fatal: \($0)") },
+			applicationTerminator: { _ in XCTFail("a restart does not hand over to the old launcher") },
+			loggerWorkerFactory: { nil },
+			instanceLock: second,
+			runningApplicationsReader: { _ in [] },
+			hammerspoonConfigSeeder: { _ in },
+			launcherQuitRequester: {
+				asked += 1
+				// The running launcher's controlled exit ends with its lock released.
+				DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { first.release() }
+				return 1
+			}
+		)
+		delegate.acquireSoleLauncherOwnership(attempt: 0) { tookOver.fulfill() }
+		wait(for: [tookOver], timeout: 10)
+		XCTAssertEqual(asked, 1, "the running launcher is asked to quit once")
+		XCTAssertTrue(second.isHeld)
 		second.release()
 	}
 

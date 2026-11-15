@@ -15,31 +15,31 @@ local PICKER_OWNERS = {
 	"hs.fs",
 	"hs.json",
 	"ui.metrics_apps",
-	"ui.ui_builder",
-	"infra.logger",
-	"infra.dialog_util",
-	"adapters.file_system",
+	"core.ui.ui.builder",
+	"core.logger.engine.logger",
+	"core.ui.engine.dialog_util",
+	"core.fs.adapters.file_system",
 	"infra.config_paths",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 	"modules.keystats.log_manager",
-	"adapters.webview_result",
-	"adapters.running_application",
-	"adapters.own_window",
-	"native_path",
-	"infra.text_utils",
-	"text_utils",
-	"compat.utf8",
-	"infra.toml.codec",
-	"toml_codec",
-	"toml_codec.codec",
-	"toml_codec.record_scanner",
-	"toml_codec.key_path",
-	"toml_codec.bom",
-	"toml_codec.basic_string",
-	"app_dirs",
-	"infra.log_folders",
-	"diagnostics.operation_reporter",
-	"infra.fs_dir",
+	"core.ui.adapters.webview_result",
+	"platform.focus.running_application",
+	"core.ui.adapters.own_window",
+	"core.fs.engine.native_path",
+	"core.text.engine.utils",
+	"core.text.engine.utils_core",
+	"core.lifecycle.engine.compat.utf8",
+	"core.text.engine.toml.codec",
+	"core.text.engine.toml_codec",
+	"core.text.engine.toml_codec.codec",
+	"core.text.engine.toml_codec.record_scanner",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.basic_string",
+	"core.fs.engine.app_dirs",
+	"core.logger.engine.log_folders",
+	"diagnostics.engine.operation_reporter",
+	"core.fs.engine.dir",
 }
 
 --- Scopes only this leaf's dashboard transitive imports; the shared fixture stays unchanged.
@@ -58,11 +58,11 @@ helpers.describe("metrics_apps: discovery outcome", function()
 					local pending, logs = {}, {}
 					local complete
 					package.loaded["infra.app_picker"] = { discover_apps = function(callback) complete = callback end }
-					local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
-					package.loaded["infra.logger"].debug = function(_, message, ...)
+					local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
+					package.loaded["core.logger.engine.logger"].debug = function(_, message, ...)
 						logs[#logs + 1] = string.format(message, ...)
 					end
-					package.loaded["adapters.timer_scheduler"].after = function(_, callback)
+					package.loaded["core.events.timer_scheduler"].after = function(_, callback)
 						local handle = { timer = {} }
 						pending[#pending + 1] = function() handle.timer = nil; callback() end
 						return handle, true

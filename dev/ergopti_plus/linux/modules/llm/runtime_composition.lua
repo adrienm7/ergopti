@@ -7,7 +7,7 @@
 --- owners without publishing configuration.
 --- ==============================================================================
 
-local Repair=require('llm.runtime_repair')
+local Repair=require('ai.engine.local_servers.runtime_repair')
 local M={}
 local function empty(reason, done)
 	local op={started=false,result={ok=false,error=reason}}
@@ -25,7 +25,7 @@ end
 --- serve_environment (rows of the shared managed_ollama_environment.json),
 --- optional network ({policy,lookup,timeout_ms,origins,relay}: the shared proxy policy,
 --- the owned system proxy lookup, its bound, the route_origins.json "ollama"
---- inventory and the sign-in relay binding (infra/proxy_auth_relay.lua: policy,
+--- inventory and the sign-in relay binding (core/network/engine/proxy_auth_relay.lua: policy,
 --- probe, timeout_ms, executable, timings), see managed_ollama_proxy.lua).
 --- `source` owns captured enable/app source proofs and existing writer ACK.
 function M.new(deps)

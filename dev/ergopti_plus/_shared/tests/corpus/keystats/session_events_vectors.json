@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the events_session rows: a typing session's start and end and the idle spans inside it. Replayed through the shared Lua state machine (_shared/lua/keystats/session_events.lua) the Linux driver runs.",
+	"description": "Golden vectors for the events_session rows: a typing session's start and end and the idle spans inside it. Replayed through the shared Lua state machine (_shared/metrics/engine/system/session_events.lua) the Linux driver runs.",
 	"rule": "A keystroke starts a session; a key or pointer input keeps it alive and ends an idle span, with duration_ms from the span's start (last input + micro_idle_ms) to the input. A tick after more than micro_idle_ms of silence starts an idle span once; after more than session_timeout_ms of silence the session ends, duration_ms from its first to its last input. Pointer input alone starts no session. stop closes an open session.",
 	"timings": { "micro_idle_ms": 30000, "session_timeout_ms": 300000 },
 	"differences": {

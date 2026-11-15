@@ -5,11 +5,11 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
-local Transaction = require("config_scope_transaction")
-local FencedTransaction = require("config_scope_fenced_transaction")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local KEY = require("config_keys").KEY
+local Transaction = require("settings.engine.scope.transaction")
+local FencedTransaction = require("settings.engine.scope.fenced_transaction")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local KEY = require("settings.engine.keys").KEY
 local LOG = "infra.metrics_scope"
 local _owner, _sequence = nil, 0
 require("infra.scope_registry").register("metrics_scope", function() return _owner ~= nil and _owner.pending() == true end)
@@ -43,7 +43,7 @@ function M.new(options)
 	end
 	local transaction = Transaction.new({
 		path = options.path, backup_path = options.backup_path,
-		files = options.files or require("adapters.file_system"), manifest = Manifest,
+		files = options.files or require("core.fs.adapters.file_system"), manifest = Manifest,
 		capture = capture,
 		apply = function(config, updates)
 			local touched = {}
@@ -79,13 +79,13 @@ function M.new(options)
 end
 
 --- Executes a menu request, retaining any failed inverse for the next retry.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
 --- @param mode string Recommended or clear.
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
+function M.apply(mode)
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid metrics scope mode" end
-	if type(is_paused) ~= "function" or is_paused() then return false, "metrics configuration is paused" end
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "metrics rollback is pending" end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
@@ -100,11 +100,10 @@ function M.apply(mode, is_paused)
 end
 
 --- The metrics participant of a composed scope, bound to the retained owner.
---- @param is_paused function Live pause getter.
 --- @return table participant See config_scope_composition.
-function M.participant(is_paused)
-	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+function M.participant()
+	return require("settings.engine.scope.participant").synchronous({
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end

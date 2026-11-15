@@ -16,7 +16,7 @@
 --- DEPENDENCIES:
 --- - lib.logger (project-wide logger).
 --- - hs.json, hs.sqlite3, hs.fs.
---- - Canonical SQLite schema: static/ergopti_plus/_shared/data/db/schema.sql.
+--- - Canonical SQLite schema: static/ergopti_plus/_shared/metrics/data/db/schema.sql.
 --- ==============================================================================
 
 local M = {}
@@ -30,16 +30,20 @@ local fs      = require("hs.fs")
 local json    = require("hs.json")
 local sqlite3 = require("hs.sqlite3")
 
-local Logger = require("infra.logger")
-local Paths  = require("infra.paths")
-local Queries = require("keystats.queries")
+local Logger = require("core.logger.engine.logger")
+local Paths  = require("core.fs.engine.paths")
+local Queries = require("metrics.engine.queries")
+local LocalTime = require("metrics.engine.local_time")
+local WindowTopology = require("metrics.engine.system.window_topology")
+local CapturePresence = require("metrics.engine.capture_presence")
+local NetworkTransitions = require("metrics.engine.system.network_transitions")
 -- At-rest encryption of the typed-text columns. Hard require: the setting must
 -- never silently degrade into "stored in clear".
 local TextCipher = require("modules.keystats.text_cipher")
 -- Statement shapes for the at-rest migration (section 8). Shared with Linux so
 -- the two drivers cannot drift on which columns a conversion may rewrite.
-local Migration  = require("keystats.text_migration")
-local MediaStore = require("keystats.media_store")
+local Migration  = require("metrics.engine.privacy.text_migration_core")
+local MediaStore = require("metrics.engine.media.store")
 local LOG    = "keystats.sqlite_writer"
 
 
@@ -143,7 +147,7 @@ local _now_ts = require("modules.keystats.timestamp").now_ts
 
 --- Resolve the canonical schema.sql path through the single shared-tree
 --- resolver (Paths.shared) so the shared root lives in exactly one place.
-local _SCHEMA_SQL_PATH = Paths.shared("data/db/schema.sql")
+local _SCHEMA_SQL_PATH = Paths.shared("metrics/data/db/schema.sql")
 
 --- Read and retire one schema stream before admitting its SQL.
 --- @param path string Canonical schema path.
@@ -270,7 +274,7 @@ local function _initialize_db(db, existed)
 		Logger.success(LOG, "Schema applied (version 1).")
 	end
 
-	local media_schema = _read_schema_file(Paths.shared("data/db/media_schema.sql"), "semantic media schema")
+	local media_schema = _read_schema_file(Paths.shared("metrics/data/db/media_schema.sql"), "semantic media schema")
 	if media_schema == nil then
 		return false
 	end
@@ -286,9 +290,23 @@ local function _initialize_db(db, existed)
 		return false
 	end
 
+	-- A cache built before the UTC offset column (maintainer decision KMD-1 of
+	-- 2026-11-11) gains it on every raw table, and its purge triggers written
+	-- before it are retired, in one transaction; the purge schema below then
+	-- creates the current ones.
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
+	local missing = {}
+	for row in db:nrows(UtcOffsetColumn.missing_query()) do missing[#missing + 1] = row.name end
+	local offset_statements = UtcOffsetColumn.statements(missing)
+	if #offset_statements > 0 then
+		_exec_startup_sql(db, "BEGIN IMMEDIATE;\n" .. table.concat(offset_statements, "\n") .. "\nCOMMIT;",
+			"UTC offset column")
+		Logger.info(LOG, "db.sqlite gained the UTC offset column on %d raw table(s); older rows keep none.", #missing)
+	end
+
 	-- The purge tombstone triggers run on every open, so a cache built before
 	-- them still applies a tombstone, from this writer or a replayed ledger.
-	local purge_schema = _read_schema_file(Paths.shared("data/db/purge_schema.sql"), "metrics purge schema")
+	local purge_schema = _read_schema_file(Paths.shared("metrics/data/db/purge_schema.sql"), "metrics purge schema")
 	if purge_schema == nil then
 		return false
 	end
@@ -336,7 +354,7 @@ local function _initialize_db(db, existed)
 	end
 
 	-- Ensure meta keys exist (INSERT OR IGNORE is idempotent on replay). This set MUST
-	-- stay in lockstep with the meta seeds in _shared/data/db/schema.sql: the schema
+	-- stay in lockstep with the meta seeds in _shared/metrics/data/db/schema.sql: the schema
 	-- block runs only on a fresh DB, so any key missing here is never back-filled into
 	-- an existing/older DB, and writes to it become silent no-op UPDATEs. 'rev' was the
 	-- omitted key — its UPDATE froze the UI cache-invalidation counter at 0 (F-L2).
@@ -557,6 +575,24 @@ local function _opt_text(value)
 	return tostring(value)
 end
 
+--- A row's instant in UTC and the offset in force when it was recorded
+--- (maintainer decision KMD-1 of 11 November 2026): today.log stamps local
+--- time, the stored row carries `ts` in UTC and `utc_offset_min`, while `date`
+--- stays the local day the timestamp names. The conversion uses this Mac's
+--- zone rules for that instant (keystats.local_time.from_local).
+--- @param e table The decoded JSONL entry, its timestamp admitted by build_inserts.
+--- @return string ts
+local function _utc_ts(e)
+	return (LocalTime.from_local(e.timestamp))
+end
+
+--- @param e table The decoded JSONL entry.
+--- @return integer offset Minutes east of UTC.
+local function _utc_offset(e)
+	local _, offset = LocalTime.from_local(e.timestamp)
+	return offset
+end
+
 function _builders.typing(e, id)
 	-- `text` and `events_json` are the only columns holding what the user
 	-- literally typed, so they are the only ones encrypted. The aggregates the
@@ -573,9 +609,14 @@ function _builders.typing(e, id)
 		return nil
 	end
 
+	-- The formatted copy has no reader that decrypts it, so an encrypted
+	-- database stores nothing there, as Windows and Linux always do.
+	local rich_text = nil
+	if not TextCipher.is_enabled() then rich_text = _opt_text(e.rich_text) end
+
 	return Queries.render("events.typing", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), title = _opt_text(e.title), url = _opt_text(e.url),
 		field_role = _opt_text(e.field_role), layout = _opt_text(e.layout),
 		document_path = _opt_text(e.document_path),
@@ -587,14 +628,14 @@ function _builders.typing(e, id)
 		mouse_distance_px = tonumber(e.mouse_distance_px) or 0,
 		pause_before_ms = tonumber(e.pause_before_ms),
 		battery_level = tonumber(e.battery_level), audio_volume = tonumber(e.audio_volume),
-		wpm = tonumber(e.wpm), text = enc_text, rich_text = _opt_text(e.rich_text), events_json = enc_json,
+		wpm = tonumber(e.wpm), text = enc_text, rich_text = rich_text, events_json = enc_json,
 	})
 end
 
 function _builders.app_switch(e, id)
 	return Queries.render("events.app_switch", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		prev_app = _opt_text(e.prev_app), next_app = _opt_text(e.next_app),
 		duration_ms = tonumber(e.duration_ms) or 0,
 	})
@@ -603,7 +644,7 @@ end
 function _builders.window_switch(e, id)
 	return Queries.render("events.window_switch", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- events_window_switch.app is TEXT NOT NULL; a nil would make INSERT OR
 		-- IGNORE drop the whole row. Same "Unknown" fallback the typing builder uses.
 		app = tostring(e.app or "Unknown"),
@@ -615,7 +656,7 @@ end
 function _builders.shortcut(e, id)
 	return Queries.render("events.shortcut", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- Both columns are TEXT NOT NULL. Losing the key name degrades one field;
 		-- emitting NULL loses the entire shortcut event to INSERT OR IGNORE.
 		app = tostring(e.app or "Unknown"), key = tostring(e.key or ""),
@@ -638,7 +679,7 @@ function _builders.system(e, id, action_override)
 	end
 	return Queries.render("events.system", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		-- The override covers the types that carry no `action` of their own, but a
 		-- bare "system_event" entry still relies on e.action being present — and the
 		-- column is NOT NULL, the exact swallow this function's docstring warns
@@ -659,16 +700,53 @@ function _builders.roi(e, id)
 	end
 	return Queries.render("events.roi", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = e.type, app = tostring(e.app or "Unknown"),
 		meta_json = _required_event_json(meta, "trigger ROI event"),
+	})
+end
+
+--- Persists clipboard copy, paste and burst rows in the Windows metadata shape,
+--- through the statement keystats.clipboard_events shares with Linux.
+--- @param e table Admitted clipboard event.
+--- @param id number Allocated event identity.
+--- @return string
+function _builders.clipboard(e, id)
+	local meta = {}
+	for key, value in pairs(e) do
+		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
+	end
+	return require("metrics.engine.capture.clipboard_events").insert_sql({
+		device_id = tostring(_device_id), id = id,
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
+		kind = e.type, app = tostring(e.app or "Unknown"),
+		meta_json = _required_event_json(meta, "clipboard event"),
+	})
+end
+
+--- Persists a window-topology, capture-presence or connectivity entry as the Windows
+--- generic (kind, app, meta_json) row of its table.
+--- @param statement string "events.window_topo", "events.av" or "events.network".
+--- @param e table Admitted entry.
+--- @param id number Allocated event identity.
+--- @return string
+function _builders.kind_meta(statement, e, id)
+	local meta = {}
+	for key, value in pairs(e) do
+		if key ~= "type" and key ~= "timestamp" and key ~= "app" then meta[key] = value end
+	end
+	return Queries.render(statement, "native", {
+		device_id = tostring(_device_id), id = id,
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
+		kind = e.type, app = tostring(e.app or "Unknown"),
+		meta_json = _required_event_json(meta, statement .. " event"),
 	})
 end
 
 function _builders.hotstring(e, id, kind)
 	return Queries.render("events.hotstring", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		trigger = tostring(e.trigger or ""), replacement = tostring(e.replacement or ""),
 		h_type = _opt_text(e.h_type), net_saved_chars = tonumber(e.net_saved_chars),
@@ -678,7 +756,7 @@ end
 function _builders.llm(e, id, kind)
 	local values = {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		app = tostring(e.app or "Unknown"), kind = tostring(kind),
 		context = _opt_text(e.context), prediction = _opt_text(e.prediction),
 		predictions_json = e.predictions ~= nil and _required_event_json(e.predictions, "LLM predictions") or nil,
@@ -696,7 +774,7 @@ end
 function _builders.session(e, id, kind)
 	return Queries.render("events.session", "native", {
 		device_id = tostring(_device_id), id = id,
-		ts = tostring(e.timestamp), date = e.timestamp:sub(1, 10),
+		ts = _utc_ts(e), date = e.timestamp:sub(1, 10), utc_offset_min = _utc_offset(e),
 		kind = tostring(kind), duration_ms = tonumber(e.duration_ms),
 	})
 end
@@ -715,7 +793,10 @@ function M.build_inserts(entry)
 	-- the throw escapes ingest_once and the offset never advances past the poison
 	-- line. Coerce to the current wall-clock time so the entry is stored rather
 	-- than causing a permanent stall.
-	if type(entry.timestamp) ~= "string" then
+	-- A string that names no instant would raise the same way in the UTC
+	-- conversion (keystats.local_time), so it is coerced too.
+	if type(entry.timestamp) ~= "string"
+		or not entry.timestamp:match("^%d%d%d%d%-%d%d%-%d%d[ T]%d%d:%d%d:%d%d") then
 		entry.timestamp = _now_ts()
 	end
 	local t = entry.type
@@ -735,6 +816,14 @@ function M.build_inserts(entry)
 		return { _builders.system(entry, _alloc_event_id()) }
 	elseif t == "roi_snapshot" or t == "new_trigger_candidate" or t == "trigger_halflife" then
 		return { _builders.roi(entry, _alloc_event_id()) }
+	elseif t == "clipboard_copy" or t == "clipboard_paste" or t == "paste_burst" then
+		return { _builders.clipboard(entry, _alloc_event_id()) }
+	elseif WindowTopology.KINDS[t] then
+		return { _builders.kind_meta("events.window_topo", entry, _alloc_event_id()) }
+	elseif CapturePresence.KINDS[t] then
+		return { _builders.kind_meta("events.av", entry, _alloc_event_id()) }
+	elseif NetworkTransitions.KINDS[t] then
+		return { _builders.kind_meta("events.network", entry, _alloc_event_id()) }
 	elseif t == "hotstring" then
 		return { _builders.hotstring(entry, _alloc_event_id(), "fired") }
 	elseif t == "hotstring_suggested" then
@@ -891,6 +980,19 @@ function M.apply_typing_updates(device_id, updates)
 	if _db:exec("COMMIT;") ~= sqlite3.OK then
 		Logger.error(LOG, "Cannot commit the migration batch: %s.", tostring(_db:errmsg()))
 		pcall(function() _db:exec("ROLLBACK;") end)
+		return false
+	end
+	return true
+end
+
+--- Empties the formatted copy of the typed text for one device, the first
+--- step of an encrypt pass (text_migration_core.clear_rich_text_sql).
+--- @param device_id string
+--- @return boolean True on success.
+function M.clear_rich_text(device_id)
+	if not _db then return false end
+	if _db:exec(Migration.clear_rich_text_sql(device_id)) ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot clear the formatted typed text: %s.", tostring(_db:errmsg()))
 		return false
 	end
 	return true

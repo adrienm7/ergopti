@@ -17,10 +17,10 @@ local M = {}
 function M.install(translator)
 	assert(type(translator) == "table" and type(translator.get) == "function"
 		and type(translator.section) == "function", "positive caption fixture needs its actual translator")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
 	local bytes = assert(file:read("*a"))
 	assert(file:close())
-	local source = assert(require("adapters.json_codec").decode(bytes))
+	local source = assert(require("core.fs.adapters.json_codec").decode(bytes))
 	assert(source["_meta.locale"] == "en", "actual English catalogue unavailable")
 	local caption = source["menu.hotstrings.title"]
 	assert(type(caption) == "string" and caption ~= "" and caption ~= "menu.hotstrings.title",
@@ -30,7 +30,7 @@ function M.install(translator)
 		if key == "menu.hotstrings.title" then return caption end
 		return previous_get(key, ...)
 	end
-	assert(package.loaded["infra.i18n"] == translator, "caption fixture translator was not published")
+	assert(package.loaded["core.i18n.engine.i18n"] == translator, "caption fixture translator was not published")
 	package.loaded["infra.manifest_menu"] = nil
 	return require("infra.manifest_menu")
 end

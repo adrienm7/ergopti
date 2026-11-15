@@ -19,7 +19,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).absolute().parents[2]
-NETWORK = ROOT / "platform/network"
+NETWORK = ROOT / "core/network/adapters"
 
 
 def load(name, path):
@@ -30,7 +30,9 @@ def load(name, path):
 
 
 NATIVE = load("receiving_native", NETWORK / "native_http.py")
-POLICY = load("receiving_policy", ROOT.parent / "_shared/python/network_proxy_policy.py")
+POLICY = load(
+    "receiving_policy", ROOT.parent / "_shared/core/network/adapters/python_network_proxy_policy.py"
+)
 
 
 HELPER = r"""

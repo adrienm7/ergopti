@@ -10,17 +10,17 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Paths = require("infra.paths")
-local Json = require("json")
+local Logger = require("core.logger.engine.shim")
+local Paths = require("core.fs.engine.paths")
+local Json = require("core.text.engine.json")
 
 local LOG = "modules.llm.model_profile"
 local _catalogue = nil
 local _policy = nil
 
 local function read_shared(name)
-	local path = Paths.shared("modules/llm/" .. name)
-	local acquired, handle = pcall(require("infra.regular_file_reader").open_source, path)
+	local path = Paths.shared("ai/data/" .. name)
+	local acquired, handle = pcall(require("core.fs.engine.regular_file_reader").open_source, path)
 	if not acquired or not handle then return nil end
 	local read, body = pcall(handle.read, handle, "*a")
 	local closed, acknowledged = pcall(handle.close, handle)

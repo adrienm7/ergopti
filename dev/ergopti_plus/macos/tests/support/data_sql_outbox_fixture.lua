@@ -11,16 +11,16 @@ local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 
 local MODULE_KEYS = {
-	"adapters.file_system",
-	"infra.timings",
-	"keystats.metrics",
+	"core.fs.adapters.file_system",
+	"core.timing.engine.timings",
+	"metrics.engine.metrics",
 	"modules.keystats.aggregator",
 	"modules.keystats.export",
-	"adapters.ledger_append", "modules.keystats.log_manager",
+	"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 	"modules.keystats.rotation",
 	"modules.keystats.sqlite_writer",
-	"infra.logger",
-	"adapters.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.events.timer_scheduler",
 	"modules.keystats.timestamp",
 }
 
@@ -30,7 +30,7 @@ local MODULE_KEYS = {
 local function run_refused_transaction(failure)
 	return helpers.with_stub_scope(MODULE_KEYS, function()
 		local sqlite = helpers.load_with_stubs("hs").sqlite3
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local observations = {
 			builds = 0,
 			commits = 0,
@@ -64,16 +64,16 @@ local function run_refused_transaction(failure)
 			end,
 		}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function() return true, "created" end,
 			read = function() return nil end,
 			write = function() return true end,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 5000 end,
 			sec = function() return 1 end,
 		}
-		package.loaded["keystats.metrics"] = {}
+		package.loaded["metrics.engine.metrics"] = {}
 		package.loaded["modules.keystats.aggregator"] = {
 			flush = function() return true end,
 			get_ngram_ctx = function() return {} end,

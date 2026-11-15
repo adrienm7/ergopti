@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Contract = require("test.llm_request_plan_contract")
+local Contract = require("tests.lua.ai.request_plan_contract")
 
 Contract.run_debounce(helpers, helpers.shared("tests/corpus/llm/request_plan_debounce_vectors.json"), "macos")
 Contract.run_batching(helpers, helpers.shared("tests/corpus/llm/request_plan_batching_vectors.json"))
@@ -17,8 +17,8 @@ Contract.run_info_bar(helpers, helpers.shared("tests/corpus/llm/request_plan_inf
 Contract.run_live(helpers, helpers.shared("tests/corpus/llm/request_plan_live_vectors.json"))
 Contract.run_agent(helpers, helpers.shared("tests/corpus/llm/request_plan_agent_vectors.json"))
 Contract.run_ports(helpers, {
-	HttpClient = require("adapters.http_client"),
-	TimerScheduler = require("adapters.timer_scheduler"),
+	HttpClient = require("core.network.adapters.http_client"),
+	TimerScheduler = require("core.events.timer_scheduler"),
 	TooltipRenderer = require("adapters.prediction_tooltip_port").wrap({
 		show_predictions = function() return true end,
 		hide = function() return true end,

@@ -109,13 +109,14 @@ helpers.describe("gestures.engine — 3-finger upgrade blocked on vertical scrol
 		-- Build a minimal stub state with swipe_3_up/down configured (the default).
 		-- We call M.process_frame() directly so no OS interaction is needed.
 		package.loaded["modules.gestures.engine"] = nil
-		package.loaded["infra.logger"]  = nil
-		package.loaded["infra.timings"] = nil
+		package.loaded["core.logger.engine.logger"]  = nil
+		package.loaded["core.timing.engine.timings"] = nil
 
-		local _ = helpers.load_with_stubs("infra.logger")
+		local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 		-- Stub timings to return fixed values
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
+			count = require("tests.support.registry_count"),
 			sec = function(_, key)
 				if key == "tap_max_ms"              then return 0.5
 				elseif key == "live_rearm_ms"       then return 0.1

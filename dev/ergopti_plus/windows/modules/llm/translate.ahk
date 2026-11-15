@@ -3,18 +3,18 @@
 ; ==============================================================================
 ; MODULE: Selection Translation (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/translate.lua: the pure logic behind the
+; AutoHotkey port of _shared/ai/engine/prediction/translate.lua: the pure logic behind the
 ; llm_translate_selection action, which translates the selected text with the
 ; AI menu's current text backend and offers it in the prediction tooltip.
 ;
 ; FEATURES & RATIONALE:
 ; 1. The binding names the target language: "ui" (the interface language,
 ;    followed when the user changes it) or a locale code of
-;    _shared/data/locale_names.json. Only shipped locales are accepted, so the
+;    _shared/core/i18n/data/locale_names.json. Only shipped locales are accepted, so the
 ;    picker and the native prompt offer a closed list and a typo is refused.
 ; 2. The prompt names the language by its native name ("Deutsch", "日本語"),
 ;    which models understand, so no second table of names is kept.
-; 3. Prompt, tag and token budget live in _shared/modules/llm/translate.json,
+; 3. Prompt, tag and token budget live in _shared/ai/data/translate.json,
 ;    read once and validated whole, like vision.json.
 ; 4. The answer is read like the screen answers: the text after the tag, over
 ;    any number of lines, preserving formatting in the translated text.
@@ -197,7 +197,7 @@ LLM_Translate_Config() {
 	static Config := ""
 	if (Config is Map)
 		return Config
-	Path := _SharedDir . "\modules\llm\translate.json"
+	Path := _SharedDir . "\ai\data\translate.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	_LLM_Translate_ValidateConfig(Candidate, Path)
 	Config := Candidate
@@ -213,7 +213,7 @@ LLM_Translate_LocaleNames() {
 	static Names := ""
 	if (Names is Map)
 		return Names
-	Path := _SharedDir . "\data\locale_names.json"
+	Path := _SharedDir . "\core\i18n\data\locale_names.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	Locales := (Candidate is Map) ? Candidate.Get("locales", "") : ""
 	if !(Locales is Map) || Locales.Count == 0
@@ -236,7 +236,7 @@ LLM_Translate_LocaleOrder() {
 	static Order := ""
 	if (Order is Map)
 		return Order
-	Path := _SharedDir . "\data\locale_order.json"
+	Path := _SharedDir . "\core\i18n\data\locale_order.json"
 	Candidate := JsonParse(FSReadStrict(Path))
 	Codes := (Candidate is Map) ? Candidate.Get("order", "") : ""
 	if !(Codes is Array) || Codes.Length == 0

@@ -11,7 +11,7 @@
 ; FEATURES & RATIONALE:
 ; 1. KLW_BuildBatchSql renders literal row fields. A statement the
 ;    three drivers share is rendered from the catalogue
-;    (_shared/data/db/queries.sql) by name; the Windows-only tables stay spelled here.
+;    (_shared/metrics/data/db/queries.sql) by name; the Windows-only tables stay spelled here.
 ; 2. KLW_BuildBatchSql: drains KLW.batch into one SQL string (all tables in one
 ;    pass) and returns it to the caller so it can be appended to data.sql in
 ;    the same write as the raw event INSERTs — a single fsync.

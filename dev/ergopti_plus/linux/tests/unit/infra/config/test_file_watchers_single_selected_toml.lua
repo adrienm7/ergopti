@@ -1,7 +1,7 @@
 --- tests/unit/infra/config/test_file_watchers_single_selected_toml.lua
 
 ---
---- Unit tests for infra/file_watchers.lua. Exercises the public API —
+--- Unit tests for core/fs/engine/file_watchers.lua. Exercises the public API —
 --- has_inotify(), start/stop lifecycle, debounce deadline logic, and
 --- pump-mode mtime polling — by creating a real temporary directory
 --- with .toml files and driving changes through M.pump().
@@ -39,7 +39,7 @@ helpers.describe("file watchers single selected TOML", function()
 		options = options or {}
 		local root = assert(native_luv.fs_mkdtemp("/var/tmp/eg-single-XXXXXX"))
 		local files, records, directories = {}, {}, { root }
-		local previous_watch = package.loaded["infra.file_watchers"]
+		local previous_watch = package.loaded["core.fs.engine.file_watchers"]
 		local state = { root = root, path = root .. "/selected.toml", now = 0, reloads = 0 }
 		local backend = {}
 		for key, value in pairs(native_luv) do backend[key] = value end
@@ -93,9 +93,9 @@ helpers.describe("file watchers single selected TOML", function()
 		local watcher
 		function state.start(reuse_owner)
 			if not reuse_owner then
-				watcher = helpers.load_module_with_dependency("infra.file_watchers", "luv", backend_name == "native" and backend or false)
+				watcher = helpers.load_module_with_dependency("core.fs.engine.file_watchers", "luv", backend_name == "native" and backend or false)
 			end
-			local logger, held_debug = require("logger.shim"), nil
+			local logger, held_debug = require("core.logger.engine.shim"), nil
 			held_debug = logger.debug
 			state.staging_reasons = state.staging_reasons or {}
 			logger.debug = function(tag, format, ...)
@@ -181,7 +181,7 @@ helpers.describe("file watchers single selected TOML", function()
 			end
 		end
 		native_luv.run("nowait")
-		package.loaded["infra.file_watchers"] = previous_watch
+		package.loaded["core.fs.engine.file_watchers"] = previous_watch
 		for path in pairs(files) do local removed, detail = native_luv.fs_unlink(path); if not removed then cleanup[#cleanup + 1] = tostring(detail) end end
 		for index = #directories, 1, -1 do
 			local removed, detail = native_luv.fs_rmdir(directories[index]); if not removed then cleanup[#cleanup + 1] = tostring(detail) end
@@ -395,7 +395,7 @@ helpers.describe("file watchers single selected TOML", function()
 	helpers.it("(linux-watch-selected-topology) a selected path that is not a regular file is refused in the log", function()
 		local device_mode = assert(native_luv.fs_stat("/dev/null")).mode
 		selected_file_session("native", function(s)
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local held, refusals = logger.warn, {}
 			logger.warn = function(tag, format, ...)
 				if type(format) == "string" and format:find("not a regular file", 1, true) then refusals[#refusals + 1] = format end
@@ -413,7 +413,7 @@ helpers.describe("file watchers single selected TOML", function()
 
 	helpers.it("(linux-watch-selected-file) native ENOENT is reported as absence", function()
 		selected_file_session("native", function(s)
-			local logger = require("logger.shim")
+			local logger = require("core.logger.engine.shim")
 			local original, absent = logger.info, 0
 			logger.info = function(tag, format, ...)
 				if type(format) == "string" and format:find("is absent", 1, true) then absent = absent + 1 end
@@ -429,7 +429,7 @@ helpers.describe("file watchers single selected TOML", function()
 	if native_luv.getuid() ~= 0 then
 		helpers.it("(linux-watch-selected-file) denied metadata is not reported as absence", function()
 			selected_file_session("native", function(s)
-				local logger = require("logger.shim")
+				local logger = require("core.logger.engine.shim")
 				local old_info, old_warn = logger.info, logger.warn
 				local absent, unreadable = 0, 0
 				logger.info = function(tag, format, ...)

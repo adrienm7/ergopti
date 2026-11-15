@@ -57,7 +57,7 @@ local function install_collaborators(effects)
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
-			or name:match("^adapters%.")
+			or helpers.is_driver_module(name)
 		) then
 			package.loaded[name] = nil
 		end
@@ -90,7 +90,7 @@ local function install_collaborators(effects)
 		end,
 		set_buffer = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -114,7 +114,7 @@ local function install_collaborators(effects)
 		end,
 	}
 	package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 end
 
 --- Finds the real key-down tap installed by modules.keymap.

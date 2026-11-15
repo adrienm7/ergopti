@@ -51,9 +51,10 @@ local function module_source(module_name)
 	return module_name:gsub("%.", "/") .. ".lua"
 end
 
---- Lists every UI Lua source recursively.
+--- Lists every production Lua file of the driver, driver-relative (tests/
+--- excluded): the inventory the UI sources are selected from.
 --- @return table paths
-local function ui_sources()
+local function lua_inventory()
 	local ok_lfs, lfs = pcall(require, "lfs")
 	local paths = {}
 	if ok_lfs then
@@ -63,30 +64,40 @@ local function ui_sources()
 					local path = relative .. entry
 					local attr = lfs.attributes(DRIVER_ROOT .. path)
 					if attr and attr.mode == "directory" then
-						walk(path .. "/")
+						if path ~= "tests" then walk(path .. "/") end
 					elseif entry:match("%.lua$") then
 						paths[#paths + 1] = path
 					end
 				end
 			end
 		end
-		walk("ui/")
+		walk("")
 	else
 		local separator = package.config:sub(1, 1)
-		local ui_root = DRIVER_ROOT .. "ui/"
 		local command = separator == "\\"
-			and ('cmd /c dir /b /s /a-d "' .. ui_root:gsub("/", "\\") .. '*.lua"')
-			or ("find '" .. ui_root .. "' -type f -name '*.lua'")
+			and ('cmd /c dir /b /s /a-d "' .. DRIVER_ROOT:gsub("/", "\\") .. '*.lua"')
+			or ("find '" .. DRIVER_ROOT .. "' -type f -name '*.lua'")
 		local source_count = #paths
 		local inventory = CommandLines.read(command)
 		assert(#inventory > 0, "source inventory must not be empty")
 		for _, line in ipairs(inventory) do
 			local normalized = line:gsub("\\", "/"):gsub("%s+$", "")
-			paths[#paths + 1] = normalized:gsub("^.*/macos/", "")
+			local relative = normalized:gsub("^.*/macos/", "")
+			if not relative:match("^tests/") then paths[#paths + 1] = relative end
 		end
 		assert(#paths > source_count, "source inventory contains no matching files")
 	end
 	table.sort(paths)
+	return paths
+end
+
+--- Lists every UI Lua source, wherever its feature keeps it.
+--- @return table paths
+local function ui_sources()
+	local paths = {}
+	for _, path in ipairs(lua_inventory()) do
+		if helpers.is_ui_source(path) then paths[#paths + 1] = path end
+	end
 	return paths
 end
 
@@ -179,14 +190,14 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 				count = 1,
 				patterns = { "_debounce_timer%s*=%s*timer" },
 			},
-			[module_source("ui.tooltip.tooltip_hotstring")] = {
+			[module_source("core.ui.ui.tooltip.hotstring")] = {
 				count = 2,
 				patterns = {
 					"_idle_timer%s*=%s*timer_or_err",
 					"_dequeue_timer%s*=%s*timer_or_err",
 				},
 			},
-			[module_source("ui.tooltip.tooltip_llm")] = {
+			[module_source("core.ui.ui.tooltip.llm")] = {
 				count = 1,
 				patterns = { "_idle_timer%s*=%s*timer_or_err" },
 			},
@@ -202,13 +213,13 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 			if contract then
 				helpers.assert_eq(count, contract.count,
 					relative .. " raw timer inventory changed; migrate fire-and-forget sites "
-						.. "through infra.deferred_work")
+						.. "through core.timing.engine.deferred_work")
 				for _, pattern in ipairs(contract.patterns) do
 					helpers.assert_true(code:find(pattern) ~= nil,
 						relative .. " lost an exact strong owner for an allowed raw timer")
 				end
 			elseif count > 0 then
-				error(relative .. " contains an unowned raw UI timer; use infra.deferred_work", 0)
+				error(relative .. " contains an unowned raw UI timer; use core.timing.engine.deferred_work", 0)
 			end
 			raw_sites = raw_sites + count
 		end
@@ -252,8 +263,8 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 	helpers.it("retains a deferred personal-shortcuts launch until delivery", function()
 		helpers.with_fresh_modules({
-			"adapters.timer_scheduler",
-			"infra.deferred_work",
+			"core.events.timer_scheduler",
+			"core.timing.engine.deferred_work",
 			"infra.personal_shortcuts",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()
@@ -266,14 +277,14 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["adapters.file_system"] = {
+				["core.fs.adapters.file_system"] = {
 					read_with_status = function() return "source", "ok" end,
 				},
 				["infra.config_paths"] = {
 					get = function() return "/tmp/personal_shortcuts.lua" end,
 				},
-				["infra.logger"] = helpers.make_logger_stub(),
-				["infra.text_utils"] = {
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
+				["core.text.engine.utils"] = {
 					shell_quote = function(value) return value end,
 				},
 				}, function()
@@ -317,10 +328,10 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["adapters.shell_runner"] = {},
-				["infra.i18n"] = { get = function(key) return key end },
-				["infra.logger"] = helpers.make_logger_stub(),
-				["infra.text_utils"] = {
+				["core.process.adapters.shell_runner"] = {},
+				["core.i18n.engine.i18n"] = { get = function(key) return key end },
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
+				["core.text.engine.utils"] = {
 					escape_gsub_replacement = function(value) return value end,
 				},
 				}, function()
@@ -352,8 +363,8 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 	helpers.it("retains a clickable notification and releases it after activation", function()
 		helpers.with_fresh_modules({
-			"adapters.timer_scheduler",
-			"infra.notifications",
+			"core.events.timer_scheduler",
+			"core.ui.engine.notifications",
 		}, function()
 			local weak_timers, restore_timers = install_weak_timers()
 			local previous_notify = hs.notify
@@ -378,9 +389,9 @@ helpers.describe("native callback owners survive Hammerspoon GC", function()
 
 			with_cleanup(function()
 				with_package_stubs({
-				["infra.logger"] = helpers.make_logger_stub(),
+				["core.logger.engine.logger"] = helpers.make_logger_stub(),
 				}, function()
-				local Notifications = require("infra.notifications")
+				local Notifications = require("core.ui.engine.notifications")
 				local dispatched, detail = Notifications.notify("Click me")
 				helpers.assert_true(dispatched, tostring(detail))
 				collect_twice()

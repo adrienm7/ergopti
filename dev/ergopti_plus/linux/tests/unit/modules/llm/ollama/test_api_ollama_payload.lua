@@ -23,30 +23,38 @@
 
 local helpers = require("tests.helpers")
 
+-- The shared folder of the Ollama policy files, under the shared root.
+local POLICY = "/ai/data"
+
 for _, name in ipairs({ "defaults.json", "inference.json" }) do
 	helpers.it("Ollama payload refuses FIFO for " .. name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		require("modules.llm.prediction_engine") -- Load unrelated owners before redirecting this source root.
 		local root, previous_root, previous_api = assert(Paths.shared_root()), Paths.shared_root, package.loaded["modules.llm.api_ollama"]
 		local base = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-ollama-policy-XXXXXX"))
-		assert(uv.fs_mkdir(base .. "/modules", 448)); assert(uv.fs_mkdir(base .. "/modules/llm", 448))
+		local folders, at = {}, base
+		for part in POLICY:gmatch("[^/]+") do
+			at = at .. "/" .. part; assert(uv.fs_mkdir(at, 448)); folders[#folders + 1] = at
+		end
+		helpers.assert_true(#folders > 0, "the policy folders were made")
 		for _, file in ipairs({ "defaults.json", "inference.json" }) do
-			local path = base .. "/modules/llm/" .. file
+			local path = base .. POLICY .. "/" .. file
 			if file == name then
 				local made = os.execute("mkfifo '" .. path .. "'")
 				assert(made == true or made == 0)
-			else assert(uv.fs_symlink(root .. "/modules/llm/" .. file, path)) end
+			else assert(uv.fs_symlink(root .. POLICY .. "/" .. file, path)) end
 		end
-		local path = base .. "/modules/llm/" .. name
+		local path = base .. POLICY .. "/" .. name
 		local exited, code, process = false, nil, nil
 		process = assert(uv.spawn("sh", { args = { "-c", 'sleep 1; cat "$2" > "$1"', "fixture", path,
-			root .. "/modules/llm/" .. name } }, function(result) code, exited = result, true; process:close() end))
+			root .. POLICY .. "/" .. name } }, function(result) code, exited = result, true; process:close() end))
 		Paths.shared_root = function() return base end
 		package.loaded["modules.llm.api_ollama"] = nil
 		local ok, owner = pcall(require, "modules.llm.api_ollama")
 		Paths.shared_root, package.loaded["modules.llm.api_ollama"] = previous_root, previous_api
-		os.remove(base .. "/modules/llm/defaults.json"); os.remove(base .. "/modules/llm/inference.json")
-		os.remove(base .. "/modules/llm"); os.remove(base .. "/modules"); os.remove(base)
+		os.remove(base .. POLICY .. "/defaults.json"); os.remove(base .. POLICY .. "/inference.json")
+		for index = #folders, 1, -1 do os.remove(folders[index]) end
+		os.remove(base)
 		while not exited do uv.run("once") end
 		assert(ok, owner)
 		helpers.assert_true(code ~= 0, "the configuration reader opened the FIFO")
@@ -57,10 +65,10 @@ end
 --- @param opts table Request options.
 --- @return table The composed transport request.
 local function captured_request(opts)
-	local previous_client = package.loaded["adapters.http_client"]
+	local previous_client = package.loaded["core.network.adapters.http_client"]
 	local previous_api = package.loaded["modules.llm.api_ollama"]
 	local seen = nil
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		postStream = function(url, headers, body, options, _on_chunk, on_done)
 			seen = { url = url, headers = headers, body = body, options = options }
 			on_done({ ok = false, error = "fixture complete" })
@@ -76,7 +84,7 @@ local function captured_request(opts)
 			function() end, function() end)
 	end)
 
-	package.loaded["adapters.http_client"] = previous_client
+	package.loaded["core.network.adapters.http_client"] = previous_client
 	package.loaded["modules.llm.api_ollama"] = previous_api
 	helpers.assert_true(ok, "the request must compose: " .. tostring(err))
 	return seen
@@ -93,6 +101,14 @@ end
 
 helpers.describe("ollama payload: keep_alive", function()
 
+	helpers.it("(net-003-ollama-deadline) gives a local request the shared Ollama budget, not the remote one", function()
+		local request = captured_request({ stream = false })
+		local Timings = require("core.timing.engine.timings")
+		helpers.assert_eq(request.options.timeout_ms, Timings.ms("llm", "ollama_request_timeout_ms"),
+			"a cold CPU model load outlasts the remote API budget; Windows gives Ollama the same ceiling")
+		helpers.assert_true(request.options.timeout_ms > Timings.ms("llm", "request_timeout_ms"))
+	end)
+
 	helpers.it("tells Ollama how long to keep the model resident", function()
 		local request = captured_request({ stream = false })
 		helpers.assert_true(request.body:find("keep_alive", 1, true) ~= nil,
@@ -104,10 +120,10 @@ helpers.describe("ollama payload: keep_alive", function()
 
 	helpers.it("takes the duration from the shared defaults rather than a literal", function()
 		local request = captured_request({ stream = false })
-		local Paths = helpers.load_module("infra.paths")
+		local Paths = helpers.load_module("core.fs.engine.paths")
 		local root = Paths.shared_root()
 		helpers.assert_not_nil(root, "the shared tree must be findable")
-		local handle = assert(io.open(root .. "/modules/llm/defaults.json", "r"))
+		local handle = assert(io.open(root .. "/ai/data/defaults.json", "r"))
 		local defaults = handle:read("*a")
 		handle:close()
 		local expected = defaults:match('"llm_ollama_keep_alive"%s*:%s*"([^"]+)"')

@@ -28,7 +28,7 @@ return function(callback)
 		})
 		context.poll = function() return poll() end
 		-- Runs every pending paced-projection slice until the queue is idle
-		local job_gap = require("infra.paced_job").DEFAULT_GAP_SEC
+		local job_gap = require("core.timing.engine.paced_job").DEFAULT_GAP_SEC
 		context.settle_jobs = function()
 			local progressed = true
 			while progressed do
@@ -43,9 +43,9 @@ return function(callback)
 		end
 		package.loaded["modules.keystats.log_manager"].get_sqlite_path = function() return nil end
 		package.loaded["modules.keystats.sqlite_reader"] = {}
-		local filesystem = package.loaded["adapters.file_system"]
+		local filesystem = package.loaded["core.fs.adapters.file_system"]
 		filesystem.read_with_status = function() return nil, "absent" end
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		logger.error = function(_, template, ...) errors[#errors + 1] = string.format(template, ...) end
 		logger.success = function(tag, template, ...)
 			if tag == "metrics_typing" then successes[#successes + 1] = string.format(template, ...) end

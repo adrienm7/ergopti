@@ -27,10 +27,10 @@ APP_ID = "ergopti-wayland-focus-proof"
 TITLE = "Ergopti native Wayland focus"
 DRIVER = Path(__file__).resolve().parents[2]
 LUA_WORKER = r"""
-package.path = './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;' .. package.path
-local Json = require('json')
-local Window = require('adapters.window_info')
-local Lifecycle = require('adapters.process_lifecycle')
+package.path = './?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;' .. package.path
+local Json = require('core.text.engine.json')
+local Window = require('platform.focus.window_info')
+local Lifecycle = require('core.process.adapters.lifecycle')
 local transitions = 0
 Lifecycle.onFocusChange(function() transitions = transitions + 1 end)
 Lifecycle.start()
@@ -302,7 +302,10 @@ def qualify(tools):
                     "physical_input_claim": False,
                     "source_sha256": {
                         name: hashlib.sha256((DRIVER / name).read_bytes()).hexdigest()
-                        for name in ("adapters/window_info.lua", "adapters/process_lifecycle.lua")
+                        for name in (
+                            "platform/focus/window_info.lua",
+                            "core/process/adapters/lifecycle.lua",
+                        )
                     },
                     "observations": observations,
                 }

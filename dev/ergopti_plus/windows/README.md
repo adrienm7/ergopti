@@ -35,7 +35,7 @@ includes.
 the clone root, or `npm run dev:windows`) asks a running ErgoptiPlus to close,
 then runs this `ErgoptiPlus.ahk` with AutoHotkey v2 x64 and the same `vendor\`
 helpers, AI runtimes and `%LOCALAPPDATA%\Ergopti\paths.toml` as the exe. A saved
-driver `.ahk` reloads it (`infra/dev_source.ahk`), as does the tray's Reload; the
+driver `.ahk` reloads it (`core/lifecycle/engine/dev_source.ahk`), as does the tray's Reload; the
 updater stays off. See `docs/design/developer-mode.md`.
 
 ## Layout
@@ -44,7 +44,7 @@ updater stays off. See `docs/design/developer-mode.md`.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ErgoptiPlus.ahk`    | Thin entry: directives + include manifest + error net + boot.                                                                                                                                    |
 | `adapters/`          | OS-isolation layer — every `DllCall`, `Send*`, `WinGet*`, file/COM call lives here (one file per port of `_shared/core/ports/contracts.json`), so domain code stays OS-agnostic.                 |
-| `infra/`             | Infrastructure helpers (no UI windows): boot, configuration, logger, paths, registry. Foldered submodules (`infra/hotstrings/`, `infra/metrics/`, `infra/timings/`) for the large ones.          |
+| `infra/`             | Infrastructure helpers (no UI windows): boot, configuration, logger, paths, registry. Foldered submodules (`infra/hotstrings/`, `infra/metrics/`, `core/timing/engine/`) for the large ones.     |
 | `modules/<feature>/` | One folder per feature (`gestures/`, `keystats/`, `keymap/`, `llm/`, `tap_holds/`, `shortcuts/`, …).                                                                                             |
 | `ui/<window>/`       | One folder per UI window (`menu/`, `tooltip/`, `onboarding/`, `healthcheck/`, `changelog/`, `spotlight/`, `wpm/`, `model_browser/`, `hotstrings_config_window/`), each with an `init.ahk` index. |
 | `build/`             | Untracked build output (compiled bundle).                                                                                                                                                        |
@@ -69,7 +69,7 @@ without launching the driver.
 Repository-wide delivery rules live in [`AGENTS.md`](../../../AGENTS.md),
 Windows semantics in the
 [`ahk-driver` skill](../../../.agents/skills/ahk-driver/SKILL.md), and logging
-in the shared [`logger contract`](../_shared/modules/logger/SPEC.md).
+in the shared [`logger contract`](../_shared/core/logger/data/SPEC.md).
 Hard-won gotchas live in
 [`../../../docs/memory/README.md`](../../../docs/memory/README.md). Work that is
 known but not done lives in the gate that measures it: each ratchet under

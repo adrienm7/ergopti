@@ -34,7 +34,7 @@ end
 
 -- The privacy gate needs a desktop; this test is about the backend, so the
 -- focused field is declared an ordinary one.
-package.loaded["adapters.secure_field_detector"] = {
+package.loaded["platform.focus.secure_field_detector"] = {
 	isSecureField = function() return false end,
 	isSecureApp = function() return false end,
 	isUrlBar = function() return false end,
@@ -126,7 +126,7 @@ check(pulled == true, "Ollama confirms the model through /api/pull")
 
 print("=== 3/ local model admission before inference ===")
 local Ollama = require("modules.llm.api_ollama")
-local Http = require("adapters.http_client")
+local Http = require("core.network.adapters.http_client")
 local native_post = Http.postStream
 local inference_posts = 0
 Http.postStream = function(...)

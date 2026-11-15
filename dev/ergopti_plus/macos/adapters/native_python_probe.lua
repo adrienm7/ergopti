@@ -8,13 +8,13 @@
 --- ==============================================================================
 
 local M = {}
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Interpreter = require("adapters.python_interpreter")
-local ShellRunner = require("adapters.shell_runner")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
 local Budget = require("modules.llm.bootstrap_retry_generated")
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local hs = hs
 local HEADER_BYTES = 4096
 local OD = "/usr/bin/od"

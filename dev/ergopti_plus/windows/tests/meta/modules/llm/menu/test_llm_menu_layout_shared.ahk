@@ -21,7 +21,7 @@
 ;      silently fall through to the "unknown row id" branch and vanish.
 ;   5. The retired second description has not come back.
 ;
-; MOVED 2026-08-07: this contract used to read _shared/modules/llm/menu_layout.json,
+; MOVED 2026-08-07: this contract used to read _shared/ai/data/menu_layout.json,
 ; a spec file of its own. One menu therefore had TWO shared descriptions — that
 ; file and the manifest's ``llm_menu`` key, which described a two-row menu only
 ; Linux drew — and neither mentioned the other. The rows now live in the manifest
@@ -65,11 +65,11 @@ _LMLS_SharedDir() {
 ; settings rows and are filtered out here exactly as _LLM_MenuLayout_Rows()
 ; filters them at runtime.
 _LMLS_ManifestRows(Source := unset) {
-	path := _LMLS_SharedDir() . "\modules\menu\menu_manifest.json"
+	path := _LMLS_SharedDir() . "\menu\data\menu_manifest.json"
 	content := IsSet(Source) ? Source : ""
 	if !IsSet(Source)
 		try content := FileRead(path, "UTF-8")
-	Assert(content != "", "_shared/modules/menu/menu_manifest.json must be readable")
+	Assert(content != "", "_shared/menu/data/menu_manifest.json must be readable")
 	parsed := JsonParse(content)
 	Assert(parsed is Map && parsed.Has("llm_menu"), "menu_manifest.json must have an 'llm_menu' array")
 	Rows := []
@@ -209,9 +209,9 @@ Test("llm-menu-layout-shared: the health dot sits on the AI title", _LMLS_Health
 ; the state this migration ended; a reintroduced menu_layout.json would drift from
 ; the manifest with nothing comparing them.
 _LMLS_NoSecondDescription() {
-	path := _LMLS_SharedDir() . "\modules\llm\menu_layout.json"
+	path := _LMLS_SharedDir() . "\ai\data\menu_layout.json"
 	Assert(!FileExist(path),
-		"_shared/modules/llm/menu_layout.json must not exist — the IA menu is described in the "
+		"_shared/ai/data/menu_layout.json must not exist — the IA menu is described in the "
 		. "menu manifest's llm_menu key, and a second shared description would drift from it")
 }
 Test("llm-menu-layout-shared: the retired second description has not come back", _LMLS_NoSecondDescription)
@@ -307,7 +307,7 @@ _LMLS_SourceRowIndex(Parts, Id) {
 }
 
 _LMLS_InventorySourceControl(Kind) {
-	Path := _LMLS_SharedDir() . "\modules\menu\menu_manifest.json"
+	Path := _LMLS_SharedDir() . "\menu\data\menu_manifest.json"
 	Source := FileRead(Path, "UTF-8")
 	_LMLS_CurrentInventoryPolicy(_LMLS_ManifestRows(Source))
 	if Kind == "current"

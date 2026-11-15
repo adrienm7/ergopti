@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Class-wide guard: the macOS driver, the Linux driver and the shared Lua they
 --- both load split, join and trim real POSIX paths only through the shared
---- owner _shared/lua/native_path.lua.
+--- owner _shared/core/fs/engine/native_path.lua.
 ---
 --- ROOT CAUSE ENCODED:
 --- A backslash is an ordinary filename byte on macOS and Linux, but about 85
@@ -29,21 +29,21 @@ local CommandLines = require("tests.support.command_lines")
 -- owner nobody calls, must not pass.
 local TREES = {
 	{ dir = "macos", excluded = "macos/tests/", min_files = 300, min_owner_calls = 60 },
-	{ dir = "_shared/lua", excluded = "_shared/lua/test/", min_files = 80, min_owner_calls = 15 },
+	{ dir = "_shared", excluded = "_shared/tests/lua/", min_files = 80, min_owner_calls = 15 },
 	{ dir = "linux", excluded = "linux/tests/", min_files = 150, min_owner_calls = 6 },
 }
 
 -- The owner itself spells the classes it hands out.
-local OWNER = "_shared/lua/native_path.lua"
+local OWNER = "_shared/core/fs/engine/native_path.lua"
 
 -- Genuine Windows-path parsers, which must see both separators on every host:
 -- path = { count, reason }.
 local WINDOWS_PATH_PARSERS = {
-	["_shared/lua/program_parameter.lua"] = { 3, "validates a drive or UNC executable in the windows executable syntax" },
-	["_shared/lua/diagnostics/redact.lua"] = { 5,
+	["_shared/settings/engine/program_parameter.lua"] = { 3, "validates a drive or UNC executable in the windows executable syntax" },
+	["_shared/diagnostics/engine/reports/redact.lua"] = { 5,
 		"redacts the home folder and masks the configuration directory's names in both slash spellings a log can hold" },
-	["_shared/lua/open_target/init.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
-	["_shared/lua/updater/config_backup.lua"] = { 1,
+	["_shared/shortcuts/engine/open_target.lua"] = { 3, "classifies a drive, UNC or %VARIABLE% target as Windows-only" },
+	["_shared/updater/engine/config_backup_core.lua"] = { 1,
 		"refuses a shipped backup name that would not be one component on Windows" },
 }
 
@@ -141,7 +141,7 @@ local function tree_sources(base, tree)
 end
 
 helpers.describe("POSIX paths split only through the shared owner (posix-backslash-separator-owner)", function()
-	helpers.it("posix-backslash-separator-owner: no [/\\] separator class outside native_path.lua", function()
+	helpers.it("posix-backslash-separator-owner: no [/\\] separator class outside core/fs/engine/native_path.lua", function()
 		local base = (helpers.driver_root():gsub("\\", "/"):gsub("/$", ""):gsub("[^/]+$", ""))
 		local offenders, seen = {}, {}
 		for _, tree in ipairs(TREES) do
@@ -153,7 +153,7 @@ helpers.describe("POSIX paths split only through the shared owner (posix-backsla
 			for _, source in ipairs(sources) do
 				local found = 0
 				for _, spelling in ipairs(SPELLINGS) do found = found + count(source.text, spelling) end
-				owner_calls = owner_calls + count(source.text, "NativePath.") + count(source.text, 'require("native_path").')
+				owner_calls = owner_calls + count(source.text, "NativePath.") + count(source.text, 'require("core.fs.engine.native_path").')
 				local allowed = WINDOWS_PATH_PARSERS[source.rel] or BASELINE[source.rel]
 				seen[source.rel] = true
 				if found ~= (allowed and allowed[1] or 0) then
@@ -171,7 +171,7 @@ helpers.describe("POSIX paths split only through the shared owner (posix-backsla
 			end
 		end
 		table.sort(offenders)
-		helpers.assert_true(#offenders == 0, "separator classes outside _shared/lua/native_path.lua treat a "
+		helpers.assert_true(#offenders == 0, "separator classes outside _shared/core/fs/engine/native_path.lua treat a "
 			.. "backslash as a separator although it is a macOS and Linux filename byte. Use the owner, or "
 			.. "list a genuine Windows-path parser in WINDOWS_PATH_PARSERS: " .. table.concat(offenders, ", "))
 	end)

@@ -6,7 +6,7 @@
 local uv = require("luv")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-storage-XXXXXX"))
 local previous_xdg = uv.os_getenv("XDG_CONFIG_HOME")
 local directories, files = { root }, {}
@@ -40,10 +40,10 @@ end
 
 local function fresh(path)
 	assert(uv.os_setenv("XDG_CONFIG_HOME", path))
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	-- Lua 5.4 also returns loader data. A final table-list call would expand
 	-- that path into a second owner; expose exactly the adapter to the fixture.
-	return (require("adapters.storage"))
+	return (require("core.fs.adapters.storage"))
 end
 
 --- Restores only this fixture's private paths, even after a regression fails.
@@ -88,7 +88,7 @@ for _, operation in ipairs(operations) do
 				"native read refusal was followed by data loss")
 			assert(accepted == false, "mutation accepted an unclassified store")
 			assert(recovery and recovery.reason == "read_failed" and recovery.preserved == true)
-			assert(uv.fs_lstat(store .. ".tmp") == nil, "refused mutation wrote a temporary store")
+			assert(uv.fs_lstat(require("core.lifecycle.engine.stage_owner").stage_path(store)) == nil, "refused mutation wrote a temporary store")
 		end)
 	end
 	check(operation.name .. " accepts a genuinely missing store", function()

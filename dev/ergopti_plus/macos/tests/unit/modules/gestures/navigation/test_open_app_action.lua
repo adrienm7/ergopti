@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/action_parameters/app_vectors.json, which the
 --- Linux and Windows suites replay too, through the real gesture validator and
---- the /usr/bin/open arguments of _shared/lua/app_parameter, then runs the
+--- the /usr/bin/open arguments of _shared/apps/engine, then runs the
 --- action with the value stored for its binding against a recording process
 --- owner.
 ---
@@ -15,8 +15,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local AppParameter = require("app_parameter")
+local json = require("core.text.engine.json")
+local AppParameter = require("apps.engine.parameter")
 
 local CORPUS = helpers.shared("tests/corpus/action_parameters/app_vectors.json")
 
@@ -28,8 +28,8 @@ local function read_corpus()
 	return assert(json.decode(raw), "the app corpus is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil

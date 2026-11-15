@@ -13,7 +13,7 @@
 
 set -u
 cd "$(dirname "$0")/../.." || exit 2
-export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+export LUA_PATH='./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;'
 # lua-lgi installs for the distro's Lua, not for LuaJIT. Without it the daemon
 # has no tooltip renderer, retires every prediction offer it cannot draw, and
 # the AI phase sees its accepting digit typed instead.
@@ -29,6 +29,7 @@ done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
 luajit -e 'require("lgi")' >/dev/null 2>&1 || { echo "ENVIRONMENT: lgi is unreachable from LuaJIT (lua-lgi)" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
+python3 tests/hardware/test_llm_selection_focus_state.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
 for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do
 	python3 "tests/hardware/${probe}" || exit 1
@@ -39,6 +40,16 @@ PIDS="$!"
 export DISPLAY=:58
 eval "$(dbus-launch --sh-syntax)"
 PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
+# The daemon moves the fixture's plaintext API key to the secret service in
+# the background. A locked keyring once held the boot before its output
+# keyboard opened: secret-tool store waited on a prompt nobody here can
+# dismiss (cbbf7766). The daemon below runs with a secret-tool that blocks the
+# same way (decided by the maintainer on 2026-11-11: that must never delay
+# input readiness); run_daemon_live.lua checks the daemon is ready meanwhile.
+SECRET_TOOL_SHIM="$(mktemp -d)"
+export ERGOPTI_LIVE_SECRET_TOOL_MARKER="${SECRET_TOOL_SHIM}/blocked"
+printf '#!/bin/sh\n: > "%s"\nexec sleep 600\n' "${ERGOPTI_LIVE_SECRET_TOOL_MARKER}" > "${SECRET_TOOL_SHIM}/secret-tool"
+chmod 700 "${SECRET_TOOL_SHIM}/secret-tool"
 "${BUS_LAUNCHER}" --launch-immediately >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
@@ -144,7 +155,7 @@ if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
 	kill ${PIDS} "${HOST}" 2>/dev/null
 	exit 2
 fi
-luajit tests/hardware/run_daemon_live.lua
+PATH="${SECRET_TOOL_SHIM}:${PATH}" luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
 wait "${HOST}"
 TRAY=$?

@@ -1,0 +1,1 @@
+import{I as e,R as t}from"./BiIdZTvV.js";import"./9dAfDHy3.js";var n=t(`<name-ergopti><span class="namecolor">Ergopti</span></name-ergopti>`,2);function r(t){var r=n();e(t,r)}export{r as t};

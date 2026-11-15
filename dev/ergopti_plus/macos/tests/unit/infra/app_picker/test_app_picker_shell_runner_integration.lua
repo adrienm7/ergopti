@@ -11,7 +11,7 @@ local with_picker = require("tests.support.app_picker_discovery_fixture")
 
 local function with_real_runner(mode, run)
 	with_picker(function(_, state)
-		helpers.with_fresh_modules({ "infra.app_picker", "adapters.shell_runner" }, function()
+		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner" }, function()
 			local tasks = {}
 			_G.hs.task = { new = function(_, completed)
 				local first = #tasks == 0
@@ -33,7 +33,7 @@ local function with_real_runner(mode, run)
 				tasks[#tasks + 1] = task
 				return task
 			end }
-			local runner = require("adapters.shell_runner")
+			local runner = require("core.process.adapters.shell_runner")
 			local picker = require("infra.app_picker")
 			run(picker, runner, tasks, state)
 		end)

@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 local shared = helpers.shared
 
-require("test.keylayout_parser_contract").register(helpers, {
+require("tests.lua.layouts.keylayout_parser_contract").register(helpers, {
 	edge_cases = shared("tests/corpus/keylayout/edge_cases.json"),
 	composed_keylayout = shared("tests/corpus/layouts/composer/composed.keylayout"),
 	composed_canonical = shared("tests/corpus/keylayout/composed.canonical.json"),

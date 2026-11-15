@@ -27,10 +27,10 @@ over the file, destroying the settings it did not know.
 ## Decision
 
 `config.toml` carries its version in `[_meta] schema_version`. One data file,
-`_shared/core/config_schema/migrations.toml`, is the only registry of versions
+`_shared/settings/data/config_schema/migrations.toml`, is the only registry of versions
 and of the steps between them; every driver reads it at runtime (Windows with
 `windows/infra/config_migrate.ahk`, macOS and Linux with
-`_shared/lua/config_migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
+`_shared/settings/engine/migration/migrate.lua`). A step is `[steps.v<N>_to_v<N+1>]` with the
 drivers whose files it changes and an ordered list of ops drawn from a closed,
 data-only set: `rename`, `rename_prefix`, `move_section`, `merge_into`,
 `map_value`, `delete`, `set_if_absent`. There is no code in a step, so the
@@ -49,7 +49,7 @@ At boot, before anything applies or saves the file, each driver classifies it:
   since it was read;
 - **current**: nothing is written;
 - **stamped below `oldest_version`**: the file is never written, the session
-  is read-only, one ERROR is logged and a notice names the way out (run 1.0.8
+  is read-only, one ERROR is logged and a notice names the way out (run 1.0.9
   once, or move the file aside). The chain starts at `oldest_version`;
 - **no stamp, once `unstamped_version` is below `oldest_version`**: treated as
   current, as a hand-written file must keep working. No step runs, no backup is
@@ -89,8 +89,11 @@ placeholder stamped with the current version.
 - **Squash old steps**: raise `oldest_version` and delete the steps below it,
   with the corpus cases that only they exercised. On 2026-11-01 it became v12,
   the schema of the first public release (1.0.0): v2 to v11 existed only in
-  pre-releases and no release from 1.0.0 on writes them. It stays at or below
-  the oldest public schema unless the maintainer decides otherwise.
+  pre-releases and no release from 1.0.0 on writes them. On 2026-11-11 the
+  maintainer raised it to v20, the schema of 1.0.9, the latest public release:
+  1.0.0 to 1.0.6 wrote v12 and 1.0.7 and 1.0.8 wrote v16, and 1.0.9 still climbs
+  both, so the notice names it as the bridge. It stays at or below the schema
+  of the latest public release, which must climb every older public schema.
 - **Change a value's domain** (an enum renamed, `0`/`1` turned into booleans):
   add a `map_value` op; its `from` and `to` sets are disjoint so a replay
   changes nothing.
@@ -142,8 +145,8 @@ placeholder stamped with the current version.
 
 ## Evidence in the codebase
 
-- Registry: `static/ergopti_plus/_shared/core/config_schema/migrations.toml`
-- Interpreters: `static/ergopti_plus/_shared/lua/config_migrate.lua`,
+- Registry: `static/ergopti_plus/_shared/settings/data/config_schema/migrations.toml`
+- Interpreters: `static/ergopti_plus/_shared/settings/engine/migration/migrate.lua`,
   `static/ergopti_plus/windows/infra/config_migrate.ahk`
 - Corpus: `static/ergopti_plus/_shared/tests/corpus/config_migrations/`,
   `static/ergopti_plus/_shared/tests/corpus/config_migration_registries/`

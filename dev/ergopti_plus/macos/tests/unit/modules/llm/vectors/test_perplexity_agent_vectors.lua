@@ -13,10 +13,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local Formats = require("llm.remote_formats")
-local Classifier = require("llm.remote_response_classifier")
+local Formats = require("ai.engine.api.remote_formats")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
 
 --- @return table corpus The decoded corpus.
 local function corpus()

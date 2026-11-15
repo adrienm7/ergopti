@@ -38,7 +38,7 @@ local MANIFEST = [[
 
 
 --- Builds a logger stub that records every Logger.warn call's format string.
---- @return table logger_stub Injectable package.loaded["infra.logger"] replacement.
+--- @return table logger_stub Injectable package.loaded["core.logger.engine.logger"] replacement.
 --- @return table warn_messages Array of format strings passed to Logger.warn (grows live).
 local function make_warn_capturing_logger()
 	local warn_messages = {}
@@ -152,7 +152,7 @@ helpers.describe("shared command provider policy", function()
 			local items = Menu.get_array("editor")
 			items[1].i18n = "menu.hotstrings.open_file"
 			local row = Menu.command_row("editor", "open", { open = function() end }, { ready = function() return true end })
-			helpers.assert_eq(row.label, require("infra.i18n").get("menu.hotstrings.open_file"))
+			helpers.assert_eq(row.label, require("core.i18n.engine.i18n").get("menu.hotstrings.open_file"))
 		end)
 	end)
 	helpers.it("shared-personal-editor-policy: absent declaration or owner refuses provider data", function()
@@ -197,7 +197,7 @@ helpers.describe("inert existing-provider status data", function()
 			helpers.assert_type(rows, "table")
 			helpers.assert_eq(#rows, 3)
 			helpers.assert_true(rows[1].separator)
-			local tr = require("infra.i18n").get
+			local tr = require("core.i18n.engine.i18n").get
 			helpers.assert_eq(rows[2].label, tr(Mutate and "menu.llm.local_servers.rescan" or "menu.llm.local_servers.header"))
 			helpers.assert_eq(rows[3].label, tr(Mutate and "menu.llm.local_servers.header" or "menu.llm.unavailable"))
 			for index = 2, 3 do
@@ -230,15 +230,15 @@ end)
 helpers.describe("ordered child template native list and conditional include contract", function()
 	local function with_frame(body)
 		local path = helpers.driver_root():gsub("/$", "") .. "/../_shared/tests/corpus/menus/profile_frame_template_api.json"
-		local Menu = assert(require("menu.renderer").new({
+		local Menu = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function() return path end,
-			json_decode = require("json").decode,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
 			logger = helpers.make_logger_stub(),
 		}))
 		local handle = assert(io.open(path, "rb"))
-		local oracle = require("json").decode(handle:read("*a")); handle:close()
+		local oracle = require("core.text.engine.json").decode(handle:read("*a")); handle:close()
 		local state = { ready = true, present = true, calls = 0, phases = {} }
 		local function native_action() state.calls = state.calls + 1; return false end
 		local builtin = { label = "Builtin native", checked = true, action = native_action }
@@ -414,9 +414,9 @@ helpers.describe("explicit inert presentation omission preserves actual native d
 		local state = { calls = 0, getters = 0, errors = {}, phases = {} }
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) state.errors[#state.errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({
+		local Menu = assert(require("menu.engine.renderer").new({
 			platform = "hs", manifest_path = function() return path end,
-			json_decode = require("json").decode,
+			json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger,
 		}))
 		local builtin = { label = "Builtin native", action = function() state.calls = state.calls + 1; return false end }
@@ -525,8 +525,8 @@ helpers.describe("inert presentation platform membership cannot invoke implicit 
 		local callbacks, errors = 0, {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return path end, json_decode = require("json").decode,
+		local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 		Menu.get_array("presentation")[1].platforms = setmetatable({ "ahk" }, {
 			__index = function(_, index) callbacks = callbacks + 1; if index == 2 then return "hs" end end,
@@ -551,8 +551,8 @@ helpers.describe("selected inert include inspects only physical identities befor
 			local callbacks, errors = 0, {}
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-			local Menu = assert(require("menu.renderer").new({ platform = "hs",
-				manifest_path = function() return path end, json_decode = require("json").decode,
+			local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
+				manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 				i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 			Menu.get_array("frame")[1].row_id = "safe"
 			local target = Menu.get_array("presentation")
@@ -587,8 +587,8 @@ helpers.describe("invalid inert selector refuses before identity comparison", fu
 		local callbacks, providers, errors = 0, 0, {}
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		local Menu = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return path end, json_decode = require("json").decode,
+		local Menu = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return path end, json_decode = require("core.text.engine.json").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end }, logger = logger }))
 		local meta = { __eq = function() callbacks = callbacks + 1; return true end }
 		Menu.get_array("frame")[1].row_id = setmetatable({}, meta)
@@ -605,47 +605,47 @@ helpers.describe("invalid inert selector refuses before identity comparison", fu
 end)
 
 
-require("test.menu_native_child_rows").run(helpers, require("infra.manifest_menu"))
+require("tests.lua.menu.native_child_rows").run(helpers, require("infra.manifest_menu"))
 
-require("test.menu_dynamic_caption_contract").register(helpers, "macos")
+require("tests.lua.menu.dynamic_caption_contract").register(helpers, "macos")
 
-require("test.menu_caption_layout_contract").register(helpers, "macos")
+require("tests.lua.menu.caption_layout_contract").register(helpers, "macos")
 
-require("test.menu_group_row_contract").register(helpers, "macos")
+require("tests.lua.menu.group_row_contract").register(helpers, "macos")
 
-require("test.menu_command_group_affix_contract").register(helpers, "macos")
+require("tests.lua.menu.command_group_affix_contract").register(helpers, "macos")
 
-require("test.menu_command_literal_prefix_contract").register(helpers, "macos")
+require("tests.lua.menu.command_literal_prefix_contract").register(helpers, "macos")
 
-require("test.menu_disabled_reasons_contract").register(helpers, "macos")
+require("tests.lua.menu.disabled_reasons_contract").register(helpers, "macos")
 
-require("test.menu_platform_lookup").register(helpers, "hs")
+require("tests.lua.menu.platform_lookup").register(helpers, "hs")
 
 
-require("test.menu_native_composition").register(helpers, "hs")
+require("tests.lua.menu.native_composition").register(helpers, "hs")
 
-require("test.menu_layout_caption_values_contract").register(helpers, "macos")
+require("tests.lua.menu.layout_caption_values_contract").register(helpers, "macos")
 
-require("test.menu_numbered_caption_contract").register(helpers, "macos")
-require("test.menu_row_order_contract").register(helpers, 8)
+require("tests.lua.menu.numbered_caption_contract").register(helpers, "macos")
+require("tests.lua.menu.row_order_contract").register(helpers, 8)
 
-require("test.menu_fixed_feature_parent_contract").register(helpers, "macos")
+require("tests.lua.menu.fixed_feature_parent_contract").register(helpers, "macos")
 
 
 -- Actual component factories consume genuine existing fixture-owned data modules.
 local function fixed_parent_native_cohort(body)
-	local names = {"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "infra.logger",
+	local names = {"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu", "core.logger.engine.logger",
 		"ui.menu.menu_shortcuts", "ui.menu.menu_gestures", "ui.menu.menu_tap_holds",
 		"ui.menu.menu_utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
 	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
 	local ok, detail = xpcall(function()
 		return helpers.with_stub_scope(names, function()
-			helpers.load_with_stubs("infra.logger")
+			helpers.load_with_stubs("core.logger.engine.logger")
 			-- The native loader installs an i18n baseline double; reload the genuine
 			-- native locale owner after that setup, as existing presentation fixtures do.
-			package.loaded["infra.i18n"] = nil
-			local locale = require("infra.locale")
-			local translator = require("infra.i18n")
+			package.loaded["core.i18n.engine.i18n"] = nil
+			local locale = require("core.i18n.engine.locale")
+			local translator = require("core.i18n.engine.i18n")
 			translator.set_locale_injector(function(code) locale.set_locale(code) end)
 			translator.init()
 			local owner = {pending = function() return false end}
@@ -653,9 +653,9 @@ local function fixed_parent_native_cohort(body)
 			local receipt = assert(translator.scope_capture(owner))
 			local invoked, result = xpcall(function()
 				assert(translator.scope_apply(owner, receipt, "en"))
-				local renderer = assert(require("menu.renderer").new({platform = "hs",
-					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("json").decode, i18n = translator, logger = require("infra.logger")}))
+				local renderer = assert(require("menu.engine.renderer").new({platform = "hs",
+					manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.logger")}))
 				package.loaded["infra.manifest_menu"] = renderer
 				return body(renderer, translator)
 			end, debug.traceback)
@@ -689,7 +689,8 @@ local function observe_actual_fixed_parent(id, module, context, manifest, transl
 		helpers.assert_true(rawequal(row.submenu, completed), "the exact genuine completed child must reach its declared parent")
 		helpers.assert_true(#completed > 0, "a positive factory must build actual child rows")
 		if expected then helpers.assert_eq(row.checked, true) else helpers.assert_nil(row.checked) end
-		if id ~= "tap_holds" then helpers.assert_eq(row.disabled, context.paused or nil) end
+		-- A pause no longer greys the parent (EDD-1, edd1-paused-writes).
+		if id ~= "tap_holds" then helpers.assert_eq(row.disabled, nil) end
 		local before = {}
 		for index, child in ipairs(completed) do before[index] = {title = child.title, fn = child.fn, menu = child.menu, checked = child.checked, disabled = child.disabled} end
 		helpers.assert_eq(#before, #row.submenu)
@@ -754,14 +755,14 @@ helpers.describe("fixed feature parents: actual Mac component owners (fixed-feat
 	end)
 end)
 
-require("test.menu_top_level_separator_contract").register(helpers, "macos")
+require("tests.lua.menu.top_level_separator_contract").register(helpers, "macos")
 
 
 helpers.describe("reasoned toggle presentation", function()
 	helpers.it("reasoned-toggle: disabled state names the reason and removes the command", function()
 		local document = [[{"reasoned_toggle":[{"type":"toggle","id":"power","category":"LLM","i18n":"contract.toggle","checked_when":["on"],"disabled_when":["ready"],"disabled_reason_key":"contract.reason"}]}]]
 		fixture.with_manifest(document, nil, function(Menu, manifest_path)
-			local translated = package.loaded["infra.i18n"]
+			local translated = package.loaded["core.i18n.engine.i18n"]
 			local old_get = translated.get
 			translated.get = function(key)
 				if key == "contract.toggle" then return "AI suggestions" end
@@ -774,9 +775,9 @@ helpers.describe("reasoned toggle presentation", function()
 				local context = { commands = { power = action }, state_getters = {
 					on = function() return true end, ready = function() return ready end,
 				} }
-				local linux = assert(require("menu.renderer").new({ platform = "linux",
+				local linux = assert(require("menu.engine.renderer").new({ platform = "linux",
 					manifest_path = function() return manifest_path end,
-					json_decode = require("adapters.json_codec").decode, i18n = translated,
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = translated,
 					logger = helpers.make_logger_stub() }))
 				for _, renderer in ipairs({ Menu, linux }) do
 					ready = false

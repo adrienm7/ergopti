@@ -10,16 +10,16 @@
 
 local helpers = require("tests.helpers")
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 --- Reads the independent custom-command identity used by each native provider.
 --- @return table expected Canonical command expectation.
 local function custom_command_expected()
-	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_custom_controls.json")
 	local file = assert(io.open(path, "rb"))
 	local text = file:read("*a")
 	file:close()
-	local corpus = assert(require("json").decode(text))
+	local corpus = assert(require("core.text.engine.json").decode(text))
 	assert(#corpus.rows == 1, "every independent custom command must be observed")
 	return corpus.rows[1]
 end
@@ -31,8 +31,8 @@ local SOURCE = '[hotstrings]\nunknown = "kept"\n\n[other]\nvalue = 42\n'
 --- @param source string|nil Initial config.toml bytes; nil is an absent file.
 --- @param body function body(Settings, path, sandbox, Terminators)
 local function with_settings(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
-	local Terminators = require("keymap.terminators")
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+	local Terminators = require("layouts.engine.layers.terminators")
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local baseline = nil
@@ -126,15 +126,15 @@ local DUPLICATE_RECORDS = {
 --- @param reordered boolean Whether the shared section is reversed.
 --- @return table controls, table context, table observations
 local function menu_controls(Settings, paused, reordered)
-	local paths = require("infra.paths")
-	local i18n = require("infra.i18n")
+	local paths = require("core.fs.engine.paths")
+	local i18n = require("core.i18n.engine.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return paths.shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return paths.shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local value = assert(require("json").decode(raw))
+			local value = assert(require("core.text.engine.json").decode(raw))
 			if reordered == "config_shared_label" then
 				if type(value.hotstrings_delays_menu) == "table" then value.hotstrings_delays_menu[1].i18n = "button.ok" end
 			elseif reordered == "custom_delete_label" then
@@ -146,7 +146,7 @@ local function menu_controls(Settings, paused, reordered)
 			return value
 		end,
 		i18n = i18n,
-		logger = require("logger.shim"),
+		logger = require("core.logger.engine.shim"),
 	}))
 	-- Forward the actual renderer's own methods through a plain observer facade.
 	-- Native source admission deliberately does not acquire inherited methods.
@@ -202,10 +202,10 @@ end
 --- Reads the independent fixed-command and delimiter-state expectations.
 --- @return table corpus
 local function controls_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Finds a command in the actual rendered native control list.
@@ -213,7 +213,7 @@ end
 --- @param key string Independent translation identity.
 --- @return table|nil row
 local function custom_delete_row(rows, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(rows or {}) do
 		if type(row.title) == "string" and row.title:gsub("^%s+", "") == text then return row end
 	end
@@ -222,10 +222,10 @@ end
 --- Reads independent Add identity and custom-record expectations.
 --- @return table corpus
 local function add_command_expected()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_add_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Uses the actual native menu and acknowledged TOML owner; only the native
@@ -237,13 +237,13 @@ local function observe_add_command(mode)
 	local result
 	with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
 		assert(Settings.load())
-		local prior_prompt = package.loaded["ui.text_prompt"]
+		local prior_prompt = package.loaded["core.ui.ui.text_prompt"]
 		local prior_execute = os.execute
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local prior_writer = Writer.batch_write
 		local context, effects
 		local observed = { prompts = 0, questions = 0, errors = 0, writes = 0 }
-		package.loaded["ui.text_prompt"] = { ask = function()
+		package.loaded["core.ui.ui.text_prompt"] = { ask = function()
 			observed.prompts = observed.prompts + 1
 			if mode == "pause_after_prompt" then context.paused = true end
 			if mode == "input_cancel" then return nil end
@@ -283,12 +283,12 @@ local function observe_add_command(mode)
 			observed.source = sandbox.read_bytes(path)
 			observed.present = has_custom(Terminators, corpus.target.linux_key)
 			observed.redraws = effects.redraws
-			observed.records = require("toml_codec").decode(observed.source)
+			observed.records = require("core.text.engine.toml_codec").decode(observed.source)
 		end)
-		package.loaded["ui.text_prompt"] = prior_prompt
+		package.loaded["core.ui.ui.text_prompt"] = prior_prompt
 		os.execute = prior_execute
 		Writer.batch_write = prior_writer
-		observed.prompt_restored = package.loaded["ui.text_prompt"] == prior_prompt
+		observed.prompt_restored = package.loaded["core.ui.ui.text_prompt"] == prior_prompt
 		observed.execute_restored = os.execute == prior_execute
 		observed.writer_restored = Writer.batch_write == prior_writer
 		if not passed then error(failure, 0) end
@@ -300,10 +300,10 @@ end
 --- Reads the independent command and existing native window identity.
 --- @return table corpus Historical command expectation.
 local function delay_settings_command_expected()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 return {

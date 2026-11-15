@@ -92,8 +92,8 @@ local function load_subject()
 		end,
 		has_pending_screenshot_action = function() return false end,
 	}
-	package.loaded["infra.i18n"] = {get = function(key) return key end}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts.bindings"] = nil
 
 	local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
@@ -157,7 +157,7 @@ helpers.describe("shortcut bindings: one refused hotkey fails alone (shortcut-re
 		local subject, controls = load_subject()
 		controls.refuse_cmd_star = true
 		local warnings = {}
-		package.loaded["infra.logger"].warn = function(_, msg, ...)
+		package.loaded["core.logger.engine.logger"].warn = function(_, msg, ...)
 			warnings[#warnings + 1] = { msg = msg, args = { ... } }
 		end
 

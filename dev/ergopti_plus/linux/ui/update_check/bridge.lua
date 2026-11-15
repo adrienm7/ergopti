@@ -11,7 +11,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. The phases and actions are the shared session's
----    (_shared/lua/updater/check_session.lua), identical on macOS: "checking",
+---    (_shared/updater/engine/check_session.lua), identical on macOS: "checking",
 ---    then the answer of modules/updater/manager.lua's check, with every other
 ---    channel whose latest release is newer than the installed build.
 --- 2. Update downloads and installs the offered release through the updater,
@@ -32,10 +32,10 @@
 local M = {}
 M.bridge_name = "update_check_bridge"
 
-local Json         = require("json")
-local Logger       = require("logger.shim")
-local CheckSession = require("updater.check_session")
-local Installation = require("infra.installation")
+local Json         = require("core.text.engine.json")
+local Logger       = require("core.logger.engine.shim")
+local CheckSession = require("updater.engine.check_session")
+local Installation = require("core.lifecycle.engine.installation")
 
 local LOG = "bridge.update_check"
 
@@ -76,7 +76,7 @@ local function push(message)
 		Logger.error(LOG, "An update-check message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	return require("ui.webview_manager").eval_js(APP,
+	return require("core.ui.ui.webview_manager").eval_js(APP,
 		"if(window.receiveUpdateCheck)window.receiveUpdateCheck(" .. json .. ")")
 end
 
@@ -108,7 +108,7 @@ function M.download_offered(updater, release, ctx)
 	local channel = updater.get_channel()
 	local owner = { active = false, terminal = false, attempt = 0, failed_download = false }
 	local session_id
-	local I18n = require("infra.i18n")
+	local I18n = require("core.i18n.engine.i18n")
 	local DownloadWindow = require("ui.download_window.bridge")
 	local function current()
 		if serial ~= _offer_serial or owner.cancelled or owner.succeeded
@@ -132,9 +132,9 @@ function M.download_offered(updater, release, ctx)
 	end
 	local function diagnostics_available()
 		if not current() or type(ctx.on_open_today_log) ~= "function" then return false end
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		if shell.has_command("xdg-open") ~= true then return false end
-		local file = require("infra.regular_file_reader").open(require("infra.logger_sink").main_log_path())
+		local file = require("core.fs.engine.regular_file_reader").open(require("core.logger.engine.sink").main_log_path())
 		if not file then return false end
 		local closed, accepted = pcall(file.close, file)
 		return closed and accepted == true and current()
@@ -252,7 +252,7 @@ end
 --- @param updater table modules.updater.manager
 --- @return table session
 local function new_session(updater)
-	local manager = require("ui.webview_manager")
+	local manager = require("core.ui.ui.webview_manager")
 	local session
 	session = CheckSession.new({
 		push = push,
@@ -300,7 +300,7 @@ local function new_session(updater)
 		-- The notes pane's links: the session checked them against the repository
 		repository = updater.repo_info,
 		open_url = function(url)
-			local Shell = require("adapters.shell_runner")
+			local Shell = require("core.process.adapters.shell_runner")
 			if not Shell.has_command("xdg-open") then
 				Logger.error(LOG, "xdg-open is unavailable: the release link cannot be opened.")
 				return false
@@ -328,7 +328,7 @@ local function new_session(updater)
 				session.retire()
 			end
 		end,
-		log_path = function() return require("infra.logger_sink").main_log_path() end,
+		log_path = function() return require("core.logger.engine.sink").main_log_path() end,
 		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
 	})
 	return session
@@ -361,7 +361,7 @@ function M.open(ctx)
 	-- Windows. Starting a check would replace the pending answer with a failure
 	if _session ~= nil and _session.result() == nil then
 		_ctx = ctx
-		if require("ui.webview_manager").show(APP) ~= true then
+		if require("core.ui.ui.webview_manager").show(APP) ~= true then
 			Logger.error(LOG, "The update-check window could not be shown again.")
 			return false
 		end
@@ -385,7 +385,7 @@ function M.open(ctx)
 	_ctx = ctx
 	local session = new_session(ctx.updater)
 	_session = session
-	if require("ui.webview_manager").show(APP) ~= true then
+	if require("core.ui.ui.webview_manager").show(APP) ~= true then
 		if _session == session then _session = nil end
 		session.retire()
 		Logger.error(LOG, "The update-check window could not open.")

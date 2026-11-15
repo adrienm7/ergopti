@@ -31,7 +31,7 @@
 ; =====================================================================
 
 ; The picker's key ids come from TapHoldKeyDefs(), the Windows column of the
-; shared key catalogue ([tap_hold.catalog] in _shared/tap_hold/defaults.toml).
+; shared key catalogue ([tap_hold.catalog] in _shared/tap_hold/data/defaults.toml).
 ; Reading them from there rather than hardcoding today's fourteen means a key
 ; added to the picker tomorrow is checked the day it is added — the failure mode
 ; this repo hits most often is an invariant fixed at one site with one sibling

@@ -13,8 +13,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 local Export = helpers.load_with_stubs("modules.keystats.export")
 package.loaded["modules.keystats.ledger_replay"] = nil
 local LedgerReplay = require("modules.keystats.ledger_replay")
@@ -82,7 +82,7 @@ local STEP_ALLOCATION_BLOCKS = 6
 --- allocation, measured over the same paused window.
 local function run_replay(path, size, options)
 	local applied, steps, max_cpu_ms, max_step_bytes, max_step_kb = {}, 0, 0, 0, 0
-	local json = require("json")
+	local json = require("core.text.engine.json")
 	local state = LedgerReplay.new_state()
 	while true do
 		local before = state.offset

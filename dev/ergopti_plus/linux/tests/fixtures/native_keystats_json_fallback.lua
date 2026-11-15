@@ -10,13 +10,13 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_keystats_json_fallback%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local folder, kind = assert(arg[1]), assert(arg[2])
 for _, key in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR" }) do
 	assert(assert(os.getenv(key)):sub(1, #folder + 1) == folder .. "/", "each worker requires private XDG roots")
 end
-local Shell, Json, uv = require("adapters.shell_runner"), require("json"), require("luv")
+local Shell, Json, uv = require("core.process.adapters.shell_runner"), require("core.text.engine.json"), require("luv")
 local open = io.open
 local function write(path, bytes)
 	local file = assert(open(path, "wb")); assert(file:write(bytes)); assert(file:close())
@@ -31,7 +31,7 @@ for _, program in ipairs({ "mkdir" }) do
 	assert(found and path:sub(1, 1) == "/"); assert(uv.fs_symlink(path:gsub("\n$", ""), bin .. "/" .. program))
 end
 assert(uv.os_setenv("PATH", bin)); assert(Shell.has_command("sqlite3") == false)
-local Writer = require("infra.regular_file_writer")
+local Writer = require("core.fs.engine.regular_file_writer")
 local native_open = Writer.open
 local Keystats, Sqlite = require("modules.keystats.keystats"), require("modules.keystats.sqlite_writer")
 require("tests.support.metrics_preferences_fixture").with(function()
@@ -75,7 +75,7 @@ require("tests.support.metrics_preferences_fixture").with(function()
 		return open(candidate, mode)
 	end
 	Writer.open = function(candidate, mode)
-		if candidate == path .. ".tmp" then return wrap(native_open(candidate, mode)) end
+		if candidate == require("core.lifecycle.engine.stage_owner").stage_path(path) then return wrap(native_open(candidate, mode)) end
 		return native_open(candidate, mode)
 	end
 	Keystats.on_keydown("b", 1200, app)
@@ -104,6 +104,6 @@ require("tests.support.metrics_preferences_fixture").with(function()
 	end
 	assert(retry == false and row.pending_final == 3, "summary ACK cannot consume native SQLite source")
 	assert(final.apps[app].keystrokes == 3 and row.public_keystrokes == 3, "retry must save cumulative A+B+C exactly once")
-	assert(uv.fs_lstat(path .. ".tmp") == nil and uv.fs_lstat(folder .. "/metrics.sqlite") == nil)
+	assert(uv.fs_lstat(require("core.lifecycle.engine.stage_owner").stage_path(path)) == nil and uv.fs_lstat(folder .. "/metrics.sqlite") == nil)
 	write(folder .. "/complete", "complete")
 end, { initial = { ["metrics.encrypt"] = false } })

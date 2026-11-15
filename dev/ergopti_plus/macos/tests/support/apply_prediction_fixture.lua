@@ -20,8 +20,7 @@ local function noop() end
 local function purge_driver_modules()
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:find("^modules%.") or name:find("^adapters%.")
-				or name:find("^infra%.") or name:find("^ui%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -112,8 +111,8 @@ function M.run(options)
 
 	local logger = helpers.make_logger_stub()
 	logger.LEVELS = { DEBUG = 10 }
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.05 end,
 		ms = function() return options.pace_ms or 20 end,
 	}
@@ -181,7 +180,7 @@ function M.run(options)
 	}
 
 	local tooltip_accept_callback = nil
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		hide = noop,
 		show_stacked = noop,
 		set_timeout = noop,
@@ -194,7 +193,7 @@ function M.run(options)
 		set_on_show_callback = noop,
 		set_runtime_guard = noop,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = noop }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = noop }
 	package.loaded["modules.keymap.registry"] = {
 		init = function() return true end,
 		mappings_for_tail = function() return nil end,
@@ -211,18 +210,18 @@ function M.run(options)
 			return false
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,
 		to_name = function() return "f16" end,
 	}
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local km_utils = require("modules.keymap.utils")
 	local terminal_target = options.terminal and { id = "terminal-app" } or nil
 	if terminal_target then
-		local text_sender = require("adapters.text_sender")
+		local text_sender = require("platform.input.text_sender")
 		text_sender.terminalInputTarget = function() return terminal_target end
 	end
 	-- Keep the fixture about dispatch, not overlap policy.

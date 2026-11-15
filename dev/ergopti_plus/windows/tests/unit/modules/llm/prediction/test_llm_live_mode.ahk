@@ -147,12 +147,16 @@ _LLV_NoticeRetirementPreservesForeignOwnership() {
 			for Interrupted in [false, true] {
 				Observed := []
 				Notice := ""
-				Failure := ""
+				; The caught state is the verdict: an Error with an empty message is
+				; still an exception, and the empty expected message alone accepted it.
+				Caught := false, Failure := ""
 				Outcome := true
 				try Outcome := _LLV_InvokeAndRetireNotice(_LLV_NoticeBoundaryAction.Bind(Interrupted, Observed), &Notice)
 				catch as Err {
+					Caught := true
 					Failure := Err.Message
 				}
+				AssertEqual(Interrupted, Caught, "only the interrupted callback may raise through the notice boundary")
 				AssertEqual(Interrupted ? "owned live-mode notice interruption" : "", Failure,
 					"the notice boundary preserves the actual callback exception")
 				if !Interrupted
@@ -507,7 +511,7 @@ _LLV_LiveIsPartOfTheRequestIdentity() {
 		"a live request never shares a cache entry or callback with an ordinary one")
 	AssertThrows(() => _LLM_Engine_NormalizePromptOverride(
 		Map("profile_id", "basic", "live", "yes")), "the live flag is a Boolean")
-	Path := _SharedDir . "\modules\llm\live.json"
+	Path := _SharedDir . "\ai\data\live.json"
 	File := JsonParse(FileRead(Path, "UTF-8"))
 	AssertEqual(File["debounce_ms"], LLM_Live_Config()["debounce_ms"], "the debounce is live.json's")
 	AssertEqual(File["min_words"], LLM_Live_Config()["min_words"], "the word floor is live.json's")
@@ -943,7 +947,7 @@ _LLV_DeclaredOffLabelOwnsUniqueness() {
 			AssertEqual(21, Spec["locales"].Length, "the real locale corpus remains complete")
 			for Code in Spec["locales"] {
 				_I18nLocale := Code
-				_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+				_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 				_I18nCacheLoaded := true
 				Label := t(Spec["stop_notice_key"])
 				Assert(Label != "" && Label != Spec["stop_notice_key"], "the stop notice is translated: " . Code)

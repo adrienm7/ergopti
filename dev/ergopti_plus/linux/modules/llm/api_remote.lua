@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Sends predictions to a hosted API (Cerebras, OpenAI, Anthropic, Gemini,
 --- Mistral, OpenRouter, Groq, Backboard, any OpenAI-compatible server)
---- described by the shared catalogue _shared/modules/llm/api_providers.json,
+--- described by the shared catalogue _shared/ai/data/api_providers.json,
 --- the same file macOS and Windows read, and asks the agent's System 1 question
 --- to Jev (TypeSafe's decisions protocol, directly or through Backboard).
 ---
@@ -23,7 +23,7 @@
 ---    an image, or only the agent's System 1. Backboard chats through an
 ---    assistant created once per key and remembered for the session; a
 ---    decisions provider (Jev) is not a chat model and only answers decide().
----    Their request shapes are the shared _shared/lua/llm/remote_formats.lua.
+---    Their request shapes are the shared _shared/ai/engine/api/remote_formats.lua.
 --- ==============================================================================
 
 local M = {}
@@ -32,28 +32,28 @@ local M = {}
 -- requests. The engine hands it in at init; every other request keeps the adapter.
 local InferenceClient = nil
 
-local Logger = require("logger.shim")
-local ErrorDescription = require("error_description")
-local Json = require("json")
-local Paths = require("infra.paths")
-local Timings = require("infra.timings")
-local HttpClient = require("adapters.http_client")
-local Ports = require("llm.request_plan.ports")
-local PromptBuilder = require("llm.prompt_builder")
-local TextUtils = require("text_utils")
+local Logger = require("core.logger.engine.shim")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local Json = require("core.text.engine.json")
+local Paths = require("core.fs.engine.paths")
+local Timings = require("core.timing.engine.timings")
+local HttpClient = require("core.network.adapters.http_client")
+local Ports = require("ai.engine.request_plan.ports")
+local PromptBuilder = require("ai.engine.prediction.prompt_builder_core")
+local TextUtils = require("core.text.engine.utils_core")
 local LlmBridge = require("infra.llm_bridge")
-local Monotonic = require("infra.monotonic")
-local Formats = require("llm.remote_formats")
-local Classifier = require("llm.remote_response_classifier")
-local AuthPolicy = require("llm.local_server_auth")
-local ThinkingOff = require("llm.thinking_off")
-local ModelCapabilities = require("llm.model_capabilities")
-local TableUtil = require("table_util")
-local ApiModelListing = require("llm.api_model_listing")
+local Monotonic = require("core.logger.engine.monotonic")
+local Formats = require("ai.engine.api.remote_formats")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
+local AuthPolicy = require("ai.engine.local_servers.auth")
+local ThinkingOff = require("ai.engine.policy.thinking_off")
+local ModelCapabilities = require("ai.engine.local_servers.model_capabilities")
+local TableUtil = require("core.text.engine.table_util")
+local ApiModelListing = require("ai.engine.api.model_listing")
 local LocalCatalogue = require("modules.llm.local_server_catalogue")
-local ProviderConfig = require("llm.provider_config_policy")
-local UrlTemplate = require("llm.api_url_template")
-local TokenExchange = require("llm.api_token_exchange")
+local ProviderConfig = require("ai.engine.policy.provider_config_policy")
+local UrlTemplate = require("ai.engine.api.url_template")
+local TokenExchange = require("ai.engine.api.token_exchange")
 
 local LOG = "modules.llm.api_remote"
 
@@ -228,9 +228,9 @@ end
 --- @return table
 local function catalogue()
 	if _catalogue then return _catalogue end
-	local path = Paths.shared("modules/llm/api_providers.json")
+	local path = Paths.shared("ai/data/api_providers.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local closed = status == "ok"
 	local cloud_published
@@ -406,7 +406,7 @@ end
 --- @param fn function
 --- @return boolean armed
 local function schedule_access_slice(fn)
-	return require("adapters.timer_scheduler").after(0, fn).armed == true
+	return require("core.events.timer_scheduler").after(0, fn).armed == true
 end
 
 --- Exchanges an entry's stored key for an access token, once at a time;
@@ -456,11 +456,15 @@ local function refresh_access(provider, entry, on_done)
 					Monotonic.now_sec())
 				if token then
 					slot.token, slot.expires_at, slot.failure, slot.retry_at = token.token, token.expires_at, nil, nil
+					slot.failure_status = nil
 					Logger.success(LOG, "Access token of provider '%s' received (valid %d s).", provider.id,
 						math.floor(token.expires_at - Monotonic.now_sec()))
 					return settle(true, nil)
 				end
 				slot.failure, slot.retry_at = why, Monotonic.now_sec() + ACCESS_RETRY_SECONDS
+				-- The exchange's own HTTP status, for the requests it fails (access_failure).
+				local status = tonumber(result.status)
+				slot.failure_status = status and status ~= 200 and { status = status, reason = why } or nil
 				Logger.error(LOG, "Access token of provider '%s' refused: %s.", provider.id, why)
 				return settle(false, why)
 			end
@@ -492,6 +496,24 @@ end
 --- @param provider table
 --- @param entry table
 --- @return string|nil token, string|nil reason
+--- The failure a request reports when its entry's exchange was refused: the
+--- exchange's HTTP status first, as Windows carries it
+--- (_LLMRemote_AccessFailInfo), so llm.failure_class tells a refused key from
+--- a transient refusal and the retry policy never resends a refused key.
+--- @param entry table
+--- @param reason string The exchange's reason.
+--- @return string failure
+local function access_failure(entry, reason)
+	local slot = access_slot(entry)
+	-- Bound to the reason it came with: a later failure of another kind
+	-- replaces slot.failure and is not given this status.
+	local http = slot.failure_status
+	if http and reason == http.reason and reason == slot.failure then
+		return "HTTP " .. tostring(http.status) .. ": " .. reason
+	end
+	return reason
+end
+
 local function access_token(provider, entry)
 	local slot = access_slot(entry)
 	local now = Monotonic.now_sec()
@@ -556,7 +578,7 @@ local function with_access(entry, owned, send, refuse)
 	M.prepare_access(entry, function(ok, reason)
 		settled = true
 		if not owned() then return end
-		if ok then result = send() else result = refuse(reason or "the access token could not be fetched") end
+		if ok then result = send() else result = refuse(access_failure(entry, reason or "the access token could not be fetched")) end
 	end)
 	if settled then return result end
 	return nil
@@ -598,7 +620,7 @@ function M.endpoint(entry, model)
 	if provider.auth then
 		-- The stored key is exchanged for the short-lived token the requests carry
 		local access, access_reason = access_token(provider, entry)
-		if not access then return nil, access_reason end
+		if not access then return nil, access_failure(entry, access_reason) end
 		token = access
 	end
 
@@ -673,7 +695,7 @@ local thinking_families
 local function thinking_refused()
 	if _thinking_refused then return _thinking_refused end
 	local path = thinking_refused_path()
-	local fh, _, errno = require("infra.regular_file_reader").open_source(path)
+	local fh, _, errno = require("core.fs.engine.regular_file_reader").open_source(path)
 	local stored = nil
 	if fh then
 		local read_ok, text = pcall(fh.read, fh, "*a")
@@ -693,14 +715,14 @@ end
 --- @return boolean saved
 local function save_thinking_refused()
 	local path = thinking_refused_path()
-	local dir = require("native_path").dirname(path)
-	local Shell = require("adapters.shell_runner")
+	local dir = require("core.fs.engine.native_path").dirname(path)
+	local Shell = require("core.process.adapters.shell_runner")
 	if dir and not Shell.run("mkdir -p " .. Shell.quote(dir) .. " 2>/dev/null") then return false end
 	local text = Json.encode(_thinking_refused)
 	local temp = path .. ".tmp"
 	-- An existing staging entry has no retained owner; exclusive creation
 	-- refuses it without opening or deleting an unrelated file.
-	local opened, fh, _, _, remove_owned, current_image = pcall(require("infra.regular_file_writer").open, temp, "wx")
+	local opened, fh, _, _, remove_owned, current_image = pcall(require("core.fs.engine.regular_file_writer").open, temp, "wx")
 	if not opened or not fh or type(remove_owned) ~= "function" or type(current_image) ~= "function" or type(text) ~= "string" then
 		if opened and fh then
 			pcall(fh.close, fh)
@@ -729,9 +751,9 @@ end
 --- @return table families
 function thinking_families()
 	if _thinking_families then return _thinking_families end
-	local path = Paths.shared("modules/llm/thinking_off.json")
+	local path = Paths.shared("ai/data/thinking_off.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local families, reason = ThinkingOff.parse_families(type(text) == "string" and Json.decode(text) or nil)
 	if not families then
@@ -1119,7 +1141,16 @@ local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, aut
 	Logger.info(LOG, "Creating the Backboard assistant for this key.")
 	-- fail() logs the reason with the request it fails.
 	post_json(scope, epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
-		fail("the Backboard assistant could not be created: " .. detail, receipt)
+		-- The creation's HTTP status stays first, as the request's own failure
+		-- reads, so llm.failure_class tells a refused key (never retried).
+		local status_prefix, rest = tostring(detail):match("^(HTTP %d%d%d)(.*)$")
+		if status_prefix then
+			local cause = rest:gsub("^:?%s*", "")
+			fail(status_prefix .. ": the Backboard assistant could not be created" .. (cause ~= "" and (": " .. cause) or ""),
+				receipt)
+		else
+			fail("the Backboard assistant could not be created: " .. detail, receipt)
+		end
 	end, function(root)
 		if authorized and not authorized() then return end
 		local assistant_id = Formats.backboard_assistant_id(root)
@@ -1219,7 +1250,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		end
 		local elapsed_ms = Monotonic.now_ms() - started
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, elapsed_ms)
-		require("perf_budget").judge(Logger, LOG, "llm.remote", elapsed_ms,
+		require("core.logger.engine.perf_budget").judge(Logger, LOG, "llm.remote", elapsed_ms,
 			function() return Timings.ms("budgets", "llm_remote_request_ms") end)
 		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
@@ -1478,7 +1509,7 @@ function M.refresh_capabilities(entry)
 	local function finish(records)
 		ModelCapabilities.finish(_capabilities, provider_id, records, os.time())
 	end
-	local scheduled = require("adapters.event_loop").defer(function()
+	local scheduled = require("core.events.loop").defer(function()
 		Logger.info(LOG, "Capability listing of provider %s requested.", provider_id)
 		local dispatched = HttpClient.get(url, headers,
 			{ owner = CAPABILITY_OWNER, timeout_ms = Timings.ms("llm", "request_timeout_ms"), follow_redirects = false },

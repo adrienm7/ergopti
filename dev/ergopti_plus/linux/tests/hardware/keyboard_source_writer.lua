@@ -21,7 +21,7 @@
 
 local M = {}
 
-local Names = require("infra.device_names")
+local Names = require("platform.input.device_names")
 
 --- The relative-axis registration a keyboard source must not carry.
 M.RELATIVE_REGISTRATION = "\t\tif not admit(UI_SET_EVBIT, EV_REL) then return false end\n"
@@ -33,7 +33,7 @@ M.RELATIVE_REGISTRATION = "\t\tif not admit(UI_SET_EVBIT, EV_REL) then return fa
 --- @param path string|nil Writer path, relative to the driver root by default.
 --- @return string source
 function M.keyboard_source(path)
-	local file = assert(io.open(path or "adapters/uinput_writer.lua", "rb"), "production writer unreadable")
+	local file = assert(io.open(path or "platform/input/uinput_writer.lua", "rb"), "production writer unreadable")
 	local text = assert(file:read("*a"))
 	file:close()
 	local start, finish = text:find(M.RELATIVE_REGISTRATION, 1, true)
@@ -48,7 +48,7 @@ end
 --- @return table writer A fresh writer module instance.
 function M.load(name, path)
 	assert(type(name) == "string" and name ~= "", "fixture source name required")
-	local chunk = assert(load(M.keyboard_source(path), "@adapters/uinput_writer.lua"))
+	local chunk = assert(load(M.keyboard_source(path), "@platform/input/uinput_writer.lua"))
 	local old_name = Names.VIRTUAL_KEYBOARD
 	Names.VIRTUAL_KEYBOARD = name
 	local loaded, writer = pcall(chunk)

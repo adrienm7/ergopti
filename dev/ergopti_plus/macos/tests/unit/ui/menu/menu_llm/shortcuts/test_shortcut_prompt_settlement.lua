@@ -14,19 +14,19 @@
 local helpers = require("tests.helpers")
 local WarningContract = require("tests.support.dialog_warning_contract")
 local SHORTCUT_OWNERS = {
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"ui.menu.shortcut_utils",
-	"send_input",
+	"platform.input.send_input",
 	"infra.native_presentation",
-	"window_titles",
-	"native_presentation",
-	"infra.locale",
-	"locale.core",
-	"adapters.json_codec",
-	"infra.paths",
-	"native_path",
+	"core.ui.engine.window_titles",
+	"menu.engine.native_presentation_core",
+	"core.i18n.engine.locale",
+	"core.i18n.engine.core",
+	"core.fs.adapters.json_codec",
+	"core.fs.engine.paths",
+	"core.fs.engine.native_path",
 }
 
 local Fixture = require("tests.support.profile_delete_fixture")
@@ -36,24 +36,24 @@ local with_delete_fixture = Fixture.with_delete_fixture
 --- @param raw string Prompt input.
 --- @param body function Test callback receiving the real utility.
 local function with_real_shortcut_prompt_owned(raw, body)
-	local saved_dialog = package.loaded["infra.dialog_util"]
-	local saved_i18n = package.loaded["infra.i18n"]
-	local saved_logger = package.loaded["infra.logger"]
+	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
+	local saved_i18n = package.loaded["core.i18n.engine.i18n"]
+	local saved_logger = package.loaded["core.logger.engine.logger"]
 	local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
 	local ok, err = xpcall(function()
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function() return "button.ok", raw end,
 			alert = function() return true end,
 		}
-		local warnings = WarningContract.attach(package.loaded["infra.dialog_util"])
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		local warnings = WarningContract.attach(package.loaded["core.ui.engine.dialog_util"])
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["ui.menu.shortcut_utils"] = nil
 		body(require("ui.menu.shortcut_utils"), warnings)
 	end, debug.traceback)
-	package.loaded["infra.dialog_util"] = saved_dialog
-	package.loaded["infra.i18n"] = saved_i18n
-	package.loaded["infra.logger"] = saved_logger
+	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
+	package.loaded["core.i18n.engine.i18n"] = saved_i18n
+	package.loaded["core.logger.engine.logger"] = saved_logger
 	package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts
 	if not ok then error(err, 0) end
 end
@@ -144,8 +144,8 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 	-- so the trigger submenu opens on its debounce row and prompts for no chord.
 	helpers.it("the trigger submenu draws no dedicated shortcut row (llm-trigger-shortcut-retired)", function()
 		local saved_app_picker = package.loaded["infra.app_picker"]
-		local saved_i18n = package.loaded["infra.i18n"]
-		local saved_logger = package.loaded["infra.logger"]
+		local saved_i18n = package.loaded["core.i18n.engine.i18n"]
+		local saved_logger = package.loaded["core.logger.engine.logger"]
 		local saved_manifest = package.loaded["infra.manifest_menu"]
 		local saved_llm = package.loaded["modules.llm"]
 		local saved_shortcuts = package.loaded["ui.menu.shortcut_utils"]
@@ -153,14 +153,14 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 		local prompts = 0
 		local ok, err = xpcall(function()
 			package.loaded["infra.app_picker"] = {build_menu = function() return {} end}
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
 				platform = "hs",
-				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
-				json_decode = function(raw) return require("json").decode(raw) end,
+				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
+				json_decode = function(raw) return require("core.text.engine.json").decode(raw) end,
 				i18n = {get = function(key) return key end, section = function(key) return key end},
-				logger = package.loaded["infra.logger"],
+				logger = package.loaded["core.logger.engine.logger"],
 			}))
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_debounce = 0.2, llm_min_request_interval = 0.5},
@@ -188,8 +188,8 @@ helpers.describe("HS-033 shortcut prompt settlement propagation", function()
 			helpers.assert_eq(prompts, 0, "no row may open the shortcut prompt")
 		end, debug.traceback)
 		package.loaded["infra.app_picker"] = saved_app_picker
-		package.loaded["infra.i18n"] = saved_i18n
-		package.loaded["infra.logger"] = saved_logger
+		package.loaded["core.i18n.engine.i18n"] = saved_i18n
+		package.loaded["core.logger.engine.logger"] = saved_logger
 		package.loaded["infra.manifest_menu"] = saved_manifest
 		package.loaded["modules.llm"] = saved_llm
 		package.loaded["ui.menu.shortcut_utils"] = saved_shortcuts

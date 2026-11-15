@@ -1,4 +1,4 @@
-// AUTO-GENERATED from _shared/data/identifiers.json.
+// AUTO-GENERATED from _shared/core/text/data/identifiers.json.
 // DO NOT EDIT BY HAND — run `npm run codegen:identifiers` to refresh.
 
 // Application names, bundle ids, service labels and external hosts for the

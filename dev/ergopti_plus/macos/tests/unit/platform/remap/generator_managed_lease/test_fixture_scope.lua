@@ -9,8 +9,8 @@
 local helpers = require("tests.helpers")
 local with_fixture = require("tests.support.generator_managed_lease_fixture").with_fixture
 local OWNERS = {
-	"platform.remap.generator", "infra.logger", "adapters.file_system",
-	"infra.config_paths", "infra.keycodes", "hs", "tests.stubs.hs",
+	"platform.remap.generator", "core.logger.engine.logger", "core.fs.adapters.file_system",
+	"infra.config_paths", "platform.input.keycodes", "hs", "tests.stubs.hs",
 }
 
 local function with_observer(callback)

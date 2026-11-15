@@ -33,19 +33,19 @@ local helpers = require("tests.helpers")
 --- @param source string|nil Configuration bytes.
 --- @param body function body(context)
 local function with_caps_word(source, body)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source, function(path)
 			local context = { now = 1000, deferred = {}, resolution = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["infra.monotonic"] = {
+			package.loaded["core.logger.engine.monotonic"] = {
 				now_ms = function() return context.now end,
 				now_sec = function() return context.now / 1000 end,
 				resolution_ms = function() return context.resolution end,
 			}
-			local EventLoop = require("adapters.event_loop")
+			local EventLoop = require("core.events.loop")
 			local original_defer = EventLoop.defer
 			EventLoop.defer = function(fn, delay_ms)
 				context.deferred[#context.deferred + 1] = { fn = fn, due = context.now + delay_ms }
@@ -61,7 +61,7 @@ local function with_caps_word(source, body)
 			end
 			-- No keyboard is captured here: the session's CapsLock goes to a fake hook.
 			context.hook = require("tests.support.caps_word_lock_hook_fake").new()
-			package.loaded["adapters.keyboard_hook"] = context.hook
+			package.loaded["platform.input.keyboard_hook"] = context.hook
 			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
 			package.loaded["modules.shortcuts.manager"] = nil
 			context.AutoOff = require("modules.shortcuts.caps_word_auto_off")
@@ -157,13 +157,13 @@ helpers.describe("caps word auto-off: the settings", function()
 			helpers.assert_true(c.AutoOff.set_terminator("comma", true))
 			local f = assert(io.open(c.path, "rb"))
 			local text = assert(f:read("*a")); assert(f:close())
-			local document = require("toml_codec").decode(text)
+			local document = require("core.text.engine.toml_codec").decode(text)
 			helpers.assert_eq(table.concat(document.shortcuts.caps_word.terminators, ","), "space,comma,future_key")
 			helpers.assert_eq(table.concat(c.AutoOff.settings().terminators, ","), "space,comma")
 			helpers.assert_true(c.AutoOff.set_terminator("space", false))
 			local second = assert(io.open(c.path, "rb"))
 			local updated = assert(second:read("*a")); assert(second:close())
-			local again = require("toml_codec").decode(updated)
+			local again = require("core.text.engine.toml_codec").decode(updated)
 			helpers.assert_eq(table.concat(again.shortcuts.caps_word.terminators, ","), "comma,future_key")
 		end)
 	end)
@@ -218,7 +218,7 @@ end)
 helpers.describe("caps word auto-off: evdev pointer kinds", function()
 	helpers.it("caps word auto-off, names the kind of every pointer press", function()
 		with_caps_word(nil, function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			local kind = c.AutoOff.pointer_kind_of_button
 			helpers.assert_eq(kind(Codes.BTN_LEFT), "left_click")
 			helpers.assert_eq(kind(Codes.BTN_RIGHT), "right_click")
@@ -377,7 +377,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("caps word auto-off, a checked pointer kind ends CapsWord and an unchecked one keeps it", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nright_click = false\npointer_motion = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_RIGHT)), false)
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_motion()), false)
@@ -457,7 +457,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 			Emitter.press_codes = original
 			helpers.assert_true(called, tostring(result))
 			helpers.assert_eq(result, true)
-			helpers.assert_eq(pressed, { mods = {}, keys = { require("infra.evdev_codes").KEY_CAPSLOCK } })
+			helpers.assert_eq(pressed, { mods = {}, keys = { require("platform.input.evdev_codes").KEY_CAPSLOCK } })
 		end)
 	end)
 
@@ -530,7 +530,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("(cwl-002) enabling left click mid-session ends CapsWord at the next click", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nleft_click = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), false,
 				"control: unchecked, a click keeps it")
@@ -644,7 +644,7 @@ local function corpus()
 	local file = assert(io.open(path, "rb"), "the shared CapsWord corpus is readable")
 	local text = file:read("*a")
 	file:close()
-	return require("json").decode(text)
+	return require("core.text.engine.json").decode(text)
 end
 
 -- The policy contract proves each vector's verdict on the policy alone; these
@@ -779,13 +779,16 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "press", ev.code, ev.value, slot)')
 		helpers.assert_contains(hook, '_on_pointer_event = type(options.onPointerEvent) == "function" and options.onPointerEvent or nil')
 		-- The frame a report closes is for the metrics; it is neither a press nor a motion.
-		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot)')
+		helpers.assert_contains(hook, '_call_callback("pointer event callback", _on_pointer_event, "frame", ev.code, ev.value, slot, ev.timestamp_us)')
 		helpers.assert_contains(source("ergopti_hotstrings.lua"), 'if kind_of_event == "frame" or kind_of_event == "reset" or kind_of_event == "dropped" then return end')
+		-- Nor is a touch report, which only feeds the tap-to-click count.
+		helpers.assert_contains(source("ergopti_hotstrings.lua"),
+			'if kind_of_event == "contact" then keystats.record_pointer(kind_of_event, code, value, source); return end')
 	end)
 
 	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nmiddle_click = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("press", Codes.BTN_MIDDLE), false,
 				"an unchecked middle click keeps CapsWord on")

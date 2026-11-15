@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local names = {"llm.bootstrap_budget", "llm.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "logger.shim", "infra.i18n", "llm.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "config_outdated", "toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
+local names = {"ai.engine.bootstrap.budget", "ai.engine.local_servers.runtime_repair", "modules.llm.runtime_source", "modules.llm.owned_timer", "modules.llm.runtime_composition", "infra.logger", "core.logger.engine.shim", "core.i18n.engine.i18n", "ai.engine.settings.profile_selector", "infra.llm_bridge", "infra.manifest_reader", "infra.config_paths", "settings.engine.migration.outdated", "core.text.engine.toml_codec.writer", "infra.llm_preferences", "modules.llm.profiles"}
 local previous = {}
 for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 local function run_registered()
@@ -34,12 +34,12 @@ local logger={}
 for _,name in ipairs({'info','warn','debug','error'})do
 	logger[name]=function(_,message)if w and w.on_log then w.on_log(message)end end
 end
-fixture_ports={['logger.shim']=logger,['infra.logger']=logger,
-	['infra.i18n']={get=function(k)return k end},['llm.profile_selector']={},['infra.llm_bridge']={}}
+fixture_ports={['core.logger.engine.shim']=logger,['infra.logger']=logger,
+	['core.i18n.engine.i18n']={get=function(k)return k end},['ai.engine.settings.profile_selector']={},['infra.llm_bridge']={}}
 for name,value in pairs(fixture_ports)do package.loaded[name]=value end
-Writer = helpers.load_module("toml_codec.writer")
+Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 local function world()
-	Writer = helpers.load_module("toml_codec.writer")
+	Writer = helpers.load_module("core.text.engine.toml_codec.writer")
 	w={bytes='[llm]\nenabled = false\n[llm.models]\nselected = "ollama"\nollama = "llama3.2:3b"\n',state={
 		paused=false,blocked=false,enabled=false,backend='ollama',model='llama3.2:3b',
 		origin='http://127.0.0.1:11434',revision=5,app_epoch=2},writes=0}
@@ -52,14 +52,20 @@ local function world()
 			if owner.on_publication_read then owner.on_publication_read(owner.batch_frame)end
 		end
 		if owner.on_read then owner.on_read(owner.reads)end
+		if owner.bytes==nil then return nil,'absent' end
 		return owner.bytes,'ok'
 	end
+	-- An absent source has no bytes to compare, as for the real file adapter.
+	local function unchanged(source)
+		if owner.bytes==nil then return source.status=='absent' end
+		return source.status=='ok' and source.content==owner.bytes
+	end
 	function memory.write_if_unchanged(_,content,source)
-		if owner.write_refused or source.status~='ok' or source.content~=owner.bytes then return false,'source changed'end
+		if owner.write_refused or not unchanged(source) then return false,'source changed'end
 		owner.bytes=content;owner.writes=owner.writes+1;return true
 	end
 	function memory.write_if_unchanged_admitted(path,content,source,on_error,admission)
-		if source.status~='ok' or source.content~=owner.bytes then return false,'source changed'end
+		if not unchanged(source) then return false,'source changed'end
 		local called,allowed=pcall(admission)
 		if not called or allowed~=true then return false,'final admission refused'end
 		return memory.write_if_unchanged(path,content,source)
@@ -86,8 +92,8 @@ local function world()
 		end}
 	package.loaded['infra.manifest_reader']=manifest
 	package.loaded['infra.config_paths']={config=function()return '/memory/config.toml'end}
-	package.loaded['config_outdated']={manifest_value_fits=function()return true end,report=function()end}
-	package.loaded['toml_codec.writer']=routed
+	package.loaded['settings.engine.migration.outdated']={manifest_value_fits=function()return true end,canonical_enum_value=function(_,value)return value end,report=function()end}
+	package.loaded['core.text.engine.toml_codec.writer']=routed
 	local prefs = helpers.load_module("infra.llm_preferences")
 	package.loaded['infra.llm_preferences']=prefs
 	local profiles = helpers.load_module("modules.llm.profiles")
@@ -116,7 +122,7 @@ local function world()
 		owner.state.enabled=false;return true
 	end
 	owner.source=Source.new({preferences=prefs,profiles=profiles,writer=routed,manifest=manifest,engine=engine,backend_key='llm.models.selected',path='/memory/config.toml'})
-	package.loaded['toml_codec.writer']=Writer
+	package.loaded['core.text.engine.toml_codec.writer']=Writer
 	-- Actual Preferences captured its routed Writer at module import.
 	function owner:capture()self.handle=self.source.capture();assert(self.handle,'source capture must be admitted');return self.handle end
 	function owner:publish()
@@ -133,6 +139,15 @@ test('actual profile/preference/shared writer ACK produces exact private app pro
 	local v=world();v:capture();local before=v.preferences.generation();eq(v:publish(),true)
 	eq(v.writes,1);eq(v.accept_count,1);eq(v.preferences.generation(),before+2);eq(v.state.enabled,true)
 	eq(v.source.app_current(v.application,v.runtime,v.handle.origin),true)
+end)
+-- (runtime-absent-config) config_migrate leaves an absent config.toml absent,
+-- and the writer's preimage of it carries "" where the preference read carries
+-- nil: starting Ergopti's Ollama was refused (runtime_writer_unacknowledged_restored)
+-- until an absent source compared by status alone (container proof 2026-11-10).
+test('(runtime-absent-config) an absent config.toml publishes the enable it creates',function()
+	local v=world();v.bytes=nil;v:capture();eq(v:publish(),true)
+	eq(v.writes,1);eq(v.accept_count,1);eq(v.state.enabled,true)
+	eq(v.bytes:find('enabled = true',1,true)~=nil,true)
 end)
 test('exact preview preserves independent unrelated bytes',function()
 	local v=world();v.bytes=v.bytes..'# independent preserved comment\n';v:capture();eq(v:publish(),true)
@@ -373,7 +388,7 @@ for _, stale in ipairs({ false, true }) do
 		diagnostic_origin(v,'original');v.reads=0
 		if stale then v.on_read=function(count)if count==2 then v.bytes=v.bytes..'# external source edit\n'end end end
 		local notices, logs=0,0
-		package.loaded['adapters.notifier']={send=function(_,options)
+		package.loaded['platform.system.notifier']={send=function(_,options)
 			notices=notices+1;eq(options.level,'error');return true
 		end}
 		v.on_log=function(template)
@@ -383,7 +398,7 @@ for _, stale in ipairs({ false, true }) do
 		local text=assert(helpers.read_driver_unit('local function SYSTEM_CLOCK('))
 		local callback=assert(text:match('request:on_result%((function%(result%).-\n\t\t\t\tend)%)'), 'actual production runtime failure observer')
 		local env={type=type,tostring=tostring,require=require,Logger=logger,LOG='runtime-notice-test',
-			owner={source=v.source},handle=v.handle,I18n=require('infra.i18n')}
+			owner={source=v.source},handle=v.handle,I18n=require('core.i18n.engine.i18n')}
 		local chunk
 		if setfenv then chunk=assert(loadstring('return '..callback));setfenv(chunk,env)
 		else chunk=assert(load('return '..callback,'actual-runtime-error-observer','t',env))end

@@ -15,7 +15,7 @@
 ; 2. Background polling: optional periodic silent check; surfaces a TrayTip
 ;    on new releases and updates the menu label immediately.
 ; 3. Channel-aware: the user subscribes to one channel of the shared registry
-;    (_shared/modules/updater/channels.json, most stable first). The choice is
+;    (_shared/updater/data/channels.json, most stable first). The choice is
 ;    persisted in the shared config TOML by Updater_SetChannel, its one owner.
 ; 4. GitHub Releases API: async WinHTTP requests retain immutable manual or
 ;    background provenance through their terminal callback.

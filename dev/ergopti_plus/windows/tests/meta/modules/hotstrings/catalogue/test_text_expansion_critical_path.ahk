@@ -69,9 +69,9 @@ _MetaCheckTextExpansionOnCriticalPath() {
 	MarkPos := InStr(Body, "magickey text_expansion registered")
 	Assert(MarkPos > HeaderPos,
 		"the 'magickey text_expansion registered' BootProfile mark must follow the 4.3 header")
-	GatePos := InStr(Body, "if !DeferHeavy", , HeaderPos)
+	GatePos := InStr(Body, "if DeferHeavy", , HeaderPos)
 	Assert(GatePos > MarkPos,
-		"text_expansion (section 4.3) must NOT sit behind 'if !DeferHeavy' -- it registers on the "
+		"text_expansion (section 4.3) must NOT sit behind a DeferHeavy gate -- it registers on the "
 		. "boot critical path. The next DeferHeavy gate must be the emoji/symbol one, after the mark.")
 
 	; Emoji/symbols must STAY deferred: the deferred orchestrator exists and the

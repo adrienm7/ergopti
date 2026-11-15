@@ -12,7 +12,7 @@ Orchestrates dynamic text expansions that cannot be stored as static hotstring t
 | `TextSender`     | Injecting expanded text via the keymap expander         |
 | `TimerScheduler` | Debounce between trigger detection and expansion firing |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 - `HotstringMatcher.spec.js` — the rules engine exposes match callbacks consumed by the keymap's Registry under this contract
 

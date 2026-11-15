@@ -23,7 +23,7 @@ local table_unpack = table.unpack or unpack
 --- @param key string
 --- @return table|nil
 local function submenu_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item.menu end
 	end
@@ -35,7 +35,7 @@ end
 --- @param key string
 --- @return table|nil
 local function parent_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if type(item.title) == "string" and item.title:find(label, 1, true) then return item end
 	end
@@ -58,11 +58,13 @@ end
 --- @param llm table
 --- @param changed table|nil Receives a `count` of on_menu_changed calls.
 --- @return table items
-local function build(llm, changed)
+local function build(llm, changed, paused)
 	local mb = helpers.load_module("ui.menu.builder")
 	return mb.build({
 		_version = "0.0.0-dev.12",
 		llm = llm,
+		paused = paused == true,
+		is_paused = function() return paused == true end,
 		on_quit = function() end,
 		on_menu_changed = function() if changed then changed.count = changed.count + 1 end end,
 	})
@@ -74,7 +76,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		local items = build(llm)
 		local rows = submenu_of(items, "menu.llm.title")
 		helpers.assert_true(rows ~= nil and rows[1] ~= nil, "the AI submenu must be drawn")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].title, require("core.i18n.engine.i18n").get("menu.llm.enable"))
 		helpers.assert_eq(rows[1].checked, false, "the switch is a checkbox, unticked while off")
 		helpers.assert_eq(type(rows[1].fn), "function", "the toggle row must act")
 		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, false, "the parent is unticked too")
@@ -84,7 +86,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		local llm = fake_llm(true)
 		local items = build(llm)
 		local rows = submenu_of(items, "menu.llm.title")
-		helpers.assert_eq(rows[1].title, require("infra.i18n").get("menu.llm.enable"))
+		helpers.assert_eq(rows[1].title, require("core.i18n.engine.i18n").get("menu.llm.enable"))
 		helpers.assert_eq(rows[1].checked, true, "the switch is ticked while on")
 		helpers.assert_eq(parent_of(items, "menu.llm.title").checked, true, "the parent row is ticked too")
 	end)
@@ -98,12 +100,29 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 		helpers.assert_eq(changed.count, 1, "the tray must be rebuilt so the label follows the state")
 	end)
 
+	-- A pause stops typing, not configuration (EDD-1): an AI that is on can be
+	-- switched off while paused; turning it on waits for resume.
+	helpers.it("turns an enabled AI off while paused (edd1-paused-writes)", function()
+		local llm, calls = fake_llm(true)
+		local rows = submenu_of(build(llm, nil, true), "menu.llm.title")
+		helpers.assert_true(rows[1].disabled ~= true, "the switch stays live")
+		rows[1].fn()
+		helpers.assert_eq(calls.toggle, 1, "the paused click reaches llm.toggle")
+	end)
+
+	helpers.it("keeps an off AI off while paused (edd1-paused-writes)", function()
+		local llm, calls = fake_llm(false)
+		local rows = submenu_of(build(llm, nil, true), "menu.llm.title")
+		if type(rows[1].fn) == "function" then rows[1].fn() end
+		helpers.assert_eq(calls.toggle, 0, "turning the AI on waits for resume")
+	end)
+
 	-- ai-menu-no-clear: « Tout effacer (comportement du système) » sat under the
 	-- switch and cleared a section with nothing for the system to do in its
 	-- place; the maintainer retired it. « Restaurer les valeurs conseillées »
 	-- stays the one row between the switch and the separator.
 	helpers.it("draws the restore row under the switch and no clear row", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(fake_llm(true)), "menu.llm.title")
 		helpers.assert_true(rows ~= nil and #rows > 3, "the AI submenu must be drawn")
 		helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"), "the restore row follows the switch")
@@ -120,7 +139,7 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 	-- groups with one separator as the submenu of the other drivers.
 	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
 		helpers.it("draws the generation groups with the AI " .. state, function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = submenu_of(build(fake_llm(enabled)), "menu.llm.title")
 			local head = function(key) return i18n.get(key):match("^[^%%]*") end
 			local first, last
@@ -129,12 +148,12 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 				if row.title:find(head("menu.llm.reset_on_nav"), 1, true) then last = index end
 			end
 			helpers.assert_true(first ~= nil and last ~= nil, "the generation rows are drawn")
-			require("test.ai_menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
+			require("tests.lua.ai.menu_layout_contract").assert_generation(helpers, { table_unpack(rows, first, last) }, {
 				count = head("menu.llm.num_predictions_label"), min_words = head("menu.llm.min_words_label"),
 				max_words = head("menu.llm.max_words_label"), context = head("menu.llm.generation.context_length"),
 				clear_context = head("menu.llm.reset_on_nav"),
 			}, state)
-			require("test.ai_menu_layout_contract").assert_clean_separators(helpers, rows, state)
+			require("tests.lua.ai.menu_layout_contract").assert_clean_separators(helpers, rows, state)
 		end)
 	end
 
@@ -143,12 +162,12 @@ helpers.describe("tray (linux): the AI master toggle row", function()
 	for state, enabled in pairs({ ["on"] = true, ["off"] = false }) do
 		for model_state, model in pairs({ ["a model"] = "local-a", ["no model"] = false }) do
 			helpers.it("keeps the model, profile and test block with the AI " .. state .. " and " .. model_state, function()
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local llm = fake_llm(enabled)
 				llm.get_current_model = function() return model or nil end
 				llm.get_prediction_model = llm.get_current_model
 				local rows = submenu_of(build(llm), "menu.llm.title")
-				require("test.ai_menu_layout_contract").assert_block(helpers, rows, {
+				require("tests.lua.ai.menu_layout_contract").assert_block(helpers, rows, {
 					profile = i18n.get("menu.profiles.profile_label_prefix"):match("^[^%%{]*"),
 					test = i18n.get("menu.llm.test_prediction"),
 					trigger = i18n.get("menu.llm.trigger_menu_title"),
@@ -209,14 +228,14 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 
 	helpers.it("draws no empty slot group when the catalogue cannot be read", function()
 		with_unavailable_source(function()
-			local saved_paths = package.loaded["infra.paths"]
+			local saved_paths = package.loaded["core.fs.engine.paths"]
 			local saved_kbd = package.loaded["modules.shortcuts.keyboard_shortcuts"]
-			local real_paths = require("infra.paths")
+			local real_paths = require("core.fs.engine.paths")
 			local blind = setmetatable({ shared = function() return nil end }, { __index = real_paths })
-			package.loaded["infra.paths"] = blind
+			package.loaded["core.fs.engine.paths"] = blind
 			package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 			local ok_kbd, kbd = pcall(require, "modules.shortcuts.keyboard_shortcuts")
-			package.loaded["infra.paths"] = saved_paths
+			package.loaded["core.fs.engine.paths"] = saved_paths
 			local ok, err = pcall(function()
 				helpers.assert_true(ok_kbd, tostring(kbd))
 				kbd._reset()
@@ -278,20 +297,20 @@ local function with_slot_frame(locale, mutation, body)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local saved_i18n_safe = rawget(_G, "i18n_safe")
 	local ok, raised = pcall(function()
-		local Paths = require("infra.paths")
-		local json = require("json")
-		local file = assert(io.open(Paths.shared("data/locales/" .. locale .. ".json"), "rb"))
+		local Paths = require("core.fs.engine.paths")
+		local json = require("core.text.engine.json")
+		local file = assert(io.open(Paths.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 		local catalogue = json.decode(file:read("*a"))
 		assert(file:close())
 		local state = { opened = {}, assigned = {}, accepts = true, catalogue = catalogue }
 		local function translate(key) return catalogue[key] or key end
 		-- Both the old native path and shared rendering receive the same real
 		-- catalogue, so predecessor comparisons do not invent a locale failure.
-		package.loaded["infra.i18n"] = { get = translate, section = translate,
+		package.loaded["core.i18n.engine.i18n"] = { get = translate, section = translate,
 			get_locale = function() return locale end }
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			json_decode = json.decode,
 			i18n = { get = translate, section = translate },
 			logger = helpers.make_logger_stub(),
@@ -421,9 +440,9 @@ end)
 
 helpers.describe("Linux rendered AI source refusal", function()
 	helpers.it("disables the genuine toggle row and refuses a retained click after newer-schema boot (ai-readonly-admission)", function()
-		local Sandbox = require("test.config_unused_keys_contract").sandbox
-		local Migration = require("config_migrate")
-		local registry = assert(Migration.load_registry(require("infra.paths").shared(Migration.REGISTRY_PATH)))
+		local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+		local Migration = require("settings.engine.migration.migrate")
+		local registry = assert(Migration.load_registry(require("core.fs.engine.paths").shared(Migration.REGISTRY_PATH)))
 		local source = '[_meta]\nschema_version = ' .. (registry.current + 1)
 			.. '\n[llm]\nenabled = false\n[private]\nkeep = "exact"\n'
 		Sandbox.with_config(source, function(path)
@@ -434,7 +453,7 @@ helpers.describe("Linux rendered AI source refusal", function()
 					config = function() return path end,
 					config_home = function() return assert(path:match("^(.*)/[^/]+$")) end,
 					-- The storage adapter keeps storage.json in the default configuration folder.
-					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("app_dirs").linux.folder_name end,
+					default_config_dir = function() return assert(path:match("^(.*)/[^/]+$")) .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 				}
 				package.loaded["infra.llm_preferences"] = nil
 				local llm, calls = fake_llm(false)

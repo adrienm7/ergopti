@@ -11,11 +11,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
-local Json = require("json")
-local Policy = require("control.driver_control")
+local AppDirs = require("core.fs.engine.app_dirs")
+local Json = require("core.text.engine.json")
+local Policy = require("diagnostics.engine.control_driver_control")
 
-require("test.driver_control_contract").run(helpers, helpers.shared(""))
+require("tests.lua.core_lifecycle.driver_control_contract").run(helpers, helpers.shared(""))
 
 local function read(path)
 	local file = assert(io.open(path, "rb"))
@@ -24,7 +24,7 @@ local function read(path)
 	return text
 end
 
-local SPEC_TEXT = read(helpers.shared("modules/control/driver_control.json"))
+local SPEC_TEXT = read(helpers.shared("diagnostics/data/control/driver_control.json"))
 local SPEC = Policy.validate(Json.decode(SPEC_TEXT))
 local TOKEN = Json.decode(read(helpers.shared("tests/corpus/control/driver_control.json"))).token
 local FOLDER = "/Users/u/" .. AppDirs.macos.support_relative .. "/control"
@@ -91,7 +91,7 @@ local function world(coordinator, files)
 			return true
 		end,
 	}
-	local DriverControl = require("infra.driver_control")
+	local DriverControl = require("core.lifecycle.engine.driver_control")
 	state.session = DriverControl.new({ spec = SPEC, folder = FOLDER, pid = 777, ports = ports,
 		request_reload = function(reason, on_aborted)
 			state.calls[#state.calls + 1] = reason
@@ -104,15 +104,15 @@ end
 --- @param options table Native fault controls.
 --- @param callback function Receives the module and independently observable native state.
 local function with_native_world(options, callback)
-	helpers.with_stub_scope({ "infra.driver_control", "infra.logger", "adapters.file_system", "adapters.shell_runner", "adapters.timer_scheduler", "app_dirs" }, function()
+	helpers.with_stub_scope({ "core.lifecycle.engine.driver_control", "core.logger.engine.logger", "core.fs.adapters.file_system", "core.process.adapters.shell_runner", "core.events.timer_scheduler", "core.fs.engine.app_dirs" }, function()
 		local state = { files = {}, stops = 0, starts = 0, created = 0, running = false, options = options }
 		state.errors = {}
 		local module
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, message, ...) state.errors[#state.errors + 1] = string.format(message, ...) end
 		logger.start = function() if options.on_log_start then options.on_log_start(module, state) end end
-		package.loaded["infra.logger"] = logger
-		module = helpers.load_with_stubs("infra.driver_control", {
+		package.loaded["core.logger.engine.logger"] = logger
+		module = helpers.load_with_stubs("core.lifecycle.engine.driver_control", {
 			fs = { attributes = function() return { mode = "directory", permissions = "rwx------" } end },
 			pathwatcher = { new = function(folder, delivery)
 				state.folder = folder
@@ -145,7 +145,7 @@ local function with_native_world(options, callback)
 			end },
 		})
 		state.deferred = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback }
 				state.deferred[#state.deferred + 1] = handle
@@ -153,8 +153,8 @@ local function with_native_world(options, callback)
 			end,
 			cancel = function(handle) handle.cancelled = true; return true end,
 		}
-		package.loaded["adapters.shell_runner"] = { exec = function() return "" end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.process.adapters.shell_runner"] = { exec = function() return "" end }
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				if options.read_error and path:sub(-#"/session.json") == "/session.json" then return nil end
 				return path == "declaration" and SPEC_TEXT or state.files[path]
@@ -590,13 +590,13 @@ helpers.describe("macOS local driver control", function()
 	helpers.it("starts after a complete boot on the owned controlled reload and stops in teardown", function()
 		local init = assert(helpers.read_driver_unit("Storage.set(HS_BOOT_READY_SETTING_KEY, true)"))
 		local ready = assert(init:find("Storage.set(HS_BOOT_READY_SETTING_KEY, true)", 1, true))
-		local start = init:find('require("infra.driver_control").start({', 1, true)
+		local start = init:find('require("core.lifecycle.engine.driver_control").start({', 1, true)
 		helpers.assert_true(start ~= nil and start > ready, "the control starts once boot is complete")
 		helpers.assert_true(init:find("return TerminationCoordinator.request_reload_owned(reason, on_aborted)", start, true) ~= nil,
 			"a request goes through the owned controlled reload")
 		local step = init:find('name = "driver-control",', 1, true)
 		helpers.assert_true(step ~= nil and step < ready, "the local teardown retires the control")
-		helpers.assert_true(init:find('package.loaded["infra.driver_control"]', step, true) ~= nil)
+		helpers.assert_true(init:find('package.loaded["core.lifecycle.engine.driver_control"]', step, true) ~= nil)
 	end)
 
 	helpers.it("ignores other files in the folder and refuses a second start", function()

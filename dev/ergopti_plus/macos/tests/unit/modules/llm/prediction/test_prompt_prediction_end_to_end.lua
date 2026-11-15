@@ -20,9 +20,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
-local SharedPromptBuilder = require("llm.prompt_builder")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local ENTRY_ID = "e2e-cerebras"
@@ -63,8 +63,7 @@ local function build_world(buffer)
 	-- Every driver module is loaded fresh: the acceptance fixture of a previous
 	-- scenario leaves its own doubles (manifest reader, keymap, tooltip) cached
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -81,10 +80,10 @@ local function build_world(buffer)
 		path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	for _, name in ipairs({
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
@@ -103,7 +102,7 @@ local function build_world(buffer)
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,

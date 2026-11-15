@@ -11,9 +11,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Configuration = require("healthcheck.configuration")
-local Toml = require("toml_codec")
+local Json = require("core.text.engine.json")
+local Configuration = require("diagnostics.engine.healthcheck.configuration")
+local Toml = require("core.text.engine.toml_codec")
 
 --- The shared corpus.
 --- @return table
@@ -53,7 +53,7 @@ helpers.describe("diagnostics configuration reducer", function()
 end)
 
 helpers.describe("diagnostics configuration sharing", function()
-	local Share = require("healthcheck.share")
+	local Share = require("diagnostics.engine.healthcheck.share")
 
 	--- Reads a shared JSON document.
 	--- @param rel string Path under _shared/.
@@ -65,8 +65,8 @@ helpers.describe("diagnostics configuration sharing", function()
 		return data
 	end
 
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	local controls = shared_json("tests/corpus/healthcheck/configuration_share_vectors.json")
 
 	--- A minimal host snapshot carrying only the configuration sections.
@@ -190,9 +190,9 @@ end)
 
 -- Reloaded under the stubbed runtime and restored after the case
 local PROBE_MODULES = {
-	"tests.stubs.hs", "infra.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
-	"adapters.system_info", "adapters.key_state", "adapters.network_info", "adapters.accessibility_permission",
-	"adapters.screen_capture", "adapters.timer_scheduler", "healthcheck.configuration",
+	"tests.stubs.hs", "core.logger.engine.logger", "ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes",
+	"platform.system.info", "platform.input.key_state", "core.network.adapters.info", "adapters.accessibility_permission",
+	"platform.system.screen_capture", "core.events.timer_scheduler", "diagnostics.engine.healthcheck.configuration",
 }
 
 --- Runs a case under the stubbed Hammerspoon runtime.
@@ -205,7 +205,7 @@ local function under_stub(body)
 		hs_stub.execute = function() return "", false end
 		hs_stub.host.vmStat = function() return { memSize = 17179869184, pagesFree = 1000, pageSize = 16384 } end
 		hs_stub.usb = { attachedDevices = function() return {} end }
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		body(hs_stub)
 	end)
 	if not ok then error(err, 0) end
@@ -226,7 +226,7 @@ local function slow_configuration_reader(calls, slow_ms)
 			return { files = { items = {} }, settings = { items = {} } }
 		end
 	end
-	package.loaded["healthcheck.configuration"] = guard
+	package.loaded["diagnostics.engine.healthcheck.configuration"] = guard
 end
 
 helpers.describe("diagnostics configuration is collected by a probe, not by phase A", function()
@@ -263,7 +263,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 	helpers.it("a report from the Debug menu completes the configuration after phase A", function()
 		under_stub(function()
 			local completed = {}
-			package.loaded["healthcheck.configuration"] = {
+			package.loaded["diagnostics.engine.healthcheck.configuration"] = {
 				complete = function(snapshot)
 					completed[#completed + 1] = snapshot
 					snapshot.probes.configuration = { state = "ok", cleanup = "settled", ms = 1 }
@@ -281,7 +281,7 @@ helpers.describe("diagnostics configuration is collected by a probe, not by phas
 	--- @return table published, table timers, table run
 	local function start_local(clock_step, extra)
 		local published, timers = {}, {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(seconds, fn)
 				local handle = { seconds = seconds, fn = fn }
 				timers[#timers + 1] = handle
@@ -394,7 +394,7 @@ helpers.describe("an over-budget synchronous collection names its slowest collec
 		under_stub(function(hs_stub)
 			slow_configuration_reader({}, 0)
 			local lines = {}
-			package.loaded["infra.logger"].info = function(_, format, ...)
+			package.loaded["core.logger.engine.logger"].info = function(_, format, ...)
 				lines[#lines + 1] = string.format(format, ...)
 			end
 			-- The memory read is the hardware collector's: make it hold the thread

@@ -12,8 +12,8 @@
 
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
-local Json = require("json")
-local SessionEvents = require("keystats.session_events")
+local Json = require("core.text.engine.json")
+local SessionEvents = require("metrics.engine.system.session_events")
 
 local function read(path)
 	local handle = assert(io.open(path, "rb"), "cannot open " .. path)
@@ -49,6 +49,7 @@ helpers.describe("session events: the recorder", function()
 		local fake_writer = setmetatable({
 			open_db = function() return true end,
 			ensure_token_encoding = function() return true end,
+			ensure_awake_definition = function() return true end,
 			register_device = function() return true end,
 			read_open_walk = function() return nil, true end,
 			upsert_open_walk = function() return true end,
@@ -64,7 +65,7 @@ helpers.describe("session events: the recorder", function()
 			keystats.init({ sqlite_path = "/tmp/ergopti_keystats_session_mock.sqlite" })
 			require("tests.support.metrics_consent_fixture").enable(keystats)
 			keystats.reset_session()
-			local now = math.floor(require("infra.monotonic").now_ms())
+			local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 			keystats.on_keydown("a", now, "org.mozilla.firefox", 30)
 			keystats.on_keydown("b", now + 100, "org.mozilla.firefox", 48)
 			keystats.flush()

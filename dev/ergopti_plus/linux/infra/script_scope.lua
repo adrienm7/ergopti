@@ -3,11 +3,11 @@
 --- Registers the global declaration's own script rows through native owners.
 local M = {}
 local Manifest = require("infra.manifest_reader")
-local Runtime = require("script_scope_runtime")
-local Transaction = require("config_scope_transaction")
-local Fenced = require("config_scope_fenced_transaction")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Runtime = require("settings.engine.scope.script_scope_runtime")
+local Transaction = require("settings.engine.scope.transaction")
+local Fenced = require("settings.engine.scope.fenced_transaction")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 local _owner, _edit_owners, _sequence = nil, {}, 0
 require("infra.scope_registry").register("script_scope", function()
 	if _owner ~= nil and _owner.pending() == true then return true end
@@ -24,7 +24,7 @@ local ALIAS_NAMES = {
 
 --- Native field owner module of each directly declared script row.
 local NATIVE_OWNERS = {
-	[ConfigKeys.KEY.SCRIPT_LOCALE] = "infra.i18n",
+	[ConfigKeys.KEY.SCRIPT_LOCALE] = "core.i18n.engine.i18n",
 	[ConfigKeys.KEY.SCRIPT_LOG_LEVEL] = "infra.script_settings",
 	[ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG] = "ui.error_dialog.bridge",
 }
@@ -50,9 +50,9 @@ end
 --- Runs before the error window, the log level and i18n read their alias.
 --- @return table|nil adopted Canonical path -> adopted value.
 function M.adopt_configured()
-	return require("script_config_authority").adopt({
+	return require("settings.engine.scope.script_config_authority").adopt({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, platform = "linux",
-		aliases = M.alias_names(), storage = require("adapters.storage"), logger = Logger, log = "infra.script_scope" })
+		aliases = M.alias_names(), storage = require("core.fs.adapters.storage"), logger = Logger, log = "infra.script_scope" })
 end
 
 --- Rewrites the config.toml row a menu or wizard change replaces, when the
@@ -62,7 +62,7 @@ end
 --- @return boolean committed
 function M.rewrite_configured(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	local committed, detail = require("script_config_authority").rewrite({
+	local committed, detail = require("settings.engine.scope.script_config_authority").rewrite({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
 	if committed ~= true then Logger.error("infra.script_scope", "%s was not changed: %s.", path, tostring(detail)) end
 	return committed == true
@@ -70,27 +70,29 @@ end
 
 function M.rewrite_configured_owned(path, value)
 	assert(ALIAS_NAMES[path] ~= nil, "not a native script row: " .. tostring(path))
-	return require("script_config_authority").rewrite_owned({
+	return require("settings.engine.scope.script_config_authority").rewrite_owned({
 		path = require("infra.config_paths").config("config.toml"), manifest = Manifest, key = path, value = value })
 end
 
 function M.restore_configured_rewrite(receipt)
-	return require("script_config_authority").restore_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").restore_rewrite(receipt)
 end
 
 function M.verify_configured_rewrite(receipt)
-	return require("script_config_authority").verify_rewrite(receipt)
+	return require("settings.engine.scope.script_config_authority").verify_rewrite(receipt)
 end
 
 --- Creates the direct participant's existing file transaction and native fences.
---- @param options table Path, backup path, storage backup path, files and pause getter.
+--- A pause does not refuse it: a pause stops typing, not configuration (EDD-1,
+--- maintainer decision 2026-11-12).
+--- @param options table Path, backup path, storage backup path and files.
 --- @return table owner Apply/revert/release/pending/retry_restore.
 function M.new(options)
-	assert(type(options) == "table" and type(options.is_paused) == "function", "script scope requires its pause owner")
+	assert(type(options) == "table", "script scope requires its options")
 	local transaction
 	local token = { pending = function() return transaction ~= nil and transaction.pending() end, edit_key = options.edit_key }
 	local runtime = Runtime.new({ manifest = Manifest, platform = "linux", aliases = options.aliases or aliases(),
-		storage = options.storage or require("adapters.storage"), token = token, files = options.files,
+		storage = options.storage or require("core.fs.adapters.storage"), token = token, files = options.files,
 		only = options.only, allow_invalid_source = options.allow_invalid_source, storage_backup_path = function() return options.storage_backup_path end })
 	transaction = Transaction.new({ path = options.path, backup_path = options.backup_path, files = options.files,
 		manifest = runtime.manifest,
@@ -101,7 +103,7 @@ function M.new(options)
 	local owner
 	owner = Fenced.new({ owner = {}, native_token = token, transaction = transaction, scope = "global",
 		fences = runtime.fences, available = function()
-			return options.is_paused() == false and require("config_migrate").read_only_reason(options.path) == nil
+			return require("settings.engine.migration.migrate").read_only_reason(options.path) == nil
 		end })
 	local release = owner.release
 	function owner.release()
@@ -134,9 +136,10 @@ function M.edit_setting(key, value)
 	local path = require("infra.config_paths").config("config.toml")
 	local timestamp = os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence
 	local backup = path .. ".edit-" .. timestamp .. ".bak"
+	local storage_backup = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak"
 	local field = assert(key:match("^script%.([%w_]+)$"))
 	local function prepare(target, updates, files)
-		local Writer, Codec = require("toml_codec.writer"), require("toml_codec")
+		local Writer, Codec = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec")
 		local content, status, detail = Writer.read_classified(target, files)
 		if status ~= "ok" and status ~= "absent" then return false, detail end
 		local source = { status = status, content = status == "ok" and content or nil }
@@ -147,8 +150,8 @@ function M.edit_setting(key, value)
 		return Writer.prepare_batch(target, script and script[field] ~= nil and updates or {}, files, source)
 	end
 	local owner = M.new({ path = path, backup_path = backup,
-		storage_backup_path = require("infra.config_paths").default_config_dir() .. "/storage.edit-" .. timestamp .. ".bak",
-		files = require("adapters.file_system"), is_paused = function() return false end, allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
+		storage_backup_path = storage_backup,
+		files = require("core.fs.adapters.file_system"), allow_invalid_source = true, edit_key = key, allow_boolean = key == ConfigKeys.KEY.SCRIPT_SHOW_ERROR_DIALOG,
 		aliases = { [key] = { alias = alias, native = require(native_name) } }, only = { [key] = true },
 		prepare_batch = prepare, preserve_unchanged = true,
 		validate_update = function(scope, row)
@@ -157,35 +160,43 @@ function M.edit_setting(key, value)
 	_edit_owners[key] = owner
 	local committed = owner.apply_updates({ { section = "script", key = field, value = value } })
 	if committed ~= true then return false end
-	return owner.release() == true
+	if owner.release() ~= true then return false end
+	-- A released edit has nothing left to roll back: its two copies, named for
+	-- this edit alone, go. Windows and macOS keep no copy per edit (CFL-002).
+	for _, copy in ipairs({ backup, storage_backup }) do
+		local removed, detail = os.remove(copy)
+		local remaining = not removed and io.open(copy, "rb") or nil
+		if remaining then
+			remaining:close()
+			Logger.warn("infra.script_scope", "An edit's rollback copy could not be removed (%s): %s.", copy, tostring(detail))
+		end
+	end
+	return true
 end
 
 function M.edit_locale(value) return M.edit_setting(ConfigKeys.KEY.SCRIPT_LOCALE, value) end
 
 --- Applies requested script rows, retaining its exact native/file inverse.
 --- @param mode string Recommended or clear.
---- @param is_paused function Live pause getter.
 --- @return boolean committed
 --- @return string|nil detail
-function M.apply(mode, is_paused)
-	if type(is_paused) ~= "function" or is_paused() ~= false then return false, "script configuration is paused" end
+function M.apply(mode)
 	if _owner and _owner.pending() and _owner.retry_restore() ~= true then return false, "script rollback remains pending" end
 	_sequence = _sequence + 1
 	local path = require("infra.config_paths").config("config.toml")
 	local backup = path .. ".script-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak"
 	_owner = M.new({ path = path, backup_path = backup, storage_backup_path = backup .. ".settings",
-		files = require("adapters.file_system"), is_paused = is_paused })
+		files = require("core.fs.adapters.file_system") })
 	local committed, detail = _owner.apply(mode)
 	if committed ~= true then Logger.warn("infra.script_scope", "Script scope refused: %s.", tostring(detail)) end
 	return committed, detail
 end
 
 --- Retains the exact participant cohort through the shared composition.
---- @param is_paused function Live pause getter.
 --- @return table participant Shared synchronous participant.
-function M.participant(is_paused)
-	return require("config_scope_participant").synchronous({
-		apply = function(mode) return M.apply(mode, is_paused) end,
+function M.participant()
+	return require("settings.engine.scope.participant").synchronous({
+		apply = function(mode) return M.apply(mode) end,
 		owner = function() return _owner end,
 	})
 end

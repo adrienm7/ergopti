@@ -9,14 +9,14 @@
 
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local Atspi = require("adapters.atspi_focus")
-local Detector = require("adapters.secure_field_detector")
+local Atspi = require("platform.focus.atspi_focus")
+local Detector = require("platform.focus.secure_field_detector")
 local FocusGuard = require("modules.keystats.focus_guard")
-local CaptureGate = require("infra.input_capture_gate")
+local CaptureGate = require("platform.input.capture_gate")
 local Engine = require("modules.hotstrings.engine")
 local Runtime = require("infra.user_hotstring_runtime")
-local FileSystem = require("adapters.file_system")
-local Timer = require("adapters.timer_scheduler")
+local FileSystem = require("core.fs.adapters.file_system")
+local Timer = require("core.events.timer_scheduler")
 local Injector = require("modules.hotstrings.injector")
 local uv = require("luv")
 local NativeConfigPaths = require("infra.config_paths")
@@ -24,7 +24,7 @@ local NativeConfigPaths = require("infra.config_paths")
 -- Canonical source discovery also loads the installed-layout registry and its
 -- updater/storage readers. They capture paths at require time, so fixture paths
 -- and every such module owner must be scoped together, including false/nil caches.
-local DISCOVERY_OWNERS = { "adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "infra.i18n" }
+local DISCOVERY_OWNERS = { "core.fs.adapters.storage", "modules.updater.manager", "modules.keymap.layout_registry", "core.i18n.engine.i18n" }
 
 local function drain()
 	for _ = 1, 16 do
@@ -35,7 +35,7 @@ local function drain()
 end
 
 local function with_runtime(body)
-	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "adapters.application_notifier" }
+	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "platform.focus.application_notifier" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do owned[#owned + 1] = name end
 	local previous = {}
 	for _, path in ipairs(owned) do previous[path] = package.loaded[path]; package.loaded[path] = nil end
@@ -47,7 +47,7 @@ local function with_runtime(body)
 	_G.__LINUX_USER_HOTSTRING_FIXTURE = f
 	package.loaded["infra.config_paths"] = setmetatable({ get_config_dir = function() return "/owned" end },
 		{ __index = NativeConfigPaths })
-	package.loaded["adapters.application_notifier"] = { send = function() f.notified = true; return true end }
+	package.loaded["platform.focus.application_notifier"] = { send = function() f.notified = true; return true end }
 	f.content = [[return function(api)
 		local f=__LINUX_USER_HOTSTRING_FIXTURE
 		f.factories=f.factories+1
@@ -71,7 +71,7 @@ local function with_runtime(body)
 	Atspi._set_command_runner_for_test(function(command)
 		helpers.assert_contains(command, "timeout -s KILL")
 		if f.probe_hook then f.probe_hook() end
-		return true, "FOCUS:" .. require("json").encode({ role = f.secure and 40 or 61, name = "Document",
+		return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = f.secure and 40 or 61, name = "Document",
 			attributes = {}, native_bus_name = ":1.42", native_object_path = f.path, active_scope = true })
 	end)
 	Detector._set_probe_for_test(nil)
@@ -144,7 +144,7 @@ local with_native_injector = require("tests.support.infra.preferences.user_hotst
 --- Runs actual global and dynamic scope owners around the native callback fixture.
 local function with_configuration_scope(f, body)
 	local modules = { "infra.hotstrings_scope", "infra.dynamic_hotstrings_scope", "modules.dynamic_hotstrings.manager",
-		"modules.dynamic_hotstrings.prefix_rules", "dynamic_hotstrings", "modules.hotstrings.hotstrings_config",
+		"modules.dynamic_hotstrings.prefix_rules", "hotstrings.engine.dynamic.core", "modules.hotstrings.hotstrings_config",
 		"modules.hotstrings.loader", "infra.hotstring_preferences", "modules.hotstrings.repeat_key",
 		"modules.hotstrings.magic_key", "modules.hotstrings.terminator_settings", "modules.hotstrings.preview_settings" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do modules[#modules + 1] = name end
@@ -163,7 +163,7 @@ local function with_configuration_scope(f, body)
 			config = function(relative) return relative and directory .. "/" .. relative or directory end,
 			home = function() return directory end, config_home = function() return directory end,
 			-- The storage adapter keeps storage.json in the default configuration folder.
-			default_config_dir = function() return directory .. "/" .. require("app_dirs").linux.folder_name end,
+			default_config_dir = function() return directory .. "/" .. require("core.fs.engine.app_dirs").linux.folder_name end,
 			data_home = function() return directory end }, { __index = NativeConfigPaths })
 		package.loaded["modules.hotstrings.loader"] = { find_toml_files = function() return {} end,
 			list_subdirs = function() return {} end, read_file = function() return nil end,
@@ -174,7 +174,7 @@ local function with_configuration_scope(f, body)
 		if f.zero_builtin then
 			-- A refusing builtin registrar is the availability fault under test;
 			-- the manager still derives its actual count from the real rule store.
-			local builtin = require("dynamic_hotstrings")
+			local builtin = require("hotstrings.engine.dynamic.core")
 			builtin.register_date_rules = function() builtin.reset_rules(); return false end
 		end
 		helpers.assert_true(Dynamic.init({ trigger_char = "★", personal_info_path = directory .. "/personal_info.toml" }))
@@ -186,7 +186,7 @@ local function with_configuration_scope(f, body)
 		local Terminators = require("modules.hotstrings.terminator_settings")
 		helpers.assert_true(Terminators.load())
 		local scope = require("infra.hotstrings_scope").new({ path = config_path, backup_suffix = ".scope-test.bak",
-			is_paused = function() return false end, config = Config, preferences = Preferences, dynamic = Dynamic,
+			config = Config, preferences = Preferences, dynamic = Dynamic,
 			repeat_key = Repeat, word_reset = require("modules.hotstrings.word_reset"), magic_key = require("modules.hotstrings.magic_key"), terminators = Terminators,
 			preview_settings = require("modules.hotstrings.preview_settings") })
 		local dynamic_scope = require("infra.dynamic_hotstrings_scope").new({ path = config_path,
@@ -250,16 +250,16 @@ helpers.describe("programmable native Linux runtime", function()
 			with_configuration_scope(f, function(c)
 				local paths = require("infra.config_paths")
 				helpers.assert_eq(paths.config_home(), c.path:match("^(.*)/[^/]+$"))
-				local storage = require("adapters.storage")
+				local storage = require("core.fs.adapters.storage")
 				helpers.assert_eq(type(storage), "table", "real discovery must never poison the LuaJIT require cache")
 				helpers.assert_eq(type(storage.get), "function")
 				helpers.assert_eq(type(require("modules.updater.manager").installed_channel), "function")
 				helpers.assert_eq(type(require("modules.keymap.layout_registry").settings), "function")
-				helpers.assert_eq(require("adapters.storage"), storage, "repeated require retains the actual admitted reader")
+				helpers.assert_eq(require("core.fs.adapters.storage"), storage, "repeated require retains the actual admitted reader")
 			end)
 		end)
 		for _, name in ipairs(DISCOVERY_OWNERS) do helpers.assert_eq(package.loaded[name], original[name], name) end
-		local ok, storage = pcall(require, "adapters.storage")
+		local ok, storage = pcall(require, "core.fs.adapters.storage")
 		helpers.assert_true(ok, "the next production reader must load after fixture teardown")
 		helpers.assert_eq(type(storage.get), "function")
 		for _, name in ipairs(DISCOVERY_OWNERS) do package.loaded[name] = original[name] end
@@ -279,7 +279,7 @@ helpers.describe("programmable native Linux runtime", function()
 					local outer = {}
 					for _, name in ipairs(DISCOVERY_OWNERS) do outer[name] = package.loaded[name] end
 					with_configuration_scope(f, function()
-						helpers.assert_eq(type(require("adapters.storage").get), "function")
+						helpers.assert_eq(type(require("core.fs.adapters.storage").get), "function")
 					end)
 					for _, name in ipairs(DISCOVERY_OWNERS) do helpers.assert_eq(package.loaded[name], outer[name], "nested owner " .. name) end
 				end)
@@ -296,7 +296,7 @@ helpers.describe("programmable native Linux runtime", function()
 		local ok, problem = pcall(function()
 			with_runtime(function(f)
 				with_configuration_scope(f, function()
-					helpers.assert_eq(type(require("adapters.storage").get), "function")
+					helpers.assert_eq(type(require("core.fs.adapters.storage").get), "function")
 					error("independent callback refusal after actual source discovery")
 				end)
 			end)
@@ -334,7 +334,7 @@ helpers.describe("programmable native Linux runtime", function()
 	end
 	helpers.it("(user-hotstrings-native) rechecks actual clipboard settle before paste and restores its original bytes", function()
 		with_runtime(function(f)
-			local Shell, Display = require("adapters.shell_runner"), require("infra.display_server")
+			local Shell, Display = require("core.process.adapters.shell_runner"), require("core.ui.engine.display_server")
 			local old = { has = Shell.has_command, read = Shell.exec_checked, stdin = Shell.with_exact_stdin,
 				run = Shell.run, wayland = Display.is_wayland, x11 = Display.is_x11 }
 			local writes = {}
@@ -393,14 +393,14 @@ helpers.describe("programmable native Linux runtime", function()
 		with_runtime(function(f)
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.native)); helpers.assert_true(f.User.set_time_activation(0.5))
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then warned[#warned + 1] = message end
 				return warn(module, message, ...)
 			end
 			Logger.error = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then errors[#errors + 1] = message end
 				return err(module, message, ...)
 			end
 			local ok, failure = pcall(function()
@@ -743,7 +743,7 @@ helpers.describe("programmable native Linux runtime", function()
 				helpers.assert_true(f.User.is_enabled())
 				helpers.assert_true(Preferences.set("hotstrings.dynamic.user_code.time_activation_seconds", 0.125))
 				local input = assert(io.open(path, "r")); local bytes = input:read("*a"); input:close()
-				local decoded = require("toml_codec").decode(bytes)
+				local decoded = require("core.text.engine.toml_codec").decode(bytes)
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
 				package.loaded["infra.hotstring_preferences"] = nil
@@ -765,7 +765,7 @@ helpers.describe("programmable native Linux runtime", function()
 	for _, failure in ipairs({ "false", "throw" }) do
 		helpers.it("(user-menu-publication-inverse) restores actual Linux source timing after " .. failure .. " publication", function()
 			with_runtime(function(f)
-				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "ui.text_prompt", "ui.modal" }
+				local names = { "infra.hotstring_preferences", "ui.menu.programmatic_hotstrings", "core.ui.ui.text_prompt", "core.ui.ui.modal" }
 				local previous = {}
 				for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 				local writes, updates = 0, 0
@@ -778,8 +778,8 @@ helpers.describe("programmable native Linux runtime", function()
 							return false
 						end,
 					}
-					package.loaded["ui.text_prompt"] = { ask = function() return "125" end }
-					package.loaded["ui.modal"] = { run = function() error("a refused publication opens no dialog") end }
+					package.loaded["core.ui.ui.text_prompt"] = { ask = function() return "125" end }
+					package.loaded["core.ui.ui.modal"] = { run = function() error("a refused publication opens no dialog") end }
 					local facade = {
 						is_enabled = function() return f.enabled end,
 						set_user_code_time_activation = f.User.set_time_activation,

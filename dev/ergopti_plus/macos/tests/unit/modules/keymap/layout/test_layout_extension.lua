@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Extension = require("layouts.extension")
+local Extension = require("layouts.engine.composer.extension")
 
 local function fixture()
 	local files = {

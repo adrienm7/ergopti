@@ -54,7 +54,7 @@ end
 
 helpers.describe("expansion delay: what the settings window writes is what resolves", function()
 	helpers.it("refuses malformed CSS color overrides (hotstring-css-color)", function()
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local old_error, messages = logger.error, {}
 		logger.error = function(_, message) messages[#messages + 1] = message end
 		local ok, err = xpcall(function()
@@ -179,9 +179,9 @@ end)
 --- @param files table Map of file name to content, created before init.
 --- @param body function Called with (config, directory, read).
 local function with_config(files, body)
-	local shell = helpers.load_module("adapters.shell_runner")
+	local shell = helpers.load_module("core.process.adapters.shell_runner")
 	shell._reset_runner()
-	package.loaded["adapters.shell_runner"] = shell
+	package.loaded["core.process.adapters.shell_runner"] = shell
 	local directory = os.tmpname()
 	os.remove(directory)
 	assert(shell.run("mkdir -p " .. shell.quote(directory)))
@@ -270,18 +270,18 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
 			helpers.assert_true(config.set_override("rolls", nil, "delay", 0))
 			helpers.assert_true(config.set_override("rolls", "fast", "delay", 0))
-			local previous = package.loaded["ui.webview_manager"]
+			local previous = package.loaded["core.ui.ui.webview_manager"]
 			local script
-			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
 			local ok, err = xpcall(function()
 				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
-				local payload = require("json").decode(assert(script:match("setData%((.*)%)$")))
+				local payload = require("core.text.engine.json").decode(assert(script:match("setData%((.*)%)$")))
 				helpers.assert_eq(payload.categories[1].delay_ms, 0)
 				helpers.assert_eq(payload.categories[1].sections[1].delay_ms, 0)
 				helpers.assert_eq(payload.categories[1].delay_overridden, true)
 				helpers.assert_eq(payload.categories[1].sections[1].delay_overridden, true)
 			end, debug.traceback)
-			package.loaded["ui.webview_manager"] = previous
+			package.loaded["core.ui.ui.webview_manager"] = previous
 			if not ok then error(err) end
 		end)
 	end)
@@ -291,18 +291,18 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 			config._set_categories_for_test({ rolls = { sections_order = { "fast" } } })
 			helpers.assert_true(config.set_base_delay(0))
 			helpers.assert_eq(config.get_base_delay(), 0)
-			local previous = package.loaded["ui.webview_manager"]
+			local previous = package.loaded["core.ui.ui.webview_manager"]
 			local script
-			package.loaded["ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { eval_js = function(_, code) script = code; return true end }
 			local ok, err = xpcall(function()
 				require("ui.hotstrings_config_window.bridge").on_message("ready", { config = config })
-				local payload = require("json").decode(assert(script:match("setData%((.*)%)$")))
+				local payload = require("core.text.engine.json").decode(assert(script:match("setData%((.*)%)$")))
 				helpers.assert_eq(payload.global_default_delay_ms, 0)
 				helpers.assert_eq(payload.categories[1].delay_ms, 0)
 				helpers.assert_nil(payload.categories[1].delay_default_ms)
 				helpers.assert_nil(payload.categories[1].sections[1].delay_default_ms)
 			end, debug.traceback)
-			package.loaded["ui.webview_manager"] = previous
+			package.loaded["core.ui.ui.webview_manager"] = previous
 			if not ok then error(err) end
 		end)
 	end)
@@ -315,9 +315,9 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 	end)
 
 	helpers.it("replays the shared base delay corpus the other drivers replay", function()
-		local path = assert(helpers.load_module("infra.paths").shared("tests/corpus/hotstrings/base_delay_vectors.json"))
+		local path = assert(helpers.load_module("core.fs.engine.paths").shared("tests/corpus/hotstrings/base_delay_vectors.json"))
 		local handle = assert(io.open(path, "rb"))
-		local corpus = require("json").decode(handle:read("*a"))
+		local corpus = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		helpers.assert_true(#corpus.vectors > 0, "a corpus with no vectors proves nothing")
 		for _, vector in ipairs(corpus.vectors) do
@@ -336,7 +336,7 @@ helpers.describe("expansion delay: the base is a config.toml leaf and overrides 
 					helpers.assert_eq(config.resolve(expected.category, expected.section).delay, expected.delay,
 						vector.id .. ": effective delay of " .. expected.category .. "." .. tostring(expected.section))
 				end
-				local decoded = require("toml_codec").decode(read("hotstrings_overrides.toml") or "")
+				local decoded = require("core.text.engine.toml_codec").decode(read("hotstrings_overrides.toml") or "")
 				for key, leaves in pairs(vector.stored) do
 					local category, section = key:match("^([^.]+)%.?(.*)$")
 					local record = section ~= "" and decoded[category][section] or decoded[category]

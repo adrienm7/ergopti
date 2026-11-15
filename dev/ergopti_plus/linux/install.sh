@@ -65,9 +65,9 @@ fi
 # shellcheck source=install/messages.sh
 source "${SRC_DRIVER}/install/messages.sh"
 
-# The external hosts are declared once, in _shared/data/identifiers.json. Both
+# The external hosts are declared once, in _shared/core/text/data/identifiers.json. Both
 # layouts carry the generated shell copy in the _shared tree beside the driver.
-. "${DRIVERS_ROOT}/_shared/data/identifiers.sh"
+. "${DRIVERS_ROOT}/_shared/core/text/data/identifiers.sh"
 
 # A release tarball carries the private runtime prefix every package runs
 # (linux/runtime: LuaJIT, luv, luafilesystem, luaposix, curl, sqlite3, openssl,
@@ -304,7 +304,7 @@ DEST_SHARED="${LIB_DIR}/_shared"
 case "$SRC_DRIVER$SRC_SHARED${ERGOPTI_RUNTIME_PREFIX:-}" in
 	*[\;\?]*)
 		export ERGOPTI_LITERAL_DRIVER_ROOT="$SRC_DRIVER"
-		export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED/lua" ;;
+		export ERGOPTI_LITERAL_SHARED_ROOT="$SRC_SHARED" ;;
 esac
 
 # Tar replaces an incumbent symlink with a payload entry (and a linked root
@@ -487,7 +487,7 @@ _available_apt_runtime_package() {
 }
 
 _archive_digest_runtime_available() {
-	luajit "${SRC_DRIVER}/platform/network/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
+	luajit "${SRC_DRIVER}/core/network/adapters/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
 }
 
 _ensure_archive_digest_runtime() {
@@ -678,7 +678,7 @@ _check_or_install() {
 # Inline LuaJIT probes are app-owned entry points as well: initialise the
 # literal owner without changing LUA_INIT or host processes.
 _lua_app_probe() {
-	local bootstrap="local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); if d and d~='' then assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX')) end; "
+	local bootstrap="local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'); if d and d~='' then assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')),os.getenv('ERGOPTI_RUNTIME_PREFIX')) end; "
 	luajit -e "$bootstrap$1"
 }
 
@@ -801,7 +801,7 @@ _prepare_source_network_runtime() {
 # Read-only native admission shares the lookup child's ABI and resolver factory.
 # A loadable GLib alone cannot replace an installed proxy module or LuaJIT luv.
 _network_runtime_available() {
-	luajit "${SRC_DRIVER}/platform/network/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
+	luajit "${SRC_DRIVER}/core/network/adapters/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
 }
 
 _ensure_network_runtime() {
@@ -1201,8 +1201,8 @@ install -d "${CONFIG_DIR}"
 # shellcheck source=install/canonical_packs.sh
 source "${SRC_DRIVER}/install/canonical_packs.sh"
 migrate_canonical_packs \
-	"${SRC_SHARED}/modules/hotstrings" \
-	"${DEST_SHARED}/modules/hotstrings" \
+	"${SRC_SHARED}/hotstrings/data/catalogue" \
+	"${DEST_SHARED}/hotstrings/data/catalogue" \
 	"${CONFIG_DIR}"
 
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
@@ -1211,6 +1211,23 @@ migrate_canonical_packs \
 # Exclude the canonical generated backend from the source copy. Checkout-local
 # fixture .so bytes can never be staged even briefly; only the freshly compiled
 # output (or release-bundle artifact) below supplies this exact destination.
+# A bytecode package compiled from the previous payload must not outlive it:
+# removed before the copy, rebuilt from the new payload once its receipt exists.
+# The schema names it; an empty name must never widen this to the library.
+# shellcheck source=install/ownership_schema.sh
+source "${SRC_DRIVER}/install/ownership_schema.sh"
+BYTECODE_TREE="${LIB_DIR}/${OWNERSHIP_DERIVED_TREE:?}"
+if [ -L "$BYTECODE_TREE" ] || { [ -e "$BYTECODE_TREE" ] && [ ! -d "$BYTECODE_TREE" ]; }; then
+	printf '[install] code=invalid-derived-tree path=%q\n' "$BYTECODE_TREE" >&2
+	exit 1
+fi
+rm -rf -- "$BYTECODE_TREE"
+# The previous receipt, held until the new one exists: see
+# prune_retired_payload below.
+PRIOR_RECEIPT_ROWS=()
+if [ -f "${LIB_DIR}/.ergopti-owned-files" ] && [ ! -L "${LIB_DIR}/.ergopti-owned-files" ]; then
+	mapfile -t PRIOR_RECEIPT_ROWS < "${LIB_DIR}/.ergopti-owned-files" || exit 1
+fi
 NATIVE_LUV_RETAINED_DIGEST=""
 if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
 	&& [ ! -L "${LIB_DIR}/.ergopti-owned-files" ] \
@@ -1292,6 +1309,54 @@ if [ -n "$NATIVE_LUV_STAGE" ]; then
 	# Keep the authenticated source/build evidence; no recursive cleanup assumes
 	# retirement of compiler descendants solely from the installer's own exit.
 	ergopti_msg install.network_build_evidence "$NATIVE_LUV_STAGE"
+fi
+
+# A reinstall extracts over the previous tree, so a file the previous version
+# shipped and this one does not stayed behind, unowned: the tree then failed its
+# own receipt (modules/updater/ownership_receipt.lua verify) and, once it was
+# <root>.old, the next update could not retire it. Remove each payload file the
+# previous receipt owned and the new one does not, when its bytes still match;
+# a file the user changed is kept, as uninstall.sh keeps it.
+prune_retired_payload() {
+	local current="$1" prior_receipt="${LIB_DIR}/.ergopti-owned-files" library_physical row digest relative owned parent actual
+	local -A shipped=()
+	library_physical="$(cd -- "$LIB_DIR" && pwd -P)" || return 1
+	while IFS=$'\t' read -r digest relative || [ -n "$digest$relative" ]; do
+		shipped["$relative"]=1
+	done < "$current"
+	for row in "${PRIOR_RECEIPT_ROWS[@]}"; do
+		digest="${row%%$'\t'*}"
+		relative="${row#*$'\t'}"
+		if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]] || [ "$relative" = "$row" ]; then
+			printf '[install] code=prior-receipt-invalid path=%q\n' "$prior_receipt" >&2
+			return 1
+		fi
+		case "$relative" in
+			linux/*|_shared/*) ;;
+			*) continue ;;
+		esac
+		case "/$relative/" in
+			*/../*|*/./*|*//*|*\\*)
+				printf '[install] code=prior-receipt-unsafe path=%q\n' "$relative" >&2
+				return 1 ;;
+		esac
+		[ -z "${shipped[$relative]:-}" ] || continue
+		owned="${LIB_DIR}/$relative"
+		[ -f "$owned" ] && [ ! -L "$owned" ] || continue
+		# Only a file reached without a link below the library is ours to remove.
+		parent="$(cd -- "$(dirname -- "$owned")" && pwd -P)" || return 1
+		[ "$parent" = "$library_physical/$(dirname -- "$relative")" ] || continue
+		actual="$(sha256sum < "$owned")" || return 1
+		[ "${actual%% *}" = "$digest" ] || continue
+		rm -f -- "$owned" || return 1
+	done
+}
+prune_retired_payload "${LIB_DIR}/.ergopti-owned-files" || exit 1
+
+# The bytecode package (core/lifecycle/engine/bytecode_package.lua), compiled after the receipt
+# by the luajit the daemon runs; without it the daemon starts from source.
+if ! luajit "${LIB_DIR}/linux/install/compile_bytecode.lua" "${LIB_DIR}" >/dev/null; then
+	ergopti_msg_with "  ⚠  " install.bytecode_skipped
 fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.
@@ -1466,6 +1531,15 @@ AUTOSTART
 		ergopti_msg_with "  ✔  " install.xdg_autostart "${AUTOSTART_FILE}"
 	fi
 fi
+
+
+# GNOME and KDE tell a Wayland client nothing about the focused window; the
+# Ergopti Shell extension and KWin script, installed and enabled here for the
+# running desktop, report it to the daemon. launch.sh refreshes them at every
+# start, which is how package installs get them too.
+echo ""
+_section install.section_focus
+bash "${LIB_DIR}/linux/install/compositor_focus.sh" install "${LIB_DIR}/linux" || true
 
 
 # =======================================

@@ -1,6 +1,6 @@
 ﻿; _generated/config_keys.ahk
-; AUTO-GENERATED from _shared/core/config_schema/config.schema.json and
-; _shared/modules/menu/menu_manifest.json.
+; AUTO-GENERATED from _shared/settings/data/config_schema/config.schema.json and
+; _shared/menu/data/menu_manifest.json.
 ; DO NOT EDIT BY HAND — run `npm run codegen:config-keys` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -170,6 +170,9 @@ class ConfigKey {
 	static SHORTCUTS_SCRIPT_CONTROL_ENABLED := "shortcuts.script_control.enabled"
 	static SHORTCUTS_SCRIPT_CONTROL_ESCAPE := "shortcuts.script_control.escape"
 	static SHORTCUTS_SCRIPT_CONTROL_RETURN_KEY := "shortcuts.script_control.return_key"
+	static SHORTCUTS_SEARCH := "shortcuts.search"
+	static SHORTCUTS_SEARCH_SEARCH_ENGINE := "shortcuts.search.search_engine"
+	static SHORTCUTS_SEARCH_SEARCH_ENGINE_URL_QUERY := "shortcuts.search.search_engine_url_query"
 	static SHORTCUTS_TAP_KEYS := "shortcuts.tap_keys"
 	static SHORTCUTS_WRAP_SYMBOLS := "shortcuts.wrap_symbols"
 	static SHORTCUTS_WRAP_SYMBOLS_CUSTOM := "shortcuts.wrap_symbols.custom"
@@ -295,6 +298,9 @@ class ConfigLeaf {
 	static SCHEMA_VERSION := "schema_version"
 	static SCRIPT := "script"
 	static SCRIPT_CONTROL := "script_control"
+	static SEARCH := "search"
+	static SEARCH_ENGINE := "search_engine"
+	static SEARCH_ENGINE_URL_QUERY := "search_engine_url_query"
 	static SECURE_FILTER_ENABLED := "secure_filter_enabled"
 	static SELECTED := "selected"
 	static SENSITIVITIES := "sensitivities"
@@ -373,6 +379,7 @@ class MenuCommand {
 	static EDIT_NAV_LAYER := "edit_nav_layer"
 	static EDIT_SHORTCUTS := "edit_shortcuts"
 	static ENCRYPTION := "encryption"
+	static ERGOPTI_STUDIO := "ergopti_studio"
 	static EXTENSION_ALL_SECTIONS := "extension_all_sections"
 	static EXTENSION_DISABLE_ALL := "extension_disable_all"
 	static EXTENSION_ENABLE_ALL := "extension_enable_all"
@@ -485,6 +492,7 @@ class MenuCommand {
 	static NUMBER_ROW_EDGES := "number_row_edges"
 	static NUMBER_ROW_MODE := "number_row_mode"
 	static OPEN_ERROR_LOG := "open_error_log"
+	static OPEN_LAYOUT_EDITOR := "open_layout_editor"
 	static OPEN_LOGS := "open_logs"
 	static OPEN_TODAY_LOG := "open_today_log"
 	static OPEN_USER_HOTSTRING_SOURCE := "open_user_hotstring_source"
@@ -551,6 +559,7 @@ class MenuCommand {
 	static TAP_HOLD_LOGIN_ITEMS_OPEN := "tap_hold_login_items_open"
 	static TAP_HOLD_LOGIN_ITEMS_STEPS := "tap_hold_login_items_steps"
 	static TAP_HOLD_OWNED_INSTALL := "tap_hold_owned_install"
+	static TAP_HOLD_OWNED_REPAIR := "tap_hold_owned_repair"
 	static TAP_HOLD_RESETS_WORD := "tap_hold_resets_word"
 	static TAP_HOLD_VHID_UPDATE := "tap_hold_vhid_update"
 	static TITLECASE_SELECTION := "titlecase_selection"

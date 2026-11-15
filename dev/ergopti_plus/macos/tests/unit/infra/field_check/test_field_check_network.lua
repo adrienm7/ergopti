@@ -18,7 +18,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
+local MODULES = { "core.logger.engine.logger", "infra.field_check", "infra.field_check_checks", "platform.remap.ke_paths" }
 
 local PAC_URL = "http://pac.intranet.example/proxy.pac"
 local SCUTIL_PAC = "<dictionary> {\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : " .. PAC_URL .. "\n}\n"
@@ -52,7 +52,7 @@ local function run(world)
 	}
 	local result
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.field_check"] = nil
 		package.loaded["infra.field_check_checks"] = nil
 		local Engine = require("infra.field_check")
@@ -223,7 +223,7 @@ helpers.describe("network check", function()
 
 	helpers.it("names as many Ollama origins as the shared inventory holds", function()
 		local origins = assert(require("modules.llm.network_env").route_origins("ollama"))
-		helpers.assert_eq(#origins, #require("network.field_check_network").OLLAMA_ORIGIN_TOKENS)
+		helpers.assert_eq(#origins, #require("core.network.engine.field_check_network").OLLAMA_ORIGIN_TOKENS)
 	end)
 
 	helpers.it("never lets the PAC address or a host reach a step value", function()

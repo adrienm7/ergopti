@@ -6,10 +6,10 @@
 local M = {}
 function M.with_fixture(body)
  local original_tmpname = os.tmpname -- Restore even when decoration fails before old inner cleanup.
- local names = { "modules.updater.manager", "infra.archive_output", "infra.monotonic", "infra.installation" }
+ local names = { "modules.updater.manager", "infra.archive_output", "core.logger.engine.monotonic", "core.lifecycle.engine.installation" }
  local saved = {}; for _, name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
- local Fs = require("adapters.file_system")
- local Move = require("infra.no_replace_move")
+ local Fs = require("core.fs.adapters.file_system")
+ local Move = require("core.fs.engine.no_replace_move")
  local owners, config_path, manager = {}, nil, nil
  local now = 0.25
  local function owned_operation(dispatch)
@@ -150,15 +150,15 @@ function M.with_fixture(body)
   config_path = os.tmpname() -- Reserve before the original allocator override.
   local config = assert(io.open(config_path, "wb")); assert(config:close())
   package.loaded["infra.archive_output"] = { native_artifact = factory }
-  package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+  package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
    backend = function() return "luv.hrtime" end, now_ms = function() return now end }
   package.loaded["modules.updater.manager"] = nil
   manager = require("modules.updater.manager")
   manager._http_client = { cancel = function() return true end }
   manager._file_digest = { cancel = function() return true end }
-  package.loaded["infra.installation"] = { is_source_run = function() return true end }
+  package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
   manager.init({ config_path = config_path, is_paused = function() return false end })
-  package.loaded["infra.installation"] = saved["infra.installation"].value
+  package.loaded["core.lifecycle.engine.installation"] = saved["core.lifecycle.engine.installation"].value
   body(manager, decorate_http)
  end, debug.traceback)
  local cleanup_error

@@ -11,14 +11,14 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local check = require("test.menu_row_text")
+local check = require("tests.lua.menu.row_text")
 
 local SHARED_ROOT = "../_shared"
 
 helpers.describe("gesture slot names", function()
 	helpers.it("names every slot by its translated gesture.slots text", function()
 		local Manager = require("modules.gestures.manager")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved = i18n.get
 		local ok, err = pcall(function()
 			local slots = {}
@@ -26,7 +26,7 @@ helpers.describe("gesture slot names", function()
 			for _, slot in ipairs(Manager.AXIS_SLOTS) do slots[#slots + 1] = slot end
 			helpers.assert_true(#slots > 0, "the shared catalogue offers gesture slots")
 			for _, locale in ipairs({ "fr", "en" }) do
-				local catalogue = check.catalogue(SHARED_ROOT, locale, require("json").decode)
+				local catalogue = check.catalogue(SHARED_ROOT, locale, require("core.text.engine.json").decode)
 				i18n.get = function(key) return catalogue[key] or key end
 				for _, slot in ipairs(slots) do
 					local text = catalogue["gesture.slots." .. slot]

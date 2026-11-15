@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/zh.msg
-# AUTO-GENERATED from _shared/data/locales/zh.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/zh.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=已从源代码构建 LuaJIT 网络模块。
 build_luv.recipe_required=luv 原生构建需要其源代码配方。
 install.already_installed={1} — 已安装
 install.archive_digest_unavailable=保留描述符的更新需要真实的 OpenSSL3 运行时；该功能仍不可用。
+install.bytecode_skipped=无法生成预编译模块 — Ergopti 将从源代码启动，速度稍慢。
 install.capability_verified={1} — 功能已验证
 install.command_still_missing=已安装 {1}，但仍找不到 '{2}'。
 install.daemon_manual=要手动启动守护进程：
 install.daemon_running=守护进程在后台运行。要查看其状态：
+install.focus_integration_enabled=已启用 {1} 焦点集成
+install.focus_integration_failed=无法启用 {1} 焦点集成——此桌面上的按应用规则保持停用。
+install.focus_integration_next_login=已安装 {1} 焦点集成（下次登录时生效）
+install.focus_integration_updated=已更新 {1} 焦点集成
 install.gnome_extension_active=GNOME AppIndicator 扩展 — 已启用
 install.gnome_extension_enabled=已启用 GNOME AppIndicator 扩展
 install.gnome_extension_failed=无法启用 AppIndicator 扩展 — 没有它，GNOME 不会显示图标。
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — 依赖项检查
 install.section_deps_skipped=已跳过依赖项（--no-deps）
 install.section_done=安装完成
 install.section_files=正在安装文件
+install.section_focus=Wayland 下的活动应用（GNOME、KDE）
 install.section_lua_deps=可选的 Lua 依赖项（事件循环、定时器、Web 视图、信号）
 install.section_permissions=输入权限（需要 sudo）
 install.section_services=正在创建 systemd 用户服务
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG 自动启动：{1}
 launch.already_running=Ergopti+ 已在此会话中运行（{1} 已被占用）；本次启动被拒绝。
 launch.authorization_failed=输入访问授权已取消或失败。
 launch.groups_unavailable=会话无法获得已配置的输入组。
+launch.restarting=Ergopti+ 已在此会话中运行；正在请求其退出，然后重新启动。
 launch.session_lock_invalid=会话锁定文件夹必须使用绝对路径。
 launcher.dependencies_installed=依赖项已安装。
 launcher.driver_missing=错误：找不到 Linux 驱动目录：{1}

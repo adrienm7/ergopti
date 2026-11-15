@@ -37,8 +37,8 @@ end
 --- @param body function Receives observations after the control callback.
 local function with_undo(options, body)
 	Fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
-			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "logger.shim" }
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local observations = { wire = {}, writes = {}, logs = {}, documents = {
@@ -48,15 +48,15 @@ local function with_undo(options, body)
 				observations.moved = true; state.path = "/field/successor"
 			end
 		end
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_level("trace")
 		logger.set_sink(function(line)
 			observations.logs[#observations.logs + 1] = line
 			if line:find("Undo: restoring", 1, true) then transition("undo-log") end
 		end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local commands, clipboard = {}, "SAVED"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			exec_checked = function(command)
 				if ClipboardTargets.is_listing(command) then return true, ClipboardTargets.TEXT_ONLY end
@@ -77,9 +77,9 @@ local function with_undo(options, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = { is_wayland = function() return false end,
+		package.loaded["core.ui.engine.display_server"] = { is_wayland = function() return false end,
 			is_x11 = function() return true end, kind = function() return "x11" end }
-		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
+		package.loaded["platform.input.keyboard_hook"] = { held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end, held_forwarded_keys = function() return {} end,
 			emergency_stop = function() observations.stopped = true end }
 		local injector
@@ -125,7 +125,8 @@ local function with_undo(options, body)
 					-- The physical Backspace that requests the Undo is a manual correction.
 					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()
-					return { trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
+					return { trigger = options.stored_trigger or options.trigger,
+						typed_trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
 						is_private = options.private == true }
 				end }, Logger = logger, injector = wrapped,
 			}, { __index = _G })
@@ -165,15 +166,32 @@ helpers.describe("Main Undo retains its original expansion authority", function(
 				helpers.assert_eq(state.stopped, nil, "a healthy destination refusal must not stop the keyboard")
 				helpers.assert_eq(state.clipboard, "SAVED")
 				helpers.assert_eq(state.undo, nil)
+				-- Windows logs a failed restore as an error; Main dropped the receipt.
+				helpers.assert_true(table.concat(state.logs, "\n"):find("Undo: the trigger was not restored", 1, true) ~= nil,
+					"a refused restore must be reported (undo-refusal-reported)")
 			end)
 		end)
 	end
+	-- A conform rule stores `adn` and fires on `Adn`: Windows (the buffer) and
+	-- macOS (the matched text) type back what the user typed. Main used the
+	-- stored trigger and restored `adn`.
+	helpers.it("restores the trigger with the casing the user typed (undo-typed-casing)", function()
+		with_undo({ trigger = "ok", stored_trigger = "OK" }, function(state)
+			helpers.assert_true(state.result.ok and state.result.cleanup_ok)
+			helpers.assert_eq(state.documents["/field/original"], "ok", "the typed spelling comes back")
+		end)
+	end)
 	helpers.it("keeps the private trigger out of the actual injector trace (undo-owner)", function()
 		with_undo({ trigger = "★PRIVATE_UNDO★", private = true }, function(state)
 			helpers.assert_true(state.result.ok)
 			helpers.assert_eq(table.concat(state.logs, "\n"):find("★PRIVATE_UNDO★", 1, true), nil,
 				"a private trigger must not reach the persistent logger")
 			helpers.assert_true(state.private, "the private classification must survive the Undo commit record")
+			local logs = table.concat(state.logs, "\n")
+			helpers.assert_true(logs:find("Undo: restoring a private trigger (content withheld)", 1, true) ~= nil,
+				"a private restore says only that it happened, as on Windows and macOS (undo-private-log)")
+			helpers.assert_eq(logs:find("Undo: restoring the trigger (", 1, true), nil,
+				"not even the private trigger's length")
 			helpers.assert_eq(state.documents["/field/original"], "★PRIVATE_UNDO★")
 		end)
 	end)

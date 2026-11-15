@@ -70,7 +70,7 @@ end
 --- The decoded file.
 --- @return table
 local function stored()
-	return require("json").decode(assert(file_text(), "the file exists"))
+	return require("core.text.engine.json").decode(assert(file_text(), "the file exists"))
 end
 
 local LEGACY = '{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
@@ -123,14 +123,6 @@ helpers.describe("api_entries: keys live in the desktop secret service", functio
 		Fake.uninstall()
 	end)
 
-	helpers.it("the daemon migrates plaintext keys once at boot (linux-api-key-secret-service)", function()
-		local fh = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
-		local source = fh:read("*a")
-		fh:close()
-		helpers.assert_true(source:find("pcall(entries.migrate_plaintext)", 1, true) ~= nil,
-			"the boot runs the migration, and a failure there never stops the boot")
-	end)
-
 	helpers.it("moves a plaintext key of an earlier build to the service once (linux-api-key-secret-service)", function()
 		local fake = Fake.install()
 		write_file(LEGACY)
@@ -148,6 +140,65 @@ helpers.describe("api_entries: keys live in the desktop secret service", functio
 		for index = calls + 1, #fake.calls do
 			helpers.assert_true(fake.calls[index]:match("^lookup ") ~= nil, "a second load stores nothing")
 		end
+		Fake.uninstall()
+	end)
+
+	helpers.it("publishes the references the background move stored, and refuses a changed entry (linux-api-key-background-migration)", function()
+		local fake = Fake.install()
+		write_file(LEGACY)
+		local entries = fresh(true)
+		local keys = entries.plaintext_keys()
+		helpers.assert_eq(#keys, 1)
+		helpers.assert_eq(keys[1].id, "cerebras-1")
+		local published, reason, uncertain = entries.publish_migrated({ ["cerebras-1"] = "secret-service:cerebras-1#a" },
+			{ ["cerebras-1"] = "csk-OTHERKEY" })
+		helpers.assert_eq(published, false, "a key that is not the entry's is never published")
+		helpers.assert_true(tostring(reason):find("changed", 1, true) ~= nil, tostring(reason))
+		helpers.assert_eq(uncertain, nil)
+		helpers.assert_eq(file_text(), LEGACY)
+		fake.items["cerebras-1#a"] = "csk-PLAINCANARY"
+		helpers.assert_eq(entries.publish_migrated({ ["cerebras-1"] = "secret-service:cerebras-1#a" },
+			{ ["cerebras-1"] = "csk-PLAINCANARY" }), true)
+		helpers.assert_eq(Fake.count(fake), 1, "the publication stores nothing itself")
+		helpers.assert_eq(stored().entries[1].token, "secret-service:cerebras-1#a")
+		helpers.assert_eq(file_text():find("PLAINCANARY", 1, true), nil)
+		helpers.assert_eq(#entries.plaintext_keys(), 0)
+		helpers.assert_eq(fresh(true).active().token, "csk-PLAINCANARY", "the reference reads back")
+		Fake.uninstall()
+	end)
+
+	helpers.it("lists an entry restored without its key as needing it again, and keeps its reference (linux-api-key-restored-missing)", function()
+		-- A pre-install backup names a key its entry's deletion removed from the service.
+		local fake = Fake.install()
+		write_file('{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
+			.. '"label":"cerebras/qwen","token":"secret-service:cerebras-1#gone","model":"","base_url":""}]}')
+		local entries = fresh(true)
+		helpers.assert_eq(#entries.list(), 1, "the restored entry is listed, not left out as outdated")
+		helpers.assert_eq(entries.key_missing("cerebras-1"), true, "it needs its key re-entered")
+		helpers.assert_eq(entries.get("cerebras-1").token, "")
+		helpers.assert_eq(entries.set_model("cerebras-1", "other-model"), true)
+		helpers.assert_eq(stored().entries[1].token, "secret-service:cerebras-1#gone",
+			"a save keeps the reference until a new key replaces it")
+		helpers.assert_eq(Fake.count(fake), 0, "no empty key is stored")
+		helpers.assert_eq(entries.set_token("cerebras-1", "csk-REENTERED"), true)
+		helpers.assert_eq(entries.key_missing("cerebras-1"), false)
+		local reference = stored().entries[1].token
+		helpers.assert_true(reference:match(REFERENCE) ~= nil and reference ~= "secret-service:cerebras-1#gone", reference)
+		helpers.assert_eq(file_text():find("REENTERED", 1, true), nil, "the new key is not in the file")
+		helpers.assert_eq(fresh(true).active().token, "csk-REENTERED", "the new key reads back")
+		helpers.assert_eq(entries.remove("cerebras-1"), true)
+		helpers.assert_eq(Fake.count(fake), 0, "removing the entry still deletes its key")
+		Fake.uninstall()
+	end)
+
+	helpers.it("a key the service cannot read for another reason is not taken for a missing one (linux-api-key-restored-missing)", function()
+		local fake = Fake.install()
+		fake.lookup_refusal = "the keyring is locked, or its unlock prompt was dismissed"
+		write_file('{"version":1,"active_id":"cerebras-1","entries":[{"id":"cerebras-1","provider":"cerebras",'
+			.. '"label":"cerebras/qwen","token":"secret-service:cerebras-1#locked","model":"","base_url":""}]}')
+		local entries = fresh(true)
+		helpers.assert_eq(#entries.list(), 0, "kept as written: the key is still in the service")
+		helpers.assert_eq(entries.key_missing("cerebras-1"), false)
 		Fake.uninstall()
 	end)
 
@@ -310,7 +361,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end
@@ -319,7 +370,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		local info = fifo and uv.fs_lstat(fifo)
 		if fifo then
 			os.remove(fifo)
-			uv.fs_rmdir(require("native_path").dirname(fifo))
+			uv.fs_rmdir(require("core.fs.engine.native_path").dirname(fifo))
 		end
 		os.execute("rm -rf '" .. dir .. "'")
 		helpers.assert_eq(expired, false, "secret-tool diagnostics must not block on a FIFO")
@@ -348,7 +399,7 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		Store._set_tool_for_test(nil)
 		Fake.uninstall()
 		local uv = require("luv")
-		local result_dir = result_path and require("native_path").dirname(result_path)
+		local result_dir = result_path and require("core.fs.engine.native_path").dirname(result_path)
 		local file_left = result_path and uv.fs_lstat(result_path)
 		local dir_left = result_dir and uv.fs_lstat(result_dir)
 		os.execute("rm -rf '" .. dir .. "'")
@@ -480,5 +531,40 @@ assert(reasons["secret-service:fixture#1"] ~= "absent", "unreadable diagnostics 
 		helpers.assert_true(reason:find("not installed", 1, true) ~= nil, reason)
 		Store._set_tool_for_test(nil)
 		Fake.uninstall()
+	end)
+
+	-- Measured on a real gnome-keyring (tests/hardware/run_keyring_receipts.sh):
+	-- a lookup whose unlock prompt is dismissed and a clear on a locked keyring
+	-- both exit 1 with nothing on stderr, as an absent item does, and the clear
+	-- removes nothing. `search` without --unlock prompts for nothing and still
+	-- lists a locked item, so it tells the cases apart.
+	helpers.it("secret-tool-locked-keyring: a locked item is neither absent nor cleared", function()
+		local dir = os.tmpname(); os.remove(dir); assert(os.execute("mkdir -p '" .. dir .. "'"))
+		local tool = dir .. "/secret-tool"
+		local script = assert(io.open(tool, "w"))
+		script:write("#!/bin/sh\ncase \"$1\" in\n"
+			.. "  lookup|clear) exit 1 ;;\n"
+			.. "  search) [ \"$5\" = present#r ] && printf '[/1]\\nlabel = key\\n'; exit 0 ;;\n"
+			.. "esac\nexit 2\n")
+		script:close(); os.execute("chmod +x '" .. tool .. "'")
+		local Store = helpers.load_module("modules.llm.api_token_store")
+		Store._set_backend_for_test(nil)
+		Store._set_tool_for_test(tool)
+		local ok, err = pcall(function()
+			local present, gone = "secret-service:present#r", "secret-service:gone#r"
+			local tokens, reasons = Store.lookup_many({ present, gone })
+			helpers.assert_nil(tokens[present], "a locked item yields no key")
+			helpers.assert_true(reasons[present] ~= "absent" and tostring(reasons[present]):find("locked", 1, true) ~= nil,
+				"a locked or dismissed item is not reported absent: " .. tostring(reasons[present]))
+			helpers.assert_eq(reasons[gone], "absent", "an item the service does not list stays absent")
+			local cleared, why = Store.clear(present)
+			helpers.assert_eq(cleared, false, "a clear that left the item in place is not a success")
+			helpers.assert_true(tostring(why):find("locked", 1, true) ~= nil, tostring(why))
+			helpers.assert_eq(Store.clear(gone), true, "clearing an absent item succeeds")
+		end)
+		Store._set_tool_for_test(nil)
+		Fake.uninstall()
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
 	end)
 end)

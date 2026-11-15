@@ -4,7 +4,7 @@
 --- MODULE: process_prediction Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/process_prediction_vectors.json through the
---- shared reply parser (_shared/lua/llm/parser.lua), which the Linux prediction
+--- shared reply parser (_shared/ai/engine/api/parser_core.lua), which the Linux prediction
 --- engine requires to turn a model reply into the physical injection: deletes,
 --- text to type, word count, corrections and bold.
 ---
@@ -15,7 +15,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/llm/process_prediction_vectors.json"
 
@@ -33,7 +33,7 @@ local function as_bool(value) return value and true or false end
 
 helpers.describe("process_prediction corpus: the shared parser on Linux", function()
 	local corpus = read_corpus()
-	local Parser = helpers.load_module("llm.parser")
+	local Parser = helpers.load_module("ai.engine.api.parser_core")
 
 	helpers.it("the corpus carries vectors", function()
 		helpers.assert_true(#corpus.vectors >= 10, "the process_prediction corpus lost its vectors")

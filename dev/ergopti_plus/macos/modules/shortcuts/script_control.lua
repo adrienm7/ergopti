@@ -4,7 +4,7 @@
 --- MODULE: Script Control
 --- DESCRIPTION:
 --- Manages the script-management chords every driver shares
---- (_shared/modules/actions/script_chords.json), AltGr (the right Option key)
+--- (_shared/shortcuts/data/actions/script_chords.json), AltGr (the right Option key)
 --- with Return, Backspace, Delete (fn+Delete on a Mac keyboard without the key)
 --- or Escape, each on its slot of [shortcuts.script_control]:
 ---   Return    → toggle pause / resume all modules.
@@ -19,7 +19,7 @@
 --- 2. Safe Pause: Uses pause_processing() rather than stop() on the keymap so
 ---    the script-control eventtap itself stays reachable while paused.
 --- 3. A chord belongs to the driver only while its slot runs an action
----    (_shared/lua/script_chords.lua): an unassigned slot, every slot while the
+---    (_shared/keyboard/engine/layers/script_chords.lua): an unassigned slot, every slot while the
 ---    submenu's switch is off, and while paused every action outside script
 ---    management leave the key combination to the system. Karabiner emits a
 ---    slot's sentinel only then (platform/remap/script_chord_rules.lua): this
@@ -30,23 +30,23 @@
 local M = {}
 
 local hs            = hs
-local notifications = require("infra.notifications")
+local notifications = require("core.ui.engine.notifications")
 local EventProvenance = require("adapters.event_provenance")
-local SyntheticInput = require("adapters.synthetic_input")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings       = require("infra.timings")
-local Logger        = require("infra.logger")
-local Keycodes      = require("infra.keycodes")
-local i18n          = require("infra.i18n")
+local SyntheticInput = require("platform.input.synthetic_input")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings       = require("core.timing.engine.timings")
+local Logger        = require("core.logger.engine.logger")
+local Keycodes      = require("platform.input.keycodes")
+local i18n          = require("core.i18n.engine.i18n")
 
 local Engine    = require("modules.gestures.engine")
 local GestActions = require("modules.gestures.actions")
-local KeyState  = require("adapters.key_state")
-local KeyEventHealth = require("infra.key_event_health")
-local ScriptChords = require("script_chords")
+local KeyState  = require("platform.input.key_state")
+local KeyEventHealth = require("core.logger.engine.key_event_health")
+local ScriptChords = require("keyboard.engine.layers.script_chords")
 local ChordCatalogue = require("infra.script_chord_catalogue")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "shortcuts.script_control"
 
@@ -129,6 +129,15 @@ local _tap_generation  = 0
 -- (set_shortcut_action, set_chords_enabled). The switch off keeps every
 -- slot's action.
 local _key_actions, _chords_on = nil, nil
+-- What the menu chose while the driver was paused or between pause states
+-- (the maintainer's decision of 2026-11-14): saved at once, applied when the
+-- resume settles, so the chord that resumes stays the one active when the
+-- pause started. `_deferred_actions` maps a slot to its chosen action; a nil
+-- `_deferred_chords_on` means the switch was not touched.
+local _deferred_actions, _deferred_chords_on = nil, nil
+-- Defined with the chord state below; the pause transaction settles first.
+local apply_deferred_chords
+local sync_karabiner_chords
 -- The key of the last plan Karabiner read (M.karabiner_chords), and whether a
 -- regeneration for a newer one is already queued.
 local _karabiner_plan_key = nil
@@ -171,7 +180,7 @@ local _pause_rollback_debt_steps = nil
 local _resume_rollback_debt_steps = nil
 
 --- An additive observer never replaces the existing pause-change singleton.
-local _physical_pause = require("keystats.physical_lifecycle_observation").new("pause", function()
+local _physical_pause = require("metrics.engine.capture.physical_lifecycle_observation").new("pause", function()
 	return require("adapters.physical_observation_clock").now()
 end, function(reason) Logger.error(LOG, "Physical pause observer retired: %s.", tostring(reason)) end)
 
@@ -504,6 +513,13 @@ local function pause_all()
 				return _shortcuts.resume_bindings(SCRIPT_CONTROL_SHORTCUT_CLAIM)
 			end or nil
 			shortcut_resume_label = "shortcuts.resume_bindings"
+		elseif type(_shortcuts.resume_bindings_after_pause) == "function" then
+			-- OFF at pause time: the switch may still turn the layer ON during
+			-- the pause (EDD-1), and this inverse then starts it on resume.
+			shortcut_rollback = function()
+				return _shortcuts.resume_bindings_after_pause(SCRIPT_CONTROL_SHORTCUT_CLAIM)
+			end
+			shortcut_resume_label = "shortcuts.resume_bindings_after_pause"
 		else
 			shortcut_rollback = type(_shortcuts.release_bindings_pause_claim) == "function"
 				and function()
@@ -693,7 +709,35 @@ local function pause_all()
 	)
 	if not ok_step then return false, step_reason end
 
-	local tt, tt_reason = require_pause_module("ui.tooltip")
+	-- A running CapsWord ends at pause, as on Windows and Linux: the paused
+	-- Karabiner graph holds no CapsWord rule, so its CapsLock would stay on.
+	-- Read only once the remap loaded it; without the remap no CapsWord runs.
+	local remap_watchers = package.loaded["platform.remap.watchers"]
+	if type(remap_watchers) == "table" and type(remap_watchers.end_capsword_for_pause) == "function" then
+		ok_step, step_reason = add_required_step(
+			"watchers.end_capsword_for_pause",
+			remap_watchers.end_capsword_for_pause,
+			nil,
+			"an ended CapsWord is not restored on resume, as on Windows and Linux"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	-- The foreground application's time stops with the pause (EDD-1): its open
+	-- interval is credited up to here, and the resume opens a new one. Read only
+	-- once loaded; without keystats no interval is open.
+	local keystats_owner = package.loaded["modules.keystats"]
+	if type(keystats_owner) == "table" and type(keystats_owner.close_app_interval_for_pause) == "function" then
+		ok_step, step_reason = add_required_step(
+			"keystats.close_app_interval_for_pause",
+			keystats_owner.close_app_interval_for_pause,
+			nil,
+			"a closed interval is not reopened on rollback: the resume opens a new one"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
+	local tt, tt_reason = require_pause_module("core.ui.ui.tooltip")
 	if tt_reason then return false, tt_reason end
 	if tt then
 		ok_step, step_reason = add_required_step(
@@ -1050,6 +1094,7 @@ local function complete_pause_transition(transaction, ok, reason)
 	if queued ~= nil and (queued ~= _is_paused or queued_repause_debt) then
 		request_pause_transition(queued)
 	end
+	apply_deferred_chords()
 end
 
 --- Restores native PAUSED after a local Hammerspoon resume step failed. The
@@ -1350,6 +1395,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			_pause_admission_fence = admission_fence
 		end
 		finish_physical_pause(physical_ticket, true)
+		apply_deferred_chords()
 		return true
 	end
 
@@ -1400,6 +1446,26 @@ end
 local function chord_state()
 	if _key_actions == nil then _key_actions, _chords_on = ChordCatalogue.defaults() end
 	return _key_actions, _chords_on
+end
+
+--- Whether a chord change must wait for the resume: the driver is paused, or a
+--- pause or resume is still settling, so the chord that resumes must not move.
+--- @return boolean
+local function chord_change_deferred()
+	return _is_paused or M.is_pause_transition_pending()
+end
+
+--- Applies the chord changes chosen while paused, once the resume has settled.
+--- Karabiner is asked for the new plan, as for a change made while active.
+apply_deferred_chords = function()
+	if _deferred_actions == nil and _deferred_chords_on == nil then return end
+	if chord_change_deferred() then return end
+	local actions = chord_state()
+	for slot_id, action in pairs(_deferred_actions or {}) do actions[slot_id] = action end
+	if _deferred_chords_on ~= nil then _chords_on = _deferred_chords_on end
+	_deferred_actions, _deferred_chords_on = nil, nil
+	Logger.info(LOG, "Script chord changes made while paused applied on resume.")
+	sync_karabiner_chords()
 end
 
 --- Captures the genuine script chord assignment and tap lifecycle without IO.
@@ -1817,6 +1883,7 @@ end
 function M.get_shortcut_actions()
 	local actions = {}
 	for key, value in pairs((chord_state())) do actions[key] = value end
+	for key, value in pairs(_deferred_actions or {}) do actions[key] = value end
 	return actions
 end
 
@@ -1936,7 +2003,7 @@ end
 --- the system, and one that started must get its sentinel. The remap refuses a
 --- regeneration while paused or switched off, and its next one reads the plan;
 --- before its first build nothing is asked, since that build reads the plan.
-local function sync_karabiner_chords()
+sync_karabiner_chords = function()
 	if _karabiner_sync_queued or _karabiner_plan_key == nil
 		or type(_karabiner) ~= "table" or type(_karabiner.regenerate) ~= "function" then
 		return
@@ -1965,7 +2032,7 @@ local function sync_karabiner_chords()
 end
 
 --- Configures the action a chord slot runs.
---- @param slot_id string A slot of _shared/modules/actions/script_chords.json.
+--- @param slot_id string A slot of _shared/shortcuts/data/actions/script_chords.json.
 --- @param action string An action id, or "none" to leave the chord to the system.
 --- @return boolean committed
 function M.set_shortcut_action(slot_id, action)
@@ -1976,6 +2043,12 @@ function M.set_shortcut_action(slot_id, action)
 	if ChordCatalogue.get().by_id[slot_id] == nil then
 		Logger.error(LOG, "set_shortcut_action(): '%s' is not a script chord slot.", slot_id)
 		return false
+	end
+	if chord_change_deferred() then
+		_deferred_actions = _deferred_actions or {}
+		_deferred_actions[slot_id] = action
+		Logger.debug(LOG, "Script chord slot '%s' → '%s', applied on resume.", slot_id, action)
+		return true
 	end
 	chord_state()[slot_id] = action
 	Logger.debug(LOG, "Script chord slot '%s' → '%s'.", slot_id, action)
@@ -1993,6 +2066,11 @@ function M.set_chords_enabled(on)
 		return false
 	end
 	chord_state()
+	if chord_change_deferred() then
+		_deferred_chords_on = on
+		Logger.debug(LOG, "Script chords switched %s, applied on resume.", on and "on" or "off")
+		return true
+	end
 	_chords_on = on
 	Logger.debug(LOG, "Script chords switched %s.", on and "on" or "off")
 	sync_karabiner_chords()
@@ -2003,6 +2081,7 @@ end
 --- @return boolean
 function M.chords_enabled()
 	local _, chords_on = chord_state()
+	if _deferred_chords_on ~= nil then return _deferred_chords_on end
 	return chords_on
 end
 

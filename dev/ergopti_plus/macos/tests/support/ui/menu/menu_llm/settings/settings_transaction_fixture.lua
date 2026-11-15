@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"modules.llm.backend_detector",
 	"infra.manifest_reader",
-	"adapters.storage",
+	"core.fs.adapters.storage",
 	"ui.menu.menu_llm",
 	"ui.menu.menu_llm.settings_manager",
 	"ui.menu.menu_llm.trigger_panel",
@@ -36,10 +36,10 @@ local MODULES = {
 	"modules.llm.api_mlx",
 	"modules.llm.mlx_deps_checker",
 	"modules.llm.ollama_deps_checker",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.dialog_util",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.ui.engine.dialog_util",
 	"ui.menu.shortcut_utils",
 	"infra.app_picker",
 	"infra.manifest_menu",
@@ -120,7 +120,7 @@ end
 
 local function with_fixture(options, callback)
 	options = options or {}
-	require("infra.paths").shared_root()
+	require("core.fs.engine.paths").shared_root()
 	local preferences_owner = options.preferences or require("infra.preferences")
 	local saved_modules = {}
 	for _, name in ipairs(MODULES) do
@@ -130,7 +130,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local mlx_loaded_dependencies = {}
 	local profile_loaded_dependencies = {}
-	local mlx_previous_json_codec = package.loaded["adapters.json_codec"]
+	local mlx_previous_json_codec = package.loaded["core.fs.adapters.json_codec"]
 
 	local state = {
 		llm_enabled = true,
@@ -308,18 +308,18 @@ local function with_fixture(options, callback)
 		is_backend_load_failed = function() return false end,
 		load_api_entries = function() end,
 	}
-	package.loaded["infra.logger"] = Logger
-	package.loaded["infra.notifications"] = {notify = function() end}
-	local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-	local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+	package.loaded["core.logger.engine.logger"] = Logger
+	package.loaded["core.ui.engine.notifications"] = {notify = function() end}
+	local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+	local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 	assert(locale_file:close())
 	local function fixture_caption(key)
 		if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 		return options.translate and options.translate(key) or require("tests.helpers").I18N_PLACEHOLDER_FORMATS[key] or key
 	end
-	package.loaded["infra.i18n"] = {get = fixture_caption, section = fixture_caption}
+	package.loaded["core.i18n.engine.i18n"] = {get = fixture_caption, section = fixture_caption}
 	local prompt_value = options.prompt_value or "0.75"
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function()
 			return "button.ok", prompt_value
 		end,
@@ -335,11 +335,11 @@ local function with_fixture(options, callback)
 			return {}
 		end,
 	}
-	local display_renderer = assert(require("menu.renderer").new({
+	local display_renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
-		manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+		manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.parent_id then
 				for index, row in ipairs(root.llm_menu) do
 					if row.id == options.parent_id then
@@ -560,7 +560,7 @@ local function with_fixture(options, callback)
 		if options.native_mlx_port then
 			local prior_dependencies = {}
 			for name, value in pairs(package.loaded) do prior_dependencies[name] = value end
-			package.loaded["adapters.json_codec"] = nil
+			package.loaded["core.fs.adapters.json_codec"] = nil
 			package.loaded["modules.llm.api_mlx"] = nil
 			package.loaded["modules.llm.api_mlx"] = require("modules.llm.api_mlx")
 			-- Restore only actual dependency entries changed by this genuine API, including false.
@@ -685,7 +685,7 @@ local function with_fixture(options, callback)
 	_G.hs = saved_hs
 	for name, prior in pairs(mlx_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
 	for name, prior in pairs(profile_loaded_dependencies) do package.loaded[name] = rawget(prior, "value") end
-	if options.native_mlx_port then package.loaded["adapters.json_codec"] = mlx_previous_json_codec end
+	if options.native_mlx_port then package.loaded["core.fs.adapters.json_codec"] = mlx_previous_json_codec end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved_modules[name] end
 	if not ok then error(err, 0) end
 end
@@ -825,21 +825,21 @@ local function info_bar_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/info_bar_control.json", "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 local function token_streaming_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 local function privacy_corpus()
 	local file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/privacy_trigger_controls.json", "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 return {

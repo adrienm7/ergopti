@@ -12,7 +12,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_shell_group_retirement%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 local uv, ffi = require("luv"), require("ffi")
 ffi.cdef([[
 	int prctl(int option, ...);
@@ -22,8 +22,8 @@ local PR_SET_CHILD_SUBREAPER, WNOHANG = 36, 1
 assert(ffi.C.prctl(PR_SET_CHILD_SUBREAPER, ffi.new("int", 1), ffi.new("int", 0), ffi.new("int", 0), ffi.new("int", 0)) == 0)
 -- The other native admission fixture initializes ShellRunner first. This
 -- order proves the canonical owner's deferred validator cannot create a cycle.
-require("adapters.owned_process")
-local Shell = require("adapters.shell_runner")
+require("core.process.adapters.owned_process")
+local Shell = require("core.process.adapters.shell_runner")
 local directory = assert(uv.fs_mkdtemp("/var/tmp/erg-shell-family-XXXXXX"))
 local checks, failures = 0, 0
 local PROGRAM = [[

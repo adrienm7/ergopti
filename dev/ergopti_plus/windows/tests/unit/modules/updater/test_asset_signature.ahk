@@ -224,7 +224,7 @@ Test("AssetSignature: the update gate follows the policy before anything downloa
 ; install path passes the gate before its transaction.
 _TAS_GateWired() {
 	global _SharedDir
-	Policy := JsonParse(FileRead(_SharedDir . "\modules\updater\asset_signing.json", "UTF-8"))
+	Policy := JsonParse(FileRead(_SharedDir . "\updater\data\asset_signing.json", "UTF-8"))
 	AssertEqual("", AssetSignature_AdmitPolicy(Policy))
 	Body := _StripFullLineComments(_DriverFuncBody("Updater_DownloadAndInstall"))
 	Gate := InStr(Body, "AssetSignature_AllowsInstall(AssetName, Asset, Release, Request)")

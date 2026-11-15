@@ -29,13 +29,15 @@
 
 local M = {}
 local hs        = hs
-local Logger    = require("infra.logger")
-local i18n      = require("infra.i18n")
+local Logger    = require("core.logger.engine.logger")
+local i18n      = require("core.i18n.engine.i18n")
 local changelog = require("ui.changelog")
 local Updater   = require("modules.updater")
-local VersionLabel = require("updater.version_label")
+local VersionLabel = require("updater.engine.version_label")
 local ManifestMenu = require("infra.manifest_menu")
 local UpdateLauncher = require("adapters.update_launcher")
+local CheckNotice = require("updater.engine.check_notice")
+local Notifications = require("core.ui.engine.notifications")
 local LOG       = "menu_about"
 
 
@@ -108,15 +110,42 @@ end
 --- @param owner table The menu session's update-channel owner.
 --- @param subscribed string Registry id of the subscribed channel.
 --- @return table row A provider row with its items.
+--- Runs the check a click asked for when the update-check window cannot open,
+--- and notifies its answer in the sentence the window would show.
+--- @param checks table|nil The automatic-check owner (check_now).
+--- @param owner table|nil The menu session's channel owner.
+--- @param on_change function|nil Menu refresh after the answer.
+--- @return boolean dispatched
+local function notify_check_without_window(checks, owner, on_change)
+	Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
+	if type(checks) ~= "table" or type(checks.check_now) ~= "function"
+		or type(owner) ~= "table" or type(owner.get) ~= "function" then
+		Logger.error(LOG, "No automatic-check owner: the update check cannot run without its window.")
+		return false
+	end
+	return checks.check_now(owner.get(), function(result)
+		local body = CheckNotice.body(result, i18n.get, function(id)
+			local entry = Updater.channels().channel(id)
+			return entry and i18n.get(entry.label_key) or tostring(id)
+		end)
+		local notified, err = Notifications.notify(i18n.get("updater.window_title"), body,
+			result.state == "error" and "warning" or "info")
+		if notified ~= true then
+			Logger.error(LOG, "The update-check answer could not be notified: %s.", tostring(err))
+		end
+		if type(on_change) == "function" then on_change() end
+	end) == true
+end
+
 local function channel_picker(owner, subscribed)
-	return ManifestMenu.choice_row("about_update_channel_menu", require("config_keys").COMMAND.UPDATE_CHANNEL, {
+	return ManifestMenu.choice_row("about_update_channel_menu", require("settings.engine.keys").COMMAND.UPDATE_CHANNEL, {
 		update_channel = function(id)
 			Logger.info(LOG, "User chose the update channel '%s'.", id)
 			local ok, committed = pcall(owner.set, id)
 			return ok and committed == true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHANNEL] = function() return subscribed end,
+		[require("settings.engine.keys").KEY.UPDATER_CHANNEL] = function() return subscribed end,
 		installed_build = function() return not is_local_source() end,
 	})
 end
@@ -127,14 +156,14 @@ end
 --- @param stored_seconds number|nil A source run's snapped interval, without an owner.
 --- @return table row A provider row with its items.
 local function frequency_picker(checks, stored_seconds)
-	return ManifestMenu.choice_row("about_update_frequency_menu", require("config_keys").COMMAND.UPDATE_CHECK_INTERVAL, {
+	return ManifestMenu.choice_row("about_update_frequency_menu", require("settings.engine.keys").COMMAND.UPDATE_CHECK_INTERVAL, {
 		update_check_interval = function(seconds)
 			if type(checks) ~= "table" then return false end
 			Logger.info(LOG, "User chose the check interval %ds.", seconds)
 			return checks.set_interval(seconds) == true
 		end,
 	}, {
-		[require("config_keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
+		[require("settings.engine.keys").KEY.UPDATER_CHECK_INTERVAL_SECONDS] = function()
 			if stored_seconds ~= nil then return stored_seconds end
 			return checks.interval()
 		end,
@@ -201,11 +230,16 @@ function M.build(ctx, actions)
 		-- consent to install it, so it goes straight to Sparkle.
 		local check_action = function()
 				Logger.info(LOG, "User asked for an update check (channel: %s).", channel)
-				require("ui.update_check").open({
+				local on_change = type(ctx) == "table" and ctx.updateMenu or nil
+				local opened = require("ui.update_check").open({
 					checks = checks,
 					channel_owner = owner,
-					on_change = type(ctx) == "table" and ctx.updateMenu or nil,
+					on_change = on_change,
 				})
+				if opened == true then return true end
+				-- Without its window the click showed nothing: the check runs and its
+				-- answer is notified, as on Windows and Linux (UPX-001).
+				return notify_check_without_window(checks, owner, on_change)
 		end
 		local offered_label
 		if type(latest) == "table" and type(latest.tag) == "string" and latest.tag ~= ""
@@ -236,8 +270,8 @@ function M.build(ctx, actions)
 				return changelog.complete_pending_install()
 			end
 		end
-		local check_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
+		local check_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = check_action,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if check_row then
 			if offered_label then check_row.label = offered_label end
@@ -254,8 +288,8 @@ function M.build(ctx, actions)
 		-- out, nobody could tell whether the automatic update exists.
 		local state = type(ctx) == "table" and type(ctx.state) == "table" and ctx.state or {}
 		local seconds = require("modules.updater.auto_check").stored_interval(state)
-		local source_row = ManifestMenu.command_row("about_source_menu", require("config_keys").COMMAND.ABOUT_SOURCE_CHECK, {
-			[require("config_keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
+		local source_row = ManifestMenu.command_row("about_source_menu", require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK, {
+			[require("settings.engine.keys").COMMAND.ABOUT_SOURCE_CHECK] = function() return false end,
 		}, { ["about_source_release_ready"] = function() return not local_src end })
 		if source_row then table.insert(menu_items, source_row) end
 		table.insert(menu_items, frequency_picker(nil, seconds))
@@ -269,14 +303,14 @@ function M.build(ctx, actions)
 	local render_ctx = {}
 	for key, value in pairs(ctx or {}) do render_ctx[key] = value end
 	render_ctx.commands = {
-		[require("config_keys").COMMAND.ABOUT_CHANGELOG] = function()
+		[require("settings.engine.keys").COMMAND.ABOUT_CHANGELOG] = function()
 			Logger.info(LOG, "User opened changelog (channel: %s).", channel)
 			show_changelog(channel, owner)
 		end,
-		[require("config_keys").COMMAND.ABOUT_RELEASES_PAGE] = function() hs.urlevent.openURL(releases_page_url()) end,
+		[require("settings.engine.keys").COMMAND.ABOUT_RELEASES_PAGE] = function() hs.urlevent.openURL(releases_page_url()) end,
 		-- The menu session's uninstall transaction; an unregistered command is
 		-- reported by the renderer and draws no row that would do nothing.
-		[require("config_keys").COMMAND.START_AT_LOGIN] = type(actions) == "table" and actions.start_at_login or nil,
+		[require("settings.engine.keys").COMMAND.START_AT_LOGIN] = type(actions) == "table" and actions.start_at_login or nil,
 		["uninstall"] = type(actions) == "table" and actions.uninstall or nil,
 	}
 	-- A local version run from source has nothing to uninstall: the row stays,

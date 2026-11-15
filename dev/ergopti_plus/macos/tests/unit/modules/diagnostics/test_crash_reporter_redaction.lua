@@ -17,10 +17,10 @@ local helpers = require("tests.helpers")
 local function with_fixture(redact, callback)
 	local module_names = {
 		"modules.diagnostics.crash_reporter",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"infra.config_paths",
-		"infra.i18n",
-		"infra.logger",
+		"core.i18n.engine.i18n",
+		"core.logger.engine.logger",
 	}
 	helpers.with_fresh_modules(module_names, function()
 		local original_open = io.open
@@ -29,7 +29,7 @@ local function with_fixture(redact, callback)
 		local files = {}
 		local attempts = {}
 
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				attempts[#attempts + 1] = path
 				if files[path] ~= nil then return false, "exists" end
@@ -37,14 +37,14 @@ local function with_fixture(redact, callback)
 				return true, "created"
 			end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 		}
 		local logger_stub = helpers.make_logger_stub()
 		-- The logger is the one resolver of the crash-reports folder.
 		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
 		logger_stub.redact_message = redact
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 
 		-- The legacy implementation writes directly with mode "w". Model that
 		-- faithfully so the pre-fix code overwrites the same in-memory path and

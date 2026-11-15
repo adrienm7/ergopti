@@ -234,13 +234,18 @@ _MSG_ExecutableSpacing(Source) {
 
 ; A retained child may join only the reviewed non-disposing feature adapter.
 _MSG_RetainedFeatureAdapter(Body) {
-	Expected := '_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {`n'
+	; Feature := false stages a head that stays live while paused (EDD-1); the
+	; retained Shortcuts and TapHolds parents omit it and stay feature rows.
+	Expected := '_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {`n'
 		. '	Published := false`n'
 		. '	try {`n'
 		. '		Row := Receiver.Call(Child, Getters)`n'
 		. '		if !(Row is Map) || Row.Get("submenu", false) != Child`n'
 		. '			throw Error("The canonical feature parent changed during native construction.")`n'
-		. '		TrayMenuStage_AddFeature(Row["label"], Child)`n'
+		. '		if Feature`n'
+		. '			TrayMenuStage_AddFeature(Row["label"], Child)`n'
+		. '		else`n'
+		. '			TrayMenuStage_Add(Row["label"], Child)`n'
 		. '		Published := true`n'
 		. '		if Row.Get("checked", false)`n'
 		. '			TrayMenuStage_Check(Row["label"])`n'

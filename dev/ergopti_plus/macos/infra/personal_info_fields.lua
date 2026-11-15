@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Personal-Info Field Classification (macOS binding)
 --- DESCRIPTION:
---- Reads _shared/modules/personal_info/fields.toml — which personal_info fields
+--- Reads _shared/hotstrings/data/personal_info/fields.toml — which personal_info fields
 --- are secrets, and how much of one may appear on screen — and hands it to the
 --- shared masking function.
 ---
@@ -13,8 +13,8 @@
 ---    produces is the worst kind — a value shown because one driver's private
 ---    list disagreed with the declaration. Linux carries the same module for the
 ---    same reason; the two must not diverge, and the corpus at
----    _shared/modules/personal_info/preview_vectors.toml is what measures that.
---- 2. Fail-CLOSED, unlike its timings sibling. infra/timings.lua raises when the
+---    _shared/hotstrings/data/personal_info/preview_vectors.toml is what measures that.
+--- 2. Fail-CLOSED, unlike its timings sibling. core/timing/engine/timings.lua raises when the
 ---    registry is unreadable, which is right for a boot-time constant table.
 ---    Here a raise would take down the preview bubble on the keystroke path, and
 ---    worse, a driver that cannot read the classification must not conclude that
@@ -27,16 +27,16 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local Codec  = require("infra.toml.codec")
-local Mask   = require("personal_info.mask")
-local Paths  = require("infra.paths")
-local TableUtil = require("table_util")
+local Logger = require("core.logger.engine.logger")
+local Codec  = require("core.text.engine.toml.codec")
+local Mask   = require("hotstrings.engine.personal_info.mask")
+local Paths  = require("core.fs.engine.paths")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "infra.personal_info_fields"
 
 -- Where the declaration lives inside the shared tree.
-local DECLARATION_REL = "modules/personal_info/fields.toml"
+local DECLARATION_REL = "hotstrings/data/personal_info/fields.toml"
 
 -- What the classification degrades to when it cannot be read. Everything is
 -- masked and nothing is revealed, so a driver that lost its declaration hides

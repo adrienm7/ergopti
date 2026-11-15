@@ -20,7 +20,7 @@
 
 local helpers = require("tests.helpers")
 
-local SCHEMA = require("healthcheck.snapshot").load_config(require("infra.paths").shared).schema
+local SCHEMA = require("diagnostics.engine.healthcheck.snapshot").load_config(require("core.fs.engine.paths").shared).schema
 
 --- The real core over a counted network adapter.
 --- @param body function(Core, world)
@@ -28,10 +28,10 @@ local function with_core(body)
 	-- A case may script hs.usb; the shared hs stub outlives this module
 	local saved_usb = hs.usb
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"infra.logger", "adapters.network_info", "ui.healthcheck.core", "ui.healthcheck.helpers",
-		"adapters.accessibility_permission", "adapters.screen_capture",
+		"core.logger.engine.logger", "core.network.adapters.info", "ui.healthcheck.core", "ui.healthcheck.helpers",
+		"adapters.accessibility_permission", "platform.system.screen_capture",
 	}, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { signal_reads = 0, tcc_reads = {} }
 		package.loaded["adapters.accessibility_permission"] = {
 			is_trusted = function()
@@ -39,13 +39,13 @@ local function with_core(body)
 				return true
 			end,
 		}
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function()
 				world.tcc_reads[#world.tcc_reads + 1] = "screen_recording"
 				return false
 			end,
 		}
-		package.loaded["adapters.network_info"] = {
+		package.loaded["core.network.adapters.info"] = {
 			getSsidHash = function() return nil end,
 			getSignalStrength = function() world.signal_reads = world.signal_reads + 1; return 64 end,
 			isInternetReachable = function() return true end,
@@ -69,11 +69,11 @@ local function run_local_state(step_costs, failing)
 	local saved_absolute = hs.timer.absoluteTime
 	local clock_ns = 0
 	local ok, err = pcall(helpers.with_stub_scope, {
-		"infra.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "adapters.timer_scheduler",
+		"core.logger.engine.logger", "ui.healthcheck.probes", "ui.healthcheck.core", "core.events.timer_scheduler",
 	}, function()
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		hs.timer.absoluteTime = function() return clock_ns end
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = { delay = delay, callback = callback }
 				world.timers[#world.timers + 1] = handle
@@ -136,7 +136,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			helpers.assert_nil(snapshot.sections.developer.modules_ok, "phase A ran the module contract check")
 			helpers.assert_nil(snapshot.sections.network.wifi_signal, "phase A filled the Wi-Fi signal")
 			helpers.assert_eq(snapshot.probes.local_state.state, "pending", "the probe owns them")
-			local undeclared = require("healthcheck.snapshot").check_fields(snapshot, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(snapshot, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "phase A fields stay declared")
 		end)
 	end)
@@ -171,7 +171,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			helpers.assert_true(completed.sections.versions.commit ~= nil, "the steps fill the versions")
 			helpers.assert_true(completed.sections.input.shift ~= nil, "the steps fill the keyboard state")
 			helpers.assert_eq(#completed.sections.peripherals.items, 1, "the steps list the USB devices")
-			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(completed, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
 		end)
 	end)
@@ -203,7 +203,7 @@ helpers.describe("healthcheck (macOS): local_state probe (healthcheck-local-stat
 			for _, item in ipairs(completed.sections.permissions.items) do ids[#ids + 1] = item.id end
 			helpers.assert_eq(ids, { "accessibility", "input_monitoring", "login_items", "screen_recording" },
 				"the schema's order is kept")
-			local undeclared = require("healthcheck.snapshot").check_fields(completed, Core.config().schema)
+			local undeclared = require("diagnostics.engine.healthcheck.snapshot").check_fields(completed, Core.config().schema)
 			helpers.assert_eq(undeclared, {}, "the moved fields stay declared")
 		end)
 	end)

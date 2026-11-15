@@ -22,10 +22,10 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local STUBBED = {
-	"ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
+	"core.ui.ui.webview_manager", "ui.download_window.bridge", "ui.error_dialog.bridge", "ui.changelog.bridge",
 }
 
 --- Loads the real bridge with controlled collaborators.
@@ -40,11 +40,11 @@ local function load_bridge(answer)
 	}
 	for _, name in ipairs(STUBBED) do context.saved[name] = package.loaded[name] end
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	context.real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return context.source_run end
 	package.loaded["ui.update_check.bridge"] = nil
-	package.loaded["ui.webview_manager"] = {
+	package.loaded["core.ui.ui.webview_manager"] = {
 		show = function(app)
 			context.shown[#context.shown + 1] = app
 			if context.on_show then return context.on_show(app) end
@@ -119,7 +119,7 @@ end
 
 local function restore(context)
 	for _, name in ipairs(STUBBED) do package.loaded[name] = context.saved[name] end
-	require("infra.installation").is_source_run = context.real_is_source_run
+	require("core.lifecycle.engine.installation").is_source_run = context.real_is_source_run
 	package.loaded["ui.update_check.bridge"] = nil
 end
 
@@ -232,7 +232,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 		helpers.it("(update-log-fifo) inspects " .. kind .. " logs without blocking", function()
 			if package.config:sub(1, 1) == "\\" then return end
 			local path = os.tmpname(); os.remove(path)
-			local quote, root = require("text_utils").shell_quote, helpers.driver_root()
+			local quote, root = require("core.text.engine.utils_core").shell_quote, helpers.driver_root()
 			if kind == "fifo" then
 				local made = os.execute("mkfifo " .. quote(path))
 				assert(made == true or made == 0)
@@ -240,10 +240,10 @@ helpers.describe("update-check window bridge (Linux)", function()
 				local file = assert(io.open(path, "w")); assert(file:write("log")); assert(file:close())
 			end
 			local source = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/?/init.lua;"
-				.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;") .. "..package.path;"
-				.. "package.loaded['infra.installation']={is_source_run=function()return false end};"
-				.. "package.loaded['infra.logger_sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
-				.. "package.loaded['adapters.shell_runner']={has_command=function()return true end};"
+				.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;") .. "..package.path;"
+				.. "package.loaded['core.lifecycle.engine.installation']={is_source_run=function()return false end};"
+				.. "package.loaded['core.logger.engine.sink']={main_log_path=function()return " .. string.format("%q", path) .. " end};"
+				.. "package.loaded['core.process.adapters.shell_runner']={has_command=function()return true end};"
 				.. "local window; package.loaded['ui.download_window.bridge']={show=function(v)window=v;return 1 end};"
 				.. "local release={tag='v1',download_url='https://example.invalid/a'}; local u={"
 				.. "get_cached_release=function()return release end,get_state=function()return 'idle' end,"
@@ -393,8 +393,8 @@ helpers.describe("update-check window bridge (Linux)", function()
 
 	helpers.it("opens a repository link of the notes with xdg-open, nothing else", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, commands = package.loaded["adapters.shell_runner"], {}
-			package.loaded["adapters.shell_runner"] = {
+			local saved, commands = package.loaded["core.process.adapters.shell_runner"], {}
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function(binary) return binary == "xdg-open" end,
 				quote = function(text) return "'" .. text .. "'" end,
 				run = function(command) commands[#commands + 1] = command; return true end,
@@ -410,15 +410,15 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(#commands, 1, "a link outside the repository never reaches the shell")
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)
 
 	helpers.it("says so when xdg-open is missing", function()
 		scenario(with_notes, function(bridge, context)
-			local saved, ran = package.loaded["adapters.shell_runner"], 0
-			package.loaded["adapters.shell_runner"] = {
+			local saved, ran = package.loaded["core.process.adapters.shell_runner"], 0
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return false end,
 				quote = function(text) return text end,
 				run = function() ran = ran + 1; return true end,
@@ -429,7 +429,7 @@ helpers.describe("update-check window bridge (Linux)", function()
 				helpers.assert_eq(ran, 0)
 				helpers.assert_eq(last(context).ok, false)
 			end)
-			package.loaded["adapters.shell_runner"] = saved
+			package.loaded["core.process.adapters.shell_runner"] = saved
 			if not ok then error(err, 0) end
 		end)
 	end)

@@ -2,10 +2,10 @@
 
 --- Catalogue discovery uses actual private source ownership and retained native GETs.
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 -- The shipped catalogue. These cases drive four of its servers; the others
 -- are stopped by the scan fake below, so a longer catalogue changes no case.
-local CATALOGUE = Json.decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"), "rb")):read("*a"))
+local CATALOGUE = Json.decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"), "rb")):read("*a"))
 local DRIVEN = { omlx = true, lmstudio = true, llamacpp = true, jan = true }
 --- The probed sources of one sweep: the driven servers and configured rows.
 --- @param servers table modules.llm.local_servers
@@ -19,7 +19,7 @@ local function probed(servers)
 end
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
+		"core.network.adapters.http_client", "core.events.loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows",
 		"modules.llm.local_server_ports" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
@@ -33,10 +33,10 @@ local function isolated(body)
 	end
 	require("tests.support.modules.llm.local_server_scan_fake").install(scan_overrides)
 	-- Native scheduling is covered independently by test_local_server_startup.
-	package.loaded["adapters.event_loop"] = { defer = function(fn) fn(); return true end }
+	package.loaded["core.events.loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)
 	local calls = {}
-	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)
+	package.loaded["core.network.adapters.http_client"] = { get_owned = function(url, headers, options, callback)
 		local call = { url = url, headers = headers, options = options, callback = callback, cancelled = 0, listeners = {} }
 		local operation = { started = true }
 		function operation:is_settled()
@@ -81,7 +81,7 @@ end
 helpers.describe("Linux local server discovery ownership", function()
 	helpers.it("a shutdown during deferred source reading prevents later target lookup", function()
 		isolated(function(servers, entries, calls)
-			local loop = require("adapters.event_loop")
+			local loop = require("core.events.loop")
 			local defer, source, target = loop.defer, entries.source_is_current, servers.target
 			local pending, armed, stopping, ack, after = {}, false, false, nil, 0
 			loop.defer = function(fn) pending[#pending + 1] = fn; return true end
@@ -173,7 +173,7 @@ helpers.describe("Linux local server discovery ownership", function()
 
 	helpers.it("review-deferred-admit: shutdown cannot ACK before the deferred acquisition frame ends", function()
 		isolated(function(servers, entries)
-			local loop = require("adapters.event_loop")
+			local loop = require("core.events.loop")
 			local original_defer, original_current = loop.defer, entries.source_is_current
 			local pending, armed, ack, after = {}, false, nil, 0
 			loop.defer = function(fn) pending[#pending + 1] = fn; return true end
@@ -342,10 +342,10 @@ helpers.describe("Linux local server discovery ownership", function()
 			local function build() return ServerRows.rows(llm,dialogs,function() end,context) end
 			local rows=build()
 			helpers.assert_eq(#calls,0,"no local server is probed while the AI is off")
-			local rescan=find(rows,require("infra.i18n").get("menu.llm.local_servers.rescan"))
+			local rescan=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.rescan"))
 			helpers.assert_true(rescan~=nil and rescan.action==nil and rescan.disabled==true,
 				"the rescan row is inert while the AI is off")
-			local address=find(rows,require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address~=nil)
 			for _,item in ipairs(address.items or {}) do
 				helpers.assert_nil(item.action,"another address cannot be typed while the AI is off")
@@ -640,7 +640,7 @@ helpers.describe("Linux local server discovery ownership", function()
 
 	helpers.it("a waiter failure diagnostic cannot acknowledge the active delivery", function()
 		isolated(function(servers)
-			local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+			local ports, logger = require("modules.llm.local_server_ports"), require("core.logger.engine.shim")
 			local prior, previous_error, closed, during = ports.scan_owned, logger.error, false, nil
 			ports.scan_owned = function()
 				return { cancel = function() return false end, is_settled = function() return closed end }
@@ -708,7 +708,7 @@ helpers.describe("Linux local server discovery ownership", function()
 		scanner._list_proc = function() return { "1" } end
 		scanner._read_cmdline = function() return "/usr/bin/omlx-server\0" end
 		scanner._owned_process = function(_, _, options, callback)
-			return require("adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
+			return require("core.process.adapters.owned_process").start("/bin/sleep", { "10" }, options, callback)
 		end
 		local ok, failure = pcall(isolated, function(servers)
 			local ports = require("modules.llm.local_server_ports")
@@ -899,7 +899,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				for _, id in ipairs({ "omlx", "lmstudio", "llamacpp", "jan" }) do
 					scan[id] = { running = false, pids = {} }
 				end
-				local ports, logger = require("modules.llm.local_server_ports"), require("logger.shim")
+				local ports, logger = require("modules.llm.local_server_ports"), require("core.logger.engine.shim")
 				local original_scan, original_error, messages = ports.scan, logger.error, {}
 				if source == "port scan" then ports.scan = function() error("synthetic-private-token") end end
 				logger.error = function(_, fmt, ...) messages[#messages + 1] = string.format(fmt, ...) end
@@ -925,7 +925,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				error = function() errors = errors + 1 end }
 			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
 				{ is_paused = function() return false end, page_current = function() return live end })
-			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address = find(rows, require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address ~= nil)
 			helpers.assert_eq(address.items[1].action(), false)
 			helpers.assert_eq(errors, 0)
@@ -942,7 +942,7 @@ helpers.describe("Linux local server discovery ownership", function()
 				error = function() end }
 			local rows = require("ui.menu.local_server_rows").rows(llm, dialogs, function() end,
 				{ is_paused = function() return false end, page_current = function() return live end })
-			local address = find(rows, require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address = find(rows, require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address ~= nil)
 			helpers.assert_eq(address.items[1].action(), false)
 			helpers.assert_eq(servers.target("omlx").base_url, "http://127.0.0.1:8000/v1")
@@ -959,7 +959,7 @@ helpers.describe("Linux local server discovery ownership", function()
 			local dialogs={prompt=function() allowed=false;return "http://localhost:9876/v1" end,error=function() end}
 			local Rows=require("ui.menu.local_server_rows")
 			local rows=Rows.rows(llm,dialogs,function() end,{is_paused=function() return false end})
-			local address=find(rows,require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			local address=find(rows,require("core.i18n.engine.i18n").get("menu.llm.local_servers.other_address"))
 			helpers.assert_true(address~=nil)
 			local result=address.items[1].action()
 			helpers.assert_eq(result,false)
@@ -1224,7 +1224,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 	for _, failure in ipairs({"throw","unsupported","dead_start","observation_false","observation_throw"}) do
 		helpers.it("reports native "..failure.." as unavailable while retaining cleanup ownership (local-probe-unavailable)",function()
 			isolated(function(servers,_,calls)
-				local http=package.loaded["adapters.http_client"]
+				local http=package.loaded["core.network.adapters.http_client"]
 				local original=http.get_owned
 				http.get_owned=function(url,headers,options,callback)
 					if failure=="throw" then error("actual native construction refused") end
@@ -1243,13 +1243,13 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
 					can_configure_local_servers=function() return true end,is_enabled=function() return true end}, {},function() end,{is_paused=function() return false end})
-				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
+				local failed=find(rows,require("core.i18n.engine.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
-				local catalogue=require("json").decode(assert(io.open(require("infra.paths").shared("modules/llm/local_servers.json"),"rb")):read("*a"))
+				local catalogue=require("core.text.engine.json").decode(assert(io.open(require("core.fs.engine.paths").shared("ai/data/local_servers.json"),"rb")):read("*a"))
 				local labels={}
 				for _,id in ipairs(catalogue.server_order) do labels[#labels+1]=catalogue.servers[id].label end
-				local none=require("infra.i18n").get("menu.llm.local_servers.none_detected")
+				local none=require("core.i18n.engine.i18n").get("menu.llm.local_servers.none_detected")
 				helpers.assert_nil(find(rows,none),"infrastructure refusal cannot become a no-server claim")
 				helpers.assert_eq(servers.cancel(),false,"no flag acknowledges still retained native debt")
 				if failure~="throw" and failure~="unsupported" then
@@ -1278,7 +1278,7 @@ end)
 helpers.describe("Native synchronous discovery ownership (local-probe-unavailable)",function()
 	helpers.it("acknowledges a zero-resource dead-start refusal without replaying its body (local-probe-unavailable)",function()
 		isolated(function(servers)
-			package.loaded["adapters.http_client"].get_owned=function(_,_,_,callback)
+			package.loaded["core.network.adapters.http_client"].get_owned=function(_,_,_,callback)
 				local operation={started=false}
 				function operation:is_settled() return true end
 				function operation:cancel() return true end
@@ -1336,7 +1336,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 				helpers.assert_nil(servers.apply(servers.capture(id),{model="invented"},function() return true end))
 			end
 			local count=0
-			local label=require("infra.i18n").get("menu.llm.local_servers.no_models")
+			local label=require("core.i18n.engine.i18n").get("menu.llm.local_servers.no_models")
 			for _,row in ipairs(build()) do
 				for _,child in ipairs(row.items or {}) do
 					if child.label==label then
@@ -1361,7 +1361,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
 					can_configure_local_servers=function() return true end,is_enabled=function() return true end},{},function() end,{is_paused=function() return false end})
-				helpers.assert_nil(find(rows,require("infra.i18n").get("healthcheck.status.failed")))
+				helpers.assert_nil(find(rows,require("core.i18n.engine.i18n").get("healthcheck.status.failed")))
 			end)
 		end)
 	end
@@ -1447,9 +1447,9 @@ end)
 helpers.describe("Scripted startup discovery transport custody (startup-local-http-edge)",function()
 	helpers.it("models absent default listeners through acknowledged operations rather than disabling dispatch (startup-local-http-edge)",function()
 		isolated(function(servers,_,calls)
-			local port=package.loaded["adapters.http_client"]
+			local port=package.loaded["core.network.adapters.http_client"]
 			local _,probes=require("tests.support.owned_http_fixture").local_discovery(port)
-			local logger=require("logger.shim")
+			local logger=require("core.logger.engine.shim")
 			local previous,errors=logger.error,{}
 			logger.error=function(_,message) errors[#errors+1]=message end
 			local ok,err=pcall(function()
@@ -1470,7 +1470,7 @@ helpers.describe("Scripted startup discovery transport custody (startup-local-ht
 	end)
 	helpers.it("forwards every unrelated owner with its original arguments and operation identity (startup-local-http-edge)",function()
 		isolated(function(_,_,calls)
-			local port=package.loaded["adapters.http_client"]
+			local port=package.loaded["core.network.adapters.http_client"]
 			require("tests.support.owned_http_fixture").local_discovery(port)
 			local headers,options,callback={Authorization="inert"},{owner="original-updater"},function() end
 			local operation=port.get_owned("https://example.invalid/owned",headers,options,callback)

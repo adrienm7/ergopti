@@ -7,8 +7,8 @@ local helpers = require("tests.helpers")
 
 helpers.describe("Menu — log level emojis", function()
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n    = require("infra.i18n")
-	local Logger  = require("infra.logger")
+	local i18n    = require("core.i18n.engine.i18n")
+	local Logger  = require("core.logger.engine.logger")
 
 	helpers.admit_logger_privacy(Logger)
 	helpers.it("includes correct emojis in log level selection labels", function()
@@ -31,7 +31,7 @@ helpers.describe("Menu — log level emojis", function()
 		}
 		
 		-- Mock i18n.get to return keys for easier verification
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local old_get = i18n.get
 		i18n.get = function(k) return k end
 		-- Also need this for builder.lua line 488
@@ -102,7 +102,7 @@ local function log_corpus()
 	local file = assert(io.open(helpers.shared("tests/corpus/menus/log_level_rows.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(raw))
+	return assert(require("core.fs.adapters.json_codec").decode(raw))
 end
 
 --- Builds the actual Debug row with its real logger threshold.
@@ -110,11 +110,11 @@ end
 --- @param setter function Existing native assignment owner.
 --- @return table row
 local function log_row(value, setter)
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	logger.set_level(value)
 	local rows = helpers.load_with_stubs("ui.menu.builder").generate({}, {}, { set_log_level = setter })
-	local label = require("infra.i18n").get("menu.debug.log_level")
+	local label = require("core.i18n.engine.i18n").get("menu.debug.log_level")
 	for _, top in ipairs(rows) do
 		for _, row in ipairs(top.menu or {}) do
 			if row.title and row.title:find(label, 1, true) == 1 then return row end
@@ -126,7 +126,7 @@ end
 helpers.describe("macOS shared Debug log choices", function()
 	for _, state in ipairs(log_corpus().states) do
 		helpers.it("replays the independent four-state matrix for " .. state.selected, function()
-			local logger, observed = require("infra.logger"), {}
+			local logger, observed = require("core.logger.engine.logger"), {}
 			local previous = logger.current_level
 			local ok, detail = pcall(function()
 				local row = log_row(state.selected, function(value) observed[#observed + 1] = value; return true end)
@@ -135,7 +135,7 @@ helpers.describe("macOS shared Debug log choices", function()
 					helpers.assert_eq(row.menu[index].title, level.label)
 					helpers.assert_eq(row.menu[index].checked == true, state.checked[index])
 					if level.value == state.selected then
-						helpers.assert_eq(row.title, require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get("menu.debug.log_level"), level.label))
+						helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get("menu.debug.log_level"), level.label))
 					end
 					helpers.assert_eq(row.menu[index].fn(), true)
 				end
@@ -147,7 +147,7 @@ helpers.describe("macOS shared Debug log choices", function()
 	end
 
 	helpers.it("follows the actual shared order without treating refusal as success", function()
-		local renderer, logger = require("infra.manifest_menu"), require("infra.logger")
+		local renderer, logger = require("infra.manifest_menu"), require("core.logger.engine.logger")
 		local declaration
 		for _, row in ipairs(renderer.get_root().debug_menu) do if row.id == "log_level" then declaration = row end end
 		local previous, threshold = declaration.choices, logger.current_level
@@ -179,7 +179,7 @@ local function check_log_commit(receipt)
 	local ok, detail = pcall(function()
 		local fixture = require("tests.support.menu_boot_fixture").boot()
 		local actions = fixture.global_actions()
-		local logger, storage = require("infra.logger"), require("adapters.storage")
+		local logger, storage = require("core.logger.engine.logger"), require("core.fs.adapters.storage")
 		storage_owner, previous_storage_set = storage, storage.set
 		local threshold, writes, published, rebuilt = "INFO", 0, 0, 0
 		local stored_key, stored_value, detached_threshold
@@ -241,15 +241,15 @@ end)
 --- @param body function Independent native row/source assertions.
 local function debug_parent_fixture(body)
 	local saved = {}
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
-	helpers.load_with_stubs("infra.paths")
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	helpers.load_with_stubs("core.fs.engine.paths")
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks = {}
 	local function setter(value) callbacks[#callbacks + 1] = value; return false end
-	local logger = require("infra.logger")
+	local logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(logger)
 	local threshold = logger.current_level
 	logger.set_level("INFO")
@@ -262,12 +262,12 @@ local function debug_parent_fixture(body)
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, logger) end, debug.traceback)
 	locale.set_locale(language)
 	logger.current_level = threshold
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
 	if not ok then error(detail, 0) end
 end
 
-local debug_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
+local debug_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/debug_parent.json"), "rb"))
 local debug_parent_raw = debug_parent_file:read("*a")
 debug_parent_file:close()
-require("test.debug_parent_contract").register(helpers, debug_parent_fixture,
-	assert(require("adapters.json_codec").decode(debug_parent_raw)), "hs")
+require("tests.lua.debug_parent_contract").register(helpers, debug_parent_fixture,
+	assert(require("core.fs.adapters.json_codec").decode(debug_parent_raw)), "hs")

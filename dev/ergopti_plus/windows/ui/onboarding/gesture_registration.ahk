@@ -96,6 +96,9 @@ _Onboarding_StartGestureAuto(OnDone) {
 		try LoggerError("Onboarding", "Gesture auto-config refused: the touchpad values were not backed up and written.")
 		return false
 	}
+	; An isolated profile wrote its private key: no device restart, no UAC prompt.
+	if TouchpadRegistrySkipsDeviceRestart(OnDone)
+		return true
 	Epoch := _OnboardingGestureJob["epoch"] + 1
 	JobStem := A_Temp . "\ergopti_gesture_config_" . DriverPid . "_" . Epoch
 	ScriptPath := JobStem . ".ps1"
@@ -118,7 +121,7 @@ _Onboarding_StartGestureAuto(OnDone) {
 		return false
 	}
 	Pid := 0
-	try Run('*RunAs powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . ScriptPath . '"', , "Hide", &Pid)
+	try GestureRestartRunElevated(ScriptPath, &Pid)
 	catch as err {
 		FSDelete(ScriptPath)
 		_Onboarding_AbortGestureAutoReservation(Epoch)

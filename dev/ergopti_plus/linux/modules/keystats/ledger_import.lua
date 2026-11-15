@@ -40,8 +40,8 @@
 
 local M = {}
 
-local Json = require("json")
-local Queries = require("keystats.queries")
+local Json = require("core.text.engine.json")
+local Queries = require("metrics.engine.queries")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local MetricsLedger = require("modules.keystats.metrics_ledger")
 
@@ -92,7 +92,7 @@ function M.is_foreign_device_id(name)
 end
 
 --- The columns of every raw events_* table of the shared schema.
---- @param schema string Text of _shared/data/db/schema.sql.
+--- @param schema string Text of _shared/metrics/data/db/schema.sql.
 --- @return table columns { [table] = { [column] = true } }
 function M.raw_columns(schema)
 	local out = {}
@@ -147,20 +147,49 @@ function M.last_complete_batch(chunk)
 	end
 end
 
+--- Reads one single-quoted SQL string at `pos`, doubled quotes included.
+--- @return string|nil quoted Its exact text, quotes included.
+--- @return integer|nil next Position after it.
+local function read_quoted(chunk, pos)
+	local close = pos
+	repeat
+		close = chunk:find("'", close + 1, true)
+		if not close then return nil end
+		local doubled = chunk:sub(close + 1, close + 1) == "'"
+		if doubled then close = close + 1 end
+	until not doubled
+	return chunk:sub(pos, close), close + 1
+end
+
 --- Reads one SQL literal at `pos`.
 --- @return string|nil literal Its exact text.
 --- @return integer|nil next Position after it.
 local function read_literal(chunk, pos)
 	local first = chunk:sub(pos, pos)
 	if first == "'" then
-		local close = pos
-		repeat
-			close = chunk:find("'", close + 1, true)
-			if not close then return nil end
-			local doubled = chunk:sub(close + 1, close + 1) == "'"
-			if doubled then close = close + 1 end
-		until not doubled
-		return chunk:sub(pos, close), close + 1
+		local quoted, after = read_quoted(chunk, pos)
+		if not quoted then return nil end
+		-- Every driver writes a CR or a NUL as a char() concatenation
+		-- (core/fs/engine/sqlite/literal.lua, Windows SQLite_Q): only that form joins literals,
+		-- re-rendered as the exact bytes it stores.
+		if chunk:sub(after, after + 1) ~= "||" then return quoted, after end
+		local parts = { (quoted:sub(2, -2):gsub("''", "'")) }
+		while chunk:sub(after, after + 1) == "||" do
+			local code = chunk:match("^||char%((%d+)%)", after)
+			if code == "0" or code == "13" then
+				parts[#parts + 1] = string.char(tonumber(code))
+				after = after + #"||char()" + #code
+			elseif chunk:sub(after + 2, after + 2) == "'" then
+				local next_quoted, next_after = read_quoted(chunk, after + 2)
+				if not next_quoted then return nil end
+				parts[#parts + 1] = (next_quoted:sub(2, -2):gsub("''", "'"))
+				after = next_after
+			else
+				return nil
+			end
+		end
+		local bytes = table.concat(parts)
+		return "CAST(X'" .. (bytes:gsub(".", function(c) return string.format("%02X", c:byte()) end)) .. "' AS TEXT)", after
 	end
 	for _, pattern in ipairs({
 		"^NULL", "^[xX]'%x*'", "^CAST%(X'%x*' AS TEXT%)",

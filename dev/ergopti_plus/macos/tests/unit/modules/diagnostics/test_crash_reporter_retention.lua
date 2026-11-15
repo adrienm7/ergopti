@@ -17,16 +17,16 @@ local helpers = require("tests.helpers")
 local function with_fixture(listing, callback)
 	local module_names = {
 		"modules.diagnostics.crash_reporter",
-		"adapters.file_system",
+		"core.fs.adapters.file_system",
 		"infra.config_paths",
-		"infra.i18n",
-		"infra.logger",
-		"infra.fs_dir",
+		"core.i18n.engine.i18n",
+		"core.logger.engine.logger",
+		"core.fs.engine.dir",
 	}
 	helpers.with_fresh_modules(module_names, function()
 		local original_attributes, original_mkdir, original_dir = hs.fs.attributes, hs.fs.mkdir, hs.fs.dir
 		local state = { files = {}, removed = {}, warnings = {}, refuse_remove = false }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			create_if_absent = function(path, content)
 				if state.files[path] ~= nil then return false, "exists" end
 				state.files[path] = content
@@ -38,11 +38,11 @@ local function with_fixture(listing, callback)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger_stub = helpers.make_logger_stub()
 		logger_stub.crash_reports_dir = function() return "/virtual/logs/crash_reports/" end
 		logger_stub.warn = function(_, fmt, ...) state.warnings[#state.warnings + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 		hs.fs.attributes = function() return { mode = "directory" } end
 		hs.fs.mkdir = function() return true end
 		hs.fs.dir = function()
@@ -66,7 +66,7 @@ end
 
 helpers.describe("crash_reporter retention (macOS)", function()
 	helpers.it("deletes the oldest reports beyond the shared cap and nothing else", function()
-		local cap = require("crash_report").MAX_REPORTS
+		local cap = require("diagnostics.engine.reports.crash_report").MAX_REPORTS
 		with_fixture(listing_of(cap + 2), function(CrashReporter, state)
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom" })
 			helpers.assert_eq(path, "/virtual/logs/crash_reports/2026-10-25T01-02-03Z.json")
@@ -85,7 +85,7 @@ helpers.describe("crash_reporter retention (macOS)", function()
 	end)
 
 	helpers.it("still returns the saved path when a deletion is refused, and says so", function()
-		with_fixture(listing_of(require("crash_report").MAX_REPORTS + 1), function(CrashReporter, state)
+		with_fixture(listing_of(require("diagnostics.engine.reports.crash_report").MAX_REPORTS + 1), function(CrashReporter, state)
 			state.refuse_remove = true
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom" })
 			helpers.assert_true(path ~= nil, "the report is on disk whatever retention does")
@@ -98,12 +98,12 @@ helpers.describe("crash_reporter retention (macOS)", function()
 		with_fixture({}, function(CrashReporter, state)
 			local path = CrashReporter.save({ timestamp = "2026-10-25T01:02:03Z", error_msg = "boom", stack_trace = "a\nb" })
 			local content = state.files[path]
-			local decoded = require("json").decode(content)
+			local decoded = require("core.text.engine.json").decode(content)
 			helpers.assert_eq(decoded.error_msg, "boom")
 			helpers.assert_eq(decoded.stack_trace, "a\nb")
 			helpers.assert_eq(decoded.os_version, "unknown")
 			local last = 0
-			for _, field in ipairs(require("crash_report").FIELDS) do
+			for _, field in ipairs(require("diagnostics.engine.reports.crash_report").FIELDS) do
 				local at = content:find('"' .. field[1] .. '":', 1, true)
 				helpers.assert_true(at ~= nil and at > last, field[1] .. " is written in the shared order")
 				last = at

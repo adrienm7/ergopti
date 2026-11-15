@@ -39,7 +39,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Driver subtrees to scan. tests/ is excluded so this file's own documentation of
 -- the forbidden strings does not trip the guard.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core" }
 
 -- The two forbidden markers, with the reason each one is banned.
 local FORBIDDEN = {
@@ -129,7 +129,7 @@ helpers.describe("no driver source runs the Python TOML formatter synchronously"
 		for _, dir in ipairs(SOURCE_DIRS) do
 			collect_lua_files(root .. "/" .. dir, files)
 		end
-		collect_lua_files(helpers.shared("lua"), files)
+		collect_lua_files(helpers.shared(""), files)
 		files[#files + 1] = root .. "/init.lua"
 
 		helpers.assert_true(#files > 0,

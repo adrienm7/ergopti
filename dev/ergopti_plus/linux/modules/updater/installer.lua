@@ -10,24 +10,32 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local TextUtils = require("text_utils")
-local Shell = require("adapters.shell_runner")
+local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
+local Shell = require("core.process.adapters.shell_runner")
 
-local Fs = require("adapters.file_system")
-local Paths = require("infra.paths")
-local Version = require("updater.version")
-local Snapshot = require("diagnostics.snapshot")
-local NativePath = require("native_path")
-local NoReplaceMove = require("infra.no_replace_move")
+local Fs = require("core.fs.adapters.file_system")
+local Paths = require("core.fs.engine.paths")
+local Version = require("updater.engine.version_core")
+local Snapshot = require("diagnostics.engine.snapshot")
+local NativePath = require("core.fs.engine.native_path")
+local NoReplaceMove = require("core.fs.engine.no_replace_move")
 local Ownership = require("modules.updater.ownership_receipt")
-local ProgramRunner = require("adapters.program_runner")
+local ProgramRunner = require("core.process.adapters.program_runner")
 local uv_loaded, uv = pcall(require, "luv")
 
 local WORK_PREFIX = ".ergopti-update."
--- How often the owned smoke child re-admits the install deadline while the
--- event loop keeps running; a refused admission kills its process group.
-local SMOKE_ADMISSION_POLL_MS = 50
+-- How often an owned child (the wrapper smoke, the ownership owner) re-admits
+-- the install deadline while the event loop keeps running; a refused admission
+-- kills its process group.
+local OWNED_CHILD_ADMISSION_POLL_MS = 50
+-- The receipt owner the running (previous) installation ships; it hashes the
+-- whole staged payload, which takes seconds on a real tree.
+local OWNERSHIP_OWNER = "/linux/install/ownership.sh"
+-- The owned child runs the bash owner through the POSIX shell, so bash is found
+-- on PATH exactly as the synchronous `bash owner` command finds it.
+local POSIX_SHELL = "/bin/sh"
+local EXEC_BASH = 'exec bash "$0" "$@"'
 
 
 
@@ -137,7 +145,7 @@ function M.resolve(source_path, probe)
 	local wrapper = prefix .. "/bin/ergopti-hotstrings"
 	local shared_root = Paths.shared_root_from(driver_root,
 		function(path) return probe(path, "file") end)
-	if not shared_root or not probe(shared_root .. "/lua", "dir")
+	if not shared_root or not probe(shared_root .. "", "dir")
 		or not probe(wrapper, "file") then
 		return { kind = "unmanaged", reason = Errors.UPDATER_STANDALONE_FILES_ABSENT }
 	end
@@ -229,16 +237,15 @@ function DEFAULT_OPS.extract(archive_path, work_dir)
 end
 
 --- Records the new payload before it can replace the user's installation.
+--- @param run_owner function Runs (owner_path, arguments) and returns success.
 --- @param root string Validated staging root containing only release files.
 --- @param previous string Current installation whose launcher is retained.
 --- @return boolean success
-function DEFAULT_OPS.record_ownership(root, previous)
+local function record_ownership_with(run_owner, root, previous)
 	-- The running updater owns the receipt format, not the selected release.
 	local schema = Ownership.read_schema(previous)
 	if not schema then return false end
-	if not run_command("bash " .. shell_quote(previous .. "/linux/install/ownership.sh")
-		.. " " .. shell_quote(root .. "/linux") .. " " .. shell_quote(root .. "/_shared")
-		.. " " .. shell_quote(root)) then return false end
+	if not run_owner(previous .. OWNERSHIP_OWNER, { root .. "/linux", root .. "/_shared", root }) then return false end
 	local manifest = previous .. "/" .. schema.MANIFEST
 	local old, status = Ownership.read_current(manifest)
 	if status == "absent" then return true end
@@ -246,6 +253,18 @@ function DEFAULT_OPS.record_ownership(root, previous)
 	local record = Ownership.parse(old, schema)
 	if not record then return false end
 	return #record.external == 0 or Fs.append(root .. "/" .. schema.MANIFEST, table.concat(record.external))
+end
+
+--- Records the new payload synchronously (the original synchronous install).
+--- @param root string Validated staging root containing only release files.
+--- @param previous string Current installation whose launcher is retained.
+--- @return boolean success
+function DEFAULT_OPS.record_ownership(root, previous)
+	return record_ownership_with(function(owner, arguments)
+		local quoted = {}
+		for index, argument in ipairs(arguments) do quoted[index] = shell_quote(argument) end
+		return run_command("bash " .. shell_quote(owner) .. " " .. table.concat(quoted, " "))
+	end, root, previous)
 end
 
 --- Validates a disposable installation tree through its canonical receipt owner.
@@ -296,6 +315,32 @@ function DEFAULT_OPS.smoke(wrapper)
 	return run_command(shell_quote(wrapper) .. " --help >/dev/null 2>&1")
 end
 
+
+--- The interpreter running this daemon, which is the one the installed
+--- launcher starts: bytecode is only valid for the luajit that compiled it.
+--- @return string|nil path
+local function running_interpreter()
+	local ffi = require("ffi")
+	pcall(ffi.cdef, "long readlink(const char *, char *, size_t);")
+	local size = 4096
+	local buffer = ffi.new("char[?]", size)
+	local length = tonumber(ffi.C.readlink("/proc/self/exe", buffer, size))
+	if not length or length <= 0 or length >= size then return nil end
+	return ffi.string(buffer, length)
+end
+
+--- Compiles the activated installation's bytecode package.
+--- @param root string Activated installation root.
+--- @return boolean success
+function DEFAULT_OPS.compile_bytecode(root)
+	local interpreter = running_interpreter()
+	if not interpreter then return false end
+	-- The compiler the activated release ships (core/lifecycle/engine/bytecode_package.lua).
+	local compiler = root .. "/" .. require("core.text.engine.identifiers").bytecode_package.compiler
+	return run_command(shell_quote(interpreter) .. " " .. shell_quote(compiler)
+		.. " " .. shell_quote(root) .. " >/dev/null 2>&1")
+end
+
 M.DEFAULT_OPS = DEFAULT_OPS
 
 -- =========================================
@@ -318,8 +363,25 @@ local function validate_context(context)
 	return true, { install_root = root, parent = parent, wrapper = wrapper }
 end
 
+--- The shared root of a staged release, found by its build stamp. The staged
+--- tree is another version, so its layout is not this version's: a release
+--- built before a folder move keeps its locales elsewhere, and probing it with
+--- this version's locale path refused every such update. The stamp sits at the
+--- shared root in every layout (sibling in the tarball, child in packages).
+--- @param work_dir string The staged archive's root.
+--- @param ops table Installer operations (is_file).
+--- @return string|nil root The staged shared root, or nil when none is stamped.
+local function staged_shared_root(work_dir, ops)
+	for _, candidate in ipairs({ work_dir .. "/_shared", work_dir .. "/linux/_shared" }) do
+		if ops.is_file(candidate .. "/" .. Snapshot.BUILD_STAMP_FILE) then return candidate end
+	end
+	return nil
+end
+
+M._staged_shared_root = staged_shared_root
+
 local function validate_candidate(work_dir, expected_version, ops)
-	local shared_root = Paths.shared_root_from(work_dir .. "/linux", ops.is_file)
+	local shared_root = staged_shared_root(work_dir, ops)
 	local required_files = {
 		work_dir .. "/linux/ergopti_hotstrings.lua",
 		work_dir .. "/linux/infra/version.lua",
@@ -329,7 +391,7 @@ local function validate_candidate(work_dir, expected_version, ops)
 	for _, path in ipairs(required_files) do
 		if not ops.is_file(path) then return false, "staged archive is missing " .. path end
 	end
-	if not shared_root or not ops.is_dir(shared_root .. "/lua") then
+	if not shared_root or not ops.is_dir(shared_root .. "") then
 		return false, "staged archive is missing the shared Lua tree"
 	end
 
@@ -480,11 +542,17 @@ local function install_transaction(options, owned_current)
 			.. "; staging retained at " .. work_dir
 	end
 
+	-- Compiled into the verified, activated root: a staged tree's chunks would
+	-- name the staging path, and the receipt verifier of the release that
+	-- staged it may predate the derived tree. A failure costs boot time only:
+	-- the daemon loads from source and says so.
+	local compiled = ops.compile_bytecode(context.install_root)
 	local work_removed = cleanup_work(work_dir, context.parent, ops)
 	local archive_removed = ops.remove_file(options.archive_path)
 	if not work_removed or not archive_removed then
 		return true, "update installed but temporary cleanup was incomplete"
 	end
+	if not compiled then return true, "update installed but its bytecode package was not compiled" end
 	return true
 end
 
@@ -551,19 +619,21 @@ local function refuse_owned_admission(finish, reservation, callback)
  return operation
 end
 
---- Starts the updated wrapper's `--help` smoke as an owned child of the event
---- loop, for the async installer.
+--- Starts one install child (the updated wrapper's `--help` smoke, the
+--- ownership owner) as an owned child of the event loop, for the async installer.
 ---
---- The synchronous smoke ran `os.execute` on the daemon's event loop: a slow
---- or hung wrapper stalled input and every timer, past the install deadline it
---- could not observe. Here the child runs in its own process group, a libuv
---- timer re-admits the install deadline while it runs, and a refused admission
---- kills the group; the result is delivered only once the group is gone.
---- @param wrapper string Absolute wrapper path.
+--- Both ran through `os.execute` on the daemon's event loop: a slow or hung
+--- child stalled input and every timer, past the install deadline it could not
+--- observe (the ownership owner hashes the whole payload: 9 s on a real tree,
+--- with the keyboard grabbed). Here the child runs in its own process group, a
+--- libuv timer re-admits the install deadline while it runs, and a refused
+--- admission kills the group; the result is delivered only once it is gone.
+--- @param executable string Absolute program path.
+--- @param arguments table Dense literal argv after the program.
 --- @param admitted function The install admission (deadline included).
 --- @param done function Receives { ok = boolean }.
 --- @return table operation is_settled, request_cancel and on_settled.
-local function start_owned_smoke(wrapper, admitted, done)
+local function start_owned_child(executable, arguments, admitted, done)
  local operation, listeners = {}, {}
  local settled, outcome, timer = false, nil, nil
  local function settle(result)
@@ -585,7 +655,7 @@ local function start_owned_smoke(wrapper, admitted, done)
   return operation
  end
  local cancelled = false
- local child = ProgramRunner.spawn(wrapper, { "--help" }, function(code) outcome = code end, function()
+ local child = ProgramRunner.spawn(executable, arguments, function(code) outcome = code end, function()
   return not cancelled and admitted()
  end)
  local function retire()
@@ -617,7 +687,7 @@ local function start_owned_smoke(wrapper, admitted, done)
   -- A refused spawn holds no process; an ambiguous one is still polled.
   if child.isSettled() then retire(); return operation end
  end
- local armed = pcall(timer.start, timer, SMOKE_ADMISSION_POLL_MS, SMOKE_ADMISSION_POLL_MS, tick)
+ local armed = pcall(timer.start, timer, OWNED_CHILD_ADMISSION_POLL_MS, OWNED_CHILD_ADMISSION_POLL_MS, tick)
  if not armed then
   cancelled = true
   child.terminate(true)
@@ -687,8 +757,16 @@ function M.install_owned(options, callback)
   return type(result) == "table" and result.ok == true
  end
  ops.smoke = function(wrapper)
-  local result = await(function(done) return start_owned_smoke(wrapper, owned_current, done) end)
+  local result = await(function(done) return start_owned_child(wrapper, { "--help" }, owned_current, done) end)
   return type(result) == "table" and result.ok == true
+ end
+ ops.record_ownership = function(root, previous)
+  return record_ownership_with(function(owner, arguments)
+   local argv = { "-c", EXEC_BASH, owner }
+   for _, argument in ipairs(arguments) do argv[#argv + 1] = argument end
+   local result = await(function(done) return start_owned_child(POSIX_SHELL, argv, owned_current, done) end)
+   return type(result) == "table" and result.ok == true
+  end, root, previous)
  end
  local captured = { context = rawget(options, "context"), expected_version = rawget(options, "expected_version"),
   archive_path = reservation, ops = ops }

@@ -20,13 +20,13 @@
 --- 3. One diagnostic per run: the first refusal of a publication is logged,
 ---    deferred off the eventtap; the following ones are not.
 --- 4. Cheap on the tap: the frontmost check is read from NSWorkspace, and the
----    focused window is asked only of this process (adapters/own_window.lua).
+---    focused window is asked only of this process (core/ui/adapters/own_window.lua).
 --- ==============================================================================
 
 local M = {}
 
-local Logger           = require("infra.logger")
-local SyntheticInput   = require("adapters.synthetic_input")
+local Logger           = require("core.logger.engine.logger")
+local SyntheticInput   = require("platform.input.synthetic_input")
 local FieldRunSelftest = require("infra.field_run_selftest")
 local LOG = "keymap.selftest_gate"
 
@@ -47,7 +47,7 @@ local function ports()
 			local field_run = package.loaded["infra.field_run"]
 			return type(field_run) == "table" and field_run.holds_reload() == true
 		end,
-		focused_own_window_id = function() return require("adapters.own_window").focused_window_id() end,
+		focused_own_window_id = function() return require("core.ui.adapters.own_window").focused_window_id() end,
 	}
 end
 

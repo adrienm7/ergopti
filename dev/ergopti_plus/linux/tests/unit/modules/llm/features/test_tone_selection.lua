@@ -23,13 +23,13 @@
 local helpers = require("tests.helpers")
 local ProfilesFixture = require("tests.support.llm_profiles_fixture")
 local Fakes = require("tests.fakes")
-local Json = require("json")
-local EvdevCodes = require("infra.evdev_codes")
+local Json = require("core.text.engine.json")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 -- The Left arrow's kernel code (input-event-codes.h KEY_LEFT)
 local KEY_LEFT = 105
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local Rewrite = require("llm.rewrite")
+local Rewrite = require("ai.engine.prediction.rewrite")
 
 local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", token = "k", model = "", base_url = "" }
 
@@ -45,7 +45,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -100,12 +100,12 @@ local function scenario(opts, body)
 		world.active_entry = ENTRY
 		world.alternate_entry = { id = "cerebras-2", provider = "cerebras", label = "Cerebras",
 			token = "k", model = "replacement-model", base_url = "" }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			post = function(url, _, request_body, callback)
 				world.posts[#world.posts + 1] = { url = url, body = Json.decode(request_body), callback = callback }
 				world.wire[#world.wire + 1] = "post"
@@ -207,6 +207,7 @@ local function scenario(opts, body)
 				return world.focus
 			end,
 			privacy_guard = opts.privacy_guard,
+			privacy_context = opts.privacy_context,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -362,7 +363,7 @@ helpers.describe("tone actions: the selection moves along the ladder", function(
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("gesture_swipe_right", nil), false)
 			world.wait_for(3)
 			helpers.assert_eq(#world.posts, 2, "no request past the most formal register")
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_formal"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_formal"))
 			helpers.assert_eq(#world.emitted, 0)
 
 			-- With cycling: wraps around to the most familiar register
@@ -383,7 +384,7 @@ helpers.describe("tone actions: the selection moves along the ladder", function(
 			helpers.assert_eq(system_turn(world.posts[1]):sub(1, 120), prompt_head("tone_familiar"))
 			world.respond(1, "REWRITE: Bonjour")
 			helpers.assert_eq(world.handlers.llm_tone_more_familiar("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.tone.most_familiar"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.tone.most_familiar"))
 			helpers.assert_eq(world.handlers.llm_tone_more_familiar_cycle("tap_3", nil), true)
 			world.wait_for(2)
 			helpers.assert_eq(system_turn(world.posts[2]):sub(1, 120), prompt_head("tone_very_formal"),
@@ -418,6 +419,19 @@ end)
 
 helpers.describe("tone actions: refusals and dropped answers", function()
 
+	helpers.it("(aix-001-excluded-app-selection) refuses in an app excluded from the AI, before reading", function()
+		local Trigger = require("modules.llm.trigger_settings")
+		scenario({ selection = "Salut", privacy_context = function()
+			return { app_id = "org.example.Excluded", title = "Draft", native_identity = "n1" }
+		end }, function(world)
+			assert(Trigger.set_disabled_apps({ "org.example.Excluded" }))
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0, "the selection is never read")
+			helpers.assert_eq(#world.posts, 0, "nothing is sent to the provider")
+			assert(Trigger.set_disabled_apps({}))
+		end)
+	end)
+
 	helpers.it("does nothing when nothing is selected", function()
 		scenario({ selection = nil }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
@@ -438,7 +452,7 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("refuses like the manual prediction while the AI is off, without probing", function()
 		scenario({ selection = "merci", disabled = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"))
 			helpers.assert_eq(world.reads, 0, "no copy chord is sent")
 			helpers.assert_eq(#world.posts, 0)
 		end)
@@ -447,7 +461,7 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 	helpers.it("refuses while paused", function()
 		scenario({ selection = "merci", paused = true }, function(world)
 			helpers.assert_eq(world.handlers.llm_tone_more_formal_cycle("tap_3", nil), false)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.paused"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.manual_prediction.paused"))
 			helpers.assert_eq(#world.posts, 0)
 		end)
 	end)
@@ -596,17 +610,17 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
 			helpers.assert_eq(world.reads, 0)
 			helpers.assert_eq(#world.posts, 0)
-			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+			helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"))
 		end)
 	end)
 	for _, missing in ipairs({"empty", "unavailable"}) do
 		helpers.it("refuses tone before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
 			scenario({selection = "merci pour ton aide"}, function(world)
 				world.focus = missing == "empty" and "" or nil
-				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+				helpers.assert_eq(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false), false)
 				helpers.assert_eq(world.reads, 0, "an unknown target cannot authorize a copy probe")
 				helpers.assert_eq(#world.posts, 0)
-				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+				helpers.assert_eq(world.notices[1], require("core.i18n.engine.i18n").get("llm.text_target_unavailable"),
 					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)
@@ -616,7 +630,7 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 		scenario({selection = "merci pour ton aide"}, function(world)
 			world.focus = "x11:10:100"
 			world.on_read_selection = function(_, authorized, callback) world.focus = "x11:10:101" end
-			helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+			helpers.assert_eq(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false), false)
 			helpers.assert_eq(world.reads, 1)
 			helpers.assert_eq(#world.posts, 0, "the captured text is never attributed to the replacement target")
 			helpers.assert_eq(#world.emitted, 0)
@@ -668,7 +682,7 @@ helpers.describe("selection capture originating action authority", function()
 				world.on_read_selection = function(_, authorized, callback)
 					if action == "cancel" then world.engine.cancel() else world.engine.set_backend("ollama") end
 				end
-				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+				helpers.assert_eq(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false), false)
 				helpers.assert_eq(world.reads, 1)
 				helpers.assert_eq(#world.posts, 0)
 			helpers.assert_eq(#world.emitted, 0)
@@ -681,7 +695,7 @@ helpers.describe("asynchronous tone native ownership", function()
 	helpers.it("ai-pass2-span waits for capture ACK before provider dispatch and fences cancellation", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
 			world.defer_selection_read = true
-			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
 			helpers.assert_eq(#world.posts, 0, "workflow admission is not a provider dispatch")
 			world.engine.cancel()
 			world.complete_selection_read()
@@ -692,7 +706,7 @@ helpers.describe("asynchronous tone native ownership", function()
 		helpers.it("ai-pass2-span waits for rewrite verification ACK cancel=" .. tostring(cancel), function()
 			scenario({ selection = "merci pour ton aide" }, function(world)
 			world.defer_selection_replace = true
-			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
 			world.respond(1, "REWRITE: Merci pour votre aide.")
 			helpers.assert_eq(#world.emitted, 0, "provider completion is not physical selection authority")
 			if cancel then world.engine.cancel() end
@@ -728,7 +742,7 @@ end)
 helpers.describe("active API entry deletion", function()
 	helpers.it("ai-pass2-remove retires the active request before deleting its entry", function()
 		scenario({ selection = "merci pour ton aide" }, function(world)
-			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
 			local rows = require("tests.support.ui.menu.llm.api_page_rows").rows(require("ui.menu.llm_backend_rows"),
 				world.engine, { confirm = function() return true end }, nil)
 			local removed = false
@@ -756,7 +770,7 @@ helpers.describe("tone dispatch retains its native admission owner", function()
 					elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
 					else
 						subject.selection = "Bonjour"
-						action_result = subject.engine.shift_tone(require("llm.tone").MORE_FORMAL, false)
+						action_result = subject.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false)
 					end
 					boundary_finished = true
 				end
@@ -780,7 +794,7 @@ helpers.describe("tone dispatch retains its native admission owner", function()
 					else
 						world.on_focus = function() if boundary_finished then retired_focus_reads = retired_focus_reads + 1 end end
 					end
-					helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+					helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
 					world.wait_for(previous_posts + (action == "successor" and 2 or 1))
 					helpers.assert_true(observed, "the actual pre-send " .. boundary .. " boundary must dispatch the competing action")
 					helpers.assert_true(action_result, "the competing action must acquire its real engine owner")
@@ -796,7 +810,7 @@ helpers.describe("tone dispatch retains its native admission owner", function()
 						assert_replaced(world, "Bonjour")
 						helpers.assert_eq(world.selection, "Bonjour", "the successor callback retains its tone generation")
 						world.emitted = {}
-						helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+						helpers.assert_true(world.engine.shift_tone(require("ai.engine.prediction.tone").MORE_FORMAL, false))
 						world.wait_for(index + 1)
 						helpers.assert_eq(user_turn(world.posts[index + 1]), 'PREFIX: "Bonjour"\nTAIL: "Bonjour"', "the next ladder step must retain the successor's original source")
 					elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end

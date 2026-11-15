@@ -17,9 +17,9 @@
 --- length lets macOS disable the tap outright (kCGEventTapDisabledByTimeout) and
 --- kills the shortcut permanently.
 ---
---- The driver already knew this: adapters/text_sender.lua's eraseChars/pressKey
+--- The driver already knew this: platform/input/text_sender.lua's eraseChars/pressKey
 --- both coerce the delay to 0, gestures/actions.lua's postKeyStroke() helper
---- passes 0, and keymap/utils.lua's paste path passes 0. The invariant was simply
+--- passes 0, and layouts/engine/utils.lua's paste path passes 0. The invariant was simply
 --- applied per-site, and 49 sibling sites across gestures/actions.lua,
 --- shortcuts/actions/{text,apps,system}.lua and the text_sender paste path never
 --- got it — the recurring "one forgotten sibling" failure mode of this repo.
@@ -39,7 +39,7 @@ local CommandLines = require("tests.support.command_lines")
 
 -- Source subtrees that ship in the driver. tests/, vendor/ and _generated/ are
 -- excluded: stubs legitimately declare keyStroke with a two-argument signature.
-local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui" }
+local SOURCE_DIRS = { "adapters", "infra", "modules", "platform", "ui", "core" }
 
 -- Minimum argument count for a correct call: (modifiers, character, delay).
 local REQUIRED_ARG_COUNT = 3

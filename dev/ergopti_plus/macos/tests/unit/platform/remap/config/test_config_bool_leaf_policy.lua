@@ -13,26 +13,35 @@ local helpers = require("tests.helpers")
 --- @param original string Independently handwritten TOML fixture.
 --- @param body function Assertions receiving the owner and recorded boundary ports.
 local function with_file(original, body)
-	helpers.with_stub_scope({ "platform.remap.config", "adapters.file_system", "infra.logger", "logger.shim", "toml_codec", "infra.toml.codec" }, function()
+	helpers.with_stub_scope({ "platform.remap.config", "platform.remap.tap_hold_file", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.logger.engine.shim", "core.text.engine.toml_codec", "core.text.engine.toml.codec" }, function()
 		local warnings, errors = {}, {}
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
-		package.loaded["infra.logger"], package.loaded["logger.shim"] = logger, logger
-		require("config_outdated").reset_for_tests()
+		package.loaded["core.logger.engine.logger"], package.loaded["core.logger.engine.shim"] = logger, logger
+		require("settings.engine.migration.outdated").reset_for_tests()
 		local config = helpers.load_with_stubs("platform.remap.config")
-		local path = os.tmpname()
+		local path = require("tests.support.tap_hold_file_text").private_path()
 		local function write(text)
 			local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
 		end
 		local function read()
 			local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
 		end
+		local Text = require("tests.support.tap_hold_file_text")
+		local original_config
+		original, original_config = Text.file(original)
 		write(original)
-		local files = require("adapters.file_system")
+		Text.write_config(path, original_config)
+		local files = require("core.fs.adapters.file_system")
 		local native_read, native_write = files.read_with_status, files.write_if_unchanged
 		local controls = { writes = 0 }
 		files.write_if_unchanged = function(destination, content, expected)
+			-- The manifest rows publish to the config.toml beside it, counted apart.
+			if destination == Text.config_path(path) then
+				controls.config_writes = (controls.config_writes or 0) + 1
+				return native_write(destination, content, expected)
+			end
 			controls.writes = controls.writes + 1
 			helpers.assert_eq(destination, path)
 			helpers.assert_eq(expected, { status = "ok", content = controls.expected or original })
@@ -44,13 +53,27 @@ local function with_file(original, body)
 		end
 		local ok, err = pcall(body, { config = config, files = files, path = path, warnings = warnings,
 			errors = errors, controls = controls, load = load, read = read, write = write,
-			decode = require("infra.toml.codec").decode, native_read = native_read })
+			decode = function(text) return Text.model(text, Text.read_config(path)) end, file = function(text) local tap, rows = Text.file(text); Text.write_config(path, rows); return tap end, original = original, native_read = native_read })
 		files.read_with_status, files.write_if_unchanged = native_read, native_write
-		os.remove(path); os.remove(path .. ".tmp")
+		Text.remove_private(path)
 		if not ok then error(err, 0) end
 	end)
 end
 
+--- How a warning names a model leaf: both leaves audited here are config.toml
+--- rows (`_shared/tap_hold/data/SCHEMA.md`), spelled as the model spells them.
+--- @param leaf table `{ section, key }` in the Karabiner model.
+--- @return string
+local function file_leaf(leaf)
+	return leaf.section .. "." .. leaf.key
+end
+
+--- The file a warning about a config.toml row names: the one beside tap_hold.toml.
+--- @param f table The with_file() context.
+--- @return string
+local function owner_path(f)
+	return require("tests.support.tap_hold_file_text").config_path(f.path)
+end
 
 helpers.describe("TODO33 Boolean leaf audit", function()
 	for _, leaf in ipairs({
@@ -79,9 +102,9 @@ helpers.describe("TODO33 Boolean leaf audit", function()
 				helpers.assert_eq(status, "ok")
 				helpers.assert_eq(state[leaf.state], false)
 				helpers.assert_eq(#f.warnings, 1)
-				helpers.assert_contains(f.warnings[1], leaf.section .. "." .. leaf.key)
-				helpers.assert_contains(f.warnings[1], f.path)
-				helpers.assert_eq(f.read(), source)
+				helpers.assert_contains(f.warnings[1], file_leaf(leaf))
+				helpers.assert_contains(f.warnings[1], owner_path(f))
+				helpers.assert_eq(f.read(), f.original)
 				helpers.assert_eq(f.errors, {})
 			end)
 		end)
@@ -128,12 +151,12 @@ helpers.describe("Obsolete remap Boolean leaf publication contracts", function()
 					local state, status = f.load()
 					helpers.assert_eq(status, "ok")
 					helpers.assert_eq(state[leaf.state], false)
-					helpers.assert_eq(f.read(), source, "load never mutates obsolete source bytes")
+					helpers.assert_eq(f.read(), f.original, "load never mutates obsolete source bytes")
 					helpers.assert_eq(#f.warnings, 1)
-					helpers.assert_contains(f.warnings[1], "'" .. leaf.section .. "." .. leaf.key .. "' in '" .. f.path .. "'")
+					helpers.assert_contains(f.warnings[1], "'" .. file_leaf(leaf) .. "' in '" .. owner_path(f) .. "'")
 					state.tap_hold_config.tab = { tap = "copy", hold = "none" }
 					helpers.assert_true(f.config.save_user_config(state, f.path))
-					helpers.assert_eq(f.decode(f.read()), f.decode(saved_fixture(leaf, vector.literal)),
+					helpers.assert_eq(f.decode(f.read()), f.decode(f.file(saved_fixture(leaf, vector.literal))),
 						"the complete independently specified source model survives publication")
 					local fresh, fresh_status = f.load()
 					helpers.assert_eq(fresh_status, "ok")
@@ -152,11 +175,11 @@ helpers.describe("Obsolete remap Boolean leaf publication contracts", function()
 					state[leaf.state] = true
 					helpers.assert_eq(f.config.save_user_config(state, f.path), false)
 					helpers.assert_eq(f.controls.writes, 0, "implicit replacement never reaches the native writer")
-					helpers.assert_eq(f.read(), source)
+					helpers.assert_eq(f.read(), f.original)
 					helpers.assert_eq(#f.errors, 1)
 					helpers.assert_contains(f.errors[1], "candidate has no explicit repair owner for " .. leaf.section .. "." .. leaf.key)
 					helpers.assert_contains(f.errors[1], f.path)
-					local repaired = fixture(leaf, "false")
+					local repaired = f.file(fixture(leaf, "false"))
 					f.write(repaired)
 					f.controls.expected = repaired
 					helpers.assert_true(f.config.save_user_config(state, f.path), "manual source repair permits the same candidate to retry")

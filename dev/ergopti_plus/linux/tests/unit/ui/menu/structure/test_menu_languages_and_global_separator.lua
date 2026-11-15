@@ -65,7 +65,7 @@ end
 helpers.describe("tray layout (linux): language header and global separator", function()
 	helpers.it("hotstring languages: header, separator and flag before the language row", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows, at = submenu_with(mb.build({ config = fake_config(), _version = "9.9.9" }), "Français")
 		helpers.assert_true(rows ~= nil, "the French language pack row must be drawn")
 		helpers.assert_eq(rows[at].title:sub(1, #"🇫🇷 Français"), "🇫🇷 Français",
@@ -78,7 +78,7 @@ helpers.describe("tray layout (linux): language header and global separator", fu
 
 	helpers.it("configuration: restore and clear, the cleanup, the two windows, then the proxy", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local shown = {}
 		local items = mb.build({
 			_version = "9.9.9",
@@ -119,16 +119,16 @@ end)
 local function configuration_parent_fixture(body)
 	-- These real modules capture one another. A preceding registered fixture may
 	-- reload locale alone; retain a fresh coherent native chain for this case.
-	local names = { "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }
+	local names = { "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }
 	local previous, original_i18n_safe = {}, rawget(_G, "i18n_safe")
 	for module, value in pairs(package.loaded) do previous[module] = value end
 	for _, module in ipairs(names) do rawset(package.loaded, module, nil) end
 	local completed, failure = xpcall(function()
 	-- Complete the genuine discovery/read phase before a requested test locale;
 	-- the Language child must not lazily initialize it back to the saved locale.
-	require("infra.i18n").init()
+	require("core.i18n.engine.i18n").init()
 	local native = helpers.load_module("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks = {}
 	local context = { on_toggle_pause = function() end, on_quit = function() end,
@@ -150,11 +150,11 @@ local function configuration_parent_fixture(body)
 	if not completed then error(failure, 0) end
 end
 
-local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
+local configuration_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
-require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
-	assert(require("json").decode(configuration_parent_raw)), "linux")
+require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
+	assert(require("core.text.engine.json").decode(configuration_parent_raw)), "linux")
 
 
 
@@ -186,13 +186,13 @@ end
 local function language_callback_fixture(body)
 	local previous, original_safe = {}, rawget(_G, "i18n_safe")
 	for name, value in pairs(package.loaded) do previous[name] = value end
-	for _, name in ipairs({ "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.builder" }) do
+	for _, name in ipairs({ "core.i18n.engine.core", "core.i18n.engine.locale", "core.i18n.engine.i18n", "infra.manifest_menu", "ui.menu.builder" }) do
 		rawset(package.loaded, name, nil)
 	end
 	local native, scope_held = nil, false
 	local owner = { pending = function() return false end }
 	local completed, failure = xpcall(function()
-		native = require("infra.i18n")
+		native = require("core.i18n.engine.i18n")
 		native.init()
 		local builder, renderer = require("ui.menu.builder"), require("infra.manifest_menu")
 		local producer = language_callback_capture(builder.build, "_build_language")
@@ -200,11 +200,15 @@ local function language_callback_fixture(body)
 		local production_source = debug.getinfo(producer, "S").source
 		helpers.assert_true(rawequal(producer, require("ui.menu.menu_language").build),
 			"the actual loaded MenuBuilder must bind the language module's producer")
-		helpers.assert_true(production_source:find("/ui/menu/menu_language.lua", 1, true) ~= nil)
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
+		-- The defining file is the one require resolves for the module name, so
+		-- the module can move without this assertion naming its path.
+		local module_file = assert(package.searchpath("ui.menu.menu_language", package.path)):gsub("^%./", "")
+		helpers.assert_true(production_source:sub(-#module_file) == module_file,
+			"the producer must be defined in " .. module_file .. ", got " .. production_source)
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
 		local raw = assert(file:read("*a"))
 		assert(file:close())
-		local corpus = assert(require("json").decode(raw))
+		local corpus = assert(require("core.text.engine.json").decode(raw))
 		helpers.assert_eq(#corpus.locales, 21, "the existing independent original corpus remains complete")
 		local context, observed = {}, { redraws = 0 }
 		local function publish()

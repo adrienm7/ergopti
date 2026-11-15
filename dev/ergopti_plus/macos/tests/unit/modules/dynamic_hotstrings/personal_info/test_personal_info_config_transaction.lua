@@ -9,15 +9,15 @@
 
 local helpers = require('tests.helpers')
 local modules = {
-	'modules.dynamic_hotstrings.personal_info', 'adapters.file_system',
-	'infra.logger', 'adapters.synthetic_input', 'ui.personal_info_editor',
+	'modules.dynamic_hotstrings.personal_info', 'core.fs.adapters.file_system',
+	'core.logger.engine.logger', 'platform.input.synthetic_input', 'ui.personal_info_editor',
 	'modules.keystats',
 	'infra.manifest_reader', 'infra.personal_info_fields',
 }
 local function with_subject(content, run)
 	helpers.with_fresh_modules(modules, function()
 		local state = { content = content, writes = 0, registrations = 0, logs = {}, refreshes = 0 }
-		package.loaded['adapters.file_system'] = {
+		package.loaded['core.fs.adapters.file_system'] = {
 			read_with_status = function() return state.content, 'ok' end,
 			write_if_unchanged = function(_, value, expected)
 				if expected.content ~= state.content then return false end
@@ -32,8 +32,8 @@ local function with_subject(content, run)
 				state.logs[#state.logs + 1] = string.format(format, ...)
 			end
 		end
-		package.loaded['infra.logger'] = logger
-		package.loaded['adapters.synthetic_input'] = {}
+		package.loaded['core.logger.engine.logger'] = logger
+		package.loaded['platform.input.synthetic_input'] = {}
 		package.loaded['ui.personal_info_editor'] = {}
 		package.loaded['modules.keystats'] = {}
 		local subject = require('modules.dynamic_hotstrings.personal_info')
@@ -93,7 +93,7 @@ helpers.describe('personal-info configuration transactions', function()
 				helpers.assert_eq(subject.get_info().first_name, case[2])
 				helpers.assert_eq(subject.save_info({ last_name = 'Updated' }), true)
 				helpers.assert_eq(state.writes, 1)
-				local decoded = require('toml_codec.codec').decode(state.content)
+				local decoded = require('core.text.engine.toml_codec.codec').decode(state.content)
 				helpers.assert_eq(decoded.info.first_name, case[2])
 				helpers.assert_eq(decoded.info.last_name, 'Updated')
 			end)

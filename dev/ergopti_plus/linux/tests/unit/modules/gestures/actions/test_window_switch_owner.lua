@@ -1,9 +1,9 @@
 --- tests/unit/modules/gestures/actions/test_window_switch_owner.lua
 
 local helpers = require("tests.helpers")
-local Policy = require("cursor_window_policy")
+local Policy = require("core.ui.engine.cursor_window_policy")
 local Switch = require("adapters.window_switch")
-local Display = require("infra.display_server")
+local Display = require("core.ui.engine.display_server")
 local PACKET = [[pointer
 X=1500
 Y=200
@@ -363,8 +363,8 @@ helpers.describe("Cursor-window source and asynchronous ownership", function()
 end)
 
 helpers.describe("GNU timeout capability admission", function()
-	local Runner = require("adapters.program_runner")
-	local Shell = require("adapters.shell_runner")
+	local Runner = require("core.process.adapters.program_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("requires exact GNU timeout capability receipt: " .. receipt, function()
 			local previous = Display.kind()

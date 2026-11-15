@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local TomlCodec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local TomlCodec = require("core.text.engine.toml_codec")
 
 -- fr(azerty) and us(intl), cut to the three keys: TLDE (KEY_GRAVE, 41), AE11
 -- (KEY_MINUS, 12) and AE12 (KEY_EQUAL, 13). XKB keycodes are evdev + 8.
@@ -49,7 +49,7 @@ local US_INTL = keymap("dead_grave, dead_tilde", "minus, underscore", "NoSymbol,
 local function fresh(stored)
 	local log = { deferred = {}, executed = {} }
 	local previous = {}
-	for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+	for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 		previous[name] = package.loaded[name]
 	end
 	local prefs = {}
@@ -62,7 +62,7 @@ local function fresh(stored)
 	Sandbox.write_bytes(path, table.concat(lines, "\n") .. "\n")
 	log.path = path
 	package.loaded["infra.config_paths"] = { config = function() return path end }
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default) if prefs[key] == nil then return default end return prefs[key] end,
 		set = function(key, value) prefs[key] = value return true end,
 	}
@@ -78,7 +78,7 @@ local function fresh(stored)
 		defer = function(fn) log.deferred[#log.deferred + 1] = fn return true end,
 	})
 	log.restore = function()
-		for _, name in ipairs({ "adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
+		for _, name in ipairs({ "core.fs.adapters.storage", "infra.config_paths", "modules.gestures.manager", "modules.shortcuts.tap_keys" }) do
 			package.loaded[name] = previous[name]
 		end
 		os.remove(path)
@@ -107,7 +107,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 
 	helpers.it("tap-config-owner: refuses a file change between admission and write", function()
 		local TapKeys, log = fresh({ ["shortcuts.tap_keys.number_row_left"] = "screen_capture" })
-		local Writer, original = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+		local Writer, original = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 		local external = '[shortcuts.tap_keys]\nnumber_row_left = "send_shortcut"\n'
 		local ok, err = pcall(function()
 			helpers.assert_eq(TapKeys.get_action("number_row_left"), "screen_capture")
@@ -128,7 +128,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 	helpers.it("tap-config-owner: absent overrides stay native despite legacy storage", function()
 		local TapKeys, log = fresh()
 		local ok, err = pcall(function()
-			package.loaded["adapters.storage"].get = function() return "screen_capture" end
+			package.loaded["core.fs.adapters.storage"].get = function() return "screen_capture" end
 			os.remove(log.path)
 			helpers.assert_eq(TapKeys.get_action("number_row_left"), "none")
 			helpers.assert_true(TapKeys.set_action("number_row_left", "send_text"))
@@ -246,7 +246,7 @@ helpers.describe("Linux number-row tap keys (tap-keys)", function()
 	helpers.it("the labels follow the loaded keymap, a dead key hinted", function()
 		local TapKeys, log = fresh()
 		local Layout = helpers.load_module("adapters.keyboard_layout")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local ok, err = pcall(function()
 			local function names()
 				local out = {}
@@ -362,16 +362,16 @@ helpers.describe('deferred tap during a pause cycle', function()
     local previous_manager = package.loaded['modules.gestures.manager']
     local Manager = helpers.load_module('modules.gestures.manager')
     local ScriptActions = require('modules.shortcuts.script_actions')
-    local Loop = require('adapters.event_loop')
+    local Loop = require('core.events.loop')
     local controller = ScriptActions.new({reset=function() end,reload=function() end,quit=function() end})
-    local old_reader = package.loaded['adapters.evdev_reader']
+    local old_reader = package.loaded['platform.input.evdev_reader']
     Manager.init({enabled=false,persist=false,is_paused=controller.is_paused,action_handlers=controller.handlers})
     Manager._test_begin_reading({feed=function() return {fingers=3,direction='up'} end})
     assert(Manager.enable())
     assert(Manager.set_action('swipe_3_up','script_pause_toggle'))
     local TapKeys, log = fresh({['shortcuts.tap_keys.number_row_left']='screen_capture'})
     TapKeys.init({is_active=function() return not controller.is_paused() end,defer=Loop.defer,pause_epoch=controller.pause_epoch})
-    package.loaded['adapters.evdev_reader'] = {TOUCHPAD='touchpad', close=function() return true end, drain=function(callback) callback({}); callback({}); return 2 end}
+    package.loaded['platform.input.evdev_reader'] = {TOUCHPAD='touchpad', close=function() return true end, drain=function(callback) callback({}); callback({}); return 2 end}
     local ok, err = pcall(function()
       assert(TapKeys.on_key({code=41,mods={}}))
       assert(Manager.pump() == 2)
@@ -383,7 +383,7 @@ helpers.describe('deferred tap during a pause cycle', function()
       helpers.assert_eq(log.executed, {'screen_capture@tap_key__number_row_left'}, 'new presses after resume still run')
     end)
     Manager.disable()
-    package.loaded['adapters.evdev_reader'] = old_reader
+    package.loaded['platform.input.evdev_reader'] = old_reader
     log.restore()
     package.loaded['modules.gestures.manager'] = previous_manager
     if not ok then error(err,0) end

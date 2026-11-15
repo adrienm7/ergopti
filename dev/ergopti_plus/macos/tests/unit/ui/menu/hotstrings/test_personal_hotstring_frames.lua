@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local PersonalTranslator = require("infra.i18n")
+local PersonalTranslator = require("core.i18n.engine.i18n")
 local SectionBackups = require("tests.support.section_settings_backups")
 
 --- Owns one genuine renderer and the native context supplied by the tray.
@@ -22,9 +22,9 @@ local function with_personal_frame(body, options)
 	local scratch, native, owner, receipt, acquired, fresh_bridge
 	local ok, result = xpcall(function()
 		local driver = helpers.driver_root():gsub("/+$", "")
-		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared/lua"
+		local shared = assert(driver:match("^(.*)/[^/]+$")) .. "/_shared"
 		require("tests.support.module_isolation").purge(driver, shared)
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname()); assert(os.remove(scratch))
 		assert(hs.fs.mkdir(scratch)); assert(hs.fs.mkdir(scratch .. "/metrics"))
 		local ledger = assert(io.open(scratch .. "/metrics/karabiner_kc.log", "wb")); assert(ledger:close())
@@ -35,9 +35,9 @@ local function with_personal_frame(body, options)
 			return previous_getenv(name)
 		end
 		local paths = require("infra.config_paths"); assert(paths.init(scratch .. "/") == true)
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -46,8 +46,8 @@ local function with_personal_frame(body, options)
 		assert(native.scope_apply(owner, receipt, options.locale or PersonalTranslator.get_locale()) == true)
 		local renderer = require("infra.manifest_menu")
 
-		local corpus_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
-		local corpus = assert(require("json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
+		local corpus_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/hotstring_personal_frames.json"), "rb"))
+		local corpus = assert(require("core.text.engine.json").decode(assert(corpus_file:read("*a")))); assert(corpus_file:close())
 		local calls = { saves = 0, updates = 0, defaults = 0, closes = 0 }
 		local sections = options.empty and {} or {
 			{ name = "alpha", description = "Repeated", count = 2 },
@@ -89,8 +89,8 @@ local function with_personal_frame(body, options)
 	local cleaned, cleanup_error = pcall(function()
 		fresh_bridge = fresh_bridge or package.loaded["modules.keystats.kc_bridge"]
 		if fresh_bridge and not rawequal(fresh_bridge, previous["modules.keystats.kc_bridge"]) then fresh_bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			assert(scheduler.cancelAll() == true); assert(scheduler.activeCount() == 0)
 		end
 		if scratch then
@@ -361,7 +361,7 @@ local function with_registered_personal_sections(frame, scenario, posture)
 				and rawequal(received_delays, native_keymap.DELAYS_DEFAULT), "actual boot state and canonical defaults")
 			assert(rawequal(rawget(package.loaded, "modules.keymap.registry"), registry), "actual retained registry cohort")
 			local name = "personal_ext_section"
-			local descriptor = require("hotstrings.personal_files").describe({ "section.toml" })
+			local descriptor = require("hotstrings.engine.catalogue.personal_files").describe({ "section.toml" })
 			assert(registry.load_toml(name, path, nil, descriptor) == true)
 			assert(registry.disable_section(name, "beta") == true)
 			if posture == "group_off" then assert(registry.disable_group(name) == true) end
@@ -481,7 +481,8 @@ helpers.describe("shared personal section leaf policy", function()
 					helpers.assert_eq(alpha.checked, true); helpers.assert_nil(beta.checked)
 					for _, row in ipairs({ alpha, beta }) do
 						helpers.assert_nil(row.menu, "section leaves remain commands rather than submenus")
-						if posture == "ready" then
+						-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+						if posture == "ready" or posture == "paused" then
 							helpers.assert_nil(row.disabled); helpers.assert_type(row.fn, "function")
 						else
 							helpers.assert_eq(row.disabled, true); helpers.assert_nil(row.fn)

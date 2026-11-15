@@ -149,7 +149,7 @@ helpers.describe("multi-paste follows actual FIFO handoff", function()
 			w.advance(0.30)
 			helpers.assert_eq(#w.pastes, 1)
 			local native_new = hs.timer.new
-			local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+			local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 			local attempts, refusing = 0, true
 			hs.timer.new = function(delay, ...)
 				if refusing and delay == restore_delay then
@@ -179,7 +179,7 @@ helpers.describe("multi-paste follows actual FIFO handoff", function()
 			helpers.assert_true(helpers.deep_equal(w.board, w.original))
 			helpers.assert_eq(w.synthetic.stats().active_transactions, 0)
 			helpers.assert_eq(w.synthetic.stats().pending, 0)
-			helpers.assert_eq(require("adapters.timer_scheduler").activeCount(), 0)
+			helpers.assert_eq(require("core.events.timer_scheduler").activeCount(), 0)
 		end)
 	end)
 
@@ -194,7 +194,7 @@ helpers.describe("multi-paste follows actual FIFO handoff", function()
 					if status == "dispatched" then helpers.assert_true(w.synthetic.cancel(tx)) end
 				end)
 				local native_new = hs.timer.new
-				local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+				local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 				local refusing, attempts = refuse_timer, 0
 				hs.timer.new = function(delay, ...)
 					if refusing and delay == restore_delay then
@@ -229,7 +229,7 @@ helpers.describe("multi-paste follows actual FIFO handoff", function()
 				helpers.assert_eq(w.restores, 2)
 				helpers.assert_true(helpers.deep_equal(w.board, w.original))
 				helpers.assert_eq(w.synthetic.stats().active_transactions, 0)
-				helpers.assert_eq(require("adapters.timer_scheduler").activeCount(), 0)
+				helpers.assert_eq(require("core.events.timer_scheduler").activeCount(), 0)
 			end)
 		end)
 	end

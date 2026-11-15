@@ -80,7 +80,7 @@ local function install_personal_catalogue(path)
 	local dir, name = path:match("^(.*)[/\\]([^/\\]+)%.toml$")
 	assert(type(dir) == "string" and dir ~= "")
 	assert(type(name) == "string" and name ~= "")
-	package.loaded["infra.fs_dir"] = {
+	package.loaded["core.fs.engine.dir"] = {
 		entries = function(candidate)
 			if candidate == dir then return { name .. ".toml" } end
 			return {}
@@ -126,7 +126,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		helpers.it(failure .. " returns false and preserves the live UI state", function()
 			local path = fixture_path(failure:gsub("[^%w]", "_"))
 			install_config_stub()
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return SENTINEL, "ok" end,
 				write_if_unchanged = function() return false end,
 			}
@@ -157,7 +157,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 	helpers.it("a committed write updates the file and then notifies the UI", function()
 		local path = fixture_path("success")
 		install_config_stub()
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 		PersonalFixture.prepare_personal_window(win, personal_dir)
@@ -180,7 +180,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 
 	helpers.it("resolves personal files from the native catalogue, never the bridge path (hs-071)", function()
 		install_config_stub()
-		package.loaded["infra.fs_dir"] = {
+		package.loaded["core.fs.engine.dir"] = {
 			entries = function(dir)
 				helpers.assert_eq(dir, "/personal")
 				return { "allowed.toml" }
@@ -188,7 +188,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		}
 		local reads = {}
 		local writes = {}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(path)
 				reads[#reads + 1] = path
 				return SENTINEL, "ok"
@@ -230,7 +230,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 	helpers.it("canonical provenance and retired display stems never grant an uncaptured native binding", function()
 		install_config_stub()
 		local reads, writes, notifications = 0, 0, 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() reads = reads + 1 return SENTINEL, "ok" end,
 			write_if_unchanged = function() writes = writes + 1 return true end,
 		}
@@ -261,7 +261,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local store = install_config_stub()
 		local reads = 0
 		local writes = 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function()
 				reads = reads + 1
 				return SENTINEL, "ok"
@@ -304,7 +304,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		install_config_stub()
 		local reads = 0
 		local writes = 0
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function()
 				reads = reads + 1
 				return SENTINEL, "ok"
@@ -332,7 +332,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 	helpers.it("accepts the shortest and longest supported hexadecimal colors", function()
 		local path = fixture_path_with_content("valid_colors", '[_meta]\ncolor = "#000000"\n')
 		local store = install_config_stub()
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 		PersonalFixture.prepare_personal_window(win, personal_dir)
@@ -352,7 +352,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local content = read_fixture(path)
 		local _, color_count = content:gsub("color%s*=", "")
 		helpers.assert_eq(color_count, 1)
-		local decoded = require("infra.toml.codec").decode(content)
+		local decoded = require("core.text.engine.toml.codec").decode(content)
 		helpers.assert_type(decoded, "table")
 		helpers.assert_eq(decoded._meta.color, "#A1b2C3D4")
 		helpers.assert_eq(notifications, 2)
@@ -368,7 +368,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		local initial = "[_meta]\n" .. matrix_record .. "\ndelay = 0.33\n"
 		local path = fixture_path_with_content("nested_array", initial)
 		install_config_stub()
-		package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+		package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 		local personal_dir, category = install_personal_catalogue(path)
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window")
 		PersonalFixture.prepare_personal_window(win, personal_dir)
@@ -389,7 +389,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			"the continuation line must not create a duplicate owned field")
 		helpers.assert_contains(content, matrix_record,
 			"the unowned nested record must remain byte-identical")
-		local codec = require("infra.toml.codec")
+		local codec = require("core.text.engine.toml.codec")
 		local decode_ok, decoded = pcall(codec.decode, content)
 		helpers.assert_true(decode_ok and type(decoded) == "table",
 			"the UI must publish valid TOML after the real bridge action")
@@ -412,7 +412,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 			local reads = 0
 			local writes = 0
 			local personal_dir, category, native_path = install_personal_catalogue(path)
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(candidate)
 					helpers.assert_eq(candidate, native_path)
 					reads = reads + 1
@@ -441,7 +441,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		install_config_stub()
 		local events = {}
 		local personal_dir, category, native_path = install_personal_catalogue(path)
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(candidate)
 				helpers.assert_eq(candidate, native_path)
 				events[#events + 1] = "read"
@@ -476,7 +476,7 @@ helpers.describe("hotstrings config window: personal writes are transactional", 
 		install_config_stub()
 		local publications = 0
 		local personal_dir, category, native_path = install_personal_catalogue(path)
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(candidate)
 				helpers.assert_eq(candidate, native_path)
 				return SENTINEL, "ok"
@@ -535,11 +535,11 @@ end)
 helpers.describe("hotstrings config window: incomplete TOML reads are withheld", function()
 	helpers.it("omits personal and extension entries returned with committed=false", function()
 		install_config_stub()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return nil, "absent", "not found" end,
 			write = function() return true end,
 		}
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function()
 				return {
 					meta = { delay = 0.99, sections = {} },
@@ -548,7 +548,7 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 				}, false
 			end,
 		}
-		package.loaded["infra.fs_dir"] = {
+		package.loaded["core.fs.engine.dir"] = {
 			entries = function(dir)
 				if dir == "/personal" then return { "private.toml" } end
 				if dir == "/extensions" then return { "demo" } end
@@ -558,7 +558,7 @@ helpers.describe("hotstrings config window: incomplete TOML reads are withheld",
 		}
 
 		PersonalFixture.install_personal_binding("/personal/private.toml", SENTINEL)
-		package.loaded["infra.toml.reader"] = { parse = function()
+		package.loaded["core.text.engine.toml.reader"] = { parse = function()
 			return { meta = { delay = 0.99, sections = {} }, sections = {}, sections_order = {} }, false
 		end }
 		local win = helpers.load_with_stubs("ui.hotstrings_config_window", {

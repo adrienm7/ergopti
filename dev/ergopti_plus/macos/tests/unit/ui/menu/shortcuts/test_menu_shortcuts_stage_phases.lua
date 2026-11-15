@@ -18,9 +18,9 @@ local helpers = require("tests.helpers")
 local names = {
 	"ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys", "ui.menu.menu_shortcuts",
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
-	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
-	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
-	"infra.paths", "menu.renderer", "infra.phase_stats",
+	"modules.shortcuts.actions.text", "core.i18n.engine.i18n", "core.logger.engine.logger", "infra.manifest_menu",
+	"core.timing.engine.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
+	"core.fs.engine.paths", "menu.engine.renderer", "infra.phase_stats",
 }
 
 helpers.describe("menu_shortcuts: each provider records a named phase (menu-shortcuts-stage-phases)", function()
@@ -37,11 +37,11 @@ helpers.describe("menu_shortcuts: each provider records a named phase (menu-shor
 			package.loaded["modules.shortcuts.tap_keys"] = {}
 			package.loaded["modules.shortcuts.bindings"] = {}
 			package.loaded["modules.shortcuts.actions.text"] = {}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.deferred_work"] = {}
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.timing.engine.deferred_work"] = {}
 			package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 			package.loaded["ui.menu.menu_utils"] = {}
-			package.loaded["infra.paths"] = { shared = helpers.shared }
+			package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
 			local actual_manifest = require("infra.manifest_menu")
 			local invoked = {}
 			package.loaded["infra.manifest_menu"] = {

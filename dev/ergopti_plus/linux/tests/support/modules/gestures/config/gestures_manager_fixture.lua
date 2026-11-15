@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local TomlCodec = require("toml_codec")
+local TomlCodec = require("core.text.engine.toml_codec")
 
 -- Actual native catalogue identity, not runtime assignment presence, owns
 -- retirement. Every file fixture is retained until explicit caller cleanup.

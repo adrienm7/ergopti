@@ -29,7 +29,7 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local KePaths = require("platform.remap.ke_paths")
 
 local LOG = "adapters.karabiner_coexistence"
@@ -78,8 +78,8 @@ M.RESTORE_STEP = "register-core-agents"
 function M.new(dependencies)
 	dependencies = dependencies or {}
 	local exec = dependencies.exec or require("adapters.field_check_ports").exec
-	local exists = dependencies.exists or require("adapters.file_system").exists
-	local timer = dependencies.timer or require("adapters.timer_scheduler")
+	local exists = dependencies.exists or require("core.fs.adapters.file_system").exists
+	local timer = dependencies.timer or require("core.events.timer_scheduler")
 	local port = {}
 
 	--- Counts the active official user-side processes.

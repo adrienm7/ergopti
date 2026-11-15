@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Drives the production keymap keyDown and keyUp eventtaps with physical
 --- events and checks that every one of them reaches the session's pairing
---- counters (infra/key_event_health.lua), so the next macOS report says
+--- counters (core/logger/engine/key_event_health.lua), so the next macOS report says
 --- whether a key-down or a key-up went missing (issues #99 and #100), while
 --- Ergopti's own tagged output is never counted as typing (key-event-pairing).
 --- ==============================================================================
@@ -24,11 +24,11 @@ local function load_fixture()
 			name:match("^modules%.keymap")
 			or name:match("^modules%.llm")
 			or name:match("^modules%.keystats")
-			or name:match("^ui%.tooltip")
-			or name == "adapters.synthetic_input"
+			or name:match("^core%.ui%.ui%.tooltip")
+			or name == "platform.input.synthetic_input"
 			or name == "adapters.event_provenance"
-			or name == "adapters.event_clock"
-			or name == "infra.key_event_health"
+			or name == "core.events.clock"
+			or name == "core.logger.engine.key_event_health"
 		) then
 			package.loaded[name] = nil
 		end
@@ -68,7 +68,7 @@ local function load_fixture()
 	end
 	helpers.assert_not_nil(down_tap, "the keymap keyDown tap must exist")
 	helpers.assert_not_nil(up_tap, "the keymap keyUp tap must exist")
-	local Health = require("infra.key_event_health")
+	local Health = require("core.logger.engine.key_event_health")
 	Health.reset()
 	return { down = down_tap.callback, up = up_tap.callback, hs = hs_stub, health = Health }
 end
@@ -147,7 +147,7 @@ helpers.describe("keymap taps feed the key pairing counters (key-event-pairing)"
 
 	helpers.it("never counts Ergopti's own tagged output as typing", function()
 		local fixture = load_fixture()
-		local synthetic = require("adapters.synthetic_input")
+		local synthetic = require("platform.input.synthetic_input")
 		local tx = synthetic.begin("test.key-pairing", "replacement")
 		local batch = synthetic.begin_callback(tx)
 		synthetic.keyStroke(batch, {}, "a")

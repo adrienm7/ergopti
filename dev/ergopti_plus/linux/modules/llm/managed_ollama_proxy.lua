@@ -9,7 +9,7 @@
 --- cannot evaluate a PAC itself, so without these entries a pull behind a
 --- PAC-only network is refused. The environment/loopback/selection rules are
 --- the shared proxy policy and the per-origin aggregation is the shared route
---- plan (network/route_plan.lua), the same ones macOS applies.
+--- plan (core/network/engine/route_plan.lua), the same ones macOS applies.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A proxy the user exported (HTTPS_PROXY and friends) wins: the daemon
@@ -27,7 +27,11 @@
 --- 4. An unusable desktop configuration (GIO could not resolve the origin, or
 ---    ran out of time: a PAC it could not fetch or evaluate) sends that origin
 ---    direct, at the closed stages of proxy_policy.json "pac_unavailable_fallback",
----    with one WARNING naming the stage, as macOS does. A relay the user exported
+---    with one WARNING naming the stage, as macOS does. The lookup child
+---    evaluates a GNOME PAC itself, since GIO drops every entry but the first
+---    "METHOD host" one: a PAC it could not download answers DIRECT beside that
+---    stage (native_pac_download), a PAC that fails to run is the
+---    native_pac_evaluation stage, and the same WARNING names each. A relay the user exported
 ---    never reaches the lookup, and a relay the PAC names is kept as named.
 ---    Any other failure or a refused plan refuses the start with a classified
 ---    reason instead of launching a daemon that would fail its first pull.
@@ -39,7 +43,7 @@
 ---    so the daemon starts under it. A refused sign-in starts the daemon without
 ---    the proxy, as Windows does: the models on disk keep working, and the result
 ---    carries the relay's closed reason, which refuses only the pull.
---- 7. The user's proxy override (network/proxy_override.lua, which the policy
+--- 7. The user's proxy override (core/network/engine/proxy_override.lua, which the policy
 ---    binding applies) wins over everything above: "direct" bypasses every relay
 ---    the daemon would inherit, the sign-in relay included; a relay URL becomes
 ---    the daemon's HTTPS_PROXY as given, and is probed like a planned relay, so
@@ -48,12 +52,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local RoutePlan = require("network.route_plan")
+local Logger = require("core.logger.engine.shim")
+local RoutePlan = require("core.network.engine.route_plan")
 local LOG = "modules.llm.managed_ollama_proxy"
 
 --- The registry the Ollama daemon pulls from (one source for every driver).
-M.REGISTRY_URL = require("llm.ollama_registry").URL
+M.REGISTRY_URL = require("ai.engine.ollama.registry").URL
 
 --- The relay variable the daemon reads for its HTTPS registry and blob traffic.
 M.VARIABLE = "HTTPS_PROXY"
@@ -65,12 +69,16 @@ M.BYPASS_VARIABLES = { "NO_PROXY", "no_proxy" }
 --- Every variable the stage may set; the composition admits only these.
 M.VARIABLES = { M.VARIABLE, M.BYPASS_VARIABLES[1], M.BYPASS_VARIABLES[2] }
 
---- The closed lookup stage each GIO lookup failure stands for. GIO names no
---- finer step: a PAC it cannot download or evaluate fails the lookup itself.
---- Failures of Ergopti's own helper process are not listed and keep refusing.
+--- The closed lookup stage each lookup failure stands for. A PAC the lookup
+--- child could not download is no failure: it answers DIRECT, and the
+--- receipt's pac_unavailable names that stage. A PAC that downloaded but
+--- raised, broke a bound or answered an unsupported entry is the evaluation
+--- stage. Failures of Ergopti's own helper process, and a missing PAC engine,
+--- are not listed and keep refusing.
 M.LOOKUP_STAGES = {
 	["proxy-lookup-failed"] = "native_proxy_lookup",
 	["proxy-lookup-timeout"] = "native_proxy_budget",
+	["proxy-pac-evaluation-failed"] = "native_pac_evaluation",
 }
 
 --- Splits "NAME=value" rows into a name -> value map for the given names.
@@ -119,9 +127,9 @@ end
 --- Builds the proxy port of the runtime repair.
 --- @param deps table { policy, lookup, environment, timeout_ms, owner, origins, relay,
 ---   probe, relay_address, probe_timeout_ms }
----   relay = { policy (network/proxy_auth_relay.lua), probe(upstream, authority,
+---   relay = { policy (core/network/engine/proxy_auth_relay_core.lua), probe(upstream, authority,
 ---   options, callback) -> operation|nil, reason, timeout_ms }: the sign-in relay.
----   probe = fn(host, port, timeout_ms, callback) -> child (adapters/tcp_probe.lua),
+---   probe = fn(host, port, timeout_ms, callback) -> child (core/network/adapters/tcp_probe.lua),
 ---   relay_address = fn(relay) -> host, port: the PAC list walk.
 --- @return function port Called as port(budget, authorized, done) -> operation.
 function M.new(deps)
@@ -255,7 +263,7 @@ function M.new(deps)
 			end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy relay probe not started: %s", tostring(probe_error))
-				refuse_sign_in(require("network.proxy_auth_relay").UNAVAILABLE)
+				refuse_sign_in(require("core.network.engine.proxy_auth_relay_core").UNAVAILABLE)
 				return
 			end
 			if step == mine then inner = child end
@@ -325,6 +333,12 @@ function M.new(deps)
 					stage, index, #origins)
 				fallback = fallback or stage
 				choices = { { mode = "direct" } }
+			elseif receipt.pac_unavailable ~= nil and policy.falls_back_direct(receipt.pac_unavailable) then
+				-- GIO answered DIRECT for a PAC it could not download: the same
+				-- direct route, named as the unusable PAC it is.
+				Logger.warn(LOG, "Managed Ollama proxy lookup unusable at %s: origin %d of %d goes direct.",
+					receipt.pac_unavailable, index, #origins)
+				fallback = fallback or receipt.pac_unavailable
 			end
 			choose(index, choices, 1)
 		end
@@ -394,9 +408,13 @@ function M.new(deps)
 			end
 			step = step + 1
 			local mine = step
+			-- The lookup child downloads and evaluates a desktop PAC itself, under
+			-- the same bound as the whole lookup (timings managed_proxy_lookup_timeout_ms).
+			local timeout = math.ceil(math.min(deps.timeout_ms, remaining))
 			local child, dispatch_error = lookup(origins[index], {
-				owner = owner, timeout_ms = math.ceil(math.min(deps.timeout_ms, remaining)),
+				owner = owner, timeout_ms = timeout,
 				environment_exclusions = route.environment_exclusions,
+				pac_check_timeout_ms = timeout,
 			}, function(receipt) receive(index, receipt) end)
 			if not child then
 				Logger.error(LOG, "Managed Ollama proxy lookup not started: %s", tostring(dispatch_error))

@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Snapshot = require("diagnostics.snapshot")
+local Snapshot = require("diagnostics.engine.snapshot")
 
 local SHA = "c3005e0b9aaaabbbbccccddddeeeeffff0000111"
 local SHORT = "c3005e0b9"
@@ -83,7 +83,7 @@ local CHECKOUTS = {
 
 -- The identity chain, reloaded per case: earlier suites leave logger stubs in
 -- package.loaded, and a module cached under one of them logs nowhere.
-local IDENTITY_MODULES = { "logger.shim", "infra.diagnostic_snapshot", "infra.version" }
+local IDENTITY_MODULES = { "core.logger.engine.shim", "infra.diagnostic_snapshot", "infra.version" }
 
 --- Runs body(Version) over a freshly loaded identity chain bound to the real
 --- logger, with every log line captured at DEBUG; restores the chain after.
@@ -95,7 +95,7 @@ local function capture_logs(body)
 		saved[name] = package.loaded[name]
 		package.loaded[name] = nil
 	end
-	local Logger = require("logger")
+	local Logger = require("core.logger.engine")
 	local lines = {}
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)
@@ -134,7 +134,7 @@ local function version_row(identity)
 	local ok, items = pcall(mb.build, { on_quit = function() end })
 	Version.identity = real_identity
 	if not ok then error(items, 0) end
-	local title = require("infra.i18n").get("menu.about.title")
+	local title = require("core.i18n.engine.i18n").get("menu.about.title")
 	for _, item in ipairs(items) do
 		if item.title == title then return item.menu[1].title end
 	end
@@ -146,7 +146,7 @@ end
 --- @param values table Placeholder → value.
 --- @return string
 local function expected(key, values)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for placeholder, value in pairs(values) do
 		local at = text:find(placeholder, 1, true)
 		assert(at, key .. " must carry " .. placeholder)
@@ -212,7 +212,7 @@ helpers.describe("tray (linux): the About version row names the build and its co
 		end)
 		helpers.assert_eq(identity, { kind = "local", version = "", commit = "" })
 		helpers.assert_eq(row, expected("menu.about.version_local", {
-			["{commit}"] = require("infra.i18n").get("menu.about.commit_unknown"),
+			["{commit}"] = require("core.i18n.engine.i18n").get("menu.about.commit_unknown"),
 		}))
 		local warned = lines_with(lines, "WARNING", "Build commit unknown")
 		helpers.assert_eq(#warned, 1, "expected one WARNING naming the missing data; got:\n" .. table.concat(lines, "\n"))

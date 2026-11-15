@@ -7,7 +7,7 @@ corpus(helpers)
 
 local Home = require("tests.support.keystats_home_fixture")
 local Native = require("tests.support.keystats_native_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local function context(window)
 	return { app_id = "Editor", title = "Document", native_identity = window or "x11:owner:1" }
@@ -32,7 +32,7 @@ end
 Home.it("Linux trigger ROI: native snapshots survive refusal and finish once with private gains", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		collector.record_hotstring("Editor", "SECRET", "x", now + 11, "static", 6, true)
 		collector.record_hotstring("Editor", "empty", "", now + 12, "static", 5, false)
@@ -120,7 +120,7 @@ end)
 Home.it("Linux trigger ROI: refused collection never captures physical metadata or the calendar", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local hook, calendar = require("adapters.keyboard_hook"), require("modules.keystats.calendar")
+		local hook, calendar = require("platform.input.keyboard_hook"), require("modules.keystats.calendar")
 		local original_layout, original_capture = hook.get_layout, calendar.capture
 		local function refused(owner)
 			local physical, clocks = 0, 0
@@ -173,14 +173,14 @@ end)
 Home.it("Linux trigger ROI: early cipher refusal still retires queued text and keeps numerical totals", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local hook, cipher = require("adapters.keyboard_hook"), require("modules.keystats.text_cipher")
+		local hook, cipher = require("platform.input.keyboard_hook"), require("modules.keystats.text_cipher")
 		local original_layout, original_enabled = hook.get_layout, cipher.is_enabled
 		local probes = { { "on", "observe" }, { "unknown", "text" }, { "on", "key" }, { "unknown", "shortcut" } }
 		for _, probe in ipairs(probes) do
 			local configuration = assert(collector.configuration_snapshot())
 			configuration.enabled = true; helpers.assert_true(collector.apply_configuration(configuration))
 			for _ = 1, 5 do collector.record_roi_text("retiredcandidate ", context(), unknown) end
-			local now = require("infra.monotonic").now_ms()
+			local now = require("core.logger.engine.monotonic").now_ms()
 			for index = 1, 10 do collector.record_hotstring("Editor", "x", "xx", now + index, "static", 1, true) end
 			if probe[1] == "unknown" then
 				configuration.enabled = false; helpers.assert_true(collector.apply_configuration(configuration))
@@ -225,7 +225,7 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 			TapHold = { observe_copy_activity = function() end },
 			wrap_on_type = { on_pointer_down = function() end }, Logger = { debug = function() end },
 			keyboard_hook = { held_modifiers = function() return {} end },
-			Monotonic = require("infra.monotonic"),
+			Monotonic = require("core.logger.engine.monotonic"),
 			WordReset = { observe_key = function() return false end, cascade_max_arrows = function() return 0 end,
 				click_resets_word = function() return false end },
 			terminators_mod = { is_terminator = function() return false end },
@@ -247,12 +247,12 @@ Home.it("Linux trigger ROI: actual daemon callbacks exclude synthetic output and
 		first = assert(source:find("\tlocal function on_pointer_event(", 1, true))
 		last = assert(source:find("\n\t-- Text the daemon types itself", first, true))
 		local pointer = compile(source:sub(first, last - 1) .. "\nreturn on_pointer_event")
-		first = assert(source:find("\tlocal function on_click()", 1, true))
+		first = assert(source:find("\tlocal function on_click(code)", 1, true))
 		last = assert(source:find("\n\t-- A pointer event", first, true))
 		local click = compile(source:sub(first, last - 1) .. "\nreturn on_click")
 		local function type_text(text)
-			for _, cp in require("compat.utf8").codes(text) do
-				local ok, failure = pcall(character, require("compat.utf8").char(cp), 30)
+			for _, cp in require("core.lifecycle.engine.compat.utf8").codes(text) do
+				local ok, failure = pcall(character, require("core.lifecycle.engine.compat.utf8").char(cp), 30)
 				if admitted and not paused then helpers.assert_eq(ok, false); helpers.assert_eq(failure, stop)
 				else helpers.assert_true(ok) end
 			end
@@ -301,7 +301,7 @@ Home.it("Linux trigger ROI: requested encryption purges new text without deletin
 		for _ = 1, 5 do text("discarded ") end
 		for _ = 1, 4 do text("fresh ") end
 		text("fragment")
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "x", "xx", now + index, "static", 1, true) end
 		local configuration = assert(collector.configuration_snapshot())
 		configuration.encrypt = true
@@ -384,8 +384,8 @@ Home.it("Linux trigger ROI: the native writer admits only numerical new events u
 			local operation = assert(writer.start_flush("fixture", {
 				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, roi = events }, upserts = {},
 			}))
-			local uv, now = require("luv"), require("infra.monotonic").now_ms
-			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			local uv, now = require("luv"), require("core.logger.engine.monotonic").now_ms
+			local until_ms = now() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 			while not operation:is_settled() and now() < until_ms do
 				operation:pump()
 				if operation:is_retryable() then operation:cancel() end
@@ -458,7 +458,7 @@ end)
 
 
 Home.it("Linux trigger ROI: encryption refusal clears last-use text before later native idle checks", function()
-	local clock, cipher = require("infra.monotonic"), require("modules.keystats.text_cipher")
+	local clock, cipher = require("core.logger.engine.monotonic"), require("modules.keystats.text_cipher")
 	local original_now, original_available = clock.now_ms, cipher.is_available
 	local offset = 0
 	clock.now_ms = function() return original_now() + offset end
@@ -559,7 +559,7 @@ end)
 helpers.it("Linux trigger ROI: real canonical file transitions reject malformed encryption without input reparsing", function()
 	Home.run(function()
 		local path = require("infra.config_paths").config("config.toml")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		assert(shell.run("mkdir -p " .. shell.quote(path:match("^(.*)/[^/]+$"))))
 		local function write(source)
 			local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())

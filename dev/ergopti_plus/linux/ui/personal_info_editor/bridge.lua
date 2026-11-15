@@ -7,11 +7,11 @@
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 M.bridge_name = "hsPersonalInfo"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local LOG = "bridge.hsPersonalInfo"
 local APP_NAME = "personal_info_editor"
 local _opening = nil
@@ -32,7 +32,7 @@ local function opening_current(owner, state, context)
 		or type(owner.host.document_owner_retained) ~= "function"
 		or owner.host.document_owner_retained ~= owner.document_owner_retained
 		or dependency(state, "dyn_hotstrings", "modules.dynamic_hotstrings.manager") ~= owner.dynamic
-		or dependency(state, "webview_manager", "ui.webview_manager") ~= owner.host
+		or dependency(state, "webview_manager", "core.ui.ui.webview_manager") ~= owner.host
 		or owner.host.current_epoch ~= owner.current_epoch or owner.host.page_current ~= owner.page_current
 		or type(owner.current_epoch) ~= "function" or type(owner.page_current) ~= "function" then return false end
 	local admitted, document_current = pcall(owner.document_owner_current, owner.document_owner)
@@ -56,13 +56,13 @@ local function close_page(state, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		return context.close_owned_window() == true
 	end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	return manager and type(manager.hide) == "function"
 		and manager.hide(APP_NAME) == true
 end
 
 local function push_init(state, payload, current, document_owner)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" or current and not current() then return false end
 	local ok_json, encoded = pcall(Json.encode, payload)
 	if not ok_json or type(encoded) ~= "string" or current and not current() then return false end
@@ -97,7 +97,7 @@ local function _build_initial_payload(state, captured)
 			hint = alias and ("(@" .. alias .. trigger .. ")") or "",
 		}
 	end
-	local i18n = dependency(state, "i18n", "infra.i18n")
+	local i18n = dependency(state, "i18n", "core.i18n.engine.i18n")
 	local function translated(key)
 		return i18n and type(i18n.get) == "function" and i18n.get(key) or key
 	end
@@ -123,7 +123,7 @@ function M.on_message(payload, state, context)
 		local captured, current, candidate
 		if type(context) == "table" and context.epoch ~= nil then
 			local dynamic = dependency(state, "dyn_hotstrings", "modules.dynamic_hotstrings.manager")
-			local host = dependency(state, "webview_manager", "ui.webview_manager")
+			local host = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 			if type(host) ~= "table" or type(dynamic) ~= "table" or type(dynamic.capture_info_edit) ~= "function" then
 				return { pushed = false }
 			end

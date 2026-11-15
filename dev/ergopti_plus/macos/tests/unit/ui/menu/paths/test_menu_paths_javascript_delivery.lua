@@ -10,9 +10,9 @@ local helpers = require("tests.helpers")
 local load_fixture = require("tests.support.paths_editor_fixture")
 
 local function with_editor(callback)
-	helpers.with_fresh_modules({ "infra.deferred_work" }, function()
+	helpers.with_fresh_modules({ "core.timing.engine.deferred_work" }, function()
 		local pending, evaluations = {}, {}
-		package.loaded["infra.deferred_work"] = { after = function(_, fn)
+		package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn)
 			pending[#pending + 1] = fn
 			return true
 		end }
@@ -49,11 +49,11 @@ helpers.describe("paths JavaScript delivery", function()
 		helpers.it("(paths-js-delivery) construction scheduling refusal " .. mode .. " is visible", function()
 			with_editor(function(editor, calls, _, evaluations)
 				calls.bridge_callback({ body = { action = "cancel" } })
-				package.loaded["infra.deferred_work"].after = function()
+				package.loaded["core.timing.engine.deferred_work"].after = function()
 					if mode == "throw" then error("PRIVATE_PATH") end
 					return false
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local create = builder.show_webview
 				builder.show_webview = function(options)
 					local view = create(options)
@@ -71,7 +71,7 @@ helpers.describe("paths JavaScript delivery", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(paths-js-delivery) scheduling refusal " .. mode .. " is visible", function()
 			with_editor(function(_, calls, _, evaluations)
-				package.loaded["infra.deferred_work"].after = function()
+				package.loaded["core.timing.engine.deferred_work"].after = function()
 					if mode == "throw" then error("PRIVATE_PATH") end
 					if mode == "false" then return false end
 				end
@@ -130,7 +130,7 @@ helpers.describe("paths JavaScript delivery", function()
 	end)
 	helpers.it("(paths-js-delivery) logging reentry cannot redirect initData", function()
 		with_editor(function(editor, calls, _, evaluations)
-			package.loaded["infra.logger"].debug = function(_, message)
+			package.loaded["core.logger.engine.logger"].debug = function(_, message)
 				if message == "Injecting initData into webview…" then
 					calls.options.on_close()
 					helpers.assert_true(editor.open_editor())
@@ -143,7 +143,7 @@ helpers.describe("paths JavaScript delivery", function()
 	helpers.it("(paths-js-delivery) deferred navigation survives normal construction", function()
 		with_editor(function(editor, calls, _, evaluations, pending)
 			calls.bridge_callback({ body = { action = "cancel" } })
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local create = builder.show_webview
 			builder.show_webview = function(options)
 				local view = create(options)
@@ -202,7 +202,7 @@ end)
 helpers.describe("paths editor scalar native JSON boundary", function()
 	helpers.it("(hs-scalar-json-paths) actual browse keeps control and Unicode bytes with native table-only JSON", function()
 		with_editor(function(_, calls, _, evaluations, pending)
-			local Json = require("json")
+			local Json = require("core.text.engine.json")
 			local picked = '/PRIVATE/é漢😀/\r\n\t"\\");globalThis.__injected=true;//'
 			local native_tables = 0
 			-- Explicit native boundary double; the selected directory is a string.
@@ -227,7 +227,7 @@ helpers.describe("paths editor scalar native JSON boundary", function()
 	for _, mode in ipairs({ "nil", "false", "throw" }) do
 		helpers.it("(hs-scalar-json-paths) selected path quotation " .. mode .. " refuses privately", function()
 			with_editor(function(_, calls, _, evaluations, pending)
-				local Json = require("json")
+				local Json = require("core.text.engine.json")
 				local original = Json.quote
 				local ok, err = xpcall(function()
 					Json.quote = function()

@@ -20,12 +20,12 @@
 local M = {}
 local Manifest = require("infra.manifest_reader")
 local ConfigPaths = require("infra.config_paths")
-local ConfigKeys = require("config_keys")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Policy = require("layout.number_row_policy")
+local ConfigKeys = require("settings.engine.keys")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Policy = require("layouts.engine.layout.number_row_policy")
 local LOG = "infra.number_row_preferences"
 
 -- Role -> the config.toml path and the validator of a stored value.
@@ -67,7 +67,10 @@ function M.resolve(config, mark)
 		local section, key = leaf(role)
 		local node = config[section]
 		local value
-		if type(node) == "table" then value = node[key] end
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		if type(node) == "table" then
+			value = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(spec.path), node[key])
+		end
 		if value ~= nil then
 			local valid, detail = spec.valid(value)
 			if not valid then

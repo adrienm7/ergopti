@@ -16,7 +16,7 @@ local helpers = require("tests.helpers")
 local function with_priority(body, no_engine)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local directory = os.tmpname()
 	os.remove(directory)
 	assert(Shell.run("mkdir -p " .. Shell.quote(directory)))
@@ -42,7 +42,7 @@ local function with_priority(body, no_engine)
 		.. '[hotstrings.modules.first]\nmain=true\nclosed=false\n'
 		.. '[hotstrings.modules.second]\nmain=true\nclosed=false\n')
 	local Loader = require("modules.hotstrings.loader")
-	local Writer = require("toml_codec.writer")
+	local Writer = require("core.text.engine.toml_codec.writer")
 	local original_load, original_find, original_publish = Loader.load_catalogue, Loader.find_toml_files, Writer.publish_if_unchanged
 	local state = { loads = 0, writes = 0, images = {}, pushes = {}, read = read, directory = directory,
 		override_path = overrides, choice_path = choices }
@@ -93,7 +93,7 @@ local function with_priority(body, no_engine)
 		state.config_dir = directory .. "/unused"
 		assert(Config.init(not no_engine and engine or nil, state.config_dir))
 		if not no_engine then assert(select(2, Config.load_all())) end
-		package.loaded["ui.webview_manager"] = { current_epoch = function() return 1 end,
+		package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 1 end,
 			eval_js = function(_, js) state.pushes[#state.pushes + 1] = js; return true end }
 		package.loaded["ui.hotstrings_config_window.bridge"] = nil
 		local Bridge = require("ui.hotstrings_config_window.bridge")

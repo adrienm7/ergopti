@@ -13,8 +13,8 @@ local helpers = require("tests.helpers")
 local function with_crypto_fixture(options, body)
 	options = options or {}
 	local names = {
-		"modules.llm.api_token_crypto", "adapters.shell_runner",
-		"adapters.timer_scheduler", "infra.timings", "infra.logger",
+		"modules.llm.api_token_crypto", "core.process.adapters.shell_runner",
+		"core.events.timer_scheduler", "core.timing.engine.timings", "core.logger.engine.logger",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -36,7 +36,7 @@ local function with_crypto_fixture(options, body)
 		args = nil,
 		errors = {},
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
@@ -44,7 +44,7 @@ local function with_crypto_fixture(options, body)
 			fixture.errors[#fixture.errors + 1] = string.format(tostring(fmt), ...)
 		end,
 	}
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(section, key)
 			helpers.assert_eq(section, "llm")
 			helpers.assert_eq(key, "keychain_operation_timeout_ms")
@@ -58,7 +58,7 @@ local function with_crypto_fixture(options, body)
 			return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, callback)
 			helpers.assert_eq(delay, 10)
 			fixture.timeout = callback
@@ -88,7 +88,7 @@ local function with_crypto_fixture(options, body)
 			return true
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		spawn = function(executable, args, on_done, on_chunk)
 			if options.spawn_throws then error("spawn exploded") end
 			fixture.executable = executable
@@ -126,7 +126,7 @@ local function with_crypto_fixture(options, body)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	-- Keep the shared-slot restore explicit so the cross-file hygiene scanner can
 	-- prove this fixture cannot leak an exec-less shell runner into its successor.
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err) end
 end
 
@@ -151,6 +151,23 @@ helpers.describe("TokenCrypto async task ownership", function()
 			helpers.assert_eq(#results, 1,
 				"late and duplicate native completions must be fenced after timeout")
 		end)
+	end)
+
+	-- An item the Keychain no longer holds (a restored backup's entry) is its
+	-- own launcher exit, read as "absent"; any other failure stays a Keychain
+	-- error (macos-api-key-restored-missing).
+	helpers.it("reads the launcher's absent-item exit as reason absent, and no other exit", function()
+		for _, case in ipairs({ { code = 69, reason = "absent" }, { code = 70, reason = "security_failed" } }) do
+			with_crypto_fixture({}, function(TokenCrypto, fixture)
+				local results = {}
+				TokenCrypto.decrypt_async("keychain:restored", function(...) results[#results + 1] = table.pack(...) end)
+				helpers.assert_eq(TokenCrypto.ABSENT_EXIT_CODE, 69)
+				fixture.done(case.code, "", "")
+				helpers.assert_eq(#results, 1)
+				helpers.assert_eq(results[1][1], false)
+				helpers.assert_eq(results[1][3], case.reason, "exit " .. case.code)
+			end)
+		end
 	end)
 
 	helpers.it("reports start refusal exactly once and never waits for a callback", function()
@@ -356,7 +373,7 @@ end)
 local function with_remote_fixture(body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.http_client", "modules.shortcuts.script_control",
+		"core.network.adapters.http_client", "modules.shortcuts.script_control",
 	}
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
@@ -389,7 +406,7 @@ local function with_remote_fixture(body)
 			}
 		end,
 	}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		new = function()
 			return {
 				cancel = function() return true end,
@@ -416,8 +433,8 @@ end
 local function with_real_remote_crypto_settlement(stop_mode, body)
 	local names = {
 		"modules.llm.api_remote", "modules.llm.api_token_crypto",
-		"adapters.shell_runner", "adapters.timer_scheduler",
-		"adapters.http_client", "modules.shortcuts.script_control",
+		"core.process.adapters.shell_runner", "core.events.timer_scheduler",
+		"core.network.adapters.http_client", "modules.shortcuts.script_control",
 		"platform.remap.lease_helper",
 	}
 	local saved = {}
@@ -452,11 +469,11 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		end,
 	}
 	local ok, err = xpcall(function()
-		helpers.load_with_stubs("adapters.timer_scheduler", { timer = timer_stub })
+		helpers.load_with_stubs("core.events.timer_scheduler", { timer = timer_stub })
 		package.loaded["platform.remap.lease_helper"] = {
 			resolve = function() return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end,
 		}
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			spawn = function(_executable, _args, on_done)
 				fixture.done = on_done
 				return {
@@ -469,7 +486,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 			is_paused = function() return false end,
 			get_pause_epoch = function() return 0 end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			new = function()
 				return {
 					cancel = function() return true end,
@@ -490,7 +507,7 @@ local function with_real_remote_crypto_settlement(stop_mode, body)
 		body(require("modules.llm.api_remote"), fixture)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(err) end
 end
 
@@ -663,20 +680,20 @@ end)
 helpers.describe("API menu metadata path", function()
 	helpers.it("builds before token resolution without starting any shell work", function()
 		local names = {
-			"modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
-			"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
-			"menu.renderer", "adapters.json_codec",
+			"modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+			"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel",
+			"menu.engine.renderer", "core.fs.adapters.json_codec",
 		}
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local resolver_calls = 0
 		local entry = { id = "entry-a", provider = "openai", token = "keychain:entry-a", model = "gpt" }
 		local ok, err = xpcall(function()
-			local Renderer = require("menu.renderer")
-			local JsonCodec = require("adapters.json_codec")
+			local Renderer = require("menu.engine.renderer")
+			local JsonCodec = require("core.fs.adapters.json_codec")
 			local command_renderer = assert(Renderer.new({
 				platform = "hs",
-				manifest_path = function() return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json" end,
+				manifest_path = function() return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json" end,
 				json_decode = JsonCodec.decode,
 				i18n = {
 					get = function(key) return key end,
@@ -695,10 +712,10 @@ helpers.describe("API menu metadata path", function()
 					resolve_active_entry = function() resolver_calls = resolver_calls + 1 end,
 				},
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.logger"] = { error = function() end }
-			package.loaded["infra.dialog_util"] = {}
-			package.loaded["infra.notifications"] = {}
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.logger.engine.logger"] = { error = function() end }
+			package.loaded["core.ui.engine.dialog_util"] = {}
+			package.loaded["core.ui.engine.notifications"] = {}
 			package.loaded["infra.manifest_menu"] = {
 				command_row = command_renderer.command_row,
 				template_rows = command_renderer.template_rows,
@@ -717,9 +734,9 @@ helpers.describe("API menu metadata path", function()
 		end, debug.traceback)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err) end
-		helpers.assert_eq(package.loaded["menu.renderer"], saved["menu.renderer"],
+		helpers.assert_eq(package.loaded["menu.engine.renderer"], saved["menu.engine.renderer"],
 			"the borrowed renderer cache identity must be restored")
-		helpers.assert_eq(package.loaded["adapters.json_codec"], saved["adapters.json_codec"],
+		helpers.assert_eq(package.loaded["core.fs.adapters.json_codec"], saved["core.fs.adapters.json_codec"],
 			"the borrowed JSON adapter cache identity must be restored")
 	end)
 end)

@@ -29,8 +29,8 @@ helpers.describe("macOS real-source indentation compensation", function()
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-		package.loaded["adapters.file_system"] = {
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
 				return disk, "ok"
@@ -74,7 +74,7 @@ helpers.describe("macOS real-source indentation compensation", function()
 					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = initial})
 					helpers.assert_eq(fixture.state.llm_temperature, previous_temperature)
 					helpers.assert_eq(fixture.runtime.llm_temperature, previous_temperature)
-					helpers.assert_eq(require("infra.toml.codec").decode(disk).llm.generation.temperature, 0.9)
+					helpers.assert_eq(require("core.text.engine.toml.codec").decode(disk).llm.generation.temperature, 0.9)
 					helpers.assert_eq(unconditional, 0)
 					helpers.assert_eq(wrong_path, false)
 					return
@@ -89,7 +89,7 @@ helpers.describe("macOS real-source indentation compensation", function()
 				else
 					helpers.assert_eq(receipt.id, 1, "only the true owned forward save issues authority")
 					helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
-					local acknowledged = require("infra.toml.codec").decode(receipt.source.content)
+					local acknowledged = require("core.text.engine.toml.codec").decode(receipt.source.content)
 					helpers.assert_eq(acknowledged.llm.enabled, true)
 					helpers.assert_eq((acknowledged.llm.display or {}).pred_indent, -7, "only the requested signed offset belongs to the acknowledged source")
 					helpers.assert_eq(preferences.source_snapshot(path), receipt.source)
@@ -113,7 +113,7 @@ helpers.describe("macOS real-source indentation compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -121,7 +121,17 @@ helpers.describe("macOS real-source indentation compensation", function()
 end)
 
 helpers.describe("macOS retained Info Bar source admission", function()
-	for _, condition in ipairs({"paused", "master", "runtime value", "retired owner"}) do
+	helpers.it("commits a retained checkbox while paused, read on resume (shared-info-bar)", function()
+		local options = {prediction_count = 1, progressive_state = false}
+		with_fixture(options, function(fixture)
+			local row = assert(find_item(fixture.streaming_menu(), info_bar_corpus().row.i18n))
+			options.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(fixture.state.llm_show_info_bar, false)
+			helpers.assert_eq(fixture.persisted().llm_show_info_bar, false)
+		end)
+	end)
+	for _, condition in ipairs({"master", "runtime value", "retired owner"}) do
 		helpers.it("refuses a retained actual checkbox after " .. condition .. " (shared-info-bar)", function()
 			local options = {prediction_count = 1, progressive_state = false}
 			with_fixture(options, function(fixture)
@@ -162,8 +172,8 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 		local external = race == "before menu construction" and (initial .. '[llm.generation]\ntemperature = 0.9\n')
 			or initial:gsub('enabled = true', 'enabled = false')
 		local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-		local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-		package.loaded["adapters.file_system"] = {
+		local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function(read_path)
 				if read_path ~= path then wrong_path = true end
 				return disk, "ok"
@@ -207,7 +217,7 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 					helpers.assert_eq(preferences.source_snapshot(path), {status = "ok", content = initial})
 					helpers.assert_eq(fixture.state.llm_temperature, previous_temperature)
 					helpers.assert_eq(fixture.runtime.llm_temperature, previous_temperature)
-					helpers.assert_eq(require("infra.toml.codec").decode(disk).llm.generation.temperature, 0.9)
+					helpers.assert_eq(require("core.text.engine.toml.codec").decode(disk).llm.generation.temperature, 0.9)
 					helpers.assert_eq(unconditional, 0)
 					helpers.assert_eq(wrong_path, false)
 					return
@@ -222,7 +232,7 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 				else
 					helpers.assert_eq(receipt.id, 1, "only the true owned forward save issues authority")
 					helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
-					local acknowledged = require("infra.toml.codec").decode(receipt.source.content)
+					local acknowledged = require("core.text.engine.toml.codec").decode(receipt.source.content)
 					helpers.assert_eq(acknowledged.llm.enabled, true)
 					helpers.assert_eq((acknowledged.llm.display or {}).show_info_bar, false, "only the requested checkbox value belongs to the acknowledged source")
 					helpers.assert_eq(preferences.source_snapshot(path), receipt.source)
@@ -246,7 +256,7 @@ helpers.describe("macOS real-source Info Bar compensation", function()
 				helpers.assert_eq(wrong_path, false)
 			end)
 		end, debug.traceback)
-		package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+		package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 		if not ok then error(err, 0) end
 	end)
 
@@ -284,7 +294,20 @@ helpers.describe("Shared privacy trigger checks", function()
 		end
 	end)
 
-	for _, condition in ipairs({"paused", "master withdrawn", "runtime disagreement", "retired runtime"}) do
+	helpers.it("commits a held privacy callback while paused, read on resume (shared-privacy-triggers)", function()
+		for _, expected in ipairs(privacy_corpus().rows) do
+			local options = {}
+			with_fixture(options, function(fixture)
+				local row = assert(find_item(fixture.trigger_menu(), expected.i18n))
+				local before = fixture.state[expected.hs]
+				options.paused = true
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(fixture.calls.save, 1)
+				helpers.assert_eq(fixture.persisted()[expected.hs], not before)
+			end)
+		end
+	end)
+	for _, condition in ipairs({"master withdrawn", "runtime disagreement", "retired runtime"}) do
 		helpers.it("refuses a held privacy callback after " .. condition .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local options = {}
@@ -321,8 +344,8 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local path = require("infra.config_paths").get("ConfigTomlPath")
 				local disk = case.source
-				local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-				package.loaded["adapters.file_system"] = {
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function() return disk, "ok" end,
 					write = function() error("a privacy row never writes unconditionally") end,
 					write_if_unchanged = function(_, content, source)
@@ -353,7 +376,7 @@ helpers.describe("Privacy rows over a sparse config.toml", function()
 						end
 					end)
 				end, debug.traceback)
-				package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)
@@ -373,8 +396,8 @@ helpers.describe("Privacy native publication source ownership", function()
 				local initial = '[llm]\nenabled = true\n[llm.models]\nselected = "ollama"\n[llm.trigger]\nurl_bar_filter_enabled = false\nsecure_filter_enabled = false\n[private]\nfuture = 42\n'
 				local external = initial:gsub('enabled = true', 'enabled = false'):gsub('future = 42', 'future = 73')
 				local disk, attempts, unconditional, wrong_path = initial, 0, 0, false
-				local previous_fs, previous_preferences = package.loaded["adapters.file_system"], package.loaded["infra.preferences"]
-				package.loaded["adapters.file_system"] = {
+				local previous_fs, previous_preferences = package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"]
+				package.loaded["core.fs.adapters.file_system"] = {
 					read_with_status = function(read_path)
 						if read_path ~= path then wrong_path = true end
 						return disk, "ok"
@@ -425,7 +448,7 @@ helpers.describe("Privacy native publication source ownership", function()
 						helpers.assert_eq(receipt.id, race == "before forward acknowledgement" and 0 or 1)
 						if receipt.id == 1 then
 							helpers.assert_eq(preferences.source_matches(receipt.source, {status = "ok", content = external}), false)
-							local own = require("infra.toml.codec").decode(receipt.source.content)
+							local own = require("core.text.engine.toml.codec").decode(receipt.source.content)
 							helpers.assert_eq(own.llm.enabled, true)
 							local owned_value = own.llm.trigger[expected.linux]
 							if expected.neutral == true then
@@ -444,7 +467,7 @@ helpers.describe("Privacy native publication source ownership", function()
 						helpers.assert_eq(disk, external)
 					end)
 				end, debug.traceback)
-				package.loaded["adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
+				package.loaded["core.fs.adapters.file_system"], package.loaded["infra.preferences"] = previous_fs, previous_preferences
 				if not ok then error(err, 0) end
 			end
 		end)
@@ -454,7 +477,7 @@ end)
 
 helpers.describe("Shared privacy intent policy", function()
 	helpers.it("replays independent strict snapshot types and exact identities (shared-privacy-triggers)", function()
-		local corpus, policy = privacy_corpus(), require("llm.trigger_policy")
+		local corpus, policy = privacy_corpus(), require("ai.engine.policy.trigger_policy")
 		for _, vector in ipairs(corpus.vectors) do
 			local expected = clone_value(corpus.snapshot)
 			expected.owner = {}
@@ -497,12 +520,12 @@ helpers.describe("LLM navigation: shared native child declarations", function()
 	end)
 
 	helpers.it("(llm-nav-shared) preserves all twenty-one actual captions and native ranges", function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local root = helpers.driver_root() .. "../_shared/"
-		local file = assert(io.open(root .. "data/locale_order.json", "r"))
+		local file = assert(io.open(root .. "core/i18n/data/locale_order.json", "r"))
 		local locales = assert(Json.decode(file:read("*a"))).order; file:close()
 		helpers.assert_eq(#locales, 21)
-		local manifest_file = assert(io.open(helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json", "r"))
+		local manifest_file = assert(io.open(helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json", "r"))
 		local definitions = assert(Json.decode(manifest_file:read("*a"))).llm_navigation_rows; manifest_file:close()
 		local corpus_file = assert(io.open(helpers.driver_root() .. "../_shared/tests/corpus/menus/llm_navigation_rows.json", "r"))
 		local expected = assert(Json.decode(corpus_file:read("*a"))).rows; corpus_file:close()
@@ -513,7 +536,7 @@ helpers.describe("LLM navigation: shared native child declarations", function()
 				{ expected[index].id, expected[index].type, expected[index].i18n })
 		end
 		for _, locale in ipairs(locales) do
-			local input = assert(io.open(root .. "data/locales/" .. locale .. ".json", "r"))
+			local input = assert(io.open(root .. "core/i18n/data/locales/" .. locale .. ".json", "r"))
 			local catalogue = assert(Json.decode(input:read("*a"))); input:close()
 			local matched_paths = {}
 			local function translated(key)
@@ -594,16 +617,18 @@ helpers.describe("LLM fixed parents: actual shared group topology", function()
 		end)
 	end)
 	for _, condition in ipairs({{enabled = false}, {paused = true}}) do
-		helpers.it("retains all three native parent gates while " .. (condition.paused and "paused" or "off"), function()
+		helpers.it("parent gates follow the master, not the pause: " .. (condition.paused and "paused" or "off"), function()
 			condition.parent_only = true
 			with_fixture(condition, function(fixture)
 				local rows = fixture.top_level_callbacks().rebuild()
 				for _, parent in ipairs(parents) do
 					local row = assert(find_item(rows, parent.key))
-					helpers.assert_eq(row.disabled, true)
 					if condition.paused then
+						-- A pause stops typing, not configuration (EDD-1).
+						helpers.assert_nil(row.disabled, "a pause leaves the settings group live")
 						helpers.assert_true(type(row.menu) == "table", "gating retains the genuine child tree")
 					else
+						helpers.assert_eq(row.disabled, true)
 						-- Category-off rule: a greyed group of an off category opens nothing.
 						helpers.assert_nil(row.menu, "an off category's group opens nothing")
 					end
@@ -615,8 +640,8 @@ end)
 
 helpers.describe("LLM fixed parents: independent original full physical hierarchy", function()
 	helpers.it("retains every original native child, flag and callback through the real outer renderer", function()
-		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
-		local corpus = assert(require("json").decode(file:read("*a"))); assert(file:close())
+		local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/llm_parent_groups.json"), "rb"))
+		local corpus = assert(require("core.text.engine.json").decode(file:read("*a"))); assert(file:close())
 		with_fixture({parent_only = true}, function(fixture)
 			local rows = fixture.top_level_callbacks().rebuild()
 			local parents = {}
@@ -624,7 +649,7 @@ helpers.describe("LLM fixed parents: independent original full physical hierarch
 				parents[#parents + 1] = assert(find_item(rows, expected.i18n))
 			end
 			helpers.assert_eq(#parents, 3, "the independent complete parent set is nonempty")
-			helpers.assert_eq(require("test.menu_native_child_rows").hierarchy(parents), corpus.macos)
+			helpers.assert_eq(require("tests.lua.menu.native_child_rows").hierarchy(parents), corpus.macos)
 			helpers.assert_eq(fixture.calls.runtime, 0)
 			helpers.assert_eq(fixture.calls.save, 0)
 			helpers.assert_eq(fixture.calls.settings, 0)

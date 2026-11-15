@@ -206,7 +206,7 @@ helpers.describe("ApiOllama.get_base_url (configurable port)", function()
 	end)
 
 	-- With no user override set, the port comes from the single source
-	-- (_shared/modules/llm/defaults.json llm_ollama_owned_port = 11435, via DEFAULT_STATE),
+	-- (_shared/ai/data/defaults.json llm_ollama_owned_port = 11435, via DEFAULT_STATE),
 	-- the port of Ergopti's own Ollama, never the stock 11434 a user's own Ollama
 	-- keeps (issue #104). A regression that re-hardcodes a port, or reads the
 	-- stock-port key again, fails here.
@@ -396,7 +396,7 @@ helpers.describe("Ollama pending retry core composition", function()
 			package.loaded["modules.llm.warmup_controller"] = nil
 			local core = require("modules.llm")
 			local controller = require("modules.llm.warmup_controller")
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local state = warmup_upvalue(core.configuration_idle, "CoreState")
 			fixture.finalize = function()
 				helpers.assert_true(controller.stop(), "the exact controller timer must retire")

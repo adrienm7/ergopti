@@ -11,13 +11,13 @@
 --- libxkbcommon reads first (user_layout_installer.py), without sudo.
 ---
 --- FEATURES & RATIONALE:
---- 1. The catalogue decisions are shared with macOS (_shared/lua/layouts/
+--- 1. The catalogue decisions are shared with macOS (_shared/layouts/engine/
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the package.
 --- 2. The conversion is Lua: the .keylayout is read by the parser shared with
----    macOS (_shared/lua/layouts/keylayout.lua) and written as XKB and XCompose
----    by _shared/lua/layouts/xkb_converter.lua, byte for byte what the Python
+---    macOS (_shared/layouts/engine/composer/keylayout.lua) and written as XKB and XCompose
+---    by _shared/layouts/engine/composer/xkb_converter.lua, byte for byte what the Python
 ---    converter writes (tools/test/test-keylayout-canonical-parity.cjs). Python
 ---    3.8 or newer is still required by the user XKB installer that follows,
 ---    which edits the user tree and the desktop configuration; a missing or
@@ -29,29 +29,31 @@
 ---    injectable, so tests replay operations without network, luv or python3.
 --- ==============================================================================
 
-local Logger        = require("logger.shim")
-local Paths         = require("infra.paths")
+local Logger        = require("core.logger.engine.shim")
+local Paths         = require("core.fs.engine.paths")
 local ConfigPaths   = require("infra.config_paths")
-local I18n          = require("infra.i18n")
-local FileSystem    = require("adapters.file_system")
-local HttpClient    = require("adapters.http_client")
-local FileDigest    = require("adapters.file_digest")
-local ShellRunner   = require("adapters.shell_runner")
-local ProcessRunner = require("adapters.process_runner")
-local Json          = require("json")
-local Keylayout     = require("layouts.keylayout")
-local XkbConverter  = require("layouts.xkb_converter")
+local I18n          = require("core.i18n.engine.i18n")
+local FileSystem    = require("core.fs.adapters.file_system")
+local HttpClient    = require("core.network.adapters.http_client")
+local FileDigest    = require("core.fs.adapters.file_digest")
+local ShellRunner   = require("core.process.adapters.shell_runner")
+local ProcessRunner = require("core.process.adapters.runner")
+local Json          = require("core.text.engine.json")
+local TomlCodec     = require("core.text.engine.toml_codec")
+local Keylayout     = require("layouts.engine.composer.keylayout")
+local XkbConverter  = require("layouts.engine.composer.xkb_converter")
 local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
 local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
-local Registry      = require("layouts.registry")
-local Catalogue     = require("layouts.catalogue")
-local Extension     = require("layouts.extension")
-local Composer      = require("layouts.composer")
-local RegistryStore = require("layouts.registry_store")
+local Registry      = require("layouts.engine.registry.registry_core")
+local Catalogue     = require("layouts.engine.composer.catalogue")
+local Extension     = require("layouts.engine.composer.extension")
+local Composer      = require("layouts.engine.composer.composer")
+local SourceStore   = require("layouts.engine.composer.source_store")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local M = {}
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "layout_registry"
 local REQUEST_OWNER = "layout_registry"
@@ -237,7 +239,7 @@ local function read_shared_json(rel)
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
 	local known = _shared_json[path]
 	if known ~= nil and known.raw == raw then return known.decoded, nil end
-	-- The shared json.lua answers nil to invalid JSON rather than raising.
+	-- The shared core/text/engine/json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	_shared_json[path] = { raw = raw, decoded = decoded }
@@ -248,9 +250,9 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.settings()
-	local layouts, layouts_err = read_shared_json("modules/layouts/defaults.json")
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
 	if not layouts then return nil, layouts_err end
-	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
+	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
 	-- The daemon runs without the updater (Main loads it optionally), so its
 	-- absence is this function's refusal, not a raise that ends the daemon.
@@ -350,7 +352,7 @@ end
 --- @param confirm function|nil The consent; the owned dialog by default.
 --- @return function python(callback) -> callback(ok, interpreter_or_code, detail)
 local function managed_python(confirm)
-	local timeout_ms = require("infra.timings").ms("adapters", "managed_python_download_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("adapters", "managed_python_download_timeout_ms")
 	local native = require("luv")
 	local function managed_process(program, args, callback)
 		local delivered, constructing, pending = false, true, nil
@@ -419,7 +421,7 @@ local function managed_python(confirm)
 				function(result) callback(result.exit_code == 0 and result.error == nil) end)
 		end,
 		delete = FileSystem.delete,
-		rename = require("infra.no_replace_move").move,
+		rename = require("core.fs.engine.no_replace_move").move,
 	}
 	return function(callback) require("modules.keymap.managed_python").ensure(deps, callback) end
 end
@@ -443,7 +445,9 @@ local function default_deps(settings)
 	local etag_capture = local_dir .. ".index.etag.download"
 	return {
 		settings = settings,
-		local_source = require("infra.installation").is_source_run(),
+		local_source = require("core.lifecycle.engine.installation").is_source_run(),
+		-- Re-applies a layout loaded live on X11 when the desktop replaces it.
+		keep_x11_layout = function(id) require("modules.keymap.x11_layout_reapply").arm(id) end,
 		-- The asynchronous runner: the refresh shares the daemon's loop with the
 		-- grabbed keyboard, so a blocking git would delay keys.
 		registry_changes = function(dir, callback)
@@ -487,6 +491,7 @@ local function default_deps(settings)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = FileSystem.read,
+		read_bounded = FileSystem.read_bounded,
 		write = write,
 		delete = FileSystem.delete,
 		exists = FileSystem.exists,
@@ -497,7 +502,7 @@ local function default_deps(settings)
 		bundled_dir = M.bundled_dir(driver_root, settings, FileSystem.exists),
 		converter_data = M.converter_data_path(driver_root, FileSystem.exists),
 		installer = M.installer_path(driver_root, FileSystem.exists),
-		keycodes = Paths.shared("modules/layouts/mac_keycodes.json"),
+		keycodes = Paths.shared("layouts/data/mac_keycodes.json"),
 		translate = I18n.get,
 	}
 end
@@ -612,7 +617,10 @@ end
 --- The whole conversion runs in Lua (layouts.keylayout parses the file,
 --- layouts.xkb_converter writes the XKB symbols and XCompose text): no child
 --- process, so a machine without python3 still converts, and only the user XKB
---- installer that follows needs it.
+--- installer that follows needs it. The composed layout of a layout source is
+--- written from the converter target the page compiled straight from the
+--- source (composer.lua check_target), which keeps the levels its .keylayout
+--- cannot hold (XKB's fifth level); its .keylayout stays the record's file.
 --- @param deps table
 --- @param entry table
 --- @param layout_path string
@@ -624,15 +632,29 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		on_done(false, M.FAILURE_CONVERSION, "the XKB conversion data is not shipped with this driver")
 		return
 	end
-	local text = deps.read(layout_path)
-	if type(text) ~= "string" then
-		on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
-		return
+	local canonical, level5
+	local composer_settings = entry.id ~= nil and M.composer_settings() or nil
+	if composer_settings ~= nil and entry.id == composer_settings.id then
+		local target, target_err = Composer.read_target(composer_settings,
+			deps.config_dir or (ConfigPaths.config("") .. "/"), deps)
+		if target_err ~= nil then
+			on_done(false, M.FAILURE_CONVERSION, target_err)
+			return
+		end
+		if target ~= nil then canonical, level5 = target.canonical, target.level5 end
 	end
-	local canonical, parse_err = Keylayout.parse(text)
-	if not canonical then
-		on_done(false, M.FAILURE_CONVERSION, parse_err)
-		return
+	if canonical == nil then
+		local text = deps.read(layout_path)
+		if type(text) ~= "string" then
+			on_done(false, M.FAILURE_CONVERSION, "the downloaded .keylayout cannot be read: " .. layout_path)
+			return
+		end
+		local parse_err
+		canonical, parse_err = Keylayout.parse(text)
+		if not canonical then
+			on_done(false, M.FAILURE_CONVERSION, parse_err)
+			return
+		end
 	end
 	local function decode_file(path)
 		local raw = deps.read(path)
@@ -661,8 +683,15 @@ local function convert(deps, entry, layout_path, on_done, rows)
 		display_name = entry.name,
 		hints = entry.xkb,
 		rows = rows,
+		level5 = level5,
 	})
 	if not result then on_done(false, M.FAILURE_CONVERSION, convert_err) return end
+	local types_ok, shipped_types = pcall(XkbConverter.types_text, types, level5)
+	if not types_ok then
+		on_done(false, M.FAILURE_CONVERSION, tostring(type(shipped_types) == "table" and shipped_types.keylayout_error
+			or shipped_types))
+		return
+	end
 	-- What the conversion could not carry is named, never silently lost.
 	if #result.unplaced > 0 then
 		Logger.warn(LOG, "Layout '%s': %d key(s) have no Linux key name and are left out (macOS codes %s).",
@@ -676,7 +705,7 @@ local function convert(deps, entry, layout_path, on_done, rows)
 	for _, file in ipairs({
 		{ entry.id .. ".xkb", result.symbols_text },
 		{ entry.id .. ".XCompose", result.compose_text },
-		{ "xkb_types.txt", types },
+		{ "xkb_types.txt", shipped_types },
 	}) do
 		local written, write_err = write_file(deps, out_dir .. file[1], file[2])
 		if not written then on_done(false, M.FAILURE_WRITE, write_err) return end
@@ -1065,7 +1094,7 @@ function M.live_path(deps)
 	local session = (deps.session_type or session_type)()
 	if session == "x11" then return "x11", session end
 	if session == "wayland" then
-		local desktop_is = deps.desktop_is or require("infra.display_server").desktop_is
+		local desktop_is = deps.desktop_is or require("core.ui.engine.display_server").desktop_is
 		if desktop_is("gnome") or desktop_is("kde") then return "wayland", session end
 	end
 	return nil, session
@@ -1098,7 +1127,7 @@ end
 --- on_done(true, { id, rows, slot }) or on_done(false, failure_code, detail,
 --- user_message, live_code) runs once unless terminal shutdown cancels its delivery.
 --- live_code is the installer's closed code (not_loaded, stale_keymap, select_refused,
---- ...) when the load failed.
+--- gnome_extension_missing, ...) when the load failed.
 --- @param id string|nil Installed layout id; nil takes the active or the only one.
 --- @param rows table { order = "native"|"digits"|"symbols", edges = boolean }
 --- @param on_done function
@@ -1186,6 +1215,9 @@ function M.apply_rows(id, rows, on_done, deps)
 					return
 				end
 				_active = base
+				-- GNOME and Plasma under X11 put their own layouts back on a new
+				-- keyboard (W4): keep this one loaded from now on.
+				if deps.keep_x11_layout then deps.keep_x11_layout(base) end
 				finish(true, { id = base, rows = report })
 			end)
 		end)
@@ -1288,12 +1320,12 @@ function M.install_local(entry, text, on_done, deps)
 	return true
 end
 
---- The composer's ports over this module (see layouts/composer.lua).
+--- The composer's ports over this module (see layouts/engine/composer/composer.lua).
 --- @param deps table Resolved collaborators.
 --- @return table|nil operations
 --- @return string|nil error
 local function composer_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = Composer.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1309,6 +1341,8 @@ local function composer_operations(deps)
 		shortcuts = "single",
 		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
 		decode_json = deps.decode_json,
+		-- The page may save an Ergopti layout source in place of a composition.
+		decode_toml = TomlCodec.decode,
 		read = deps.read,
 		exists = deps.exists,
 		delete = deps.delete,
@@ -1359,9 +1393,33 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.composer_settings()
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	return Composer.settings(layout_defaults)
+end
+
+--- The emulation table stored with the composed layout's source, for the layout
+--- emulation; nil when the composed layout has none.
+--- @param deps table|nil
+--- @return table|nil table_
+--- @return string|nil error
+function M.composer_emulation(deps)
+	local settings, settings_err = M.composer_settings()
+	if not settings then return nil, settings_err end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.read_emulation(settings, resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved)
+end
+
+--- The composed layout stored for the emulation alone (composer_emulate), for
+--- the layout emulation while the composed layout is not installed.
+--- @param deps table|nil
+--- @return table|nil composed { text, convention } nil when none is stored.
+--- @return string|nil error
+function M.composer_copy(deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.registry_copy((M.composer_settings()), resolved.config_dir or (ConfigPaths.config("") .. "/"), resolved, TomlCodec.decode)
 end
 
 --- The text of an installed layout's copy, for the Debug check of the composer.
@@ -1430,12 +1488,193 @@ function M.composer_save(payload, on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail, false) end)
 end
 
+--- Stores a layout source for the layout emulation alone: nothing is installed
+--- in the system (layouts/engine/composer/composer.lua store).
+--- @param payload table { source, keylayout [, emulation] }
+--- @param on_done function on_done(ok, code, detail, id)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_emulate(payload, on_done, deps)
+	return with_composer(deps, function(operations) operations.store(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
 --- Removes the composition.
 --- @param on_done function on_done(ok, code, detail)
 --- @param deps table|nil
 --- @return boolean dispatched
 function M.composer_remove(on_done, deps)
 	return with_composer(deps, function(operations) operations.remove(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- The layout editor's file store over this module (see layouts/engine/composer/source_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function source_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = SourceStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return SourceStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		read = deps.read,
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- The editor's downloads land where the metrics export does.
+		downloads_dir = deps.downloads_dir or function()
+			return require("metrics.engine.maintenance").downloads_dir(os.getenv)
+		end,
+	})
+end
+
+--- Runs a layout editor file operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_source(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = source_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout editor store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Sends the layout editor the last source it saved.
+--- @param on_done function on_done({ text, filename, folder })
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_open(on_done, deps)
+	return with_source(deps, function(operations) operations.open(on_done) end,
+		function() on_done({}) end)
+end
+
+--- Stores one file of the layout editor (its source or an export).
+--- @param payload table { filename, text }
+--- @param on_done function on_done(ok, code, detail, filename)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_save(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Writes one download of the layout editor (XKB archive, KLC, DLL images,
+--- macOS bundle) to the user's Downloads folder, never over a file there.
+--- @param payload table { filename, data } with data the bytes as base64.
+--- @param on_done function on_done(ok, code, detail, path)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_export(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.export(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Ergopti Studio's personal layouts over this module (see layouts/engine/composer/studio_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function studio_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local settings, settings_err = StudioStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return StudioStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or (ConfigPaths.config("") .. "/"),
+		-- The root of _shared, where the built-in corpus tables are generated.
+		shared_dir = deps.shared_dir or (Paths.shared_root() and Paths.shared_root() .. "/"),
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs an Ergopti Studio layout operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_studio(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = studio_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The Ergopti Studio layout store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Lists Ergopti Studio's personal layouts, as the JSON texts the page saved.
+--- @param on_done function on_done(ok, texts_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_list(on_done, deps)
+	return with_studio(deps, function(operations) operations.list(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores one Ergopti Studio personal layout.
+--- @param payload table { id, text }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Removes one Ergopti Studio personal layout.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_remove(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.remove(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads one built-in corpus's generated tables for the Ergopti Studio page.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_corpus(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.corpus(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads the user's Ergopti Studio fingering profile (nil for the defaults).
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_profile_load(on_done, deps)
+	return with_studio(deps, function(operations) operations.profile_load(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores the user's Ergopti Studio fingering profile, or restores the defaults.
+--- @param payload table { text = JSON text } or { reset = true }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_profile_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.profile_save(payload, on_done) end,
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
@@ -1446,6 +1685,8 @@ end
 --- @return boolean acknowledged Every install/activation helper physically retired.
 function M.shutdown()
 	if not _stopping then _stopping = true; _epoch = _epoch + 1 end
+	local Reapply = package.loaded["modules.keymap.x11_layout_reapply"]
+	if Reapply then Reapply.shutdown() end
 	if _checking_shutdown then return false end
 	_checking_shutdown = true
 	if not _transports_cancelled then
@@ -1487,9 +1728,9 @@ function M.shipped_extension_root(deps)
 	if resolved == nil then
 		-- Offline shipped data belongs to the local registry. Its source path
 		-- never needs the updater's initialized transport or installed channel.
-		local layouts, layouts_error = read_shared_json("modules/layouts/defaults.json")
+		local layouts, layouts_error = read_shared_json("layouts/data/defaults.json")
 		if not layouts then error(layouts_error, 0) end
-		local updater, updater_error = read_shared_json("modules/updater/defaults.json")
+		local updater, updater_error = read_shared_json("updater/data/defaults.json")
 		if not updater then error(updater_error, 0) end
 		local settings, settings_error = Registry.resolve(layouts, updater)
 		if not settings then error(settings_error, 0) end

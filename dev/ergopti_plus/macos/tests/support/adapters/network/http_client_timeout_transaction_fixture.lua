@@ -27,13 +27,13 @@ local helpers = require("tests.helpers")
 --- @return table client A fresh HttpClient instance.
 --- @return table scheduler The freshly loaded TimerScheduler adapter.
 local function load_client(timer_stub, http_stub, options)
-	package.loaded["adapters.http_client"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
-	local HttpClient = helpers.load_with_stubs("adapters.http_client", {
+	package.loaded["core.network.adapters.http_client"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	local HttpClient = helpers.load_with_stubs("core.network.adapters.http_client", {
 		timer = timer_stub,
 		http = http_stub,
 	})
-	return HttpClient.new(options), package.loaded["adapters.timer_scheduler"]
+	return HttpClient.new(options), package.loaded["core.events.timer_scheduler"]
 end
 
 --- Builds a native timer whose start behavior is selected by the test.

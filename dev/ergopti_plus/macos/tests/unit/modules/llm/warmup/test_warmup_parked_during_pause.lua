@@ -36,14 +36,14 @@ local helpers = require("tests.helpers")
 
 local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"modules.shortcuts.script_control",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.keycodes",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.llm.api_mlx",
@@ -53,7 +53,7 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
+	"core.ui.ui.tooltip",
 	"modules.keystats",
 }
 
@@ -73,9 +73,9 @@ local function exercise_committed_backend_pause()
 
 		local idle_callback = nil
 		local admission_fence = nil
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = function() end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -84,11 +84,11 @@ local function exercise_committed_backend_pause()
 			ESCAPE = 53,
 		}
 		package.loaded["adapters.event_provenance"] = {}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callback = callback
 				return true
@@ -106,7 +106,7 @@ local function exercise_committed_backend_pause()
 			end,
 			admission_open = function() return admission_fence == nil end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function() return { timer = nil }, true end,
 			cancel = function() return true end,
 		}
@@ -146,7 +146,7 @@ local function exercise_committed_backend_pause()
 			resume_after_pause = function() return true end,
 		}
 		package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
-		package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
+		package.loaded["core.ui.ui.tooltip"] = { hide_forced = function() return true end }
 		package.loaded["modules.keystats"] = { resync_context = function() return true end }
 
 		local ScriptControl = helpers.load_with_stubs("modules.shortcuts.script_control")

@@ -32,8 +32,8 @@ local function with_remap(route, dry, action, hold, body, revoke)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
+		if helpers.is_driver_module(name)
+			or name:match("^platform%.remap%.") or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local config_path, tap_path = os.tmpname(), os.tmpname()
 	local injector, manager
@@ -47,14 +47,16 @@ local function with_remap(route, dry, action, hold, body, revoke)
 		environment.opts = evaluate(source:sub(first, last - 1) .. "\nreturn parse_args()", environment)
 		helpers.assert_eq(environment.opts.dry_run, dry)
 		helpers.assert_eq(environment.opts.tray, false)
+		-- The Tap-Holds switch is a config.toml row; tap_hold.toml holds the keys.
 		local config = '[shortcuts]\nenabled = true\n[gestures]\nenabled = false\n'
+			.. '[tap_holds]\nenabled = ' .. tostring(route == "single") .. '\n'
 			.. '[gesture_parameters]\ntap_hold__tab__send_text = "ok"\ncombination__caps_lock_then_tab__send_text = "ok"\ncombination__tab_then_caps_lock__send_text = "ok"\n'
 		if route == "ordered" then config = config .. '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "' .. action .. '"\n'
 			.. (hold and '[shortcuts.key_combination_holds]\ncaps_lock_then_tab = "ctrl"\n' or "")
 		elseif route == "buffered" then config = config .. '[mod_combos]\nenabled = true\nsimultaneous_threshold_ms = 50\nsymmetric = true\n'
 			.. '[mod_combos.config.tab_then_caps_lock]\ncombo = "' .. action .. '"\n' end
 		file = assert(io.open(config_path, "wb")); assert(file:write(config)); assert(file:close())
-		local tap = '[tap_hold]\nenabled = ' .. tostring(route == "single") .. '\ninherit_defaults = false\n'
+		local tap = '[tap_hold]\ninherit_defaults = false\n'
 		if route == "single" then tap = tap .. '[tap_hold.keys.tab]\ntap_action = "' .. action .. '"\n'
 			.. 'hold_modifier = "' .. (hold and "ctrl" or "") .. '"\n' .. (hold and "" or 'hold_layer = ""\n') .. 'time_activation_seconds = 0.2\n' end
 		file = assert(io.open(tap_path, "wb")); assert(file:write(tap)); assert(file:close())
@@ -73,7 +75,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				caps_locked = false
 				capture = {
 					is_ready = function() return true end, reset_state = function() caps_locked = false; return true end,
-					modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
+					modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code] end,
 					caps_locked = function() return caps_locked end, restore_compose = function() return true end,
 					peek_text = function() return nil end,
 					process = function(code, value) if code == 58 and value == 1 then caps_locked = not caps_locked end end,
@@ -82,20 +84,20 @@ local function with_remap(route, dry, action, hold, body, revoke)
 			require("tests.support.input_owner_fixture").with_session({ public_chords = true, source_ids = { "a" }, keys = {}, capture = capture }, function(session)
 				assert(session.hook.set_remapper(nil))
 				local world = { reads = 0, writes = 0, lifecycle = 0, resets = 0, errors = {} }
-				local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+				local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 				logger.set_sink(function() end)
 				logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
-				package.loaded["logger.shim"], environment.Logger = logger, logger
+				package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 				local pending, clipboard = nil, "ok"
-				package.loaded["adapters.shell_runner"] = {
+				package.loaded["core.process.adapters.shell_runner"] = {
 					has_command = function() return true end,
 					exec_checked = function() world.reads = world.reads + 1; return true, clipboard end,
 					with_exact_stdin = function(command, text) pending = text; return command end,
 					run = function() clipboard = pending; world.writes = world.writes + 1; return true end,
 				}
-				package.loaded["infra.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
+				package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 					is_x11 = function() return true end, is_wayland = function() return false end }
-				package.loaded["adapters.window_info"] = { focused_app_id = function() return "owned-editor" end }
+				package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
 				local layout = require("adapters.keyboard_layout")
 				layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} } })
 				injector = require("modules.hotstrings.injector")

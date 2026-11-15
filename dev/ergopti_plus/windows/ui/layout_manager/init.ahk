@@ -10,7 +10,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. The same rules as the macOS and Linux hosts
-;    (_shared/lua/layouts/manager_bridge.lua): an allowlist of actions, each
+;    (_shared/layouts/engine/manager_bridge.lua): an allowlist of actions, each
 ;    checked against the catalogue or the installed layouts before it runs,
 ;    and one page state for the three drivers.
 ; 2. Selecting a layout writes [layout] emulated_layout (the Ergopti layouts
@@ -18,6 +18,14 @@
 ;    emulation registers its hotkeys.
 ; 3. Singleton window; every WebView2 callback is fenced by a session epoch,
 ;    so a late callback of a closed window never writes into its successor.
+; 4. The unified layout editor (docs/design/layout-editor.md « Windows host »)
+;    has its own window (editor_window.ahk): the page's « Layout editor » button
+;    posts open_editor and the menu's « Create or edit a layout… » opens it
+;    directly. LayoutManager_HandleEditorAction answers the editor's actions:
+;    source_open and source_save go to source_store.ahk, composer_save with a
+;    source and composer_emulate to composer.ahk, nav_save to the navigation
+;    layer editor's own save; WebView2's own file chooser opens files, so
+;    source_pick is refused here.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -56,10 +64,36 @@ global LAYMGR_VHOST := "ergopti.layoutmanager"
 global LAYMGR_HOST_ACCESS_ALLOW := 1
 
 ; The only actions the page may send (the page and the Lua hosts declare the
-; same list; tools/test/test-layout-manager-page.cjs pins the three).
+; same list; tools/test/test-layout-manager-page.cjs pins the three). The
+; layout editor's own window has its list in editor_window.ahk.
 global LAYMGR_ACTIONS := Map("ready", true, "refresh", true, "install", true, "update", true,
-	"uninstall", true, "select", true, "open_homepage", true, "close", true,
-	"composer_open", true, "composer_save", true, "composer_remove", true)
+	"uninstall", true, "select", true, "open_homepage", true, "close", true, "open_editor", true)
+
+; The actions that change the installed or selected layout, refused while a
+; runtime refresh is pending.
+global LAYMGR_MUTATIONS := Map("install", true, "update", true, "uninstall", true, "select", true,
+	"composer_save", true, "composer_remove", true, "composer_emulate", true, "nav_save", true)
+
+; A JSON boolean: AutoHotkey's true is the integer 1, which the page's strict
+; `=== true` would read as a number.
+class LayMgrJsonBool {
+	__New(Value) {
+		this.Value := Value ? true : false
+	}
+}
+
+global LAYMGR_JSON_TRUE := LayMgrJsonBool(true)
+global LAYMGR_JSON_FALSE := LayMgrJsonBool(false)
+
+/**
+ * The JSON boolean of a truth value.
+ * @param {Any} Value
+ * @returns {LayMgrJsonBool}
+ */
+LayMgrJsonBool_Of(Value) {
+	global LAYMGR_JSON_TRUE, LAYMGR_JSON_FALSE
+	return Value ? LAYMGR_JSON_TRUE : LAYMGR_JSON_FALSE
+}
 
 
 
@@ -107,6 +141,8 @@ _LayMgrWeb_Json(Value) {
 	global JSON_NULL
 	if (Value == JSON_NULL)
 		return "null"
+	if Value is LayMgrJsonBool
+		return Value.Value ? "true" : "false"
 	if (Value is Map) {
 		Out := ""
 		for Key, Item in Value
@@ -223,15 +259,16 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 	Deps := Deps.Clone()
 	Deps["session_epoch"] := SessionEpoch
 	_LayMgrWeb_PresentationDeps := Deps
-	if (_LayMgrWeb_RuntimeRefresh is Map) && (Action == "install" || Action == "update"
-			|| Action == "uninstall" || Action == "select" || Action == "composer_save"
-			|| Action == "composer_remove") {
+	global LAYMGR_MUTATIONS
+	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
 		LoggerWarn("LayoutManager", "Refused a layout mutation while runtime refresh is pending.")
 		return false
 	}
 	if (Action == "ready") {
 		_LayMgrWeb_Result := 0
-		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]))
+		; The page offers the layout editor's window only for a host that stores its files.
+		Initial := Map("strings", _LayMgrWeb_Strings(), "state", LayoutManager_PageState(Deps["local_dir"]),
+			"source_editor", LayMgrJsonBool_Of(true))
 		if !_LayMgrWeb_CommandCurrent(SessionEpoch, Action)
 			return false
 		_LayMgrWeb_PushPayload(Deps, "initData", Initial)
@@ -240,6 +277,8 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
 	}
+	if (Action == "open_editor")
+		return Deps.Get("open_editor", LayoutEditorWindow_Open).Call()
 	if (Action == "refresh") {
 		Deps["refresh"].Call(_LayMgrWeb_PushState.Bind(Deps))
 		return true
@@ -248,8 +287,6 @@ LayoutManager_HandleMessage(Payload, Deps := 0, SessionEpoch := unset) {
 		Deps["close"].Call()
 		return true
 	}
-	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_remove")
-		return LayoutComposer_Handle(Action, Payload, Deps)
 	Id := Payload.Has("id") ? Payload["id"] : ""
 	if !LayoutRegistry_IsValidId(Id) {
 		LoggerWarn("LayoutManager", "Refused a layout manager '{1}' without a valid layout id.", Action)
@@ -399,6 +436,122 @@ _LayMgrWeb_PushPayload(Deps, Name, Payload) {
 	return true
 }
 
+; The configuration folder the editor's files go to: the test's, else the driver's.
+_LayMgrWeb_ConfigDir(Deps) {
+	global _ConfigDir
+	return Deps.Has("config_dir") ? Deps["config_dir"] : _ConfigDir
+}
+
+/**
+ * The layout editor's strings in the active locale. The macOS and Linux hosts
+ * seed window._i18n_strings before the page runs; this host sends them with
+ * sourceData, the first message the editor reads.
+ * The Ergopti Studio analysis panels (_shared/ui/layout_analysis) mounted in
+ * the editor read their layout_analysis.* keys from the same store.
+ * @returns {Map} Every layout_editor.* and layout_analysis.* key -> its translation.
+ */
+LayoutManager_EditorStrings() {
+	global _I18nCache, _I18nCacheEn
+	_I18nEnsureLoaded()
+	Strings := Map()
+	for Cache in [_I18nCache, _I18nCacheEn]
+		for Key in Cache
+			if (SubStr(Key, 1, 14) == "layout_editor." || SubStr(Key, 1, 16) == "layout_analysis.")
+					&& !Strings.Has(Key)
+				Strings[Key] := I18nLookup(Key)
+	return Strings
+}
+
+; Answers the editor's source_open: the last saved source, else text null.
+_LayMgrWeb_SourceOpen(Deps) {
+	global JSON_NULL
+	Data := SourceStore_Open(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps), Deps.Get("source_ports", 0))
+	if !Data.Has("text")
+		Data["text"] := JSON_NULL, Data["filename"] := JSON_NULL
+	Data["strings"] := Deps.Get("editor_strings", LayoutManager_EditorStrings).Call()
+	return _LayMgrWeb_PushPayload(Deps, "sourceData", Data)
+}
+
+; « Apply the navigation layer »: the navigation layer editor's own save, then
+; the pause-preserving reload that applies it.
+_LayMgrWeb_ApplyNav(Text) {
+	global _SharedDir, _ConfigDir
+	return LayerEditor_SaveAndApply(Text, _SharedDir, _ConfigDir, ReloadPreservingSuspend)
+}
+
+/**
+ * Answers one action of the layout editor (its own window, editor_window.ahk):
+ * source_open, source_save, source_export, source_pick, nav_save,
+ * composer_open, composer_save and composer_emulate. The caller checked its
+ * allowlist.
+ * @param {String} Action - The page's action.
+ * @param {Map} Payload - Decoded message.
+ * @param {Map} Deps - "push" (FunctionName, Payload), "local_dir", and the
+ *   optional "config_dir", "source_ports", "export_ports", "apply_nav" and
+ *   composer ports.
+ * @returns {Boolean} Whether the action was accepted.
+ */
+LayoutManager_HandleEditorAction(Action, Payload, Deps) {
+	global LAYMGR_MUTATIONS, _LayMgrWeb_RuntimeRefresh
+	if (_LayMgrWeb_RuntimeRefresh is Map) && LAYMGR_MUTATIONS.Has(Action) {
+		LoggerWarn("LayoutManager", "Refused a layout editor change while runtime refresh is pending.")
+		return false
+	}
+	if (Action == "source_open") {
+		_LayMgrWeb_SourceOpen(Deps)
+		return true
+	}
+	if (Action == "source_save") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor save without its file name and text.")
+			return false
+		}
+		Result := SourceStore_Save(SourceStore_SharedSettings(), _LayMgrWeb_ConfigDir(Deps),
+			Map("filename", Payload["filename"], "text", Payload["text"]), Deps.Get("source_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "sourceResult", Result)
+		return true
+	}
+	if (Action == "source_export") {
+		if !(Payload.Get("filename", 0) is String) || !(Payload.Get("data", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a layout editor download without its file name and bytes.")
+			return false
+		}
+		Result := SourceStore_Export(SourceStore_SharedSettings(),
+			Map("filename", Payload["filename"], "data", Payload["data"]), Deps.Get("export_ports", 0))
+		Result["ok"] := LayMgrJsonBool_Of(Result["ok"])
+		_LayMgrWeb_PushPayload(Deps, "exportResult", Result)
+		return true
+	}
+	if (Action == "source_pick") {
+		LoggerWarn("LayoutManager", "Refused a layout editor file pick: this host lets the page pick files.")
+		return false
+	}
+	if (Action == "nav_save") {
+		if !(Payload.Get("text", 0) is String) {
+			LoggerWarn("LayoutManager", "Refused a navigation layer save without its layers.toml text.")
+			return false
+		}
+		Result := Deps.Get("apply_nav", _LayMgrWeb_ApplyNav).Call(Payload["text"])
+		_LayMgrWeb_PushPayload(Deps, "navResult", Map("saved", LayMgrJsonBool_Of(Result.Get("saved", false)),
+			"applied", LayMgrJsonBool_Of(Result.Get("applied", false)), "errors", Result.Get("errors", [])))
+		return true
+	}
+	if (Action == "composer_open" || Action == "composer_save" || Action == "composer_emulate")
+		return LayoutComposer_Handle(Action, Payload, Deps)
+	LoggerWarn("LayoutManager", "Refused the layout editor action '{1}'.", Action)
+	return false
+}
+
+/**
+ * The menu's « Create or edit a layout… »: opens the layout editor in its own
+ * window (editor_window.ahk), or brings the open one to the front.
+ * @returns {Boolean} Whether the window is shown.
+ */
+LayoutManager_OpenEditor(*) {
+	return LayoutEditorWindow_Open()
+}
+
 /**
  * Selects a layout through the acknowledged configuration handoff.
  * @param {String} Id Registry layout identifier.
@@ -445,6 +598,21 @@ LayoutManager_SelectSettled(Id, OnDone, Options := unset) {
 }
 
 /**
+ * Makes a stored layout the emulated one with its base layer on ([layout]
+ * emulated_layout and ergopti_base), the « Emulate without installing » of the
+ * layout editor, and reports its terminal outcome as LayoutManager_SelectSettled.
+ * @param {String} Id Registry layout identifier (the composer's).
+ * @param {Func} OnDone Called once with (Ok, Detail) at the terminal outcome.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
+ */
+LayoutManager_EmulateSettled(Id, OnDone, Options := unset) {
+	Lifecycle := IsSet(Options) ? Options.Clone() : Map()
+	Lifecycle["emulate"] := true
+	return LayoutManager_SelectSettled(Id, OnDone, Lifecycle)
+}
+
+/**
  * Retains the selected configuration until successor completion or rollback.
  * The resident input owner keeps its admitted layout while the reload is pending.
  * @param {String} Id Registry layout identifier.
@@ -467,12 +635,13 @@ LayoutManager_SelectTransition(Id, Options := unset) {
 	Expected := Options.Has("expected") ? Options["expected"] : SnapshotFn.Call(Path)
 	LoggerInfo("LayoutManager", "Selecting the '{1}' layout through the owned reload handoff.", Id)
 	return ConfigScopeCommitOperations("keyboard_layout", "select",
-		_LayMgrWeb_SelectionOperations.Bind(Id, Path, Expected, SnapshotFn), Options)
+		_LayMgrWeb_SelectionOperations.Bind(Id, Path, Expected, SnapshotFn, Options.Get("emulate", false)), Options)
 }
 
 ; Built-in selections keep the existing empty-emulation contract and overlays.
 ; A registry selection changes only its source identifier; it owns no layer gate.
-_LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
+; An emulated source also turns its base layer on, which « none » may have left off.
+_LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn, Emulate := false) {
 	global ERGOPTI_PLUS_LAYOUT_ID
 	Current := SnapshotFn.Call(Path)
 	if !(Expected is Map) || !(Current is Map)
@@ -493,6 +662,11 @@ _LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
 			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, ""),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
 			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_VARIANT, Id),
+		]
+	if Emulate
+		return [
+			ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id),
+			ManifestSparseOperation(ConfigKey.LAYOUT_ERGOPTI_BASE, true),
 		]
 	return [ManifestSparseOperation(ConfigKey.LAYOUT_EMULATED_LAYOUT, Id)]
 }
@@ -518,12 +692,11 @@ _LayMgrWeb_After(Id, Action, OnDone, Options := unset) {
 		OnDone.Call(true)
 		return true
 	}
-	if Selected && Action == "uninstall" {
-		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; back to the system layout.", Id)
-		WriteSelection := Options.Get("write_selection", (Value) => WriteFeatureV2(Features, ConfigKey.LAYOUT_EMULATED_LAYOUT, Value))
-		if !WriteSelection.Call("")
-			return ConfigReportPersistenceFailure("the layout selection")
-	}
+	; The stored choice is kept (decided on 2026-11-12, as macOS and Linux): the
+	; reload stops the emulation, the menu names the layout « cannot be emulated »,
+	; and installing it again resumes it. The boot never reinstalls it.
+	if Selected && Action == "uninstall"
+		LoggerInfo("LayoutManager", "The emulated '{1}' layout was uninstalled; it stays chosen and is no longer emulated.", Id)
 	Refused(Reason) {
 		LoggerError("LayoutManager", "Runtime refresh refused after catalogue publication: {1}.", Reason)
 		OnDone.Call(false)

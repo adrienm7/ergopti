@@ -3,7 +3,7 @@
 		"git_commit": "1e0556e8020e265dfc20da806657281ac05ef7a6",
 		"original_provider_path": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk",
 		"original_provider_sha256": "7120ce73672ea0cba2b5be99ec59a464257c3beec400996613a555639b3855a4",
-		"provider_catalogue_path": "static/ergopti_plus/_shared/modules/llm/api_providers.json",
+		"provider_catalogue_path": "static/ergopti_plus/_shared/ai/data/api_providers.json",
 		"provider_catalogue_sha256": "82e735399be97d00ed8a1843c9dddb4d9aaa483f120e7124704256b1f727008a",
 		"policy": "Original literal StrReplace({1}, native value) source projection captured before candidate source authoring; no candidate generator or renderer used."
 	},

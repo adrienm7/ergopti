@@ -489,7 +489,7 @@ const EDITABLE_KINDS = new Set([
 ]);
 const SEND_INPUT_KINDS = new Set(['text', 'key', 'shortcut']);
 
-// Host-supplied: the decoded _shared/modules/actions/send_keys.json, the
+// Host-supplied: the decoded _shared/shortcuts/data/actions/send_keys.json, the
 // host's capabilities (the executable path syntax of a program parameter,
 // "windows" or "posix", and whether Command is the primary modifier), and the
 // localized strings of the editor ({ save, back, captureKey, captureShortcut,
@@ -585,10 +585,15 @@ function parseSendShortcut(value) {
 }
 
 // The rules pinned by _shared/tests/corpus/action_parameters/llm_prompt_vectors.json:
-// "<profile_id>" or "<profile_id>|<count>", the count from 1 to 10.
+// "<profile_id>" or "<profile_id>|<count>", the count within the AI menu's
+// setting, declared once in the shared value schema (llm.profiles.num_predictions).
 const LLM_PROMPT_MAX_ID_LENGTH = 128;
-const LLM_PROMPT_MIN_PREDICTIONS = 1;
-const LLM_PROMPT_MAX_PREDICTIONS = 10;
+const LLM_PROMPT_PREDICTIONS = window.ErgoptiValueCheck.entryFor(
+	window.ErgoptiValueCheck.SCHEMA,
+	window.ErgoptiValueCheck.KEY.LLM_PROFILES_NUM_PREDICTIONS
+);
+const LLM_PROMPT_MIN_PREDICTIONS = LLM_PROMPT_PREDICTIONS.min;
+const LLM_PROMPT_MAX_PREDICTIONS = LLM_PROMPT_PREDICTIONS.max;
 
 // {profileId, numPredictions (null = the menu's count)}, or null when invalid.
 function parseLlmPrompt(value) {

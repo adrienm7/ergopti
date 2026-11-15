@@ -13,7 +13,7 @@ local SOURCE = '# retained header\n[hotstrings]\npreview_colored_tooltips = true
 --- Runs a body with the actual scalar owner routed to private independent bytes.
 --- @param body function Receives owner, settings, private path and sandbox.
 local function with_preferences(body, source, fresh_writer)
-	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
@@ -22,7 +22,7 @@ local function with_preferences(body, source, fresh_writer)
 			package.loaded["infra.config_paths"] = paths
 			package.loaded["infra.hotstring_preferences"] = nil
 			package.loaded["modules.hotstrings.preview_settings"] = nil
-			if fresh_writer then package.loaded["toml_codec.writer"] = nil end
+			if fresh_writer then package.loaded["core.text.engine.toml_codec.writer"] = nil end
 			local Preferences = require("infra.hotstring_preferences")
 			assert(Preferences.refresh())
 			body(Preferences, require("modules.hotstrings.preview_settings"), path, Sandbox)
@@ -34,15 +34,15 @@ local function with_preferences(body, source, fresh_writer)
 end
 
 local function menu_controls(paused, relabel, magic_relabel, presence_options)
-	local paths = require("infra.paths")
-	local i18n = require("infra.i18n")
+	local paths = require("core.fs.engine.paths")
+	local i18n = require("core.i18n.engine.i18n")
 	local original = package.loaded["infra.manifest_menu"]
 	local observations = { writes = 0, redraws = 0 }
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return paths.shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return paths.shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local value = assert(require("json").decode(raw))
+			local value = assert(require("core.text.engine.json").decode(raw))
 			if relabel then value.preview_colored_control[1].i18n = "button.ok" end
 			if magic_relabel and value.preview_magic_control then value.preview_magic_control[1].i18n = "button.ok" end
 			if presence_options and value.preview_presence_controls then
@@ -53,7 +53,7 @@ local function menu_controls(paused, relabel, magic_relabel, presence_options)
 			return value
 		end,
 		i18n = i18n,
-		logger = require("logger.shim"),
+		logger = require("core.logger.engine.shim"),
 	}))
 	-- Forward the actual renderer's own methods through a plain observer facade.
 	-- Native source admission deliberately does not acquire inherited methods.
@@ -100,7 +100,7 @@ helpers.describe("declared coloured preview native row", function()
 	helpers.it("uses the shared label and keeps the three presence rows plus separator", function()
 		with_preferences(function(_, _, _, _)
 			local rows = menu_controls(false, true)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(#rows, 5)
 			for index, label in ipairs({ "tooltip_magic", "tooltip_autocorrect", "tooltip_ai" }) do
 				helpers.assert_eq(rows[index].title, i18n.get("menu.hotstrings." .. label))
@@ -125,7 +125,7 @@ helpers.describe("declared coloured preview native row", function()
 	for _, mode in ipairs({ "false", "throw" }) do
 		helpers.it("retains the source and redraw posture after writer " .. mode, function()
 			with_preferences(function(_, Settings, path, sandbox)
-				local Writer = require("toml_codec.writer"); local original = Writer.batch_write
+				local Writer = require("core.text.engine.toml_codec.writer"); local original = Writer.batch_write
 				Writer.batch_write = function() if mode == "throw" then error("injected refusal", 0) end; return false end
 				local outcome, observed
 				local ok, err = pcall(function()
@@ -159,20 +159,20 @@ end)
 --- Runs a body with the desktop notifier replaced by a recorder.
 --- @param body function Receives the list of { text, level } sent.
 local function with_recording_notifier(body)
-	local original, sent = package.loaded["adapters.notifier"], {}
-	package.loaded["adapters.notifier"] = { send = function(text, opts)
+	local original, sent = package.loaded["platform.system.notifier"], {}
+	package.loaded["platform.system.notifier"] = { send = function(text, opts)
 		sent[#sent + 1] = { text = text, level = opts and opts.level }
 		return true
 	end }
 	local ok, err = pcall(body, sent)
-	package.loaded["adapters.notifier"] = original
+	package.loaded["platform.system.notifier"] = original
 	if not ok then error(err, 0) end
 end
 
 helpers.describe("preview bubble toggles notify like the macOS menu", function()
 	helpers.it("does not duplicate the current preview write's case-twin notice", function()
 		with_preferences(function(_, _, path, sandbox)
-			local writer = require("toml_codec.writer")
+			local writer = require("core.text.engine.toml_codec.writer")
 			local reports, notices, execute = 0, 0, os.execute
 			writer.set_case_twin_reporter(function() reports = reports + 1 end)
 			local rows, _, observed = menu_controls(false)
@@ -227,7 +227,7 @@ helpers.describe("preview bubble toggles notify like the macOS menu", function()
 	helpers.it("announces the new state of the coloured bubble and nothing when the write is refused", function()
 		with_preferences(function(Preferences, _, _, _)
 			with_recording_notifier(function(sent)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local lease = {}; assert(Preferences.acquire(lease))
 				local refused_rows = menu_controls(false)
 				helpers.assert_eq(refused_rows[5].fn(), false)
@@ -245,23 +245,23 @@ end)
 helpers.describe("coloured provider locale contract", function()
 	helpers.it("uses all twenty-one actual catalogues without disturbing provider order", function()
 		with_preferences(function(_, _, _, _)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local observed = {}
 			local ok, err = pcall(function()
 				for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
-					local path = require("infra.paths").shared("data/locales/" .. code .. ".json")
+					local path = require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. code .. ".json")
 					local file = assert(io.open(path, "rb")); local raw = file:read("*a"); file:close()
-					local catalog = assert(require("json").decode(raw))
+					local catalog = assert(require("core.text.engine.json").decode(raw))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					local rows = menu_controls(false)
 					observed[#observed + 1] = { rows = rows, expected = catalog["menu.hotstrings.tooltip_colored"] }
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not ok then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observed, 21)
 			for _, item in ipairs(observed) do
 				helpers.assert_eq(#item.rows, 5)
@@ -290,7 +290,7 @@ helpers.describe("declared magic preview native row", function()
 	for _, mode in ipairs({ "false", "throw" }) do
 		helpers.it("retains magic physical source after actual writer " .. mode, function()
 			with_preferences(function(_, Settings, path, sandbox)
-				local Writer = require("toml_codec.writer"); local original = Writer.batch_write
+				local Writer = require("core.text.engine.toml_codec.writer"); local original = Writer.batch_write
 				Writer.batch_write = function() if mode == "throw" then error("injected refusal", 0) end; return false end
 				local outcome, redraws
 				local passed, err = pcall(function()
@@ -326,7 +326,7 @@ helpers.describe("magic provider locale contract", function()
 	helpers.it("consumes the declaration label while keeping separator and colored siblings", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, true)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			helpers.assert_eq(#rows, 5)
 			helpers.assert_eq(rows[1].title, i18n.get("button.ok"))
 			helpers.assert_eq(rows[2].title, i18n.get("menu.hotstrings.tooltip_autocorrect"))
@@ -337,25 +337,25 @@ helpers.describe("magic provider locale contract", function()
 	end)
 	helpers.it("uses all twenty-one real catalogues for the magic checkbox", function()
 		with_preferences(function()
-			local i18n = require("infra.i18n")
-			local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/preview_magic_control.json"), "rb"))
+			local i18n = require("core.i18n.engine.i18n")
+			local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/preview_magic_control.json"), "rb"))
 			local raw = file:read("*a"); file:close()
-			local corpus = assert(require("json").decode(raw))
+			local corpus = assert(require("core.text.engine.json").decode(raw))
 			local observations = {}
 			local passed, err = pcall(function()
 				for _, code in ipairs(corpus.locales) do
-					local locale = assert(io.open(require("infra.paths").shared("data/locales/" .. code .. ".json"), "rb"))
+					local locale = assert(io.open(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. code .. ".json"), "rb"))
 					local text = locale:read("*a"); locale:close()
-					local catalog = assert(require("json").decode(text))
+					local catalog = assert(require("core.text.engine.json").decode(text))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					observations[#observations + 1] = { rows = menu_controls(false), label = catalog[corpus.row.i18n] }
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not passed then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 21)
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(observation.rows[1].title, observation.label)
@@ -418,7 +418,7 @@ helpers.describe("declared autocorrection and AI presence receipt", function()
 		for _, mode in ipairs({ "false", "throw" }) do
 			helpers.it("retains physical " .. name .. " after writer " .. mode, function()
 				with_preferences(function(_, Settings, path, sandbox)
-					local Writer = require("toml_codec.writer"); local original = Writer.batch_write
+					local Writer = require("core.text.engine.toml_codec.writer"); local original = Writer.batch_write
 					Writer.batch_write = function() if mode == "throw" then error("injected refusal", 0) end; return false end
 					local result, redraws
 					local passed, err = pcall(function()
@@ -481,28 +481,28 @@ end)
 helpers.describe("ordered presence provider locale contract", function()
 	helpers.it("uses all twenty-one actual catalogues in canonical and reversed declaration order", function()
 		with_preferences(function()
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local function read_json(path)
 				local file = assert(io.open(path, "rb")); local text = file:read("*a"); file:close()
-				return assert(require("json").decode(text))
+				return assert(require("core.text.engine.json").decode(text))
 			end
-			local Paths = require("infra.paths")
+			local Paths = require("core.fs.engine.paths")
 			local corpus = read_json(Paths.shared("tests/corpus/menus/preview_presence_controls.json"))
 			local observations = {}
 			local passed, err = pcall(function()
 				for _, code in ipairs(corpus.locales) do
-					local catalog = read_json(Paths.shared("data/locales/" .. code .. ".json"))
+					local catalog = read_json(Paths.shared("core/i18n/data/locales/" .. code .. ".json"))
 					local translated = {}; for key, value in pairs(i18n) do translated[key] = value end
 					translated.get = function(key) return catalog[key] or key end
-					package.loaded["infra.i18n"] = translated
+					package.loaded["core.i18n.engine.i18n"] = translated
 					for _, reverse in ipairs({ false, true }) do
 						observations[#observations + 1] = { rows = menu_controls(false, false, false, { reverse = reverse }), catalog = catalog, reverse = reverse }
 					end
 				end
 			end)
-			package.loaded["infra.i18n"] = i18n
+			package.loaded["core.i18n.engine.i18n"] = i18n
 			if not passed then error(err, 0) end
-			helpers.assert_eq(package.loaded["infra.i18n"], i18n)
+			helpers.assert_eq(package.loaded["core.i18n.engine.i18n"], i18n)
 			helpers.assert_eq(#observations, 42)
 			for _, observation in ipairs(observations) do
 				helpers.assert_eq(#observation.rows, 5)
@@ -520,8 +520,8 @@ helpers.describe("ordered presence provider locale contract", function()
 	helpers.it("consumes the current declaration label rather than a cached native caption", function()
 		with_preferences(function()
 			local rows = menu_controls(false, false, false, { relabel = true })
-			helpers.assert_eq(rows[2].title, require("infra.i18n").get("button.ok"))
-			helpers.assert_eq(rows[3].title, require("infra.i18n").get("menu.hotstrings.tooltip_ai"))
+			helpers.assert_eq(rows[2].title, require("core.i18n.engine.i18n").get("button.ok"))
+			helpers.assert_eq(rows[3].title, require("core.i18n.engine.i18n").get("menu.hotstrings.tooltip_ai"))
 		end)
 	end)
 end)

@@ -4,7 +4,7 @@
 --- MODULE: Input Reader (Linux)
 --- DESCRIPTION:
 --- Translates kernel keycodes into the characters a layout produces. It is the
---- one place that owns _shared/data/keycodes/evdev.json, and every caller that
+--- one place that owns _shared/layouts/data/keycodes/evdev.json, and every caller that
 --- needs a character from a code goes through resolve_char().
 ---
 --- WHAT IT NO LONGER DOES:
@@ -13,12 +13,12 @@
 --- second copy of shift handling, a second copy of the control-key list, and a
 --- third copy of the struct layout — all hardcoded to a 24-byte struct with the
 --- type field at offset 17, which is the 64-bit shape and only that. Reading the
---- descriptor now belongs to adapters/evdev_reader.lua and the struct to
---- infra/input_event.lua, where the size is measured rather than assumed.
+--- descriptor now belongs to platform/input/evdev_reader.lua and the struct to
+--- platform/input/event.lua, where the size is measured rather than assumed.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single source for layout data: the keycode maps live in
----    _shared/data/keycodes/evdev.json and are loaded once at require time.
+---    _shared/layouts/data/keycodes/evdev.json and are loaded once at require time.
 --- 2. Fail-fast: a missing or unreadable JSON is an assertion, not a fallback.
 ---    A silent inline copy is how the tables diverged the first time.
 --- 3. No device access: this module reads no file descriptor and holds no state
@@ -34,8 +34,8 @@ local M = {}
 -- =========================================
 -- =========================================
 
-local Logger = require("logger.shim")
-local Paths  = require("infra.paths")
+local Logger = require("core.logger.engine.shim")
+local Paths  = require("core.fs.engine.paths")
 
 local LOG = "modules.hotstrings.input_reader"
 
@@ -46,8 +46,8 @@ local LOG = "modules.hotstrings.input_reader"
 -- =========================================
 -- =========================================
 
--- Deliberately none. The struct layout lives in infra/input_event.lua and the
--- key identities in infra/evdev_codes.lua; both were duplicated here, and a
+-- Deliberately none. The struct layout lives in platform/input/event.lua and the
+-- key identities in platform/input/evdev_codes.lua; both were duplicated here, and a
 -- constant that exists in two files is a constant that will eventually differ
 -- in two files.
 
@@ -68,14 +68,14 @@ local LOG = "modules.hotstrings.input_reader"
 local LAYOUTS = nil
 
 local function _load_shared_layouts()
-	local ok_evdev, evdev = pcall(require, "keycodes.evdev")
+	local ok_evdev, evdev = pcall(require, "platform.input.keycodes.evdev")
 	if not ok_evdev or type(evdev) ~= "table" or type(evdev.load) ~= "function" then
-		return nil, "keycodes.evdev module unavailable"
+		return nil, "platform.input.keycodes.evdev module unavailable"
 	end
 
 	-- Keycode data is JSON, never executable Lua. Refuse a broken install
 	-- before handing an unavailable decoder to the shared loader.
-	local ok_json, json_mod = pcall(require, "json")
+	local ok_json, json_mod = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json_mod) ~= "table" or type(json_mod.decode) ~= "function" then
 		return nil, "no JSON decoder available"
 	end
@@ -106,11 +106,11 @@ else
 end
 
 -- No hardcoded fallback keycode tables. The single source of truth is
--- _shared/data/keycodes/evdev.json, loaded at module-init time via
+-- _shared/layouts/data/keycodes/evdev.json, loaded at module-init time via
 -- _load_shared_layouts(). If that load fails, the module errors out —
 -- keycode data MUST come from the shared source, never re-declared here.
 -- The inline tables used to be triplicates of evdev.json
-assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/data/keycodes/evdev.json is the single source and must be readable")
+assert(LAYOUTS ~= nil, "input_reader: evdev.json keycode tables failed to load — _shared/layouts/data/keycodes/evdev.json is the single source and must be readable")
 
 
 

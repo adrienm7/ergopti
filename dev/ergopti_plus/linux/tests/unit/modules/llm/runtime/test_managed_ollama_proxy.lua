@@ -12,7 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Paths = require("infra.paths")
+local Paths = require("core.fs.engine.paths")
 
 local function it(name, body) helpers.it(name .. " (ollama-proxy)", body) end
 local function eq(actual, expected)
@@ -20,20 +20,20 @@ local function eq(actual, expected)
 end
 
 local function policy()
-	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
+	local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_policy.json")), "rb"))
 	local bytes = file:read("*a")
 	assert(file:close())
-	return assert(require("network.proxy_policy").new(require("json").decode(bytes)))
+	return assert(require("core.network.engine.proxy_policy_core").new(require("core.text.engine.json").decode(bytes)))
 end
 
 local function relay_policy()
-	local file = assert(io.open(assert(Paths.shared("modules/network/proxy_auth_relay.json")), "rb"))
+	local file = assert(io.open(assert(Paths.shared("core/network/data/proxy_auth_relay.json")), "rb"))
 	local bytes = file:read("*a")
 	assert(file:close())
-	return assert(require("network.proxy_auth_relay").new(require("json").decode(bytes)))
+	return assert(require("core.network.engine.proxy_auth_relay_core").new(require("core.text.engine.json").decode(bytes)))
 end
 
-local ORIGINS = assert(require("infra.route_origins").client("ollama"))
+local ORIGINS = assert(require("core.network.engine.route_origins").client("ollama"))
 local BLOB = ORIGINS[2]
 
 --- One port over a scripted lookup. `world.receipt` is what the desktop answers
@@ -49,7 +49,7 @@ local function world(options)
 	w.port = Proxy.new({
 		policy = w.policy or policy(), environment = function() return w.rows end, timeout_ms = 3000, owner = "test-owner",
 		origins = w.origins or ORIGINS,
-		probe_timeout_ms = 1000, relay_address = require("adapters.tcp_probe").relay_address,
+		probe_timeout_ms = 1000, relay_address = require("core.network.adapters.tcp_probe").relay_address,
 		probe = function(host, port, timeout_ms, callback)
 			w.tcp_probes = w.tcp_probes or {}
 			w.tcp_probes[#w.tcp_probes + 1] = { host = host, port = port, timeout_ms = timeout_ms }
@@ -98,7 +98,7 @@ local function world(options)
 end
 
 it("the shipped inventory starts with the registry and names its blob host", function()
-	eq(ORIGINS[1], require("llm.ollama_registry").URL)
+	eq(ORIGINS[1], require("ai.engine.ollama.registry").URL)
 	assert(#ORIGINS >= 2, "the blob redirect host must be looked up too")
 end)
 
@@ -211,11 +211,28 @@ it("an empty exported variable does not count as a proxy", function()
 	eq(w:run().environment[1], "HTTPS_PROXY=http://p:1")
 end)
 
+it("(linux-pac-evaluation) a missing PAC engine refuses the start instead of guessing a route", function()
+	local result = world({ receipt = { ok = false, error = "proxy-pac-engine-unavailable" } }):run()
+	eq(result.ok, false)
+	eq(result.error, "proxy_lookup_failed")
+end)
+
+it("(linux-pac-evaluation) a dead first relay of the evaluated PAC list falls to DIRECT", function()
+	local w = world({ receipt = { ok = true, proxies = { "http://127.0.0.1:9", "direct://" } } })
+	local result = w:run()
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(w.tcp_probes[1].host, "127.0.0.1")
+	eq(w.tcp_probes[1].port, 9)
+end)
+
 it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemon direct", function()
 	for receipt_error, stage in pairs({ ["proxy-lookup-failed"] = "native_proxy_lookup",
-		["proxy-lookup-timeout"] = "native_proxy_budget" }) do
+		["proxy-lookup-timeout"] = "native_proxy_budget",
+		-- (linux-pac-evaluation) a PAC the lookup child ran and that raised.
+		["proxy-pac-evaluation-failed"] = "native_pac_evaluation" }) do
 		local warnings = {}
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local original = Logger.warn
 		Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
 		local ok, result = pcall(function()
@@ -229,6 +246,43 @@ it("(pac-unavailable-fallback) an unusable desktop configuration sends the daemo
 		eq(#warnings, #ORIGINS)
 		assert(warnings[1]:find(stage, 1, true), warnings[1])
 	end
+end)
+
+-- (pac-download-direct) GIO answers DIRECT, with no error, for a PAC it could
+-- not download; the lookup child names that stage beside the DIRECT answer.
+-- The WARNING was never logged on Linux before (container proof 2026-11-10).
+it("(pac-download-direct) a DIRECT answer for an undownloadable PAC warns and records the stage", function()
+	local warnings = {}
+	local Logger = require("core.logger.engine.shim")
+	local original = Logger.warn
+	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+	local ok, result = pcall(function()
+		local w = world({ receipt = { ok = true, proxies = { "direct://" }, pac_unavailable = "native_pac_download" } })
+		local answer = w:run()
+		-- The child downloads the PAC under the whole lookup's bound.
+		eq(w.lookup_options.pac_check_timeout_ms, w.lookup_options.timeout_ms)
+		eq(w.lookup_options.timeout_ms, 3000)
+		return answer
+	end)
+	Logger.warn = original
+	assert(ok, result)
+	eq(result.ok, true)
+	eq(#result.environment, 0)
+	eq(result.direct_fallback, "native_pac_download")
+	eq(#warnings, #ORIGINS)
+	assert(warnings[1]:find("unusable at native_pac_download", 1, true), warnings[1])
+end)
+
+it("(pac-download-direct) a PAC that answered DIRECT itself warns nothing", function()
+	local warnings = {}
+	local Logger = require("core.logger.engine.shim")
+	local original = Logger.warn
+	Logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
+	local ok, result = pcall(function() return world({ receipt = { ok = true, proxies = { "direct://" } } }):run() end)
+	Logger.warn = original
+	assert(ok, result)
+	eq(result.direct_fallback, nil)
+	eq(#warnings, 0)
 end)
 
 it("(pac-unavailable-fallback) each fallback stage is one the shared policy lists", function()
@@ -347,7 +401,7 @@ end)
 
 it("no origin URL and no proxy ever reach the log", function()
 	local seen = {}
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local originals = { info = Logger.info, error = Logger.error, warn = Logger.warn }
 	for _, level in ipairs({ "info", "error", "warn" }) do
 		Logger[level] = function(_, message, ...) seen[#seen + 1] = string.format(message, ...) end
@@ -413,7 +467,7 @@ it("(proxy-auth-relay) a refused sign-in starts without the proxy and carries th
 end)
 
 it("(proxy-auth-relay) a relay that is not installed keeps the proxy as named, with a warning", function()
-	local Logger = require("logger.shim")
+	local Logger = require("core.logger.engine.shim")
 	local warned = {}
 	local original = Logger.warn
 	Logger.warn = function(_, message) warned[#warned + 1] = message end
@@ -479,15 +533,15 @@ end)
 
 --- The real Linux policy binding over a stubbed storage holding `stored`.
 local function bound_policy(stored)
-	local saved = { storage = package.loaded["adapters.storage"], binding = package.loaded["infra.proxy_policy"] }
-	package.loaded["adapters.storage"] = { get = function(key, default)
+	local saved = { storage = package.loaded["core.fs.adapters.storage"], binding = package.loaded["core.network.engine.proxy_policy"] }
+	package.loaded["core.fs.adapters.storage"] = { get = function(key, default)
 		if key == "network.proxy_override" then return stored end
 		return default
 	end }
-	package.loaded["infra.proxy_policy"] = nil
-	local active = assert(require("infra.proxy_policy").load())
+	package.loaded["core.network.engine.proxy_policy"] = nil
+	local active = assert(require("core.network.engine.proxy_policy").load())
 	return active, function()
-		package.loaded["adapters.storage"], package.loaded["infra.proxy_policy"] = saved.storage, saved.binding
+		package.loaded["core.fs.adapters.storage"], package.loaded["core.network.engine.proxy_policy"] = saved.storage, saved.binding
 	end
 end
 
@@ -529,13 +583,28 @@ it("an automatic override keeps the PAC lookup, and an invalid one refuses the s
 	restore()
 	assert(ok, failure)
 	active, restore = bound_policy("proxy.corp.example:3128")
+	-- The refused stored value is reported once, by its key only (value-validation).
+	local saved_logger = package.loaded["core.logger.engine.shim"]
+	local errors = {}
 	ok, failure = pcall(function()
+		local logger = setmetatable({ error = function(_, message, ...)
+			local line = string.format(message, ...)
+			if line:find("is refused", 1, true) then errors[#errors + 1] = line end
+		end }, { __index = saved_logger })
+		package.loaded["core.logger.engine.shim"] = logger
+		package.loaded["core.network.engine.proxy_policy"] = nil
+		active = assert(require("core.network.engine.proxy_policy").load())
 		local w = world({ policy = active })
 		local result = w:run()
 		eq(result.ok, false)
 		eq(result.error, "proxy_route_invalid")
 		eq(w.lookups, 0)
+		w:run()
+		eq(#errors, 1, "the refused override is reported once")
+		eq(errors[1]:find("network.proxy_override", 1, true) ~= nil, true, "the report names the key")
+		eq(errors[1]:find("corp.example", 1, true), nil, "the report never names the relay")
 	end)
+	package.loaded["core.logger.engine.shim"] = saved_logger
 	restore()
 	assert(ok, failure)
 end)
@@ -595,7 +664,7 @@ it("an unreachable relay moves to the next relay, not straight to DIRECT", funct
 end)
 
 it("the shared probe deadline is the timings registry's one second", function()
-	local Timings = require("infra.timings")
+	local Timings = require("core.timing.engine.timings")
 	eq(Timings.ms("llm", "managed_proxy_probe_timeout_ms"), 1000)
 end)
 
@@ -707,7 +776,7 @@ it("handles inline settlement and an uncertain observer registration without dup
 end)
 
 it("retires real native handles when both observers and diagnostics throw (pac-observer-logger)", function()
-	local logger, uv = require("logger.shim"), require("luv")
+	local logger, uv = require("core.logger.engine.shim"), require("luv")
 	local old_error = logger.error
 	logger.error = function() error("controlled logger failure") end
 	local tested, reason = pcall(function()

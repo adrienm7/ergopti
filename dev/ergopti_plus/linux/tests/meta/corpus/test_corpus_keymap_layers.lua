@@ -4,7 +4,7 @@
 --- MODULE: Layer-File Corpus Consumer (Linux)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/keymap_layers/vectors.json through the shared
---- Lua loader (_shared/lua/keymap/layers.lua) under the Linux runtime (LuaJIT in
+--- Lua loader (_shared/layouts/engine/layers/layers.lua) under the Linux runtime (LuaJIT in
 --- CI), with the shared TOML codec and the shared JSON decoder the daemon reads
 --- its data with. The JS gate, the macOS suite and the AHK suite replay the
 --- same vectors, so every implementation of the layer-file schema answers every
@@ -20,10 +20,10 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
-local json = require("json")
-local toml_codec = require("toml_codec")
-local Layers = require("keymap.layers")
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+local json = require("core.text.engine.json")
+local toml_codec = require("core.text.engine.toml_codec")
+local Layers = require("layouts.engine.layers.layers")
 
 local shared_root = helpers.driver_root() .. "/../_shared"
 
@@ -75,14 +75,14 @@ local function sorted_copy(list)
 	return out
 end
 
---- The text a vector hands the loader. _shared/lua/json.lua decodes a JSON null
+--- The text a vector hands the loader. _shared/core/text/engine/json.lua decodes a JSON null
 --- inside an object to its own sentinel table, not to nil, and the JS gate lets
 --- "toml" be only a string or null: anything else here is that null, the absent
 --- file, which load() takes as nil.
 --- @param v table One vector.
 --- @return string|nil text
 local function vector_text(v)
-	if v.file then return read_file(shared_root .. "/keymap/" .. v.file) end
+	if v.file then return read_file(shared_root .. "/layouts/data/" .. v.file) end
 	if type(v.toml) == "string" then return v.toml end
 	return nil
 end

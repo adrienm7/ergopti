@@ -11,24 +11,24 @@
 
 local M = {}
 
-local SaveFailure = require("config_save_failure")
-local LabelValue = require("locale.label_value")
-local Logger = require("logger.shim")
-local Extensions = require("hotstrings.extensions")
-local PersonalFiles = require("hotstrings.personal_files")
-local SectionOrder = require("hotstrings.section_order")
+local SaveFailure = require("settings.engine.publication.save_failure")
+local LabelValue = require("core.i18n.engine.label_value")
+local Logger = require("core.logger.engine.shim")
+local Extensions = require("hotstrings.engine.extensions")
+local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
+local SectionOrder = require("hotstrings.engine.section_order")
 local HotstringPreferences = require("infra.hotstring_preferences")
-local PersonalFileMenu = require("menu.personal_files")
-local Languages = require("hotstrings.languages")
+local PersonalFileMenu = require("menu.engine.personal_files")
+local Languages = require("hotstrings.engine.languages")
 local LocaleTable = require("_generated.locale_table")
 local MagicKey = require("modules.hotstrings.magic_key")
-local MagicFrame = require("menu.frames.magic_frame")
-local PersonalInfoSource = require("menu.frames.personal_info_source")
+local MagicFrame = require("menu.engine.frames.magic_frame")
+local PersonalInfoSource = require("menu.engine.frames.personal_info_source")
 local PreviewSettings = require("modules.hotstrings.preview_settings")
 local RepeatKey = require("modules.hotstrings.repeat_key")
 local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
-local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
-local COMMAND = require("config_keys").COMMAND
+local ProgrammableMenuPolicy = require("menu.engine.programmable_hotstrings")
+local COMMAND = require("settings.engine.keys").COMMAND
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -88,8 +88,8 @@ end
 --- @param mode string "recommended" or "clear".
 --- @return boolean committed
 local function _apply_hotstrings_scope(ctx, mode)
-	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
-	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+	-- Runs while paused: a pause stops typing, not configuration (EDD-1).
+	local committed = require("infra.hotstrings_scope").apply(mode,
 		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
 	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	return committed
@@ -188,7 +188,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			return id
 		end
 		local locale = "en"
-		local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+		local ok_i18n, i18n_mod = pcall(require, "core.i18n.engine.i18n")
 		if ok_i18n and type(i18n_mod.get_locale) == "function" then
 			local current = i18n_mod.get_locale()
 			if type(current) == "string" and current ~= "" then locale = current end
@@ -274,7 +274,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			SaveFailure.present(i18n_safe, function(message) show_error(message, i18n_safe("common.error_title")) end)
 			return false
 		end
-		return ManifestMenu.check_row("hotstring_scope_checkbox", require("config_keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
+		return ManifestMenu.check_row("hotstring_scope_checkbox", require("settings.engine.keys").COMMAND.HOTSTRING_SCOPE_ALL_SECTIONS,
 			{ hotstring_scope_all_sections = action },
 			{ hotstring_scope_all_on = function() return all_on end })
 	end
@@ -375,8 +375,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 			return true
 		end, function()
-			return order_snapshot ~= nil and current_source() and ctx.paused ~= true
-				and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+			-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+			return order_snapshot ~= nil and current_source()
 		end)
 		for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
@@ -395,10 +395,10 @@ local function _manifest_hotstring_rows(ctx, config)
 			return false
 		end
 		local render_ctx = { commands = {
-			[require("config_keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = function()
+			[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_ENABLE_ALL] = function()
 				return commit_scope(true)
 			end,
-			[require("config_keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = function()
+			[require("settings.engine.keys").COMMAND.HOTSTRING_CATEGORY_DISABLE_ALL] = function()
 				return commit_scope(false)
 			end,
 		} }
@@ -407,7 +407,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				["hotstring_category_file"] = function()
 					if not category or not category.path then return {} end
 					local source = category.path
-					local row = ManifestMenu.command_row("hotstring_file_commands", require("config_keys").COMMAND.HOTSTRING_FILE_OPEN,
+					local row = ManifestMenu.command_row("hotstring_file_commands", require("settings.engine.keys").COMMAND.HOTSTRING_FILE_OPEN,
 						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
 						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
 					return row and { row } or {}
@@ -427,7 +427,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
 				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
 				edit = function() return ctx.webview ~= nil and type(ctx.webview.show) == "function"
-					and ctx.webview.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW) == true end,
+					and ctx.webview.show(require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW) == true end,
 				metadata_reason = function() return i18n_safe("menu.hotstrings.personal_metadata_unavailable") end,
 				changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
 			})
@@ -539,23 +539,24 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- Asks for a delay in milliseconds and returns it in seconds.
 	--- @param title string Already-translated dialog title.
 	--- @param current_sec number
+	--- @param key string Declaration of the shared value schema.
 	--- @return number|nil Seconds, or nil when cancelled or refused.
-	local function prompt_delay(title, current_sec)
+	local function prompt_delay(title, current_sec, key)
 		local raw = prompt_text(
 			title,
 			i18n_safe("menu.hotstrings.delay_prompt"),
 			tostring(math.floor(current_sec * MS_PER_SEC + 0.5)))
 		if raw == nil then return nil end
-
-		local value = tonumber((raw:gsub("%s", "")))
-		-- Refused rather than clamped: a negative or fractional millisecond is a
-		-- typo, and silently rounding it would store a number the user never chose
-		-- and cannot see is different from what they typed.
-		if not require("number_policy").is_finite(value) or value < 0 or value ~= math.floor(value) then
-			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
+		-- Refused rather than clamped, by the shared value schema: a negative or
+		-- fractional millisecond is a typo, and the refusal names the accepted range.
+		local ValueCheck = require("settings.engine.value_check")
+		local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), raw)
+		if not typed.ok then
+			Logger.warn(LOG, "Typed delay '%s' for %s refused (%s).", tostring(raw), key, typed.reason)
+			show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 			return nil
 		end
-		return value / MS_PER_SEC
+		return typed.value
 	end
 
 	--- Contains the existing durable delay owner's receipt before repainting.
@@ -594,7 +595,8 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current)
+				local chosen = prompt_delay(title, current,
+					require("settings.engine.value_check").KEY.HOTSTRINGS_EXPANSION_DELAY)
 				if chosen == nil then return end
 				return commit_delay(config.set_base_delay, chosen)
 			end,
@@ -626,27 +628,27 @@ local function _manifest_hotstring_rows(ctx, config)
 			label = LabelValue.compose(i18n_safe, title, delay_display(current))
 				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
 			action = function()
-				local chosen = prompt_delay(title, current)
+				local chosen = prompt_delay(title, current,
+					require("settings.engine.value_check").KEY.HOTSTRINGS_CONFIG_ANY_DELAY)
 				if chosen == nil then return end
 				return commit_delay(config.set_override, category, nil, "delay", chosen)
 			end,
 		}
 	end
 
-	local ok_term, Terminators = pcall(require, "keymap.terminators")
+	local ok_term, Terminators = pcall(require, "layouts.engine.layers.terminators")
 	if not ok_term then Terminators = nil end
 
 	local params_handlers = {
 		["word_expanders"] = function()
 			if not boundaries then return {} end
 			if not Terminators then
-				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
+				Logger.error(LOG, "layouts.engine.layers.terminators unavailable — the word-delimiter submenu is skipped.")
 				return {}
 			end
 
-			local function word_expanders_ready()
-				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
-			end
+			-- The delimiters are configuration: they run while paused (EDD-1).
+			local function word_expanders_ready() return true end
 
 			--- Captures enough catalogue state to undo a persistence failure.
 			--- @return table
@@ -810,8 +812,8 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 					if def.custom then
-						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_DELETE, {
-							[require("config_keys").COMMAND.WORD_EXPANDER_DELETE] = function()
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", require("settings.engine.keys").COMMAND.WORD_EXPANDER_DELETE, {
+							[require("settings.engine.keys").COMMAND.WORD_EXPANDER_DELETE] = function()
 								local saved = snapshot()
 								if Terminators.remove_custom_terminator(key) ~= true then return false end
 								return commit(saved) == true
@@ -824,8 +826,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local catalogue_rows = sub
 			sub = {}
-			local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("config_keys").COMMAND.WORD_EXPANDER_ADD, {
-				[require("config_keys").COMMAND.WORD_EXPANDER_ADD] = function()
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", require("settings.engine.keys").COMMAND.WORD_EXPANDER_ADD, {
+				[require("settings.engine.keys").COMMAND.WORD_EXPANDER_ADD] = function()
 					local char = prompt_text(
 						i18n_safe("dialog.hotstrings.new_delimiter_title"),
 						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
@@ -858,7 +860,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						local _, reason = Terminators.validate_custom_terminator("custom_" .. char, char, char, consume)
 						if reason == "character_collision" or reason == "key_collision" then
 							local message = string.format(i18n_safe("editor.hotstrings.err_id_exists"), char)
-							show_error(require("ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
+							show_error(require("core.ui.ui.native_dialog").plain_markup(message), i18n_safe("dialog.hotstrings.invalid_title"))
 						elseif reason == "invalid_character" then
 							show_error(i18n_safe("dialog.hotstrings.invalid_body"), i18n_safe("dialog.hotstrings.invalid_title"))
 						else
@@ -873,9 +875,9 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			local exp_ctx = {
 				commands = {
-					[require("config_keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = set_all(true),
-					[require("config_keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = set_all(false),
-					[require("config_keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
+					[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_ENABLE_ALL] = set_all(true),
+					[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_DISABLE_ALL] = set_all(false),
+					[require("settings.engine.keys").COMMAND.WORD_EXPANDERS_RESTORE] = reset_terminators,
 				},
 				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 			}
@@ -944,7 +946,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- The values were all there; only the prompts were missing.
 			if not captions then return {} end
 
-			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW, {
 				hotstrings_config_window = function()
 					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
 						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
@@ -954,7 +956,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					-- bridge but no page, so this row opened a window reading
 					-- "Error: app 'hotstrings_config' not found" — the settings window
 					-- this whole submenu points at had never once opened on Linux.
-					ctx.webview.show(require("config_keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
+					ctx.webview.show(require("settings.engine.keys").COMMAND.HOTSTRINGS_CONFIG_WINDOW)
 				end,
 			}, { hotstrings_config_ready = function() return true end })
 			local sub = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, {
@@ -1136,8 +1138,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return true
 			end, function()
-				return order_snapshot ~= nil and ctx.paused ~= true
-					and (type(ctx.is_paused) ~= "function" or ctx.is_paused() == false)
+				-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+				return order_snapshot ~= nil
 			end)
 			for _, row in ipairs(order_rows) do sub[#sub + 1] = row end
 
@@ -1179,13 +1181,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		["hotstring_personal"] = function()
 			local default_parent, group_rows, unavailable_rows = {}, {}, {}
 			local preferences_present, close_on_add, close_action = false, false, nil
+			-- The editor is configuration: it opens while paused (EDD-1).
 			local function editor_ready()
-				if ctx.paused == true or type(ctx.is_paused) ~= "function"
-					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
-				local ok, current = pcall(ctx.is_paused)
-				return ok and current == false
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
 			end
-			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("config_keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", require("settings.engine.keys").COMMAND.PERSONAL_HOTSTRING_OPEN_EDITOR,
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
 				{ personal_hotstring_editor_ready = editor_ready })
 
@@ -1214,8 +1214,8 @@ local function _manifest_hotstring_rows(ctx, config)
 
 				for _, name in ipairs(personal and personal.sections_order or {}) do
 					local selected = (current == name)
-					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
-						[require("config_keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_SECTION, {
+						[require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_SECTION] = function()
 							return save_editor_pref("default_section", name)
 						end,
 					}, {
@@ -1229,7 +1229,7 @@ local function _manifest_hotstring_rows(ctx, config)
 					choices[#choices + 1] = choice
 				end
 				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
-					[require("config_keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
+					[require("settings.engine.keys").COMMAND.PERSONAL_DEFAULT_NONE] = none_action,
 				}, {
 					["personal_default_unset"] = function() return current == nil or current == "" end,
 					["personal_default_boundary"] = function() return false end,
@@ -1290,14 +1290,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 			local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
-				[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
+				[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = close_action,
 			}, {
 				["personal_open_present"] = function() return false end,
 				["personal_controls_head_boundary"] = function() return false end,
 				["personal_controls_tail_boundary"] = function() return true end,
 				["personal_preferences_present"] = function() return preferences_present end,
 				["personal_controls_ready"] = function() return true end,
-				[require("config_keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return close_on_add end,
+				[require("settings.engine.keys").COMMAND.PERSONAL_CLOSE_ON_ADD] = function() return close_on_add end,
 			}, {
 				["personal_editor"] = function() return editor_row and { editor_row } or {} end,
 				["personal_default_parent"] = function() return default_parent end,
@@ -1391,7 +1391,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				local packs = by_extension[extension_id]
 				local pack_rows, bound_rows = {}, {}
 				local function commit_gates(enabled)
-					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
 					local bindings = {}
 					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
 						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
@@ -1414,8 +1414,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
 				local bulk = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
-					[require("config_keys").COMMAND.EXTENSION_ENABLE_ALL] = function() return commit_gates(true) end,
-					[require("config_keys").COMMAND.EXTENSION_DISABLE_ALL] = function() return commit_gates(false) end,
+					[require("settings.engine.keys").COMMAND.EXTENSION_ENABLE_ALL] = function() return commit_gates(true) end,
+					[require("settings.engine.keys").COMMAND.EXTENSION_DISABLE_ALL] = function() return commit_gates(false) end,
 				}, {}, {})
 
 				for _, name in ipairs(packs) do
@@ -1428,7 +1428,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
 					local description = bound.description
 					if type(description) == "table" then
-						local locale = require("infra.i18n").get_locale()
+						local locale = require("core.i18n.engine.i18n").get_locale()
 						description = description[locale] or description.en
 					end
 					if type(description) ~= "string" or description == "" then description = bound.section end
@@ -1436,10 +1436,10 @@ local function _manifest_hotstring_rows(ctx, config)
 						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
-						disabled = not category_on or ctx.paused == true,
-						action   = (category_on and ctx.paused ~= true) and function()
-							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
-								or config.is_group_enabled(bound.category) ~= true then return false end
+						disabled = not category_on,
+						action   = category_on and function()
+							-- A pause does not refuse it: a pause stops typing, not configuration (EDD-1).
+							if config.is_group_enabled(bound.category) ~= true then return false end
 							local called, committed = pcall(function()
 								if type(config.toggle_section) ~= "function" then return false end
 								return config.toggle_section(bound.category, bound.section)
@@ -1486,7 +1486,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		["magic_key_config"] = params_handlers["magic_key_config"],
 		["delays_colors"] = params_handlers["delays_colors"],
 		-- The four toggles the manifest has declared for this driver all along and
-		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
+		-- that nothing could reach: core/ui/ui/tooltip/preview.lua honoured them on the hot
 		-- path while its set_enabled() had no caller, so they were fixed at their
 		-- load-time value. PreviewSettings owns them now; this menu is the way in.
 		--
@@ -1501,15 +1501,15 @@ local function _manifest_hotstring_rows(ctx, config)
 				return false
 			end
 			local choices = {}
-			local row = ManifestMenu.check_row("preview_magic_control", require("config_keys").LEAF.PREVIEW_STAR_ENABLED, {
-				[require("config_keys").LEAF.PREVIEW_STAR_ENABLED] = function()
+			local row = ManifestMenu.check_row("preview_magic_control", require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED, {
+				[require("settings.engine.keys").LEAF.PREVIEW_STAR_ENABLED] = function()
 					if not toggle_preview("star") then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_star"), PreviewSettings.get("star") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			}, {
-				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return PreviewSettings.get("star") == true end,
+				[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_STAR_ENABLED] = function() return PreviewSettings.get("star") == true end,
 				-- Preserve configuration access while the Linux engine is paused.
 				["preview_magic_ready"] = function() return true end,
 			})
@@ -1536,15 +1536,15 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 			local presence_rows = choices
 			choices = {}
-			local row = ManifestMenu.check_row("preview_colored_control", require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
-				[require("config_keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
+			local row = ManifestMenu.check_row("preview_colored_control", require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS, {
+				[require("settings.engine.keys").LEAF.PREVIEW_COLORED_TOOLTIPS] = function()
 					if not toggle_preview("colored") then return false end
 					require("ui.menu.feature_notice").feature(i18n_safe("menu.hotstrings.notify_bubble_colored"), PreviewSettings.get("colored") == true)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
 			}, {
-				[require("config_keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return PreviewSettings.get("colored") == true end,
+				[require("settings.engine.keys").KEY.HOTSTRINGS_PREVIEW_COLORED_TOOLTIPS] = function() return PreviewSettings.get("colored") == true end,
 				-- Configuring a preview remains allowed while the Linux engine is paused.
 				["preview_colored_ready"] = function() return true end,
 			})
@@ -1574,7 +1574,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			for key, value in pairs(c) do params_ctx[key] = value end
 			params_ctx.commands = {}
 			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
-			params_ctx.commands[require("config_keys").COMMAND.REPEAT_KEY] = function()
+			params_ctx.commands[require("settings.engine.keys").COMMAND.REPEAT_KEY] = function()
 				local committed, noticed = RepeatKey.toggle_with_notice()
 				if committed ~= true then
 					Logger.error(LOG, "Repeat setting could not be saved.")
@@ -1600,7 +1600,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 				return committed
 			end
-			params_ctx.commands[require("config_keys").COMMAND.IDLE_RESET] = function(seconds)
+			params_ctx.commands[require("settings.engine.keys").COMMAND.IDLE_RESET] = function(seconds)
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
 			params_ctx.commands["idle_reset_custom"] = function()
@@ -1608,34 +1608,37 @@ local function _manifest_hotstring_rows(ctx, config)
 					i18n_safe("menu.hotstrings.idle_reset_prompt"),
 					string.format("%g", WordReset.idle_seconds()))
 				if answer == nil then return false end
-				local seconds = WordReset.parse_seconds(answer)
-				if seconds == nil then
-					Logger.warn(LOG, "Invalid idle delay '%s' — ignored.", tostring(answer))
-					show_error(i18n_safe("menu.hotstrings.idle_reset_invalid"),
-						i18n_safe("dialog.gestures.param_error_title"))
+				-- The shared value schema owns the accepted range and its refusal text.
+				local ValueCheck = require("settings.engine.value_check")
+				local key = ValueCheck.KEY.HOTSTRINGS_IDLE_RESET_SECONDS
+				local typed = ValueCheck.parse_entry(ValueCheck.declaration(key), answer)
+				if not typed.ok then
+					Logger.warn(LOG, "Invalid idle delay '%s' — ignored (%s).", tostring(answer), typed.reason)
+					show_error(ValueCheck.refusal_text(key, typed, i18n_safe), i18n_safe("dialog.value_check.title"))
 					return false
 				end
+				local seconds = typed.value
 				return word_reset_changed(WordReset.set_idle_seconds(seconds))
 			end
 			params_ctx.commands[COMMAND.CASCADE_MAX_ARROWS] = function(arrows)
 				return word_reset_changed(WordReset.set_cascade_max_arrows(arrows))
 			end
-			params_ctx.commands[require("config_keys").COMMAND.CLICK_RESETS_WORD] = function()
+			params_ctx.commands[require("settings.engine.keys").COMMAND.CLICK_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_click_resets_word())
 			end
-			params_ctx.commands[require("config_keys").COMMAND.ARROW_RESETS_WORD] = function()
+			params_ctx.commands[require("settings.engine.keys").COMMAND.ARROW_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_arrow_resets_word())
 			end
-			params_ctx.commands[require("config_keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
+			params_ctx.commands[require("settings.engine.keys").COMMAND.SHORTCUT_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_shortcut_resets_word())
 			end
-			params_ctx.commands[require("config_keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
+			params_ctx.commands[require("settings.engine.keys").COMMAND.TAP_HOLD_RESETS_WORD] = function()
 				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
 			end
-			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = function()
+			params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_IDLE_RESET_SECONDS] = function()
 				return WordReset.idle_seconds()
 			end
-			params_ctx.state_getters[require("config_keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = function()
+			params_ctx.state_getters[require("settings.engine.keys").KEY.HOTSTRINGS_CASCADE_MAX_ARROWS] = function()
 				return WordReset.cascade_max_arrows()
 			end
 			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
@@ -1669,11 +1672,11 @@ local function _manifest_hotstring_rows(ctx, config)
 	end
 
 	hs_ctx.commands = {
-		[require("config_keys").COMMAND.SCOPE_RESTORE] = function() return apply_hotstrings_scope("recommended") end,
-		[require("config_keys").COMMAND.SCOPE_CLEAR] = function() return apply_hotstrings_scope("clear") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_RESTORE] = function() return apply_hotstrings_scope("recommended") end,
+		[require("settings.engine.keys").COMMAND.SCOPE_CLEAR] = function() return apply_hotstrings_scope("clear") end,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
-		[require("config_keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
+		[require("settings.engine.keys").COMMAND.HOTSTRINGS_TOGGLE]      = function()
 			-- The batched writers, not a loop of toggle_group: each toggle_group
 			-- ends in a full load_all(), which re-parses every pack — magickey.toml
 			-- alone is 305 KB — once per category, inside a menu callback.
@@ -1697,7 +1700,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		-- Reloading the catalogue from disk: this driver's own affordance, because
 		-- it is the only one whose hotstrings can change under it without a
 		-- restart. Declared with that reason rather than appended unannounced.
-		[require("config_keys").COMMAND.HOTSTRINGS_RELOAD]      = function()
+		[require("settings.engine.keys").COMMAND.HOTSTRINGS_RELOAD]      = function()
 			if config.reload then config.reload() end
 		end,
 	}

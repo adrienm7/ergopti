@@ -21,14 +21,14 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Paths = require("infra.config_paths")
-local Writer = require("toml_codec.writer")
-local Codec = require("toml_codec")
-local ConfigKeys = require("config_keys")
+local Writer = require("core.text.engine.toml_codec.writer")
+local Codec = require("core.text.engine.toml_codec")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.shortcuts.chatgpt"
 local FEATURE_PATH = ConfigKeys.KEY.SHORTCUTS_CHATGPT_URL
@@ -36,12 +36,14 @@ local _configuration_owner = nil
 
 M.DEFAULT_URL = Manifest.default_for(FEATURE_PATH)
 
---- Whether a value is a non-empty HTTP(S) URL with no whitespace.
+--- Whether a value is the web address its shared value schema declaration
+--- admits (an http or https scheme, no space or control character, at most
+--- 2048 characters).
 --- @param value any
 --- @return boolean
 function M.is_valid(value)
-	return type(value) == "string" and value:match("^https?://%S+$") ~= nil
-		and value:find("%c") == nil
+	local ValueCheck = require("settings.engine.value_check")
+	return ValueCheck.check_value(ValueCheck.declaration(FEATURE_PATH), value).ok
 end
 
 if not M.is_valid(M.DEFAULT_URL) then
@@ -102,7 +104,7 @@ end
 function M.set_url(value)
 	if _configuration_owner ~= nil then return false end
 	if not M.is_valid(value) then
-		Logger.error(LOG, "Refusing an invalid ChatGPT URL.")
+		Logger.error(LOG, "Refusing a ChatGPT URL its value schema declaration refuses.")
 		return false
 	end
 	local called, committed, detail = pcall(function()

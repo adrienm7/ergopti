@@ -25,9 +25,9 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ShellRunner = require("adapters.shell_runner")
-local TableUtil = require("table_util")
+local Logger = require("core.logger.engine.shim")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "modules.gestures.background_commands"
 
@@ -135,7 +135,7 @@ end
 --- @return boolean armed
 arm = function()
 	if _collector_armed then return true end
-	_collector_armed = require("adapters.event_loop").defer(collect, POLL_MS) == true
+	_collector_armed = require("core.events.loop").defer(collect, POLL_MS) == true
 	return _collector_armed
 end
 

@@ -42,7 +42,7 @@
 ; the shipped ones.
 _TestRender_SeedShortcutSpec() {
 	global _SharedDir, UI_LLM_SHORTCUT_ORDER, UI_LLM_SHORTCUT_JOINER
-	Constants := ParseTomlFile(_SharedDir . "\modules\tooltip\constants.toml")
+	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
 	UI_LLM_SHORTCUT_ORDER := IniCacheGet(Constants, "llm_ui", "shortcut_modifier_order")
 	UI_LLM_SHORTCUT_JOINER := IniCacheGet(Constants, "llm_ui", "shortcut_joiner_ahk")
 	AssertTrue(UI_LLM_SHORTCUT_ORDER != "_" && UI_LLM_SHORTCUT_JOINER != "_",
@@ -168,7 +168,7 @@ Test("render: each row's shortcut names the chord its binding consumes (llm-shor
 ; ==================================================================
 
 _TestRender_BuildGuardPresent() {
-	Body := _DriverDirConcat("ui/tooltip")
+	Body := _DriverDirConcat("core/ui/ui/tooltip")
 	; Defence in depth: even if some future formatter throws mid-build, the tooltip
 	; must not be left destroyed with a ghost "visible" flag. LLM_TooltipShow wraps
 	; the build and resets to a clean hidden state on error.

@@ -12,10 +12,10 @@ local root, temporary = assert(arg[3]), assert(arg[2])
 assert(os.getenv("HOME") == temporary and os.getenv("TMPDIR") == temporary, "owned runtime directories required")
 local driver = root .. "/static/ergopti_plus/macos"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-	.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua"
+	.. root .. "/static/ergopti_plus/_shared/?.lua;"
+	.. root .. "/static/ergopti_plus/_shared/?/init.lua"
 package.cpath = ""
-local Json, Helpers = require("json"), require("tests.helpers")
+local Json, Helpers = require("core.text.engine.json"), require("tests.helpers")
 
 local function rpc(message)
 	message.kind = "request"
@@ -91,7 +91,7 @@ package.loaded["hs.timer"] = loop.api
 hs.timer = loop.api
 local errors, logger = {}, Helpers.make_logger_stub()
 logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
-package.loaded["infra.logger"] = logger
+package.loaded["core.logger.engine.logger"] = logger
 local Export = require("modules.keystats.export")
 package.loaded["modules.keystats.export"] = {
 	init = function() return true end, cleanup = function() return true end,
@@ -106,11 +106,11 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 		local response = rpc({ op = "link", source = source, destination = destination })
 		return response.ok and true or nil, response.error
 	end
-	package.loaded["adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
+	package.loaded["core.fs.adapters.file_system"] = native.make_adapter(nil, nil, nil, link)
 	hs.timer = loop.api
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["adapters.ledger_append"] = nil
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.fs.adapters.ledger_append"] = nil
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["hs.sqlite3"], package.loaded["hs.json"], package.loaded["hs.timer"] = sqlite_port, json_port, loop.api
 	local Writer = require("modules.keystats.sqlite_writer")
 	local Manager = require("modules.keystats.log_manager")
@@ -160,7 +160,7 @@ require("tests.support.file_system_transaction_fixture").with_fixture(function(n
 		end
 		return stream
 	end
-	local Scheduler = require("adapters.timer_scheduler")
+	local Scheduler = require("core.events.timer_scheduler")
 	local original_after, original_cancel = Scheduler.after, Scheduler.cancel
 	if fault == "schedule" then Scheduler.after = function() return nil, false end end
 	local cancelled_once = false

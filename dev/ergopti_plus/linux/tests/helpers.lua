@@ -25,10 +25,21 @@ local M = {}
 -- A test file run on its own, without tests/run.lua, still loads these helpers
 -- first: isolating here keeps its logs and config away from the account's own
 -- home. Idempotent, the runner already isolated.
-require("test.runner_home").isolate()
+require("tests.lua.core.runner_home").isolate()
+-- The fixtures read the French catalogue whatever the session language says
+-- (tests/support/session_language.lua); helpers load once per test process.
+require("tests.support.session_language").install()
+-- No fixture may show a real desktop notification: each case resolves the
+-- notifier to a recorder (tests/support/notice_recorder.lua), and a notice that
+-- still reaches notify-send hits a sentinel that fails the run
+-- (tests/support/notify_send_guard.lua).
+local NotifySendGuard = require("tests.support.notify_send_guard")
+NotifySendGuard.install()
+local NoticeRecorder = require("tests.support.notice_recorder")
+NoticeRecorder.install()
 
 -- Value formatting and stack-trace helpers shared with macOS (single source of truth).
-local fmt = require("test.format")
+local fmt = require("tests.lua.format")
 local _timing = nil
 local _current_module = nil
 M.inspect = fmt.inspect
@@ -50,15 +61,15 @@ local _fail_msg = fmt.fail_msg_for("helpers%.lua$")
 --- @param text string Lua source text.
 --- @return string expanded
 function M.expand_config_keys(text)
-	local keys = require("config_keys")
+	local keys = require("settings.engine.keys")
 	local function resolve(whole, root_table, name)
 		local found, tbl = pcall(function() return keys[root_table] end)
 		if not found then return whole end
 		local ok, value = pcall(function() return tbl[name] end)
 		return ok and type(value) == "string" and string.format("%q", value) or whole
 	end
-	text = text:gsub('require%("config_keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
-		return resolve('require("config_keys").' .. root_table .. "." .. name, root_table, name)
+	text = text:gsub('require%("settings.engine.keys"%)%.(%u+)%.([%u%d_]+)', function(root_table, name)
+		return resolve('require("settings.engine.keys").' .. root_table .. "." .. name, root_table, name)
 	end)
 	return (text:gsub("ConfigKeys%.(%u+)%.([%u%d_]+)", function(root_table, name)
 		return resolve("ConfigKeys." .. root_table .. "." .. name, root_table, name)
@@ -75,6 +86,40 @@ function M.driver_root()
 	return (tests_dir:match("^(.*)[/\\\\]tests$") or tests_dir):gsub("\\\\", "/")
 end
 
+-- Top-level folders of the driver's production Lua, read once per process.
+local _production_heads = nil
+
+--- True when `name` is a module of this driver's production code: its first
+--- segment is a top-level folder holding the driver's Lua (tests/ excluded),
+--- and it does not resolve to a shared module. The folders come from the tree,
+--- never from a list of their names, so a package.loaded sweep through this
+--- predicate keeps covering a module that moves to another folder; a stub a
+--- test placed under such a name is covered too.
+--- @param name any A package.loaded key.
+--- @return boolean
+function M.is_driver_module(name)
+	if type(name) ~= "string" then return false end
+	if not _production_heads then
+		local root = (M.driver_root():gsub("[/\\]$", ""))
+		local paths, detail = require("tests.lua.core.runner_discovery").files(root, function(file)
+			return file:match("%.lua$") ~= nil
+		end, { tests = true })
+		assert(paths, detail)
+		local heads = {}
+		for _, path in ipairs(paths) do
+			local head = path:sub(#root + 2):match("^([^/\\]+)[/\\]")
+			if head then heads[head] = true end
+		end
+		-- An empty inventory is no evidence: a sweep over it would clear nothing.
+		assert(next(heads), "no production folder under " .. root)
+		_production_heads = heads
+	end
+	local head = name:match("^([%w_]+)%.")
+	if not head or not _production_heads[head] then return false end
+	local file = package.searchpath(name, package.path)
+	return not (file and file:gsub("\\", "/"):find("/_shared/", 1, true))
+end
+
 -- Production sources, read once per process: the tree is never mutated by a test.
 local _production_sources = nil
 
@@ -82,7 +127,7 @@ local _production_sources = nil
 --- @return table bodies
 local function production_sources()
 	if _production_sources then return _production_sources end
-	local paths, detail = require("test.runner_discovery").files(M.driver_root(), function(name)
+	local paths, detail = require("tests.lua.core.runner_discovery").files(M.driver_root(), function(name)
 		return name:match("%.lua$") ~= nil
 	end, { tests = true })
 	assert(paths, detail)
@@ -122,7 +167,7 @@ end
 --- The source of a production module, resolved from its module name through
 --- package.searchpath exactly as require would find it, so a test listing
 --- several modules names them as the code does, never by a driver path.
---- @param module_name string Dotted module name, e.g. "adapters.http_client".
+--- @param module_name string Dotted module name, e.g. "core.network.adapters.http_client".
 --- @return string|nil body, string|nil err Body, or nil plus why.
 function M.read_module_source(module_name)
 	local path, missing = package.searchpath(module_name, package.path)
@@ -230,7 +275,7 @@ end
 --- deep_equal is used by assert_eq and is also available to test files.
 local deep_equal = fmt.deep_equal
 
--- The seven assertions come from _shared/lua/test/assertions.lua. Both drivers
+-- The seven assertions come from _shared/tests/lua/assertions.lua. Both drivers
 -- carried their own copy: six of the seven bodies were byte-identical once
 -- whitespace was normalised, and the seventh differed by a single COMMENT line.
 -- Two copies of an assertion library is two places for a fix to land in one of,
@@ -238,7 +283,7 @@ local deep_equal = fmt.deep_equal
 --
 -- fail_msg is injected because it is the one genuinely per-driver part: it skips
 -- the stack frames belonging to THIS file so a failure reports the caller's line.
-local _assertions = require("test.assertions").build("helpers%.lua$", fmt)
+local _assertions = require("tests.lua.assertions").build("helpers%.lua$", fmt)
 M.assert_eq        = _assertions.assert_eq
 M.assert_true      = _assertions.assert_true
 M.assert_nil       = _assertions.assert_nil
@@ -272,6 +317,14 @@ function M.openssl_stdout_receipt(command, output, status)
 	return output
 end
 
+--- The staging path the native TOML writer and the store use for a destination:
+--- named after this process (CFD-1, core/lifecycle/engine/stage_owner.lua).
+--- @param path string Destination path.
+--- @return string stage
+function M.stage_path(path)
+	return require("core.lifecycle.engine.stage_owner").stage_path(path)
+end
+
 --- Hands one admitted regular source to stdio on its own path name.
 --- Production reads TOML through a pinned /proc/self/fd alias, which a test's
 --- io.open double keyed on the path never sees. Native classification still
@@ -284,13 +337,13 @@ end
 --- @param virtual boolean|nil True when no file exists on disk at that path.
 --- @return function restore Reinstates the native admission.
 function M.route_source_through_stdio(path, virtual)
-	local Reader = require("infra.regular_file_reader")
+	local Reader = require("core.fs.engine.regular_file_reader")
 	local native = Reader.open
 	local Writer, native_write
 	if virtual then
-		Writer = require("infra.regular_file_writer"); native_write = Writer.open
+		Writer = require("core.fs.engine.regular_file_writer"); native_write = Writer.open
 		Writer.open = function(candidate, mode)
-			if candidate ~= path .. ".tmp" or mode ~= "wx" then return native_write(candidate, mode) end
+			if candidate ~= M.stage_path(path) or mode ~= "wx" then return native_write(candidate, mode) end
 			local stream, detail, errno = io.open(candidate, "w")
 			return stream, detail, errno, function() return os.remove(candidate) end, function() return true end
 		end
@@ -362,17 +415,20 @@ end
 function M.it(name, fn)
 	-- --only <substr>: run only tests whose name contains the filter (plain
 	-- substring) so one behaviour can be re-run in isolation.
+	if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 	local ok, err
+	NotifySendGuard.enter_case(tostring(_current_module) .. " :: " .. name)
+	NoticeRecorder.begin_case(M.is_fixture_double)
 	if _timing then
 		ok, err = _timing.case(name, fn, _before_each_fn, _only_filter, _current_module)
-		if ok == nil then return end
 	else
-		if _only_filter and not string.find(name, _only_filter, 1, true) then return end
 		ok, err = pcall(function()
 			if _before_each_fn then _before_each_fn() end
 			fn()
 		end)
 	end
+	NoticeRecorder.end_case()
+	NotifySendGuard.enter_case(tostring(_current_module) .. " (outside a test case)")
 	if ok then
 		_suite_results.passed = _suite_results.passed + 1
 		print("  ok   " .. name)
@@ -397,6 +453,11 @@ function M.make_logger_stub()
 	}
 end
 
+--- What the current case sent through the recording notifier
+--- (tests/support/notice_recorder.lua), in order.
+--- @return table notices { { title, message, urgency, args }, ... }
+function M.recorded_notices() return NoticeRecorder.notices() end
+
 --- Returns the global test result tally.
 --- @return table { passed, failed, failures }
 function M.get_results() return _suite_results end
@@ -417,7 +478,7 @@ function M.set_only_filter(substr) _only_filter = substr end
 --- Support imports by E2E do not acquire a clock or claim unit timing coverage.
 function M.initialize_timing()
 	assert(_timing == nil, "Lua unit timing is already initialized")
-	_timing = require("test.runner_timing").capture("linux")
+	_timing = require("tests.lua.core.runner_timing").capture("linux")
 end
 
 --- Whether a package.loaded value is a test double: a table holding a function
@@ -439,6 +500,14 @@ local function is_test_double(value, roots)
 	return false
 end
 
+--- Whether a package.loaded value is a double defined by the test suite.
+--- @param value any Loaded value.
+--- @return boolean
+function M.is_fixture_double(value)
+	local driver = M.driver_root()
+	return is_test_double(value, { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/tests/lua/" })
+end
+
 --- Puts back every product module left replaced by a test double since a
 --- snapshot. Without this, one fixture that failed before its restore left
 --- doubles installed for every later module: the document fixture's timings
@@ -448,7 +517,7 @@ end
 --- @return string[] leaked Sorted names that held a double, now restored.
 function M.restore_leaked_doubles(before)
 	local driver = M.driver_root()
-	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/lua/test/" }
+	local roots = { driver .. "/tests/", (driver:match("^(.*)/[^/]+$") or driver) .. "/_shared/tests/lua/" }
 	local leaked = {}
 	for key, value in pairs(package.loaded) do
 		if type(key) == "string" and not key:match("^tests?%.") and value ~= before[key]
@@ -498,6 +567,7 @@ function M.measure_module(name, callback)
 	for key, value in pairs(package.loaded) do before[key] = value end
 	local previous = _current_module
 	_current_module = name
+	NotifySendGuard.enter_case(name .. " (outside a test case)")
 	local ok, result = _timing.measure("module", name, callback, name)
 	_current_module = previous
 	fail_leaked_doubles(name, before)

@@ -13,13 +13,13 @@
 local helpers = require("tests.helpers")
 
 local DEPENDENCIES = {
-	"infra.logger",
-	"infra.timings",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.timer_scheduler",
-	"error_description",
-	"number_policy",
+	"platform.input.synthetic_input",
+	"core.events.timer_scheduler",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 	"modules.gestures.actions_click",
 	"modules.gestures",
 	"modules.gestures.actions",
@@ -208,13 +208,13 @@ local function with_fixture(config, body)
 		},
 	}
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
 		error = function() end,
 	}
-	package.loaded["infra.timings"] = { sec = function()
+	package.loaded["core.timing.engine.timings"] = { count = require("tests.support.registry_count"), sec = function()
 		return config.click_cooldown_sec or 0.25
 	end }
 	package.loaded["adapters.event_provenance"] = {
@@ -223,7 +223,7 @@ local function with_fixture(config, body)
 			return nil, "foreign", { events = {} }
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		prepare_mouse_event = function(_, event_type, position, options)
 			local event = hs_stub.eventtap.event.newMouseEvent(event_type, position)
 			if event == nil or event == false then return nil, "constructor refused" end
@@ -289,9 +289,9 @@ local function with_fixture(config, body)
 			return true
 		end,
 	}
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["error_description"] = nil
-	package.loaded["number_policy"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["diagnostics.engine.reports.error_description"] = nil
+	package.loaded["core.text.engine.number_policy"] = nil
 	package.loaded["modules.gestures.actions_click"] = nil
 	package.loaded["modules.gestures"] = nil
 	package.loaded["modules.gestures.actions"] = nil
@@ -354,7 +354,7 @@ end
 helpers.describe("click-hold acquisition transaction", function()
 	helpers.it("releases a held gesture when its original slot is cleared", function()
 		with_fixture({ real_gestures = true }, function(Click, fixture, types)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.done, logger.success, logger.start = function() end, function() end, function() end
 			logger.callback = function(_, _, callback, ...) return true, callback(...) end
 			local Gestures = require("modules.gestures")
@@ -370,7 +370,7 @@ helpers.describe("click-hold acquisition transaction", function()
 
 	helpers.it("keeps another slot's hold and a refused release remains retryable", function()
 		with_fixture({ real_gestures = true }, function(Click, fixture, types)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.done, logger.success, logger.start = function() end, function() end, function() end
 			logger.callback = function(_, _, callback, ...) return true, callback(...) end
 			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
@@ -389,7 +389,7 @@ helpers.describe("click-hold acquisition transaction", function()
 	end)
 	helpers.it("blocks the changed slot until a refused assignment is rolled back", function()
 		with_fixture({ real_gestures = true }, function(Click, fixture)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.done, logger.success, logger.start = function() end, function() end, function() end
 			logger.callback = function(_, _, callback, ...) return true, callback(...) end
 			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
@@ -407,7 +407,7 @@ helpers.describe("click-hold acquisition transaction", function()
 
 	helpers.it("keeps the actual slot closed while assignment recovery is pending", function()
 		with_fixture({ real_gestures = true }, function(Click, fixture)
-			local logger = package.loaded["infra.logger"]
+			local logger = package.loaded["core.logger.engine.logger"]
 			logger.done, logger.success, logger.start = function() end, function() end, function() end
 			logger.callback = function(_, _, callback, ...) return true, callback(...) end
 			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
@@ -443,9 +443,9 @@ helpers.describe("click-hold acquisition transaction", function()
 
 	helpers.it("observes a real logger failure after the direct rollback already restores the slot", function()
 		with_fixture({ real_gestures = true }, function(Click)
-			package.loaded["infra.logger"] = nil
-			package.loaded["logger"] = nil
-			local Logger = require("infra.logger")
+			package.loaded["core.logger.engine.logger"] = nil
+			package.loaded["core.logger.engine"] = nil
+			local Logger = require("core.logger.engine.logger")
 			local Gestures, Actions = require("modules.gestures"), require("modules.gestures.actions")
 			assert(Gestures.set_action("tap_3", "left_click_toggle"))
 			assert(Actions.execute_single("left_click_toggle", "tap_3"))

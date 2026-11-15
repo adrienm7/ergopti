@@ -1,5 +1,5 @@
 {
-	"_comment": "How many backend calls one prediction request takes, replayed through _shared/lua/llm/request_plan/batching.lua by the macOS and Linux runners. A batch profile asks once for every variant when more than one is requested; every other case asks once per variant. This is the rule of llm/profile_selector.lua (a batch prompt is a batch only above one prediction). per_call is the number of variants one call returns, which also scales that call's token budget. expect_error is a substring of the message the plan must raise.",
+	"_comment": "How many backend calls one prediction request takes, replayed through _shared/ai/engine/request_plan/batching.lua by the macOS and Linux runners. A batch profile asks once for every variant when more than one is requested; every other case asks once per variant. This is the rule of ai/engine/settings/profile_selector.lua (a batch prompt is a batch only above one prediction). per_call is the number of variants one call returns, which also scales that call's token budget. expect_error is a substring of the message the plan must raise.",
 	"vectors": [
 		{
 			"id": "a-batch-profile-asks-once-for-every-variant",

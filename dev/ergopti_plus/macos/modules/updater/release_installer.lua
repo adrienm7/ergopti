@@ -30,15 +30,15 @@
 
 local M = {}
 
-local Identifiers = require("identifiers")
-local Logger      = require("infra.logger")
-local Paths       = require("infra.paths")
-local NativePath  = require("native_path")
-local FileSystem  = require("adapters.file_system")
-local JsonCodec   = require("adapters.json_codec")
-local ShellRunner = require("adapters.shell_runner")
-local Archives    = require("updater.release_assets")
-local ProxyPolicy = require("network.proxy_policy")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger      = require("core.logger.engine.logger")
+local Paths       = require("core.fs.engine.paths")
+local NativePath  = require("core.fs.engine.native_path")
+local FileSystem  = require("core.fs.adapters.file_system")
+local JsonCodec   = require("core.fs.adapters.json_codec")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local Archives    = require("updater.engine.release_assets")
+local ProxyPolicy = require("core.network.engine.proxy_policy_core")
 
 local LOG = "updater.release_installer"
 local ARMING_RECEIPT = "ARMED"
@@ -79,6 +79,8 @@ assert(type(M.STAGE_SCRIPT) == "string" and M.STAGE_SCRIPT ~= "", "The native re
 --- once its boot reports ready (the Windows swap's boot-ready and probation):
 --- a build that never reports within the wait, or exits during the probation,
 --- is stopped and moved aside, and the previous app is put back and opened.
+--- The wait is the new build's boot, so a user's Quit lands there: the boot
+--- writes `quit` to the token, and the swap keeps the build and opens nothing.
 --- Arguments: launcher pid, installed app, verified app, previous-app path.
 M.SWAP_SCRIPT = table.concat({
 	"set -u",
@@ -146,10 +148,17 @@ M.SWAP_SCRIPT = table.concat({
 	'		/bin/sleep 0.1',
 	'	done',
 	'	successor=$(/bin/cat "$ready_dir/ready")',
-	'	/bin/rm -rf "$ready_dir"',
-	'	case "$successor" in ""|*[!0-9]*) successor=; failure="an invalid boot report"; return 1 ;; esac',
+	'	# A Quit is no failed start: the boot writes quit (infra/updater_boot_ready.lua)',
+	'	if [ "$successor" = quit ]; then /bin/rm -rf "$ready_dir"; successor=; kept="before it reported ready"; return 1; fi',
+	'	case "$successor" in ""|*[!0-9]*) /bin/rm -rf "$ready_dir"; successor=; failure="an invalid boot report"; return 1 ;; esac',
 	'	/bin/sleep 0.75',
-	'	/bin/kill -0 "$successor" 2>/dev/null || { failure="it quit during the probation"; return 1; }',
+	'	if ! /bin/kill -0 "$successor" 2>/dev/null; then',
+	'		[ "$(/bin/cat "$ready_dir/ready" 2>/dev/null)" = quit ] && kept="during its probation"',
+	'		/bin/rm -rf "$ready_dir"',
+	'		[ -n "$kept" ] && return 1',
+	'		failure="it quit during the probation"; return 1',
+	'	fi',
+	'	/bin/rm -rf "$ready_dir"',
 	'	return 0',
 	'}',
 	'# Successor boot-ready receiving ends',
@@ -160,8 +169,9 @@ M.SWAP_SCRIPT = table.concat({
 	'		/usr/bin/open -- "$app" || { echo "The installed app could not be opened."; exit 7; }',
 	'		exit 0',
 	'	fi',
-	'	successor=; failure=',
+	'	successor=; failure=; kept=',
 	'	if open_until_ready; then echo "The installed app reported a healthy start."; exit 0; fi',
+	'	if [ -n "$kept" ]; then echo "The installed app was quit $kept: it stays installed and nothing is opened."; exit 0; fi',
 	'	stop_successor "$successor"',
 	'	failed_app="$app.failed-$$"',
 	'	if [ -e "$failed_app" ] || [ -L "$failed_app" ]; then',
@@ -221,7 +231,7 @@ local DETACH_SCRIPT = table.concat({
 --- Resolves the ordered native archive bindings from the shared updater defaults.
 --- @return table|nil identity Result of Archives.resolve().
 local function identity()
-	local path = Paths.shared("modules/updater/defaults.json")
+	local path = Paths.shared("updater/data/defaults.json")
 	local raw = type(path) == "string" and FileSystem.read(path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
 	local resolved, reason = Archives.resolve(decoded)
@@ -313,17 +323,28 @@ function M.stage(asset, done)
 	stage_sequence = stage_sequence + 1
 	local stage_dir = (parent:gsub("/+$", "")) .. "/.ergopti-release-install-"
 		.. os.date("!%Y%m%d-%H%M%S") .. "-" .. tostring(stage_sequence)
+	-- The archive's absolute and idle bounds, declared once in the shared updater
+	-- defaults (decided by the maintainer on 2026-11-12, aligned on Windows).
+	local defaults_path = Paths.shared("updater/data/defaults.json")
+	local defaults_raw = type(defaults_path) == "string" and FileSystem.read(defaults_path) or nil
+	local limits = require("updater.engine.transfer_budget").archive_limits(
+		type(defaults_raw) == "string" and JsonCodec.decode(defaults_raw) or nil)
+	if not limits then
+		Logger.error(LOG, "Cannot stage %s: the shared release archive budget is unavailable.", tostring(asset.tag))
+		return false
+	end
 	-- Keep JSON release data out of shell source and bind the native request to
 	-- this exact stage, using the existing per-child environment override.
 	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
-		output = stage_dir .. "/release." .. asset.format, timeout_ms = 900000 })
+		output = stage_dir .. "/release." .. asset.format, timeout_ms = limits.absolute_ms,
+		idle_timeout_ms = limits.idle_ms })
 	if request_err ~= nil or type(request) ~= "string" or request == "" or #request >= 65536 then
 		Logger.error(LOG, "Cannot encode the chosen release download request.")
 		return false
 	end
 	-- Read the shared proxy policy instead of maintaining another precedence.
 	-- Only the staging script's explicit-environment branch invokes curl.
-	local policy_path = Paths.shared("modules/network/proxy_policy.json")
+	local policy_path = Paths.shared("core/network/data/proxy_policy.json")
 	local raw = type(policy_path) == "string" and FileSystem.read(policy_path) or nil
 	local decoded = type(raw) == "string" and JsonCodec.decode(raw) or nil
 	local policy = ProxyPolicy.new(decoded)
@@ -332,8 +353,10 @@ function M.stage(asset, done)
 	for _, name in ipairs(policy.environment_names()) do environment[name] = M._getenv(name) or "" end
 	local route = policy.route(asset.url, environment)
 	if not route then Logger.error(LOG, "The release proxy route is invalid."); return false end
-	if route.mode == "environment" and not require("adapters.system_curl").check("the release download") then return false end
+	if route.mode == "environment" and not require("core.network.adapters.system_curl").check("the release download") then return false end
 	environment.ERGOPTI_RELEASE_STAGE_REQUEST = request
+	environment.ERGOPTI_RELEASE_STAGE_TIMEOUT_MS = string.format("%d", limits.absolute_ms)
+	environment.ERGOPTI_RELEASE_STAGE_IDLE_MS = string.format("%d", limits.idle_ms)
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)

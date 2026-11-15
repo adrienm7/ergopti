@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/text_case/vectors.json"
 
@@ -52,7 +52,7 @@ local function transformed_by(action_name, selected)
 	local names = {
 		manager = "modules.shortcuts.manager",
 		clipboard = "adapters.clipboard",
-		event_loop = "adapters.event_loop",
+		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",

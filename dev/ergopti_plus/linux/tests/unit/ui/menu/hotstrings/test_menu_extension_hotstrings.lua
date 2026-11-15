@@ -12,7 +12,7 @@
 
 local helpers = require("tests.helpers")
 local manifest_file = assert(io.open(helpers.driver_root() .. "/../../layouts/registry/ergopti/manifest.toml", "r"))
-local shipped = require("toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
+local shipped = require("core.text.engine.toml_codec.codec").decode(assert(manifest_file:read("*a"))).extension
 assert(manifest_file:close())
 
 --- A hotstrings config double whose loaded categories name their extension.
@@ -82,7 +82,7 @@ end
 helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) lists SFB reduction and rolls in a Hotstrings Ergopti submenu", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local row = row_starting(mb.build({ config = fake_config(true), _version = "9.9.9" }), label)
 		helpers.assert_true(row ~= nil, "the « " .. label .. " » submenu must be drawn")
@@ -102,7 +102,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 	helpers.it("(ergopti-hotstrings-ext) takes the repeat corrections out of the magic key submenu", function()
 		local mb = helpers.load_module("ui.menu.builder")
 		local built = mb.build({ config = fake_config(true), _version = "9.9.9" })
-		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
+		local label = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")
 		local seen = 0
 		for _, row in ipairs(titles(built)) do
 			if row.title:find("repeat_corrections", 1, true) then seen = seen + 1 end
@@ -115,7 +115,7 @@ helpers.describe("Hotstrings menu (linux): extension submenus", function()
 
 	helpers.it("(ergopti-hotstrings-ext) draws no Ergopti submenu when the extension is not installed", function()
 		local mb = helpers.load_module("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local label = string.format(i18n.get("menu.extensions.hotstrings_of"), "Ergopti+")
 		helpers.assert_nil(row_starting(mb.build({ config = fake_config(false), _version = "9.9.9" }), label))
 	end)
@@ -127,10 +127,10 @@ local function with_extension_frame(body, paused)
 	local names = { "infra.manifest_menu", "ui.menu.builder" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local ok, err = pcall(function()
-		local translator = require("infra.i18n")
-		local renderer = assert(require("menu.renderer").new({ platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+		local translator = require("core.i18n.engine.i18n")
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "linux",
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = translator, logger = require("core.logger.engine.shim"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local owner = helpers.load_module("ui.menu.builder")
@@ -159,14 +159,15 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 			helpers.assert_eq(rows[7].checked, true)
 			local writes = 0
 			f.context.config.set_extension_sections_enabled = function() writes = writes + 1; return true end
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
 			f.context.paused = true
-			helpers.assert_eq(rows[1].fn(), false); helpers.assert_eq(rows[2].fn(), false)
-			helpers.assert_eq(writes, 0)
+			helpers.assert_true(rows[1].fn()); helpers.assert_true(rows[2].fn())
+			helpers.assert_eq(writes, 2)
 		end)
 	end)
-	helpers.it("preserves the genuine paused top-level withdrawal of extension children", function()
+	helpers.it("keeps the extension children in a paused tray (edd1-paused-writes)", function()
 		with_extension_frame(function(f)
-			helpers.assert_eq(f.build(), nil)
+			helpers.assert_type(f.build(), "table")
 		end, true)
 	end)
 	for _, section in ipairs({ "hotstring_extension_bulk_controls", "hotstring_extension_content_frame", "hotstrings_parameter_boundary" }) do
@@ -213,19 +214,19 @@ end)
 -- The standard-category empty marker is inert presentation owned by its live list.
 local function read_standard_empty_json(path)
 	local file = assert(io.open(path, "rb"))
-	local value = assert(require("json").decode(file:read("*a")))
+	local value = assert(require("core.text.engine.json").decode(file:read("*a")))
 	file:close()
 	return value
 end
 
-local StandardEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_standard_category_empty_status.json"))
+local StandardEmptyCorpus = read_standard_empty_json(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_standard_category_empty_status.json"))
 
 --- Observes the real registered provider while forwarding the full public build.
 --- @param callback function Receives native build, captured data and genuine binding.
 local function with_standard_empty(callback, locale)
 	local old_builder = package.loaded["ui.menu.builder"]
 	local binding = require("infra.manifest_menu")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
 	local owner
 	for _, row in ipairs(binding.get_array(StandardEmptyCorpus.section)) do
@@ -259,7 +260,7 @@ local function with_standard_empty(callback, locale)
 		end,
 	}
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)
@@ -411,11 +412,11 @@ end)
 
 
 -- Independent caption oracle comes from the original native marker's 21 locale files.
-local ExtensionEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_extension_empty_status.json"))
+local ExtensionEmptyCorpus = read_standard_empty_json(require("core.fs.engine.paths").shared("tests/corpus/menus/linux_extension_empty_status.json"))
 
 local function with_extension_empty(callback, locale)
 	local old_builder = package.loaded["ui.menu.builder"]
-	local binding, i18n = require("infra.manifest_menu"), require("infra.i18n")
+	local binding, i18n = require("infra.manifest_menu"), require("core.i18n.engine.i18n")
 	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
 	local owner
 	for _, row in ipairs(binding.get_array(ExtensionEmptyCorpus.section)) do
@@ -428,7 +429,7 @@ local function with_extension_empty(callback, locale)
 	local old_statuses = owner.status_rows
 	local state = { loaded = false, data = nil, delivered = nil, writes = {} }
 	local ok, detail = xpcall(function()
-		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		local catalogue = read_standard_empty_json(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. (locale or "en") .. ".json"))
 		i18n.get = function(key) return catalogue[key] or key end
 		i18n.get_locale = function() return locale or "en" end
 		binding.build = function(key, category, dynamic, builders, ctx, providers)
@@ -495,7 +496,7 @@ helpers.describe("shared Linux empty extension status", function()
 				helpers.assert_eq(count_extension_empty(rows, expected), 1)
 				local header
 				for index, row in ipairs(rows) do
-					if row.title == require("infra.i18n").section("menu.extensions.header") then header = index end
+					if row.title == require("core.i18n.engine.i18n").section("menu.extensions.header") then header = index end
 				end
 				helpers.assert_not_nil(header)
 				helpers.assert_eq(rows[header + 1].title, expected)
@@ -544,10 +545,10 @@ helpers.describe("shared Linux empty extension status", function()
 			local rows = build()
 			helpers.assert_eq(#state.data, 1)
 			helpers.assert_eq(count_extension_empty(rows, ExtensionEmptyCorpus.captions.en), 0)
-			local extension = assert(row_starting(rows, string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
+			local extension = assert(row_starting(rows, string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti+")))
 			helpers.assert_eq(#extension.menu, 7)
 			helpers.assert_eq(extension.menu[4].title, "sfbsreduction (5)")
-			helpers.assert_eq(extension.menu[5].title, require("infra.i18n").get("category.rolls") .. " (7)")
+			helpers.assert_eq(extension.menu[5].title, require("core.i18n.engine.i18n").get("category.rolls") .. " (7)")
 			helpers.assert_eq(extension.menu[7].title, "repeat_corrections (14)")
 			helpers.assert_eq(extension.menu[1].fn(), true)
 			helpers.assert_eq(extension.menu[2].fn(), true)
@@ -558,7 +559,7 @@ helpers.describe("shared Linux empty extension status", function()
 		end)
 	end)
 	helpers.it("(extension-empty-status) restores exact native owners after a failed scenario", function()
-		local binding, translator = require("infra.manifest_menu"), require("infra.i18n")
+		local binding, translator = require("infra.manifest_menu"), require("core.i18n.engine.i18n")
 		local before = { binding.build, binding.status_rows, translator.get, translator.get_locale, package.loaded["ui.menu.builder"] }
 		local ok, detail = pcall(function() with_extension_empty(function(build) build(); error("extension empty sentinel", 0) end) end)
 			helpers.assert_eq(ok, false)

@@ -152,7 +152,7 @@ Test("LLM request plan: options accept -1 never and the interval range (par-65)"
 
 _LReqPlan_OldFloorIsGone() {
 	global _SharedDir
-	Inference := FileRead(_SharedDir . "\modules\llm\inference.json", "UTF-8")
+	Inference := FileRead(_SharedDir . "\ai\data\inference.json", "UTF-8")
 	AssertFalse(InStr(Inference, "rate_limit_min_interval_ms"), "the per-backend floor left inference.json")
 	AssertFalse(InStr(_DriverSourceConcat(), "GetRateLimitMs"), "its reader is gone with it")
 }

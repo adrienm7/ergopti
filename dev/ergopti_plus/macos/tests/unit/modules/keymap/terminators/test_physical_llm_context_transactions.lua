@@ -48,7 +48,7 @@ local function load_fixture()
 
 	for name in pairs(package.loaded) do
 		if type(name) == "string"
-			and (name:match("^modules%.keymap") or name:match("^adapters%.")) then
+			and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -80,7 +80,7 @@ local function load_fixture()
 		end,
 		set_buffer = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,
@@ -110,7 +110,7 @@ local function load_fixture()
 	package.loaded["modules.hotstrings.hotstrings_config"] = {
 		resolve = function() return nil end,
 	}
-	package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+	package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 
 	local Keymap = helpers.load_with_stubs("modules.keymap")
 	local hs_stub = _G.hs
@@ -197,7 +197,7 @@ helpers.describe("physical AI context retention", function()
 			helpers.assert_eq(keymap.inject_dynamic(5, secret, function() return #secret, secret, secret end,
 				"dynamic", true), true)
 			for c in ("safe"):gmatch(".") do tap.fn(physical_key(c)) end
-			local scheduler = require("adapters.timer_scheduler")
+			local scheduler = require("core.events.timer_scheduler")
 			local original_time = scheduler.hotstring_time
 			scheduler.hotstring_time = function() return 10000 end
 			state.last_key_time = 10000 - state.WORD_TIMEOUT_SEC - 1

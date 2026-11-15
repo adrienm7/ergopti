@@ -7,8 +7,8 @@
 --- ==============================================================================
 local M = {}
 local helpers = require("tests.helpers")
-local Coordinator = require("infra.shutdown_coordinator")
-local Gate = require("infra.input_capture_gate")
+local Coordinator = require("core.lifecycle.engine.shutdown.coordinator")
+local Gate = require("platform.input.capture_gate")
 local Onboarding = require("ui.onboarding.startup")
 
 --- Runs actual Main startup statements through its first real idle callback.
@@ -115,11 +115,14 @@ function M.run(options)
 		output_broker = function() return {} end,
 		emit_key = noop,
 	}
+	local function layout_refresh()
+		observed.layout_refreshes = observed.layout_refreshes + 1
+		record("layout.refresh"); native_callback("layout.refresh"); return true
+	end
 	env.keyboard_layout = {
-		refresh = function()
-			observed.layout_refreshes = observed.layout_refreshes + 1
-			record("layout.refresh"); native_callback("layout.refresh"); return true
-		end,
+		refresh = layout_refresh,
+		-- The pre-grab resolve: the same boundary, proven or dumped again.
+		refresh_unless_current = layout_refresh,
 		is_ready = function() return true end,
 		publish_current_capture = function()
 			observed.preparing = true
@@ -130,9 +133,11 @@ function M.run(options)
 	}
 	env.opts = { tray = true, grab = true, layout = "qwerty", dry_run = false }
 	env.device, env.mapping_count, env.config_path, env.SCRIPT_DIR = "/controlled/event0", 1, "/controlled/config.toml", "/controlled/driver"
+	observed.stages = {}
 	env.BootProfiler = { stage = function(name)
+		observed.stages[#observed.stages + 1] = "open " .. name
 		if name == "input hooks" then native_callback("input.stage") end
-	end, stage_done = noop, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
+	end, stage_done = function(name) observed.stages[#observed.stages + 1] = "close " .. name end, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
 	env.Logger = { info = function(_, message)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
 	end, error = function(_, message)
@@ -164,6 +169,8 @@ function M.run(options)
 	env.emit_diagnostic_snapshot = function(boot_ms, _, _, prepared)
 		if prepared then prepared({ boot_ms = boot_ms }) end
 	end
+	-- The real clock: the metrics' desktop source is handed it at startup.
+	env.Monotonic = require("core.logger.engine.monotonic")
 	env.RuntimeGuard = { call = function(_, callback) callback(); return true end, optional_require = function() return nil end }
 	env.webview_manager = { set_daemon_state = function(state) observed.daemon_state = state end,
 		show = function()
@@ -175,7 +182,7 @@ function M.run(options)
 		ui("watchers"); observed.services = true
 	end, stop = function() record("watchers.stop") end, has_inotify = function() return true end }
 	env.require = function(name)
-		if name == "infra.signal_handlers" then
+		if name == "core.lifecycle.engine.shutdown.signal_handlers" then
 			return { start = function(callbacks)
 				observed.callbacks = callbacks; observed.signals_active = true; record("signals.start")
 				return not options.signal_refused, "controlled signal admission refusal"
@@ -183,11 +190,11 @@ function M.run(options)
 				record("signals.stop"); observed.signal_stops = observed.signal_stops + 1
 				observed.signals_active = false; return true
 			end }
-		elseif name == "infra.gui_stack" then
+		elseif name == "core.ui.engine.gui_stack" then
 			-- The desktop toolkit is present: its refusal has its own cases
-			-- (tests/unit/infra/lifecycle/test_gui_stack.lua).
+			-- (tests/unit/core/lifecycle/test_gui_stack.lua).
 			return { check_at_start = function() record("gui_stack"); return nil end }
-		elseif name == "infra.driver_control" then
+		elseif name == "core.lifecycle.engine.driver_control" then
 			-- The local reload control starts once the daemon is ready.
 			return { start = function(control_options)
 				observed.driver_control = control_options
@@ -197,6 +204,8 @@ function M.run(options)
 			-- The update watcher that started this daemon is told once it is ready.
 			return { report = function(reason)
 				observed.boot_ready_reason = reason; record("updater.boot_ready"); return false
+			end, report_quit = function(reason)
+				observed.boot_quit_reason = reason; record("updater.boot_quit"); return false
 			end }
 		elseif name == "adapters.wpm_surface" then
 			-- The floating WPM widget pumps its own window, tray or not.
@@ -204,7 +213,7 @@ function M.run(options)
 		elseif name == "infra.typed_input_withheld" then
 			-- The session's withheld-input summary is logged as the daemon exits.
 			return { summary = function() record("withheld.summary"); return "controlled withheld summary" end }
-		elseif name == "infra.reload_timing" then
+		elseif name == "core.timing.engine.reload_timing" then
 			-- The Reload this boot completes is reported once the boot is complete.
 			return { complete = function() record("reload.complete"); return nil end }
 		elseif name == "infra.field_run" then
@@ -213,16 +222,30 @@ function M.run(options)
 				observed.field_run = field_options
 				return { stop = function() return true end }
 			end }
+		elseif name == "modules.keystats.topology_metrics" then
+			-- Window topology binds its X11 source at startup and closes its capture interval at stop.
+			return { bind_topology_source = noop, daemon_tick = noop, daemon_stop = noop }
 		elseif name == "infra.personal_shortcuts" then
 			-- The user's personal source runs once, at the end of the services.
 			return { load = function() record("personal_shortcuts"); return true end }
+		elseif name == "modules.gestures.workspace_switcher" then
+			-- No X11 desktop in the fixture: the Wayland workspace reader is asked,
+			-- and this session has none (its own cases: test_workspace_switcher).
+			return { current_workspace_source = function() record("workspace.source"); return nil, "unsupported" end }
+		elseif name == "modules.keystats.tap_click_sources" then
+			-- The touchpad tap count binds its sources into keystats (its own
+			-- cases: test_keystats_pointer_metrics, test_tap_to_click_setting).
+			return { bind = noop }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
-		elseif name == "infra.input_access" then
+		elseif name == "platform.input.access" then
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
-		elseif name == "infra.i18n" then
+		elseif name == "core.i18n.engine.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }
-		elseif name == "infra.dev_source" then
+		elseif name == "core.logger.engine.perf_counters" then
+			-- The real counters: the exit path flushes their last interval.
+			return require(name)
+		elseif name == "core.lifecycle.engine.dev_source" then
 			-- An installed daemon: no developer root, no source watchers.
 			return { root = function() return nil end, is_active = function() return false end,
 				source_dirs = function() return nil end, DRIVER_SUBPATH = "/static/ergopti_plus/linux" }

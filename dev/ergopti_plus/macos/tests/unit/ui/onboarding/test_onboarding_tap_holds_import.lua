@@ -4,7 +4,7 @@
 --- MODULE: Regression — the wizard's Tap-Holds answer imports the checked keys
 --- DESCRIPTION:
 --- The first-run wizard's Tap-Holds page asked nothing on macOS: the switch
---- lives in config_karabiner.toml, where a config.toml answer is never read,
+--- lives in tap_hold.toml, where a config.toml answer is never read,
 --- so the page showed a note and a Yes imported no key.
 ---
 --- ROOT CAUSE ENCODED:
@@ -360,8 +360,8 @@ end)
 local function with_wizard_timeout_native_refusal(exercise)
 	with_finish({}, function(state)
 		local previous_hs = rawget(_G, "hs")
-		local previous_scheduler = package.loaded["adapters.timer_scheduler"]
-		local previous_deferred = package.loaded["infra.deferred_work"]
+		local previous_scheduler = package.loaded["core.events.timer_scheduler"]
+		local previous_deferred = package.loaded["core.timing.engine.deferred_work"]
 		local previous_after = previous_deferred.after
 		local scheduler, deferred, original_after
 		local handles, nodes, cleanup_errors = {}, {}, {}
@@ -398,9 +398,9 @@ local function with_wizard_timeout_native_refusal(exercise)
 		end
 		local outcome = table.pack(pcall(function()
 			_G.hs = native_hs
-			package.loaded["adapters.timer_scheduler"] = nil
-			package.loaded["infra.deferred_work"] = nil
-			scheduler = require("adapters.timer_scheduler")
+			package.loaded["core.events.timer_scheduler"] = nil
+			package.loaded["core.timing.engine.deferred_work"] = nil
+			scheduler = require("core.events.timer_scheduler")
 			original_after = scheduler.after
 			-- Forward every call to the actual producer, retaining only its exact
 			-- returned handles for this fresh fixture's finally cleanup.
@@ -409,7 +409,7 @@ local function with_wizard_timeout_native_refusal(exercise)
 				handles[#handles + 1] = result[1]
 				return table.unpack(result, 1, result.n)
 			end
-			deferred = require("infra.deferred_work")
+			deferred = require("core.timing.engine.deferred_work")
 			previous_deferred.after = deferred.after
 			return exercise(state, control)
 		end))
@@ -423,8 +423,8 @@ local function with_wizard_timeout_native_refusal(exercise)
 			attempt("scheduler method restoration", function() scheduler.after = original_after end)
 		end
 		attempt("held DeferredWork facade restoration", function() previous_deferred.after = previous_after end)
-		attempt("DeferredWork module restoration", function() package.loaded["infra.deferred_work"] = previous_deferred end)
-		attempt("scheduler module restoration", function() package.loaded["adapters.timer_scheduler"] = previous_scheduler end)
+		attempt("DeferredWork module restoration", function() package.loaded["core.timing.engine.deferred_work"] = previous_deferred end)
+		attempt("scheduler module restoration", function() package.loaded["core.events.timer_scheduler"] = previous_scheduler end)
 		attempt("native namespace restoration", function() assert(rawget(_G, "hs") == native_hs); _G.hs = previous_hs end)
 		if #cleanup_errors > 0 then
 			if not outcome[1] then

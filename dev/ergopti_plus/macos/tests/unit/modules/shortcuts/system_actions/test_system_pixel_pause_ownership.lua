@@ -142,9 +142,9 @@ local function fresh_pixel_owner()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message, _, level)
 			fixture.notifications[#fixture.notifications + 1] = {
 				message = message,
@@ -152,7 +152,7 @@ local function fresh_pixel_owner()
 			}
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		create_secure_temp_file = function()
 			local mode = table.remove(fixture.next_temp_modes, 1)
 			if mode == "false" then return false, "allocation refused" end
@@ -180,8 +180,8 @@ local function fresh_pixel_owner()
 			return nil, "absent"
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = nil
-	package.loaded["adapters.screen_capture"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
+	package.loaded["platform.system.screen_capture"] = nil
 	package.loaded["adapters.python_interpreter"] = helpers.healthy_python_resolver()
 	package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 	package.loaded["modules.shortcuts.actions.system_pixel"] = nil

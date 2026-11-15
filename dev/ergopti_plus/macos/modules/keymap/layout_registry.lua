@@ -10,7 +10,7 @@
 --- ~/Library/Keyboard Layouts and adds it to the enabled input sources.
 ---
 --- FEATURES & RATIONALE:
---- 1. The catalogue decisions are shared with Linux (_shared/lua/layouts/
+--- 1. The catalogue decisions are shared with Linux (_shared/layouts/engine/
 ---    catalogue.lua): conditional refresh with the cached ETag, cache and
 ---    shipped-index fallbacks with the exact error, the installed record, and
 ---    the offline installation of a layout shipped with the app.
@@ -24,18 +24,20 @@
 ---    typing path: every entry point is a menu or window action.
 --- ==============================================================================
 
-local Logger       = require("infra.logger")
-local Paths        = require("infra.paths")
+local Logger       = require("core.logger.engine.logger")
+local Paths        = require("core.fs.engine.paths")
 local ConfigPaths  = require("infra.config_paths")
-local FileSystem   = require("adapters.file_system")
-local HttpClient   = require("adapters.http_client")
-local Crypto       = require("adapters.crypto")
-local Json         = require("json")
-local Registry     = require("layouts.registry")
-local Catalogue    = require("layouts.catalogue")
-local Extension    = require("layouts.extension")
-local Composer     = require("layouts.composer")
-local RegistryStore = require("layouts.registry_store")
+local FileSystem   = require("core.fs.adapters.file_system")
+local HttpClient   = require("core.network.adapters.http_client")
+local Crypto       = require("core.crypto.crypto")
+local Json         = require("core.text.engine.json")
+local TomlCodec    = require("core.text.engine.toml_codec")
+local Registry     = require("layouts.engine.registry.registry_core")
+local Catalogue    = require("layouts.engine.composer.catalogue")
+local Extension    = require("layouts.engine.composer.extension")
+local Composer     = require("layouts.engine.composer.composer")
+local SourceStore  = require("layouts.engine.composer.source_store")
+local RegistryStore = require("layouts.engine.registry.store")
 
 local M = {}
 
@@ -135,7 +137,7 @@ local function read_shared_json(rel)
 	if type(raw) ~= "string" then return nil, "_shared/" .. rel .. " is unreadable" end
 	local known = _shared_json[path]
 	if known ~= nil and known.raw == raw then return known.decoded, nil end
-	-- The shared json.lua answers nil to invalid JSON rather than raising.
+	-- The shared core/text/engine/json.lua answers nil to invalid JSON rather than raising.
 	local ok, decoded = pcall(Json.decode, raw)
 	if not ok or type(decoded) ~= "table" then return nil, "_shared/" .. rel .. " is not valid JSON" end
 	_shared_json[path] = { raw = raw, decoded = decoded }
@@ -146,9 +148,9 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.settings()
-	local layouts, layouts_err = read_shared_json("modules/layouts/defaults.json")
+	local layouts, layouts_err = read_shared_json("layouts/data/defaults.json")
 	if not layouts then return nil, layouts_err end
-	local updater, updater_err = read_shared_json("modules/updater/defaults.json")
+	local updater, updater_err = read_shared_json("updater/data/defaults.json")
 	if not updater then return nil, updater_err end
 	return Registry.resolve(layouts, updater, require("modules.updater").installed_channel())
 end
@@ -177,7 +179,7 @@ local function default_deps(settings)
 		-- An asynchronous task (ShellRunner.run), never a blocking shell call: the refresh
 		-- runs on the main thread that also delivers the keys.
 		registry_changes = function(dir, callback)
-			require("adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
+			require("core.process.adapters.shell_runner").run(GIT, Catalogue.registry_changes_args(dir), function(ok, out, stderr)
 				if ok then
 					callback(out or "", nil)
 				else
@@ -204,6 +206,7 @@ local function default_deps(settings)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = FileSystem.read,
+		read_bounded = FileSystem.read_bounded,
 		write = FileSystem.write,
 		create = FileSystem.create_if_absent,
 		inspect_file = FileSystem.classify_no_follow,
@@ -554,7 +557,7 @@ local function publish_update(deps, entry, text, previous)
 	local installed_path = deps.layouts_dir .. entry.id .. ".keylayout"
 	local encoded_ok, encoded = pcall(function() return deps.encode_json(Catalogue.with_installed(current, entry)) end)
 	if not encoded_ok or type(encoded) ~= "string" then return nil, M.FAILURE_RECORD, "cannot encode the installed layout record" end
-	local loaded, inverse_module = pcall(require, "config_file_inverse")
+	local loaded, inverse_module = pcall(require, "settings.engine.migration.file_inverse")
 	local factory = loaded and type(inverse_module) == "table" and inverse_module.for_current_writer or nil
 	if type(factory) ~= "function" then return nil, M.FAILURE_WRITE, "layout compensation owner is unavailable" end
 	local built, inverse, writer = pcall(factory)
@@ -579,9 +582,9 @@ local function publish_update(deps, entry, text, previous)
 		return replace(path, content, expected, on_error)
 	end
 	local function current_owner()
-		return rawequal(package.loaded["config_file_inverse"], inverse_module)
+		return rawequal(package.loaded["settings.engine.migration.file_inverse"], inverse_module)
 			and rawequal(inverse_module.for_current_writer, factory)
-			and rawequal(package.loaded["toml_codec.writer"], writer)
+			and rawequal(package.loaded["core.text.engine.toml_codec.writer"], writer)
 			and rawequal(writer.publish_if_unchanged, publish_exact)
 			and rawequal(writer.read_classified, read_classified)
 			and rawequal(writer.remove_if_unchanged, remove_conditional)
@@ -1001,12 +1004,12 @@ function M.install_local(entry, text, on_done, deps)
 	return true
 end
 
---- The composer's ports over this module (see layouts/composer.lua).
+--- The composer's ports over this module (see layouts/engine/composer/composer.lua).
 --- @param deps table
 --- @return table|nil operations
 --- @return string|nil error
 local function composer_operations(deps)
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	local settings, settings_err = Composer.settings(layout_defaults)
 	if not settings then return nil, settings_err end
@@ -1021,6 +1024,8 @@ local function composer_operations(deps)
 		shortcuts = "full",
 		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
 		decode_json = deps.decode_json,
+		-- The page may save an Ergopti layout source in place of a composition.
+		decode_toml = TomlCodec.decode,
 		read = deps.read,
 		exists = deps.exists,
 		delete = deps.delete,
@@ -1053,9 +1058,33 @@ end
 --- @return table|nil settings
 --- @return string|nil error
 function M.composer_settings()
-	local layout_defaults, defaults_err = read_shared_json("modules/layouts/defaults.json")
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
 	if not layout_defaults then return nil, defaults_err end
 	return Composer.settings(layout_defaults)
+end
+
+--- The emulation table stored with the composed layout's source, for the layout
+--- emulation; nil when the composed layout has none.
+--- @param deps table|nil
+--- @return table|nil table_
+--- @return string|nil error
+function M.composer_emulation(deps)
+	local settings, settings_err = M.composer_settings()
+	if not settings then return nil, settings_err end
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.read_emulation(settings, resolved.config_dir or ConfigPaths.get_config_dir(), resolved)
+end
+
+--- The composed layout stored for the emulation alone (composer_emulate), for
+--- the layout emulation while the composed layout is not installed.
+--- @param deps table|nil
+--- @return table|nil composed { text, convention } nil when none is stored.
+--- @return string|nil error
+function M.composer_copy(deps)
+	local resolved, deps_err = resolve_deps(deps)
+	if not resolved then return nil, deps_err end
+	return Composer.registry_copy((M.composer_settings()), resolved.config_dir or ConfigPaths.get_config_dir(), resolved, TomlCodec.decode)
 end
 
 --- The text of an installed layout's copy, for the Debug check of the composer.
@@ -1118,6 +1147,24 @@ function M.composer_save(payload, on_done, deps)
 	return true
 end
 
+--- Stores a layout source for the layout emulation alone: nothing is installed
+--- in the system (layouts/engine/composer/composer.lua store).
+--- @param payload table { source, keylayout [, emulation] }
+--- @param on_done function on_done(ok, code, detail, id)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.composer_emulate(payload, on_done, deps)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = composer_operations(resolved) end
+	if not operations then
+		on_done(false, M.FAILURE_WRITE, deps_err or operations_err)
+		return false
+	end
+	operations.store(payload, on_done)
+	return true
+end
+
 --- Removes the composition.
 --- @param on_done function on_done(ok, code, detail)
 --- @param deps table|nil
@@ -1132,6 +1179,176 @@ function M.composer_remove(on_done, deps)
 	end
 	operations.remove(on_done)
 	return true
+end
+
+--- The layout editor's file store over this module (see layouts/engine/composer/source_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function source_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local settings, settings_err = SourceStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return SourceStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
+		read = deps.read,
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+		-- The editor's downloads land where the metrics export does.
+		downloads_dir = deps.downloads_dir or function()
+			return require("metrics.engine.maintenance").downloads_dir(os.getenv)
+		end,
+	})
+end
+
+--- Runs a layout editor file operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_source(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = source_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The layout editor store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Sends the layout editor the last source it saved.
+--- @param on_done function on_done({ text, filename, folder })
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_open(on_done, deps)
+	return with_source(deps, function(operations) operations.open(on_done) end,
+		function() on_done({}) end)
+end
+
+--- Stores one file of the layout editor (its source or an export).
+--- @param payload table { filename, text }
+--- @param on_done function on_done(ok, code, detail, filename)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_save(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Writes one download of the layout editor (XKB archive, KLC, DLL images,
+--- macOS bundle) to the user's Downloads folder, never over a file there.
+--- @param payload table { filename, data } with data the bytes as base64.
+--- @param on_done function on_done(ok, code, detail, path)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.source_export(payload, on_done, deps)
+	return with_source(deps, function(operations) operations.export(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail, nil) end)
+end
+
+--- Ergopti Studio's personal layouts over this module (see layouts/engine/composer/studio_store.lua).
+--- @param deps table Resolved collaborators.
+--- @return table|nil operations
+--- @return string|nil error
+local function studio_operations(deps)
+	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
+	if not layout_defaults then return nil, defaults_err end
+	local StudioStore = require("layouts.engine.composer.studio_store")
+	local settings, settings_err = StudioStore.settings(layout_defaults)
+	if not settings then return nil, settings_err end
+	return StudioStore.new({
+		settings = settings,
+		config_dir = deps.config_dir or ConfigPaths.get_config_dir(),
+		-- The root of _shared, where the built-in corpus tables are generated.
+		shared_dir = deps.shared_dir or (Paths.shared_root() and Paths.shared_root() .. "/"),
+		read_bounded = deps.read_bounded,
+		exists = deps.exists,
+		write = function(path, content) return write_file(deps, path, content) end,
+		log = function(level, message, ...) Logger[level](LOG, message, ...) end,
+	})
+end
+
+--- Runs an Ergopti Studio layout operation, or refuses it when the store is unusable.
+--- @param deps table|nil
+--- @param run function run(operations)
+--- @param refuse function refuse(detail)
+--- @return boolean dispatched
+local function with_studio(deps, run, refuse)
+	local resolved, deps_err = resolve_deps(deps)
+	local operations, operations_err
+	if resolved then operations, operations_err = studio_operations(resolved) end
+	if not operations then
+		Logger.error(LOG, "The Ergopti Studio layout store is unusable: %s.", tostring(deps_err or operations_err))
+		refuse(deps_err or operations_err)
+		return false
+	end
+	run(operations)
+	return true
+end
+
+--- Lists Ergopti Studio's personal layouts, as the JSON texts the page saved.
+--- @param on_done function on_done(ok, texts_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_list(on_done, deps)
+	return with_studio(deps, function(operations) operations.list(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores one Ergopti Studio personal layout.
+--- @param payload table { id, text }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Removes one Ergopti Studio personal layout.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_remove(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.remove(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads one built-in corpus's generated tables for the Ergopti Studio page.
+--- @param payload table { id }
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_corpus(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.corpus(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Reads the user's Ergopti Studio fingering profile (nil for the defaults).
+--- @param on_done function on_done(ok, text_or_code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_profile_load(on_done, deps)
+	return with_studio(deps, function(operations) operations.profile_load(on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
+end
+
+--- Stores the user's Ergopti Studio fingering profile, or restores the defaults.
+--- @param payload table { text = JSON text } or { reset = true }
+--- @param on_done function on_done(ok, code, detail)
+--- @param deps table|nil
+--- @return boolean dispatched
+function M.studio_profile_save(payload, on_done, deps)
+	return with_studio(deps, function(operations) operations.profile_save(payload, on_done) end,
+		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
 --- The text and index entry of a layout the app ships (the field run's source of

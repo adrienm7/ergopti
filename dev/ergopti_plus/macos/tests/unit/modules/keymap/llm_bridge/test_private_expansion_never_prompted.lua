@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local SECRET = "2840175123456"
@@ -70,8 +70,7 @@ local function build_world()
 	local world = { posts = {} }
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -83,10 +82,10 @@ local function build_world()
 		path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
 		log_llm = function() end,
@@ -101,7 +100,7 @@ local function build_world()
 	}
 	-- Every other tooltip operation succeeds: a reset that could not hide would abort the request.
 	local noop = function() return true end
-	package.loaded["ui.tooltip"] = setmetatable({
+	package.loaded["core.ui.ui.tooltip"] = setmetatable({
 		show_loading = function() return true end,
 		show = function() return true end,
 		show_predictions = function() return true end,
@@ -114,7 +113,7 @@ local function build_world()
 		is_hotstring_visible = function() return false end,
 		tint = function() return {} end,
 	}, { __index = function() return noop end })
-	package.loaded["adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.ui.adapters.tooltip_renderer"] = setmetatable({}, { __index = function() return noop end })
 
 	local State = helpers.load_with_stubs("modules.keymap.state")
 	local Registry = require("modules.keymap.registry")
@@ -163,6 +162,7 @@ local function build_world()
 		register_lua_group = function() end,
 		set_post_load_hook = function() end,
 		register_interceptor = function() end,
+		dynamic_rule_within_delay = function() return true end,
 		register_preview_provider = function() end,
 		registry_transaction = function(_, mutation) return mutation() == true end,
 	})

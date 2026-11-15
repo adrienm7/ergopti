@@ -2,6 +2,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
+
 _SAFR_SelectedFile(Reparse) {
  Root := A_Temp . "\ergopti_selected_file_reparse_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(100000, 999999)
  Created := FSCreateDirectoryExclusiveStrict(Root)
@@ -17,6 +19,8 @@ _SAFR_SelectedFile(Reparse) {
   Native := DllCall("Kernel32\CreateSymbolicLinkW", "Str", Link, "Str", Target, "UInt", 2, "UChar")
   NativeError := A_LastError
   _TestAppendProgress("# RECEIPT selected-file-reparse setup=" . Native . " error=" . NativeError)
+  ; Both cases share this setup, so an account without the privilege runs neither.
+  TestRequireHostCapability(TestFileSymlinkReceipt.Bind(Native, NativeError))
   AssertTrue(Native != 0, "A genuine owned file symlink is required before the action can be qualified")
   Attributes := DllCall("Kernel32\GetFileAttributesW", "Str", Link, "UInt")
   AssertTrue(Attributes != 0xFFFFFFFF && Attributes & 0x400, "The selected file must itself carry FILE_ATTRIBUTE_REPARSE_POINT")

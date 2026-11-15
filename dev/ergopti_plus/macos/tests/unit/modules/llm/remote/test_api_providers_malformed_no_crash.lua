@@ -33,7 +33,7 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 			fh:write(json_content)
 			fh:close()
 		end
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(rel) return helpers.shared(rel) end,
 			shared_root = function() return helpers.shared() end,
 			shared_llm_path = function(name)
@@ -125,11 +125,11 @@ helpers.describe("api_remote — malformed api_providers.json does not crash req
 
 	helpers.it("still loads normally when JSON is valid", function()
 		-- Reset to the real shared path (test helpers default)
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(rel) return helpers.shared(rel) end,
 			shared_root = function() return helpers.shared() end,
 			shared_llm_path = function(name)
-				return helpers.shared("modules/llm/" .. name)
+				return helpers.shared("ai/data/" .. name)
 			end,
 			find_from_configdir = function() return nil end,
 		}

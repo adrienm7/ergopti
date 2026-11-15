@@ -17,12 +17,12 @@ local MODULE_KEYS = {
 	"ui.menu.global_scope",
 	"ui.menu.scoped_preferences",
 	"ui.menu.gesture_scope",
-	"infra.dialog_util",
-	"infra.logger",
-	"infra.notifications",
+	"core.ui.engine.dialog_util",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"ui.hotstring_editor",
-	"infra.text_utils",
-	"infra.i18n",
+	"core.text.engine.utils",
+	"core.i18n.engine.i18n",
 	"infra.ui_restore",
 	"infra.preferences",
 	"ui.menu.builder",
@@ -32,12 +32,12 @@ local MODULE_KEYS = {
 	"ui.menu.keymap_lifecycle",
 	"ui.menu.menu_watchers",
 	"modules.updater",
-	"adapters.file_system",
-	"adapters.storage",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.storage",
 	"adapters.tray_menu",
-	"chord",
-	"adapters.hotkey_registrar",
-	"infra.termination_coordinator",
+	"keyboard.engine.chord",
+	"platform.input.hotkey_registrar",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"infra.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.global_actions_transaction",
@@ -231,7 +231,7 @@ local function with_menu_fixture(options, callback)
 		initial_settings = nil,
 		files = {
 			["/virtual/config.toml"] = "feature = true\n",
-			["/virtual/config_karabiner.toml"] = "tap = old\n",
+			["/virtual/tap_hold.toml"] = "tap = old\n",
 		},
 		initial_files = nil,
 		karabiner_state = { profile = "old", tap = "escape", hold = "left_control" },
@@ -274,7 +274,7 @@ local function with_menu_fixture(options, callback)
 				return true
 			end
 		end
-		logger.LEVELS = require("logger").LEVELS
+		logger.LEVELS = require("core.logger.engine").LEVELS
 		logger.is_enabled = function() return false end
 		return logger
 	end
@@ -294,8 +294,8 @@ local function with_menu_fixture(options, callback)
 		return keys
 	end
 
-	package.loaded["infra.logger"] = logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger_stub()
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(label, _, level)
 			if observations.reload_finalized then
 				observations.post_reload_effects = observations.post_reload_effects + 1
@@ -308,11 +308,11 @@ local function with_menu_fixture(options, callback)
 		end,
 	}
 	package.loaded["ui.hotstring_editor"] = { set_update_menu = noop }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.preferences"] = {
 		build_initial_state = function() return state end,
@@ -354,7 +354,7 @@ local function with_menu_fixture(options, callback)
 		is_initialized = function() return true end,
 		get = function(key)
 			if key == "ConfigTomlPath" then return "/virtual/config.toml" end
-			if key == "KarabinerConfigPath" then return "/virtual/config_karabiner.toml" end
+			if key == "TapHoldConfigPath" then return "/virtual/tap_hold.toml" end
 			return "/virtual/unused"
 		end,
 		get_config_dir = function() return "/virtual" end,
@@ -393,13 +393,13 @@ local function with_menu_fixture(options, callback)
 			return true
 		end,
 	}
-	package.loaded["chord"] = { format = function() return "ctrl+x" end }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_user_exit = function()
 			observations.calls.exit = (observations.calls.exit or 0) + 1
 			local descriptor = observations.armed and observations.failures.exit or nil
@@ -740,10 +740,12 @@ local function assert_fully_restored(observations)
 	helpers.assert_eq(observations.persisted, observations.initial_state)
 	helpers.assert_eq(observations.named_shortcut, true)
 	helpers.assert_eq(observations.named_bound, true)
-	-- A refused Quit tells the user so; the reset itself notifies nothing.
+	-- A refused Quit or manual Reload tells the user so (NUI-002); the reset
+	-- itself notifies nothing.
 	for _, notification in ipairs(observations.notifications) do
-		helpers.assert_eq(notification.label, "notify.quit_refused",
-			"a rolled-back reset notifies nothing of its own")
+		helpers.assert_true(notification.label == "notify.quit_refused"
+			or notification.label == "init.reload_refused_title",
+			"a rolled-back reset notifies nothing of its own: " .. tostring(notification.label))
 	end
 end
 

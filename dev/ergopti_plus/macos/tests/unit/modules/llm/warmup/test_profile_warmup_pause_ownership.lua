@@ -59,7 +59,7 @@ local function load_fixture()
 		return timer
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.shortcuts.script_control"] = {
 		get_pause_epoch = function()
 			local reentrant_profile = fixture.reenter_on_pause_epoch
@@ -74,7 +74,7 @@ local function load_fixture()
 		is_pause_transition_pending = function() return fixture.pending end,
 	}
 	package.loaded["modules.llm.profiles"] = nil
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.llm"] = nil
 	fixture.core = helpers.load_with_stubs("modules.llm", { timer = timer_stub })
 	fixture.baseline = #fixture.timers

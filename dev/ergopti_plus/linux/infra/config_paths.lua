@@ -4,7 +4,7 @@
 --- MODULE: Linux User-Directory Resolver
 --- DESCRIPTION:
 --- Single source of truth for the user's home, config and data directories,
---- mirroring the macOS infra/paths.lua config helpers.
+--- mirroring the macOS core/fs/engine/paths.lua config helpers.
 ---
 --- WHY THIS EXISTS:
 --- Fifteen files derived `$HOME` themselves, across nineteen call sites, with
@@ -39,8 +39,8 @@
 
 local M = {}
 
-local AppDirs = require("app_dirs")
-local NativePath = require("native_path")
+local AppDirs = require("core.fs.engine.app_dirs")
+local NativePath = require("core.fs.engine.native_path")
 
 local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
@@ -129,7 +129,7 @@ end
 --- points at changes and cannot recurse through M.config().
 --- @return string Absolute path, no trailing slash.
 function M.get_config_dir()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
 		return M.default_config_dir()
 	end
@@ -159,10 +159,10 @@ end
 --- @return boolean prepared
 local function prepare_config_directory(normalized)
 	local target = normalized == "" and M.default_config_dir() or normalized
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local called, ready = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(target) .. " 2>/dev/null")
 	if called and ready == true then return true end
-	require("logger.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
+	require("core.logger.engine.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
 	return false
 end
 
@@ -170,7 +170,7 @@ end
 --- the names under it at write time. Required lazily: the sink reads this module
 --- when it installs, so neither may require the other at load.
 local function follow_config_dir_in_logs()
-	require("infra.logger_sink").follow_config_dir(M.get_config_dir())
+	require("core.logger.engine.sink").follow_config_dir(M.get_config_dir())
 end
 
 --- Persists a configuration-directory override.
@@ -180,7 +180,7 @@ function M.set_config_dir(path)
 	local normalized = normalize_config_override(path)
 	if normalized == nil then return false end
 
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false end
 	if not prepare_config_directory(normalized) then return false end
 	local committed
@@ -298,7 +298,7 @@ end
 --- reload after the path editor saved a new folder needs no other hand-off.
 --- @return string Absolute path, no trailing slash.
 function M.get_logs_dir()
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.get) ~= "function" then
 		return M.default_logs_dir()
 	end
@@ -315,7 +315,7 @@ end
 function M.set_logs_dir(path)
 	local normalized, err = M.normalize_logs_dir(path)
 	if normalized == nil then return false, err end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false, "bootstrap storage is unavailable" end
 	if normalized == "" or normalized == M.default_logs_dir() then
 		return type(Storage.delete) == "function"
@@ -342,7 +342,7 @@ function M.set_paths(config_dir, logs_dir)
 	end
 	append(CONFIG_DIR_STORAGE_KEY, config, M.default_config_dir())
 	if logs_dir ~= nil then append(LOGS_DIR_STORAGE_KEY, logs, M.default_logs_dir()) end
-	local ok, Storage = pcall(require, "adapters.storage")
+	local ok, Storage = pcall(require, "core.fs.adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.set_many) ~= "function" then return false end
 	if not prepare_config_directory(config) then return false end
 	local called, saved = pcall(Storage.set_many, values, deletions)

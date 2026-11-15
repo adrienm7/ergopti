@@ -38,10 +38,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Shell = require("adapters.shell_runner")
-local DisplayServer = require("infra.display_server")
-local EvdevCodes = require("infra.evdev_codes")
+local Logger = require("core.logger.engine.shim")
+local Shell = require("core.process.adapters.shell_runner")
+local DisplayServer = require("core.ui.engine.display_server")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local LOG = "adapters.clipboard"
 
@@ -112,6 +112,19 @@ local function backend()
 				-- Every MIME type the owner offers, one per line: a borrower
 				-- checks it before replacing formats it could not put back.
 				list_types = string.format("timeout %d wl-paste --list-types 2>/dev/null", IO_TIMEOUT_S),
+				-- wl-paste exits 1 on an empty clipboard and on a failed read
+				-- alike; only its message tells them apart.
+				owned = function()
+					local empty = Shell.exec_checked(string.format(
+						"{ timeout %d wl-paste --list-types 2>&1 >/dev/null; } | grep -qx 'Nothing is copied'",
+						IO_TIMEOUT_S))
+					if empty then return false end
+					return nil
+				end,
+				-- Gives an empty clipboard back empty, not as an owned "" entry.
+				clear = function()
+					return Shell.exec_checked(string.format("timeout %d wl-copy --clear", IO_TIMEOUT_S)) == true
+				end,
 				-- One advertised type's exact bytes, for a multi-format snapshot.
 				read_target = function(target)
 					return string.format("timeout %d wl-paste --no-newline --type %s 2>/dev/null", IO_TIMEOUT_S,
@@ -133,6 +146,10 @@ local function backend()
 				-- The ICCCM TARGETS answer: every target the owner can convert to.
 				list_types = string.format(
 					"timeout %d xclip -selection clipboard -t TARGETS -o 2>/dev/null", IO_TIMEOUT_S),
+				-- xclip exits 1 on an ownerless clipboard and on a failed read alike.
+				owned = function() return (require("adapters.x11_selection_stamp").owned()) end,
+				-- Gives an unowned clipboard back unowned, not as an owned "" entry.
+				clear = function() return (require("adapters.x11_selection_stamp").disown()) == true end,
 				read_target = function(target)
 					return string.format("timeout %d xclip -selection clipboard -t %s -o 2>/dev/null", IO_TIMEOUT_S,
 						Shell.quote(target))
@@ -206,6 +223,12 @@ local TEXT_EQUIVALENT_TARGETS = {
 	["TEXT"] = true, ["COMPOUND_TEXT"] = true, ["text/plain"] = true,
 }
 
+-- ICCCM bookkeeping an owner answers itself; it carries no saved payload.
+local BOOKKEEPING_TARGETS = {
+	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true, ["SAVE_TARGETS"] = true,
+	["DELETE"] = true, ["INSERT_SELECTION"] = true, ["INSERT_PROPERTY"] = true,
+}
+
 --- Whether one advertised target is the restored text or bookkeeping.
 --- @param target string One line of the type listing.
 --- @return boolean
@@ -220,23 +243,20 @@ end
 --- @param selected_backend table
 --- @return boolean ok False when the formats could not be enumerated.
 --- @return table lost Advertised formats other than the text.
+--- @return boolean offers_text Whether a text format is advertised at all.
 local function formats_lost_by_text_restore(selected_backend)
-	if not selected_backend.list_types then return false, {} end
+	if not selected_backend.list_types then return false, {}, false end
 	local ok, listing = Shell.exec_checked(selected_backend.list_types)
-	if not ok then return false, {} end
-	local lost = {}
+	if not ok then return false, {}, false end
+	local lost, offers_text = {}, false
 	for line in listing:gmatch("[^\r\n]+") do
-		local target = require("text_utils").trim(line)
-		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target end
+		local target = require("core.text.engine.utils_core").trim(line)
+		if target ~= "" and not is_text_equivalent_target(target) then lost[#lost + 1] = target
+		elseif target ~= "" and not BOOKKEEPING_TARGETS[target] then offers_text = true end
 	end
-	return true, lost
+	return true, lost, offers_text
 end
 
--- ICCCM bookkeeping an owner answers itself; it carries no saved payload.
-local BOOKKEEPING_TARGETS = {
-	["TARGETS"] = true, ["TIMESTAMP"] = true, ["MULTIPLE"] = true, ["SAVE_TARGETS"] = true,
-	["DELETE"] = true, ["INSERT_SELECTION"] = true, ["INSERT_PROPERTY"] = true,
-}
 
 -- Bytes a multi-format snapshot may hold in all; a larger clipboard (a raw
 -- screenshot in several encodings) is refused rather than held in memory.
@@ -250,7 +270,7 @@ local function read_all_targets(selected_backend)
 	if not ok then return nil end
 	local targets, seen, total = {}, {}, 0
 	for line in listing:gmatch("[^\r\n]+") do
-		local name = require("text_utils").trim(line)
+		local name = require("core.text.engine.utils_core").trim(line)
 		if name ~= "" and not BOOKKEEPING_TARGETS[name] and not seen[name] then
 			seen[name] = true
 			local read_ok, data = Shell.exec_checked(selected_backend.read_target(name))
@@ -283,8 +303,26 @@ end
 --- @return string|nil reason
 local function read_restorable_snapshot(selected_backend)
 	local ok, contents, reason = read_backend_checked(selected_backend)
-	if not ok then return false, nil, reason end
-	local listed, lost = formats_lost_by_text_restore(selected_backend)
+	local text_withheld = false
+	if not ok then
+		-- A clipboard nobody owns (nothing copied yet this session, or its owner
+		-- quit) makes xclip and wl-paste fail as a broken read does. It is an
+		-- empty clipboard, given back unowned as macOS clears its pasteboard,
+		-- so a clipboard manager records no empty entry (ADD-2, decided by the
+		-- maintainer on 2026-11-11); any other failure still refuses.
+		local owned = selected_backend.owned and selected_backend.owned()
+		if owned == false then
+			if type(selected_backend.clear) ~= "function" then return false, nil, reason end
+			return true, { text = "", unowned = true }, nil
+		end
+		if owned ~= true then return false, nil, reason end
+		-- An owner offering no text (a screenshot copied alone) fails the text
+		-- read too: its own formats are saved whole, as Windows' ClipboardAll
+		-- saves them (CBL-001). A text format that fails to read still refuses.
+		text_withheld, contents = true, ""
+	end
+	local listed, lost, offers_text = formats_lost_by_text_restore(selected_backend)
+	if text_withheld and (not listed or offers_text or #lost == 0) then return false, nil, reason end
 	if not listed then
 		-- xsel cannot ask for TARGETS: nothing proves the text is all there is.
 		Logger.warn(LOG, "Clipboard formats cannot be listed via %s; borrowing refused (install %s).",
@@ -314,6 +352,7 @@ end
 --- @param snapshot table From read_restorable_snapshot.
 --- @return boolean
 local function restore_snapshot(selected_backend, snapshot)
+	if snapshot.unowned then return selected_backend.clear() == true end
 	if snapshot.targets then return require("adapters.clipboard_owner").write(snapshot.targets) end
 	return write_backend_checked(selected_backend, snapshot.text)
 end
@@ -647,9 +686,9 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 		return admitted(admission)
 	end)
 
-	-- Restored even when it was empty: writing "" back is what leaves the
-	-- clipboard as the user left it, and skipping the restore on an empty save
-	-- would leave our replacement sitting there.
+	-- Restored even when it was empty: an owned "" is written back and an
+	-- unowned clipboard is cleared, which leaves it as the user left it;
+	-- skipping the restore would leave our replacement sitting there.
 	local held = holds_pasted_text(b, text)
 	if held == nil or (held and not restore_snapshot(b, saved)) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
@@ -745,7 +784,7 @@ end
 --- Reads the file manager's selection by copying it: the text/uri-list it
 --- publishes on Ctrl+C, then puts the clipboard's text back. xsel cannot ask
 --- for a target, so it has no route; the caller parses the list
---- (_shared/lua/file_selection).
+--- (_shared/core/fs/engine).
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
 --- @return boolean ok

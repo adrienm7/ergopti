@@ -9,11 +9,11 @@
 
 local M = {}
 local hs = hs
-local Logger = require("infra.logger")
-local Paths = require("infra.paths")
-local DeferredWork = require("infra.deferred_work")
-local JsonCodec = require("adapters.json_codec")
-local OwnWindow = require("adapters.own_window")
+local Logger = require("core.logger.engine.logger")
+local Paths = require("core.fs.engine.paths")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local OwnWindow = require("core.ui.adapters.own_window")
 local LOG = "console_window"
 
 --- Resolves the native console ratios from the shared geometry owner.

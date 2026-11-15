@@ -43,6 +43,29 @@ helpers.describe("Keyboard layout submenu reaches the tray populated", function(
 		helpers.assert_true(seen["menu.layout.menubar_icon"], "the menubar icon row must be in the rendered submenu")
 	end)
 
+	helpers.it("« Create or edit a layout… » opens the layout manager straight on the editor (layout-editor-menu)", function()
+		local saved = package.loaded["ui.layout_manager"]
+		local deferred = 0
+		local window = {
+			menu_command = function() return function() end end,
+			editor_menu_command = function() return function() deferred = deferred + 1 end end,
+		}
+		package.loaded["ui.layout_manager"] = window
+		local ok, err = pcall(function()
+			local row = tray_row(make_ctx())
+			local editor
+			for _, child in ipairs(row and row.menu or {}) do
+				if child.title == "menu.layout.edit" then editor = child end
+			end
+			helpers.assert_true(type(editor) == "table", "the editor row must be in the rendered submenu")
+			helpers.assert_eq(type(editor.fn), "function")
+			editor.fn()
+		end)
+		package.loaded["ui.layout_manager"] = saved
+		helpers.assert_true(ok, tostring(err))
+		helpers.assert_eq(deferred, 1, "the row runs the window's editor command")
+	end)
+
 	-- The emulated rows group handed its finished rows back as `items` too, so
 	-- « Rangées émulées » opened onto nothing.
 	helpers.it("the emulated rows submenu carries its four switches", function()
@@ -92,8 +115,8 @@ end)
 --- Captures actual provider data while forwarding its status and rendering to the real binding.
 --- @param callback function Receives the native build, fixture state and binding.
 local function with_empty_layout(callback)
-	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"adapters.json_codec", "menu.renderer", "modules.keymap.layout_registry" }, function()
+	helpers.with_stub_scope({ "ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
+		"core.fs.adapters.json_codec", "menu.engine.renderer", "modules.keymap.layout_registry" }, function()
 		local module = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 		install_legacy_layout_formats()
 		local binding = require("infra.manifest_menu")
@@ -125,7 +148,7 @@ local function with_empty_layout(callback)
 end
 
 -- Independent pre-migration captions; the generated status declaration is the subject.
-local EmptyLayoutJson = require("json")
+local EmptyLayoutJson = require("core.text.engine.json")
 local function read_empty_layout_json(path)
 	local file = assert(io.open(path, "rb"))
 	local value = assert(EmptyLayoutJson.decode(file:read("*a")))
@@ -169,9 +192,9 @@ helpers.describe("the shared empty native-layout status", function()
 	for locale, expected in pairs(EmptyLayoutCorpus.captions) do
 		helpers.it("(layout-empty-status) renders the real empty provider in " .. locale, function()
 			with_empty_layout(function(build, state, binding)
-				local catalogue = read_empty_layout_json(helpers.shared("data/locales/" .. locale .. ".json"))
+				local catalogue = read_empty_layout_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
 				helpers.assert_eq(catalogue[EmptyLayoutCorpus.row.i18n], expected)
-				require("infra.i18n").get = function(key) return catalogue[key] or key end
+				require("core.i18n.engine.i18n").get = function(key) return catalogue[key] or key end
 				local rows = build()
 				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
 				helpers.assert_eq(count_empty_layout_caption(rows, expected), 1)
@@ -190,7 +213,7 @@ helpers.describe("the shared empty native-layout status", function()
 			with_empty_layout(function(build, state, binding)
 				local statuses = empty_layout_owner(binding).status_rows
 				local baseline = build()
-				local caption = require("infra.i18n").get(EmptyLayoutCorpus.row.i18n)
+				local caption = require("core.i18n.engine.i18n").get(EmptyLayoutCorpus.row.i18n)
 				helpers.assert_eq(count_empty_layout_caption(baseline, caption), 1)
 				local bad = {
 					empty = {}, command = { { type = "command", id = "layout_manager", i18n = "menu.layout.manage" } },
@@ -235,8 +258,8 @@ end)
 --- Uses the actual empty-source list, canonical binding and native row renderer.
 --- Native effect ports are controlled and expose their launch receipt.
 local function with_empty_source_preferences(callback, labels)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install", "adapters.shell_runner"}, function()
+	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
+		"modules.keymap.input_sources", "modules.keymap.layout_install", "core.process.adapters.shell_runner"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local state = {records = {}, commands = {}, result = true, effects = 0}
@@ -250,12 +273,12 @@ local function with_empty_source_preferences(callback, labels)
 		installer.install_user = forbid_effect
 		installer.install_system = forbid_effect
 		sources.set_input_source_async = forbid_effect
-		package.loaded["adapters.shell_runner"] = { open = function(url)
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(url)
 			state.commands[#state.commands + 1] = url
 			if state.result == "throw" then error("Native launch refused") end
 			return state.result
 		end }
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end end
 		package.loaded["infra.manifest_menu"] = nil
 		local binding = require("infra.manifest_menu")
@@ -367,12 +390,12 @@ helpers.describe("empty native Input Sources consumes the canonical preferences 
 		end)
 	end)
 	helpers.it("consumes every existing real locale caption without a native literal", function()
-		local codec = require("adapters.json_codec")
-		local file = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
+		local codec = require("core.fs.adapters.json_codec")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
 		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
 			helpers.assert_true(type(labels["menu.layout.open_prefs"]) == "string" and labels["menu.layout.open_prefs"] ~= "")
 			with_empty_source_preferences(function(build, state)
@@ -417,7 +440,8 @@ helpers.describe("layout switching consumes its complete shared presentation fra
 				local rows = build()
 				local parent = switch_row(rows, "  ↳ menu.layout.layout_on_pause : ")
 				helpers.assert_not_nil(parent)
-				helpers.assert_eq(parent.disabled == true, shape ~= "ready")
+				-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+				helpers.assert_eq(parent.disabled == true, shape == "off")
 			end)
 		end)
 	end
@@ -483,13 +507,13 @@ helpers.describe("layout switching consumes its complete shared presentation fra
 		end)
 	end)
 	helpers.it("preserves all 21 independently frozen old captions through actual renderer", function()
-		local codec = require("adapters.json_codec")
+		local codec = require("core.fs.adapters.json_codec")
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/layout_switching_captions.json"), "rb"))
 		local vectors = assert(codec.decode(file:read("*a"))); assert(file:close())
 		local count = 0
 		for lang, vector in pairs(vectors) do
 			count = count + 1
-			file = assert(io.open(helpers.shared("data/locales/" .. lang .. ".json"), "rb"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. lang .. ".json"), "rb"))
 			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
 			with_switch_frame(function(build)
 				local rows = build()

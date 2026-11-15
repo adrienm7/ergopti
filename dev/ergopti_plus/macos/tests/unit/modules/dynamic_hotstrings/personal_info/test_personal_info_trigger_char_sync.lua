@@ -31,13 +31,13 @@ local active_fixture = nil
 local function with_dynamic_fixture(body)
 	helpers.with_stub_scope({ "modules.dynamic_hotstrings", "modules.dynamic_hotstrings.rules_engine",
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
-		"dynamic_hotstrings", "dynamic_hotstrings.user_source", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
-		"adapters.file_system", "infra.config_paths", "adapters.application_notifier" }, function()
+		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
+		"core.fs.adapters.file_system", "infra.config_paths", "platform.focus.application_notifier" }, function()
 		local previous = active_fixture
 		local fixture = { captures = 0, factory_loads = 0 }
 		active_fixture = fixture
-		local Source = require("dynamic_hotstrings.user_source")
+		local Source = require("hotstrings.engine.dynamic.user_source")
 		local load = Source.load
 		Source.load = function(...)
 			fixture.factory_loads = fixture.factory_loads + 1
@@ -105,6 +105,7 @@ local function make_fake_keymap(custom_trigger, preview_fence)
 		add                       = function() end,
 		inject_dynamic            = function() return true end,
 		register_interceptor      = function(fn) interceptors[#interceptors + 1] = fn end,
+		dynamic_rule_within_delay      = function() return true end,
 		register_preview_provider = function() end,
 		registry_transaction      = function(_, mutation) return mutation() == true end,
 		invalidate_hotstring_preview = preview_fence or function() return true end,

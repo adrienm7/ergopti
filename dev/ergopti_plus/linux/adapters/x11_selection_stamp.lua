@@ -10,7 +10,7 @@
 --- WHY NATIVE:
 --- xsel, the other X11 clipboard tool, cannot request an arbitrary target, so
 --- without xclip the copy went unchecked. libX11 is already one of the
---- driver's declared native libraries (_shared/data/linux_native_runtime.json).
+--- driver's declared native libraries (_shared/core/network/data/linux_native_runtime.json).
 ---
 --- FEATURES & RATIONALE:
 --- 1. One connection per read: a copy check reads twice, and a connection that
@@ -18,7 +18,9 @@
 --- 2. Bounded wait: the owner's answer is awaited for at most the caller's
 ---    timeout, polling without blocking, then the read is "unreadable".
 --- 3. No owner, no stamp: a clipboard nobody owns answers 0, which a later
----    copy moves, as an owner's renewed timestamp does.
+---    copy moves, as an owner's renewed timestamp does. M.owned answers the
+---    owner question alone, for the clipboard borrower, and M.disown gives an
+---    unowned clipboard back as it was found.
 --- ==============================================================================
 
 local M = {}
@@ -49,6 +51,7 @@ local DECLARATIONS = {
 		.. " unsigned long);",
 	"int XFlush(struct _XDisplay *);",
 	"unsigned long XGetSelectionOwner(struct _XDisplay *, unsigned long);",
+	"int XSetSelectionOwner(struct _XDisplay *, unsigned long, unsigned long, unsigned long);",
 	"typedef union { long pad[24]; } ErgoptiSelectionStampEvent;",
 	"typedef struct { int type; unsigned long serial; int send_event; void *display; unsigned long requestor,"
 		.. " selection, target, property, time; } ErgoptiSelectionStampNotify;",
@@ -70,7 +73,7 @@ local function bind()
 	end
 	local loaded, x11 = pcall(ffi.load, Runtime.x11)
 	if not loaded then return nil, "unsupported" end
-	local sleep = require("infra.native_sleep").bind(ffi)
+	local sleep = require("core.timing.engine.native_sleep").bind(ffi)
 	if not sleep then return nil, "unsupported" end
 	_bound = { ffi = ffi, x11 = x11, sleep = sleep }
 	return _bound
@@ -106,6 +109,43 @@ local function await_stamp(native, display, window, property, timeout_s)
 		waited = waited + POLL_STEP_S
 	end
 	return nil
+end
+
+--- Whether any client owns the CLIPBOARD selection. xclip cannot tell an
+--- ownerless clipboard from a failed read (both exit 1), and an ownerless
+--- clipboard is simply empty.
+--- @return boolean|nil owned
+--- @return string|nil reason "unsupported" without libX11 or a display.
+function M.owned()
+	local native, reason = bind()
+	if not native then return nil, reason end
+	local x11 = native.x11
+	local display = x11.XOpenDisplay(nil)
+	if display == nil then return nil, "unsupported" end
+	local owner = x11.XGetSelectionOwner(display, x11.XInternAtom(display, "CLIPBOARD", 0))
+	x11.XCloseDisplay(display)
+	return owner ~= NONE
+end
+
+--- Leaves the CLIPBOARD selection without an owner, as it was before a
+--- borrow found it unowned: the ICCCM way to empty it, which macOS
+--- (clearContents) matches. The owner Ergopti's writer started receives
+--- SelectionClear and exits; nothing records an empty entry (ADD-2).
+--- @return boolean cleared true once the server reports no owner.
+--- @return string|nil reason "unsupported" without libX11 or a display, "owned" when an owner remains.
+function M.disown()
+	local native, reason = bind()
+	if not native then return false, reason end
+	local x11 = native.x11
+	local display = x11.XOpenDisplay(nil)
+	if display == nil then return false, "unsupported" end
+	local clipboard = x11.XInternAtom(display, "CLIPBOARD", 0)
+	x11.XSetSelectionOwner(display, clipboard, NONE, CURRENT_TIME)
+	x11.XFlush(display)
+	local owner = x11.XGetSelectionOwner(display, clipboard)
+	x11.XCloseDisplay(display)
+	if owner ~= NONE then return false, "owned" end
+	return true
 end
 
 --- The CLIPBOARD owner's TIMESTAMP.

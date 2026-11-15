@@ -29,14 +29,14 @@ local helpers = require("tests.helpers")
 --- real M.LEVELS / M.current_level for the log-level submenu, so a fully
 --- synthetic make_logger_stub() is too minimal here) and records every
 --- Logger.error call's already-formatted message.
---- @return table logger_spy Injectable package.loaded["infra.logger"] replacement.
+--- @return table logger_spy Injectable package.loaded["core.logger.engine.logger"] replacement.
 --- @return table error_messages Array of formatted strings passed to Logger.error (grows live).
 local function make_error_capturing_logger()
 	local error_messages = {}
 	-- Real logger module, loaded fresh so it is unaffected by any stub a
 	-- previous test file may have left in package.loaded.
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local logger_spy = setmetatable({}, { __index = real_logger })
 	logger_spy.error = function(module_name, fmt, ...)
@@ -68,10 +68,10 @@ end
 helpers.describe("Builder.generate: tail calls (download item, canvas badge) are pcall-isolated (F-MED-11)", function()
 	helpers.it("a throwing build_download_item does not prevent M.generate from returning the rest of the menu", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -100,7 +100,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 
 	helpers.it("a throwing CanvasBadge.prepend_to does not prevent M.generate from returning the rest of the menu", function()
 		local logger_stub, error_messages = make_error_capturing_logger()
-		package.loaded["infra.logger"] = logger_stub
+		package.loaded["core.logger.engine.logger"] = logger_stub
 
 		-- load_with_stubs unconditionally wipes every cached "ui.menu.*" module
 		-- (so a leaked i18n stub can never survive between test files — see its
@@ -116,7 +116,7 @@ helpers.describe("Builder.generate: tail calls (download item, canvas badge) are
 		package.loaded["ui.menu.builder"] = nil
 		builder = require("ui.menu.builder")
 
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.get = function(k) return k end
 		i18n.build_language_menu_items = function() return {} end
 
@@ -142,9 +142,9 @@ end)
 --- @param body function Receives a genuine build closure, root, i18n and actions.
 local function with_lifecycle_root(body)
 	return helpers.with_stub_scope({ "ui.menu.builder", "ui.menu.canvas_badge", "infra.manifest_menu",
-		"menu.renderer", "infra.i18n", "infra.paths", "infra.logger" }, function()
+		"menu.engine.renderer", "core.i18n.engine.i18n", "core.fs.engine.paths", "core.logger.engine.logger" }, function()
 		local logger = make_error_capturing_logger()
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		helpers.load_with_stubs("ui.menu.builder")
 		local renderer = require("infra.manifest_menu")
 		local root = renderer.get_root()
@@ -160,7 +160,7 @@ local function with_lifecycle_root(body)
 		local builder = require("ui.menu.builder")
 		local actions = make_actions()
 		local context = { config = { log_level = 2 } }
-		body(function() return builder.generate(context, {}, actions) end, root, require("infra.i18n"), actions)
+		body(function() return builder.generate(context, {}, actions) end, root, require("core.i18n.engine.i18n"), actions)
 	end)
 end
 
@@ -171,7 +171,7 @@ local function lifecycle_json(relative)
 	local file = assert(io.open(helpers.shared(relative), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return require("json").decode(raw)
+	return require("core.text.engine.json").decode(raw)
 end
 
 helpers.describe("root lifecycle commands own declared Mac captions and retained native delivery", function()
@@ -180,7 +180,7 @@ helpers.describe("root lifecycle commands own declared Mac captions and retained
 		helpers.it("preserves independently frozen Reload/Quit captions and native acknowledgments: " .. locale, function()
 			with_lifecycle_root(function(build, _, i18n, actions)
 				local prior = lifecycle_json("tests/corpus/menus/macos_lifecycle_command_captions.json").captions[locale]
-				local strings = lifecycle_json("data/locales/" .. locale .. ".json")
+				local strings = lifecycle_json("core/i18n/data/locales/" .. locale .. ".json")
 				i18n.get = function(key) return strings[key] or key end
 				local calls = {}
 				actions.reload = function(value) calls[#calls + 1] = { "reload", value }; return false end

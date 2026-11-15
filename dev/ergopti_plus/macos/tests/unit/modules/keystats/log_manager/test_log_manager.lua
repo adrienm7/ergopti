@@ -21,7 +21,7 @@
 
 local helpers = require("tests.helpers")
 local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
-local saved_file_system = package.loaded["adapters.file_system"]
+local saved_file_system = package.loaded["core.fs.adapters.file_system"]
 
 
 
@@ -33,16 +33,16 @@ local saved_file_system = package.loaded["adapters.file_system"]
 -- =====================================
 
 -- Must be registered BEFORE load_with_stubs so downstream requires resolve them.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	t = function(key) return key end,
 }
 
 -- Every harness below models a fresh install. Identity publication is a
 -- prerequisite owned by the filesystem adapter, not the behavior under test.
-package.loaded["adapters.file_system"] = {
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -103,7 +103,7 @@ package.loaded["modules.keystats.export"] = {
 local _TIMINGS_MS = {
 	keystats = { max_keystroke_delay_ms = 5000 },
 }
-package.loaded["infra.timings"] = {
+package.loaded["core.timing.engine.timings"] = {
 	ms  = function(section, key)
 		return (_TIMINGS_MS[section] or {})[key] or 1000
 	end,
@@ -737,4 +737,4 @@ helpers.describe("log_manager — ensure_ingest_running lifecycle (e2e-async-lif
 	end)
 end)
 
-package.loaded["adapters.file_system"] = saved_file_system
+package.loaded["core.fs.adapters.file_system"] = saved_file_system

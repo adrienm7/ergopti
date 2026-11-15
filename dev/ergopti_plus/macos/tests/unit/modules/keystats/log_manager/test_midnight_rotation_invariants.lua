@@ -34,7 +34,7 @@ local function drive_rotation(rollover_results, paused, ticks, split_results)
 	logger.error = function(_log, format, ...)
 		errors[#errors + 1] = string.format(format, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["modules.keystats.log_manager"] = {
 		flush_buffer = function()
 			calls[#calls + 1] = "flush"
@@ -69,7 +69,7 @@ local function drive_rotation(rollover_results, paused, ticks, split_results)
 	}
 	watchers.init(state, function() return paused end)
 
-	local synthetic_input = require("adapters.synthetic_input")
+	local synthetic_input = require("platform.input.synthetic_input")
 	local provenance = require("adapters.event_provenance")
 	local tagged = provenance_fixture.tagged_key(
 		synthetic_input, "test.midnight", "replacement", "m")
@@ -152,7 +152,7 @@ helpers.describe("keystats: behavioural midnight rotation invariants", function(
 			if format:find("Midnight rotation complete", 1, true) then successes = successes + 1 end
 		end
 		local attempts, recovering = 0, true
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.keystats.log_manager"] = {
 			ROLLOVER_WAITS_FOR_RECOVERY = "recovering",
 			flush_buffer = function() return true end,

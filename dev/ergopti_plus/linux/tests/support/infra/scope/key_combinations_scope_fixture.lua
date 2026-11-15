@@ -12,7 +12,7 @@ local NativeLoop = require("luv")
 
 local helpers = require("tests.helpers")
 
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local Scope = require("infra.key_combinations_scope")
 
@@ -60,12 +60,12 @@ local function with_owner(body, managed, public_chords)
 		}
 		if managed then
 			local Loader=require("platform.remap.tap_hold_loader")
-			local defaults=require("infra.paths").shared("tap_hold/defaults.toml")
-			local loaded=Loader.load_document(defaults,{tap_hold={enabled=false,inherit_defaults=true}},nil,"/controlled/tap_hold.toml")
+			local defaults=require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
+			local loaded=Loader.load_document(defaults,{ tap_hold = { inherit_defaults = true } }, nil, "/controlled/tap_hold.toml", nil, { tap_holds = { enabled = false } })
 			package.loaded["platform.remap.tap_hold_manager"]=nil
 			package.loaded["platform.remap.tap_hold_loader"]={GLOBAL_DEFAULT_SECONDS=Loader.GLOBAL_DEFAULT_SECONDS,load=function() return loaded end}
 			package.loaded["platform.remap.nav_layer"]={load=function() return {} end}
-			package.loaded["adapters.file_system"]=files
+			package.loaded["core.fs.adapters.file_system"]=files
 			package.loaded["infra.config_paths"]={config=function() return path end}
 			local hook={set_remapper=function(engine,callback)
 				if state.native then
@@ -78,14 +78,14 @@ local function with_owner(body, managed, public_chords)
 			for _,name in ipairs({"key_text","held_modifiers","held_text_modifier_codes","held_shortcut_modifier_codes"}) do hook[name]=function() return {} end end
 			package.loaded["modules.shortcuts.key_combinations"]=nil
 			state.manager=require("platform.remap.tap_hold_manager")
-			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
+			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml",config_path="/controlled/config.toml"}))
 			state.pairs=require("modules.shortcuts.key_combinations")
 		else
 		local keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }
 		if public_chords==true then
-			local file=assert(io.open(require("infra.paths").shared("tap_hold/defaults.toml"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),"rb"))
 			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
-			keys=require("tap_hold.key_catalog").for_platform(defaults,"linux")
+			keys=require("tap_hold.engine.key_catalog").for_platform(defaults,"linux")
 		end
 		state.pairs = PairOwner.new({ keys = keys,
 			hold_picker = { modifiers = {"shift","alt"}, layers = {"nav"} }, files = files,
@@ -105,7 +105,7 @@ local function with_owner(body, managed, public_chords)
 		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
 			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
-			end},is_paused=function() return state.paused end})
+			end}})
 		body(state)
 	end)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
@@ -116,24 +116,25 @@ end
 local function failed(value) helpers.assert_eq(value,false) end
 
 local function next_scope(s,expected,manifest,tag)
-	return Scope.new({path=path,backup_path=backup..(tag or ".next"),files=s.files,combinations=s.pairs,parameters=s.gestures,
-		manifest=manifest or require("infra.manifest_reader"),is_paused=function() return s.paused end,expected_source=expected})
+	return Scope.new({path=path,backup_path=backup..(tag or ".next"),
+		files=s.files,combinations=s.pairs,parameters=s.gestures,
+		manifest=manifest or require("infra.manifest_reader"),expected_source=expected})
 end
 
 local function with_menu(body, public_chords)
 	with_owner(function(s)
-		package.loaded["adapters.file_system"]=s.files
+		package.loaded["core.fs.adapters.file_system"]=s.files
 		package.loaded["infra.config_paths"]={config=function() return path end}
 		package.loaded["infra.key_combinations_scope"]=nil
 		package.loaded["ui.menu.key_combinations"]=nil
 		local renderer=require("infra.manifest_menu")
-		local i18n=require("infra.i18n")
-		local Holds=require("tap_hold.hold_options")
+		local i18n=require("core.i18n.engine.i18n")
+		local Holds=require("tap_hold.engine.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}
 		if public_chords==true then
-			local file=assert(io.open(require("infra.paths").shared("tap_hold/defaults.toml"),"rb"))
+			local file=assert(io.open(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"),"rb"))
 			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
-			keys=require("tap_hold.key_catalog").for_platform(defaults,"linux")
+			keys=require("tap_hold.engine.key_catalog").for_platform(defaults,"linux")
 		end
 		local holds=Holds.build({modifiers={"shift","alt"},layers={"nav"}})
 		local PairOwner=require("modules.shortcuts.key_combinations")

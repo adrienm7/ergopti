@@ -81,13 +81,13 @@ helpers.describe("modules.shortcuts.manager", function()
   end)
 
   -- Regression + SSoT guard: the wrap catalogue must be derived from the shared
-  -- JSON (_shared/modules/wrap_symbols/wrap_symbols.json), never hardcoded. Build
+  -- JSON (_shared/keyboard/data/wrap_symbols/wrap_symbols.json), never hardcoded. Build
   -- the expected flattened lookup straight from the canonical JSON and deep-equal
   -- it against the module's catalogue, so any drift — or a revert to a hardcoded
   -- subset — fails here.
   helpers.it("wrap catalogue matches the shared wrap_symbols.json SSoT", function()
-    local json = require("json")
-    local path = helpers.driver_root() .. "/../_shared/modules/wrap_symbols/wrap_symbols.json"
+    local json = require("core.text.engine.json")
+    local path = helpers.driver_root() .. "/../_shared/keyboard/data/wrap_symbols/wrap_symbols.json"
     local fh = assert(io.open(path, "r"), "shared wrap_symbols.json must be readable")
     local raw = fh:read("*a")
     fh:close()
@@ -99,7 +99,7 @@ helpers.describe("modules.shortcuts.manager", function()
     for _, group in ipairs(data.groups) do
       for _, pair in ipairs(group.pairs or {}) do
         -- Every trigger form of both ends (bare and space-variant guillemets).
-        require("wrap_pair").register(expected, pair)
+        require("keyboard.engine.wrap_pair").register(expected, pair)
       end
     end
 
@@ -114,9 +114,9 @@ helpers.describe("modules.shortcuts.manager", function()
   -- restored at the end of the block. The real lock is proven by
   -- test_keyboard_hook_caps_word_lock and the session's endings by
   -- test_caps_word_auto_off.
-  local prior_hook = package.loaded["adapters.keyboard_hook"]
+  local prior_hook = package.loaded["platform.input.keyboard_hook"]
   local hook = require("tests.support.caps_word_lock_hook_fake").new()
-  package.loaded["adapters.keyboard_hook"] = hook
+  package.loaded["platform.input.keyboard_hook"] = hook
   M.init({})
 
   helpers.it("is_caps_word_active returns false initially", function()
@@ -149,7 +149,7 @@ helpers.describe("modules.shortcuts.manager", function()
 
   -- Not an `it`: a --only filter skips cases, and the fake would then stay in
   -- package.loaded for every later module (the diagnostics bridge reads the hook).
-  package.loaded["adapters.keyboard_hook"] = prior_hook
+  package.loaded["platform.input.keyboard_hook"] = prior_hook
 
   -- ==========================================================================
   -- 4. Enable / disable / toggle
@@ -329,7 +329,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 			.. tostring(enabled) .. '\nfuture_mode = "kept" # preserve this comment\n[future]\nvalues = ["a", "b"]\n'
 		local file = assert(io.open(path, "wb"));assert(file:write(source));assert(file:close())
 		local prior = package.loaded["modules.shortcuts.manager"]
-		local writer, rename = require("toml_codec.writer"), os.rename
+		local writer, rename = require("core.text.engine.toml_codec.writer"), os.rename
 		local batch = writer.batch_write
 		local called, failure = pcall(function()
 			local manager = helpers.load_module("modules.shortcuts.manager")
@@ -338,7 +338,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 		end)
 		writer.batch_write, os.rename = batch, rename
 		package.loaded["modules.shortcuts.manager"] = prior
-		os.remove(path .. ".tmp")
+		os.remove(path .. ".tmp"); os.remove(helpers.stage_path(path))
 		local removed = os.remove(path)
 		assert(removed, "the owned master fixture is physically retired")
 		if not called then error(failure, 0) end
@@ -357,7 +357,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					local renamed, published = os.rename, 0
 					if outcome:match("^rename%-") then
 						os.rename = function(from, to)
-							if from == path .. ".tmp" and to == path then
+							if from == helpers.stage_path(path) and to == path then
 								published = published + 1
 								if outcome == "rename-throw" then error("controlled publication refusal") end
 								if outcome == "rename-nil" then return nil, "controlled publication refusal" end
@@ -410,7 +410,7 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					local redraws, attempts, notices, releases = 0, 0, {}, 0
 					local tree = builder.build({ shortcuts = manager, _version = "9.9.9",
 						on_menu_changed = function() redraws = redraws + 1 end })
-					local title = require("infra.i18n").get("menu.shortcuts.enable")
+					local title = require("core.i18n.engine.i18n").get("menu.shortcuts.enable")
 					local action, matches = nil, 0
 					for _, group in ipairs(tree) do
 						for _, row in ipairs(group.menu or {}) do
@@ -419,10 +419,10 @@ helpers.describe("Shortcuts master publication: exact acknowledgement", function
 					end
 					helpers.assert_eq(matches, 1)
 					helpers.assert_eq(type(action), "function")
-					local rename, execute, modal = os.rename, os.execute, require("ui.modal")
+					local rename, execute, modal = os.rename, os.execute, require("core.ui.ui.modal")
 					local run = modal.run
 					os.rename = function(from, to)
-						if from == path .. ".tmp" and to == path then
+						if from == helpers.stage_path(path) and to == path then
 							attempts = attempts + 1
 							if outcome == "throw" then error("controlled publication refusal") end
 							if outcome == "false" then return false end

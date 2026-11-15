@@ -20,8 +20,8 @@
 
 local M = {}
 
-local TimerScheduler = require("adapters.timer_scheduler")
-local Logger         = require("infra.logger")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Logger         = require("core.logger.engine.logger")
 
 -- Seconds before each retry. The first ones cover a keyboard layout that
 -- settles a moment after the rebind (a reboot, a probe layout of a field run);

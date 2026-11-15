@@ -26,8 +26,8 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ShellRunner = require("adapters.shell_runner")
+local Logger = require("core.logger.engine.shim")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "gestures.pointer_warp"
 
@@ -140,7 +140,7 @@ end
 --- @return number|nil x
 --- @return number|nil y
 function M.read_state(action)
-	if require("infra.display_server").is_wayland() then
+	if require("core.ui.engine.display_server").is_wayland() then
 		Logger.error(LOG, "%s: a Wayland session lets no program move the pointer.", action)
 		return nil
 	end

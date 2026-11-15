@@ -7,10 +7,10 @@
 --- ==============================================================================
 
 local M = {}
-local Monotonic = require("infra.monotonic")
-local TableUtil = require("table_util")
-local StorageOwned = require("storage_owned")
-local Logger = require("logger.shim")
+local Monotonic = require("core.logger.engine.monotonic")
+local TableUtil = require("core.text.engine.table_util")
+local StorageOwned = require("core.fs.engine.storage_owned")
+local Logger = require("core.logger.engine.shim")
 local MS_PER_SECOND = 1000
 local US_PER_MS = MS_PER_SECOND
 local LOG = "modules.keystats.calendar"
@@ -34,7 +34,7 @@ local function wall_ms()
 end
 
 --- Epoch milliseconds, the daemon's one wall-clock reader (the reload duration
---- across a restart reads it too, infra/reload_timing.lua).
+--- across a restart reads it too, core/timing/engine/reload_timing.lua).
 M.wall_ms = wall_ms
 
 -- CLOCK_BOOTTIME includes suspended time; Linux CLOCK_MONOTONIC (luv.hrtime)

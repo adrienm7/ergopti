@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 local Config = require("modules.hotstrings.hotstrings_config")
 local Choices = require("tests.support.hotstring_choices")
 
@@ -31,7 +31,7 @@ local function fixture(choices, body, overrides)
 			.. '", auto_expand = true, is_word = false, is_case_sensitive = true, is_case_sensitive_strict = true }\n'))
 		assert(file:close())
 	end
-	local engine = require("hotstring_engine").new()
+	local engine = require("hotstrings.engine.matcher").new()
 	Config._set_override_config_dir_for_test(root)
 	if overrides then
 		local file = assert(io.open(root .. "/hotstrings_overrides.toml", "w"))
@@ -60,7 +60,7 @@ end
 --- @param key string Locale key of the reason.
 --- @return string
 local function reason_head(key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	local cut
 	for _, mark in ipairs({ ":", "\239\188\154" }) do
 		local at = text:find(mark, 1, true)
@@ -169,7 +169,7 @@ helpers.describe("native adopted personal file gates", function()
 			local item = f.definitions[2]
 			helpers.assert_eq(f.config.toggle_section(item.id, "probe"), true)
 			with_native_menu(f, function(render, opened, changed)
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local file = assert(render("a / b ("), "the actual personal file submenu must be reachable")
 				for index, key in ipairs({ "menu.common.enabled", "hs_config.label_delay", "hs_config.label_priority",
 					"hs_config.label_color", "hs_config.label_tooltip" }) do
@@ -191,7 +191,7 @@ helpers.describe("native adopted personal file gates", function()
 				helpers.assert_eq(changed(), 6)
 				helpers.assert_eq(f.config.is_section_enabled(item.id, "probe"), false)
 				local file_source = assert(io.open(item.path)); local bytes = assert(file_source:read("*a")); assert(file_source:close())
-				helpers.assert_eq(require("toml_codec.codec").decode(bytes)._meta.show_tooltip, not before,
+				helpers.assert_eq(require("core.text.engine.toml_codec.codec").decode(bytes)._meta.show_tooltip, not before,
 					"the tooltip menu ACK includes physical source publication")
 			end)
 		end)
@@ -205,7 +205,7 @@ helpers.describe("native adopted personal file gates", function()
 				local file = assert(render("a / b ("))
 				helpers.assert_true(file.menu[2].disabled)
 				helpers.assert_nil(file.menu[2].fn)
-				helpers.assert_true(file.menu[2].title:find(require("infra.i18n").get("menu.hotstrings.personal_metadata_unavailable"), 1, true) ~= nil)
+				helpers.assert_true(file.menu[2].title:find(require("core.i18n.engine.i18n").get("menu.hotstrings.personal_metadata_unavailable"), 1, true) ~= nil)
 				helpers.assert_eq(file.menu[1].disabled == true, false, "the authoritative file gate remains usable")
 				local read = assert(io.open(item.path)); local before = assert(read:read("*a")); assert(read:close())
 				local alias = f.root .. "/hot/alias.toml"
@@ -220,7 +220,7 @@ helpers.describe("native adopted personal file gates", function()
 	end)
 	helpers.it("102 native exposes skipped linked and depth-limited directories as actual read-only menu rows", function()
 		fixture('', function(f)
-			local limit = require("hotstrings.personal_files").additional_scan_max_depth
+			local limit = require("hotstrings.engine.catalogue.personal_files").additional_scan_max_depth
 			local target, linked = f.root .. "/outside", f.root .. "/hot/linked"
 			assert(Shell.run("mkdir " .. Shell.quote(target)))
 			local excluded = assert(io.open(target .. "/outside.toml", "w")); assert(excluded:write('[probe]\n"excluded" = "Excluded"\n')); assert(excluded:close())
@@ -255,11 +255,11 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native requires an acknowledged rendered page owner before metadata publication", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 			local epoch, accepted = 41, false
-			package.loaded["ui.webview_manager"] = { current_epoch = function() return epoch end,
+			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return epoch end,
 				eval_js = function() return accepted end }
 			local ok, detail = pcall(function()
 				local Bridge = require("ui.hotstrings_config_window.bridge")
@@ -291,10 +291,10 @@ helpers.describe("native adopted personal file gates", function()
 	helpers.it("102 native refuses metadata from a rendered window after its source catalogue changes", function()
 		fixture('', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local names = { "ui.webview_manager", "ui.hotstrings_config_window.bridge" }
+			local names = { "core.ui.ui.webview_manager", "ui.hotstrings_config_window.bridge" }
 			local previous = {}
 			for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-			package.loaded["ui.webview_manager"] = { current_epoch = function() return 41 end, eval_js = function() return true end }
+			package.loaded["core.ui.ui.webview_manager"] = { current_epoch = function() return 41 end, eval_js = function() return true end }
 			local ok, detail = pcall(function()
 				local Bridge = require("ui.hotstrings_config_window.bridge")
 				local state = { config = f.config }
@@ -355,7 +355,7 @@ helpers.describe("native adopted personal file gates", function()
 				fixture('', function(f)
 					local item, before = f.definitions[2], f.read()
 					helpers.assert_eq(select(2, f.config.load_all()), true)
-					local Writer, write = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+					local Writer, write = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 					Writer.batch_write = function(path, ...)
 						if path == f.path then
 							assert(f.engine:load_mappings({ { trigger = "foreignx", replacement = "Foreign",
@@ -408,7 +408,7 @@ helpers.describe("native adopted personal file gates", function()
 		fixture('', function(f)
 			local item, before = f.definitions[2], f.read()
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local write = Writer.batch_write
 			Writer.batch_write = function(path, ...)
 				if path == f.path then
@@ -435,7 +435,7 @@ helpers.describe("native adopted personal file gates", function()
 		fixture('', function(f)
 			local item, before = f.definitions[2], f.read()
 			helpers.assert_eq(select(2, f.config.load_all()), true)
-			local Writer, write = require("toml_codec.writer"), require("toml_codec.writer").batch_write
+			local Writer, write = require("core.text.engine.toml_codec.writer"), require("core.text.engine.toml_codec.writer").batch_write
 			local load, inverse_pending = f.engine.load_mappings, false
 			Writer.batch_write = function(path, ...)
 				if path == f.path then inverse_pending = true; return false, "controlled preferences refusal" end
@@ -484,7 +484,7 @@ helpers.describe("native adopted personal file gates", function()
 					helpers.assert_true(content:find(line, 1, true) ~= nil, "legacy source line remains byte-identical: " .. line)
 				end
 				helpers.assert_eq(scanned_lines, sample.choice_lines, "each independent legacy fixture has its expected source lines")
-				local decoded = require("toml_codec").decode(content)
+				local decoded = require("core.text.engine.toml_codec").decode(content)
 				helpers.assert_eq(decoded.hotstrings.groups[item.id], true)
 				helpers.assert_eq(decoded.hotstrings.modules[item.id].probe, true)
 				assert(f.config.init(f.engine, f.root .. "/hot", nil))
@@ -520,7 +520,7 @@ helpers.describe("native adopted personal file gates", function()
 			helpers.assert_not_nil(f.match(item.trigger))
 			helpers.assert_eq(f.config.set_category_scope_enabled({ item.id }, false), true)
 			helpers.assert_nil(f.match(item.trigger)); helpers.assert_not_nil(f.match(f.definitions[1].trigger))
-			local document = require("toml_codec").decode(f.read())
+			local document = require("core.text.engine.toml_codec").decode(f.read())
 			helpers.assert_eq(document.hotstrings.modules[item.id]["dotted.team"], false)
 			helpers.assert_nil(document.hotstrings.modules[item.id].dotted)
 			helpers.assert_eq(f.config.set_category_scope_enabled({ item.id }, true), true)
@@ -542,7 +542,7 @@ helpers.describe("native adopted personal file gates", function()
 				helpers.assert_eq(f.config.resolve(item.id, "probe")[row[1]], row[2])
 			end
 			local file = assert(io.open(item.path)); local source = assert(file:read("*a")); assert(file:close())
-			local parsed = require("toml_codec").decode(source)
+			local parsed = require("core.text.engine.toml_codec").decode(source)
 			helpers.assert_eq(parsed._meta, { delay = 0.2, color = "#aabbcc", show_tooltip = false, priority = 43 })
 			helpers.assert_eq(f.match(item.trigger).replacement, item.output)
 			helpers.assert_eq(f.config.set_override(item.id, "probe", "priority", 62), true)
@@ -567,7 +567,7 @@ helpers.describe("native adopted personal file gates", function()
 			local tested, failure = pcall(function()
 				fixture('', function(f)
 					helpers.assert_eq(select(2, f.config.load_all()), true)
-					local item, Writer = f.definitions[2], require("toml_codec.writer")
+					local item, Writer = f.definitions[2], require("core.text.engine.toml_codec.writer")
 					local publish = Writer.publish_if_unchanged
 					local function source()
 						local file = assert(io.open(item.path)); local bytes = assert(file:read("*a")); assert(file:close()); return bytes
@@ -604,7 +604,7 @@ helpers.describe("native adopted personal file gates", function()
 		fixture('[future]\nkeep = "exact unknown value"\n', function(f)
 			helpers.assert_eq(select(2, f.config.load_all()), true)
 			local item = f.definitions[2]
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local publish = Writer.publish_if_unchanged
 			Writer.publish_if_unchanged = function(path, ...)
 				if path == item.path then return false, "controlled source refusal" end
@@ -648,7 +648,7 @@ helpers.describe("native adopted personal file gates", function()
 			helpers.assert_eq(f.config.set_category_scope_enabled({ selected.id }, false), true)
 			helpers.assert_nil(f.match(selected.trigger))
 			helpers.assert_not_nil(f.match(f.definitions[1].trigger))
-			local document = require("toml_codec").decode(f.read())
+			local document = require("core.text.engine.toml_codec").decode(f.read())
 			helpers.assert_eq(document.hotstrings.groups[selected.id], false)
 			helpers.assert_eq(document.hotstrings.modules[selected.id].probe, false)
 			helpers.assert_eq(document.future.keep, "exact unknown value")

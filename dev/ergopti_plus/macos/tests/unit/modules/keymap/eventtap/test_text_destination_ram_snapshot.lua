@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 -- Preserve the process-wide logger identity while scoping its shared adapter.
-require("logger")
+require("core.logger.engine")
 
 local function with_destination(callback, real_detector)
 	helpers.with_stub_scope({
-		"modules.keymap.utils", "keymap.utils", "infra.text_utils", "text_utils", "compat.utf8",
-		"infra.logger", "logger.shim", "infra.timings", "adapters.timer_scheduler",
-		"adapters.synthetic_input", "adapters.secure_field_detector",
+		"modules.keymap.utils", "layouts.engine.utils", "core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8",
+		"core.logger.engine.logger", "core.logger.engine.shim", "core.timing.engine.timings", "core.events.timer_scheduler",
+		"platform.input.synthetic_input", "platform.focus.secure_field_detector",
 	}, function()
 		local f = { now = 100, window = 42, element = {}, secure = false, title = "Editor",
 			timers = {}, callbacks = {}, calls = { clock = 0, absolute = 0, timer = 0, start = 0, stop = 0, ax = 0, watcher = 0 } }
@@ -63,10 +63,10 @@ local function with_destination(callback, real_detector)
 				end }
 			end },
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.timings"] = { sec = function() return 0.1 end }
-		package.loaded["adapters.synthetic_input"] = {}
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.timings"] = { sec = function() return 0.1 end }
+		package.loaded["platform.input.synthetic_input"] = {}
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureApp = function() return false end,
 			inspectFocusedElement = function() f.calls.ax = f.calls.ax + 1; return f.secure end,
 			inspectFocusedElementWithReceipt = function() f.calls.ax = f.calls.ax + 1; return f.secure, nil, f.element end,
@@ -74,8 +74,8 @@ local function with_destination(callback, real_detector)
 			watchFocusedElementChanges = function(_, receive) return watcher("secure", receive), nil, true end,
 		}
 		if real_detector then
-			package.loaded["adapters.secure_field_detector"] = nil
-			local detector = require("adapters.secure_field_detector")
+			package.loaded["platform.focus.secure_field_detector"] = nil
+			local detector = require("platform.focus.secure_field_detector")
 			detector.watchFocusedElementChanges = function(_, receive) return watcher("secure", receive), nil, true end
 		end
 		f.Utils = require("modules.keymap.utils")

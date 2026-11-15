@@ -15,9 +15,9 @@ local function fixture(picked, typed, body)
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local asked = { typed_prompts = 0 }
 	local ok, failure = xpcall(function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.dialog_util"] = {
 			choose = function(title, message, labels)
 				asked.choose = { title = title, message = message, labels = labels }
 				return picked
@@ -71,7 +71,7 @@ helpers.describe("macOS screen action vision parameter (macos-vision-choice-list
 		fixture(3, "", function(utils)
 			local value = utils.ask_parameter_value(gestures, "screen_read", "llm_vision", "T", "")
 			helpers.assert_eq(value, "custom|")
-			helpers.assert_eq(require("llm.vision").is_valid(value), false)
+			helpers.assert_eq(require("ai.engine.prediction.vision").is_valid(value), false)
 		end)
 	end)
 

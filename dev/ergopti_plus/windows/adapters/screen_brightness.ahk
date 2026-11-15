@@ -26,7 +26,7 @@ ScreenBrightnessData() {
 	global _SharedDir
 	if ScreenBrightnessOwner.data is Map
 		return ScreenBrightnessOwner.data
-	Data := JsonParse(FileRead(_SharedDir . "\modules\actions\brightness.json", "UTF-8"))
+	Data := JsonParse(FileRead(_SharedDir . "\shortcuts\data\actions\brightness.json", "UTF-8"))
 	if !(Data is Map) || Data.Get("version", 0) != 1 || !(Data.Get("actions", 0) is Map)
 		throw ValueError("Invalid shared screen brightness policy.")
 	ScreenBrightnessOwner.data := Data
@@ -58,7 +58,7 @@ ScreenBrightnessRequest(Action, Done := 0) {
 		? ScreenBrightnessOwner.spawn_fn : ShellRunner_SpawnTreeOwned
 	Args := ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass", "-File",
 		_VendorDir . "\ergopti_brightness_worker.ps1", "-PolicyPath",
-		_SharedDir . "\modules\actions\brightness.json", "-Action", Action]
+		_SharedDir . "\shortcuts\data\actions\brightness.json", "-Action", Action]
 	try Handle := Spawn.Call("powershell.exe", Args,
 		ScreenBrightnessCompleted.Bind(Id), , , Data["max_receipt_bytes"])
 	catch as Err {

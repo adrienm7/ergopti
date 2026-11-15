@@ -2,12 +2,12 @@
 
 --- Publishes an action parameter and its binding under exact runtime ownership.
 local M = {}
-local Transaction = require("config_scope_transaction")
-local TableUtil = require("table_util")
-local Writer = require("toml_codec.writer")
-local PhysicalSlots = require("shortcuts.physical_slots")
-local Logger = require("logger.shim")
-local ConfigKeys = require("config_keys")
+local Transaction = require("settings.engine.scope.transaction")
+local TableUtil = require("core.text.engine.table_util")
+local Writer = require("core.text.engine.toml_codec.writer")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
+local Logger = require("core.logger.engine.shim")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "infra.program_binding_transaction"
 local _current, _sequence = nil, 0
 local _constructing = false
@@ -60,7 +60,7 @@ function M.new(options)
 		"parameterized binding update is invalid")
 	parameter = { section = parameter.section, key = parameter.key, value = parameter.value }
 	local owner, held, retiring, busy = {}, {}, false, false
-	local files = options.files or require("adapters.file_system")
+	local files = options.files or require("core.fs.adapters.file_system")
 	local checkpoint, reconcile_pending, inverse_source = nil, false, nil
 	local ports = { { acquire = parameters.acquire_parameter_configuration, release = parameters.release_parameter_configuration,
 		snapshot = function()

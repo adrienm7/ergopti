@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 local TEXT_ENTRY_ID = "vision-cerebras"
 local TEXT_MODEL = "qwen-3.8-27b"
 local VISION_ENTRY_ID = "vision-openai"
@@ -50,8 +50,7 @@ local function build_world()
 		local_gets = {}, alerts = {}, installs = {},
 	}
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -65,10 +64,10 @@ local function build_world()
 		path = function() return "/Applications/Vision.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 
 	for _, name in ipairs({
 		"modules.llm", "modules.llm.profiles", "modules.llm.api_remote", "modules.llm.api_ollama",
@@ -88,7 +87,7 @@ local function build_world()
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -121,7 +120,7 @@ local function build_world()
 			return true
 		end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, message, first, second)
 			world.alerts[#world.alerts + 1] = { title = title, message = message, buttons = { first, second } }
 			return first

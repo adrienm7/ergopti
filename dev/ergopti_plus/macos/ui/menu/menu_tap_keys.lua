@@ -17,12 +17,12 @@
 --- ==============================================================================
 
 local M = {}
-local ParameterLabel = require("action_parameter_label")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
 
-local i18n              = require("infra.i18n")
-local LabelValue = require("locale.label_value")
-local Logger            = require("infra.logger")
-local DeferredWork      = require("infra.deferred_work")
+local i18n              = require("core.i18n.engine.i18n")
+local LabelValue = require("core.i18n.engine.label_value")
+local Logger            = require("core.logger.engine.logger")
+local DeferredWork      = require("core.timing.engine.deferred_work")
 local InputSourceBroker = require("adapters.input_source_broker")
 local ActionPicker      = require("ui.action_picker")
 local ShortcutUtils     = require("ui.menu.shortcut_utils")
@@ -87,10 +87,10 @@ local function choose_action_for(id, name, ctx)
 		-- Asked after the picker window has closed, unless the picker's editor
 		-- collected it, under the binding the key dispatches with, and bound only
 		-- once the value is stored.
-		return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), function()
+		return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), function()
 			local committed = ShortcutUtils.prompt_action_parameter(ctx.gestures, TapKeys.binding_id(id), action_id, spec,
 				picked, {
-					publishes_assignment = true, section = require("config_keys").KEY.SHORTCUTS_TAP_KEYS, key = id,
+					publishes_assignment = true, section = require("settings.engine.keys").KEY.SHORTCUTS_TAP_KEYS, key = id,
 					read = function() return TapKeys.get_action(id) end,
 					apply = function(on_error, publication_observer)
 						if TapKeys.set_action(id, action_id, ctx.gestures.is_assignable, on_error, publication_observer) ~= true then return false end

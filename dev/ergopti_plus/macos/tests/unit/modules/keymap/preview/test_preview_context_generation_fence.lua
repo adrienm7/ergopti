@@ -17,8 +17,8 @@ local LITERAL_LIFETIME_SEC = 0.01
 --- Runs the scenario while restoring every process-global module mutation.
 local function run_scenario(mode)
 	local dependency_names = {
-		"adapters.synthetic_input",
-		"adapters.timer_scheduler",
+		"platform.input.synthetic_input",
+		"core.events.timer_scheduler",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander",
@@ -26,7 +26,7 @@ local function run_scenario(mode)
 		"modules.keystats",
 		"modules.llm",
 		"modules.llm.prediction_engine",
-		"ui.tooltip",
+		"core.ui.ui.tooltip",
 		"modules.keymap.llm_bridge",
 	}
 	local previous = {}
@@ -49,10 +49,10 @@ local function run_scenario(mode)
 		star_base = "old",
 	}
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 		after = function(delay, fn)
 			local handle = { delay = delay, fn = fn }
@@ -111,7 +111,7 @@ local function run_scenario(mode)
 		get_llm_enabled = function() return false end,
 		reset = function() return true end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_runtime_guard = function() end,
 		set_accept_callback = function() end,
 		set_cancel_callback = function() end,

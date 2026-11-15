@@ -59,7 +59,7 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 		local h = fresh()
 		h.ctx.applyTriggerChar = function(text) return (text:gsub("★", "§")) end
 		local items = index_items(require("ui.menu.menu_caps_word").build(h.ctx))
-		local label = require("infra.i18n").get("terminators.label_star")
+		local label = require("core.i18n.engine.i18n").get("terminators.label_star")
 		helpers.assert_true(label:find("★", 1, true) ~= nil, "control: the shipped caption names ★")
 		helpers.assert_true(find(items, label) ~= nil, "the star row keeps the literal ★")
 		helpers.assert_true(find(items, (label:gsub("★", "§"))) == nil, "no row names the renamed key")
@@ -67,8 +67,8 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 
 	helpers.it("draws the presets, the delimiter catalogue and every pointer kind", function()
 		local h = fresh()
-		local i18n = require("infra.i18n")
-		local Policy = require("caps_word.auto_off")
+		local i18n = require("core.i18n.engine.i18n")
+		local Policy = require("keyboard.engine.caps_word_auto_off")
 		for _, row in ipairs(Policy.terminator_rows()) do
 			if not row.separator then
 				helpers.assert_true(find(h.items, i18n.get(row.label_key)) ~= nil, row.key .. " has its checkbox")
@@ -94,13 +94,13 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 
 	helpers.it("a fresh install ticks exactly the eight shipped delimiters and the 10 s delay", function()
 		local h = fresh(nil, true)
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local shipped = {}
 		for _, key in ipairs(require("infra.manifest_reader").default_for("shortcuts.caps_word.terminators")) do
 			shipped[key] = true
 		end
 		local ticked = {}
-		for _, row in ipairs(require("caps_word.auto_off").terminator_rows()) do
+		for _, row in ipairs(require("keyboard.engine.caps_word_auto_off").terminator_rows()) do
 			if not row.separator then
 				local item = find(h.items, i18n.get(row.label_key))
 				helpers.assert_eq(item.checked == true, shipped[row.key] == true, row.key .. " follows the shipped default")
@@ -114,20 +114,20 @@ helpers.describe("CapsWord auto-off menu (caps_word_auto_off_group)", function()
 
 	helpers.it("a pointer and a delimiter click apply and save; a refused save restores", function()
 		local h = fresh()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		find(h.items, i18n.get("menu.caps_word.pointer.middle_click")).fn()
 		helpers.assert_eq(h.state.caps_word_pointer.middle_click, false)
 		helpers.assert_eq(h.saves, 1)
 		find(h.items, i18n.get("terminators.label_nbsp")).fn()
 		helpers.assert_eq(h.state.caps_word_terminators, { "space", "nbsp", "tab", "enter" },
 			"the list is stored in catalogue order")
-		helpers.assert_true(require("caps_word.auto_off").ends_on_text(h.owner.policy(), "\xC2\xA0"),
+		helpers.assert_true(require("keyboard.engine.caps_word_auto_off").ends_on_text(h.owner.policy(), "\xC2\xA0"),
 			"the watcher's policy follows at once")
 
 		local refused = fresh(false)
 		find(refused.items, i18n.get("menu.caps_word.pointer.left_click")).fn()
 		helpers.assert_eq(refused.state.caps_word_pointer.left_click, true, "a refused save restores the state")
-		helpers.assert_true(require("caps_word.auto_off").ends_on_pointer(refused.owner.policy(), "left_click"),
+		helpers.assert_true(require("keyboard.engine.caps_word_auto_off").ends_on_pointer(refused.owner.policy(), "left_click"),
 			"and the policy in force")
 	end)
 end)

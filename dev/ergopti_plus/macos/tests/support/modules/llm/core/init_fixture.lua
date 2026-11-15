@@ -10,14 +10,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- A prior test may have installed a stub modules.llm.profiles (with empty
 -- get_all_profiles) that would leak into this file's top-level require.
 -- Force the real implementation to be reloaded so profile accessors work.
 package.loaded["modules.llm.profiles"]   = nil
-package.loaded["llm.profile_selector"]   = nil
+package.loaded["ai.engine.settings.profile_selector"]   = nil
 
 local Core = helpers.load_with_stubs("modules.llm")
 local INITIAL_HS = _G.hs
@@ -100,7 +100,7 @@ local function load_core_with_timer_spy(options)
 		end
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler_stub
+	package.loaded["core.events.timer_scheduler"] = scheduler_stub
 	local fresh_core = helpers.load_with_stubs("modules.llm")
 	local loaded_hs = package.loaded["hs"]
 	local load_time_calls = {}

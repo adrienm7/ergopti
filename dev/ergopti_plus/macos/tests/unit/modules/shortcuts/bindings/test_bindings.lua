@@ -12,14 +12,14 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Stub lib.keycodes: actions/system.lua calls Keycodes.to_name(F18_WAKE_OS)
 -- at module level. The real implementation iterates hs.keycodes.map, which
 -- is not populated in the unit-test stub, so to_name would error. We provide
 -- the two fields that system.lua actually needs.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F18_WAKE_OS             = 79,
 	F19_LAYER_NAV_EXITED    = 80,
 	to_name = function(code)
@@ -31,7 +31,7 @@ package.loaded["infra.keycodes"] = {
 -- Stub lib.i18n: bindings.lua calls i18n.get() at module level for
 -- shortcut labels. The real module depends on locale JSON files unavailable
 -- in unit tests.
-package.loaded["infra.i18n"] = {
+package.loaded["core.i18n.engine.i18n"] = {
 	get = function(key) return key end,
 }
 
@@ -411,6 +411,17 @@ helpers.describe("shortcuts.bindings: set_chatgpt_url (shortcuts-ctrl-g-ignores-
 		B.set_chatgpt_url("")
 		helpers.assert_eq(B.get_chatgpt_url(), B.DEFAULT_CHATGPT_URL)
 	end)
+
+	helpers.it("refuses a URL its value schema declaration refuses and keeps the current one", function()
+		local B = fresh_bindings()
+		local configured_url = "https://chatgpt.example.test/configured"
+		helpers.assert_eq(B.set_chatgpt_url(configured_url), true)
+		for _, refused in ipairs({ "file:///etc/passwd", "javascript:alert(1)", "https://bad url",
+			"https://line\nbreak", 42, "https://example.test/" .. string.rep("a", 2048) }) do
+			helpers.assert_eq(B.set_chatgpt_url(refused), false, tostring(refused))
+			helpers.assert_eq(B.get_chatgpt_url(), configured_url)
+		end
+	end)
 end)
 
 
@@ -638,7 +649,7 @@ end)
 helpers.describe("bindings effective URL snapshot", function()
 	helpers.it("keeps the configured conversation URL out of diagnostics", function()
 		local subject = helpers.load_with_stubs("modules.shortcuts.bindings")
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local original, logs = logger.debug, {}
 		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
 		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"

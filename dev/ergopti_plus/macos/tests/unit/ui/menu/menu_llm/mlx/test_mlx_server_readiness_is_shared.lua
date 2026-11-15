@@ -127,8 +127,8 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 
 	helpers.it("(mlx-startup-waiter-failure) (mlx-native-callback-protection) notifies every joined caller when the shared startup fails", function()
 		local module_names = {
-			"infra.notifications", "infra.logger", "infra.i18n", "infra.config_paths",
-			"modules.llm.api_common", "adapters.task_lifecycle",
+			"core.ui.engine.notifications", "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.config_paths",
+			"modules.llm.api_common", "core.process.adapters.task_lifecycle",
 			"modules.llm.api_mlx", "ui.menu.menu_llm.models_manager_mlx_server",
 		}
 		local saved_modules = {}
@@ -144,8 +144,8 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 		local reject_probe_task = false
 		local retry_timer_result = "handle"
 
-		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.logger"] = {
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		package.loaded["core.logger.engine.logger"] = {
 			today_log_path = function() return "/tmp/ergopti-test.log" end,
 			debug = noop, info = noop, warn = noop,
 			error = function(...) table.insert(logged_errors, { ... }) end,
@@ -153,7 +153,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				return xpcall(callback, debug.traceback, ...)
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local active_model_path = "/Users/fixture/Config Dir/active-model.txt"
 		package.loaded["infra.config_paths"] = {
 			get = function(key)
@@ -168,7 +168,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				return table.unpack(results, 1, results.n)
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = {
+		package.loaded["core.process.adapters.task_lifecycle"] = {
 			create = function(factory) return factory() end,
 			native = function(_, path, completion, stream_or_args, args)
 				return _G.hs.task.new(path, completion, stream_or_args, args)
@@ -231,7 +231,7 @@ helpers.describe("MLX server: a duplicate start joins the startup in flight", fu
 				function() cancel_one = cancel_one + 1 end)
 			helpers.assert_not_nil(server_task)
 			helpers.assert_true(type(server_args) == "table" and type(server_args[2]) == "string")
-			local quoted_path = require("infra.text_utils").shell_quote(active_model_path)
+			local quoted_path = require("core.text.engine.utils").shell_quote(active_model_path)
 			helpers.assert_true(server_args[2]:find(quoted_path, 1, true) ~= nil,
 				"the launcher must publish the model id only under the private config tree")
 			helpers.assert_true(server_args[2]:find("/tmp/mlx_active_model.txt", 1, true) == nil,

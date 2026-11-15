@@ -1,5 +1,5 @@
 {
-	"description": "Golden vectors for the day log attachment (_shared/lua/diagnostics/day_log.lua) with the rules of _shared/modules/diagnostics/redaction.json. `file_size` is what the driver measured on disk; `raw` is absent when the file is over the cap. Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"description": "Golden vectors for the day log attachment (_shared/diagnostics/engine/day_log.lua) with the rules of _shared/diagnostics/data/redaction.json. `file_size` is what the driver measured on disk; `raw` is absent when the file is over the cap. Replayed by the macOS and Linux Lua suites and the AHK suite.",
 	"limits": {
 		"max_bytes": 400,
 		"preview_head_lines": 2,

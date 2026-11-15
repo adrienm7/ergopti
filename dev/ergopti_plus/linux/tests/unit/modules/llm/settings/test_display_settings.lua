@@ -71,8 +71,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 				if name == "show_info_bar" then return true end
 			end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local rows = overlay.build_rows({
 			{ to_type = "first" },
 			{ to_type = "second" },
@@ -81,7 +81,7 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 			profile = "batch_advanced",
 			validation_modifiers = { "alt" },
 		})
-		local chrome = require("ui.tooltip.config").llm_line()
+		local chrome = require("core.ui.ui.tooltip.config").llm_line()
 		helpers.assert_eq(rows[1].segments[1].text, "first")
 		helpers.assert_eq(rows[1].label, "Alt+1")
 		helpers.assert_eq(rows[1].selected, false)
@@ -103,8 +103,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 				if name == "show_info_bar" then return true end
 			end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local rows = overlay.build_rows({ { to_type = "a" }, { to_type = "b" } }, 1, {
 			model = "qwen:4b", profile = "Mon profil  —  texte long", validation_modifiers = { "alt" },
 		})
@@ -117,8 +117,8 @@ helpers.describe("LLM suggestion overlay: headless row decisions", function()
 		replace("modules.llm.display_settings", {
 			get = function(name) return name == "pred_indent" and 0 or false end,
 		})
-		package.loaded["ui.tooltip.llm"] = nil
-		local overlay = require("ui.tooltip.llm")
+		package.loaded["core.ui.ui.tooltip.llm"] = nil
+		local overlay = require("core.ui.ui.tooltip.llm")
 		local frames = {}
 		local renderer = {
 			show = function(rows) frames[#frames + 1] = rows; return true end,
@@ -166,11 +166,11 @@ local function with_info_menu(options, callback)
 	package.loaded["modules.llm.profile_settings"] = nil
 	local profiles = require("modules.llm.profile_settings")
 	profiles._reset()
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "linux",
-		manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+		manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 		json_decode = function(raw)
-			local root = assert(require("json").decode(raw))
+			local root = assert(require("core.text.engine.json").decode(raw))
 			if options.label then root.llm_display_menu[2].i18n = options.label end
 			for index, row in ipairs(root.llm_display_menu) do
 				if row.id == "llm_show_all" then
@@ -185,7 +185,7 @@ local function with_info_menu(options, callback)
 			end
 			return root
 		end,
-		i18n = require("infra.i18n"), logger = require("logger.shim"),
+		i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 	}))
 	package.loaded["infra.manifest_menu"] = renderer
 	local observed = { writes = 0, redraws = 0, active = true, paused = false, backend = options.backend or "ollama", revision = 0 }
@@ -220,7 +220,7 @@ local function with_info_menu(options, callback)
 			is_paused = function() return observed.paused end,
 			on_menu_changed = function() observed.redraws = observed.redraws + 1 end,
 		})
-		local title = require("infra.i18n").get("menu.llm.display_menu_title")
+		local title = require("core.i18n.engine.i18n").get("menu.llm.display_menu_title")
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
 				if row.title == title and row.menu then return row end
@@ -238,10 +238,10 @@ end
 --- Loads a historical expectation independently of the generated menu declaration.
 --- @return table corpus
 local function info_bar_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/info_bar_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("LLM shared Info Bar check", function()
@@ -251,7 +251,7 @@ helpers.describe("LLM shared Info Bar check", function()
 		for _, selected in ipairs(corpus.states) do
 			with_info_menu({selected = selected}, function(parent, settings, storage, observed)
 				local row = parent.menu[1]
-				helpers.assert_eq(row.title, require("infra.i18n").get(corpus.row.i18n))
+				helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.row.i18n))
 				helpers.assert_eq(row.checked or false, selected)
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(settings.get("show_info_bar"), not selected)
@@ -267,7 +267,7 @@ helpers.describe("LLM shared Info Bar check", function()
 
 	helpers.it("moves the actual check after its shared remaining provider (shared-info-bar)", function()
 		with_info_menu({selected = true, info_last = true}, function(parent, _, _, observed)
-			helpers.assert_eq(parent.menu[#parent.menu].title, require("infra.i18n").get(info_bar_corpus().row.i18n))
+			helpers.assert_eq(parent.menu[#parent.menu].title, require("core.i18n.engine.i18n").get(info_bar_corpus().row.i18n))
 			helpers.assert_true(#parent.menu > 1)
 			helpers.assert_eq(observed.writes, 0)
 			helpers.assert_eq(observed.redraws, 0)
@@ -290,7 +290,7 @@ helpers.describe("LLM shared Info Bar check", function()
 		local corpus = info_bar_corpus()
 		with_info_menu({selected = true, refused = true, label = corpus.alternate_i18n}, function(parent, settings, storage, observed)
 			local row = parent.menu[1]
-			helpers.assert_eq(row.title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(row.title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(settings.get("show_info_bar"), true)
 			helpers.assert_eq(storage.get("llm.display.show_info_bar"), true)
@@ -314,10 +314,10 @@ end)
 --- Reads fixed progressive and show-all semantics independently of native code.
 --- @return table
 local function show_all_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/show_all_control.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Finds the declared checkbox after Linux's real tray projection.
@@ -325,7 +325,7 @@ end
 --- @param key string
 --- @return table
 local function show_all_row(parent, key)
-	local title = require("infra.i18n").get(key)
+	local title = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(parent.menu) do if row.title == title then return row end end
 	error("the real display submenu omitted " .. key)
 end
@@ -357,9 +357,9 @@ helpers.describe("LLM shared Show-all check", function()
 	helpers.it("uses the declared Show-all label and placement (shared-show-all)", function()
 		local corpus = show_all_corpus()
 		with_info_menu({selected = true, progressive = true, count = 2, show_all_label = corpus.alternate_i18n, show_all_first = true}, function(parent)
-			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(parent.menu[1].title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_eq(parent.menu[1].checked or false, false)
-			helpers.assert_eq(parent.menu[2].title, require("infra.i18n").get("menu.llm.show_info_bar"))
+			helpers.assert_eq(parent.menu[2].title, require("core.i18n.engine.i18n").get("menu.llm.show_info_bar"))
 		end)
 	end)
 
@@ -371,16 +371,16 @@ helpers.describe("LLM shared Show-all check", function()
 			helpers.assert_eq(row.fn(), false)
 			helpers.assert_eq(observed.writes, before)
 			helpers.assert_true(profiles.set("num_predictions", 2))
-			before = observed.writes
+			-- A pause stops typing, not configuration (EDD-1).
 			observed.paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(observed.writes, before)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("streaming_multi"), false)
 			observed.paused = false
+			before = observed.writes
 			observed.active = false
 			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(settings.get("streaming_multi"), true)
+			helpers.assert_eq(settings.get("streaming_multi"), false)
 			helpers.assert_eq(observed.writes, before)
-			helpers.assert_eq(observed.redraws, 0)
 		end)
 	end)
 
@@ -411,11 +411,18 @@ end)
 -- =========================================
 
 helpers.describe("LLM token streaming live admission", function()
-	for _, condition in ipairs({ "paused", "off", "backend", "retired source", "restored runtime owner" }) do
+	helpers.it("commits an existing callback while paused, read on resume (shared-token-streaming)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, "menu.llm.show_streaming")
+			observed.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("streaming"), true)
+		end)
+	end)
+	for _, condition in ipairs({ "off", "backend", "retired source", "restored runtime owner" }) do
 		helpers.it("refuses an existing callback after " .. condition .. " (shared-token-streaming)", function()
 			with_info_menu({selected = true, progressive = true, streaming = false, count = 2}, function(parent, settings, storage, observed)
 				local row = show_all_row(parent, "menu.llm.show_streaming")
-				if condition == "paused" then observed.paused = true end
 				if condition == "off" then observed.active = false end
 				if condition == "backend" then observed.backend = "api" end
 				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
@@ -434,18 +441,18 @@ end)
 --- Reads independent native capability and stale-command expectations.
 --- @return table corpus
 local function token_streaming_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/token_streaming_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 helpers.describe("shared token streaming policy", function()
 	helpers.it("replays independent capability and admission vectors (shared-token-streaming)", function()
-		local policy = require("llm.display_policy")
+		local policy = require("ai.engine.settings.display_policy")
 		local corpus = token_streaming_corpus()
 		helpers.assert_eq(#corpus.capabilities, 9)
-		helpers.assert_eq(#corpus.cases, 15)
+		helpers.assert_eq(#corpus.cases, 16)
 		for _, vector in ipairs(corpus.capabilities) do
 			helpers.assert_eq(policy.streaming_capable(vector.platform, vector.backend), vector.capable)
 		end
@@ -534,17 +541,17 @@ end)
 --- Reads independent signed values and retained-command expectations.
 --- @return table corpus
 local function indentation_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/indentation_control.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(text))
+	return assert(require("core.text.engine.json").decode(text))
 end
 
 --- Finds the actual declared numeric submenu, including its selected caption.
 --- @param parent table Native AI display submenu.
 --- @return table row
 local function indentation_row(parent)
-	local label = require("infra.i18n").get("menu.llm.indent_label")
+	local label = require("core.i18n.engine.i18n").get("menu.llm.indent_label")
 	for _, row in ipairs(parent.menu) do
 		if type(row.title) == "string" and row.title:sub(1, #label) == label and row.menu then return row end
 	end
@@ -557,18 +564,25 @@ helpers.describe("shared indentation choice", function()
 			local row, corpus = indentation_row(parent), indentation_corpus()
 			helpers.assert_eq(#row.menu, 15)
 			for index, choice in ipairs(corpus.choices) do
-				helpers.assert_eq(row.menu[index].title, choice.prefix .. require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, choice.prefix .. require("core.i18n.engine.i18n").get(choice.i18n))
 				helpers.assert_eq(row.menu[index].checked or false, choice.value == settings.get("pred_indent"))
 			end
 			helpers.assert_eq(row.disabled == true, false)
 		end)
 	end)
 
-	for _, condition in ipairs({"paused", "off", "single", "retired source", "restored owner"}) do
+	helpers.it("commits a retained indentation choice while paused, read on resume (shared-indentation)", function()
+		with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed)
+			local command = assert(indentation_row(parent).menu[1].fn)
+			observed.paused = true
+			helpers.assert_eq(command(), true)
+			helpers.assert_true(settings.get("pred_indent") ~= 0, "the paused choice is stored")
+		end)
+	end)
+	for _, condition in ipairs({"off", "single", "retired source", "restored owner"}) do
 		helpers.it("refuses a retained indentation choice after " .. condition .. " (shared-indentation)", function()
 			with_info_menu({selected = true, progressive = true, streaming = false, count = 3}, function(parent, settings, storage, observed, profiles)
 				local command = assert(indentation_row(parent).menu[1].fn)
-				if condition == "paused" then observed.paused = true end
 				if condition == "off" then observed.active = false end
 				if condition == "single" then helpers.assert_true(profiles.set("num_predictions", 1)) end
 				if condition == "retired source" then helpers.assert_true(storage.set("llm.display.show_info_bar", false)) end
@@ -627,7 +641,7 @@ helpers.describe("shared indentation choice", function()
 	end)
 
 	helpers.it("replays independent shared multi-prediction admission and value vectors (shared-indentation)", function()
-		local corpus, policy = indentation_corpus(), require("llm.display_policy")
+		local corpus, policy = indentation_corpus(), require("ai.engine.settings.display_policy")
 		local owner, other = {}, {}
 		for _, vector in ipairs(corpus.cases) do
 			local expected, current = {}, {}
@@ -654,18 +668,25 @@ helpers.describe("LLM retained Info Bar admission", function()
 			for key, value in pairs(vector.current) do current[key] = value end
 			expected.owner = expected.owner == "owned" and owner or other
 			current.owner = current.owner == "owned" and owner or other
-			local decision = require("llm.display_policy").info_bar_intent(expected, current)
+			local decision = require("ai.engine.settings.display_policy").info_bar_intent(expected, current)
 			helpers.assert_eq(decision.admitted, vector.admitted, vector.id)
 			if vector.admitted then helpers.assert_eq(decision.value, vector.value, vector.id) end
 		end
 	end)
 
-	for _, condition in ipairs({"paused", "master", "canonical master", "source", "runtime value", "generation", "backend"}) do
+	helpers.it("commits a retained actual native checkbox while paused, read on resume (shared-info-bar)", function()
+		with_info_menu({selected = true, count = 1, progressive = false}, function(parent, settings, storage, observed)
+			local row = show_all_row(parent, info_bar_corpus().row.i18n)
+			observed.paused = true
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(settings.get("show_info_bar"), false)
+		end)
+	end)
+	for _, condition in ipairs({"master", "canonical master", "source", "runtime value", "generation", "backend"}) do
 		helpers.it("refuses a retained actual native checkbox after " .. condition .. " (shared-info-bar)", function()
 			with_info_menu({selected = true, count = 1, progressive = false}, function(parent, settings, storage, observed)
 				local row = show_all_row(parent, info_bar_corpus().row.i18n)
 				helpers.assert_eq(row.disabled == true, false)
-				if condition == "paused" then observed.paused = true end
 				if condition == "master" then observed.active = false end
 				if condition == "canonical master" then assert(storage.set("llm.enabled", false)) end
 				if condition == "source" then assert(storage.set("llm.generation.temperature", 0.9)) end
@@ -722,5 +743,5 @@ helpers.describe("LLM retained Info Bar admission", function()
 	end
 end)
 
-require("test.pred_indent_default_contract")(helpers,
-	require("infra.manifest_reader").default_for(require("config_keys").KEY.LLM_DISPLAY_PRED_INDENT))
+require("tests.lua.pred_indent_default_contract")(helpers,
+	require("infra.manifest_reader").default_for(require("settings.engine.keys").KEY.LLM_DISPLAY_PRED_INDENT))

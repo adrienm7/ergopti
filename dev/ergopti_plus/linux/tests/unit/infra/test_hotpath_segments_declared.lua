@@ -12,26 +12,28 @@
 local helpers = require("tests.helpers")
 
 -- Spans that are timed for the interval summary but are not hot-path segments:
--- the idle wait is long by design, the periodic tick, the tray and the keystats
--- flush run off the keystroke.
+-- the idle wait is long by design, the periodic tick, the tray, the keystats
+-- flush, a layout switch and a catalogue reload run off the keystroke, and a
+-- key's age from its kernel stamp includes the loop's queueing by design.
 local TIMED_ONLY = {
 	["loop.idle"] = true, ["loop.periodic"] = true,
-	["keystats.flush"] = true, ["tray.build"] = true, ["tray.open"] = true,
+	["keystats.flush"] = true, ["tray.build"] = true, ["tray.open"] = true, ["tray.fill"] = true,
+	["input.latency"] = true, ["layout.switch"] = true, ["config.reload"] = true,
 }
 
-require("test.hotpath_segments_contract").register(helpers, {
+require("tests.lua.core.hotpath_segments_contract").register(helpers, {
 	driver = "linux",
-	directory = require("infra.native_directory"),
+	directory = require("core.fs.engine.native_directory"),
 	root = helpers.driver_root(),
-	call_pattern = 'Perf%.span%(%s*"([^"]+)"',
+	call_patterns = { 'Perf%.span%(%s*"([^"]+)"', 'Perf%.done%(%s*"([^"]+)"', 'Perf%.record_age%(%s*"([^"]+)"' },
 	timed_only = TIMED_ONLY,
-	default_slow_ms = require("infra.timings").ms("logger", "hotpath_slow_ms"),
+	default_slow_ms = require("core.timing.engine.timings").ms("logger", "hotpath_slow_ms"),
 })
 
 helpers.describe("hot-path segment inventory: linux spans", function()
 	helpers.it("declares every inventory segment as a perf span", function()
-		local spans = helpers.load_module("infra.perf_counters").snapshot().spans
-		for name in pairs(require("hotpath_segments").for_driver("linux")) do
+		local spans = helpers.load_module("core.logger.engine.perf_counters").snapshot().spans
+		for name in pairs(require("metrics.engine.perf.hotpath_segments").for_driver("linux")) do
 			helpers.assert_true(spans[name] ~= nil, "'" .. name .. "' is in the inventory but is not a perf span")
 		end
 	end)

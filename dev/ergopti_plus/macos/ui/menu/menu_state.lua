@@ -14,11 +14,11 @@
 
 local M = {}
 local hs     = hs
-local Logger = require("infra.logger")
-local Storage = require("adapters.storage")
-local DeferredWork = require("infra.deferred_work")
+local Logger = require("core.logger.engine.logger")
+local Storage = require("core.fs.adapters.storage")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 local LOG    = "menu_state"
 
 -- Delay before starting the keystats engine. Its start (~1.3 s of SQLite +
@@ -309,8 +309,19 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 	--   2. `hotstrings_config.resolve(category).delay` for TOML-backed keys —
 	--      this is the new authoritative source (TOML metadata + user override).
 	--   3. `keymap.DELAYS_DEFAULT[k]` — ultimate hardcoded fallback.
-	if type(state.expansion_delay) == "number" then
-		if keymap and type(keymap.set_base_delay) == "function" then try("hotstrings", "keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay) end
+	if state.expansion_delay ~= nil then
+		-- A stored base delay its shared value schema declaration refuses is
+		-- reported once and the engine keeps its default.
+		local ValueCheck = require("settings.engine.value_check")
+		local key = ValueCheck.KEY.HOTSTRINGS_EXPANSION_DELAY
+		local checked = ValueCheck.check_value(ValueCheck.declaration(key), state.expansion_delay)
+		if not checked.ok then
+			require("settings.engine.migration.outdated").report(key, string.format(
+				"%s is refused (%s, %s..%s s); the default applies", tostring(state.expansion_delay),
+				checked.reason, tostring(checked.min), tostring(checked.max)))
+		elseif keymap and type(keymap.set_base_delay) == "function" then
+			try("hotstrings", "keymap.set_base_delay", keymap.set_base_delay, state.expansion_delay)
+		end
 	end
 	if keymap and type(keymap.set_delay) == "function" then
 		local defs       = keymap.DELAYS_DEFAULT or {}
@@ -568,10 +579,20 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 			local _shortcuts_ref = core_mods.shortcuts_mod
 			_keystats_start_pending = true
 			local scheduling, fired = true, false
+			-- The hardware UUID the first start needs is read by an ioreg child
+			-- during the delay; run on the main thread it held the run loop
+			-- 151 ms at boot+1 s (field report 2026-11-03). A failed or late read
+			-- resumes the start, which then reads it synchronously.
+			local function prepare(resume)
+				if type(kl.prepare_start) ~= "function" then return true end
+				local prepared, ready = try("metrics", "keystats.prepare_start", kl.prepare_start, resume)
+				return not prepared or ready == true
+			end
 			local function activate()
 				if keystats_generation ~= _keystats_start_generation then return end
 				if scheduling then fired = true; return end
 				if type(kl.start) ~= "function" then return end
+				if not prepare(activate) then return end
 				local _t_kl = hs.timer.secondsSinceEpoch()
 				local start_ok, started = try("metrics", "keystats.start", kl.start, _shortcuts_ref)
 				if start_ok and started ~= true then
@@ -594,6 +615,7 @@ function M.sync_state_to_modules(state, saved, config_absent, deps)
 				_keystats_start_ms = (hs.timer.secondsSinceEpoch() - _t_kl) * 1000
 				Logger.info(LOG, "Keystats engine start (deferred): %.1f ms.", _keystats_start_ms)
 			end
+			prepare(nil)
 			local scheduled = DeferredWork.after(KEYSTATS_START_DELAY_SEC, activate, "menu_state.keystats_start")
 			scheduling = false
 			if scheduled ~= true then

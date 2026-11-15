@@ -1,0 +1,27 @@
+# Receipt: developer mode with the package installed (2026-11-10)
+# Proof: tests/hardware/desktop/run_linux_dev_mode.sh, as root in the input and uinput groups, Ubuntu 24.04
+# (kernel 6.18.44), base ac832229e2. Real: tools/dev/run-linux-dev.sh, install/launch.sh, the daemon,
+# its tray (libayatana-appindicator, read by tests/hardware/sni_host.py) and systemd --user 255.
+# Emulated: the keyboard node (FIFO + evdev_fifo_shim.c; this kernel has no evdev and no uinput), and
+# the installed unit's process (a sleeping stand-in under the real unit file).
+developer run with the package installed
+  ok   the installed unit is active before the run
+  ok   the developer run stopped the installed unit
+  ok   the run said it stops the unit
+  ok   the tray appears (item registered, icon file, Reload row)
+  ok   the daemon runs (pid 2779)
+second developer run
+  ok   the second run returns at once (exit 0, a tray start)
+  ok   it reports « already running » on the session lock
+  ok   the first daemon still runs
+a saved .lua
+  ok   the daemon restarted (new pid)
+  ok   the restarted daemon shows its tray
+  ok   the saved file is unchanged
+the tray's Reload
+  ok   the Reload row was clicked
+  ok   the daemon restarted (new pid)
+  ok   the reloaded daemon shows its tray (pid 5016)
+  ok   exactly one daemon runs
+  ok   the installed unit stays stopped
+rc=0

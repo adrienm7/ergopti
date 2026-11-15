@@ -19,7 +19,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local HOME = "/Users/jdoe"
 local ERRORS_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_errors_2026-09-24.log"
@@ -29,16 +29,17 @@ local ERRORS_FILE = HOME .. "/" .. AppDirs.macos.relative .. "/ErgoptiPlus_error
 --- @return table dialog, table context
 local function load_dialog(controls)
 	controls = controls or {}
-	local Json = require("json")
-	local function document(name)
-		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
+	local Json = require("core.text.engine.json")
+	-- Each document is named by its path under _shared, wherever it lives.
+	local function shared_document(relative)
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/" .. relative, "rb"))
 		local value = Json.decode(file:read("*a")); assert(file:close()); return value
 	end
-	local sharing_schema = require("healthcheck.snapshot").load_config(helpers.shared).schema
+	local sharing_schema = require("diagnostics.engine.healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
-		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
-		"infra.termination_coordinator",
+		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "core.logger.engine.logger", "core.i18n.engine.i18n",
+		"core.i18n.engine.locale", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "core.fs.adapters.storage", "infra.manifest_reader",
+		"core.lifecycle.engine.shutdown.termination_coordinator",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -53,14 +54,14 @@ local function load_dialog(controls)
 	local logger = helpers.make_logger_stub()
 	logger.error = function(_, message, ...) context.errors[#context.errors + 1] = string.format(message, ...) end
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end, get_locale = function() return "en" end }
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		terminal_in_progress = function() return context.terminal == true end,
 	}
 	local function catalogue() return { ["common.error_title"] = "Error" } end
-	package.loaded["infra.locale"] = { all = catalogue, catalogue = catalogue }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.i18n.engine.locale"] = { all = catalogue, catalogue = catalogue }
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(delay, fn)
 			if delay == 0 then
 				context.close_cleanup = context.close_cleanup or {}
@@ -73,7 +74,7 @@ local function load_dialog(controls)
 		now_ns = function() return (context.now or 0) * 1e9 end,
 		cancel = function() return true end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		get = function(key, default)
 			if controls.stored ~= nil and key == "script.show_error_dialog" then return controls.stored end
 			return default
@@ -83,7 +84,7 @@ local function load_dialog(controls)
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(path) return path == "script.show_error_dialog" and true or nil end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		build_injected_html = function() return "<html></html>" end,
 		window_chrome_steps = function() return {} end,
 		window_title = function(title) return "ErgoptiPlus — " .. tostring(title) end,
@@ -97,7 +98,7 @@ local function load_dialog(controls)
 				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>", email_placeholder = "<email>", foreign_home_markers = {}, shared_profile_names = {}, path_name_max_words = 3, config_placeholder = "<config>", config_name_placeholder = "<name>", config_known_names = {},
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
-				templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema,
+				templates = shared_document("diagnostics/data/issue_templates.json"), repository = shared_document("updater/data/defaults.json").github, schema = sharing_schema,
 			}
 		end,
 		run = function()
@@ -226,7 +227,7 @@ helpers.describe("error window (macOS): policy and deferral (error-dialog-macos)
 	for _, failure in ipairs({ "frame", "chrome" }) do
 		helpers.it("presentation failure releases resources and admits the next error: " .. failure .. " (error-dialog-exception)", function()
 			local dialog, context = load_dialog()
-			local builder = package.loaded["ui.ui_builder"]
+			local builder = package.loaded["core.ui.ui.builder"]
 			local saved_screen, saved_chrome = hs.screen.mainScreen, builder.window_chrome_steps
 			if failure == "frame" then
 				hs.screen.mainScreen = function() return { frame = function() error("frame refused") end } end
@@ -649,7 +650,7 @@ helpers.describe("error dialog native JavaScript receipts", function()
 		local evaluations = install_evaluator(context)
 		context.page({ body = "ready" })
 		helpers.assert_type(evaluations[1].callback, "function")
-		local logger = package.loaded["infra.logger"]
+		local logger = package.loaded["core.logger.engine.logger"]
 		local record_error = logger.error
 		logger.error = function(module, message, ...)
 			record_error(module, message, ...)

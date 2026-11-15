@@ -35,8 +35,8 @@ local helpers = require("tests.helpers")
 local SENTINEL_SSN    = "9SENTINEL9"
 local SENTINEL_PREFIX = "9SENT"  -- rules_engine registers ssn_raw:sub(1, 5)
 
-package.loaded["infra.logger"] = nil
-local Logger = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local Logger = helpers.load_with_stubs("core.logger.engine.logger")
 
 
 --- Installs a keystats stub that records every log_hotstring invocation.
@@ -49,7 +49,7 @@ local function install_keystats_recorder()
 			table.insert(rec.calls, { trigger = trigger, replacement = replacement })
 		end,
 		log_private_hotstring = function(trigger, replacement)
-			local roi = require("keystats.trigger_roi")
+			local roi = require("metrics.engine.privacy.trigger_roi")
 			rec.private_savings[#rec.private_savings + 1] =
 				math.max(0, roi.utf16_length(replacement) - roi.utf16_length(trigger))
 		end,
@@ -98,6 +98,7 @@ local function build_engine(personal_data)
 		register_lua_group        = function() end,
 		set_post_load_hook        = function() end,
 		register_interceptor      = function() end,
+		dynamic_rule_within_delay      = function() return true end,
 		register_preview_provider = function() end,
 		registry_transaction      = function(_, mutation) return mutation() == true end,
 	}

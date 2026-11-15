@@ -21,16 +21,16 @@
 ---    so background checks that return 304 Not Modified do not count against
 ---    the API rate limit. A 304 has no body: it reuses the list held for that
 ---    ETag, and a request is conditional only while that list is held. The
----    lists are kept in the Storage port (_shared/lua/updater/list_cache.lua
+---    lists are kept in the Storage port (_shared/updater/engine/list_cache.lua
 ---    validates them), so the first request after a start is conditional too,
 ---    provided the ETag file still names the stored list.
---- 3. Shared parser: delegates JSON parsing to _shared/lua/updater/release_parser.lua
+--- 3. Shared parser: delegates JSON parsing to _shared/updater/engine/release_parser.lua
 ---    which requires no full JSON decoder.
 --- 4. Shared channels: every channel reads the same release list and keeps its
----    latest release through _shared/lua/updater/channels.lua (the registry in
----    _shared/modules/updater/channels.json); version order comes from
----    _shared/lua/updater/version.lua.
---- 5. Background schedule: _shared/lua/updater/schedule.lua decides from the
+---    latest release through _shared/updater/engine/channels.lua (the registry in
+---    _shared/updater/data/channels.json); version order comes from
+---    _shared/updater/engine/version_core.lua.
+--- 5. Background schedule: _shared/updater/engine/schedule.lua decides from the
 ---    wall clock and the persisted record, so a restart mid-interval does not
 ---    check at boot and a machine off past its due time catches up after the
 ---    boot delay. luv timers are monotonic and stop during a suspend, so every
@@ -47,29 +47,29 @@
 
 local M = {}
 
-local Identifiers = require("identifiers")
-local Logger    = require("logger.shim")
-local Paths     = require("infra.paths")
-local Timings   = require("infra.timings")
-local NoReplaceMove = require("infra.no_replace_move")
-local Version   = require("updater.version")
-local Parser    = require("updater.release_parser")
-local CheckResult = require("updater.check_result")
-local RateLimit = require("updater.rate_limit")
-local Channels  = require("updater.channels")
-local Schedule  = require("updater.schedule")
-local ListCache = require("updater.list_cache")
-local ReleaseSources = require("updater.release_sources")
+local Identifiers = require("core.text.engine.identifiers")
+local Logger    = require("core.logger.engine.shim")
+local Paths     = require("core.fs.engine.paths")
+local Timings   = require("core.timing.engine.timings")
+local NoReplaceMove = require("core.fs.engine.no_replace_move")
+local Version   = require("updater.engine.version_core")
+local Parser    = require("updater.engine.release_parser")
+local CheckResult = require("updater.engine.check_result")
+local RateLimit = require("updater.engine.rate_limit")
+local Channels  = require("updater.engine.channels")
+local Schedule  = require("updater.engine.schedule")
+local ListCache = require("updater.engine.list_cache")
+local ReleaseSources = require("updater.engine.release_sources")
 local Installer = require("modules.updater.installer")
-local Json      = require("json")
-local TomlCodec = require("toml_codec")
-local TomlWriter = require("toml_codec.writer")
-local Fs        = require("adapters.file_system")
-local HttpClient = require("adapters.http_client")
-local FileDigest = require("adapters.file_digest")
-local ok_storage, Storage = pcall(require, "adapters.storage")
+local Json      = require("core.text.engine.json")
+local TomlCodec = require("core.text.engine.toml_codec")
+local TomlWriter = require("core.text.engine.toml_codec.writer")
+local Fs        = require("core.fs.adapters.file_system")
+local HttpClient = require("core.network.adapters.http_client")
+local FileDigest = require("core.fs.adapters.file_digest")
+local ok_storage, Storage = pcall(require, "core.fs.adapters.storage")
 if not ok_storage then Storage = nil end
-local ok_timer, Timer = pcall(require, "adapters.timer_scheduler")
+local ok_timer, Timer = pcall(require, "core.events.timer_scheduler")
 if not ok_timer then Timer = nil end
 
 local LOG = "modules.updater.manager"
@@ -79,8 +79,8 @@ M._file_digest = FileDigest
 
 -- Single source of the driver version.
 local DriverVersion = require("infra.version")
-local NativePath = require("native_path")
-local ConfigKeys = require("config_keys")
+local NativePath = require("core.fs.engine.native_path")
+local ConfigKeys = require("settings.engine.keys")
 
 -- =========================================
 -- =========================================
@@ -88,14 +88,14 @@ local ConfigKeys = require("config_keys")
 -- =========================================
 -- =========================================
 
--- Hardcoded fallback mirroring _shared/modules/updater/defaults.json — keeps
+-- Hardcoded fallback mirroring _shared/updater/data/defaults.json — keeps
 -- the engine functional when the shared tree is unreachable (packaged edge-case)
 local _DEFAULTS_FALLBACK = {
 	github = { owner = "adrienm7", repo = "ergopti" },
 	timing = { default_check_interval_sec = 86400, boot_check_delay_sec = 30 },
 }
 
---- Resolves the absolute path to _shared/modules/updater/defaults.json.
+--- Resolves the absolute path to _shared/updater/data/defaults.json.
 ---
 --- Through infra.paths, which knows both layouts that ship. Stripping four path
 --- components off this file's own location described the checkout only: an
@@ -103,7 +103,7 @@ local _DEFAULTS_FALLBACK = {
 --- leaves the install and the updater falls back to its hardcoded scalars.
 --- @return string|nil Absolute path, or nil if it cannot be resolved.
 local function resolve_defaults_path()
-	return Paths.shared("modules/updater/defaults.json")
+	return Paths.shared("updater/data/defaults.json")
 end
 
 --- Loads the shared updater scalars from defaults.json. Falls back to
@@ -127,7 +127,7 @@ end
 
 local _defs = load_updater_defaults()
 
--- GitHub repo coordinates (single source: _shared/modules/updater/defaults.json)
+-- GitHub repo coordinates (single source: _shared/updater/data/defaults.json)
 local GH_OWNER = (_defs.github and _defs.github.owner) or _DEFAULTS_FALLBACK.github.owner
 local GH_REPO  = (_defs.github and _defs.github.repo)  or _DEFAULTS_FALLBACK.github.repo
 
@@ -153,7 +153,7 @@ local CHECK_RELEASES_URL = require_check_releases_url(_defs)
 --- no fallback: a guessed channel list could offer another channel's artifacts.
 --- @return table registry updater.channels interpreter.
 local function load_channel_registry()
-	local path = Paths.shared("modules/updater/channels.json")
+	local path = Paths.shared("updater/data/channels.json")
 	local raw = path and Fs.read(path) or nil
 	if type(raw) ~= "string" then error("the shared update channel registry is unreadable", 0) end
 	local registry, err = Channels.load(Json.decode(raw))
@@ -179,7 +179,6 @@ local MAX_RELEASE_BODY_BYTES = Timings.count("limits", "release_list_body_bytes"
 -- determines the total candidate count (100), independently of page size.
 local RELEASE_PAGE_SIZE = 20
 local _release_fetch_cancel = nil
-local DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
 local MAX_DOWNLOAD_BYTES = 256 * 1024 * 1024
 local MAX_CHECKSUM_BODY_BYTES = 4096
 
@@ -393,9 +392,12 @@ local function _read_persisted_interval(path)
 	local section = config[CONFIG_SECTION]
 	local raw = type(section) == "table" and section[CONFIG_INTERVAL_KEY] or nil
 	if raw == nil then return DEFAULT_INTERVAL_SEC end
-	if type(raw) ~= "number" or raw < 0 or raw == math.huge or raw ~= math.floor(raw) then
-		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is not a whole number of seconds; using %ds.",
-			tostring(raw), DEFAULT_INTERVAL_SEC)
+	-- The shared value schema's declaration: a whole number of seconds, 0 = never.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), raw)
+	if not checked.ok then
+		Logger.warn(LOG, "config.toml check_interval_seconds '%s' is refused (%s, %s..%s s); using %ds.",
+			tostring(raw), checked.reason, tostring(checked.min), tostring(checked.max), DEFAULT_INTERVAL_SEC)
 		return DEFAULT_INTERVAL_SEC
 	end
 	local seconds, code, snapped = Schedule.snap_interval(raw, TIMING)
@@ -736,18 +738,22 @@ local function _fetch_releases(channel, callback)
 					finish(nil, status, "incomplete conditional response", "no_connection")
 					return
 				end
+				-- A 304 this check cannot answer from its cached page (none, or one
+				-- the response does not belong to) is no list, as on macOS and
+				-- Windows: the public feed still tells whether a release is newer
+				-- (UPD-1, decided by the maintainer on 2026-11-11). The cached
+				-- page goes, so the next check asks without a validator.
 				local cached, association = _list_cache[key], result.etag_receipt
 				if type(cached) ~= "table" or type(association) ~= "table"
 					or association.format ~= "curl-etag-final-v1" or association.conditional_sent ~= true
-					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator then
-					finish(nil, status, "conditional response endpoint association refused", "unexpected"); return
-				end
-				body = cached.body
-				if not body then
-					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a cached release page.", channel, page)
-					finish(nil, status, "not modified, and no release page is cached", "unexpected")
+					or association.effective_url ~= cached.effective_url or association.sent_validator ~= cached.validator
+					or not cached.body then
+					Logger.warn(LOG, "GitHub answered 304 for channel %s page %d without a usable cached release page.", channel, page)
+					_list_cache[key] = nil
+					finish(nil, status, "not modified, and no usable release page is cached", "no_connection")
 					return
 				end
+				body = cached.body
 				Logger.debug(LOG, "GitHub releases unchanged (304) for channel %s page %d; reusing the cached page.", channel, page)
 			elseif not result or result.ok ~= true then
 				local limit = result and type(result.rate_limit) == "table" and result.rate_limit or {}
@@ -762,9 +768,19 @@ local function _fetch_releases(channel, callback)
 			else
 				all_unchanged = false
 			end
+			-- A 200 that does not even open a JSON array is a proxy or captive
+			-- portal answering in GitHub's place, not a release list: no
+			-- connection, so the public feed is read, as on macOS (UPD-1, the
+			-- shared release_sources.opens_release_array); a malformed or cut
+			-- array stays a parse failure.
+			if not ReleaseSources.opens_release_array(body) then
+				Logger.warn(LOG, "GitHub releases for channel %s page %d: HTTP %d without a JSON release array.",
+					channel, page, status)
+				finish(nil, status, "HTTP 200 without a JSON release array", "no_connection")
+				return
+			end
 			local valid, decoded = pcall(Json.decode_lossless, body)
-			if not valid or type(body) ~= "string" or not body:match("^%s*%[")
-				or type(decoded) ~= "table" then
+			if not valid or type(decoded) ~= "table" then
 				finish(nil, status, "invalid release page JSON", "parse_failed")
 				return
 			end
@@ -921,13 +937,31 @@ end
 
 M._select_channel_release = _select_channel_release
 
+--- The URL of one named asset, bound to this repository's download path for
+--- the release's own tag, as Windows (_Updater_FindAsset) and the macOS archive
+--- selection bind it: an asset of the right name served from anywhere else is
+--- refused, since its checksum would come from the same answer (UPX-002).
+--- @param body string Raw release JSON.
+--- @param name string Exact asset name.
+--- @return string url The bound URL, or an empty string.
+local function _repository_asset_url(body, name)
+	local url = Parser.parse_asset_url(body, name)
+	if url == "" then return "" end
+	local expected = M.releases_page_url() .. "/download/" .. Parser.parse_tag(body) .. "/" .. name
+	if url ~= expected then
+		Logger.warn(LOG, "Release asset '%s' refused: it is not served from this repository's release path.", name)
+		return ""
+	end
+	return url
+end
+
 --- Selects only the canonical Linux self-update archive from one release.
 --- The shared parser binds name and URL from the same asset object and returns
 --- an empty string when the exact attachment is absent.
 --- @param body string Raw release JSON.
 --- @return string url Exact asset URL, or an empty string.
 local function _select_update_asset(body)
-	return Parser.parse_asset_url(body, LINUX_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_ASSET_NAME)
 end
 
 M._select_update_asset = _select_update_asset
@@ -936,12 +970,12 @@ M._select_update_asset = _select_update_asset
 --- @param body string Raw release JSON.
 --- @return string url Exact checksum asset URL, or an empty string.
 local function _select_checksum_asset(body)
-	return Parser.parse_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
+	return _repository_asset_url(body, LINUX_CHECKSUM_ASSET_NAME)
 end
 
 M._select_checksum_asset = _select_checksum_asset
 
---- The detached-signature gate (policy: _shared/modules/updater/asset_signing.json).
+--- The detached-signature gate (policy: _shared/updater/data/asset_signing.json).
 --- Built on first use; M._signature_gate is a test seam.
 --- @return table gate
 local function get_signature_gate()
@@ -949,7 +983,7 @@ local function get_signature_gate()
 	M._signature_gate = require("modules.updater.signature_gate").new({
 		verifier = require("infra.asset_signature"),
 		read_policy = function()
-			local text = Fs.read(Paths.shared("modules/updater/asset_signing.json"))
+			local text = Fs.read(Paths.shared("updater/data/asset_signing.json"))
 			if type(text) ~= "string" then return nil, "bad_policy" end
 			local decoded_ok, decoded = pcall(Json.decode, text)
 			if not decoded_ok or type(decoded) ~= "table" then return nil, "bad_policy" end
@@ -968,7 +1002,7 @@ end
 --- @return string url
 local function _select_signature_asset(body)
 	local name = get_signature_gate().signature_name()
-	return name and Parser.parse_asset_url(body, name) or ""
+	return name and _repository_asset_url(body, name) or ""
 end
 
 M._select_signature_asset = _select_signature_asset
@@ -1251,7 +1285,9 @@ local function _complete_background_check(ok, available, release, generation)
 	_save_check_state(state)
 	Logger.info(LOG, "Background check recorded: %s (consecutive failures: %d).",
 		ok and "success" or "failure", state.failures)
-	if not available or not release then return end
+	-- A failed check still hands back the release already known; as on
+	-- Windows, only a successful check announces one (UPL-001).
+	if not ok or not available or not release then return end
 	if Version.normalize_tag(release.tag) == Version.normalize_tag(state.last_notified_tag or "") then
 		Logger.info(LOG, "Background check result: %s available, already notified.", release.tag)
 		return
@@ -1635,7 +1671,7 @@ local function start_native_download(release, download_url, callback, failure_st
  local initialized, flow = pcall(function()
   local Output = require("infra.archive_output")
   local Transfer = require("modules.updater.archive_transfer")
-  local Clock = require("infra.monotonic")
+  local Clock = require("core.logger.engine.monotonic")
   local native_artifact = rawget(Output, "native_artifact")
   local make_transfer = rawget(Transfer, "new")
   if type(native_artifact) ~= "function" or type(make_transfer) ~= "function"
@@ -2008,9 +2044,15 @@ end
 --- @param seconds number
 --- @return boolean Whether the active interval matches the request.
 function M.set_check_interval(seconds)
-	local s = tonumber(seconds)
-	if not s or s < 0 then return false end
-	local wanted = math.floor(s)
+	-- The consuming boundary: a string, a fraction, NaN, an infinity or a value
+	-- out of the declared range never reaches config.toml or the timer.
+	local ValueCheck = require("settings.engine.value_check")
+	local checked = ValueCheck.check_value(ValueCheck.declaration(ValueCheck.KEY.UPDATER_CHECK_INTERVAL_SECONDS), seconds)
+	if not checked.ok then
+		Logger.error(LOG, "Check interval '%s' refused (%s).", tostring(seconds), checked.reason)
+		return false
+	end
+	local wanted = checked.value
 	if wanted == _check_interval then return true end
 	if type(_config_path) ~= "string" or _config_path == "" then
 		Logger.error(LOG, "Check interval %ds cannot be saved: the updater has no config path (init not run).", wanted)
@@ -2090,7 +2132,7 @@ end
 --- separate "Download and install <tag>" row names and installs that release.
 --- @return string
 function M.get_menu_label()
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	if _state == "checking" then
 		return i18n.get("menu.about.update_checking")
 	end
@@ -2138,7 +2180,7 @@ function M.init(opts)
 	-- A local version run from source has no installation to update: it
 	-- checks for nothing on its own, as on the other two drivers, and the
 	-- tray greys its check and frequency rows.
-	if require("infra.installation").is_source_run() then
+	if require("core.lifecycle.engine.installation").is_source_run() then
 		Logger.info(LOG, "Local version run from source: no automatic update check.")
 		return
 	end

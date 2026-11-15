@@ -14,11 +14,11 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local quit_spy = { count = 0, result = true }
-package.loaded["infra.termination_coordinator"] = {
+package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 	request_user_exit = function(reason)
 		quit_spy.count = quit_spy.count + 1
 		quit_spy.reason = reason
@@ -63,15 +63,24 @@ helpers.describe("gestures.actions: script_quit exact-fence transaction", functi
 		local saved_exit = os.exit
 		local direct_exits = 0
 		os.exit = function() direct_exits = direct_exits + 1 end
+		local saved_notifications = package.loaded["core.ui.engine.notifications"]
+		local notices = {}
+		package.loaded["core.ui.engine.notifications"] = {
+			notify = function(text, _body, level) notices[#notices + 1] = { text = text, level = level }; return true end,
+		}
 		local ok, dispatched = pcall(Actions.execute_single, "script_quit")
 		helpers.assert_true(ok, "executing script_quit must not raise: " .. tostring(dispatched))
 		scheduled_callback()
 		os.exit = saved_exit
 		_G.hs.timer.doAfter = saved_do_after
+		package.loaded["core.ui.engine.notifications"] = saved_notifications
 
 		helpers.assert_eq(quit_spy.count, 1)
 		helpers.assert_eq(direct_exits, 0,
 			"only the coordinator may exit after proving the exact fence")
+		-- NUI-001: the refusal is told with the menubar Quit's one notice.
+		helpers.assert_eq(#notices, 1, "a refused shortcut or gesture Quit tells the user")
+		helpers.assert_eq(notices[1].level, require("menu.engine.feature_notice").LEVEL_REFUSAL)
 	end)
 
 	helpers.it("falls back to the coordinator when timer scheduling throws or returns no handle", function()

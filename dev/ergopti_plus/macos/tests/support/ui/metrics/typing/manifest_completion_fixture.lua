@@ -11,7 +11,7 @@ local Publication = require("tests.support.ui.metrics.typing.publication")
 local Completion = require("tests.support.modules.keystats.ngram_completion_fixture")
 local Today = require("tests.support.modules.keystats.today_completion_fixture")
 local with_delivery = require("tests.support.typing_delivery_fixture")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local M = {}
 
 M.PAST, M.NEXT, M.TODAY = Completion.PAST, Completion.NEXT, Completion.TODAY
@@ -139,7 +139,7 @@ function M.with_publication(options, callback)
 				state.saves, state.disk_files = {}, {}
 				local Snapshot = package.loaded["ui.metrics_typing.snapshot"]
 				local original_save = Snapshot.save
-				local filesystem = package.loaded["adapters.file_system"]
+				local filesystem = package.loaded["core.fs.adapters.file_system"]
 				filesystem.read_with_status = function(path)
 					local content = state.disk_files[path]
 					return content, content and "ok" or "absent"
@@ -165,7 +165,7 @@ function M.with_publication(options, callback)
 					state.saves[#state.saves + 1] = { payload = payload, accepted = accepted }
 					return accepted
 				end
-				local builder = package.loaded["ui.ui_builder"]
+				local builder = package.loaded["core.ui.ui.builder"]
 				local original_show = builder.show_webview
 				builder.show_webview = function(...)
 					local fresh = setmetatable({}, { __index = original_show(...) })

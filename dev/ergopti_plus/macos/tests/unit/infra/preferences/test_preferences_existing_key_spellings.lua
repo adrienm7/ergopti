@@ -8,8 +8,8 @@
 --- (toml-batch-existing-key).
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec.codec")
-local Migrate = require("config_migrate")
+local Codec = require("core.text.engine.toml_codec.codec")
+local Migrate = require("settings.engine.migration.migrate")
 
 local PATH = "/switch/config.toml"
 local GROUPS = { "autocorrection", "distancesreduction", "magickey" }
@@ -43,10 +43,10 @@ end
 --- @return boolean saved
 --- @return string disk Bytes after the save.
 local function save_after(source, change)
-	return helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
+	return helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
 		local modules = core_modules()
 		local disk = source
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			read_with_status = function() return disk, "ok" end,
 			write = function() error("the save must keep its source precondition") end,
 			write_if_unchanged = function(_, content, expected)
@@ -106,8 +106,10 @@ end
 local function migrated_old_build_file()
 	local registry = assert(Migrate.load_registry(helpers.shared(Migrate.REGISTRY_PATH)))
 	local catalogue = dofile(helpers.shared("../macos/_generated/action_catalogue.lua"))
-	local context, detail = Migrate.load_context(helpers.shared("modules/actions/modifier_chords.json"), catalogue)
+	local context, detail = Migrate.load_context(helpers.shared("shortcuts/data/actions/modifier_chords.json"), catalogue)
 	helpers.assert_true(context ~= nil, detail)
+	-- The v22 step reads the tap_hold.toml beside it: this old build had none.
+	context.companions = { ["tap_hold.toml"] = { status = "absent" } }
 	local source = "[_meta]\nschema_version = " .. registry.oldest .. "\n\n" .. old_build_file()
 	local plan = Migrate.plan(source, registry, "hs", context)
 	helpers.assert_eq(plan.outcome, "migrated", plan.detail)
@@ -129,7 +131,7 @@ helpers.describe("the Hotstrings switch saves over existing key spellings (toml-
 		local shapes = {
 			{ "older build whole-file encoder", old_build_file() },
 			{ "older build after the boot migration", migrated_old_build_file() },
-			{ "shipped macOS example config", shared_file("core/config_schema/examples/hs_config.example.toml") },
+			{ "shipped macOS example config", shared_file("settings/data/config_schema/examples/hs_config.example.toml") },
 			{ "quoted bare-compatible keys", '# kept comment\n[hotstrings]\n"enabled" = false\n"magic_key_source" = "auto"\n'
 				.. '[hotstrings.groups]\n"autocorrection" = false\n[future]\nkeep = 99\n' },
 			{ "hand-written [[hotstrings.terminators]] list", '# kept comment\n[hotstrings]\nexpansion_delay = 0.5\n\n'

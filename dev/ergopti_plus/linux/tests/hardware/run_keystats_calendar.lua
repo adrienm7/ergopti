@@ -7,12 +7,12 @@
 --- ==============================================================================
 
 local root = assert(arg[1])
-package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+package.path = root .. "/?.lua;" .. root .. "/?/init.lua;" .. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local Fixture = require("tests.support.keystats_native_fixture")
 local Preferences = require("tests.support.metrics_preferences_fixture")
 local Calendar = require("modules.keystats.calendar")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local helpers = require("tests.helpers")
 local uv = require("luv")
 local original_capture, original_now = Calendar.capture, Monotonic.now_ms
@@ -57,7 +57,7 @@ local function scenario(day, body)
 	Calendar.capture, Monotonic.now_ms = original_capture, original_now
 	os.date, os.time = original_date, original_time
 	os.remove(path)
-	os.execute("rm -rf -- " .. require("text_utils").shell_quote(path .. ".logs"))
+	os.execute("rm -rf -- " .. require("core.text.engine.utils_core").shell_quote(path .. ".logs"))
 	assert(ok, failure)
 end
 
@@ -221,7 +221,7 @@ scenario({ month = 10, day = 25 }, function(k, writer, advance, rows)
 end)
 
 scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	local original_line, original_has = shell.exec_line, shell.has_command
 	local system = require("modules.keystats.system_metrics")
 	local network = "network-one"
@@ -229,7 +229,9 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 	shell.exec_line = function(command)
 		if command:find("power_supply", 1, true) then return "50" end
 		if command:find("nmcli", 1, true) then return network end
-		if command:find("loginctl", 1, true) then return "no" end
+		-- A locked session: its time is the elapsed-time witness, since unlocked
+		-- time is no field of its own (awake_ms is keep-awake time, KMD-3).
+		if command:find("loginctl", 1, true) then return "yes" end
 		if command:find("pactl", 1, true) then return "Mute: no" end
 		return ""
 	end
@@ -246,11 +248,11 @@ scenario({ month = 10, day = 25, sec = 0 }, function(k, _, advance, rows)
 		network = "network-three"
 		sample()
 		system.acknowledge(prefix)
-		equal(system.snapshot().values["2026-10-25"].awake_ms, 60000)
+		equal(system.snapshot().values["2026-10-25"].locked_ms, 60000)
 		advance(30000)
 		sample()
 		Fixture.flush(k)
-		equal(rows("SELECT date,awake_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
+		equal(rows("SELECT date,locked_ms,battery_count,wifi_changes FROM agg_system_day ORDER BY date;"),
 			{ "2026-10-25|60000|2|1", "2026-10-26|30000|2|1" })
 		-- system_load samples the host's /proc: the calendar contract is about transitions.
 		equal(rows("SELECT date,action FROM events_system WHERE action<>'system_load' ORDER BY id;"),
@@ -326,7 +328,7 @@ end)
 scenario({ month = 10, day = 25 }, function(k, writer)
 	writer.close_db()
 	k.on_keydown("a", Monotonic.now_ms(), "shutdown-app")
-	local logger = require("logger.shim")
+	local logger = require("core.logger.engine.shim")
 	local original, errors = logger.error, 0
 	logger.error = function(tag, message, ...)
 		if tag == "modules.keystats.keystats" and message == "Final SQLite history remains uncommitted; summary publication cannot acknowledge its source." then
@@ -353,7 +355,7 @@ scenario({ month = 10, day = 25, hour = 12, min = 0, sec = 0 }, function(k, writ
 	local prior = assert(io.open(path, "wb")); prior:write("prior summary\n"); prior:close()
 	k.on_app_focus("éditeur", Monotonic.now_ms())
 	k.on_keydown("a", Monotonic.now_ms(), "éditeur")
-	local good = assert(require("json").decode(assert(k.export_json())))
+	local good = assert(require("core.text.engine.json").decode(assert(k.export_json())))
 	equal(good.apps["éditeur"].keystrokes, 1)
 	k.on_app_focus("bad" .. string.char(255), Monotonic.now_ms())
 	k.on_keydown("a", Monotonic.now_ms(), "bad" .. string.char(255))

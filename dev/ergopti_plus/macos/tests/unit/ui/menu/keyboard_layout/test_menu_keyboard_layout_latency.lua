@@ -112,8 +112,8 @@ end)
 
 helpers.describe("menu_keyboard_layout async refresh", function()
 	helpers.it("updates the cache from the probe stdout via hs.task", function()
-		package.loaded["adapters.shell_runner"] = nil
-		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["core.process.adapters.shell_runner"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
 		local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout", {
 			task = task_stub_firing('({ "KeyboardLayout Name" = French; }, { "KeyboardLayout Name" = Ergopti_v2_2_2_plus; })'),
 		})
@@ -138,7 +138,7 @@ end)
 
 helpers.describe("menu_keyboard_layout.pick_latest_bundle", function()
 	helpers.it("returns a stable result across repeated calls", function()
-		helpers.with_fresh_modules({ "infra.fs_dir", "modules.keymap.layout_install", "ui.menu.menu_keyboard_layout" }, function()
+		helpers.with_fresh_modules({ "core.fs.engine.dir", "modules.keymap.layout_install", "ui.menu.menu_keyboard_layout" }, function()
 			local kbd = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 			local bundles_dir = helpers.fixtures_dir() .. "bundles/"
 			_G.hs.fs.__set_entries(bundles_dir, { "Ergopti_v2.2.2.bundle" })
@@ -160,9 +160,9 @@ end)
 
 helpers.describe("menu_apps discovery cache", function()
 	helpers.it("scans the apps/ directory at most once across repeated menu opens", function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.fs_dir" }, function()
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.fs.engine.dir" }, function()
 			local scans = 0
-			package.loaded["infra.fs_dir"] = { try_entries_quiet = function()
+			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function()
 				scans = scans + 1
 				return {}, true
 			end }

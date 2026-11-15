@@ -11,22 +11,22 @@ local helpers = require("tests.helpers")
 
 local function with_installer(options, check)
 	options = options or {}
-	helpers.with_stub_scope({ "modules.updater.release_installer", "infra.logger", "infra.paths",
-		"adapters.file_system", "adapters.json_codec", "adapters.shell_runner" }, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.paths"] = { shared = function(path)
+	helpers.with_stub_scope({ "modules.updater.release_installer", "core.logger.engine.logger", "core.fs.engine.paths",
+		"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "core.process.adapters.shell_runner" }, function()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.fs.engine.paths"] = { shared = function(path)
 			helpers.assert_eq(path, "../macos/adapters/release_stage.sh")
 			return helpers.driver_root() .. "adapters/release_stage.sh"
 		end }
-		package.loaded["adapters.file_system"] = { classify_no_follow = function()
+		package.loaded["core.fs.adapters.file_system"] = { classify_no_follow = function()
 			if options.previous then return { mode = "directory" }, "ok" end
 			return nil, "absent"
 		end, read = function(path)
 			local file = assert(io.open(path, "rb"))
 			local content = assert(file:read("a")); assert(file:close()); return content
 		end }
-		package.loaded["adapters.json_codec"] = require("json")
-		package.loaded["adapters.shell_runner"] = {}
+		package.loaded["core.fs.adapters.json_codec"] = require("core.text.engine.json")
+		package.loaded["core.process.adapters.shell_runner"] = {}
 		local installer = require("modules.updater.release_installer")
 		installer._getenv = function(name)
 			if name == "ERGOPTI_LAUNCHER_EXECUTABLE" and not options.source then
@@ -136,12 +136,12 @@ helpers.describe("physical detached arming handshake", function()
 	local cases
 	local function observed()
 		if cases then return cases end
-		local quote = require("infra.text_utils").shell_quote
+		local quote = require("core.text.engine.utils").shell_quote
 		local output = require("tests.support.command_lines").read("python3 -B "
 			.. quote(helpers.driver_root() .. "tests/support/modules/updater/release_arming_fixture.py")
 			.. " " .. quote(helpers.driver_root()) .. " " .. quote(helpers.temp_dir())
 			.. " --hostile-interpreter 2>&1")
-		cases = assert(require("json").decode_lossless(table.concat(output, "\n")))
+		cases = assert(require("core.text.engine.json").decode_lossless(table.concat(output, "\n")))
 		helpers.assert_eq(#cases, 8, "every native refusal and healthy control must execute")
 		return cases
 	end
@@ -164,8 +164,8 @@ helpers.describe("physical detached arming handshake", function()
 			else
 				helpers.assert_true(result.status ~= 0, "a failed detached worker must fail the foreground receipt")
 				helpers.assert_eq(result.installed, "installed")
-				helpers.assert_eq(require("json").is_null(result.previous), true)
-				helpers.assert_eq(require("json").is_null(result.opened), true)
+				helpers.assert_eq(require("core.text.engine.json").is_null(result.previous), true)
+				helpers.assert_eq(require("core.text.engine.json").is_null(result.opened), true)
 			end
 		end)
 	end

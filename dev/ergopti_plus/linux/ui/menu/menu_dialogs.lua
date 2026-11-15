@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Linux Menu Dialogs
 --- DESCRIPTION:
---- The native dialogs (Ergopti's own, ui/native_dialog.lua), prompts and
+--- The native dialogs (Ergopti's own, core/ui/ui/native_dialog.lua), prompts and
 --- binding helpers the tray's section builders share: placeholder filling, shell quoting, exit-status normalisation, text
 --- prompts, error and information messages, the yes/no question, and the action
 --- picker and slot-binding rows.
@@ -11,11 +11,11 @@
 
 local M = {}
 
-local WindowTitles = require("window_titles")
-local Logger = require("logger.shim")
-local Modal = require("ui.modal")
-local NativeDialog = require("ui.native_dialog")
-local TextPrompt = require("ui.text_prompt")
+local WindowTitles = require("core.ui.engine.window_titles")
+local Logger = require("core.logger.engine.shim")
+local Modal = require("core.ui.ui.modal")
+local NativeDialog = require("core.ui.ui.native_dialog")
+local TextPrompt = require("core.ui.ui.text_prompt")
 local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
 if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
 
@@ -37,7 +37,7 @@ local function _fill(template, placeholder, value)
 end
 
 local function shell_quote(value)
-	return require("text_utils").shell_quote(value or "")
+	return require("core.text.engine.utils_core").shell_quote(value or "")
 end
 
 --- Normalises a child-process exit status across interpreters.
@@ -53,7 +53,7 @@ local function succeeded(status)
 	return status == true or status == 0
 end
 
---- Asks the user for a line of text (ui/text_prompt.lua, shared with the AI
+--- Asks the user for a line of text (core/ui/ui/text_prompt.lua, shared with the AI
 --- agent's command dialog).
 ---
 --- Declared here, above every closure that calls it: a `local` declared after a
@@ -133,7 +133,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		value = ctx.prompt_action_parameter(binding, action, spec, prior)
 	elseif spec == "app" then
 		-- An application is picked among the desktop entries, never typed.
-		local chosen, why = require("ui.app_chooser").pick(require("adapters.shell_runner"),
+		local chosen, why = require("ui.app_chooser").pick(require("core.process.adapters.shell_runner"),
 			gestures.get_action_parameter_prompt(action))
 		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
 		value = chosen
@@ -225,8 +225,8 @@ local function slot_binding_rows(slot_label, bound, binding, assign)
 	local function pick() open_action_picker(slot_label, bound, binding, assign) end
 	local function clear() assign("none") end
 	local rows = ManifestMenu.template_rows("slot_binding_frame", {
-		[require("config_keys").COMMAND.SLOT_BINDING_PICK] = pick,
-		[require("config_keys").COMMAND.SLOT_BINDING_CLEAR] = clear,
+		[require("settings.engine.keys").COMMAND.SLOT_BINDING_PICK] = pick,
+		[require("settings.engine.keys").COMMAND.SLOT_BINDING_CLEAR] = clear,
 	}, {
 		["slot_binding_has_action"] = function() return bound ~= "none" end,
 	}, {})

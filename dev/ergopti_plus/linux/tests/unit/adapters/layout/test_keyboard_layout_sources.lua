@@ -41,15 +41,24 @@ end
 --- @param answers table Ordered { pattern, output } pairs; first match wins.
 --- @param env table|nil Environment variables the module may read.
 --- @param group integer|nil Active XKB group the capture reports (1 when nil).
+--- @param native_dump string|nil What the in-process X11 dump answers; none when nil.
 --- @return table layout, table commands
-local function load_with(kind, answers, env, group)
+local function load_with(kind, answers, env, group, native_dump)
 	local commands = {}
+	-- The in-process X11 dump is the source probe's; a test names its answer, so
+	-- no case depends on an X server being reachable from the unit lane.
+	local native_calls = { count = 0 }
+	package.loaded["adapters.xkb_source_probe"] = { dump_keymap = function()
+		native_calls.count = native_calls.count + 1
+		if native_dump then return native_dump end
+		return nil, "fixture: no in-process dump"
+	end, native_calls = native_calls }
 	-- A controlled map acknowledgement owns the parser's inverse data and
 	-- receipt. This checks source order without granting native source currency.
 	package.loaded["adapters.xkb_capture"] = require("tests.support.layout_cohort_fixture").capture(function(text)
 		return package.loaded["adapters.keyboard_layout"].build(text, group)
 	end, group)
-	local Shell = helpers.load_module("adapters.shell_runner")
+	local Shell = helpers.load_module("core.process.adapters.shell_runner")
 	Shell._set_runner(function(cmd)
 		commands[#commands + 1] = cmd
 		if cmd:match("^command %-v") then
@@ -61,7 +70,7 @@ local function load_with(kind, answers, env, group)
 		end
 		return ""
 	end)
-	local DisplayServer = helpers.load_module("infra.display_server")
+	local DisplayServer = helpers.load_module("core.ui.engine.display_server")
 	DisplayServer._set_for_test(kind, "")
 	package.loaded["infra.xkb_rmlvo"] = nil
 	local layout = helpers.load_module("adapters.keyboard_layout")
@@ -82,6 +91,7 @@ end
 
 local function cleanup(Shell)
 	Shell._reset_runner()
+	package.loaded["adapters.xkb_source_probe"] = nil
 	package.loaded["adapters.xkb_capture"] = nil
 	package.loaded["adapters.keyboard_layout"] = nil
 end
@@ -89,10 +99,10 @@ end
 helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 
 	helpers.it("xkb-data-prerequisite: requires actual include files and Compose tables", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native XKB data admission requires Python and the actual LuaJIT FFI runtime")
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_native_data.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
@@ -100,10 +110,10 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 	end)
 
 	helpers.it("keymap-session-exit: failed native metadata cannot select the compiled keymap", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native session keymap receipts require Python and the actual LuaJIT FFI runtime")
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_session_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
@@ -111,10 +121,10 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 	end)
 
 	helpers.it("keymap-source-exit: refuses failed real source commands before native publication", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_true(shell.has_command("python3") and shell.has_command("luajit"),
 			"native keymap source receipts require Python and the actual LuaJIT FFI runtime")
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local runtime = assert(shell.exec_line("command -v luajit"))
 		local fixture = helpers.driver_root() .. "/tests/hardware/test_xkb_source_exit.py"
 		local status = os.execute("python3 " .. quote(fixture) .. " --runtime " .. quote(runtime))
@@ -129,6 +139,24 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 			helpers.assert_true(layout.refresh(nil), "a Wayland dump must load")
 		end)
 		helpers.assert_contains(layout.source(), "dump-keymap-wayland")
+		cleanup(Shell)
+	end)
+
+	helpers.it("bounds the Wayland dump, which waits forever on a seat with no keyboard", function()
+		local layout, commands, Shell = load_with("wayland", {
+			{ "dump-keymap-wayland", plausible_keymap() },
+		})
+		with_env({ DISPLAY = ":0" }, function()
+			helpers.assert_true(layout.refresh(nil), "a Wayland dump must load")
+		end)
+		local seconds = math.ceil(require("core.timing.engine.timings").ms("adapters", "wayland_keymap_dump_timeout_ms") / 1000)
+		local bounded = false
+		for _, cmd in ipairs(commands) do
+			if cmd:find("dump-keymap-wayland", 1, true) then
+				bounded = cmd:find("^timeout " .. seconds .. " xkbcli dump%-keymap%-wayland") ~= nil
+			end
+		end
+		helpers.assert_true(bounded, "the dump runs under timeout " .. seconds)
 		cleanup(Shell)
 	end)
 
@@ -222,6 +250,42 @@ helpers.describe("keyboard_layout: keymap sources on Wayland", function()
 end)
 
 helpers.describe("keyboard_layout: keymap sources on X11", function()
+
+	helpers.it("takes the in-process X11 dump first and forks no dump tool", function()
+		-- Before 2026-11-11 every X11 resolve forked xkbcli, then xkbcomp
+		-- (about 40 ms a resolve on Ubuntu 24.04, whose xkbcli has no dump).
+		local layout, commands, Shell = load_with("x11", {
+			{ "xkbcomp", plausible_keymap() },
+		}, nil, nil, plausible_keymap())
+		with_env({ DISPLAY = ":0", HOME = "/nonexistent-home" }, function()
+			helpers.assert_true(layout.refresh(nil), "the in-process dump must resolve the layout")
+		end)
+		helpers.assert_eq(layout.source(), "libxkbcommon-x11 (in process)")
+		helpers.assert_eq(package.loaded["adapters.xkb_source_probe"].native_calls.count, 1)
+		for _, command in ipairs(commands) do
+			helpers.assert_true(not command:find("xkbcomp", 1, true) and not command:find("dump-keymap", 1, true),
+				"no dump tool may run once the in-process dump answered: " .. command)
+		end
+		cleanup(Shell)
+	end)
+
+	helpers.it("falls back to xkbcomp when the in-process dump cannot answer", function()
+		local layout, _, Shell = load_with("x11", { { "xkbcomp", plausible_keymap() } })
+		with_env({ DISPLAY = ":0", HOME = "/nonexistent-home" }, function()
+			helpers.assert_true(layout.refresh(nil))
+		end)
+		helpers.assert_contains(layout.source(), "xkbcomp")
+		cleanup(Shell)
+	end)
+
+	helpers.it("never asks the X11 probe on Wayland", function()
+		local layout, _, Shell = load_with("wayland", {
+			{ "dump-keymap-wayland", plausible_keymap() },
+		}, nil, nil, plausible_keymap())
+		with_env({ WAYLAND_DISPLAY = "wayland-0" }, function() helpers.assert_true(layout.refresh(nil)) end)
+		helpers.assert_eq(package.loaded["adapters.xkb_source_probe"].native_calls.count, 0)
+		cleanup(Shell)
+	end)
 
 	helpers.it("compiles the session layout when neither xkbcli nor xkbcomp answer", function()
 		local layout, _, Shell = load_with("x11", {

@@ -44,7 +44,7 @@ end
 ---   names the commands this machine lacks (every other command is installed).
 --- @param body function Receives the module.
 local function with_shell(answers, body)
-	local shell_name = "adapters.shell_runner"
+	local shell_name = "core.process.adapters.shell_runner"
 	local module_name = "modules.keystats.system_metrics"
 	local previous_shell = package.loaded[shell_name]
 	local previous_module = package.loaded[module_name]
@@ -170,7 +170,7 @@ helpers.describe("system audio native output locale", function()
 					sample(0, "2026-01-02")
 					local day = sample(interval, "2026-01-02")
 					helpers.assert_eq(day.audio_muted_ms, muted and interval or 0)
-					helpers.assert_eq(day.awake_ms, interval)
+					helpers.assert_eq(day.awake_ms, 0, "unlocked time is no keep-awake time (KMD-3)")
 				end)
 			end)
 		end
@@ -203,7 +203,7 @@ helpers.describe("system metrics: reading the machine", function()
 		with_shell({ { match = "power_supply", out = "80" } }, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("power_supply", 1, true) then return "30" end
 				return ""
 			end
@@ -261,7 +261,9 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 		helpers.assert_true(math.abs(clock.boot_ms - uptime) < 5000, "CLOCK_BOOTTIME matches kernel uptime")
 	end)
 
-	helpers.it("counts the time between samples as awake", function()
+	-- KMD-3 (decided by the maintainer on 2026-11-11): awake_ms is keep-awake
+	-- time, as on Windows and macOS; unlocked uptime is no longer credited to it.
+	helpers.it("credits no unlocked time to awake_ms (linux-awake-definition)", function()
 		with_shell({
 			{ match = "power_supply", out = "50" },
 			{ match = "LockedHint", out = "no" },
@@ -269,7 +271,20 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
 			sample(step, "2026-08-06")
-			helpers.assert_eq(metrics.current().awake_ms, step)
+			helpers.assert_eq(metrics.current().awake_ms, 0)
+			helpers.assert_eq(metrics.current().locked_ms, 0)
+		end)
+	end)
+
+	helpers.it("a finished keep-awake session is the day's awake_ms and its passive row (linux-awake-definition)", function()
+		with_shell({}, function(metrics, sample)
+			sample(0, "2026-08-06")
+			helpers.assert_eq(metrics.record_awake_session(90000.4), true)
+			local day = metrics.current()
+			helpers.assert_eq(day.awake_ms, 90000)
+			helpers.assert_eq(day.passive_count, 1)
+			helpers.assert_eq(metrics.take_events(), { sample_event("passive_period", 0, "2026-08-06",
+				{ kind = "awake", duration_ms = 90000 }) })
 		end)
 	end)
 
@@ -309,13 +324,13 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 	end)
 
 	helpers.it("keeps a long active sampling delay out of sleep time", function()
-		with_shell({}, function(metrics, sample, set_clock)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample, set_clock)
 			local step = metrics._sample_interval_ms()
 			set_clock(function(now, date)
 				local clock = sample_clock(now, date); clock.boot_ms = now; return clock
 			end)
 			sample(0, "2026-08-06"); sample(step * 4, "2026-08-06")
-			helpers.assert_eq(metrics.current().awake_ms, step * 4)
+			helpers.assert_eq(metrics.current().locked_ms, step * 4)
 			helpers.assert_eq(metrics.current().sleep_ms, 0)
 			helpers.assert_eq(metrics.take_events(), {})
 		end)
@@ -330,7 +345,7 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 				return clock
 			end)
 			sample(0, "2026-08-06"); sample(step * 8, "2026-08-06")
-			helpers.assert_eq(metrics.current().awake_ms, step * 2)
+			helpers.assert_eq(metrics.current().awake_ms, 0)
 			helpers.assert_eq(metrics.current().sleep_ms, step * 6)
 			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 8, "2026-08-06", { asleep_ms = step * 6 }),
 				sample_event("passive_period", step * 8, "2026-08-06", { kind = "sleep", duration_ms = step * 6 }) })
@@ -368,7 +383,7 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			sample(0, "2026-08-06")
 			sample(step * 100, "2026-08-06")
 			helpers.assert_eq(metrics.current().sleep_ms, step * 99)
-			helpers.assert_eq(metrics.current().awake_ms, step)
+			helpers.assert_eq(metrics.current().awake_ms, 0)
 			helpers.assert_eq(metrics.take_events(), { sample_event("wake", step * 100, "2026-08-06", { asleep_ms = step * 99 }),
 				sample_event("passive_period", step * 100, "2026-08-06", { kind = "sleep", duration_ms = step * 99 }) })
 		end)
@@ -386,13 +401,13 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			local days = metrics.snapshot().values
 			helpers.assert_eq(days["2026-08-06"].sleep_ms, 59500)
 			helpers.assert_eq(days["2026-08-07"].sleep_ms, 59500)
-			helpers.assert_eq(days["2026-08-06"].awake_ms, 500)
-			helpers.assert_eq(days["2026-08-07"].awake_ms, 500)
+			helpers.assert_eq(days["2026-08-06"].awake_ms, 0)
+			helpers.assert_eq(days["2026-08-07"].awake_ms, 0)
 		end)
 	end)
 
 	helpers.it("retains the old clock domain when a suspend-aware reading fails", function()
-		with_shell({}, function(metrics, sample, set_clock)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample, set_clock)
 			local step, boot = metrics._sample_interval_ms(), 0
 			set_clock(function(now, date)
 				local clock = sample_clock(now, date)
@@ -404,7 +419,7 @@ helpers.describe("system metrics: awake, locked, asleep", function()
 			helpers.assert_nil(sample(step, "2026-08-06"))
 			boot = step * 2
 			sample(step * 2, "2026-08-06")
-			helpers.assert_eq(metrics.current().awake_ms, step * 2)
+			helpers.assert_eq(metrics.current().locked_ms, step * 2)
 		end)
 	end)
 
@@ -463,7 +478,7 @@ end)
 helpers.describe("system metrics: network changes", function()
 
 	helpers.it("keeps network changes readable under a translated nmcli locale", function()
-		local real_shell = require("adapters.shell_runner")
+		local real_shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname()
 		os.remove(dir)
 		assert(real_shell.run("mkdir -- " .. real_shell.quote(dir)))
@@ -478,7 +493,7 @@ helpers.describe("system metrics: network changes", function()
 		local okay, detail = pcall(function()
 			local ssid = "maison"
 			with_shell({ missing = { iwgetid = true } }, function(metrics, sample)
-				local shell = package.loaded["adapters.shell_runner"]
+				local shell = package.loaded["core.process.adapters.shell_runner"]
 				shell.exec_line = function(command)
 					if not command:find("nmcli", 1, true) then return "" end
 					return real_shell.exec_line("PATH=" .. real_shell.quote(dir .. ":/usr/bin:/bin")
@@ -503,7 +518,7 @@ helpers.describe("system metrics: network changes", function()
 		}, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("nmcli", 1, true) then return "yes:bureau" end
 				if command:find("power_supply", 1, true) then return "50" end
 				return ""
@@ -541,7 +556,7 @@ helpers.describe("system metrics: network changes", function()
 		}, function(metrics, sample)
 			local step = metrics._sample_interval_ms()
 			sample(0, "2026-08-06")
-			package.loaded["adapters.shell_runner"].exec_line = function(command)
+			package.loaded["core.process.adapters.shell_runner"].exec_line = function(command)
 				if command:find("power_supply", 1, true) then return "50" end
 				return ""
 			end
@@ -557,7 +572,7 @@ helpers.describe("system metrics: network changes", function()
 	-- an empty PATH, so only a reader that needs no tool passes; the stats move
 	-- between samples, so only the interface's name counts as the network.
 	helpers.it("reads the wireless interface with no tool on the PATH (wireless-without-awk)", function()
-		local real_shell = require("adapters.shell_runner")
+		local real_shell = require("core.process.adapters.shell_runner")
 		local dir = os.tmpname()
 		os.remove(dir)
 		os.execute("mkdir " .. dir)
@@ -570,7 +585,7 @@ helpers.describe("system metrics: network changes", function()
 			fh:close()
 		end
 		with_shell({}, function(metrics, sample)
-			local shell = package.loaded["adapters.shell_runner"]
+			local shell = package.loaded["core.process.adapters.shell_runner"]
 			shell.has_command = function() return false end
 			shell.exec_line = function(command)
 				if not command:find(listing, 1, true) then return "" end
@@ -604,7 +619,7 @@ helpers.describe("system metrics: network changes", function()
 			local day = metrics.current()
 			helpers.assert_eq(day.space_switches, 0, "no desktop source: nothing is counted")
 			helpers.assert_eq(metrics.space_change_availability(),
-				{ measured = false, reason = "platform_reason.desktop_changes_need_x11" })
+				{ measured = false, reason = "platform_reason.desktop_changes_need_workspace_interface" })
 			helpers.assert_eq(day.night_wake_count, 0)
 		end)
 	end)
@@ -624,10 +639,17 @@ helpers.describe("system metrics: network changes", function()
 			helpers.assert_eq(metrics.observe_desktop(), false, "no change is counted across an unanswered read")
 			desktop = 0
 			helpers.assert_eq(metrics.observe_desktop(), true)
-			helpers.assert_eq(metrics.current().space_switches, 2)
+			-- sway names its workspaces: a name is an identity like an index.
+			desktop = "1:web"
+			helpers.assert_eq(metrics.observe_desktop(), true, "a Wayland workspace name counts too")
+			desktop = "1:web"
+			helpers.assert_eq(metrics.observe_desktop(), false)
+			desktop = ""
+			helpers.assert_nil(metrics.observe_desktop(), "an empty name is no answer")
+			helpers.assert_eq(metrics.current().space_switches, 3)
 			local actions = {}
 			for _, event in ipairs(metrics.take_events()) do actions[#actions + 1] = event.action end
-			helpers.assert_eq(actions, { "space_change", "space_change" })
+			helpers.assert_eq(actions, { "space_change", "space_change", "space_change" })
 			helpers.assert_eq(metrics.space_change_availability().measured, true)
 		end)
 	end)
@@ -653,7 +675,7 @@ helpers.describe("system metrics: network changes", function()
 				"the first sample has no CPU interval yet")
 			-- 1000 more ticks: 300 user, 100 system, 600 idle.
 			write("stat", "cpu  400 0 150 1400 50 0 0 0 0 0\n")
-			local poll = require("infra.timings").ms("keystats", "system_load_poll_ms")
+			local poll = require("core.timing.engine.timings").ms("keystats", "system_load_poll_ms")
 			sample(metrics._sample_interval_ms(), "2026-08-06")
 			helpers.assert_eq(metrics.take_events(), {}, "load waits for its own poll interval")
 			for at = 2 * metrics._sample_interval_ms(), poll, metrics._sample_interval_ms() do sample(at, "2026-08-06") end
@@ -670,18 +692,21 @@ end)
 
 
 helpers.describe("system metrics: owned restart hydration", function()
-	local function persisted(date, awake)
+	-- Locked time witnesses the elapsed-time cursor: unlocked time is credited
+	-- to no field since awake_ms counts keep-awake sessions (KMD-3).
+	local function persisted(date, locked)
 		return {
 			date = date, wifi_changes = 4, space_switches = 0,
 			battery_sum = 150, battery_count = 2, battery_min = 70, battery_max = 80,
-			audio_muted_ms = 1000, locked_ms = 2000, sleep_ms = 3000, awake_ms = awake,
+			audio_muted_ms = 1000, locked_ms = locked, sleep_ms = 3000, awake_ms = 0,
 			passive_count = 0, night_wake_count = 0,
 		}
 	end
 
 	helpers.it("unbound-recovery: merges first binding without losing clocks or queued transitions", function()
 		local network = "first"
-		with_shell({ { match = "power_supply", out = "50" }, { match = "nmcli", out = function() return network end } },
+		with_shell({ { match = "power_supply", out = "50" }, { match = "nmcli", out = function() return network end },
+			{ match = "LockedHint", out = "yes" } },
 			function(metrics, sample, set_clock)
 				local base = os.time({ year = 2026, month = 10, day = 5, hour = 23, min = 59, sec = 45 })
 				set_clock(function(now, date)
@@ -702,16 +727,16 @@ helpers.describe("system metrics: owned restart hydration", function()
 				local loads = 0
 				local function load(date) loads = loads + 1; return persisted(date, 4000), true end
 				metrics.bind("recovered", "device", load)
-				helpers.assert_eq(metrics.current().awake_ms, 19000, "current day must point at its merged owner")
-				helpers.assert_eq(metrics.snapshot().values["2026-10-05"].awake_ms, 19000)
+				helpers.assert_eq(metrics.current().locked_ms, 19000, "current day must point at its merged owner")
+				helpers.assert_eq(metrics.snapshot().values["2026-10-05"].locked_ms, 19000)
 				helpers.assert_eq(metrics.current().battery_sum, 200)
 				helpers.assert_eq(metrics.current().battery_count, 3)
 				helpers.assert_eq(metrics.current().battery_min, 50)
 				helpers.assert_eq(metrics.current().battery_max, 80)
-				helpers.assert_eq(sample(60000, "2026-10-06").awake_ms, 49000, "binding must preserve the previous elapsed-time cursor")
+				helpers.assert_eq(sample(60000, "2026-10-06").locked_ms, 49000, "binding must preserve the previous elapsed-time cursor")
 				helpers.assert_eq(#metrics.take_events(), 1, "binding must preserve already-captured transitions")
 				metrics.bind("recovered", "device", load)
-				helpers.assert_eq(metrics.current().awake_ms, 49000)
+				helpers.assert_eq(metrics.current().locked_ms, 49000)
 				helpers.assert_eq(loads, 2, "same-owner binding must not merge the baseline twice")
 				metrics._reset()
 				helpers.assert_eq(metrics.snapshot().values, {}, "explicit reset must still purge all source")
@@ -719,28 +744,28 @@ helpers.describe("system metrics: owned restart hydration", function()
 	end)
 
 	helpers.it("hydrates the owned cumulative row before its first sample", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
 			local day = sample(500000, "2026-10-05")
-			helpers.assert_eq(day.awake_ms, 4000)
+			helpers.assert_eq(day.locked_ms, 4000)
 			helpers.assert_eq(day.wifi_changes, 4)
-			helpers.assert_eq(day.locked_ms, 2000)
+			helpers.assert_eq(day.awake_ms, 0)
 			helpers.assert_eq(day.audio_muted_ms, 1000)
 			helpers.assert_eq(day.battery_count, 2)
 		end)
 	end)
 
 	helpers.it("seeds an acknowledged absent row without invented history", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function() return nil, true end)
 			local day = sample(500000, "2026-10-05")
-			helpers.assert_eq(day.awake_ms, 0)
+			helpers.assert_eq(day.locked_ms, 0)
 			helpers.assert_nil(day.battery_min)
 		end)
 	end)
 
 	helpers.it("refuses unread history and retries without a writable zero day", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			local attempts = 0
 			metrics.bind("owned-a", "device-a", function(date)
 				attempts = attempts + 1
@@ -749,39 +774,39 @@ helpers.describe("system metrics: owned restart hydration", function()
 			end)
 			helpers.assert_nil(sample(500000, "2026-10-05"))
 			helpers.assert_nil(metrics.current())
-			helpers.assert_eq(sample(500001, "2026-10-05").awake_ms, 4000)
+			helpers.assert_eq(sample(500001, "2026-10-05").locked_ms, 4000)
 			helpers.assert_eq(attempts, 2)
 		end)
 	end)
 
 	helpers.it("same database and device rebinding retains the accumulated day", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			local loads = 0
 			local function load(date) loads = loads + 1; return persisted(date, 4000), true end
 			metrics.bind("owned-a", "device-a", load)
 			sample(0, "2026-10-05")
 			sample(30000, "2026-10-05")
 			metrics.bind("owned-a", "device-a", load)
-			helpers.assert_eq(sample(60000, "2026-10-05").awake_ms, 64000)
+			helpers.assert_eq(sample(60000, "2026-10-05").locked_ms, 64000)
 			helpers.assert_eq(loads, 1)
 		end)
 	end)
 
 	for _, identity in ipairs({ { "owned-b", "device-a" }, { "owned-a", "device-b" } }) do
 		helpers.it("isolates changed database or device " .. table.concat(identity, "/"), function()
-			with_shell({}, function(metrics, sample)
+			with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 				metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
 				sample(0, "2026-10-05")
 				metrics.bind(identity[1], identity[2], function(date) return persisted(date, 9000), true end)
 				helpers.assert_nil(metrics.current())
-				helpers.assert_eq(sample(900000, "2026-10-05").awake_ms, 9000)
+				helpers.assert_eq(sample(900000, "2026-10-05").locked_ms, 9000)
 				helpers.assert_eq(metrics.current().sleep_ms, 3000)
 			end)
 		end)
 	end
 
 	helpers.it("hydrates a new date and partitions its own elapsed sample clock", function()
-		with_shell({}, function(metrics, sample, set_clock)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample, set_clock)
 			local base = os.time({ year = 2026, month = 10, day = 5, hour = 23, min = 59, sec = 45 })
 			set_clock(function(now, date)
 				return { wall_ms = base * 1000 + now, mono_ms = now, date = date,
@@ -794,15 +819,15 @@ helpers.describe("system metrics: owned restart hydration", function()
 			end)
 			sample(0, "2026-10-05")
 			local day = sample(30000, "2026-10-06")
-			helpers.assert_eq(day.awake_ms, 8000 + 15000)
+			helpers.assert_eq(day.locked_ms, 8000 + 15000)
 			helpers.assert_eq(day.sleep_ms, 3000)
-			helpers.assert_eq(metrics.snapshot().values["2026-10-05"].awake_ms, 4000 + 15000)
+			helpers.assert_eq(metrics.snapshot().values["2026-10-05"].locked_ms, 4000 + 15000)
 			helpers.assert_eq(loads, 2)
 		end)
 	end)
 
 	helpers.it("folds new battery readings into the persisted extrema and sum", function()
-		with_shell({ { match = "power_supply", out = "50" } }, function(metrics, sample)
+		with_shell({ { match = "power_supply", out = "50" }, { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function(date) return persisted(date, 4000), true end)
 			local day = sample(0, "2026-10-05")
 			helpers.assert_eq(day.battery_sum, 200)
@@ -813,7 +838,7 @@ helpers.describe("system metrics: owned restart hydration", function()
 	end)
 
 	helpers.it("a throwing loader cannot publish a destructive zero day", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function() error("owned read refused") end)
 			helpers.assert_nil(sample(0, "2026-10-05"))
 			helpers.assert_nil(metrics.current())
@@ -821,11 +846,11 @@ helpers.describe("system metrics: owned restart hydration", function()
 	end)
 
 	helpers.it("reset clears the owned loader as well as the sampling state", function()
-		with_shell({}, function(metrics, sample)
+		with_shell({ { match = "LockedHint", out = "yes" } }, function(metrics, sample)
 			metrics.bind("owned-a", "device-a", function() return nil, false end)
 			metrics._reset()
 			metrics.bind_event_capture(function() return true end)
-			helpers.assert_eq(sample(0, "2026-10-05").awake_ms, 0)
+			helpers.assert_eq(sample(0, "2026-10-05").locked_ms, 0)
 		end)
 	end)
 end)

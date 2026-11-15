@@ -20,16 +20,27 @@
 --- it, moves the installation to <root>.failed-<pid>, puts <root>.old back and
 --- starts the previous daemon. Under the unit the watcher is a transient
 --- systemd-run unit, since the service's cgroup would kill it on restart.
+--- The watcher's wait is the new daemon's startup, so a Quit lands in that
+--- daemon: it writes `quit` to the token (infra/updater_boot_ready.lua) and the
+--- watcher keeps the update and starts nothing.
 --- ==============================================================================
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ShellRunner = require("adapters.shell_runner")
+local Logger = require("core.logger.engine.shim")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "modules.updater.restarter"
 
 M.UNIT = "ergopti-hotstrings.service"
+
+-- A restart or stop of the unit this process runs in makes systemd TERM every
+-- process of its cgroup, the shell and the systemctl client still reporting
+-- the queued job included. Killed there, the call reads as a refusal although
+-- the job runs: the restart then disarmed its update watcher and logged a
+-- refusal (seen under a real user manager, tests/hardware/desktop). Ignoring TERM, which
+-- the client inherits, lets it report; it exits right after, as before.
+M.OWN_UNIT_JOB_PREFIX = "trap '' TERM; "
 
 local function read_file(path)
 	local fh = io.open(path, "r")
@@ -126,8 +137,10 @@ M.WATCH_SCRIPT = table.concat({
 	'	sleep 0.1',
 	'done',
 	'successor=',
+	'kept() { note "The updated daemon was quit $1: the update stays installed and no daemon is started."; finish; exit 0; }',
 	'if [ -z "$failure" ]; then',
 	'	successor=$(cat "$token")',
+	'	[ "$successor" = quit ] && kept "before it reported ready"',
 	'	case "$successor" in ""|*[!0-9]*) successor=; failure="an invalid boot report" ;; esac',
 	'fi',
 	'if [ -z "$failure" ]; then',
@@ -135,6 +148,7 @@ M.WATCH_SCRIPT = table.concat({
 	'	kill -0 "$successor" 2>/dev/null || failure="it quit during the probation"',
 	'fi',
 	'if [ -z "$failure" ]; then note "The updated daemon reported a healthy start."; finish; exit 0; fi',
+	'[ "$(cat "$token" 2>/dev/null)" = quit ] && kept "during its probation"',
 	'if [ "$mode" = systemd ]; then',
 	'	systemctl --user stop "$unit"',
 	'else',
@@ -188,6 +202,17 @@ function M.watch_command(mode, successor, tail)
 	return table.concat(argv, " ")
 end
 
+--- The watcher command line as systemd-run hands it to the manager.
+--- systemd expands `$NAME`, `${NAME}` and `$$` in a unit's command line, so
+--- the script's `$$` arrived as a lone `$`: every rollback under the unit moved
+--- the tree to `<root>.failed-$`, and the next one found that name taken and
+--- could not move aside. Doubling every `$` hands the script over intact.
+--- @param successor table { root, token, log }.
+--- @return string
+function M.systemd_watch_command(successor)
+	return (M.watch_command("systemd", successor, { M.UNIT }):gsub("%$", "$$"))
+end
+
 --- The launcher and its arguments as one list.
 --- @param wrapper string The installed launcher.
 --- @param args table|nil Its arguments.
@@ -239,7 +264,7 @@ end
 
 --- The marker a Quit creates to stop the relay of this process from starting the launcher.
 --- It sits beside the bootstrap storage file, the per-user private location the driver
---- already owns for its restart handoffs (infra/restart_pause.lua), so it never depends on
+--- already owns for its restart handoffs (core/lifecycle/engine/reload/restart_pause.lua), so it never depends on
 --- XDG_RUNTIME_DIR.
 --- @param pid integer The relay's target process.
 --- @param start_tick string|nil Captured process start tick, read when absent.
@@ -250,7 +275,7 @@ function M.cancel_path(pid, start_tick, boot_id)
 	start_tick = start_tick or M.process_start_time(pid)
 	boot_id = M.boot_id(boot_id)
 	if type(start_tick) ~= "string" or not start_tick:match("^%d+$") or not boot_id then return nil end
-	return require("adapters.storage").path() .. ".relay-cancel-" .. string.format("%.0f", pid)
+	return require("core.fs.adapters.storage").path() .. ".relay-cancel-" .. string.format("%.0f", pid)
 		.. "-" .. start_tick .. "-" .. boot_id
 end
 
@@ -279,7 +304,7 @@ function M.cancel(how, opts)
 			if watch_token then os.remove(watch_token); os.remove((watch_token:gsub("/ready$", ""))) end
 			watch_unit, watch_token = nil, nil
 		end
-		if run("systemctl --user --no-block stop " .. M.UNIT) then
+		if run(M.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block stop " .. M.UNIT) then
 			Logger.info(LOG, "The pending restart was replaced by a stop.")
 			return true
 		end
@@ -313,7 +338,7 @@ function M.restart(opts)
 	end
 	local lease, Pause
 	if opts.paused ~= nil then
-		Pause = require("infra.restart_pause")
+		Pause = require("core.lifecycle.engine.reload.restart_pause")
 		local detail
 		lease, detail = Pause.prepare(opts.paused)
 		if not lease then
@@ -328,7 +353,7 @@ function M.restart(opts)
 		local token = M.allocate_token(opts.mkdtemp)
 		if token then
 			successor = { root = opts.successor.root, token = token,
-				log = opts.successor.log or (require("adapters.storage").path() .. ".update-watch.log") }
+				log = opts.successor.log or (require("core.fs.adapters.storage").path() .. ".update-watch.log") }
 		else
 			Logger.warn(LOG, "No boot-ready token could be allocated; the updated daemon starts unwatched.")
 		end
@@ -355,7 +380,7 @@ function M.restart(opts)
 				else
 					local unit = "ergopti-update-watch-" .. successor.token:match("ergopti%-boot%-ready%.(%w+)/ready$") .. ".service"
 					if not run("systemd-run --user --collect --quiet --unit=" .. ShellRunner.quote(unit) .. " "
-						.. M.watch_command("systemd", successor, { M.UNIT })) then
+						.. M.systemd_watch_command(successor)) then
 						Logger.warn(LOG, "The update watcher unit could not start; the updated daemon starts unwatched.")
 						run("systemctl --user unset-environment ERGOPTI_UPDATER_BOOT_READY")
 						unwatched()
@@ -367,7 +392,7 @@ function M.restart(opts)
 			end
 			-- --no-block: systemd restarts the unit after this call returns, by
 			-- stopping this process the way a logout does.
-			if run("systemctl --user --no-block restart " .. M.UNIT) then
+			if run(M.OWN_UNIT_JOB_PREFIX .. "systemctl --user --no-block restart " .. M.UNIT) then
 				Logger.info(LOG, "Restart on the update requested from systemd.")
 				return "systemd"
 			end

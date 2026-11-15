@@ -27,12 +27,12 @@ local function fresh_fixture()
 	Destination.install()
 	for _, name in ipairs({
 		"modules.shortcuts.actions.text", "adapters.clipboard",
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"adapters.event_provenance",
-		"adapters.timer_scheduler",
-		"infra.logger",
-		"infra.paths",
-		"infra.timings",
+		"core.events.timer_scheduler",
+		"core.logger.engine.logger",
+		"core.fs.engine.paths",
+		"core.timing.engine.timings",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -67,7 +67,7 @@ local function fresh_fixture()
 	for key, value in pairs(hs_stub.timer) do timer_contract[key] = value end
 	timer_contract.absoluteTime = function() return fixture.clock_ns end
 	timer_contract.new = function(delay, callback)
-		local adapter = package.loaded["adapters.synthetic_input"]
+		local adapter = package.loaded["platform.input.synthetic_input"]
 		local broker = adapter and delay == adapter.PERIODIC_OWNER_TICK_SEC
 		local options = not broker and table.remove(fixture.next_native_options, 1) or {}
 		local native = {
@@ -182,11 +182,11 @@ local function fresh_fixture()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.paths"] = { shared = function() return nil end }
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	local subject = require("modules.shortcuts.actions.text")
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 
 	local function pump_tap()
 		for _, tap in ipairs(hs_stub.eventtap.__taps) do

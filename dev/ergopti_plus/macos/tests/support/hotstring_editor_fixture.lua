@@ -17,7 +17,7 @@ local function with_editor(test)
 		errors = {}, notifications = 0,
 	}
 	local ok, err = xpcall(function()
-		package.loaded["infra.logger"] = {
+		package.loaded["core.logger.engine.logger"] = {
 			debug = function() end,
 			error = function(_, message, ...)
 				state.errors[#state.errors + 1] = string.format(message, ...)
@@ -25,16 +25,16 @@ local function with_editor(test)
 			end,
 			callback = function(_, _, callback, ...) return pcall(callback, ...) end,
 		}
-		package.loaded["infra.paths"] = { shared = function(path) return "/virtual/" .. path end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.notifications"] = { notify = function()
+		package.loaded["core.fs.engine.paths"] = { shared = function(path) return "/virtual/" .. path end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function()
 			state.notifications = state.notifications + 1
 		end }
-		package.loaded["adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
-		package.loaded["infra.toml.reader"] = {
+		package.loaded["core.fs.adapters.file_system"] = { read_with_status = function() return "source", "ok" end }
+		package.loaded["core.text.engine.toml.reader"] = {
 			parse = function() return { sections_order = {}, sections = {} }, true end,
 		}
-		package.loaded["infra.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
+		package.loaded["core.text.engine.toml.writer"] = { write_if_unchanged = function(_, document, snapshot)
 			state.last_written = document
 			state.last_snapshot = snapshot
 			state.writes = state.writes + 1
@@ -54,7 +54,7 @@ local function with_editor(test)
 				end }
 			end },
 		} }
-		package.loaded["ui.ui_builder"] = {
+		package.loaded["core.ui.ui.builder"] = {
 			get_app_geometry = function() return { width = 10, height = 10 } end,
 			get_centered_frame = function() return {} end, force_focus = function() end,
 			show_webview = function(options)

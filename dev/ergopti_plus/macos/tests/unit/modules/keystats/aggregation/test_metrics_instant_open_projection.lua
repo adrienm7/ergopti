@@ -52,7 +52,7 @@ end
 
 --- Loads a fresh reader over `sqlite`.
 local function load_reader(sqlite)
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["hs.sqlite3"] = nil
 	local reader = helpers.load_with_stubs("modules.keystats.sqlite_reader", { sqlite3 = sqlite })
 	reader.history_fingerprint_exact = true -- The fixture owns every row and mutation, so its fingerprint is exact.
@@ -86,7 +86,7 @@ end
 
 helpers.describe("metrics-instant-open: paced reader", function()
 	helpers.it("reads the all-time history day by day with the one-pass result", function()
-		helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "infra.logger", "hs.sqlite3" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "core.logger.engine.logger", "hs.sqlite3" }, function()
 			local reader = load_reader(FakeSqlite.new(dataset()))
 			local apps = { "Code", "Mail" }
 			local one_pass = reader.read_ngrams("/fake/db.sqlite", "2026-09-27", "2026-09-29", apps)
@@ -102,7 +102,7 @@ helpers.describe("metrics-instant-open: paced reader", function()
 	end)
 
 	helpers.it("merges a later window into a cached history exactly", function()
-		helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "infra.logger", "hs.sqlite3" }, function()
+		helpers.with_fresh_modules({ "modules.keystats.sqlite_reader", "core.logger.engine.logger", "hs.sqlite3" }, function()
 			local reader = load_reader(FakeSqlite.new(dataset()))
 			local whole = reader.read_ngrams("/fake/db.sqlite", "2026-09-27", "2026-09-29", nil)
 			local merged = reader.read_ngrams("/fake/db.sqlite", "2026-09-27", "2026-09-28", nil)
@@ -114,13 +114,13 @@ helpers.describe("metrics-instant-open: paced reader", function()
 end)
 
 helpers.describe("metrics-instant-open: incremental projection", function()
-	local owners = { "modules.keystats.sqlite_reader", "infra.logger", "hs.sqlite3", "hs.json",
-		"ui.metrics_typing.projection", "infra.paced_json", "json" }
+	local owners = { "modules.keystats.sqlite_reader", "core.logger.engine.logger", "hs.sqlite3", "hs.json",
+		"ui.metrics_typing.projection", "core.timing.engine.paced_json", "core.text.engine.json" }
 
 	local function load(tables)
 		local sqlite = FakeSqlite.new(tables)
 		local reader = load_reader(sqlite)
-		package.loaded["infra.paced_json"] = nil
+		package.loaded["core.timing.engine.paced_json"] = nil
 		package.loaded["ui.metrics_typing.projection"] = nil
 		local projection = require("ui.metrics_typing.projection")
 		return reader, projection, sqlite
@@ -172,7 +172,7 @@ helpers.describe("metrics-instant-open: incremental projection", function()
 				.range("2026-09-27", TODAY, nil)
 			-- One read of 2026-09-29 for the history, one of today's slice
 			helpers.assert_eq(historical_reads(sqlite) - before, 2, "only the day that became past is read")
-			local decoded = require("json").decode(payload)
+			local decoded = require("core.text.engine.json").decode(payload)
 			assert_same_dict(reader.read_ngrams("/fake/db.sqlite", "2026-09-27", "2026-09-29", nil),
 				decoded.historical, "extended")
 		end)

@@ -18,9 +18,9 @@ local helpers = require("tests.helpers")
 --- Supply only genuine Layout format strings that the complete caption API now reads.
 --- This is fixture input, never an expectation regenerated from the native producer.
 local function install_legacy_layout_formats(translator)
-	translator = translator or require("infra.i18n")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
+	translator = translator or require("core.i18n.engine.i18n")
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
+	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
 	local original_get = translator.get
 	translator.get = function(key)
@@ -65,14 +65,14 @@ local function bundle_labels(opts)
 		"modules.keymap.layout_install",
 		"ui.menu.menu_keyboard_layout",
 		"infra.manifest_menu",
-		"infra.notifications",
-		"infra.i18n",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
 	}, function()
 		local input_sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local install = require("modules.keymap.layout_install")
-		package.loaded["infra.i18n"] = { get = function(key) return LABELS[key] or key end }
-		package.loaded["infra.i18n"].section = function(key) return LABELS[key] or key end
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return LABELS[key] or key end }
+		package.loaded["core.i18n.engine.i18n"].section = function(key) return LABELS[key] or key end
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		install.bundle_variants = function()
 			return { { name = "Ergopti_v2_2_2_plus", tis_id = "com.apple.keyboardlayout.ergopti.plus",
 				keylayout = "/b/Ergopti_v2_2_2_plus.keylayout" } }
@@ -196,12 +196,12 @@ local function with_layout_fixture(listing, plists, callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			"modules.keymap.layout_install",
-			"adapters.file_system",
-			"infra.fs_dir",
+			"core.fs.adapters.file_system",
+			"core.fs.engine.dir",
 		}, function()
-			package.loaded["infra.fs_dir"] = { try_entries = function() return {}, false end }
+			package.loaded["core.fs.engine.dir"] = { try_entries = function() return {}, false end }
 			local reads = {}
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function(path)
 					reads[#reads + 1] = path
 					if plists[path] then return plists[path], "ok" end
@@ -282,7 +282,7 @@ end)
 --- Filesystem/TIS mutation ports remain controlled and must not run during builds.
 local function with_no_bundle_status(body, labels)
 	helpers.with_stub_scope({"modules.keymap.input_sources", "modules.keymap.layout_install",
-		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n", "infra.notifications"}, function()
+		"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n", "core.ui.engine.notifications"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local session = {latest = nil, effects = 0}
@@ -297,8 +297,8 @@ local function with_no_bundle_status(body, labels)
 		installer.install_system = forbid_effect
 		sources.upgrade_active_list_async = forbid_effect
 		sources.set_input_source_async = forbid_effect
-		package.loaded["infra.notifications"] = {notify = forbid_effect}
-		local translator = require("infra.i18n")
+		package.loaded["core.ui.engine.notifications"] = {notify = forbid_effect}
+		local translator = require("core.i18n.engine.i18n")
 		if labels then translator.get = function(key) return labels[key] or key end
 		else install_legacy_layout_formats(translator) end
 		package.loaded["infra.manifest_menu"] = nil
@@ -405,12 +405,12 @@ helpers.describe("canonical no-bundle status reaches the actual native layout me
 		end)
 	end)
 	helpers.it("uses each of the 21 existing real catalogue captions", function()
-		local codec = require("adapters.json_codec")
-		local file = assert(io.open(helpers.shared("data/locale_order.json"), "rb"))
+		local codec = require("core.fs.adapters.json_codec")
+		local file = assert(io.open(helpers.shared("core/i18n/data/locale_order.json"), "rb"))
 		local locales = assert(codec.decode(file:read("*a"))).order; assert(file:close())
 		helpers.assert_eq(#locales, 21)
 		for _, locale in ipairs(locales) do
-			file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+			file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 			local labels = assert(codec.decode(file:read("*a"))); assert(file:close())
 			helpers.assert_true(type(labels["menu.layout.no_bundle"]) == "string" and labels["menu.layout.no_bundle"] ~= "")
 			with_no_bundle_status(function(session)

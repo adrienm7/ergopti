@@ -20,7 +20,7 @@
 ---
 --- THE INVARIANT PINNED HERE:
 --- Every .lua file under the driver's production roots (init.lua, infra/, modules/,
---- ui/, adapters/) and under the shared Lua tree (_shared/lua/) must PARSE.
+--- ui/, adapters/) and under the shared Lua tree (_shared/) must PARSE.
 --- `loadfile` compiles the chunk to a function without executing it, so this
 --- check needs no hs runtime, no filesystem side effects, and no OS access — it
 --- only proves the source is syntactically valid Lua. A missing or malformed
@@ -33,7 +33,7 @@
 
 local helpers = require("tests.helpers")
 local CommandLines = require("tests.support.command_lines")
-local shell_quote = require("text_utils").shell_quote
+local shell_quote = require("core.text.engine.utils_core").shell_quote
 
 -- driver_root() ends with a trailing slash (e.g. ".../macos/").
 local DRIVER_ROOT = helpers.driver_root()
@@ -57,7 +57,8 @@ local SOURCE_ROOTS = {
 	DRIVER_ROOT .. "platform",
 	DRIVER_ROOT .. "vendor",
 	DRIVER_ROOT .. "_generated",
-	helpers.shared("lua"),
+	DRIVER_ROOT .. "core",
+	helpers.shared(""),
 }
 
 
@@ -115,7 +116,7 @@ helpers.describe("meta: every Lua source compiles", function()
 	-- The remap facade is the driver's largest chunk and sits at the 200-local
 	-- limit, so it is named on its own as well.
 	helpers.it("platform/remap/init.lua compiles within Lua's local-variable limit", function()
-		local chunk, err = loadfile(DRIVER_ROOT .. "platform/remap/init.lua")
+		local chunk, err = loadfile(assert(package.searchpath("platform.remap", package.path)))
 		helpers.assert_true(chunk ~= nil,
 			string.format("platform/remap/init.lua must compile (loadfile failed): %s", tostring(err)))
 	end)

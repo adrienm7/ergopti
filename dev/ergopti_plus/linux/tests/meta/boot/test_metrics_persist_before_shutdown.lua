@@ -19,7 +19,7 @@
 --- bounds it to the flush interval instead of the session length.
 ---
 --- WHY THE CADENCE IS NOT A LITERAL:
---- `_shared/modules/timings/constants.toml [keystats] ingest_tick_ms` is what
+--- `_shared/core/timing/data/constants.toml [keystats] ingest_tick_ms` is what
 --- Windows already uses as INGEST_TICK_MS and macOS as INGEST_TICK_SEC. A fourth
 --- number written by hand here would be a fourth thing to drift, and the drift
 --- would be invisible — three drivers persisting at three cadences look
@@ -105,7 +105,7 @@ helpers.describe("metrics persistence: the interval", function()
 	end)
 
 	helpers.it("flushes at least once a minute at the shipped values", function()
-		local Timings = helpers.load_module("infra.timings")
+		local Timings = helpers.load_module("core.timing.engine.timings")
 		local ingest_ms = Timings.ms("keystats", "ingest_tick_ms")
 		helpers.assert_true(type(ingest_ms) == "number" and ingest_ms > 0,
 			"the canon must actually carry the value")

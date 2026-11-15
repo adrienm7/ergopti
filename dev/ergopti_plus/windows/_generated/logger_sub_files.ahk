@@ -1,5 +1,5 @@
 ﻿; _generated/logger_sub_files.ahk
-; AUTO-GENERATED from _shared/modules/logger/sub_files.toml.
+; AUTO-GENERATED from _shared/core/logger/data/sub_files.toml.
 ; DO NOT EDIT BY HAND — run `npm run codegen:logger-sub-files` to refresh.
 #Requires AutoHotkey v2.0
 
@@ -7,7 +7,7 @@
 ; MODULE: Logger Sub-file Routing Table (Windows)
 ; DESCRIPTION:
 ; The [[sub_files]] entries whose platforms list includes "ahk", as the array
-; infra/logger.ahk fans log lines out with. A line is routed to a sub-file when
+; core/logger/engine/logger.ahk fans log lines out with. A line is routed to a sub-file when
 ; ANY of its tags is a substring of the complete line; it is always also
 ; written to the main daily log.
 ;
@@ -19,7 +19,7 @@
 
 ; A function rather than a global initialiser so include ORDER cannot matter:
 ; the logger calls this when it initialises, long after every #Include has been
-; processed. A global would have to be declared before infra/logger.ahk to be
+; processed. A global would have to be declared before core/logger/engine/logger.ahk to be
 ; visible, which is a constraint the generated file has no way to enforce.
 LoggerSubFilesData() {
 	return [

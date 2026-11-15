@@ -14,30 +14,32 @@
 local M = {}
 
 local hs               = hs
-local notifications    = require("infra.notifications")
-local FeatureNotice    = require("feature_notice")
+local notifications    = require("core.ui.engine.notifications")
+local FeatureNotice    = require("menu.engine.feature_notice")
 local hotstring_editor = require("ui.hotstring_editor")
-local Logger           = require("infra.logger")
+local Logger           = require("core.logger.engine.logger")
 local PhaseStats       = require("infra.phase_stats")
-local text_utils = require("infra.text_utils")
-local i18n             = require("infra.i18n")
+local text_utils = require("core.text.engine.utils")
+local i18n             = require("core.i18n.engine.i18n")
 local ui_restore       = require("infra.ui_restore")
 local Manifest         = require("infra.manifest_reader")
 
 local Preferences   = require("infra.preferences")
 local Builder       = require("ui.menu.builder")
 local ClickGate     = require("ui.menu.click_gate")
-local QuitAdmission = require("quit_admission")
+local RefreshScope  = require("ui.menu.refresh_scope")
+local BranchRows    = require("ui.menu.branch_rows")
+local QuitAdmission = require("core.lifecycle.engine.shutdown.quit_admission")
 local HotCounter    = require("ui.menu.hotstring_counter")
 local MenuPaths     = require("ui.menu.menu_paths")
 local MenuState     = require("ui.menu.menu_state")
-local WrapMutation  = require("menu.wrap_mutation")
+local WrapMutation  = require("menu.engine.wrap_mutation")
 local MenuWatchers  = require("ui.menu.menu_watchers")
 local TrayMenu      = require("adapters.tray_menu")
-local Storage       = require("adapters.storage")
-local TimerScheduler = require("adapters.timer_scheduler")
-local DeferredWork = require("infra.deferred_work")
-local TerminationCoordinator = require("infra.termination_coordinator")
+local Storage       = require("core.fs.adapters.storage")
+local TimerScheduler = require("core.events.timer_scheduler")
+local DeferredWork = require("core.timing.engine.deferred_work")
+local TerminationCoordinator = require("core.lifecycle.engine.shutdown.termination_coordinator")
 local PreferencesTransaction = require("ui.menu.preferences_transaction")
 local SessionDemotions = require("ui.menu.session_demotions")
 local ProgramParameterTransaction = require("ui.menu.program_parameter_transaction")
@@ -45,10 +47,10 @@ local GlobalActionsTransaction = require("ui.menu.global_actions_transaction")
 local RecoverableFileMoves = require("ui.menu.recoverable_file_moves")
 local FactoryResetJournal = require("infra.factory_reset_journal")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
-local BootProfiler = require("infra.boot_profiler")
+local BootProfiler = require("core.logger.engine.boot_profiler")
 local ConfigPaths = require("infra.config_paths")
 local LogOpeners = require("ui.log_openers")
-local ShellRunner = require("adapters.shell_runner")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "menu"
 local load_errors = {}
@@ -74,9 +76,9 @@ local MENU_REFRESH_COALESCE_SEC = 0.05
 
 -- config.toml [ui] menubar_icon: its variants and its default are the
 -- manifest's. v1 draws the simple glyph, v2 the detailed Ergopti logo.
-local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("config_keys").KEY.UI_MENUBAR_ICON)
+local MENUBAR_ICON_DEFAULT = Manifest.default_for(require("settings.engine.keys").KEY.UI_MENUBAR_ICON)
 local MENUBAR_ICON_VARIANTS = {}
-for _, variant in ipairs(Manifest.find_entry_by_path(require("config_keys").KEY.UI_MENUBAR_ICON).enum_values) do
+for _, variant in ipairs(Manifest.find_entry_by_path(require("settings.engine.keys").KEY.UI_MENUBAR_ICON).enum_values) do
 	MENUBAR_ICON_VARIANTS[variant] = true
 end
 
@@ -96,8 +98,12 @@ local function safe_require(module_id, label)
 	return mod_or_err
 end
 
+-- A refresh asked from one branch's clicks rebuilds that branch's rows alone
+-- (ui.menu.branch_rows); the builder reads the menu modules through it.
+local _branch_rows = BranchRows.new()
+
 -- Load isolated sub-menu builders safely
-local menu_mods = {
+local menu_mods = _branch_rows.wrap({
 	gestures        = safe_require("ui.menu.menu_gestures",        "gestures menu"),
 	shortcuts       = safe_require("ui.menu.menu_shortcuts",       "shortcuts menu"),
 	keyboard_layout = safe_require("ui.menu.menu_keyboard_layout", "keyboard layout menu"),
@@ -107,7 +113,7 @@ local menu_mods = {
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
 	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
-}
+})
 
 -- Load core modules
 local core_mods = {
@@ -199,7 +205,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- and must be initialized here even when ConfigPaths is already ready.
 	if not MenuPaths.is_initialized() then
 		MenuPaths.init(base_dir, function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "config_editor_reload_delay_ms"),
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "config_editor_reload_delay_ms"),
 				function() pcall(hs.reload) end,
 				"menu.reload_after_paths")
 		end)
@@ -235,6 +241,9 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- then re-push the static menu (coalesced) instead of rebuilding per click.
 	local _menu_primed       = false
 	local _menu_refresh_timer = nil
+	-- How much of the tree the pending refresh rebuilds: one branch when only
+	-- clicks in that branch asked for it, else everything (ui.menu.refresh_scope).
+	local _refresh_scope     = RefreshScope.new()
 	-- Forward declarations so updateMenu (assigned below) can schedule a refresh
 	-- whose implementation is defined further down.
 	local schedule_menu_refresh
@@ -252,7 +261,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 			return TerminationCoordinator.is_pending() == true
 		end,
-		is_reloading = function() return require("infra.reload_guard").is_reloading() == true end,
+		is_reloading = function() return require("core.lifecycle.engine.reload.guard").is_reloading() == true end,
 		stale = function() return _menu_dirty == true end,
 		refresh = function() return refresh_for_click() end,
 		current_items = function() return _cached_menu_items end,
@@ -266,6 +275,13 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				i18n.get("menu.reload_replay.lost"), "warning")
 		end,
 		now = os.time,
+		around_click = function(path, run)
+			local previous = _refresh_scope.enter_click(_branch_rows.branch_of(path[1]))
+			local results = table.pack(pcall(run))
+			_refresh_scope.leave_click(previous)
+			if not results[1] then error(results[2], 0) end
+			return table.unpack(results, 2, results.n)
+		end,
 	})
 	M._click_gate = click_gate
 	click_gate.inherit()
@@ -471,7 +487,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local function close_loaded_dashboard(module_name, label)
 		local dashboard = package.loaded[module_name]
 		if not dashboard or not dashboard._wv then return nil end
-		if not require("ui.ui_builder").is_window_focused(dashboard._wv) then return nil end
+		if not require("core.ui.ui.builder").is_window_focused(dashboard._wv) then return nil end
 		if type(dashboard.close) ~= "function" then
 			Logger.error(LOG, "%s close transaction is unavailable; exact owner retained.", label)
 			return false
@@ -558,7 +574,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		reset_journal = reset_journal,
 		reset_paths = {
 			MenuPaths.get("ConfigTomlPath"),
-			MenuPaths.get("KarabinerConfigPath"),
+			MenuPaths.get("TapHoldConfigPath"),
 		},
 		gestures = gestures,
 		gesture_slots = global_gesture_slots,
@@ -938,6 +954,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
 					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
 				end
+				-- The editor shortcut row saves a paused change without binding it
+				-- (menu_hotstrings_custom); the resume binds the saved chord. An
+				-- unchanged chord is kept as it is.
+				if is_paused == false then
+					local sc = state.custom_editor_shortcut
+					local bound = true
+					if type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
+						bound = hotstring_editor.set_shortcut(sc.mods, sc.key) == true
+					elseif sc == false then
+						bound = hotstring_editor.clear_shortcut() == true
+					end
+					if not bound then
+						Logger.error(LOG, "The editor shortcut saved while paused could not be bound on resume.")
+					end
+				end
 				-- updateMenu's first statement is pcall(update_icon), so a bare call
 				-- here rendered the icon twice per toggle — off disk, through an
 				-- off-screen canvas — from inside the script-control eventtap callback
@@ -1079,14 +1110,23 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			return require("ui.menu.unused_keys_cleanup").run_from_menu()
 		end,
 		open_paths                = function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths")
 		end,
 		reload                    = function()
-			return do_reload("menu")
+			local accepted = do_reload("menu")
+			if accepted ~= true then
+				-- Refused by a running global action or by the coordinator: say so,
+				-- as Windows' and Linux's generic reload refusal do, instead of
+				-- leaving the old settings in place in silence (NUI-002).
+				local told, told_err = pcall(notifications.notify, i18n.get("init.reload_refused_title"),
+					i18n.get("init.reload_refused_body"), "error")
+				if not told then Logger.warn(LOG, "Reload refusal notification failed: %s.", tostring(told_err)) end
+			end
+			return accepted
 		end,
 		quit                      = function()
 			-- What Quit does is decided by the one admission both drivers share
-			-- (_shared/lua/quit_admission.lua): it wins over a reload in flight (the
+			-- (_shared/core/lifecycle/engine/shutdown/quit_admission.lua): it wins over a reload in flight (the
 			-- coordinator upgrades that reload to this exit), waits for a running
 			-- configuration write or publication up to the user-quit deadline, and is
 			-- refused only for a missing owner or an exit already under way.
@@ -1134,7 +1174,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					return committed == true
 				end,
 				now = function() return hs.timer.absoluteTime() / 1e9 end,
-				timeout = require("infra.timings").sec("ui", "user_quit_deadline_ms"),
+				timeout = require("core.timing.engine.timings").sec("ui", "user_quit_deadline_ms"),
 				poll = 0.25,
 				on_admitted = function(decision) started = start_exit(decision) == true end,
 				on_refused = function(decision)
@@ -1147,7 +1187,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		open_logs                 = function() return LogOpeners.open_logs_folder(open_async) end,
 		open_console              = function() return require("ui.console_window").open() end,
 		open_paths_editor         = function()
-			return DeferredWork.after(require("infra.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
+			return DeferredWork.after(require("core.timing.engine.timings").sec("ui", "ui_handoff_ms"), MenuPaths.open_editor, "menu.open_paths_editor")
 		end,
 		open_hotstrings_editor    = function()
 			local ok, ed = pcall(require, "ui.hotstring_editor")
@@ -1181,12 +1221,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			end
 		end,
 		set_log_level             = function(level)
-			local L = require("infra.logger")
+			local L = require("core.logger.engine.logger")
 			-- config.toml's [script] log_level wins at start: rewrite it first.
-			if not require("infra.script_scope").rewrite_configured(require("config_keys").KEY.SCRIPT_LOG_LEVEL, level) then
+			if not require("infra.script_scope").rewrite_configured(require("settings.engine.keys").KEY.SCRIPT_LOG_LEVEL, level) then
 				return false
 			end
-			local ok, committed = pcall(Storage.set, require("config_keys").LEAF.LOG_LEVEL, level)
+			local ok, committed = pcall(Storage.set, require("settings.engine.keys").LEAF.LOG_LEVEL, level)
 			if not ok or committed ~= true then
 				L.warn("menu", "Log level %s was refused by settings; the live level was left unchanged.", level)
 				return false
@@ -1224,16 +1264,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil or type(gestures) ~= "table" then return nil end
 		if not gesture_scope then
 			gesture_scope = require("ui.menu.gesture_scope").new({
-				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				state = state, gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
 				demotions = session_demotions,
 				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 				admission = run_global_exclusive,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
-				end,
 				backup_path = function()
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("ConfigTomlPath") .. ".gestures-"
@@ -1248,6 +1283,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if not owner then return false end
 		local committed = owner.apply(mode)
 		if committed == true then
+			-- One line per committed restore or clear, which the field run counts
+			Logger.info(LOG, "Scope gestures %s committed.", tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1264,17 +1301,17 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	--- @param scope string Manifest scope id.
 	--- @return table|nil owner
 	local function preference_scope_owner(scope)
+		-- A pause refuses no scope owner: a pause stops typing, not configuration
+		-- (EDD-1, maintainer decision 2026-11-12).
 		if scope == "global" then
-			if read_only_reason ~= nil or type(core_mods.shortcuts_mod) ~= "table"
-				or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
+			if read_only_reason ~= nil then return nil end
 			if not script_scope then
 				local script_backup
 				script_scope = require("infra.script_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function() return core_mods.shortcuts_mod.is_paused() end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						script_backup = MenuPaths.get("ConfigTomlPath") .. ".script-"
@@ -1295,7 +1332,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				or type(menu_mods.shortcuts.scope_idle) ~= "function" then return nil end
 			if not shortcuts_scope then
 				shortcuts_scope = require("ui.menu.shortcuts_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, shortcuts = core_mods.shortcuts_mod, gestures = gestures,
 					bindings = require("modules.shortcuts.bindings"),
@@ -1308,10 +1345,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					end,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".shortcuts-"
@@ -1325,15 +1358,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil or type(llm_handler) ~= "table" or type(llm_handler.scope_runtime) ~= "table" then return nil end
 			if not llm_scope then
 				llm_scope = require("ui.menu.llm_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, runtime = llm_handler.scope_runtime, profiles = llm_handler.scope_profiles,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table" or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".llm-" .. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
@@ -1346,7 +1375,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil then return nil end
 			if not metrics_scope then
 				metrics_scope = require("ui.menu.metrics_scope").new({
-					path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+					path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 					state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 					demotions = session_demotions, core = core_mods.keystats,
 					menubar = require("ui.wpm.wpm_menubar"), widget = require("ui.wpm.wpm_widget"),
@@ -1354,11 +1383,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					activation_pending = MenuState.metrics_start_pending,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table"
-							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".metrics-"
@@ -1374,7 +1398,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			if read_only_reason ~= nil or type(keymap) ~= "table" then return nil end
 			if not hotstrings_scope then
 				local HotstringsConfig = require("modules.hotstrings.hotstrings_config")
-				local FileSystem = require("adapters.file_system")
+				local FileSystem = require("core.fs.adapters.file_system")
 				local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 				hotstrings_scope = require("ui.menu.hotstrings_scope").new({
 					path = MenuPaths.get("ConfigTomlPath"), files = FileSystem,
@@ -1393,11 +1417,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 					remove = function(target) return FileSystem.remove_exact(target) == true end,
 					capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 					admission = run_global_exclusive,
-					paused = function()
-						if type(core_mods.shortcuts_mod) ~= "table"
-							or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-						return core_mods.shortcuts_mod.is_paused()
-					end,
 					backup_path = function()
 						scope_generation = scope_generation + 1
 						return MenuPaths.get("ConfigTomlPath") .. ".hotstrings-"
@@ -1416,7 +1435,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if read_only_reason ~= nil then return nil end
 		if not layout_scope then
 			layout_scope = require("ui.menu.scoped_preferences").new({
-				path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+				path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 				scope = scope, state = state, preferences = Preferences, checkpoint = preference_checkpoint,
 				runtime = {
 					capture = function(_, source) return menu_mods.keyboard_layout.capture_scope(state, source) end,
@@ -1425,11 +1444,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				},
 				capture_preferences = function() return Preferences.snapshot(state, hotfiles, core_mods) end,
 				admission = run_global_exclusive,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
-				end,
 				backup_path = function()
 					scope_generation = scope_generation + 1
 					return MenuPaths.get("ConfigTomlPath") .. ".layout-"
@@ -1450,6 +1464,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local before = scope == "keyboard_layout" and layout_scope_rows() or nil
 		local committed = owner.apply(mode)
 		if committed == true then
+			Logger.info(LOG, "Scope %s %s committed.", tostring(scope), tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 			-- The layout's own restore rebuilds the typing layout for the new rows.
@@ -1478,6 +1493,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		if not owner then return false end
 		local committed = owner.apply(mode, require("ui.menu.shortcuts_scope").script_chord_rows)
 		if committed == true then
+			Logger.info(LOG, "Scope shortcuts.script_chords %s committed.", tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1502,6 +1518,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		local committed = owner.apply(mode,
 			require("ui.menu.shortcuts_scope").keyboard_group_rows(slot_ids, Shortcuts.keyboard_binding_id))
 		if committed == true then
+			Logger.info(LOG, "Scope shortcuts.%s %s committed.", tostring(prefix), tostring(mode))
 			Builder.invalidate_cache()
 			updateMenu()
 		end
@@ -1513,8 +1530,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	--- the log said that nothing had been restored.
 	--- @param report table Refused composition report.
 	local function show_reset_failure(report)
-		local title, message = require("config_reset_failure").message(report, i18n.get)
-		local shown, err = pcall(require("infra.dialog_util").block_alert, title, message,
+		local title, message = require("settings.engine.publication.reset_failure").message(report, i18n.get)
+		local shown, err = pcall(require("core.ui.engine.dialog_util").block_alert, title, message,
 			i18n.get("button.ok"), nil, "critical")
 		if not shown then
 			Logger.error(LOG, "Reset failure dialog could not be shown (%s): %s.", tostring(err), message)
@@ -1547,16 +1564,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				layout = { rows = layout_scope_rows, live = require("modules.keymap.number_row_live") },
 				backup_path = function(scope)
 					scope_generation = scope_generation + 1
-					return MenuPaths.get("KarabinerConfigPath") .. ".global-" .. scope .. "-"
+					return MenuPaths.get("TapHoldConfigPath") .. ".global-" .. scope .. "-"
 						.. tostring(hs.timer.absoluteTime()) .. "-" .. scope_generation .. ".bak"
 				end,
 				defer = function(continuation)
 					return DeferredWork.after(0, continuation, "menu.global_scope") == true
-				end,
-				paused = function()
-					if type(core_mods.shortcuts_mod) ~= "table"
-						or type(core_mods.shortcuts_mod.is_paused) ~= "function" then return nil end
-					return core_mods.shortcuts_mod.is_paused()
 				end,
 				refresh = function(committed, report)
 					Builder.invalidate_cache()
@@ -1596,7 +1608,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	})
 	local program_parameter_owner = ProgramParameterTransaction.new({
 		gestures = gestures, preferences = Preferences, checkpoint = preference_checkpoint,
-		path = MenuPaths.get("ConfigTomlPath"), files = require("adapters.file_system"),
+		path = MenuPaths.get("ConfigTomlPath"), files = require("core.fs.adapters.file_system"),
 		admission = run_global_exclusive, paused = live_pause, save_prefs = transactional_save_prefs,
 		current_path = function() return MenuPaths.get("ConfigTomlPath") end,
 		capture_checkpoint_candidate = function()
@@ -1607,7 +1619,6 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	local ctx = {
 		is_paused = live_pause,
 		physical_shortcuts_scope = function() return preference_scope_owner("shortcuts") end,
-		physical_shortcuts_paused = live_pause,
 		commit_program_parameter = program_parameter_owner.apply,
 		apply_gesture_scope = apply_gesture_scope,
 		apply_preference_scope = apply_preference_scope,
@@ -1648,9 +1659,39 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 	-- The window toggles (ui/window_toggle) open these pages with the same
 	-- session context as their menu rows: the remap facade, the update channel
 	-- owner and the menu state exist only here.
-	local WindowToggle = require("ui.window_toggle")
+	local WindowToggle = require("core.ui.ui.window_toggle")
 	WindowToggle.set_opener("layer_editor", function()
 		return require("ui.layer_editor").open({ karabiner = karabiner })
+	end)
+	-- The layout editor applies a source's navigation layer through the same save.
+	require("ui.layout_manager").set_nav_applier(function(text)
+		return require("ui.layer_editor").apply_text(text, { karabiner = karabiner })
+	end)
+	-- « Emulate without installing » in the layout editor stores the composed
+	-- layout as the emulated one, as the « Layout to emulate » menu does.
+	require("ui.layout_manager").set_emulation_applier(function(id)
+		if not require("infra.layout_emulation_preferences").choose(state, save_prefs, id) then
+			return false, "emulate_not_saved", "the layout emulation settings were not saved"
+		end
+		if require("modules.keymap.layout_emulation").reload_if_started() == false then
+			return false, "emulate_failed", "the layout emulation did not reload the composed layout"
+		end
+		if type(updateMenu) == "function" then updateMenu() end
+		return true
+	end)
+	-- A layout that changed while it is the emulated one reloads the emulation:
+	-- an uninstalled one stays chosen and stops, a reinstalled one resumes
+	-- (maintainer decision, 2026-11-12), and the menu shows its new state.
+	require("ui.layout_manager").set_layout_change_handler(function(id)
+		local Emulation = require("modules.keymap.layout_emulation")
+		if Emulation.status().id ~= id then return end
+		Emulation.reload_if_started()
+		if type(updateMenu) == "function" then updateMenu() end
+	end)
+	-- The extension catalogue is read once per boot: a layout whose extension
+	-- was installed or removed loads or drops its hotstrings through a reload.
+	require("ui.layout_manager").set_extension_reloader(function()
+		return do_reload("menu") == true
 	end)
 	WindowToggle.set_opener("changelog", function()
 		return require("ui.changelog").open({ channel_owner = channel_owner })
@@ -1669,6 +1710,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			and type(core_mods.shortcuts_mod.set_extras) == "function" then
 			pcall(core_mods.shortcuts_mod.set_extras, actions)
 		end
+		_refresh_scope.request()
 		_menu_dirty = true
 		-- After priming, the menu is static (no per-click callback to lazily
 		-- rebuild), so a state change must actively re-push the tree. Coalesced so
@@ -1736,8 +1778,8 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 			PhaseStats.add("menu.rebuild", elapsed_ms * 1e6)
 			Logger.info(LOG, "Menu tree rebuilt in %.1f ms (%d top-level item(s)).%s", elapsed_ms, #items,
 				Logger.is_enabled(Logger.LEVELS.INFO) and slowest_items_text(Builder.get_last_item_timings()) or "")
-			require("perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
-				function() return require("infra.timings").ms("budgets", "menu_rebuild_ms") end)
+			require("core.logger.engine.perf_budget").judge(Logger, LOG, "menu.rebuild", elapsed_ms,
+				function() return require("core.timing.engine.timings").ms("budgets", "menu_rebuild_ms") end)
 			return true
 		else
 			Logger.error(LOG, "Menu tree rebuild failed (%.1f ms): %s.", elapsed_ms, tostring(items))
@@ -1770,7 +1812,12 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		ctx.paused = core_mods.shortcuts_mod
 			and type(core_mods.shortcuts_mod.is_paused) == "function"
 			and core_mods.shortcuts_mod.is_paused() or false
-		rebuild_menu_cache()
+		-- A scope of one branch lets the build reuse every other branch's rows.
+		local scope = _refresh_scope.take()
+		if scope ~= nil and scope ~= RefreshScope.ALL then _branch_rows.request(scope) end
+		local rebuilt, reason = pcall(rebuild_menu_cache)
+		_branch_rows.settle()
+		if not rebuilt then error(reason, 0) end
 	end
 	schedule_menu_refresh = function()
 		PhaseStats.count("menu.refresh_requested")
@@ -1838,7 +1885,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		function()
 			-- A failed prime only costs a slower first open, but it used to cost it
 			-- silently; the submenu then looked empty with nothing in the log.
-			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("config_keys").KEY.TAP_HOLDS }) do
+			for _prime_index, name in ipairs({ "keyboard_layout", "apps", require("settings.engine.keys").KEY.TAP_HOLDS }) do
 				local mod = menu_mods[name]
 				if mod and type(mod.prime) == "function" then
 					local primed, prime_err = pcall(mod.prime, ctx)
@@ -1916,7 +1963,7 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		-- edit and armed a reload.
 		{
 			MenuPaths.get("ConfigTomlPath"),
-			MenuPaths.get("KarabinerConfigPath"),
+			MenuPaths.get("TapHoldConfigPath"),
 		}
 	)
 

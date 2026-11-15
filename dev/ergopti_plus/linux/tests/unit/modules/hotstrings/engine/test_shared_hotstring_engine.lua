@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Shared Hotstring Engine — Unit Tests (Linux)
 --- DESCRIPTION:
---- Validates that the shared hotstring engine at _shared/lua/hotstring_engine/
+--- Validates that the shared hotstring engine at _shared/hotstrings/engine/matcher/
 --- is accessible from the Linux driver and that its core matching algorithm
 --- behaves correctly — providing a smoke test that the path resolution in the
 --- engine.lua thin re-export works end-to-end.
@@ -24,17 +24,17 @@ local helpers = require("tests.helpers")
 -- =========================================
 -- =========================================
 
---- Resolves the path to _shared/lua/ from this test file's location.
---- @return string|nil Absolute or relative path to _shared/lua/, or nil on failure.
+--- Resolves the path to _shared/ from this test file's location.
+--- @return string|nil Absolute or relative path to _shared/, or nil on failure.
 local function shared_lua_path()
 	local this = debug.getinfo(1, "S").source:gsub("^@", "")
-	-- Navigate: this file → tests/ → linux/ → _shared/lua/
+	-- Navigate: this file → tests/ → linux/ → _shared/
 	local linux_root = this:match("^(.*[/\\])tests[/\\]")
 	if not linux_root then return nil end
-	return linux_root .. "../../_shared/lua"
+	return linux_root .. "../../_shared"
 end
 
--- Bootstrap: inject _shared/lua/ into package.path before requiring the engine.
+-- Bootstrap: inject _shared/ into package.path before requiring the engine.
 local _shared = shared_lua_path()
 if _shared then
 	local entry = _shared .. "/?.lua"
@@ -43,7 +43,7 @@ if _shared then
 	end
 end
 
-local engine_mod = require("hotstring_engine")
+local engine_mod = require("hotstrings.engine.matcher")
 
 
 
@@ -781,7 +781,7 @@ local function _time_gate_vectors()
 	local handle = assert(io.open(linux_root .. "../_shared/tests/corpus/hotstrings/time_gate_vectors.json", "r"))
 	local raw = handle:read("*a")
 	handle:close()
-	return require("json").decode(raw).vectors
+	return require("core.text.engine.json").decode(raw).vectors
 end
 
 helpers.describe("shared hotstring engine — time-gate corpus (time-gate-corpus)", function()
@@ -1028,5 +1028,41 @@ helpers.describe("shared hotstring engine — erasing what was typed starts a wo
 		helpers.assert_eq(typed:reset_after_pause(), true, "a typed word is forgotten")
 		typed:backspace()
 		helpers.assert_nil(type_into(typed, "c★"), "the forgotten word still sits left of the caret")
+	end)
+end)
+
+-- A no-break space typed inside a trigger counts as a space on every OS
+-- (maintainer decision HSE-003, 2026-11-12), as the macOS registry's
+-- add_with_space_variants made it there first.
+helpers.describe("shared engine: a no-break space inside a trigger", function()
+	local Engine = require("hotstrings.engine.matcher")
+	--- The replacement a typed text fires, or nil.
+	local function fired(text)
+		local engine = Engine.new()
+		engine:load_mappings({ { trigger = "la notre", replacement = "la nôtre", is_word = true, auto_expand = true } })
+		engine:reset(true, true)
+		local result
+		for char in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			local match = engine:on_char(char)
+			if match then result = match; engine:apply_expansion(match) end
+		end
+		return result
+	end
+
+	helpers.it("(hse-003-nbsp-trigger) fires on a no-break or narrow no-break space as on a space", function()
+		for _, space in ipairs({ " ", "\194\160", "\226\128\175" }) do
+			local match = fired("la" .. space .. "notre")
+			helpers.assert_true(match ~= nil, "fires with " .. string.format("%q", space))
+			helpers.assert_eq(match.replacement, "la nôtre")
+		end
+	end)
+
+	helpers.it("(hse-003-nbsp-trigger) a trigger starting with a space keeps no variant", function()
+		local engine = Engine.new()
+		engine:load_mappings({ { trigger = " ab", replacement = "x", is_word = false, auto_expand = true } })
+		engine:reset(true, true)
+		engine:on_char("q")
+		local match = engine:on_char("\194\160") or engine:on_char("a") or engine:on_char("b")
+		helpers.assert_nil(match, "a word-boundary guard is typed with a plain space only")
 	end)
 end)

@@ -31,8 +31,8 @@ local helpers = require("tests.helpers")
 
 local Engine = helpers.load_module("modules.llm.prediction_engine")
 local Bridge = helpers.load_module("infra.llm_bridge")
-local PromptBuilder = helpers.load_module("llm.prompt_builder")
-local Utf8 = helpers.load_module("compat.utf8")
+local PromptBuilder = helpers.load_module("ai.engine.prediction.prompt_builder_core")
+local Utf8 = helpers.load_module("core.lifecycle.engine.compat.utf8")
 
 
 

@@ -9,4 +9,4 @@
 
 local helpers = require("tests.helpers")
 
-require("test.keylayout_emulation_contract").register(helpers, helpers.shared)
+require("tests.lua.layouts.keylayout_emulation_contract").register(helpers, helpers.shared)

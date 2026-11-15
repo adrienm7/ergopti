@@ -10,7 +10,7 @@
 
 local helpers = require("tests.helpers")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 local WRITER = "platform.remap.tap_hold_writer"
 
@@ -41,15 +41,11 @@ end
 --- Builds the menu with a real tap-hold manager on the shared defaults, a fake
 --- writer and a fake picker, and returns the Tap-Holds section.
 local function build(calls, picked, user_text)
-	user_text = require("tests.support.tap_hold_fixture").with_preset(user_text)
 	local Manager = helpers.load_module("platform.remap.tap_hold_manager")
 	local user_path = os.tmpname()
 	os.remove(user_path)
-	if user_text then
-		local fh = assert(io.open(user_path, "w"))
-		fh:write(user_text)
-		fh:close()
-	end
+	-- The keys in tap_hold.toml, the switch and the timings in the config.toml beside it.
+	local config_path = require("tests.support.tap_hold_fixture").write(user_path, user_text)
 	Manager.init({
 		keyboard_hook = { set_remapper = function() end, key_text = function() return nil end,
 			held_modifiers = function() return {} end,
@@ -60,11 +56,13 @@ local function build(calls, picked, user_text)
 		action_names = function() return { "open_url" } end,
 		defaults_path = DEFAULTS,
 		user_path = user_path,
+		config_path = config_path,
 	})
 	package.loaded[WRITER] = fake_writer(calls)
 	package.loaded[SCOPE] = {
-		apply = function(mode, is_paused)
-			calls[#calls + 1] = { "scope", mode, is_paused() }
+		apply = function(mode, ...)
+			-- A pause no longer reaches the scope (EDD-1, edd1-paused-writes).
+			calls[#calls + 1] = { "scope", mode, select("#", ...) }
 			return true
 		end,
 	}
@@ -79,7 +77,7 @@ local function build(calls, picked, user_text)
 	local changed = 0
 	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = Manager, is_paused = function() return false end,
 		on_menu_changed = function() changed = changed + 1 end })
-	local title = require("infra.i18n").get("menu.tapholds.title")
+	local title = require("core.i18n.engine.i18n").get("menu.tapholds.title")
 	local section = nil
 	for _, item in ipairs(items) do
 		if item.title == title then section = item end
@@ -98,7 +96,7 @@ end
 --- window (tap_holds.lone_modifier_tap_max_ms) is the one other submenu of the
 --- section: its choices are no key.
 local function key_rows(section)
-	local lone_tap = string.format(require("infra.i18n").get("menu.tapholds.lone_tap_title"), "")
+	local lone_tap = string.format(require("core.i18n.engine.i18n").get("menu.tapholds.lone_tap_title"), "")
 	local rows = {}
 	for _, row in ipairs(section.menu or {}) do
 		if type(row.menu) == "table" and row.title:sub(1, #lone_tap) ~= lone_tap then rows[#rows + 1] = row end

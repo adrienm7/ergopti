@@ -16,40 +16,40 @@
 ---    acquires native chords for explicitly assigned catalogue slots.
 --- 3. Registrar Lifecycle: bindings are created by start(), released by stop(),
 ---    and rebuilt after any assignment change + reload. The OS call itself lives
----    in adapters/hotkey_registrar.lua, so this module never names hs.hotkey.
+---    in platform/input/hotkey_registrar.lua, so this module never names hs.hotkey.
 --- ==============================================================================
 
 local M = {}
 
-local JsonCodec   = require("adapters.json_codec")
-local Chord       = require("chord")
-local Registrar   = require("adapters.hotkey_registrar")
-local FileSystem  = require("adapters.file_system")
-local Paths       = require("infra.paths")
-local Logger      = require("infra.logger")
+local JsonCodec   = require("core.fs.adapters.json_codec")
+local Chord       = require("keyboard.engine.chord")
+local Registrar   = require("platform.input.hotkey_registrar")
+local FileSystem  = require("core.fs.adapters.file_system")
+local Paths       = require("core.fs.engine.paths")
+local Logger      = require("core.logger.engine.logger")
 local CapsLockChordEvidence = require("infra.capslock_chord_evidence")
-local OperationReporter = require("diagnostics.operation_reporter")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
 local GestActions = nil
-local Codec       = require("toml_codec")
-local Writer      = require("toml_codec.writer")
+local Codec       = require("core.text.engine.toml_codec")
+local Writer      = require("core.text.engine.toml_codec.writer")
 local Preferences = require("infra.preferences")
 local ConfigPaths = require("infra.config_paths")
 local Manifest    = require("infra.manifest_reader")
-local ConfigOutdated = require("config_outdated")
-local MagicPolicy = require("shortcuts.magic_editor")
-local KeyboardPublication = require("config_keyboard_publication")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local MagicPolicy = require("shortcuts.engine.magic_editor_core")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
 local KeyboardComposition = KeyboardPublication.compose
 local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
-local Assignment = require("shortcuts.assignment")
-local SlotRoles = require("shortcuts.slot_roles")
-local PhysicalSlots = require("shortcuts.physical_slots")
+local Assignment = require("shortcuts.engine.assignment")
+local SlotRoles = require("shortcuts.engine.slot_roles")
+local PhysicalSlots = require("shortcuts.engine.physical_slots")
 local PhysicalSlotConstructor = PhysicalSlots.new
-local PhysicalAvailability = require("shortcuts.physical_availability")
-local i18n = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
+local PhysicalAvailability = require("shortcuts.engine.physical_availability")
+local i18n = require("core.i18n.engine.i18n")
+local KeyNames = require("platform.input.keycodes.key_names")
 local AiActions = require("modules.shortcuts.ai_actions")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local RefusalRetry = require("modules.shortcuts.refusal_retry")
 
 local LOG = "shortcuts.keyboard_shortcuts"
@@ -154,7 +154,7 @@ end
 -- Path to the shared key catalogue. The slot space is prefix × key, and the keys
 -- are the same 40 the gesture actions and the Windows driver already use — a
 -- private list here would be a fourth answer to "which keys exist".
-local KEY_CATALOGUE_PATH = Paths.shared("modules/actions/modifier_chords.json")
+local KEY_CATALOGUE_PATH = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 
 -- The manifest section whose entries are this driver's shipped slot bindings.
 -- tools/test/test-keyboard-slot-recommended-bindings.cjs pins what it holds.
@@ -266,10 +266,10 @@ end
 --- Loads the immutable shared physical registry without a host key fallback.
 local function physical_model()
 	if _physical_model == nil then
-		assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+		assert(rawequal(rawget(package.loaded, "shortcuts.engine.physical_slots"), PhysicalSlots)
 			and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
 			"physical-key constructor ownership changed")
-		local raw = assert(FileSystem.read(Paths.shared("data/keycodes/physical_keys.json")), "physical registry unavailable")
+		local raw = assert(FileSystem.read(Paths.shared("layouts/data/keycodes/physical_keys.json")), "physical registry unavailable")
 		local decoded, detail = JsonCodec.decode(raw)
 		assert(decoded and not detail, "physical registry malformed")
 		_physical_model, _physical_binding_publication = PhysicalSlotConstructor(decoded)
@@ -519,11 +519,13 @@ local function physical_receipt_current(receipt)
 end
 
 --- Reports whether native source, all-owner collisions and output custody are joined.
---- The physical broker/output integration is not yet qualified on macOS. Existing
---- named shortcuts and contextual native owners retain their separate lifecycles.
+--- Turned on by the maintainer on 2026-11-11 (LIN-004), on macOS as on Linux;
+--- the next Mac field report validates it. Each dispatch still passes the
+--- source, collision and output refusals of physical_admission. Named
+--- shortcuts and contextual native owners keep their separate lifecycles.
 --- @return boolean available Native physical delivery capability.
 function M.physical_delivery_available()
-	return false
+	return true
 end
 
 --- Carries one private receipt across source and runtime callbacks.
@@ -1046,7 +1048,10 @@ local function set_action(slot_id, action_id, on_error, publication_observer)
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
 		return false
 	end
-	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
+	-- A pause admits the edit (EDD-1): the paused module holds no hotkey, so
+	-- the assignment is only published, and the resume start binds it from the
+	-- file. A start in progress is refused, since it is reading that file.
+	if _start_attempt ~= nil then return false end
 	if not owns_slot(slot_id) then return false end
 	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
 		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end
@@ -1372,7 +1377,7 @@ end
 --- Returns a detached complete native publication without reading or binding input.
 --- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
 function M.published_binding_catalogue()
-	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+	if not rawequal(rawget(package.loaded, "settings.engine.publication.keyboard_publication"), KeyboardPublication)
 		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
 		or type(KeyboardOwnerCurrent) ~= "function"
 		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)

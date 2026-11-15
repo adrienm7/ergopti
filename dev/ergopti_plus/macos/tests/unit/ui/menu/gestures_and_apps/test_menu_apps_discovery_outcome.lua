@@ -11,19 +11,19 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "infra.logger", "infra.paths", "infra.fs_dir",
-			"infra.i18n", "infra.manifest_menu", "adapters.task_lifecycle", "infra.text_utils",
-			"adapters.json_codec", "menu.renderer", "logger.shim" }, function()
+		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths", "core.fs.engine.dir",
+			"core.i18n.engine.i18n", "infra.manifest_menu", "core.process.adapters.task_lifecycle", "core.text.engine.utils",
+			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
 				output = "", status = true, kind = "exit", code = 0 }
 			local logger = helpers.make_logger_stub()
 			logger.warn = function(_, message, ...)
 				state.warnings[#state.warnings + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
-			package.loaded["infra.paths"] = { shared = function() return "/virtual/locales" end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["core.fs.engine.paths"] = { shared = function() return "/virtual/locales" end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 				state.calls[#state.calls + 1] = directory
 				if directory:find("/Contents/Resources", 1, true) then
 					if state.icon_failure then return {}, false end
@@ -42,7 +42,7 @@ local function with_apps(callback)
 				end
 				return providers.apps_installed()
 			end }
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(_, _, callback)
 					local task = { isRunning = function()
 						if state.running == "throw" then error("probe failed") end
@@ -207,7 +207,7 @@ end)
 
 -- Handwritten caption expectations are independent of the generated declaration.
 helpers.describe("the shared empty Applications caption", function()
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local file = assert(io.open(helpers.shared("tests/corpus/menu/apps_empty_caption.json"), "rb"))
 	local corpus = assert(Json.decode(file:read("*a")))
 	file:close()
@@ -226,11 +226,11 @@ helpers.describe("the shared empty Applications caption", function()
 			with_apps(function(module, state, ctx)
 				state.render_native = true
 				module.prime(ctx)
-				local locale_file = assert(io.open(helpers.shared("data/locales/" .. locale .. ".json"), "rb"))
+				local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 				local catalogue = assert(Json.decode(locale_file:read("*a")))
 				locale_file:close()
 				helpers.assert_eq(catalogue[corpus.row.i18n], expected)
-				package.loaded["infra.i18n"].get = function(key) return catalogue[key] or key end
+				package.loaded["core.i18n.engine.i18n"].get = function(key) return catalogue[key] or key end
 				local rows = module.build(ctx).submenu
 				helpers.assert_eq(rows, { { title = expected, disabled = true } })
 				helpers.assert_nil(rows[1].fn)
@@ -275,12 +275,12 @@ local function with_native_apps_parent(language, body)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
-		for _, name in ipairs({ "ui.menu.menu_apps", "infra.i18n", "infra.locale", "locale.core",
-			"infra.manifest_menu", "infra.config_paths", "infra.paths", "adapters.json_codec", "menu.renderer",
-			"adapters.task_lifecycle", "infra.text_utils", "infra.fs_dir" }) do
+		for _, name in ipairs({ "ui.menu.menu_apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+			"infra.manifest_menu", "infra.config_paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
+			"core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
 		end
-		helpers.load_with_stubs("infra.logger")
+		helpers.load_with_stubs("core.logger.engine.logger")
 		scratch = assert(os.tmpname()); assert(os.remove(scratch)); assert(hs.fs.mkdir(scratch))
 		assert(hs.fs.mkdir(scratch .. "/metrics"))
 		local ledger = assert(io.open(scratch .. "/metrics/karabiner_kc.log", "wb")); assert(ledger:close())
@@ -291,9 +291,9 @@ local function with_native_apps_parent(language, body)
 			return previous_getenv(name)
 		end
 		local paths = require("infra.config_paths"); helpers.assert_eq(paths.init(scratch .. "/"), true)
-		package.loaded["infra.i18n"] = nil
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		package.loaded["core.i18n.engine.i18n"] = nil
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end); native.init()
 		owner = { pending = function() return false end }
 		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
@@ -304,7 +304,7 @@ local function with_native_apps_parent(language, body)
 			if path == "/virtual/Apps/apps" then return { mode = "directory" } end
 			return old_attributes(path)
 		end
-		package.loaded["infra.fs_dir"] = { try_entries_quiet = function(directory)
+		package.loaded["core.fs.engine.dir"] = { try_entries_quiet = function(directory)
 			state.scans = state.scans + 1
 			if state.on_scan then state.on_scan() end
 			if directory:find("/Contents/Resources", 1, true) then return {}, true end
@@ -316,7 +316,7 @@ local function with_native_apps_parent(language, body)
 		local icon = {}
 		hs.image.imageFromPath = function() return icon end
 		local renderer = require("infra.manifest_menu")
-		local lifecycle = require("adapters.task_lifecycle")
+		local lifecycle = require("core.process.adapters.task_lifecycle")
 		local original_task = lifecycle.native
 		lifecycle.native = function(...)
 			state.launches = state.launches + 1
@@ -338,8 +338,8 @@ local function with_native_apps_parent(language, body)
 	local cleanup, cleanup_error = pcall(function()
 		local bridge = package.loaded["modules.keystats.kc_bridge"]
 		if bridge and not rawequal(bridge, previous["modules.keystats.kc_bridge"]) then bridge.stop() end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then helpers.assert_eq(scheduler.cancelAll(), true) end
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then helpers.assert_eq(scheduler.cancelAll(), true) end
 		if scratch then
 			os.remove(scratch .. "/metrics/karabiner_kc.log"); os.remove(scratch .. "/paths.toml")
 			if hs.fs.attributes(scratch .. "/hammerspoon") then assert(hs.fs.rmdir(scratch .. "/hammerspoon")) end
@@ -362,7 +362,7 @@ helpers.describe("the complete shared Apps parent", function()
 		helpers.it("(apps-parent-native) retains actual complete installed rows and callbacks in " .. language, function()
 			with_native_apps_parent(language, function(module, renderer, state, ctx, native)
 				local file = assert(io.open(helpers.shared("tests/corpus/menus/apps_parent.json"), "rb"))
-				local expected = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+				local expected = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 				local parent = assert(module.build(ctx))
 				helpers.assert_eq(parent.label, expected.captions[language])
 				helpers.assert_eq(rawequal(parent.submenu, state.finished), true)
@@ -393,12 +393,12 @@ helpers.describe("Apps parent declaration admission", function()
 	helpers.it("(apps-parent-native) owns every actual caption and the declared platform presence", function()
 		with_native_apps_parent("en", function(_, renderer)
 			local file = assert(io.open(helpers.shared("tests/corpus/menus/apps_parent.json"), "rb"))
-			local expected = assert(require("adapters.json_codec").decode(file:read("*a"))); assert(file:close())
+			local expected = assert(require("core.fs.adapters.json_codec").decode(file:read("*a"))); assert(file:close())
 			helpers.assert_eq(actual_parent(renderer), expected.row)
 			local count = 0
 			for language, caption in pairs(expected.captions) do
-				local locale_file = assert(io.open(helpers.shared("data/locales/" .. language .. ".json"), "rb"))
-				local locale = assert(require("adapters.json_codec").decode(locale_file:read("*a"))); assert(locale_file:close())
+				local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. language .. ".json"), "rb"))
+				local locale = assert(require("core.fs.adapters.json_codec").decode(locale_file:read("*a"))); assert(locale_file:close())
 				helpers.assert_eq(locale["menu.apps.title"], caption); count = count + 1
 			end
 			helpers.assert_eq(count, 21)
@@ -492,7 +492,7 @@ helpers.describe("Apps native locale cohort restoration", function()
 	for _, raises in ipairs({ false, true }) do
 		helpers.it("(apps-parent-native) restores a genuine French predecessor after " .. (raises and "raise" or "success"), function()
 			with_native_apps_parent("fr", function(_, renderer, _, _, native)
-				local names = { "infra.i18n", "infra.locale", "infra.manifest_menu", "ui.menu.menu_apps" }
+				local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu", "ui.menu.menu_apps" }
 				local prior = {}
 				for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 				local ok, message = pcall(function()
@@ -521,7 +521,7 @@ helpers.describe("Apps final logger publication fence", function()
 			with_native_apps_parent("fr", function(_, renderer, state, ctx)
 				local root, get_root = renderer.get_root(), renderer.get_root
 				local top = root.top_level
-				local logger = package.loaded["infra.logger"]
+				local logger = package.loaded["core.logger.engine.logger"]
 				local done, final_calls, getter_throws = logger.done, 0, 0
 				local throwing = false
 				if mode == "getter_throw" then

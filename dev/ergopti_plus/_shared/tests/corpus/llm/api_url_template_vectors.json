@@ -1,5 +1,5 @@
 {
-	"_comment": "Address templates of the per-account providers of api_providers.json: the placeholders a template asks for, the values that may fill one, and the address filled. _shared/lua/llm/api_url_template.lua (macOS and Linux unit suites) and its port _shared/modules/llm/api_url_template.ahk (AHK suite) each replay this corpus.",
+	"_comment": "Address templates of the per-account providers of api_providers.json: the placeholders a template asks for, the values that may fill one, and the address filled. _shared/ai/engine/api/url_template.lua (macOS and Linux unit suites) and its port _shared/ai/data/api_url_template.ahk (AHK suite) each replay this corpus.",
 	"max_value_length": 253,
 	"fields": [
 		{ "template": "https://api.openai.com/v1", "fields": [], "valid": true },

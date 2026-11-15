@@ -55,7 +55,7 @@ helpers.describe("prediction inline auto-type (llm-inline-autotype-macos)", func
 	end)
 
 	helpers.it("(llm-inline-autotype-macos) the setting reaches the engine and its runtime read-back", function()
-		local key = require("config_keys").COMMAND.LLM_INLINE_AUTOTYPE
+		local key = require("settings.engine.keys").COMMAND.LLM_INLINE_AUTOTYPE
 		Engine.set_llm_inline_autotype(true)
 		local found, value = Engine.get_llm_runtime_setting(key)
 		helpers.assert_eq(found, true)

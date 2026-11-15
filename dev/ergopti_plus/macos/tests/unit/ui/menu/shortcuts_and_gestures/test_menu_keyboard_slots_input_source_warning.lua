@@ -14,8 +14,8 @@
 local helpers = require("tests.helpers")
 
 local DISPLACED = {
-	"infra.deferred_work",
-	"infra.dialog_util",
+	"core.timing.engine.deferred_work",
+	"core.ui.engine.dialog_util",
 	"modules.shortcuts.input_source_conflict",
 	"ui.menu.menu_keyboard_slots",
 }
@@ -28,16 +28,16 @@ local DISPLACED = {
 local function with_menu(ids, answer, body)
 	local prior = {}
 	for _, name in ipairs(DISPLACED) do prior[name] = package.loaded[name] end
-	local prior_shell_runner = package.loaded["adapters.shell_runner"]
+	local prior_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local seen = { dialogs = {}, opened = {} }
-	package.loaded["infra.deferred_work"] = { after = function(_, fn) fn() return true end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn() return true end }
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(title, message, first)
 			seen.dialogs[#seen.dialogs + 1] = { title = title, message = message }
 			return answer == "open" and first or "OK"
 		end,
 	}
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		open = function(target) seen.opened[#seen.opened + 1] = target return true end,
 	}
 	package.loaded["modules.shortcuts.input_source_conflict"] = {
@@ -49,7 +49,7 @@ local function with_menu(ids, answer, body)
 		body(helpers.load_with_stubs("ui.menu.menu_keyboard_slots"), seen)
 	end)
 	for _, name in ipairs(DISPLACED) do package.loaded[name] = prior[name] end
-	package.loaded["adapters.shell_runner"] = prior_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = prior_shell_runner
 	if not ok then error(err, 0) end
 end
 

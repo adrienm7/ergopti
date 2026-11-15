@@ -6,10 +6,10 @@ local helpers = require("tests.helpers")
 local it = require("tests.support.metrics_preferences_fixture").it
 local Fakes = require("tests.fakes")
 local function assert_false(value) helpers.assert_eq(value, false) end
-require("infra.monotonic") -- Load the genuine clock before temporary native ports.
+require("core.logger.engine.monotonic") -- Load the genuine clock before temporary native ports.
 
 local function read_committed_input(database)
-	local shell = require("adapters.shell_runner")
+	local shell = require("core.process.adapters.shell_runner")
 	assert(shell.has_command("sqlite3"), "SQLite CLI is required for the independent native COMMIT assertion")
 	local ok, retained, failure = shell.exec_checked("sqlite3 -init /dev/null -bail -readonly "
 		.. shell.quote(database) .. " " .. shell.quote("SELECT COUNT(*) FROM events_typing;"))
@@ -19,7 +19,7 @@ end
 
 helpers.describe("native metrics fixture SQLite admission", function()
 	it("native-fixture-sqlite-admission: a missing CLI refuses before opening the independent query", function()
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		helpers.assert_eq(type(shell.has_command), "function", "the probe must mirror the real shell API")
 		helpers.assert_eq(type(shell.exec_checked), "function", "the query must mirror the real checked shell API")
 		local original_probe, original_checked = shell.has_command, shell.exec_checked
@@ -49,7 +49,7 @@ helpers.describe("native metrics fixture SQLite admission", function()
 		local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-sqlite-witness-XXXXXX"))
 		local original_path = assert(uv.os_getenv("PATH"), "the test runner must declare PATH")
 		local original_tmp = uv.os_getenv("TMPDIR")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		local before = {}
 		uv.walk(function(handle) before[handle] = true end)
 		local accepted, detail, pid
@@ -98,9 +98,9 @@ helpers.describe("native metrics fixture construction deadlines", function()
 				local uv = require("luv")
 				helpers.assert_eq(debug.getinfo(uv.fs_stat, "S").what, "C", "the actual native provider is required")
 				local native = require("tests.support.keystats_native_fixture")
-				local batch = require("infra.sqlite_batch_process")
+				local batch = require("core.fs.engine.sqlite_batch_process")
 				local original_start = assert(batch.start)
-				local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+				local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 				local directory = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-fixture-deadline-XXXXXX"))
 				local database = directory .. "/metrics.sqlite"
 				local armed, delayed, starts, collector = false, 0, 0, nil
@@ -163,8 +163,8 @@ helpers.describe("native metrics fixture retirement observation", function()
 	it("native-fixture-retirement: observes a real timed-out child until physical retirement", function()
 		local uv = require("luv")
 		local native = require("tests.support.keystats_native_fixture")
-		local batch = require("infra.sqlite_batch_process")
-		local operation_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		local batch = require("core.fs.engine.sqlite_batch_process")
+		local operation_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 		local original_spawn, original_timer_start, original_start = uv.spawn, uv.timer_start, batch.start
 		for _, name in ipairs({ "spawn", "timer_start", "run", "sleep", "new_check", "check_start", "walk" }) do
 			helpers.assert_eq(debug.getinfo(uv[name], "S").what, "C", "the regression requires the actual native " .. name)
@@ -256,7 +256,7 @@ helpers.describe("native metrics fixture retirement observation", function()
 	for _, phase in ipairs({ "reservation", "commit", "resolve", "cleanup", "idle", "reservation_retry", "compose_retry",
 		"commit_retry", "resolve_retry", "cleanup_retry", "uncertain" }) do
 		it("native-fixture-retirement-model: frozen " .. phase .. " has a finite observation limit", function()
-			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local budget = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
 			local now, calls = 0, 0
 			local modeled = {
 				reset_session = function() calls = calls + 1; return false end,
@@ -307,7 +307,7 @@ helpers.describe("native metrics fixture finite observation contract", function(
 			for _, name in ipairs({ "hrtime", "run", "sleep" }) do
 				helpers.assert_eq(type(uv[name]), "function", "the model must mirror the real native methods")
 			end
-			local budget = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
+			local budget = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms") * 1000000
 			local now, calls = 0, 0
 			local modeled = {
 				reset_session = function() calls = calls + 1; return not scenario.frozen and calls > #scenario.phases end,
@@ -413,7 +413,7 @@ helpers.describe("owned SQLite collector flush", function()
 	for _, phase in ipairs({ "pending", "rollback", "stopping", "healthy" }) do
 		it("rendered session reset preserves its real " .. phase .. " acknowledgement", function()
 			with_collector(function(k, ops)
-				local Logger, I18n = require("logger.shim"), require("infra.i18n")
+				local Logger, I18n = require("core.logger.engine.shim"), require("core.i18n.engine.i18n")
 				local startup, menu_name = "ui.menu.start_at_login", "ui.menu.builder"
 				local old_startup, old_menu = package.loaded[startup], package.loaded[menu_name]
 				package.loaded[startup] = { command_available = function() return false end,
@@ -743,7 +743,7 @@ helpers.describe("linux-open-session-crash-recovery", function()
 	--- with. A fixed small stamp read as typed long ago once the host had been up
 	--- longer than the session gap, so the session closed at the first flush.
 	local function recent_stamp(index)
-		return math.floor(require("infra.monotonic").now_ms()) - 1000 + 100 * index
+		return math.floor(require("core.logger.engine.monotonic").now_ms()) - 1000 + 100 * index
 	end
 	--- Starts one collector process against a shared logical database.
 	local function process(writer, body)
@@ -950,7 +950,7 @@ end)
 helpers.describe("session reset receipt currency", function()
 	it("reset-preserves-history: an ordinary successor flush cannot reuse the old reset receipt", function()
 		with_collector(function(k, operations)
-			local now = math.floor(require("infra.monotonic").now_ms())
+			local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 			k.on_keydown("a", now, "owned")
 			assert_false(k.reset_session())
 			operations[1].outcome, operations[1].physical = "commit", true
@@ -1003,7 +1003,7 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 	for _, reentrant in ipairs({ false, true }) do
 		it("reset-refusal-owner: retains the original session with reentrant=" .. tostring(reentrant), function()
 			local writer, admitted, launches = Fakes.sqlite_writer(), false, 0
-			local clock = require("infra.monotonic")
+			local clock = require("core.logger.engine.monotonic")
 			local calendar = require("modules.keystats.calendar")
 			local previous_now, previous_capture = clock.now_ms, calendar.capture
 			local now, initial = math.floor(clock.now_ms()), calendar.capture()
@@ -1038,7 +1038,7 @@ helpers.describe("session reset refusal keeps exact session ownership", function
 						if reentrant then
 							now = now + 100
 							k.on_keydown("b", now, "owned")
-							now = now + require("infra.timings").ms("keystats", "micro_idle_timeout_ms") + 1
+							now = now + require("core.timing.engine.timings").ms("keystats", "micro_idle_timeout_ms") + 1
 							assert_false(k.flush())
 						end
 						assert_false(k.reset_session(), "nested construction cannot replace the original reset owner")
@@ -1098,7 +1098,7 @@ helpers.describe("session reset construction frame retirement", function()
 		end
 		local ok, err = pcall(function()
 			with_collector(function(k)
-				local now = math.floor(require("infra.monotonic").now_ms())
+				local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 				k.on_keydown("a", now, "owned")
 				intercept = true
 				helpers.assert_eq(pcall(k.reset_session), false)
@@ -1115,7 +1115,7 @@ helpers.describe("session reset construction frame retirement", function()
 	end)
 
 	it("reset-frame-throw: a throwing native observation retires the temporary dual branch", function()
-		local module_name = "keystats.session_events"
+		local module_name = "metrics.engine.system.session_events"
 		local original = require(module_name)
 		local tracker_inputs = {}
 		local wrapped = {}
@@ -1137,7 +1137,7 @@ helpers.describe("session reset construction frame retirement", function()
 		local writer = Fakes.sqlite_writer()
 		local ok, err = pcall(function()
 			with_collector(function(k)
-				local now = math.floor(require("infra.monotonic").now_ms())
+				local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 				k.on_keydown("a", now, "owned")
 				local called, failure = pcall(k.reset_session)
 				helpers.assert_eq(called, false)
@@ -1222,7 +1222,7 @@ helpers.describe("one-click owned metrics session reset", function()
 	it("reset-one-click: a refused constructor completes false without altering its session", function()
 		local admitted, writer = false, Fakes.sqlite_writer()
 		with_collector(function(k)
-			local now = math.floor(require("infra.monotonic").now_ms())
+			local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 			k.on_keydown("a", now, "owned")
 			local origin, replies, receipt = k.get_flush_status().generation, {}, nil
 			helpers.assert_true(k.request_session_reset(function(success, completed)
@@ -1248,7 +1248,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 		local database = os.tmpname()
 		os.remove(database)
 		local native = require("tests.support.keystats_native_fixture")
-		local logger, i18n = require("logger.shim"), require("infra.i18n")
+		local logger, i18n = require("core.logger.engine.shim"), require("core.i18n.engine.i18n")
 		local previous_info, previous_error = logger.info, logger.error
 		local startup = "ui.menu.start_at_login"
 		local previous_startup = package.loaded[startup]
@@ -1266,7 +1266,7 @@ helpers.describe("one-click rendered reset with native SQLite", function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				k.on_keydown("a", math.floor(require("infra.monotonic").now_ms()), "owned")
+				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local menu = helpers.load_module("ui.menu.builder").build({ keystats = k })
 				local reset
 				for _, parent in ipairs(menu) do
@@ -1352,7 +1352,7 @@ helpers.describe("owned reset native bridge", function()
 			native.with(function(k)
 				k.init({ sqlite_path = database })
 				require("tests.support.metrics_consent_fixture").enable(k)
-				k.on_keydown("a", math.floor(require("infra.monotonic").now_ms()), "owned")
+				k.on_keydown("a", math.floor(require("core.logger.engine.monotonic").now_ms()), "owned")
 				local bridge = helpers.load_module("ui.metrics_apps.bridge")
 				bridge._reset()
 				local pushed = {}
@@ -1408,13 +1408,13 @@ end)
 
 helpers.describe("native sampled reset acknowledgement", function()
 	it("reset-sampled-native-ack: consumes the exact committed reset source once", function()
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local root = helpers.driver_root()
 		local fixture = root .. "/tests/hardware/run_keystats_reset_ack.lua"
 		local runtime, provider = "luajit", ""
 		if rawget(_G, "jit") then
 			-- Distribution suites compile real luv outside the default C search path.
-			runtime = assert(require("process.interpreter").from_arguments(arg))
+			runtime = assert(require("core.process.interpreter").from_arguments(arg))
 			provider = " LUA_CPATH=" .. quote(package.cpath)
 		end
 		-- A stock-Lua parent cannot lend its native-module ABI to the JIT child.
@@ -1450,7 +1450,8 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 			local tombstone = tombstones(operations[2])
 			helpers.assert_eq(#tombstone, 1)
 			helpers.assert_true(tombstone[1].ts:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
-			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d$") ~= nil)
+			helpers.assert_true(tombstone[1].metadata.utc:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$") ~= nil)
+			helpers.assert_eq(tombstone[1].ts, tombstone[1].metadata.utc, "a Linux tombstone stamps ts in UTC (KMD-1)")
 			helpers.assert_eq(#replies, 0, "no answer before the tombstone commits")
 			operations[2].outcome, operations[2].physical = "commit", true
 			k.pump_flush()
@@ -1505,10 +1506,10 @@ helpers.describe("dashboard export and purge through the owning writer", functio
 	end)
 
 	it("metrics-maintenance-vectors: the shared helper renders the shared tombstone and export name", function()
-		local Maintenance = require("keystats.metrics_maintenance")
-		local handle = assert(io.open(require("infra.paths").shared(
+		local Maintenance = require("metrics.engine.maintenance")
+		local handle = assert(io.open(require("core.fs.engine.paths").shared(
 			"tests/corpus/keystats/metrics_maintenance_vectors.json"), "rb"))
-		local vectors = require("json").decode(handle:read("*a"))
+		local vectors = require("core.text.engine.json").decode(handle:read("*a"))
 		handle:close()
 		local tombstone = Maintenance.tombstone(vectors.tombstone.epoch)
 		helpers.assert_eq(tombstone.action, vectors.tombstone.action)
@@ -1540,12 +1541,12 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 	Native.with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
 		require("tests.support.metrics_consent_fixture").enable(collector)
-		local now = require("infra.monotonic").now_ms()
+		local now = require("core.logger.engine.monotonic").now_ms()
 		for index = 1, 10 do collector.record_hotstring("Editor", "😀", "😀😀", now + index, "static", 1, index == 10) end
 		Native.flush(collector)
 		Native.flush(collector)
-		local until_ms = now + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
-		while not collector.stop() and require("infra.monotonic").now_ms() < until_ms do
+		local until_ms = now + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
+		while not collector.stop() and require("core.logger.engine.monotonic").now_ms() < until_ms do
 			require("luv").run("nowait")
 			require("luv").sleep(1)
 		end
@@ -1563,7 +1564,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 	require("tests.support.keystats_native_fixture").with(function(collector)
 		helpers.assert_true(collector.init(Home.options({ sqlite_path = Home.fresh_db() })))
 		local writer = require("modules.keystats.sqlite_writer")
-		local now = require("infra.monotonic").now_ms
+		local now = require("core.logger.engine.monotonic").now_ms
 		local uv = require("luv")
 		local groups = { { word = "bad" }, { word = -1 }, { word = 0 / 0 }, { word = {} },
 			{ word = { c = 0, sources = "bad" } }, { word = { c = 0, td = "bad" } },
@@ -1576,7 +1577,7 @@ require("tests.support.keystats_home_fixture").it("owned-flush-empty-ngram: nati
 				raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} },
 				upserts = { { kind = "ngrams", args = { "2026-11-07", "Editor", group, "ngram_chars" } } },
 			}))
-			local until_ms = now() + require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+			local until_ms = now() + require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 			while not operation:is_settled() and now() < until_ms do
 				operation:pump()
 				if operation:is_retryable() then operation:cancel() end

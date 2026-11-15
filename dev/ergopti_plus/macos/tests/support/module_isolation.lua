@@ -49,7 +49,7 @@ function M.purge(driver_root, shared_lua)
 	local purge_keys = {}
 	for key in pairs(package.loaded) do
 		if type(key) == "string"
-			and key ~= "logger"
+			and key ~= "core.logger.engine"
 			and resolves_inside_project(key, driver_root, shared_lua)
 		then
 			purge_keys[#purge_keys + 1] = key
@@ -79,7 +79,7 @@ function M.purge(driver_root, shared_lua)
 		package.loaded[key] = member
 	end
 
-	local ok_core, core = pcall(require, "logger")
+	local ok_core, core = pcall(require, "core.logger.engine")
 	if ok_core and type(core) == "table" then
 		pcall(core.reset_dedup)
 		pcall(core.ring_buffer_clear)

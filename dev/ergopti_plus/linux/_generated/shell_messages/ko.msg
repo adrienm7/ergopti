@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/ko.msg
-# AUTO-GENERATED from _shared/data/locales/ko.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ko.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT 네트워킹 모듈을 소스에서 빌드했습니다.
 build_luv.recipe_required=luv 네이티브 빌드에는 소스 레시피가 필요합니다.
 install.already_installed={1} — 이미 설치됨
 install.archive_digest_unavailable=유지된 디스크립터 업데이트에는 실제 OpenSSL3 런타임이 필요합니다. 이 기능은 계속 사용할 수 없습니다.
+install.bytecode_skipped=미리 컴파일된 모듈을 만들 수 없습니다 — Ergopti가 소스에서 시작하므로 조금 느려집니다.
 install.capability_verified={1} — 기능 확인됨
 install.command_still_missing={1}을(를) 설치했지만 '{2}'을(를) 여전히 찾을 수 없습니다.
 install.daemon_manual=데몬을 직접 시작하려면:
 install.daemon_running=데몬이 백그라운드에서 실행 중입니다. 상태를 확인하려면:
+install.focus_integration_enabled={1} 포커스 연동을 활성화했습니다
+install.focus_integration_failed={1} 포커스 연동을 활성화할 수 없습니다 — 이 데스크톱에서는 애플리케이션별 규칙이 비활성 상태로 유지됩니다.
+install.focus_integration_next_login={1} 포커스 연동을 설치했습니다 (다음 로그인부터 적용)
+install.focus_integration_updated={1} 포커스 연동을 업데이트했습니다
 install.gnome_extension_active=GNOME AppIndicator 확장 — 이미 활성화됨
 install.gnome_extension_enabled=GNOME AppIndicator 확장을 켰습니다
 install.gnome_extension_failed=AppIndicator 확장을 켤 수 없습니다. 이 확장이 없으면 GNOME에 아이콘이 표시되지 않습니다.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — 종속성 확인
 install.section_deps_skipped=종속성 건너뜀(--no-deps)
 install.section_done=설치 완료
 install.section_files=파일 설치
+install.section_focus=Wayland의 활성 애플리케이션 (GNOME, KDE)
 install.section_lua_deps=선택적 Lua 종속성(이벤트 루프, 타이머, 웹뷰, 신호)
 install.section_permissions=입력 권한(sudo 필요)
 install.section_services=systemd 사용자 서비스 만들기
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG 자동 시작: {1}
 launch.already_running=Ergopti+가 이 세션에서 이미 실행 중입니다({1} 사용 중). 이번 실행은 거부되었습니다.
 launch.authorization_failed=입력 접근 권한 승인이 취소되었거나 실패했습니다.
 launch.groups_unavailable=세션이 설정된 입력 그룹을 얻지 못했습니다.
+launch.restarting=Ergopti+가 이 세션에서 이미 실행 중입니다. 종료를 요청한 다음 다시 시작합니다.
 launch.session_lock_invalid=세션 잠금 폴더는 절대 경로여야 합니다.
 launcher.dependencies_installed=종속성을 설치했습니다.
 launcher.driver_missing=오류: Linux 드라이버 디렉터리를 찾을 수 없습니다: {1}

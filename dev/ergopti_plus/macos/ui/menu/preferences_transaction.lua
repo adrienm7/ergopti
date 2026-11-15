@@ -10,10 +10,10 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu"
-local OperationReporter = require("diagnostics.operation_reporter")
-local TableUtil = require("table_util")
+local OperationReporter = require("diagnostics.engine.operation_reporter")
+local TableUtil = require("core.text.engine.table_util")
 
 local clone_value = TableUtil.deep_copy_with_keys
 

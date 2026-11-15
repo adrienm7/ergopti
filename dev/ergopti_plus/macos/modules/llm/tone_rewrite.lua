@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Runs the llm_tone_more_formal / llm_tone_more_familiar actions and their
 --- _cycle variants: the selection is rewritten one register up or down the tone
---- ladder (_shared/lua/llm/tone.lua) and replaced at once, and the rewrite stays
+--- ladder (_shared/ai/engine/prediction/tone.lua) and replaced at once, and the rewrite stays
 --- selected so the next step applies to it.
 ---
 --- FEATURES & RATIONALE:
@@ -26,10 +26,10 @@
 
 local M = {}
 
-local Tone       = require("llm.tone")
-local Logger     = require("infra.logger")
-local i18n       = require("infra.i18n")
-local WindowInfo = require("adapters.window_info")
+local Tone       = require("ai.engine.prediction.tone")
+local Logger     = require("core.logger.engine.logger")
+local i18n       = require("core.i18n.engine.i18n")
+local WindowInfo = require("platform.focus.window_info")
 local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.tone_rewrite"
@@ -58,7 +58,7 @@ local _generation = 0
 --- Shows a notice explaining why a step did nothing.
 --- @param key string Locale key of the notice.
 local function show_notice(key)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, i18n.get(key), true, true)

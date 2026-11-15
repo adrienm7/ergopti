@@ -8,7 +8,7 @@
 ; folder, this developer driver picks it up, runs each declared step without
 ; its window, writes one result per step and a done marker, and the collector
 ; copies them. The protocol (files, verdicts, refusal reasons, identifiers,
-; required keys) is _shared/data/field_run_protocol.json, the one the macOS
+; required keys) is _shared/diagnostics/data/field_run_protocol.json, the one the macOS
 ; field run (macos/infra/field_run.lua) and the Linux one implement; the steps
 ; are windows/data/field_run_steps.json.
 ;
@@ -525,7 +525,7 @@ FieldRun_Start(CloneRoot) {
 	if !(CloneRoot is String) || CloneRoot == ""
 		throw ValueError("The field run runs only in developer source mode.")
 	LoggerStart(FIELD_RUN_TAG, "Starting the developer field run…")
-	Spec := FieldRun_LoadProtocol(_SharedDir . "\data\field_run_protocol.json")
+	Spec := FieldRun_LoadProtocol(_SharedDir . "\diagnostics\data\field_run_protocol.json")
 	Runners := FieldRun_Runners()
 	Steps := FieldRun_LoadSteps(CloneRoot . "\" . StrReplace(Spec["steps_file"]["windows"], "/", "\"), Spec, Runners)
 	Folder := CloneRoot . "\" . StrReplace(Spec["folder"]["clone"], "/", "\")

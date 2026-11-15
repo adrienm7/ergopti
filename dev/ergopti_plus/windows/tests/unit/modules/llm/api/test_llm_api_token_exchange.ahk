@@ -161,7 +161,7 @@ Test("Token exchange: every request of the corpus, byte for byte, signed asserti
 
 _LTE_Catalogue() {
 	global _SharedDir
-	Providers := _LTE_ReadJson("modules\llm\api_providers.json")["providers"]
+	Providers := _LTE_ReadJson("ai\data\api_providers.json")["providers"]
 	for Id in ["watsonx", "vertex"]
 		AssertTrue(LLM_TokenExchange_Parse(Providers[Id]["auth"]) is Map, Id . "'s block is valid")
 	Corpus := _LTE_ExchangeCorpus()
@@ -176,7 +176,8 @@ _LTE_Answers() {
 	Corpus := _LTE_ExchangeCorpus()
 	AssertTrue(Corpus["answers"].Length >= 5, "the corpus holds answers")
 	for Row in Corpus["answers"] {
-		Token := LLM_TokenExchange_Read(Corpus[Row["block"]], Row["status"], Row["json"], Row["now"], &Reason)
+		; A row without "json" is an answer with no JSON body (the Lua twin reads nil).
+		Token := LLM_TokenExchange_Read(Corpus[Row["block"]], Row["status"], Row.Get("json", ""), Row["now"], &Reason)
 		if Row.Has("reason") {
 			AssertEqual("", Token, Row["name"])
 			AssertEqual(Row["reason"], Reason, Row["name"])
@@ -251,7 +252,8 @@ _LTE_Refusal() {
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		_LTE_Pump()
 		_LTE_Answer(Posts[1], "", 400)
-		AssertEqual("the token exchange answered HTTP 400", Results[1]["refusal"])
+		; The refusal carries the service's own sentence (AID-2, 2026-11-11).
+		AssertEqual("the token exchange answered HTTP 400: invalid_grant", Results[1]["refusal"])
 		AssertTrue(Results[1]["key_refused"], "the OAuth invalid-grant HTTP 400 identifies a refused credential")
 		LLM_TokenExchange_Prepare(LTE_PROVIDER, Auth, _LTE_Key(), (Ok, Failure) => Results.Push(Failure))
 		AssertEqual(2, Results.Length, "during the pause the refusal answers at once")
@@ -982,7 +984,10 @@ _LTEWB_Body(Backend, Late, Posts, Lines) {
     try {
         Success := (Text, Usage := "") => Heard.Push(Map("ok", true))
         Failure := (Info := "") => Heard.Push(Map("ok", false, "info", Info))
-        Budget := 96
+        ; Only the late case needs a budget that expires: the immediate control
+        ; proves a reply inside the budget, and at 96 ms a loaded machine's
+        ; reply could arrive after its own deadline and read as a timeout.
+        Budget := Late ? 96 : 10000
         if Backend == "generate"
             Id := LLM_RemoteGenerate_Async(_LTE_Entry(), "Fixture system.", "Fixture user.", 0.1,
                 Success, Failure, "", 8, "token_wait_budget", Budget)

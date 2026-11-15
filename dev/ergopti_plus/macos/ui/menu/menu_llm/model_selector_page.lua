@@ -29,17 +29,17 @@
 
 local M = {}
 
-local i18n           = require("infra.i18n")
-local Logger         = require("infra.logger")
-local DeferredWork   = require("infra.deferred_work")
-local Timings        = require("infra.timings")
-local dialog         = require("infra.dialog_util")
+local i18n           = require("core.i18n.engine.i18n")
+local Logger         = require("core.logger.engine.logger")
+local DeferredWork   = require("core.timing.engine.deferred_work")
+local Timings        = require("core.timing.engine.timings")
+local dialog         = require("core.ui.engine.dialog_util")
 local BackendLabels  = require("ui.menu.menu_llm.backend_labels")
 local CustomModels   = require("ui.menu.menu_llm.custom_models")
-local ModelCatalogue = require("llm.model_catalogue")
-local ModelIdentifier = require("llm.model_identifier")
-local ApiModelListing = require("llm.api_model_listing")
-local TextUtils      = require("text_utils")
+local ModelCatalogue = require("ai.engine.local_servers.model_catalogue")
+local ModelIdentifier = require("ai.engine.local_servers.model_identifier")
+local ApiModelListing = require("ai.engine.api.model_listing")
+local TextUtils      = require("core.text.engine.utils_core")
 
 local LOG = "model_selector_page"
 
@@ -185,9 +185,18 @@ local function collect(ctx)
 	local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
 	local backend_collect, api_collect = {}, {}
 	local paused = ctx.is_paused() ~= false
+	-- A pause stops typing, not configuration (EDD-1): the backend and API
+	-- panels only collect choices, so they read a pause that admits them.
+	-- An unreadable pause still refuses, and the local server rows, which
+	-- start servers, keep the real pause.
+	local function configuration_blocked()
+		local ok, current = pcall(ctx.is_paused)
+		return not ok or type(current) ~= "boolean"
+	end
 	local function panel_ctx(extra)
 		local out = {
-			state = ctx.state, keymap = ctx.keymap, paused = paused, is_paused = ctx.is_paused,
+			state = ctx.state, keymap = ctx.keymap, paused = configuration_blocked(), is_paused = configuration_blocked,
+			runtime_is_paused = ctx.is_paused,
 			models_mgr = ctx.models_mgr, get_display_model_name = ctx.get_display_model_name,
 			switch_model = ctx.switch_model, disable_model = ctx.disable_model, save_prefs = ctx.save_prefs,
 			update_menu = ctx.update_menu, WarmupCtrl = ctx.WarmupCtrl,
@@ -280,6 +289,10 @@ local function api_rows(ctx, collected)
 		for _, item in ipairs(plan.models) do
 			local model = item.model
 			local actions = { { id = "other_model", text = i18n.get("model_browser.api_other_model") } }
+			if e.key_absent then
+				-- Restored without its Keychain key: the one way back is a new key.
+				actions = { { id = "set_key", text = i18n.get("menu.llm.local_servers.api_key") } }
+			end
 			if e.active and model == e.model then
 				actions[#actions + 1] = { id = "test", text = i18n.get("menu.llm.api_test_entry") }
 				actions[#actions + 1] = { id = "remove", text = i18n.get("menu.llm.api_remove_entry") }
@@ -287,7 +300,9 @@ local function api_rows(ctx, collected)
 			local row = {
 				name = prefix .. "/" .. model .. suffix, runtime_name = model, provider = prefix, installed = true,
 				entry_id = e.id, model = model, available = not e.key_missing, actions = actions,
-				hint_key = e.key_missing and "model_browser.hint_api_no_key" or nil,
+				key_absent = e.key_absent or nil,
+				hint_key = e.key_absent and "model_browser.hint_api_key_reenter"
+					or e.key_missing and "model_browser.hint_api_no_key" or nil,
 			}
 			if model == e.model then push(row) else later[#later + 1] = row end
 		end
@@ -572,6 +587,21 @@ local function prompt_api_model(ctx, row)
 	return require("ui.menu.menu_llm.api_panel").set_entry_model(ctx, row.entry_id, text) == true
 end
 
+--- Asks for the key of an entry restored without its Keychain item.
+--- @param ctx table Menu context.
+--- @param row table The entry's page row.
+--- @return boolean staged
+local function prompt_api_key(ctx, row)
+	local ok_label = i18n.get("button.ok")
+	local ok, a, b = pcall(dialog.text_prompt, row.provider, i18n.get("menu.llm.api_prompt_token"),
+		"", ok_label, i18n.get("button.cancel"), true)
+	if not ok then return false end
+	local button, text = a, b
+	if a ~= ok_label and a ~= i18n.get("button.cancel") then button, text = b, a end
+	if button ~= ok_label or type(text) ~= "string" or text == "" then return false end
+	return require("ui.menu.menu_llm.api_panel").set_entry_token(ctx, row.entry_id, text) == true
+end
+
 --- Runs a local backend's owned-runtime install for its "Install" button;
 --- the page shows it running, then the outcome on the refresh that settles it.
 local function install_runtime(ctx, backend, probes)
@@ -634,8 +664,18 @@ end
 --- @return boolean accepted True when the action was dispatched.
 function M.handle_action(ctx, body, probes, collected)
 	local action = body.action
-	if ctx.is_paused() ~= false then
-		Logger.warn(LOG, "Model selector action '%s' refused while paused.", tostring(action))
+	-- A pause stops typing, not configuration (EDD-1): choices, downloads and
+	-- installs run while paused. What starts or contacts a runtime (a key
+	-- test, a server rescan, an MLX port change that restarts MLX) waits.
+	local paused = ctx.is_paused()
+	if type(paused) ~= "boolean" then
+		Logger.warn(LOG, "Model selector action '%s' refused: the pause state is unreadable.", tostring(action))
+		return false
+	end
+	local runtime_action = (action == "row_action" and body.id == "test")
+		or (action == "group_action" and (body.id == "rescan" or body.id == "mlx_port" or body.id == "mlx_port_reset"))
+	if paused and runtime_action then
+		Logger.warn(LOG, "Model selector action '%s' waits for resume.", tostring(action))
 		return false
 	end
 	local blocked = ctx.config_reason()
@@ -726,6 +766,9 @@ function M.handle_action(ctx, body, probes, collected)
 		if body.id == "set_key" and row.local_server then
 			return require("ui.menu.menu_llm.local_server_panel").prompt_key(collected.local_ctx, row.local_server) == true
 		end
+		if body.id == "set_key" and row.entry_id and row.key_absent then
+			return prompt_api_key(ctx, row)
+		end
 		if not row.entry_id or (row.available == false and not row.typed) then return false end
 		if body.id == "other_model" then return prompt_api_model(ctx, row) end
 		if row.typed then return false end
@@ -812,7 +855,10 @@ end
 --- @param id string Tool id.
 --- @return boolean accepted
 function M.group_action(backend, id)
-	if not _ctx or _ctx.is_paused() ~= false or _ctx.config_reason() ~= nil then return false end
+	if not _ctx or _ctx.config_reason() ~= nil then return false end
+	local paused = _ctx.is_paused()
+	if type(paused) ~= "boolean" then return false end
+	if paused and (id == "rescan" or id == "mlx_port" or id == "mlx_port_reset") then return false end
 	return group_action(_ctx, collect(_ctx), backend, id, DEFAULT_PROBES)
 end
 
@@ -845,7 +891,7 @@ function M.open()
 	-- A window shown from inside the still-open menu callback can silently fail
 	-- to appear, so the page opens on the next tick.
 	local scheduled = DeferredWork.after(0, function()
-		if _ctx ~= ctx or ctx.is_paused() ~= false then return false end
+		if _ctx ~= ctx then return false end
 		local ModelBrowser = require("ui.model_browser")
 		local opened = ModelBrowser.open({
 			build_payload = function() return M.build_payload(ctx) end,

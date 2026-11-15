@@ -1,0 +1,1700 @@
+{
+	"_description": "Keyboards beyond the row-staggered ISO and ANSI boards (physical_keys.json): ortholinear, split and column-staggered ergonomic boards with thumb clusters. For each: the centre of each key in key units (19.05 mm) and its logical row (rank in its column, the home row being 3, thumb keys 5), the default finger of each key and each finger's home key. Imported on 2026-11-14 from QMK's layout file (key positions) and default keymap (which key code each position types); « placed » lists the modifiers the default keymap lacks and where they were put. A key code the board lacks is reported per layout by the engine. Decided by the agent, to review by the maintainer.",
+	"schema_version": 1,
+	"boards": {
+		"corne": {
+			"name": "Corne (split 3×6+3)",
+			"source": {
+				"keyboard": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/crkbd/info.json",
+				"layout": "LAYOUT_split_3x6_3",
+				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/crkbd/keymaps/default/keymap.c",
+				"fetched": "2026-11-14",
+				"placed": ["ShiftRight on the free key mirroring ShiftLeft (KC_ESC)"]
+			},
+			"keys": {
+				"KeyQ": {
+					"x": 1.5,
+					"y": 0.8,
+					"w": 1,
+					"row": 2
+				},
+				"KeyW": {
+					"x": 2.5,
+					"y": 0.6,
+					"w": 1,
+					"row": 2
+				},
+				"KeyE": {
+					"x": 3.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyR": {
+					"x": 4.5,
+					"y": 0.6,
+					"w": 1,
+					"row": 2
+				},
+				"KeyT": {
+					"x": 5.5,
+					"y": 0.7,
+					"w": 1,
+					"row": 2
+				},
+				"KeyY": {
+					"x": 9.5,
+					"y": 0.7,
+					"w": 1,
+					"row": 2
+				},
+				"KeyU": {
+					"x": 10.5,
+					"y": 0.6,
+					"w": 1,
+					"row": 2
+				},
+				"KeyI": {
+					"x": 11.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyO": {
+					"x": 12.5,
+					"y": 0.6,
+					"w": 1,
+					"row": 2
+				},
+				"KeyP": {
+					"x": 13.5,
+					"y": 0.8,
+					"w": 1,
+					"row": 2
+				},
+				"KeyA": {
+					"x": 1.5,
+					"y": 1.8,
+					"w": 1,
+					"row": 3
+				},
+				"KeyS": {
+					"x": 2.5,
+					"y": 1.6,
+					"w": 1,
+					"row": 3
+				},
+				"KeyD": {
+					"x": 3.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyF": {
+					"x": 4.5,
+					"y": 1.6,
+					"w": 1,
+					"row": 3
+				},
+				"KeyG": {
+					"x": 5.5,
+					"y": 1.7,
+					"w": 1,
+					"row": 3
+				},
+				"KeyH": {
+					"x": 9.5,
+					"y": 1.7,
+					"w": 1,
+					"row": 3
+				},
+				"KeyJ": {
+					"x": 10.5,
+					"y": 1.6,
+					"w": 1,
+					"row": 3
+				},
+				"KeyK": {
+					"x": 11.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyL": {
+					"x": 12.5,
+					"y": 1.6,
+					"w": 1,
+					"row": 3
+				},
+				"Semicolon": {
+					"x": 13.5,
+					"y": 1.8,
+					"w": 1,
+					"row": 3
+				},
+				"Quote": {
+					"x": 14.5,
+					"y": 1.8,
+					"w": 1,
+					"row": 3
+				},
+				"ShiftLeft": {
+					"x": 0.5,
+					"y": 2.8,
+					"w": 1,
+					"row": 4
+				},
+				"KeyZ": {
+					"x": 1.5,
+					"y": 2.8,
+					"w": 1,
+					"row": 4
+				},
+				"KeyX": {
+					"x": 2.5,
+					"y": 2.6,
+					"w": 1,
+					"row": 4
+				},
+				"KeyC": {
+					"x": 3.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyV": {
+					"x": 4.5,
+					"y": 2.6,
+					"w": 1,
+					"row": 4
+				},
+				"KeyB": {
+					"x": 5.5,
+					"y": 2.7,
+					"w": 1,
+					"row": 4
+				},
+				"KeyN": {
+					"x": 9.5,
+					"y": 2.7,
+					"w": 1,
+					"row": 4
+				},
+				"KeyM": {
+					"x": 10.5,
+					"y": 2.6,
+					"w": 1,
+					"row": 4
+				},
+				"Comma": {
+					"x": 11.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"Period": {
+					"x": 12.5,
+					"y": 2.6,
+					"w": 1,
+					"row": 4
+				},
+				"Slash": {
+					"x": 13.5,
+					"y": 2.8,
+					"w": 1,
+					"row": 4
+				},
+				"ShiftRight": {
+					"x": 14.5,
+					"y": 2.8,
+					"w": 1,
+					"row": 4
+				},
+				"Space": {
+					"x": 6.5,
+					"y": 3.95,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 10.5,
+					"y": 4.2,
+					"w": 1,
+					"row": 5
+				}
+			},
+			"fingers": {
+				"KeyQ": "lp",
+				"KeyW": "lr",
+				"KeyE": "lm",
+				"KeyR": "li",
+				"KeyT": "li",
+				"KeyY": "ri",
+				"KeyU": "ri",
+				"KeyI": "rm",
+				"KeyO": "rr",
+				"KeyP": "rp",
+				"KeyA": "lp",
+				"KeyS": "lr",
+				"KeyD": "lm",
+				"KeyF": "li",
+				"KeyG": "li",
+				"KeyH": "ri",
+				"KeyJ": "ri",
+				"KeyK": "rm",
+				"KeyL": "rr",
+				"Semicolon": "rp",
+				"Quote": "rp",
+				"ShiftLeft": "lp",
+				"KeyZ": "lp",
+				"KeyX": "lr",
+				"KeyC": "lm",
+				"KeyV": "li",
+				"KeyB": "li",
+				"KeyN": "ri",
+				"KeyM": "ri",
+				"Comma": "rm",
+				"Period": "rr",
+				"Slash": "rp",
+				"ShiftRight": "rp",
+				"Space": "lt",
+				"AltRight": "rt"
+			},
+			"home_keys": {
+				"lp": "KeyA",
+				"lr": "KeyS",
+				"lm": "KeyD",
+				"li": "KeyF",
+				"ri": "KeyJ",
+				"rm": "KeyK",
+				"rr": "KeyL",
+				"rp": "Semicolon",
+				"lt": "Space",
+				"rt": "AltRight"
+			}
+		},
+		"planck": {
+			"name": "Planck (ortholinear 4×12)",
+			"source": {
+				"keyboard": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/planck/rev6/keyboard.json",
+				"layout": "LAYOUT_ortho_4x12",
+				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/planck/keymaps/default/keymap.c",
+				"fetched": "2026-11-14",
+				"placed": [
+					"ShiftRight on the free key mirroring ShiftLeft (KC_ENT)",
+					"AltRight (AltGr) on the nearest free right thumb key (RAISE)"
+				]
+			},
+			"keys": {
+				"KeyQ": {
+					"x": 1.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyW": {
+					"x": 2.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyE": {
+					"x": 3.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyR": {
+					"x": 4.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyT": {
+					"x": 5.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyY": {
+					"x": 6.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyU": {
+					"x": 7.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyI": {
+					"x": 8.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyO": {
+					"x": 9.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyP": {
+					"x": 10.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyA": {
+					"x": 1.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyS": {
+					"x": 2.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyD": {
+					"x": 3.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyF": {
+					"x": 4.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyG": {
+					"x": 5.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyH": {
+					"x": 6.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyJ": {
+					"x": 7.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyK": {
+					"x": 8.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyL": {
+					"x": 9.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"Semicolon": {
+					"x": 10.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"Quote": {
+					"x": 11.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 3
+				},
+				"ShiftLeft": {
+					"x": 0.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyZ": {
+					"x": 1.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyX": {
+					"x": 2.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyC": {
+					"x": 3.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyV": {
+					"x": 4.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyB": {
+					"x": 5.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyN": {
+					"x": 6.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyM": {
+					"x": 7.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"Comma": {
+					"x": 8.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"Period": {
+					"x": 9.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"Slash": {
+					"x": 10.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"ShiftRight": {
+					"x": 11.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 4
+				},
+				"Space": {
+					"x": 5.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 7.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 5
+				}
+			},
+			"fingers": {
+				"KeyQ": "lp",
+				"KeyW": "lr",
+				"KeyE": "lm",
+				"KeyR": "li",
+				"KeyT": "li",
+				"KeyY": "ri",
+				"KeyU": "ri",
+				"KeyI": "rm",
+				"KeyO": "rr",
+				"KeyP": "rp",
+				"KeyA": "lp",
+				"KeyS": "lr",
+				"KeyD": "lm",
+				"KeyF": "li",
+				"KeyG": "li",
+				"KeyH": "ri",
+				"KeyJ": "ri",
+				"KeyK": "rm",
+				"KeyL": "rr",
+				"Semicolon": "rp",
+				"Quote": "rp",
+				"ShiftLeft": "lp",
+				"KeyZ": "lp",
+				"KeyX": "lr",
+				"KeyC": "lm",
+				"KeyV": "li",
+				"KeyB": "li",
+				"KeyN": "ri",
+				"KeyM": "ri",
+				"Comma": "rm",
+				"Period": "rr",
+				"Slash": "rp",
+				"ShiftRight": "rp",
+				"Space": "lt",
+				"AltRight": "rt"
+			},
+			"home_keys": {
+				"lp": "KeyA",
+				"lr": "KeyS",
+				"lm": "KeyD",
+				"li": "KeyF",
+				"ri": "KeyJ",
+				"rm": "KeyK",
+				"rr": "KeyL",
+				"rp": "Semicolon",
+				"lt": "Space",
+				"rt": "AltRight"
+			}
+		},
+		"ergodox": {
+			"name": "ErgoDox EZ",
+			"source": {
+				"keyboard": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/ergodox_ez/info.json",
+				"layout": "LAYOUT_ergodox_pretty",
+				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/ergodox_ez/keymaps/default/keymap.c",
+				"fetched": "2026-11-14",
+				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_ENT)"]
+			},
+			"keys": {
+				"Equal": {
+					"x": 0.75,
+					"y": 0.875,
+					"w": 1.5,
+					"row": 1
+				},
+				"Digit1": {
+					"x": 2.0,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"Digit2": {
+					"x": 3.0,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit3": {
+					"x": 4.0,
+					"y": 0.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit4": {
+					"x": 5.0,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit5": {
+					"x": 6.0,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
+				"Digit6": {
+					"x": 11.0,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
+				"Digit7": {
+					"x": 12.0,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit8": {
+					"x": 13.0,
+					"y": 0.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit9": {
+					"x": 14.0,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit0": {
+					"x": 15.0,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"Minus": {
+					"x": 16.25,
+					"y": 0.875,
+					"w": 1.5,
+					"row": 1
+				},
+				"KeyQ": {
+					"x": 2.0,
+					"y": 1.875,
+					"w": 1,
+					"row": 2
+				},
+				"KeyW": {
+					"x": 3.0,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyE": {
+					"x": 4.0,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyR": {
+					"x": 5.0,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyT": {
+					"x": 6.0,
+					"y": 1.75,
+					"w": 1,
+					"row": 2
+				},
+				"KeyY": {
+					"x": 11.0,
+					"y": 1.75,
+					"w": 1,
+					"row": 2
+				},
+				"KeyU": {
+					"x": 12.0,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyI": {
+					"x": 13.0,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyO": {
+					"x": 14.0,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyP": {
+					"x": 15.0,
+					"y": 1.875,
+					"w": 1,
+					"row": 2
+				},
+				"Backslash": {
+					"x": 16.25,
+					"y": 1.875,
+					"w": 1.5,
+					"row": 2
+				},
+				"KeyA": {
+					"x": 2.0,
+					"y": 2.875,
+					"w": 1,
+					"row": 3
+				},
+				"KeyS": {
+					"x": 3.0,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyD": {
+					"x": 4.0,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyF": {
+					"x": 5.0,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyG": {
+					"x": 6.0,
+					"y": 2.75,
+					"w": 1,
+					"row": 3
+				},
+				"KeyH": {
+					"x": 11.0,
+					"y": 2.75,
+					"w": 1,
+					"row": 3
+				},
+				"KeyJ": {
+					"x": 12.0,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyK": {
+					"x": 13.0,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyL": {
+					"x": 14.0,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"Semicolon": {
+					"x": 15.0,
+					"y": 2.875,
+					"w": 1,
+					"row": 3
+				},
+				"Quote": {
+					"x": 16.25,
+					"y": 2.875,
+					"w": 1.5,
+					"row": 3
+				},
+				"ShiftLeft": {
+					"x": 0.75,
+					"y": 3.875,
+					"w": 1.5,
+					"row": 4
+				},
+				"KeyZ": {
+					"x": 2.0,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"KeyX": {
+					"x": 3.0,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"KeyC": {
+					"x": 4.0,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyV": {
+					"x": 5.0,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"KeyB": {
+					"x": 6.0,
+					"y": 3.75,
+					"w": 1,
+					"row": 4
+				},
+				"KeyN": {
+					"x": 11.0,
+					"y": 3.75,
+					"w": 1,
+					"row": 4
+				},
+				"KeyM": {
+					"x": 12.0,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"Comma": {
+					"x": 13.0,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"Period": {
+					"x": 14.0,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"Slash": {
+					"x": 15.0,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"ShiftRight": {
+					"x": 16.25,
+					"y": 3.875,
+					"w": 1.5,
+					"row": 4
+				},
+				"Backquote": {
+					"x": 1.0,
+					"y": 4.875,
+					"w": 1,
+					"row": 5
+				},
+				"BracketLeft": {
+					"x": 14.0,
+					"y": 4.625,
+					"w": 1,
+					"row": 5
+				},
+				"BracketRight": {
+					"x": 15.0,
+					"y": 4.875,
+					"w": 1,
+					"row": 5
+				},
+				"Space": {
+					"x": 5.5,
+					"y": 7.0,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 11.5,
+					"y": 7.0,
+					"w": 1,
+					"row": 5
+				}
+			},
+			"fingers": {
+				"Equal": "lp",
+				"Digit1": "lp",
+				"Digit2": "lr",
+				"Digit3": "lm",
+				"Digit4": "li",
+				"Digit5": "li",
+				"Digit6": "ri",
+				"Digit7": "ri",
+				"Digit8": "rm",
+				"Digit9": "rr",
+				"Digit0": "rp",
+				"Minus": "rp",
+				"KeyQ": "lp",
+				"KeyW": "lr",
+				"KeyE": "lm",
+				"KeyR": "li",
+				"KeyT": "li",
+				"KeyY": "ri",
+				"KeyU": "ri",
+				"KeyI": "rm",
+				"KeyO": "rr",
+				"KeyP": "rp",
+				"Backslash": "rp",
+				"KeyA": "lp",
+				"KeyS": "lr",
+				"KeyD": "lm",
+				"KeyF": "li",
+				"KeyG": "li",
+				"KeyH": "ri",
+				"KeyJ": "ri",
+				"KeyK": "rm",
+				"KeyL": "rr",
+				"Semicolon": "rp",
+				"Quote": "rp",
+				"ShiftLeft": "lp",
+				"KeyZ": "lp",
+				"KeyX": "lr",
+				"KeyC": "lm",
+				"KeyV": "li",
+				"KeyB": "li",
+				"KeyN": "ri",
+				"KeyM": "ri",
+				"Comma": "rm",
+				"Period": "rr",
+				"Slash": "rp",
+				"ShiftRight": "rp",
+				"Backquote": "lp",
+				"BracketLeft": "rp",
+				"BracketRight": "rp",
+				"Space": "lt",
+				"AltRight": "rt"
+			},
+			"home_keys": {
+				"lp": "KeyA",
+				"lr": "KeyS",
+				"lm": "KeyD",
+				"li": "KeyF",
+				"ri": "KeyJ",
+				"rm": "KeyK",
+				"rr": "KeyL",
+				"rp": "Semicolon",
+				"lt": "Space",
+				"rt": "AltRight"
+			}
+		},
+		"moonlander": {
+			"name": "ZSA Moonlander",
+			"source": {
+				"keyboard": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/zsa/moonlander/keyboard.json",
+				"layout": "LAYOUT",
+				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/zsa/moonlander/keymaps/default/keymap.c",
+				"fetched": "2026-11-14",
+				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_ENT)"]
+			},
+			"keys": {
+				"Equal": {
+					"x": 0.5,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"Digit1": {
+					"x": 1.5,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"Digit2": {
+					"x": 2.5,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit3": {
+					"x": 3.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit4": {
+					"x": 4.5,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit5": {
+					"x": 5.5,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
+				"Digit6": {
+					"x": 11.5,
+					"y": 0.75,
+					"w": 1,
+					"row": 1
+				},
+				"Digit7": {
+					"x": 12.5,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit8": {
+					"x": 13.5,
+					"y": 0.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit9": {
+					"x": 14.5,
+					"y": 0.625,
+					"w": 1,
+					"row": 1
+				},
+				"Digit0": {
+					"x": 15.5,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"Minus": {
+					"x": 16.5,
+					"y": 0.875,
+					"w": 1,
+					"row": 1
+				},
+				"KeyQ": {
+					"x": 1.5,
+					"y": 1.875,
+					"w": 1,
+					"row": 2
+				},
+				"KeyW": {
+					"x": 2.5,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyE": {
+					"x": 3.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyR": {
+					"x": 4.5,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyT": {
+					"x": 5.5,
+					"y": 1.75,
+					"w": 1,
+					"row": 2
+				},
+				"KeyY": {
+					"x": 11.5,
+					"y": 1.75,
+					"w": 1,
+					"row": 2
+				},
+				"KeyU": {
+					"x": 12.5,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyI": {
+					"x": 13.5,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyO": {
+					"x": 14.5,
+					"y": 1.625,
+					"w": 1,
+					"row": 2
+				},
+				"KeyP": {
+					"x": 15.5,
+					"y": 1.875,
+					"w": 1,
+					"row": 2
+				},
+				"Backslash": {
+					"x": 16.5,
+					"y": 1.875,
+					"w": 1,
+					"row": 2
+				},
+				"KeyA": {
+					"x": 1.5,
+					"y": 2.875,
+					"w": 1,
+					"row": 3
+				},
+				"KeyS": {
+					"x": 2.5,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyD": {
+					"x": 3.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyF": {
+					"x": 4.5,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyG": {
+					"x": 5.5,
+					"y": 2.75,
+					"w": 1,
+					"row": 3
+				},
+				"KeyH": {
+					"x": 11.5,
+					"y": 2.75,
+					"w": 1,
+					"row": 3
+				},
+				"KeyJ": {
+					"x": 12.5,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"KeyK": {
+					"x": 13.5,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyL": {
+					"x": 14.5,
+					"y": 2.625,
+					"w": 1,
+					"row": 3
+				},
+				"Semicolon": {
+					"x": 15.5,
+					"y": 2.875,
+					"w": 1,
+					"row": 3
+				},
+				"Quote": {
+					"x": 16.5,
+					"y": 2.875,
+					"w": 1,
+					"row": 3
+				},
+				"ShiftLeft": {
+					"x": 0.5,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"KeyZ": {
+					"x": 1.5,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"KeyX": {
+					"x": 2.5,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"KeyC": {
+					"x": 3.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyV": {
+					"x": 4.5,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"KeyB": {
+					"x": 5.5,
+					"y": 3.75,
+					"w": 1,
+					"row": 4
+				},
+				"KeyN": {
+					"x": 11.5,
+					"y": 3.75,
+					"w": 1,
+					"row": 4
+				},
+				"KeyM": {
+					"x": 12.5,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"Comma": {
+					"x": 13.5,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"Period": {
+					"x": 14.5,
+					"y": 3.625,
+					"w": 1,
+					"row": 4
+				},
+				"Slash": {
+					"x": 15.5,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"ShiftRight": {
+					"x": 16.5,
+					"y": 3.875,
+					"w": 1,
+					"row": 4
+				},
+				"Backquote": {
+					"x": 0.5,
+					"y": 4.875,
+					"w": 1,
+					"row": 5
+				},
+				"BracketLeft": {
+					"x": 14.5,
+					"y": 4.625,
+					"w": 1,
+					"row": 5
+				},
+				"BracketRight": {
+					"x": 15.5,
+					"y": 4.875,
+					"w": 1,
+					"row": 5
+				},
+				"Space": {
+					"x": 5.5,
+					"y": 6.25,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 11.5,
+					"y": 6.25,
+					"w": 1,
+					"row": 5
+				}
+			},
+			"fingers": {
+				"Equal": "lp",
+				"Digit1": "lp",
+				"Digit2": "lr",
+				"Digit3": "lm",
+				"Digit4": "li",
+				"Digit5": "li",
+				"Digit6": "ri",
+				"Digit7": "ri",
+				"Digit8": "rm",
+				"Digit9": "rr",
+				"Digit0": "rp",
+				"Minus": "rp",
+				"KeyQ": "lp",
+				"KeyW": "lr",
+				"KeyE": "lm",
+				"KeyR": "li",
+				"KeyT": "li",
+				"KeyY": "ri",
+				"KeyU": "ri",
+				"KeyI": "rm",
+				"KeyO": "rr",
+				"KeyP": "rp",
+				"Backslash": "rp",
+				"KeyA": "lp",
+				"KeyS": "lr",
+				"KeyD": "lm",
+				"KeyF": "li",
+				"KeyG": "li",
+				"KeyH": "ri",
+				"KeyJ": "ri",
+				"KeyK": "rm",
+				"KeyL": "rr",
+				"Semicolon": "rp",
+				"Quote": "rp",
+				"ShiftLeft": "lp",
+				"KeyZ": "lp",
+				"KeyX": "lr",
+				"KeyC": "lm",
+				"KeyV": "li",
+				"KeyB": "li",
+				"KeyN": "ri",
+				"KeyM": "ri",
+				"Comma": "rm",
+				"Period": "rr",
+				"Slash": "rp",
+				"ShiftRight": "rp",
+				"Backquote": "lp",
+				"BracketLeft": "rp",
+				"BracketRight": "rp",
+				"Space": "lt",
+				"AltRight": "rt"
+			},
+			"home_keys": {
+				"lp": "KeyA",
+				"lr": "KeyS",
+				"lm": "KeyD",
+				"li": "KeyF",
+				"ri": "KeyJ",
+				"rm": "KeyK",
+				"rr": "KeyL",
+				"rp": "Semicolon",
+				"lt": "Space",
+				"rt": "AltRight"
+			}
+		},
+		"kinesis_advantage": {
+			"name": "Kinesis Advantage (kint36)",
+			"source": {
+				"keyboard": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/kinesis/kint36/keyboard.json",
+				"layout": "LAYOUT",
+				"keymap": "https://github.com/qmk/qmk_firmware/blob/master/keyboards/kinesis/keymaps/default/keymap.c",
+				"fetched": "2026-11-14",
+				"placed": ["AltRight (AltGr) on the nearest free right thumb key (KC_RCTL)"]
+			},
+			"keys": {
+				"Equal": {
+					"x": 0.625,
+					"y": 1.75,
+					"w": 1.25,
+					"row": 2
+				},
+				"Digit1": {
+					"x": 1.75,
+					"y": 1.75,
+					"w": 1,
+					"row": 1
+				},
+				"Digit2": {
+					"x": 2.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"Digit3": {
+					"x": 3.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"Digit4": {
+					"x": 4.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"Digit5": {
+					"x": 5.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 2
+				},
+				"Digit6": {
+					"x": 9.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 0
+				},
+				"Digit7": {
+					"x": 10.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit8": {
+					"x": 11.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 0
+				},
+				"Digit9": {
+					"x": 12.75,
+					"y": 1.5,
+					"w": 1,
+					"row": 1
+				},
+				"Digit0": {
+					"x": 13.75,
+					"y": 1.75,
+					"w": 1,
+					"row": 1
+				},
+				"Minus": {
+					"x": 14.875,
+					"y": 1.75,
+					"w": 1.25,
+					"row": 1
+				},
+				"KeyQ": {
+					"x": 1.75,
+					"y": 2.75,
+					"w": 1,
+					"row": 2
+				},
+				"KeyW": {
+					"x": 2.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyE": {
+					"x": 3.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyR": {
+					"x": 4.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyT": {
+					"x": 5.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyY": {
+					"x": 9.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 1
+				},
+				"KeyU": {
+					"x": 10.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyI": {
+					"x": 11.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 1
+				},
+				"KeyO": {
+					"x": 12.75,
+					"y": 2.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyP": {
+					"x": 13.75,
+					"y": 2.75,
+					"w": 1,
+					"row": 2
+				},
+				"Backslash": {
+					"x": 14.875,
+					"y": 2.75,
+					"w": 1.25,
+					"row": 2
+				},
+				"KeyA": {
+					"x": 1.75,
+					"y": 3.75,
+					"w": 1,
+					"row": 3
+				},
+				"KeyS": {
+					"x": 2.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyD": {
+					"x": 3.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyF": {
+					"x": 4.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyG": {
+					"x": 5.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 4
+				},
+				"KeyH": {
+					"x": 9.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyJ": {
+					"x": 10.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyK": {
+					"x": 11.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 2
+				},
+				"KeyL": {
+					"x": 12.75,
+					"y": 3.5,
+					"w": 1,
+					"row": 3
+				},
+				"Semicolon": {
+					"x": 13.75,
+					"y": 3.75,
+					"w": 1,
+					"row": 3
+				},
+				"Quote": {
+					"x": 14.875,
+					"y": 3.75,
+					"w": 1.25,
+					"row": 3
+				},
+				"ShiftLeft": {
+					"x": 0.625,
+					"y": 4.75,
+					"w": 1.25,
+					"row": 5
+				},
+				"KeyZ": {
+					"x": 1.75,
+					"y": 4.75,
+					"w": 1,
+					"row": 4
+				},
+				"KeyX": {
+					"x": 2.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"KeyC": {
+					"x": 3.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"KeyV": {
+					"x": 4.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"KeyB": {
+					"x": 5.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 5
+				},
+				"KeyN": {
+					"x": 9.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 3
+				},
+				"KeyM": {
+					"x": 10.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 4
+				},
+				"Comma": {
+					"x": 11.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 3
+				},
+				"Period": {
+					"x": 12.75,
+					"y": 4.5,
+					"w": 1,
+					"row": 4
+				},
+				"Slash": {
+					"x": 13.75,
+					"y": 4.75,
+					"w": 1,
+					"row": 4
+				},
+				"ShiftRight": {
+					"x": 14.875,
+					"y": 4.75,
+					"w": 1.25,
+					"row": 4
+				},
+				"Backquote": {
+					"x": 1.75,
+					"y": 5.75,
+					"w": 1,
+					"row": 5
+				},
+				"BracketLeft": {
+					"x": 12.75,
+					"y": 5.5,
+					"w": 1,
+					"row": 5
+				},
+				"BracketRight": {
+					"x": 13.75,
+					"y": 5.75,
+					"w": 1,
+					"row": 5
+				},
+				"AltRight": {
+					"x": 9.75,
+					"y": 6.5,
+					"w": 1,
+					"row": 5
+				},
+				"Space": {
+					"x": 10.75,
+					"y": 8.0,
+					"w": 1,
+					"row": 5
+				}
+			},
+			"fingers": {
+				"Equal": "lp",
+				"Digit1": "lp",
+				"Digit2": "lr",
+				"Digit3": "lm",
+				"Digit4": "li",
+				"Digit5": "li",
+				"Digit6": "ri",
+				"Digit7": "ri",
+				"Digit8": "rm",
+				"Digit9": "rr",
+				"Digit0": "rp",
+				"Minus": "rp",
+				"KeyQ": "lp",
+				"KeyW": "lr",
+				"KeyE": "lm",
+				"KeyR": "li",
+				"KeyT": "li",
+				"KeyY": "ri",
+				"KeyU": "ri",
+				"KeyI": "rm",
+				"KeyO": "rr",
+				"KeyP": "rp",
+				"Backslash": "rp",
+				"KeyA": "lp",
+				"KeyS": "lr",
+				"KeyD": "lm",
+				"KeyF": "li",
+				"KeyG": "li",
+				"KeyH": "ri",
+				"KeyJ": "ri",
+				"KeyK": "rm",
+				"KeyL": "rr",
+				"Semicolon": "rp",
+				"Quote": "rp",
+				"ShiftLeft": "lp",
+				"KeyZ": "lp",
+				"KeyX": "lr",
+				"KeyC": "lm",
+				"KeyV": "li",
+				"KeyB": "li",
+				"KeyN": "ri",
+				"KeyM": "ri",
+				"Comma": "rm",
+				"Period": "rr",
+				"Slash": "rp",
+				"ShiftRight": "rp",
+				"Backquote": "lp",
+				"BracketLeft": "rp",
+				"BracketRight": "rp",
+				"AltRight": "rt",
+				"Space": "rt"
+			},
+			"home_keys": {
+				"lp": "KeyA",
+				"lr": "KeyS",
+				"lm": "KeyD",
+				"li": "KeyF",
+				"ri": "KeyJ",
+				"rm": "KeyK",
+				"rr": "KeyL",
+				"rp": "Semicolon",
+				"lt": "Space",
+				"rt": "Space"
+			}
+		}
+	}
+}

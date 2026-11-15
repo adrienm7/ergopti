@@ -4,7 +4,7 @@
 ; MODULE: App Category Store Codec
 ; DESCRIPTION:
 ; Reads and writes the document macOS and Linux share through
-; _shared/lua/keystats/app_category_store.lua: { schema, version, apps } holding
+; _shared/metrics/engine/apps/category_store.lua: { schema, version, apps } holding
 ; one { type, score } record per application, or the flat map of records it upgrades.
 ; A flat string entry is refused (see KLAppCatFlatFormError), and a member the
 ; codec does not know is dropped at the next save, as the shared codec does.
@@ -19,9 +19,9 @@ _KL_AppCat_JsonSource(Content) {
 	return SubStr(Content, 1, 1) == Chr(0xFEFF) ? SubStr(Content, 2) : Content
 }
 
+; A finite score within its shared value schema declaration (metrics_apps.*.score).
 _KL_AppCat_ScoreValid(Score) {
-	return (Score is Integer || Score is Float)
-		&& Score >= KLAppCatConst.MIN_SCORE && Score <= KLAppCatConst.MAX_SCORE
+	return ValueCheckValue(ValueCheckEntryFor("metrics_apps.*.score"), Score)["ok"]
 }
 
 _KL_AppCat_LabelValid(Label) {

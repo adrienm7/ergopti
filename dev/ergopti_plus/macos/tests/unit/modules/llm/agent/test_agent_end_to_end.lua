@@ -21,7 +21,7 @@
 local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 
-local Agent = require("llm.agent")
+local Agent = require("ai.engine.agent.agent")
 
 local CONFIG = World.CONFIG
 local SELECTION = World.SELECTION
@@ -73,10 +73,10 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 	end)
 
 	helpers.it("shows a calendar title with literal placeholder braces before acceptance", function()
-		local previous = package.loaded["infra.i18n"]
-		package.loaded["infra.i18n"] = nil
-		local real_i18n = require("infra.i18n")
-		package.loaded["infra.i18n"] = previous
+		local previous = package.loaded["core.i18n.engine.i18n"]
+		package.loaded["core.i18n.engine.i18n"] = nil
+		local real_i18n = require("core.i18n.engine.i18n")
+		package.loaded["core.i18n.engine.i18n"] = previous
 		local world = build_world()
 		real_i18n.get = world.i18n.get
 		world.i18n.format = real_i18n.format
@@ -108,7 +108,7 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		helpers.assert_eq(world.posts[1].body.model, CONFIG.default_models["local"])
 		helpers.assert_eq(world.posts[1].body.options.num_predict, CONFIG.system2.max_tokens)
 		helpers.assert_eq(world.posts[1].body.messages[2].content, Agent.system2_user_text(CONFIG, SELECTION))
-		world.posts[1].callback({ status = 200, body = '{"message":{"content":' .. require("json").encode(TWO_ACTIONS) .. '}}' })
+		world.posts[1].callback({ status = 200, body = '{"message":{"content":' .. require("core.text.engine.json").encode(TWO_ACTIONS) .. '}}' })
 		helpers.assert_eq(#world.renders[#world.renders].texts, 2)
 
 		world.runner.set_system2("local|qwen3:14b")
@@ -250,7 +250,7 @@ helpers.describe("AI agent end to end (llm_agent_selection, llm_agent_command)",
 		trigger(world, "llm_agent_selection")
 		answer(world.posts[2], TWO_ACTIONS)
 		accept(world, 2)
-		world.runs[2].on_done(false, { reason = require("adapter_errors").CONNECTOR_AUTOMATION_REFUSED, permission = "Mail" })
+		world.runs[2].on_done(false, { reason = require("diagnostics.engine.adapter_errors").CONNECTOR_AUTOMATION_REFUSED, permission = "Mail" })
 		helpers.assert_eq(world.notices[#world.notices], world.i18n.format("llm.agent.permission_needed", "Mail"))
 		helpers.assert_eq(world.settings_opened, true, "System Settings opens at Automation")
 	end)

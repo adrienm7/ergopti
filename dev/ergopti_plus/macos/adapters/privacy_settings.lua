@@ -22,8 +22,8 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local Json = require("json")
+local Logger = require("core.logger.engine.logger")
+local Json = require("core.text.engine.json")
 
 local LOG = "adapters.privacy_settings"
 

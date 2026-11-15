@@ -10,8 +10,8 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("logger.shim")
-local i18n = require("infra.i18n")
+local Logger = require("core.logger.engine.shim")
+local i18n = require("core.i18n.engine.i18n")
 local LOG = "modules.keep_awake"
 local READY = "ERGOPTI_INHIBITED\n"
 local POLL_SECONDS = 1
@@ -45,12 +45,17 @@ end
 --- @return table owner
 function M.new(ports)
 	ports = ports or {}
-	local start = ports.start or require("adapters.owned_process").start
-	local scheduler = ports.scheduler or require("adapters.timer_scheduler")
+	local start = ports.start or require("core.process.adapters.owned_process").start
+	local scheduler = ports.scheduler or require("core.events.timer_scheduler")
 	local pipe = ports.pipe or hold_pipe
-	local has_command = ports.has_command or require("adapters.shell_runner").has_command
+	local has_command = ports.has_command or require("core.process.adapters.shell_runner").has_command
 	local notify = ports.notify or function(key)
-		require("adapters.application_notifier").send(i18n.get(key))
+		require("platform.focus.application_notifier").send(i18n.get(key))
+	end
+	local now_ms = ports.now_ms or require("core.logger.engine.monotonic").now_ms
+	-- A finished session is the day's awake_ms, as on Windows and macOS (KMD-3).
+	local record_session = ports.record_session or function(duration_ms)
+		return require("modules.keystats.system_metrics").record_awake_session(duration_ms)
 	end
 	local current
 	local owner = {}
@@ -60,7 +65,13 @@ function M.new(ports)
 		if session.timer and scheduler.cancel(session.timer) ~= true then return false end
 		current = nil
 		Logger.info(LOG, "Session idle inhibitor released.")
-		if session.active then notify("shortcuts.keep_awake_off") end
+		if session.active then
+			notify("shortcuts.keep_awake_off")
+			local recorded, credited = pcall(record_session, math.max(0, now_ms() - session.active_since_ms))
+			if not recorded or credited ~= true then
+				Logger.warn(LOG, "The keep-awake session was not credited to the metrics: %s.", tostring(credited))
+			end
+		end
 		local ready = listeners
 		listeners = {}
 		for _, fn in ipairs(ready) do fn() end
@@ -116,7 +127,7 @@ function M.new(ports)
 				if current ~= session or session.stopping or kind ~= "stdout" or session.active then return end
 				session.output = (session.output .. chunk):sub(1, #READY)
 				if session.output == READY then
-					session.active = true
+					session.active, session.active_since_ms = true, now_ms()
 					Logger.info(LOG, "Session idle inhibitor acquired.")
 					notify("shortcuts.keep_awake_inhibitor_on")
 				end
@@ -155,6 +166,36 @@ function M.new(ports)
 		end
 		return true
 	end
+
+	-- Whether the inhibitor ran when the driver paused, and the pause it
+	-- belongs to: the resume gives it back (the maintainer's decision of
+	-- 2026-11-14, as on Windows and macOS).
+	local resume_after_pause, pause_generation, paused_now = false, 0, false
+
+	--- Follows the driver's pause: a pause stops the inhibitor and remembers
+	--- whether it ran, the resume starts it again once the old one settled.
+	--- @param paused boolean The driver's settled pause state.
+	--- @return boolean settled
+	function owner.set_paused(paused)
+		if type(paused) ~= "boolean" then
+			error("keep_awake.set_paused() needs a boolean pause state", 2)
+		end
+		pause_generation = pause_generation + 1
+		paused_now = paused
+		if paused then
+			resume_after_pause = resume_after_pause or owner.is_active()
+			return owner.stop()
+		end
+		if not resume_after_pause then return true end
+		resume_after_pause = false
+		local generation = pause_generation
+		return owner.when_settled(function()
+			if pause_generation ~= generation or paused_now or current then return end
+			if owner.toggle() ~= true then
+				Logger.error(LOG, "Keep-awake could not start again on resume.")
+			end
+		end)
+	end
 	return owner
 end
 
@@ -168,6 +209,16 @@ end
 --- Releases the daemon's inhibitor before its event loop stops.
 --- @return boolean settled
 function M.stop() return not _owner or _owner.stop() end
+
+--- Follows the driver's pause: the daemon's inhibitor stops with it and comes
+--- back on resume when it ran at the pause.
+--- @param paused boolean The driver's settled pause state.
+--- @return boolean settled
+function M.set_paused(paused)
+	if type(paused) ~= "boolean" then error("keep_awake.set_paused() needs a boolean pause state", 2) end
+	if not _owner then return true end
+	return _owner.set_paused(paused)
+end
 
 --- Waits for the inhibitor's native cleanup receipt.
 --- @param fn function Settlement callback.

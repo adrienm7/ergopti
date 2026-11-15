@@ -38,13 +38,13 @@ local function fresh_harness(options)
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
 	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	-- TaskLifecycle captures `hs` at require time; reload it so any task the
 	-- watcher could construct reaches the spy below instead of a stale stub.
-	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["core.process.adapters.task_lifecycle"] = nil
 
 	local h = {
 		clock = 1000,
@@ -80,9 +80,9 @@ local function fresh_harness(options)
 		end
 		return table.unpack(results, 1, results.n)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now_ns = function() return h.clock * 1000000000 end,
 		after = function(delay, callback)
 			local handle = { delay = delay, callback = callback, fired = false, cancelled = false }
@@ -98,7 +98,7 @@ local function fresh_harness(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
 	}
 	package.loaded["platform.remap.ke_variables"] = {

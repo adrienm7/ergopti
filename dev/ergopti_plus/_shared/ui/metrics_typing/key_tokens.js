@@ -5,7 +5,7 @@
  * MODULE: N-gram Key Tokens
  * DESCRIPTION:
  * Reads a stored n-gram key back into its tokens, the dashboard's half of
- * _shared/lua/keystats/token_encoding.lua. A key is a run of markers of the
+ * _shared/metrics/engine/privacy/token_encoding.lua. A key is a run of markers of the
  * closed list, the escape "[[" for a typed "[", and single characters, so every
  * page that needs to count, split or show a key goes through here rather than
  * guessing from brackets. token_encoding_vectors.json pins it with the walkers.

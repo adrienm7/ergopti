@@ -2,7 +2,7 @@
 
 local helpers = require("tests.helpers")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_writer", "ui.menu.builder", "ui.action_picker.bridge" }
-local INITIAL = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
+local INITIAL = '[tap_hold]\ninherit_defaults = false\n[tap_hold.keys.caps_lock]\ntap_action = "enter"\ntime_activation_seconds = 0.2\n'
 local function read(path)
 	local f = io.open(path, "rb"); if not f then return nil end
 	local text = f:read("*a"); assert(f:close()); return text
@@ -17,16 +17,21 @@ local function with_editor(body, options)
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local path, defaults = os.tmpname(), os.tmpname(); os.remove(path)
-	write(defaults, assert(read(require("infra.paths").shared("tap_hold/defaults.toml"))))
-	if not options.absent then write(path, options.file_off and INITIAL:gsub("enabled = true", "enabled = false") or INITIAL) end
-	local Prompt = require("ui.text_prompt")
+	write(defaults, assert(read(require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml"))))
+	-- The switch is a config.toml row beside the file.
+	local config_path = path .. ".config.toml"
+	if not options.absent then
+		write(path, INITIAL)
+		write(config_path, "[tap_holds]\nenabled = " .. tostring(not options.file_off) .. "\n")
+	end
+	local Prompt = require("core.ui.ui.text_prompt")
 	local ask, execute, open = Prompt.ask, os.execute, io.open
-	local FileWriter = require("infra.regular_file_writer")
+	local FileWriter = require("core.fs.engine.regular_file_writer")
 	local writer_open = FileWriter.open
 	local manager
 	local ok, err = xpcall(function()
 		manager = require(MODULES[1])
-		assert(manager.init({ defaults_path = defaults, user_path = path,
+		assert(manager.init({ defaults_path = defaults, user_path = path, config_path = config_path,
 			keyboard_hook = { set_remapper = function() return true end, key_text = function() return nil end,
 				held_modifiers = function() return {} end, held_text_modifier_codes = function() return {} end,
 				held_shortcut_modifier_codes = function() return {} end },
@@ -35,7 +40,7 @@ local function with_editor(body, options)
 		local writer = require(MODULES[2])
 		local s = { manager = manager, writer = writer, path = path, defaults = defaults, notices = 0, paused = false }
 		s.bind = function(reload)
-			writer.init({ path = path, reload = reload or function() if s.reload_refused then return false end; return manager.reload() end, is_tap_action = manager.is_tap_action, canonical_hold = manager.canonical_hold })
+			writer.init({ path = path, config_path = config_path, reload = reload or function() if s.reload_refused then return false end; return manager.reload() end, is_tap_action = manager.is_tap_action, canonical_hold = manager.canonical_hold })
 		end
 		s.bind()
 		package.loaded[MODULES[4]] = { open = function(opts, confirm)
@@ -46,7 +51,7 @@ local function with_editor(body, options)
 			if command:find("dialog_host.lua' --error", 1, true) then s.notices = s.notices + 1; return 1 end
 			return execute(command)
 		end
-		local I18n = require("infra.i18n"); I18n.init()
+		local I18n = require("core.i18n.engine.i18n"); I18n.init()
 		s.context = { tap_holds = manager, is_paused = function() return s.paused end, on_menu_changed = function() end }
 		local rows = require(MODULES[3]).build(s.context)
 		local label
@@ -104,7 +109,7 @@ local function with_editor(body, options)
 	FileWriter.open = writer_open
 	if manager then manager._reset_for_test() end
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	for _, filename in ipairs({ path, defaults, path .. ".tmp" }) do os.remove(filename) end
+	for _, filename in ipairs({ path, defaults, path .. ".tmp", config_path }) do os.remove(filename) end
 	if not ok then error(err, 0) end
 end
 
@@ -163,19 +168,22 @@ helpers.describe("TapHold deferred configuration owner", function()
 			end)
 		end)
 	end
+	-- A pause stops typing, not configuration (EDD-1): an editor opened while
+	-- paused saves, the engine stays out of the hook, and resume installs it.
 	for _, route in ipairs({ "tap", "delay" }) do
-		helpers.it("rechecks " .. route .. " after a reentrant pause getter", function()
+		helpers.it("commits " .. route .. " while paused and installs it on resume (edd1-paused-writes)", function()
 			with_editor(function(s)
-				local armed = false
-				s.context.is_paused = function()
-					if armed then armed = false; s.pause(true); s.pause(false) end
-					return false
-				end
-				local before = read(s.path)
+				s.pause(true)
 				local accepted
-				if route == "tap" then s.tap(); armed = true; accepted = s.confirm("backspace")
-				else s.prompt(function() armed = true end); accepted = s.delay() end
-				helpers.assert_eq(accepted, false); helpers.assert_eq(read(s.path), before)
+				if route == "tap" then s.tap(); accepted = s.confirm("backspace")
+				else s.prompt(function() end); accepted = s.delay() end
+				helpers.assert_eq(accepted, true); helpers.assert_eq(s.notices, 0)
+				local fields = s.manager.keys().caps_lock
+				helpers.assert_eq(route == "tap" and fields.tap_action or fields.time_activation_seconds,
+					route == "tap" and "backspace" or 0.45)
+				helpers.assert_eq(s.manager.is_active(), false, "a paused script remaps nothing")
+				s.pause(false)
+				helpers.assert_eq(s.manager.is_active(), true, "resume installs the edited engine")
 			end)
 		end)
 	end

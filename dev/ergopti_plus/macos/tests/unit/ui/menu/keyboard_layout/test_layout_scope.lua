@@ -2,11 +2,11 @@
 
 local helpers = require("tests.helpers")
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
-local Codec = require("toml_codec")
-local FileSystem = require("adapters.file_system")
+local Codec = require("core.text.engine.toml_codec")
+local FileSystem = require("core.fs.adapters.file_system")
 
 local function fixture(number_row_source, complete_source)
-	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["core.fs.adapters.file_system"] = FileSystem
 	local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 	local state = { layout_pause_switch_enabled = true, layout_on_pause = "French", layout_on_resume = "Ergopti+" }
 	local original = '[layout]\npause_switch_enabled = true\non_pause = "French"\non_resume = "Ergopti+"\nfuture = { preserve = 7 }\n[llm]\nenabled = true\n[metrics]\nenabled = true\n'
@@ -26,7 +26,7 @@ local function fixture(number_row_source, complete_source)
 			return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = adapter
+	package.loaded["core.fs.adapters.file_system"] = adapter
 	local prefs = helpers.load_with_stubs("infra.preferences")
 	prefs.load("config")
 	local PT = require("ui.menu.preferences_transaction")
@@ -158,13 +158,13 @@ helpers.describe("macOS keyboard-layout scope", function()
 	end)
 end)
 
-package.loaded["adapters.file_system"] = FileSystem
+package.loaded["core.fs.adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
 helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 	helpers.it("dispatches the common commands through the exact scope owner", function()
 		local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-		local renderer = LayoutFixture.install(require("infra.i18n"))
+		local renderer = LayoutFixture.install(require("core.i18n.engine.i18n"))
 		local original, captured = renderer.build
 		renderer.build = function(...)
 			captured = select(5, ...)
@@ -181,8 +181,10 @@ helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 			helpers.assert_eq(mode, "clear")
 			helpers.assert_eq(captured.commands.scope_restore(), true)
 			helpers.assert_eq(mode, "recommended")
-			ctx.paused = true
-			helpers.assert_eq(captured.commands.scope_clear(), false)
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+			ctx.paused, mode = true, nil
+			helpers.assert_eq(captured.commands.scope_clear(), true)
+			helpers.assert_eq(mode, "clear", "a paused session still clears")
 			ctx.paused, ctx.apply_preference_scope = false, nil
 			helpers.assert_eq(captured.commands.scope_restore(), false)
 		end, debug.traceback)

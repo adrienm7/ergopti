@@ -27,7 +27,7 @@
 
 ; Returns a hex color string with each RGB channel × the canon's
 ; unit_strip_darken_factor, rounded half up — the rounding the shared Lua model
-; (_shared/lua/wpm_widget/model.lua darken_hex) uses on macOS and Linux.
+; (_shared/metrics/engine/wpm_widget_model.lua darken_hex) uses on macOS and Linux.
 ; Input and output are 6-character hex strings without leading '#'.
 _WPMWidget_DarkenHex(hex) {
 		f := WPMWidgetConst.UNIT_DARKEN

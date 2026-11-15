@@ -6,12 +6,12 @@ local helpers = require("tests.helpers")
 local DF_OUTPUT = "Filesystem 512-blocks Used Available Capacity Mounted\n/dev/disk3s1 976 300 100 75% /\n"
 
 local MODULES = {
-	"adapters.shell_runner",
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.paths", "infra.timings",
+	"core.process.adapters.shell_runner",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.models_manager_mlx",
@@ -68,7 +68,7 @@ local function with_fixture(callback)
 		-- backend stubs. load_with_stubs intentionally clears every ui.menu module;
 		-- using it on the router itself would erase those stubs and silently compose
 		-- this focused test with the real Ollama maintenance prewarm.
-		helpers.load_with_stubs("adapters.timer_scheduler", {
+		helpers.load_with_stubs("core.events.timer_scheduler", {
 			timer = timer_stub,
 			-- The system probes are asynchronous tasks now; a blocking hs.execute
 			-- would hold the main thread (issue #101) and is recorded as a failure.
@@ -101,8 +101,8 @@ local function with_fixture(callback)
 			end,
 		})
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.process.adapters.shell_runner"] = {
 			run = function(executable, args, on_done)
 				local run = { executable = executable, args = args, on_done = on_done, terminated = 0 }
 				run.handle = { terminate = function()
@@ -113,7 +113,7 @@ local function with_fixture(callback)
 				return true, run.handle
 			end,
 		}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function()
 				fixture.dialogs = fixture.dialogs + 1
 				fixture.child_present_during_dialog =
@@ -124,7 +124,7 @@ local function with_fixture(callback)
 				return "menu.llm.btn_download"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if fixture.i18n_throw_key == key then
 				error("system-check i18n continuation failure")
 			end
@@ -135,9 +135,9 @@ local function with_fixture(callback)
 			return key
 		end }
 		helpers.provide_timings()
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared_llm_path = function(name)
-				return helpers.shared("modules/llm/" .. tostring(name))
+				return helpers.shared("ai/data/" .. tostring(name))
 			end,
 		}
 		package.loaded["modules.llm"] = { get_backend = function() return "mlx" end }

@@ -4,7 +4,7 @@
 --- MODULE: Update Asset Signature Verification (Linux)
 --- DESCRIPTION:
 --- Verifies the detached signature of the Linux update bundle against the key in
---- _shared/modules/updater/asset_signing.json, with OpenSSL's ECDSA P-256
+--- _shared/updater/data/asset_signing.json, with OpenSSL's ECDSA P-256
 --- verification. The signed record binds the asset name, its size and its SHA-256
 --- (the digest the updater already computes over the exact bytes it installs), so
 --- this module never re-reads the archive. tools/build/update-asset-signature.cjs
@@ -24,7 +24,7 @@
 
 local M = {}
 
-local Base64 = require("compat.base64")
+local Base64 = require("core.lifecycle.engine.compat.base64")
 
 --- Closed reasons a verification can be refused for.
 M.REFUSALS = {
@@ -94,7 +94,7 @@ end
 --- The OpenSSL binding, or nil with a reason.
 --- @return table|nil binding
 local function native()
-	local Native = require("infra.openssl_library")
+	local Native = require("core.network.engine.openssl_library")
 	local ffi, library = Native.ffi, Native.library
 	if not ffi then return nil end
 	-- Through the library owner: the digest module declares the same EVP

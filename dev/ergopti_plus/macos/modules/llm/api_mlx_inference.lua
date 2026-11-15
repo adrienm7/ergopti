@@ -22,19 +22,19 @@
 
 local M = {}
 
-local Logger         = require("infra.logger")
-local Ports          = require("llm.request_plan.ports")
-local text_utils = require("infra.text_utils")
+local Logger         = require("core.logger.engine.logger")
+local Ports          = require("ai.engine.request_plan.ports")
+local text_utils = require("core.text.engine.utils")
 local Parser         = require("modules.llm.parser")
 local ApiCommon      = require("modules.llm.api_common")
-local SharedPromptBuilder = require("llm.prompt_builder")   -- single source for DEFAULT_MAX_TOKENS
-local Rewrite        = require("llm.rewrite")
-local JsonCodec      = require("adapters.json_codec")
-local LosslessJson   = require("json")
-local FileSystem     = require("adapters.file_system")
-local TimerScheduler = require("adapters.timer_scheduler")
-local ShellRunner    = require("adapters.shell_runner")
-local Timings        = require("infra.timings")
+local SharedPromptBuilder = require("ai.engine.prediction.prompt_builder_core")   -- single source for DEFAULT_MAX_TOKENS
+local Rewrite        = require("ai.engine.prediction.rewrite")
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local LosslessJson   = require("core.text.engine.json")
+local FileSystem     = require("core.fs.adapters.file_system")
+local TimerScheduler = require("core.events.timer_scheduler")
+local ShellRunner    = require("core.process.adapters.shell_runner")
+local Timings        = require("core.timing.engine.timings")
 local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
@@ -44,7 +44,7 @@ if not ok_kl then keystats = nil end
 
 -- Dedicated client for non-streaming inference POSTs; isolated so it never shares
 -- state with the warmup/probe/check clients that live in api_mlx.lua.
-local _infer_client  = require("adapters.http_client").new()
+local _infer_client  = require("core.network.adapters.http_client").new()
 
 local _req_counter = 0
 -- Read from the shared inference.json through ApiCommon, exactly as api_ollama and

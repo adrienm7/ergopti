@@ -24,12 +24,12 @@
 
 local M = {}
 
-local Logger    = require("infra.logger")
+local Logger    = require("core.logger.engine.logger")
 local llm_mod   = require("modules.llm")
-local Chord     = require("chord")
-local Hotkeys   = require("adapters.hotkey_registrar")
+local Chord     = require("keyboard.engine.chord")
+local Hotkeys   = require("platform.input.hotkey_registrar")
 local shortcut_ui = require("ui.menu.shortcut_utils")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu_llm.trigger_orchestrator"
 local VALID_MODIFIERS = {cmd = true, alt = true, ctrl = true, shift = true, option = true, control = true}
@@ -44,7 +44,7 @@ local function valid_modifiers(mods)
 	for index, value in pairs(mods) do
 		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > length
 			or type(value) ~= "string" then return false end
-		local modifier = require("infra.text_utils").trim(value):lower()
+		local modifier = require("core.text.engine.utils").trim(value):lower()
 		if not VALID_MODIFIERS[modifier] then return false end
 		count = count + 1
 	end

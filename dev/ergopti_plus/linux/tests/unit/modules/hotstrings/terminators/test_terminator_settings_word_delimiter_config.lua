@@ -152,7 +152,7 @@ helpers.describe("word-delimiter settings: config.toml leaves", function()
 
 	helpers.it("refuses to publish over a file an external editor changed", function()
 		with_settings(SOURCE, function(Settings, path, sandbox, Terminators)
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local original = Writer.batch_write
 			Writer.batch_write = function(target, rows, files, expected)
 				sandbox.write_bytes(target, SOURCE .. "external = 1\n")
@@ -243,7 +243,7 @@ helpers.describe("word-delimiter settings: duplicate-record ownership", function
 				helpers.assert_eq(Settings.snapshot().custom, {
 					{ key = "custom_¤", char = "¤", label = "first", consume = true },
 				}, "an unusable neighbor never becomes the runtime owner")
-				local reports = require("config_outdated").collect_reports(function()
+				local reports = require("settings.engine.migration.outdated").collect_reports(function()
 					Settings.mark_config_reads(Codec.decode(source), function() end)
 				end)
 				helpers.assert_true(reports["hotstrings.terminators." .. vector.rejected] ~= nil)
@@ -277,7 +277,7 @@ helpers.describe("word-delimiter settings: duplicate-record ownership", function
 
 		helpers.it("removes only its admitted occurrence after writer retry: " .. vector.name, function()
 			with_settings(source, function(Settings, path, sandbox, Terminators)
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local original, writes = Writer.batch_write, 0
 				local called, failure = pcall(function()
 					helpers.assert_true(Settings.load())
@@ -312,7 +312,7 @@ helpers.describe("word-delimiter settings: duplicate-record ownership", function
 		helpers.it("retains the pending Add across lease and real writer refusal: " .. vector.name, function()
 			with_settings(source, function(Settings, path, sandbox, Terminators)
 				local Preferences = require("infra.hotstring_preferences")
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local original, owner, observations = Writer.batch_write, {}, {}
 				local called, failure = pcall(function()
 					helpers.assert_true(Settings.load())
@@ -370,7 +370,7 @@ helpers.describe("word-delimiter settings: pending records must survive the real
 	}) do
 		helpers.it("refuses a hidden Add after Delete without reload: " .. vector.name, function()
 			with_settings(source, function(Settings, path, sandbox, Terminators)
-				local Writer = require("toml_codec.writer")
+				local Writer = require("core.text.engine.toml_codec.writer")
 				local original, observations, change_source = Writer.batch_write, {}, false
 				local wanted = { key = vector.key, char = vector.char, label = "replacement", consume = true }
 				local called, failure = pcall(function()
@@ -449,7 +449,7 @@ helpers.describe("word-delimiter settings: pending records must survive the real
 			.. 'metadata = { note = "unowned" } }, { key = "custom_¤", char = "¤", label = "first", consume = true }]\n'
 			.. '# preserve the external character owner\n'
 		with_settings(initial, function(Settings, path, sandbox, Terminators)
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local original, writes = Writer.batch_write, 0
 			local called, failure = pcall(function()
 				helpers.assert_true(Settings.load())
@@ -548,7 +548,7 @@ helpers.describe("word-delimiter settings: a [[hotstrings.terminators]] list", f
 		local stored = '[hotstrings]\nunknown = "kept"\n\n[[hotstrings.terminators]]\n'
 			.. 'key = "custom_¤"\nchar = "¤"\nlabel = "¤"\nconsume = true\n'
 		with_settings(stored, function(Settings, path, sandbox, Terminators)
-			local Logger = require("logger.shim")
+			local Logger = require("core.logger.engine.shim")
 			local warn, fail, warnings, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 			Logger.error = function(_, fmt, ...) errors[#errors + 1] = string.format(fmt, ...) end
@@ -608,9 +608,9 @@ helpers.describe("word-delimiter settings: scope adoption and outdated entries",
 					{ key = "space", char = "¤", label = "¤", consume = false },
 				},
 			} }
-			require("config_outdated").reset_for_tests()
+			require("settings.engine.migration.outdated").reset_for_tests()
 			local marked = {}
-			local outdated = require("config_outdated").collect_reports(function()
+			local outdated = require("settings.engine.migration.outdated").collect_reports(function()
 				Settings.mark_config_reads(document, function(...) marked[table.concat({ ... }, ".")] = true end)
 			end)
 			helpers.assert_true(marked["hotstrings.terminator_states.slash"])
@@ -677,7 +677,7 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 				helpers.assert_true(Settings.persist())
 				local controls, _, observed = menu_controls(Settings, false, false)
 				for index, row in ipairs(expected.rows) do
-					helpers.assert_eq(controls[index].title, require("infra.i18n").get(row.i18n))
+					helpers.assert_eq(controls[index].title, require("core.i18n.engine.i18n").get(row.i18n))
 					helpers.assert_type(controls[index].fn, "function")
 				end
 				helpers.assert_eq(controls[4].title, "-")
@@ -709,7 +709,7 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 			local labels = {}
 			for _, row in ipairs(expected.rows) do labels[row.id] = row.i18n end
 			for position, id in ipairs(expected.reordered_ids) do
-				helpers.assert_eq(controls[position].title, require("infra.i18n").get(labels[id]))
+				helpers.assert_eq(controls[position].title, require("core.i18n.engine.i18n").get(labels[id]))
 			end
 			local owner = {}
 			local preferences = require("infra.hotstring_preferences")
@@ -727,24 +727,19 @@ helpers.describe("word-expander native menu controls use shared declarations", f
 		end)
 	end)
 
-	helpers.it("retains the paused menu posture and refuses stale callbacks before mutation (shared-word-expander-controls)", function()
-		with_settings(stored, function(Settings, path, sandbox, Terminators)
+	helpers.it("keeps the word expander rows live and commits while paused (shared-word-expander-controls)", function()
+		with_settings(stored, function(Settings, _, _, Terminators)
 			helpers.assert_true(Settings.load())
 			local controls, ctx, observed = menu_controls(Settings, false, false)
+			-- A pause stops typing, not configuration (EDD-1): the change applies on resume.
 			ctx.paused = true
-			local receipts = {}
-			for position = 1, 3 do receipts[position] = controls[position].fn() end
-			helpers.assert_eq(observed.writes, 0, "paused callbacks cannot reach the writer")
-			helpers.assert_eq(observed.redraws, 0)
-			helpers.assert_eq(Terminators.is_terminator_enabled("space"), false)
-			helpers.assert_eq(Terminators.is_terminator_enabled("slash"), true)
-			helpers.assert_eq(sandbox.read_bytes(path), stored)
-			for position = 1, 3 do helpers.assert_eq(receipts[position], false) end
-			local grey, _, grey_observed = menu_controls(Settings, true, false)
-			helpers.assert_eq(grey_observed.hotstrings_disabled, true)
-			helpers.assert_nil(grey_observed.hotstrings_submenu, "paused native roots strip every feature action")
-			for position = 1, 3 do helpers.assert_eq(grey[position].disabled, true) end
-			helpers.assert_eq(grey_observed.writes, 0)
+			helpers.assert_eq(controls[1].fn(), true)
+			helpers.assert_eq(observed.writes, 1)
+			helpers.assert_true(Terminators.is_terminator_enabled("space") ~= false
+				or Terminators.is_terminator_enabled("slash") ~= true, "the paused click changed a delimiter")
+			local live, _, live_observed = menu_controls(Settings, true, false)
+			helpers.assert_true(live_observed.hotstrings_disabled ~= true, "a paused tray keeps the Hotstrings row")
+			for position = 1, 3 do helpers.assert_true(live[position].disabled ~= true) end
 		end)
 	end)
 end)

@@ -151,13 +151,16 @@ helpers.describe("macOS global scope", function()
 		helpers.assert_true(tostring(err):find("asks no question", 1, true) ~= nil, tostring(err))
 	end)
 
-	helpers.it("does nothing while paused, and skips an unavailable owner", function()
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("composes while paused (edd1-paused-writes)", function()
 		local trace = {}
-		for _, mode in ipairs({ "clear", "recommended" }) do
-			local paused = build(trace, { paused = true })
-			helpers.assert_eq(paused.apply(mode), false)
-		end
-		helpers.assert_eq(trace, {})
+		local paused = build(trace, { paused = true })
+		helpers.assert_eq(paused.apply("clear"), true)
+		helpers.assert_true(#trace > 0, "a paused session still composes every category")
+	end)
+
+	helpers.it("skips an unavailable owner", function()
+		local trace = {}
 		local partial, partial_observed = build(trace, { missing = "llm", remap = remap_double(trace, false) })
 		helpers.assert_eq(partial.apply("clear"), true)
 		local report = partial_observed.refreshes[1][2]

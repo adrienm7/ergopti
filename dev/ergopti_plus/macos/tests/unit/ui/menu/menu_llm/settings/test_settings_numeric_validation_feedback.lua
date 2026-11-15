@@ -10,11 +10,11 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.storage",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"core.fs.adapters.storage",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.settings_manager",
@@ -54,19 +54,19 @@ local function with_fixture(raw, callback)
 			return true
 		end,
 	}
-	package.loaded["adapters.storage"] = {
+	package.loaded["core.fs.adapters.storage"] = {
 		delete_exact = function() return true end,
 		get = function() return nil end,
 		read_exact = function() return true, nil end,
 		set = function() return true end,
 	}
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() return "button.ok", raw end,
 	}
-	package.loaded["infra.i18n"] = {
+	package.loaded["core.i18n.engine.i18n"] = {
 		get = function(key) return key end,
 	}
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		callback = function(_, _, fn, ...)
 			local results = table.pack(xpcall(fn, debug.traceback, ...))
 			return table.unpack(results, 1, results.n)
@@ -76,7 +76,7 @@ local function with_fixture(raw, callback)
 		info = function() end,
 		warn = function() end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			observations.notifications[#observations.notifications + 1] = {
 				title = title,
@@ -113,26 +113,29 @@ local function with_fixture(raw, callback)
 	if not ok then error(err, 0) end
 end
 
+-- A value its shared value schema declaration refuses is named with the
+-- declared range; the suite's i18n answers keys, so the body is the range
+-- sentence's key (and the special value's for the debounce).
 local INVALID_ROUTES = {
 	{
 		name = "context above retention limit",
 		raw = "4001",
 		title = "menu.settings.context_length_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_context_length() end,
 	},
 	{
 		name = "temperature above the maximum",
 		raw = "2",
 		title = "menu.settings.temperature_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_decimal",
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
 		name = "temperature below the minimum",
 		raw = "-0.1",
 		title = "menu.settings.temperature_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_decimal",
 		invoke = function(manager) return manager.set_temperature() end,
 	},
 	{
@@ -163,14 +166,14 @@ local INVALID_ROUTES = {
 		name = "debounce overflow",
 		raw = "1e999",
 		title = "menu.settings.delay_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
 		name = "unsupported negative debounce",
 		raw = "-2",
 		title = "menu.settings.delay_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit dialog.value_check.special",
 		invoke = function(manager) return manager.set_debounce() end,
 	},
 	{
@@ -183,14 +186,14 @@ local INVALID_ROUTES = {
 		name = "request interval overflow",
 		raw = "1e999",
 		title = "menu.settings.min_interval_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_request_interval() end,
 	},
 	{
 		name = "negative request interval (only the debounce has a never)",
 		raw = "-1",
 		title = "menu.settings.min_interval_title",
-		body = "numeric_prompt.out_of_range",
+		body = "dialog.value_check.range_integer_unit",
 		invoke = function(manager) return manager.set_min_request_interval() end,
 	},
 	{

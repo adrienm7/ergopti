@@ -10,7 +10,7 @@
 
 local M = {}
 local helpers = require("tests.helpers")
-local Timings = require("infra.timings")
+local Timings = require("core.timing.engine.timings")
 local uv = require("luv")
 
 local MODULES = { "modules.keystats.keystats", "modules.keystats.metrics_collector", "modules.keystats.sqlite_writer",
@@ -86,7 +86,7 @@ end
 function M.with(body)
 	local previous = {}
 	for _, name in ipairs(MODULES) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-	local previous_storage = package.loaded["adapters.storage"]
+	local previous_storage = package.loaded["core.fs.adapters.storage"]
 	local collector
 	local ok, err = xpcall(function()
 		collector = require("modules.keystats.keystats")
@@ -103,7 +103,7 @@ function M.with(body)
 		end
 	end)
 	for _, name in ipairs(MODULES) do package.loaded[name] = previous[name] end
-	package.loaded["adapters.storage"] = previous_storage
+	package.loaded["core.fs.adapters.storage"] = previous_storage
 	if not ok then error(err, 0) end
 	if not cleanup_ok then error(cleanup_err, 0) end
 end

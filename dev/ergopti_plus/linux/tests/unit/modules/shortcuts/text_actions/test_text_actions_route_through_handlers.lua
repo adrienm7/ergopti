@@ -26,7 +26,7 @@ local helpers = require("tests.helpers")
 local function routed_gestures()
 	local names = {
 		clipboard = "adapters.clipboard",
-		event_loop = "adapters.event_loop",
+		event_loop = "core.events.loop",
 		combo = "modules.gestures.combo_emitter",
 		injector = "modules.hotstrings.injector",
 		keystats = "modules.keystats.keystats",

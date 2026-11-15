@@ -11,7 +11,7 @@ Windows port of the shortcuts subsystem. Registers global hotkeys for AltGr comb
 | `KeyboardHook` | Registering all `#HotIf`-gated hotkeys                                            |
 | `WindowInfo`   | Context guards (`WinActive`, window class checks) used by several shortcut groups |
 
-## Domain module (`_shared/core/domain/`)
+## Domain module (`_shared/core/text/data/domain/`)
 
 No domain spec directly consumed. The module reads its enabled state from the shared `Features` map populated at startup.
 

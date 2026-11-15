@@ -45,10 +45,10 @@ local helpers, Sandbox, Codec, load_over_config, drop_config, chord =
 --- @param body function
 --- @return any The body's result.
 local function with_marked_translations(body)
-	local saved = package.loaded["infra.i18n"]
-	package.loaded["infra.i18n"] = { get = function(key) return "<" .. key .. ">" end }
+	local saved = package.loaded["core.i18n.engine.i18n"]
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return "<" .. key .. ">" end }
 	local ok, result = pcall(body)
-	package.loaded["infra.i18n"] = saved
+	package.loaded["core.i18n.engine.i18n"] = saved
 	if not ok then error(result, 0) end
 	return result
 end
@@ -123,7 +123,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 
 	helpers.it("keyboard-config-owner: refuses a sibling change racing the file write", function()
 		local shortcuts, config = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-		local Writer = require("toml_codec.writer")
+		local Writer = require("core.text.engine.toml_codec.writer")
 		local original = Writer.batch_write
 		local external = '[shortcuts.keyboard]\nprimary_j = "enter"\n'
 		local ok, err = pcall(function()
@@ -214,9 +214,9 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 		local logger = helpers.make_logger_stub()
 		logger.warn = function(_, fmt, ...) warnings[#warnings + 1] = string.format(fmt, ...) end
 		-- The outdated-entry rule warns once per process; start from a fresh one.
-		require("config_outdated").reset_for_tests()
-		local saved_logger = package.loaded["logger.shim"]
-		package.loaded["logger.shim"] = logger
+		require("settings.engine.migration.outdated").reset_for_tests()
+		local saved_logger = package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = pcall(function()
 			local shortcuts = load_over_config({
 				["shortcuts.keyboard.primary_j"] = "select_line",
@@ -227,7 +227,7 @@ helpers.describe("keyboard shortcuts: what is stored", function()
 				"an id the catalogue does not offer must not be bound")
 			helpers.assert_eq(#shortcuts.assigned_slots("primary_"), 1, "only the valid slot is bound")
 		end)
-		package.loaded["logger.shim"] = saved_logger
+		package.loaded["core.logger.engine.shim"] = saved_logger
 		drop_config()
 		if not ok then error(err, 0) end
 		local named = false
@@ -595,7 +595,7 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 		with_editor(nil, function(shortcuts, config, state)
 			local changed = 0
 			local builder = helpers.load_module("ui.menu.builder")
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local function contextual(items)
 				for _, row in ipairs(items or {}) do
 					if row.title == i18n.get("menu.shortcuts.group_contextual") then return row end
@@ -746,23 +746,23 @@ end)
 
 
 
-require("test.keyboard_native_publication_contract").register(helpers, "linux")
+require("tests.lua.layouts.keyboard_native_publication_contract").register(helpers, "linux")
 
 
 for _, case in ipairs({
-	{ name = "script chords", module = "modules.shortcuts.script_chords", path = "modules/actions/script_chords.json",
+	{ name = "script chords", module = "modules.shortcuts.script_chords", path = "shortcuts/data/actions/script_chords.json",
 		invoke = function(owner) return owner.catalogue() end },
-	{ name = "tap keys", module = "modules.shortcuts.tap_keys", path = "modules/actions/tap_keys.json",
+	{ name = "tap keys", module = "modules.shortcuts.tap_keys", path = "shortcuts/data/actions/tap_keys.json",
 		invoke = function(owner) return owner.keys() end },
-	{ name = "modifier chords", module = "modules.shortcuts.keyboard_shortcuts", path = "modules/actions/modifier_chords.json",
+	{ name = "modifier chords", module = "modules.shortcuts.keyboard_shortcuts", path = "shortcuts/data/actions/modifier_chords.json",
 		invoke = function(owner) return owner.available_slots("ctrl_") end, empty = true },
-	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "data/keycodes/physical_keys.json",
+	{ name = "physical keys", module = "modules.shortcuts.keyboard_shortcuts", path = "layouts/data/keycodes/physical_keys.json",
 		invoke = function(owner) return owner.physical_slot_descriptor("physical_ctrl_KeyA") end },
-	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "modules/actions/send_keys.json",
+	{ name = "hotstring keys", module = "modules.hotstrings.output_tokens", path = "shortcuts/data/actions/send_keys.json",
 		invoke = function(owner) return owner.parse("{Enter}") end },
 }) do
 	helpers.it("shortcut catalogue refuses FIFO: " .. case.name, function()
-		local uv, Paths = require("luv"), require("infra.paths")
+		local uv, Paths = require("luv"), require("core.fs.engine.paths")
 		local original_shared, original_module = Paths.shared, package.loaded[case.module]
 		local source = assert(original_shared(case.path))
 		local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-shortcut-config-XXXXXX"))
@@ -804,9 +804,10 @@ helpers.describe('keyboard shortcut after a pause cycle', function()
         assert(shortcuts.consume(chord('j',{ctrl=true}), opts))
         assert(script.toggle_pause()); assert(script.toggle_pause())
         queue[1]()
-        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload'} or {})
+        -- SCD-1: a pause cycle retires a claimed slot, a script action included.
+        helpers.assert_eq(fired, {})
         assert(shortcuts.consume(chord('j',{ctrl=true}),opts)); queue[2]()
-        helpers.assert_eq(fired, action == 'script_reload' and {'script_reload','script_reload'} or {'select_line'})
+        helpers.assert_eq(fired, {action})
       end)
       gestures.execute_action = original
       drop_config()

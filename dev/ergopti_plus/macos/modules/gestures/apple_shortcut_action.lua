@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- The run_apple_shortcut action of the shared catalogue and the listing its
 --- editor picks from. A binding stores one shortcut of the user's Shortcuts
---- library by identifier and name (_shared/lua/user_action_parameter.lua);
+--- library by identifier and name (_shared/shortcuts/engine/user_action_parameter.lua);
 --- running it lists the library, refuses a shortcut that was deleted or
 --- renamed with a named notice, then invokes it through the chosen Apple
 --- Shortcut owner (adapters/apple_shortcuts.lua) over the command-line
@@ -26,14 +26,14 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local Timings = require("infra.timings")
+local Logger = require("core.logger.engine.logger")
+local Timings = require("core.timing.engine.timings")
 local AuxOwner = require("modules.gestures.actions_aux_owner")
 local UserActions = require("modules.gestures.user_actions")
-local FileSystem = require("adapters.file_system")
+local FileSystem = require("core.fs.adapters.file_system")
 local Owner = require("adapters.apple_shortcuts")
 local Cli = require("adapters.apple_shortcuts_cli")
-local Parameter = require("user_action_parameter")
+local Parameter = require("shortcuts.engine.user_action_parameter")
 
 local LOG = "gestures.apple_shortcut"
 

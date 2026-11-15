@@ -8,7 +8,7 @@
 ; 2026-09-30 for each entry to read <provider>/<model>, such as
 ; "cerebras/qwen-3.8-27b", with no name to type:
 ; - the shared corpus (api_entry_names_vectors.json), which macOS and Linux
-;   replay through _shared/lua/llm/api_entry_names.lua, pins the port;
+;   replay through _shared/ai/engine/api/entry_names.lua, pins the port;
 ; - the selector page rows show the automatic name, never a name an earlier
 ;   build stored;
 ; - two entries of one provider and model read apart;

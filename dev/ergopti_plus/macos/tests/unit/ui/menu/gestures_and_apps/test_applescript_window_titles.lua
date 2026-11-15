@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local LOCALES = {
 	"ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
@@ -28,7 +28,7 @@ for _, spec in ipairs(NUMERIC_DIALOGS) do TITLE_KEYS[spec.key] = true end
 --- @param code string Locale code.
 --- @return table strings
 local function locale_strings(code)
-	local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 	local strings = Json.decode(file:read("*a"))
 	file:close()
 	return strings
@@ -84,8 +84,8 @@ end
 --- @param composer function|nil Private policy delegate, otherwise the real module.
 --- @param callback function Receives (Dialogs, Menu, Context, world).
 local function with_world(strings, composer, callback)
-	helpers.with_stub_scope({ "infra.dialog_util", "ui.menu.menu_tap_holds", "infra.i18n", "window_titles" }, function()
-		if composer then package.loaded["window_titles"] = { compose = composer } end
+	helpers.with_stub_scope({ "core.ui.engine.dialog_util", "ui.menu.menu_tap_holds", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }, function()
+		if composer then package.loaded["core.ui.engine.window_titles"] = { compose = composer } end
 		local world = { scripts = {}, focuses = 0, writes = 0 }
 		local native = {
 			focus = function() world.focuses = world.focuses + 1; return true end,
@@ -96,8 +96,8 @@ local function with_world(strings, composer, callback)
 			end },
 		}
 		local Menu = helpers.load_with_stubs("ui.menu.menu_tap_holds", native)
-		local Dialogs = require("infra.dialog_util")
-		local i18n = package.loaded["infra.i18n"]
+		local Dialogs = require("core.ui.engine.dialog_util")
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		i18n.get = function(key)
 			if TITLE_KEYS[key] or key == "button.ok" or key == "button.cancel" then return strings[key] end
 			return key

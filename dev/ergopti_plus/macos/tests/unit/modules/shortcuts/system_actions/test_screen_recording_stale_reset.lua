@@ -15,10 +15,10 @@ local helpers = require("tests.helpers")
 local BUNDLE_ID = "com.ergoptiplus.app.hammerspoon"
 
 local SUBJECT_MODULES = {
-	"adapters.screen_capture",
-	"infra.notifications",
-	"infra.i18n",
-	"infra.logger",
+	"platform.system.screen_capture",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"modules.shortcuts.actions.screen_capture_flow",
 }
 
@@ -31,7 +31,7 @@ local function with_gate(options, scenario)
 		local f = { events = {}, notifications = {}, resets = {}, logs = { error = {}, warn = {} } }
 		local function event(name) f.events[#f.events + 1] = name end
 
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function()
 				if opts.granted == nil and opts.query_fails then return nil, "tcc down" end
 				return opts.granted == true
@@ -48,7 +48,7 @@ local function with_gate(options, scenario)
 			request_permission = function() event("prompt"); return true end,
 			open_permission_settings = function() event("settings"); return true end,
 		}
-		package.loaded["infra.notifications"] = {
+		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(title, body, kind, on_click)
 				event("notice:" .. tostring(body))
 				f.notifications[#f.notifications + 1] = { title = title, body = body, kind = kind,
@@ -56,14 +56,14 @@ local function with_gate(options, scenario)
 				return true
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger = helpers.make_logger_stub()
 		for _, level in ipairs({ "error", "warn" }) do
 			logger[level] = function(_, message, ...)
 				f.logs[level][#f.logs[level] + 1] = string.format(tostring(message), ...)
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.shortcuts.actions.screen_capture_flow"] = nil
 
 		--- @param name string Event to look up.

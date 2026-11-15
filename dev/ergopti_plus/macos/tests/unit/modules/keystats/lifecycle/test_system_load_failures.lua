@@ -15,24 +15,24 @@ local helpers = require("tests.helpers")
 --- @return table fixture Persisted events and contextual diagnostics.
 local function complete_sample(status, stdout)
 	local names = {
-		"infra.logger", "infra.timings", "adapters.task_lifecycle",
-		"adapters.timer_scheduler", "modules.keystats.log_manager",
-		"modules.keystats.watchers",
+		"core.logger.engine.logger", "core.timing.engine.timings", "core.process.adapters.task_lifecycle",
+		"core.events.timer_scheduler", "modules.keystats.log_manager",
+		"modules.keystats.network_watcher", "modules.keystats.watchers",
 	}
 	local saved, saved_hs = {}, _G.hs
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local fixture = { events = {}, errors = {} }
 	local noop = function() end
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, success = noop, debug = noop, warn = noop,
 		error = function(_, message, ...)
 			fixture.errors[#fixture.errors + 1] = string.format(message, ...)
 		end,
 		pcall = function(_, callback) return pcall(callback) end,
 	}
-	package.loaded["infra.timings"] = { ms = function() return 1 end }
-	package.loaded["adapters.timer_scheduler"] = { cancel = function() return true end }
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1 end }
+	package.loaded["core.events.timer_scheduler"] = { cancel = function() return true end }
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function(_, _, callback) fixture.complete = callback; return {} end,
 		start = function() return true end,
 	}
@@ -40,6 +40,10 @@ local function complete_sample(status, stdout)
 		log_system_event = function(kind, data)
 			fixture.events[#fixture.events + 1] = { kind = kind, data = data }
 		end,
+	}
+	-- The connectivity watcher shares the hardware lifecycle; its probes are not under test.
+	package.loaded["modules.keystats.network_watcher"] = {
+		start = function() return true end, stop = noop, tick = noop, is_running = function() return false end,
 	}
 	_G.hs = { timer = { absoluteTime = function() return 1000000000 end } }
 	local ok, err = xpcall(function()

@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 local World = require("tests.support.agent_world")
 local Scope = require("tests.support.modules.llm.selection_translation_scope")
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
 	"modules.llm.agent_runner", "modules.llm.agent_learning", "modules.llm.agent_connectors",
-	"llm.agent", "llm.agent_learning", "adapters.system_info", "infra.locale",
-	"infra.dialog_util", "modules.llm.local_model_offer", "locale.core", "modules.shortcuts.script_control",
+	"ai.engine.agent.agent", "llm.agent_learning", "platform.system.info", "core.i18n.engine.locale",
+	"core.ui.engine.dialog_util", "modules.llm.local_model_offer", "core.i18n.engine.core", "modules.shortcuts.script_control",
 	"modules.shortcuts.ai_actions",
 }
 
@@ -39,7 +39,7 @@ local function with_pending_tools(options, scenario)
 					pending[#pending + 1] = function()
 						running = false
 						callback(0, "Mode focus\n", "")
-						helpers.assert_nil(require("adapters.shell_runner")._active_tasks[task],
+						helpers.assert_nil(require("core.process.adapters.shell_runner")._active_tasks[task],
 							"the exact native completion must release the real shell runner pin")
 					end
 				end

@@ -7,18 +7,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local WPMModel = require("wpm_widget.model")
-local TomlCodec = require("toml_codec")
-local Paths = require("infra.paths")
+local WPMModel = require("metrics.engine.wpm_widget_model")
+local TomlCodec = require("core.text.engine.toml_codec")
+local Paths = require("core.fs.engine.paths")
 
 -- The real canon, read before any stub replaces the paths it lives at.
-local CANON = assert(WPMModel.load(Paths.shared("modules/wpm_widget/constants.toml"), TomlCodec.decode))
+local CANON = assert(WPMModel.load(Paths.shared("metrics/data/wpm_widget/constants.toml"), TomlCodec.decode))
 
 return function(callback)
 	local original_hs = _G.hs
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({ "ui.wpm.wpm_menubar", "ui.wpm.shared", "ui.wpm.wpm_widget",
-			"ui.tooltip", "modules.keystats", "infra.logger", "adapters.timer_scheduler" }, function()
+			"core.ui.ui.tooltip", "modules.keystats", "core.logger.engine.logger", "core.events.timer_scheduler" }, function()
 			local state = { items = {}, timers = {}, logs = {} }
 			local logger = helpers.make_logger_stub()
 			for _, level in ipairs({ "debug", "info", "error" }) do
@@ -27,13 +27,13 @@ return function(callback)
 					if state.on_log then state.on_log(level, message) end
 				end
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["modules.keystats"] = { get_live_stats = function() return { wpm = 10 } end }
 			package.loaded["ui.wpm.wpm_widget"] = { _load_shared_const = function() return { source_color_duration = 1 } end }
 			package.loaded["ui.wpm.shared"] = { get_active_source = function() return "none" end,
 				format_mpm_label = function() return "10" end, canon = function() return CANON end }
-			package.loaded["ui.tooltip"] = { is_visible = function() return false end }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
+			package.loaded["core.events.timer_scheduler"] = {
 				every = function(_, run)
 					local timer = { timer = {}, run = run }
 					state.timers[#state.timers + 1] = timer

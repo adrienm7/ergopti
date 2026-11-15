@@ -10,10 +10,10 @@
 --- ==============================================================================
 
 local uv = require("luv")
-local Shell = require("adapters.shell_runner")
+local Shell = require("core.process.adapters.shell_runner")
 assert(uv.getuid() ~= 0, "native CLI tests require an ordinary user")
-assert(not require("infra.openssl_digest").available, "run this actual fallback fixture with lua5.4, without FFI")
-local Crypto = require("adapters.crypto")
+assert(not require("core.network.engine.openssl_digest").available, "run this actual fallback fixture with lua5.4, without FFI")
+local Crypto = require("core.crypto.crypto")
 local real = assert(Shell.exec_line("command -v openssl"))
 local real_head = assert(Shell.exec_line("command -v head"))
 local original_path = assert(os.getenv("PATH"))
@@ -106,7 +106,7 @@ end
 
 check("healthy fallback retains repeated quotes without requoting the stdin body", function()
 	local data = string.rep("'a", 22000)
-	local command = require("shell.heredoc").with_exact_stdin(Shell.quote(real) .. " dgst -sha256 -hex", data)
+	local command = require("core.process.shell_heredoc").with_exact_stdin(Shell.quote(real) .. " dgst -sha256 -hex", data)
 	local expected = assert(Shell.exec_line(command)):match("[0-9a-f]+$")
 	assert(expected and #expected == 64)
 	assert(Crypto.sha256(data) == expected, "supervision must not expand the data argument beyond its original byte budget")

@@ -8,11 +8,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
-local DEFAULTS = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 local MODULES = { "platform.remap.tap_hold_manager", "platform.remap.tap_hold_loader",
-	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "config_scope_transaction" }
+	"platform.remap.tap_hold_writer", "infra.tap_hold_scope", "settings.engine.scope.transaction" }
 
 local function read(path)
 	local fh = io.open(path, "r")
@@ -104,7 +104,7 @@ local function with_scope(tap_text, config_text, body)
 	local s = { dir = dir, tap_path = tap_path, config_path = config_path, manager = Manager,
 		installed = installed, paused = false, controls = {} }
 	s.parameters = fake_parameters({ tap_hold__open_url = "https://tap.example", tap_4__open_url = "https://keep.example" })
-	local files = require("adapters.file_system")
+	local files = require("core.fs.adapters.file_system")
 	s.files = setmetatable({
 		write_if_unchanged = function(path, content, expected)
 			if s.controls.before_publish then s.controls.before_publish(path) end
@@ -116,7 +116,7 @@ local function with_scope(tap_text, config_text, body)
 		return require("infra.tap_hold_scope").new({
 			path = config_path, backup_path = config_path .. ".bak",
 			tap_hold_path = tap_path, tap_hold_backup_path = tap_path .. ".bak",
-			is_paused = function() return s.paused end, parameters = s.parameters, files = s.files,
+			parameters = s.parameters, files = s.files,
 		})
 	end
 	local ok, err = pcall(body, s)

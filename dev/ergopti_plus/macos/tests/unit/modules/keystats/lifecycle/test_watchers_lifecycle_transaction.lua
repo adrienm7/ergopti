@@ -30,10 +30,10 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"infra.logger",
-	"infra.timings",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"modules.keystats.context_tracker",
 	"modules.keystats.log_manager",
 	"modules.keystats.watchers",
@@ -183,17 +183,17 @@ local function with_fixture(options, scenario)
 	_G.hs = hs_stub
 
 	local function noop() end
-	package.loaded["infra.logger"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = setmetatable({
 		error = function(_, format_string, ...)
 			fixture.error_lines[#fixture.error_lines + 1] = string.format(format_string, ...)
 		end,
 	}, { __index = function() return noop end })
-	package.loaded["infra.timings"] = {
+	package.loaded["core.timing.engine.timings"] = {
 		ms = function(_, key)
 			return options.timings and options.timings[key] or 1
 		end,
 	}
-	package.loaded["adapters.task_lifecycle"] = {
+	package.loaded["core.process.adapters.task_lifecycle"] = {
 		native = function() return nil end,
 		start = function() return false end,
 	}
@@ -217,7 +217,7 @@ local function with_fixture(options, scenario)
 		handle.timer = nil
 		return true
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["modules.keystats.log_manager"] = {
 		append_log = function(entry)
 			fixture.log_entries[#fixture.log_entries + 1] = entry

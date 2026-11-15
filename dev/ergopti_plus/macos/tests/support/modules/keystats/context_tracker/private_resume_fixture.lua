@@ -5,20 +5,20 @@ local helpers = require("tests.helpers")
 local ProvenanceFixture = require("tests.support.keystats_provenance_fixture")
 local M = {}
 local OWNERS = {
-	"keystats.physical_lifecycle_observation",
+	"metrics.engine.capture.physical_lifecycle_observation",
 	"adapters.physical_observation_clock",
 	"hs",
 	"tests.stubs.hs",
 	"lfs",
-	"native_path",
-	"error_description",
-	"number_policy",
-	"toml_codec.source_open",
-	"infra.logger",
+	"core.fs.engine.native_path",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
+	"core.text.engine.toml_codec.source_open",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
 	"infra.config_paths",
-	"infra.dialog_util",
-	"infra.teardown_transaction",
+	"core.ui.engine.dialog_util",
+	"core.lifecycle.engine.shutdown.teardown_transaction",
 	"modules.keystats.init",
 	"modules.keystats.log_manager",
 	"modules.keystats.context_tracker",
@@ -26,13 +26,13 @@ local OWNERS = {
 	"modules.keystats.watchers",
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"adapters.event_provenance",
-	"adapters.process_lifecycle",
-	"adapters.keyboard_hook",
+	"core.process.adapters.lifecycle",
+	"platform.input.keyboard_hook",
 	"adapters.input_source_broker",
-	"adapters.storage",
-	"adapters.timer_scheduler",
+	"core.fs.adapters.storage",
+	"core.events.timer_scheduler",
 	"modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state",
 	"modules.keystats.aggregator.core",
@@ -40,19 +40,19 @@ local OWNERS = {
 	"ui.metrics_typing.init",
 	"modules.keystats",
 	"modules.keystats.privacy_context",
-	"adapters.secure_field_detector",
-	"keystats.private_window",
-	"keystats.metrics",
-	"keystats.physical_context_observation",
-	"keystats.physical_configuration_observation",
-	"keystats.physical_subscription_lifetime",
+	"platform.focus.secure_field_detector",
+	"metrics.engine.view.private_window",
+	"metrics.engine.metrics",
+	"metrics.engine.capture.physical_context_observation",
+	"metrics.engine.capture.physical_configuration_observation",
+	"metrics.engine.capture.physical_subscription_lifetime",
 	"modules.shortcuts.script_control",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"infra.script_chord_catalogue",
-	"script_chords",
+	"keyboard.engine.layers.script_chords",
 	"modules.llm.api_mlx",
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
@@ -60,53 +60,53 @@ local OWNERS = {
 	"ui.wpm.wpm_menubar",
 	"ui.wpm.wpm_widget",
 	"platform.remap.onboarding",
-	"ui.tooltip",
-	"infra.toml.reader",
-	"toml_codec.reader",
-	"toml_codec.bom",
-	"toml_codec.basic_string",
-	"toml_codec.key_path",
-	"toml_codec.record_scanner",
-	"logger.shim",
-	"keycodes",
-	"infra.keycodes",
-	"json",
+	"core.ui.ui.tooltip",
+	"core.text.engine.toml.reader",
+	"core.text.engine.toml_codec.reader",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.record_scanner",
+	"core.logger.engine.shim",
+	"platform.input.keycodes.core",
+	"platform.input.keycodes",
+	"core.text.engine.json",
 	-- Optional keymap startup imports survive a rejected parent construction.
 	"adapters.clipboard",
-	"adapters.file_system",
-	"adapters.json_codec",
-	"adapters.keyboard_geometry",
-	"adapters.shell_runner",
-	"adapters.task_environment",
-	"adapters.text_sender",
-	"adapters.tooltip_renderer",
-	"compat.utf8",
-	"core.llm.ollama_runtime_choice",
-	"diagnostics.operation_reporter",
-	"diagnostics.runtime_log",
-	"hotstring_engine",
-	"hotstring_priority",
-	"hotstrings.languages",
-	"hotstrings.personal_files",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.json_codec",
+	"platform.input.keyboard_geometry",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_environment",
+	"platform.input.text_sender",
+	"core.ui.adapters.tooltip_renderer",
+	"core.lifecycle.engine.compat.utf8",
+	"core.lifecycle.engine.core.ollama_runtime_choice",
+	"diagnostics.engine.operation_reporter",
+	"diagnostics.engine.runtime_log",
+	"hotstrings.engine.matcher",
+	"hotstrings.engine.priority",
+	"hotstrings.engine.languages",
+	"hotstrings.engine.catalogue.personal_files",
 	"infra.capsword_output",
-	"infra.deferred_work",
-	"infra.fs_dir",
+	"core.timing.engine.deferred_work",
+	"core.fs.engine.dir",
 	"infra.hotstring_engine",
-	"infra.launcher_environment",
-	"keymap.control_signals",
-	"keymap.terminators",
-	"keymap.terminators_catalogue",
-	"keymap.utils",
-	"llm.enable_admission",
-	"llm.local_server_auth",
-	"llm.local_server_discovery",
-	"llm.parser",
-	"llm.profile_selector",
-	"llm.prompt_action",
-	"llm.prompt_builder",
-	"llm.rewrite",
-	"llm.translate",
-	"logger",
+	"core.lifecycle.engine.launcher_environment",
+	"layouts.engine.layers.control_signals",
+	"layouts.engine.layers.terminators",
+	"layouts.engine.layers.terminators_catalogue",
+	"layouts.engine.utils",
+	"ai.engine.settings.enable_admission_core",
+	"ai.engine.local_servers.auth",
+	"ai.engine.local_servers.discovery",
+	"ai.engine.api.parser_core",
+	"ai.engine.settings.profile_selector",
+	"ai.engine.prediction.prompt_action",
+	"ai.engine.prediction.prompt_builder_core",
+	"ai.engine.prediction.rewrite",
+	"ai.engine.prediction.translate",
+	"core.logger.engine",
 	"modules.keymap.control_sentinels",
 	"modules.keymap.expander",
 	"modules.keymap.registry",
@@ -127,7 +127,7 @@ local OWNERS = {
 	"modules.llm.prompt_builder",
 	"modules.llm.streaming_handler",
 	"platform.remap.lease_helper",
-	"text_utils",
+	"core.text.engine.utils_core",
 }
 
 --- Owns native/cache ports and always retires both public runtimes.
@@ -144,7 +144,7 @@ function M.with_runtime(callback)
 		local obs = { stages = {}, tracker_receipts = {}, native_queries = {} }
 		local function run()
 			obs.logs, obs.caffeinate = {}, { created = 0, stopped = 0 }
-			local initial_logger = assert(package.loaded["infra.logger"])
+			local initial_logger = assert(package.loaded["core.logger.engine.logger"])
 			for _, level in ipairs({ "error", "warn" }) do
 				initial_logger[level] = function(_, format, ...)
 					local row = { kind = "fixture_diagnostic", level = level, message = string.format(format, ...) }
@@ -263,7 +263,7 @@ function M.with_runtime(callback)
 					start = function(self) obs.ax_started = obs.ax_started + 1; return self end,
 					stop = function(self) obs.ax_stopped = obs.ax_stopped + 1; return self end }
 			end }
-			package.loaded["adapters.secure_field_detector"] = nil
+			package.loaded["platform.focus.secure_field_detector"] = nil
 			local tracker_path = driver .. "/modules/keystats/context_tracker.lua"
 			tracker = assert(loadfile(tracker_path))()
 			local tracker_port = assert(package.loaded["modules.keystats.context_tracker"])
@@ -287,15 +287,15 @@ function M.with_runtime(callback)
 				return table.unpack(receipt, 2, receipt.n)
 			end
 			local activation_callback
-			package.loaded["adapters.process_lifecycle"].onAppActivate = function(callback)
+			package.loaded["core.process.adapters.lifecycle"].onAppActivate = function(callback)
 				activation_callback = callback
 				return true
 			end
 			local notices = {}
-			package.loaded["infra.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 			package.loaded["modules.gestures.engine"] = {}
 			package.loaded["modules.gestures.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
-			package.loaded["adapters.key_state"] = {}
+			package.loaded["platform.input.key_state"] = {}
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end
 			for _, name in ipairs({ "modules.llm.api_mlx", "modules.llm.api_ollama", "modules.llm.api_remote", "modules.llm.warmup_controller" }) do
@@ -312,7 +312,7 @@ function M.with_runtime(callback)
 			remote.prewarm_active_entry_decrypt = function() return true end
 			for _, name in ipairs({ "ui.wpm.wpm_menubar", "ui.wpm.wpm_widget" }) do package.loaded[name] = { is_running = function() return false end } end
 			package.loaded["platform.remap.onboarding"] = { stop = yes }
-			package.loaded["ui.tooltip"] = { hide_forced = yes }
+			package.loaded["core.ui.ui.tooltip"] = { hide_forced = yes }
 			local control_path = driver .. "/modules/shortcuts/script_control.lua"
 			control = assert(loadfile(control_path))()
 			package.loaded["modules.shortcuts.script_control"] = control
@@ -322,7 +322,7 @@ function M.with_runtime(callback)
 				has_bindings_pause_debt = function() return false end, pause_bindings = yes, release_bindings_pause_claim = yes }
 			local gestures = { is_enabled = function() return false end, suspend = yes, resume = yes }
 			assert(control.start(keymap, shortcuts, gestures, nil) == true, "Real script-control tap/watchdog startup must commit")
-			local keyboard_hook = assert(package.loaded["adapters.keyboard_hook"])
+			local keyboard_hook = assert(package.loaded["platform.input.keyboard_hook"])
 			keyboard_hook.start = function(options) obs.handle_key = options.onEvent; return true end
 			assert(fixture.start(control) == true)
 			local function upvalue(fn, wanted)

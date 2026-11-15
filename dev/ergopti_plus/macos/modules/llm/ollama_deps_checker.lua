@@ -26,20 +26,20 @@
 
 local M = {}
 local hs           = hs
-local Logger       = require("infra.logger")
-local i18n         = require("infra.i18n")
+local Logger       = require("core.logger.engine.logger")
+local i18n         = require("core.i18n.engine.i18n")
 local llm_progress = require("ui.download_window")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local ApiOllama     = require("modules.llm.api_ollama")
 local ApiCommon     = require("modules.llm.api_common")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings = require("infra.timings")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings = require("core.timing.engine.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local PythonInterpreter = require("adapters.python_interpreter")
 local ExitSignal = require("modules.llm.bootstrap_exit_signal")
-local DevSource = require("infra.dev_source")
+local DevSource = require("core.lifecycle.engine.dev_source")
 
 local LOG = "ollama_deps"
 
@@ -116,8 +116,8 @@ local _observed_failure_marker = nil
 local _active_tasks = {}
 
 -- The bootstrap's named timers (initial, hide, deadline), owned from request
--- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
-local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+-- to native settlement by the shared slots (_shared/core/timing/engine/owned_timer_slots.lua).
+local _timers = require("core.timing.engine.owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
 local _owned_timers = _timers.slots
 local _task_owner = nil
 local _resume_intent = nil
@@ -210,7 +210,7 @@ end
 
 --- Names the real cause of a missing catalogue in a developer app.
 --- A built app seals its catalogue, so there a missing one stays a refused
---- pinned runtime. A developer app (infra/dev_source.lua) builds it from the
+--- pinned runtime. A developer app (core/lifecycle/engine/dev_source.lua) builds it from the
 --- clone's pinned sources (tools/dev/stage-macos-dev-ollama-catalogue.py): a
 --- missing one means that build has not succeeded, not a failed integrity check.
 --- @param exit_code integer Installer exit status.
@@ -639,7 +639,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 	end
 	-- The managed installer downloads with the system curl, checked at this use.
 	if install_dir ~= nil then
-		local curl_ok, curl_refusal = require("adapters.system_curl").check("the Ollama download")
+		local curl_ok, curl_refusal = require("core.network.adapters.system_curl").check("the Ollama download")
 		if not curl_ok then return settle_preflight_failure(curl_refusal) end
 	end
 	if not _pause_controller.is_current(token, authorization) then
@@ -859,7 +859,7 @@ function M.check_and_install_deps(on_complete, replay_token, native_choice)
 		end
 
 		local external_runtime = native_choice == nil and resolved_bin ~= nil
-			and require("core.llm.ollama_runtime_choice").classify(resolved_source) == "foreign"
+			and require("core.lifecycle.engine.core.ollama_runtime_choice").classify(resolved_source) == "foreign"
 		local function finish_provisioning(daemon_ready)
 		if not owner_is_current() then return false end
 

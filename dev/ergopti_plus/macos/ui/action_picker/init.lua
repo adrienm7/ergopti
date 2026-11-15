@@ -22,16 +22,16 @@
 local M = {}
 
 local hs         = hs
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local i18n       = require("infra.i18n")
-local Paths      = require("infra.paths")
-local Json       = require("json")
-local WebviewResult = require("adapters.webview_result")
-local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local i18n       = require("core.i18n.engine.i18n")
+local Paths      = require("core.fs.engine.paths")
+local Json       = require("core.text.engine.json")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local ControllerPool = require("core.ui.ui.webview_controller_pool").new(function(name)
 	return hs.webview.usercontent.new(name)
 end, Logger)
-local ProgramProviderPicker = require("program_provider_picker")
+local ProgramProviderPicker = require("apps.engine.program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
 local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
 local PresentationFieldsOwner = rawget(ui_builder, "presentation_fields")
@@ -135,7 +135,7 @@ function M.open(opts, on_confirm)
 			return getmetatable(opts) == nil and rawget(opts, "presentation_id") == presentation_id
 				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
 				and rawget(opts, "presentation_suffix") == presentation_suffix
-				and getmetatable(ui_builder) == nil and rawget(package.loaded, "ui.ui_builder") == ui_builder
+				and getmetatable(ui_builder) == nil and rawget(package.loaded, "core.ui.ui.builder") == ui_builder
 				and rawget(ui_builder, "prepare_app_presentation") == PresentationPrepareOwner
 				and (presentation_suffix == nil or (type(PresentationContextPrepareOwner) == "function"
 					and rawget(ui_builder, "prepare_app_contextual_title") == PresentationContextPrepareOwner))
@@ -203,7 +203,7 @@ function M.open(opts, on_confirm)
 	}
 	_active_session = session
 	_usercontent = uc
-	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
+	local adapter_ok, adapter = pcall(require, "core.process.adapters.program_providers")
 	session.providers = ProgramProviderPicker.capture(adapter_ok and adapter or nil)
 	if _active_session ~= session then
 		ProgramProviderPicker.close(session.providers)
@@ -361,7 +361,7 @@ function M.open(opts, on_confirm)
 	local native_options = {
 		delete_on_close = true,
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
-		style_masks   = { "titled", "closable", "utility" },
+		style_masks   = { "titled", "closable", "resizable", "utility" },
 		usercontent   = uc,
 		assets_dir    = ASSETS_DIR,
 		on_navigation = function(action)

@@ -11,9 +11,9 @@ local function with_compiled_navigation(body, controls, files)
 	local lfs = require("lfs")
 	local directory = helpers.temp_dir() .. "/physical-scope-nav-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
 	assert(lfs.mkdir(directory))
-	local path = directory .. "/config_karabiner.toml"
+	local path = directory .. "/tap_hold.toml"
 	local stream = assert(io.open(path, "wb"))
-	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = false\n'))
+	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_hold]\nenabled = false\n'))
 	assert(stream:close())
 	controls.navigation_source_path = path
 	local saved, original_hs = {}, _G.hs
@@ -24,7 +24,7 @@ local function with_compiled_navigation(body, controls, files)
 			return require("tests.support.remap_transaction_fixture")(function(fixture)
 				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
 				local paths = package.loaded["infra.config_paths"]
-				paths.get = function(key) if key == "KarabinerConfigPath" then return path end; return "config" end
+				paths.get = function(key) if key == "TapHoldConfigPath" then return path end; return "config" end
 				paths.get_config_dir = function() return directory end
 				local terminal, reason
 				local accepted = remap.regenerate(function(ok, detail) terminal, reason = ok, detail end)
@@ -35,8 +35,8 @@ local function with_compiled_navigation(body, controls, files)
 				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
 				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
 					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
-					["adapters.file_system"] = true, ["json"] = true, ["toml_codec"] = true,
-					["toml_codec.writer"] = true, ["keymap.layers"] = true }
+					["core.fs.adapters.file_system"] = true, ["core.text.engine.json"] = true, ["core.text.engine.toml_codec"] = true,
+					["core.text.engine.toml_codec.writer"] = true, ["layouts.engine.layers.layers"] = true }
 				-- The scope's own recorded native/port identities stay unchanged.
 				-- Retain only the exact dependencies the compiled producer rejoins.
 				for name in pairs(package.loaded) do if not retained[name] and saved[name] == nil then package.loaded[name] = nil end end
@@ -57,7 +57,7 @@ end
 
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
-	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
+	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared"))
 	for _,name in ipairs({"modules.shortcuts.keyboard_shortcuts","adapters.physical_shortcut_hook"}) do package.loaded[name]=nil end
 	helpers.load_with_stubs("hs")
 	hs.keycodes.map.g, hs.keycodes.map.j, hs.keycodes.map.a = 5, 38, 0
@@ -99,7 +99,7 @@ local function run_fixture(body, source)
 			local content = file:read("*a"); file:close(); return content
 		end,
 		read_with_status = function(path)
-			if path == controls.navigation_source_path then return require("toml_codec.writer").read_classified(path) end
+			if path == controls.navigation_source_path then return require("core.text.engine.toml_codec.writer").read_classified(path) end
 			return files[path], files[path] and "ok" or "absent"
 		end,
 		write = function() error("scope requires conditional publication") end,
@@ -111,17 +111,17 @@ local function run_fixture(body, source)
 			files[path] = value; controls.writes = controls.writes + 1; return true
 		end,
 	}
-	package.loaded["adapters.file_system"] = file_port
+	package.loaded["core.fs.adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
-	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.keycodes"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["platform.input.keycodes"] = {
 		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
-		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 		RETURN = 36, BACKSPACE = 51, ESCAPE = 53, FORWARD_DELETE = 117,
 		to_name = function(code) return "f" .. tostring(code) end,
 	}
@@ -141,8 +141,8 @@ local function run_fixture(body, source)
 		return native
 	end
 	hs.hotkey.bind = function() return handle("binding") end
-	package.loaded["adapters.hotkey_registrar"] = nil
-	local registrar = require("adapters.hotkey_registrar")
+	package.loaded["platform.input.hotkey_registrar"] = nil
+	local registrar = require("platform.input.hotkey_registrar")
 	local bind = hs.hotkey.bind
 	hs.hotkey.bind = function(...)
 		local native = bind(...)
@@ -194,14 +194,14 @@ local function run_fixture(body, source)
 	end
 	-- Controlled physical native ports exercise actual production hook/consumer.
 	local timers, callback = {}, nil
-	local prior_timer = package.loaded["adapters.timer_scheduler"]
+	local prior_timer = package.loaded["core.events.timer_scheduler"]
 	local prior_broker = package.loaded["adapters.input_source_broker"]
 	local prior_provenance = require("adapters.event_provenance")
 	package.loaded["adapters.event_provenance"]={STATUS_FOREIGN="foreign",classify_with_fence=function(event, consumer)
 		if type(event.getProperty) == "function" then return prior_provenance.classify_with_fence(event, consumer) end
 		return nil,"foreign"
 	end}
-	package.loaded["adapters.timer_scheduler"]={
+	package.loaded["core.events.timer_scheduler"]={
 		after=function(_,fn) local timer={fn=fn};timers[timer]=true;return timer,true end,
 		onSettled=function(timer,fn) timer.settled=fn;return true end,
 		cancel=function(timer) timers[timer]=nil;if timer.settled then timer.settled() end;return true end,
@@ -209,7 +209,7 @@ local function run_fixture(body, source)
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
 	package.loaded["adapters.physical_shortcut_hook"]=nil
 	local Hook=require("adapters.physical_shortcut_hook")
-	package.loaded["adapters.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
+	package.loaded["core.events.timer_scheduler"],package.loaded["adapters.input_source_broker"],package.loaded["adapters.event_provenance"] = prior_timer,prior_broker,prior_provenance
 	local actual_new=hs.eventtap.new
 	hs.eventtap.new=function(types,fn)
 		if debug.getinfo(fn,"S").source:match("physical_shortcut_hook%.lua$") then callback=fn end

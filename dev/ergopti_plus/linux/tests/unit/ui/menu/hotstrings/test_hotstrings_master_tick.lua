@@ -19,7 +19,7 @@
 local helpers = require("tests.helpers")
 local Choices = require("tests.support.hotstring_choices")
 
-local Answers = require("onboarding_answers")
+local Answers = require("onboarding.engine.answers")
 
 
 
@@ -145,14 +145,14 @@ local function with_wizard(answer, scenario)
 		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		Choices.with_file(Config, nil, function(path)
 			if #rows > 0 then
-				helpers.assert_true(require("toml_codec.writer").batch_write(path, rows) == true,
+				helpers.assert_true(require("core.text.engine.toml_codec.writer").batch_write(path, rows) == true,
 					"the wizard batch must commit")
 			end
 			local world = { Config = Config, path = path, page = page, dyn = dyn_double(false) }
 			--- Starts one session from the file, as a reload does.
 			function world.boot()
 				world.published = {}
-				local engine = require("hotstring_engine").new()
+				local engine = require("hotstrings.engine.matcher").new()
 				local load = engine.load_mappings
 				engine.load_mappings = function(self, published)
 					local committed = load(self, published)
@@ -173,7 +173,7 @@ local function with_wizard(answer, scenario)
 			--- The real tray's Hotstrings row.
 			function world.row()
 				local mb = helpers.load_module("ui.menu.builder")
-				local title = require("infra.i18n").get("menu.hotstrings.title")
+				local title = require("core.i18n.engine.i18n").get("menu.hotstrings.title")
 				local ctx = { config = Config, _version = "9.9.9", dyn_hotstrings = world.dyn }
 				for _, item in ipairs(mb.build(ctx) or {}) do
 					if type(item.title) == "string" and item.title:sub(1, #title) == title then return item end
@@ -183,7 +183,7 @@ local function with_wizard(answer, scenario)
 			--- The switch, first row of the Hotstrings submenu.
 			function world.switch()
 				local first = world.row().menu[1]
-				helpers.assert_eq(first.title, require("infra.i18n").get("menu.hotstrings.enable"),
+				helpers.assert_eq(first.title, require("core.i18n.engine.i18n").get("menu.hotstrings.enable"),
 					"the Hotstrings submenu opens with its switch")
 				return first
 			end

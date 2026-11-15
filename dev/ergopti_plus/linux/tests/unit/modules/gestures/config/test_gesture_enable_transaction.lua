@@ -9,14 +9,14 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local TomlCodec = require("toml_codec")
+local TomlCodec = require("core.text.engine.toml_codec")
 
 local MODULES = {
 	"modules.gestures.manager",
 	"modules.gestures.touchpad_finder",
 	"modules.gestures.mt_decoder",
-	"adapters.evdev_reader",
-	"logger.shim",
+	"platform.input.evdev_reader",
+	"core.logger.engine.shim",
 }
 
 --- Runs one manager instance over deterministic device, decoder, and log fakes.
@@ -44,10 +44,11 @@ local function with_manager(open_fails, init_opts, body, no_touchpad)
 		return real_open(path, slot)
 	end
 
-	package.loaded["logger.shim"] = logger
-	package.loaded["adapters.evdev_reader"] = reader
+	package.loaded["core.logger.engine.shim"] = logger
+	package.loaded["platform.input.evdev_reader"] = reader
 	package.loaded["modules.gestures.touchpad_finder"] = {
 		read_resolution = function() return nil end,
+		read_axes = function() return nil end,
 		find = function()
 			if no_touchpad then return nil, "no device reports multitouch slots" end
 			return {
@@ -83,14 +84,14 @@ end
 helpers.describe("gestures: enabling after disabled boot", function()
 	helpers.it("does not block while loading a FIFO modifier-chord catalogue", function()
 		local uv = require("luv")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		local path = os.tmpname()
 		os.remove(path)
 		assert(shell.run("mkfifo -- " .. shell.quote(path)))
 		local code = string.format([[package.path = %q
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
-paths.shared = function(name) if name == "modules/actions/modifier_chords.json" then return %q end; return original(name) end
+paths.shared = function(name) if name == "shortcuts/data/actions/modifier_chords.json" then return %q end; return original(name) end
 local manager = require("modules.gestures.manager")
 assert(type(manager.get_action_names()) == "table")
 ]], package.path, path)
@@ -101,7 +102,7 @@ assert(type(manager.get_action_names()) == "table")
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end
@@ -113,7 +114,7 @@ assert(type(manager.get_action_names()) == "table")
 	end)
 	helpers.it("refuses a gesture configuration FIFO without blocking startup", function()
 		local uv = require("luv")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		local path = os.tmpname()
 		os.remove(path)
 		assert(shell.run("mkfifo -- " .. shell.quote(path)))
@@ -129,7 +130,7 @@ assert(manager.is_enabled() == false)
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end
@@ -142,7 +143,7 @@ assert(manager.is_enabled() == false)
 
 	helpers.it("does not block or launch an editor for a personal-file FIFO", function()
 		local uv = require("luv")
-		local shell = require("adapters.shell_runner")
+		local shell = require("core.process.adapters.shell_runner")
 		local path = os.tmpname()
 		os.remove(path)
 		assert(shell.run("mkfifo -- " .. shell.quote(path)))
@@ -161,7 +162,7 @@ assert(calls == 0, "a special endpoint must not be opened as a file")
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end

@@ -9,24 +9,24 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-require("logger")
+require("core.logger.engine")
 
 local OWNED = {
-	"app_dirs", "infra.config_paths", "infra.launcher_environment", "infra.log_folders",
-	"infra.notifications", "json", "modules.llm.progressive_reveal",
+	"core.fs.engine.app_dirs", "infra.config_paths", "core.lifecycle.engine.launcher_environment", "core.logger.engine.log_folders",
+	"core.ui.engine.notifications", "core.text.engine.json", "modules.llm.progressive_reveal",
 	"modules.llm.api_mlx", "modules.llm.api_mlx_fetch", "modules.llm.api_mlx_discovery",
 	"modules.llm.mlx_stream_retirement",
-	"modules.llm.api_mlx_inference", "adapters.shell_runner", "modules.keystats",
-	"infra.logger", "adapters.timer_scheduler", "adapters.http_client",
+	"modules.llm.api_mlx_inference", "core.process.adapters.shell_runner", "modules.keystats",
+	"core.logger.engine.logger", "core.events.timer_scheduler", "core.network.adapters.http_client",
 	"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-	"llm.prompt_builder", "llm.rewrite", "llm.parser", "llm.profile_selector",
-	"adapters.file_system", "adapters.json_codec", "infra.timings",
-	"infra.deferred_work", "adapters.task_environment", "diagnostics.runtime_log",
-	"diagnostics.operation_reporter", "diagnostics.redact", "logger.shim",
-	"infra.manifest_reader", "infra.toml.reader", "adapters.storage",
-	"infra.fs_dir", "hotstrings.personal_files", "config_defaults", "lfs",
-	"text_utils", "compat.utf8", "toml_codec.basic_string", "toml_codec.bom",
-	"toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
+	"ai.engine.prediction.prompt_builder_core", "ai.engine.prediction.rewrite", "ai.engine.api.parser_core", "ai.engine.settings.profile_selector",
+	"core.fs.adapters.file_system", "core.fs.adapters.json_codec", "core.timing.engine.timings",
+	"core.timing.engine.deferred_work", "core.process.adapters.task_environment", "diagnostics.engine.runtime_log",
+	"diagnostics.engine.operation_reporter", "diagnostics.engine.reports.redact", "core.logger.engine.shim",
+	"infra.manifest_reader", "core.text.engine.toml.reader", "core.fs.adapters.storage",
+	"core.fs.engine.dir", "hotstrings.engine.catalogue.personal_files", "settings.engine.publication.defaults", "lfs",
+	"core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.text.engine.toml_codec.basic_string", "core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.reader", "core.text.engine.toml_codec.record_scanner",
 }
 
 local function with_stream(scenario)
@@ -35,10 +35,10 @@ local function with_stream(scenario)
 	local scope_ok, scope_error = xpcall(function()
 		helpers.with_stub_scope(OWNED, function()
 			local f = { native = {}, timers = {}, failures = 0 }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["modules.keystats"] = {}
-			package.loaded["adapters.http_client"] = { new = function() return {} end }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+			package.loaded["core.events.timer_scheduler"] = {
 				now = function() return 0 end,
 				after = function(delay, callback)
 					local handle = { timer = {}, delay = delay, callback = callback }
@@ -62,7 +62,7 @@ local function with_stream(scenario)
 					return native
 				end },
 			})
-			f.shell = require("adapters.shell_runner")
+			f.shell = require("core.process.adapters.shell_runner")
 			f.controller = require("modules.llm.api_mlx")
 			for index = 1, 100 do
 				local name, value = debug.getupvalue(f.controller.cancel_streaming, index)
@@ -85,7 +85,7 @@ local function with_stream(scenario)
 			local ok, detail = xpcall(function() scenario(f) end, debug.traceback)
 			for _, native in ipairs(f.native) do native:complete() end
 			for _, timer in ipairs(f.timers) do
-				if timer.delay > require("infra.timings").sec("llm", "stream_hard_timeout_ms") then timer.callback() end
+				if timer.delay > require("core.timing.engine.timings").sec("llm", "stream_hard_timeout_ms") then timer.callback() end
 			end
 			if not ok then error(detail, 0) end
 		end)

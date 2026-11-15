@@ -36,9 +36,9 @@ local function load_fixture(options)
 		hs_global = _G.hs,
 		destination = package.loaded["modules.keymap.utils"],
 		hs_module = package.loaded["hs"],
-		logger = package.loaded["infra.logger"],
-		synthetic = package.loaded["adapters.synthetic_input"],
-		timer_scheduler = package.loaded["adapters.timer_scheduler"],
+		logger = package.loaded["core.logger.engine.logger"],
+		synthetic = package.loaded["platform.input.synthetic_input"],
+		timer_scheduler = package.loaded["core.events.timer_scheduler"],
 		text = package.loaded["modules.shortcuts.actions.text"],
 	}
 
@@ -83,7 +83,7 @@ local function load_fixture(options)
 			}
 		end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local synthetic = {
 		begin = function() return {} end,
@@ -120,7 +120,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic
+	package.loaded["platform.input.synthetic_input"] = synthetic
 
 	local pasteboard = {
 		changeCount = function() return change_count end,
@@ -193,7 +193,7 @@ local function load_fixture(options)
 		end,
 	}
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	Destination.install()
 	local Text = helpers.load_with_stubs("modules.shortcuts.actions.text", {
 		pasteboard = pasteboard,
@@ -226,9 +226,9 @@ local function load_fixture(options)
 		restore = function()
 			package.loaded["modules.keymap.utils"] = saved.destination
 			package.loaded["modules.shortcuts.actions.text"] = saved.text
-			package.loaded["infra.logger"] = saved.logger
-			package.loaded["adapters.synthetic_input"] = saved.synthetic
-			package.loaded["adapters.timer_scheduler"] = saved.timer_scheduler
+			package.loaded["core.logger.engine.logger"] = saved.logger
+			package.loaded["platform.input.synthetic_input"] = saved.synthetic
+			package.loaded["core.events.timer_scheduler"] = saved.timer_scheduler
 			package.loaded["hs"] = saved.hs_module
 			_G.hs = saved.hs_global
 		end,

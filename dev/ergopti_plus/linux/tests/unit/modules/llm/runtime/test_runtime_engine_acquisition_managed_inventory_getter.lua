@@ -38,7 +38,7 @@ end
 local function with_model_pull(body)
 	with_initialization(function(world, engine)
 		local previous_download, previous_window = package.loaded["modules.llm.model_download"], package.loaded["ui.download_window.bridge"]
-		local Http = package.loaded["adapters.http_client"]
+		local Http = package.loaded["core.network.adapters.http_client"]
 		local previous_post, pulls, completions = Http.post_stream_owned, {}, {}
 		local controlled = require("tests.support.owned_http_fixture").attach({
 			postStream = function(url, _, _, options, chunk, done)
@@ -340,7 +340,7 @@ helpers.describe("profile initialization recovery", function()
 
 	test("(linux-inventory-init-recovery) real malformed preferences can be repaired before Engine retries", function()
 		with_initialization(function(_, engine, profiles)
-			local Sandbox = require("test.config_unused_keys_contract").sandbox
+			local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 			Sandbox.with_config("[llm\n", function(path)
 				local previous_paths, previous_preferences = package.loaded["infra.config_paths"], package.loaded["infra.llm_preferences"]
 				package.loaded["infra.config_paths"] = { config = function() return path end }
@@ -739,7 +739,7 @@ helpers.describe("owned deferred inventory", function()
 	test("(linux-inventory-async) replacement HTTP capability cannot acquire the reserved request", function()
 		with_managed_responses(function(world)
 			world.profiles.get_models()
-			local Http = package.loaded["adapters.http_client"]
+			local Http = package.loaded["core.network.adapters.http_client"]
 			local get = Http.get_owned
 			Http.get_owned = function() error("replacement capability must not execute") end
 			world:inventory_defer()

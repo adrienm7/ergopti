@@ -26,28 +26,28 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	-- shared receiver/lifecycle and ShellRunner over controlled native task ports.
 	local function with_startup(starts, callback)
 		helpers.with_stub_scope({
-			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
-			"core.llm.managed_ollama_daemon_receipt", "core.llm.managed_ollama_daemon_lifecycle",
+			"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
+			"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 			"modules.llm.ollama_binary", "modules.llm.ollama_server_command",
-			"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+			"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 			"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-			"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+			"modules.llm.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 			"modules.shortcuts.script_control", "modules.llm.prediction_engine",
 		}, function()
 			local fixture = { tasks = {}, paused = false, nonce_index = 0 }
 			local nonces = { "0000000000000000000000000000f001", "0000000000000000000000000000f002" }
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.notifications"] = { notify = function() return true end }
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["adapters.http_client"] = { new = function()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.network.adapters.http_client"] = { new = function()
 				return { cancel = function() return true end, isActive = function() return false end,
 					isSettled = function() return true end }
 			end }
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function() error("foreground startup must not acquire a launch timer") end,
 				cancel = function() return true end,
 			}
-			package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+			package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 			}
@@ -104,7 +104,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 					return task
 				end },
 			})
-			local shell = require("adapters.shell_runner")
+			local shell = require("core.process.adapters.shell_runner")
 			fixture.shell = shell
 			local ok, err = xpcall(function() callback(api, fixture) end, debug.traceback)
 			-- Retire controlled native objects even when an assertion fails; scoped
@@ -130,15 +130,15 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			client.post = function(url, _, body, done)
 				fixture.posts[#fixture.posts + 1] = { url = url, body = body, done = done }
 			end
-			local json = require("json")
-			fixture.codec = package.loaded["adapters.json_codec"]
+			local json = require("core.text.engine.json")
+			fixture.codec = package.loaded["core.fs.adapters.json_codec"]
 			fixture.codec.encode, fixture.codec.decode = json.encode, json.decode
-			package.loaded["adapters.timer_scheduler"].now = function() return 1 end
-			package.loaded["modules.llm.parser"].strip_thinking = require("llm.parser").strip_thinking
+			package.loaded["core.events.timer_scheduler"].now = function() return 1 end
+			package.loaded["modules.llm.parser"].strip_thinking = require("ai.engine.api.parser_core").strip_thinking
 			package.loaded["modules.llm.api_common"].protected_call = function(fn, _, ...)
-				return package.loaded["infra.logger"].callback("fixture", "request callback", fn, ...)
+				return package.loaded["core.logger.engine.logger"].callback("fixture", "request callback", fn, ...)
 			end
-			fixture.logger = package.loaded["infra.logger"]
+			fixture.logger = package.loaded["core.logger.engine.logger"]
 			for _, kind in ipairs({ "info", "warn", "error" }) do
 				fixture.logger[kind] = function(_, text, ...)
 					fixture.logs[#fixture.logs + 1] = { kind = kind, text = string.format(text, ...) }
@@ -176,15 +176,15 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	-- Only endpoint reads and the requester callback are instrumented here.
 	local function with_reentrant_requester(boundary, outcome, scenario)
 		with_owned_responses(function(api, fixture)
-			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "infra.dialog_util",
-				"infra.notifications", "infra.i18n" }, function()
+			helpers.with_fresh_modules({ "modules.llm.local_model_offer", "core.ui.engine.dialog_util",
+				"core.ui.engine.notifications", "core.i18n.engine.i18n" }, function()
 				local world = { dialogs = 0, notices = 0, installs = 0, replaced = false }
-				package.loaded["infra.i18n"] = { get = function(key) return key end,
+				package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end,
 					format = function(key) return key end }
-				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, first)
+				package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, _, first)
 					world.dialogs = world.dialogs + 1; return first
 				end }
-				package.loaded["infra.notifications"] = { notify = function()
+				package.loaded["core.ui.engine.notifications"] = { notify = function()
 					world.notices = world.notices + 1; return true
 				end }
 				local offer = require("modules.llm.local_model_offer")
@@ -249,7 +249,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 			with_owned_responses(function(api, fixture)
 				fixture.request()
 				fixture.tags(1, { { name = "qwen2.5:7b" } })
-				local storage = require("adapters.storage")
+				local storage = require("core.fs.adapters.storage")
 				local read_setting = storage.get
 				storage.get = function(key)
 					if key ~= "llm.ollama_owned_port" then return read_setting(key) end
@@ -409,7 +409,7 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 	helpers.it("(ollama-response-service-affinity) refuses old chat success and missing-model failure after replacement", function()
 		for _, response in ipairs({
 			{ status = 200, body = '{"message":{"content":"old private answer"}}' },
-			{ status = 404, body = require("json").encode({ error = 'model "qwen2.5:7b" not found' }) },
+			{ status = 404, body = require("core.text.engine.json").encode({ error = 'model "qwen2.5:7b" not found' }) },
 			{ status = 503, body = '{"error":"old service failure"}' },
 		}) do
 			with_owned_responses(function(api, fixture)
@@ -584,14 +584,14 @@ helpers.describe("ApiOllama daemon startup ownership", function()
 
 	helpers.it("(local-model-service-consent) refuses same-origin daemon replacement during held model consent", function()
 		with_startup({}, function(api, fixture)
-			helpers.with_stub_scope({ "modules.llm.local_model_offer", "infra.dialog_util" }, function()
+			helpers.with_stub_scope({ "modules.llm.local_model_offer", "core.ui.engine.dialog_util" }, function()
 				helpers.assert_true(api.ensure_running())
 				local original = fixture.tasks[1]
 				original.emit(original.frame("ACTIVE") .. original.frame("READY"))
 				local origin = api.get_base_url()
 				local installs, answered = 0, false
-				package.loaded["infra.i18n"].format = function(key) return key end
-				package.loaded["infra.dialog_util"] = { block_alert = function(_, _, download)
+				package.loaded["core.i18n.engine.i18n"].format = function(key) return key end
+				package.loaded["core.ui.engine.dialog_util"] = { block_alert = function(_, _, download)
 					if not answered then
 						answered = true
 						helpers.assert_eq(api.stop_owned_server(), false)

@@ -8,8 +8,8 @@
 
 -- Genuine public software metrics ingestion; native SQLite, no clock/provider doubles.
 local uv=require("luv")
-require("compat.utf8").install()
-local Json=require("json")
+require("core.lifecycle.engine.compat.utf8").install()
+local Json=require("core.text.engine.json")
 local root=assert(os.getenv("OWN_METRICS_UNICODE_ROOT"))
 assert(uv.fs_mkdir(root,448))
 for _,name in ipairs({"CONFIG","DATA","CACHE","STATE"}) do
@@ -21,7 +21,7 @@ assert(cfg:write("[metrics]\nenabled = true\n") and cfg:close())
 local K=require("modules.keystats.keystats")
 local W=require("modules.keystats.sqlite_writer")
 local R=require("modules.keystats.sqlite_reader")
-local Clock=require("infra.monotonic")
+local Clock=require("core.logger.engine.monotonic")
 assert(Clock.backend()=="luv.hrtime")
 K.init({sqlite_path=root.."/metrics.sqlite",log_dir=root.."/logs"})
 assert(K.is_enabled() and W.is_available())

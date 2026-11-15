@@ -18,7 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 -- The refusal store of these tests
 local REFUSED_FILE = os.tmpname()
@@ -28,7 +28,7 @@ os.remove(REFUSED_FILE)
 --- @return table remote, table calls
 local function load_remote()
 	local calls = {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		get = function() return true end,
 		post = function(url, headers, body, callback, options)
 			calls[#calls + 1] = { url = url, body = body, callback = callback }
@@ -43,7 +43,7 @@ local function load_remote()
 end
 
 local function unload()
-	package.loaded["adapters.http_client"] = nil
+	package.loaded["core.network.adapters.http_client"] = nil
 	package.loaded["modules.llm.api_remote"] = nil
 	package.loaded["modules.llm.vision_request"] = nil
 	os.remove(REFUSED_FILE)
@@ -200,7 +200,7 @@ end)
 helpers.describe("api_remote: a refused thinking field is dropped once and remembered", function()
 	helpers.it("does not block or remove a foreign FIFO at the refusal staging path", function()
 		local uv = require("luv")
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		local path = os.tmpname()
 		os.remove(path)
 		assert(Shell.run("mkfifo -- " .. Shell.quote(path .. ".tmp")))
@@ -220,7 +220,7 @@ assert(remote.thinking_refusal("deepseek", "deepseek-chat", {
 			exited, status, signal = true, code, sig
 			uv.timer_stop(timer); uv.close(timer); uv.close(child)
 		end))
-		assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+		assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 			expired = true; child:kill("sigkill")
 		end))
 		while not exited do uv.run("once") end

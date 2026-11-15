@@ -10,7 +10,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Nothing of the source is copied or patched, as on macOS: the profile goes
 ;    through the program's own options, chosen by its family in
-;    _shared/data/app_cloner/families.json (Chromium and Electron
+;    _shared/apps/data/app_cloner/families.json (Chromium and Electron
 ;    --user-data-dir, Firefox -profile, VS Code with the shared extensions).
 ; 2. A program of no family cannot be isolated on Windows: a shortcut cannot
 ;    give one process its own %APPDATA%, and redirecting it through a wrapper
@@ -37,7 +37,7 @@
  * @returns {Map}
  */
 AppCloner_LoadFamilies(SharedDir) {
-	Catalogue := JsonParse(FileRead(SharedDir . "\data\app_cloner\families.json", "UTF-8"))
+	Catalogue := JsonParse(FileRead(SharedDir . "\apps\data\app_cloner\families.json", "UTF-8"))
 	for Key in ["detection_order", "families", "profile_folder", "window_class_prefix"] {
 		if !Catalogue.Has(Key)
 			throw ValueError("The shared App Cloner families lack " . Key . ".")
@@ -76,16 +76,39 @@ AppCloner_Family(Catalogue, Program, HasMarker := 0) {
 }
 
 /**
+ * The folders an executable keeps its own settings and extensions in
+ * (families.json `user_folders`), or 0 when the family names none for it:
+ * VSCodium and the Insiders build do not share VS Code's (BAP-004), as Linux
+ * user_folders reads them.
+ * @param {Map} Catalogue
+ * @param {String} Family
+ * @param {String} Program Path to the source executable, or "".
+ * @returns {Map|Integer} settings, extensions; or 0.
+ */
+AppCloner_UserFolders(Catalogue, Family, Program) {
+	if Program == "" || !Catalogue["families"].Has(Family)
+		return 0
+	Definition := Catalogue["families"][Family]
+	if !Definition.Has("user_folders")
+		return 0
+	SplitPath(Program, &FileName)
+	Name := StrLower(RegExReplace(FileName, "i)\.exe$"))
+	return Definition["user_folders"].Get(Name, 0)
+}
+
+/**
  * The family's Windows arguments with their placeholders filled.
  * @param {Map} Catalogue
  * @param {String} Family
  * @param {Map} Values profile, window_class, home.
+ * @param {String} Program The source program, for its own user folders.
  * @returns {Array}
  */
-AppCloner_Arguments(Catalogue, Family, Values) {
+AppCloner_Arguments(Catalogue, Family, Values, Program := "") {
 	Words := []
 	if !Catalogue["families"].Has(Family)
 		return Words
+	Folders := AppCloner_UserFolders(Catalogue, Family, Program)
 	for Argument in Catalogue["families"][Family]["arguments"] {
 		if Argument.Has("platforms") {
 			Wanted := false
@@ -106,7 +129,10 @@ AppCloner_Arguments(Catalogue, Family, Values) {
 			Value .= SubStr(Template, At, Found - At) . Values[Hole[1]]
 			At := Found + Hole.Len[0]
 		}
-		Words.Push(Value . SubStr(Template, At))
+		Value .= SubStr(Template, At)
+		if Argument.Get("user_folder", "") == "extensions" && IsObject(Folders)
+			Value := "--extensions-dir=" . Values["home"] . "\" . Folders["extensions"] . "\extensions"
+		Words.Push(Value)
 	}
 	return Words
 }
@@ -175,13 +201,17 @@ AppCloner_Plan(Request) {
 	for Word in Request.Get("arguments", [])
 		Words.Push(Word)
 	for Word in AppCloner_Arguments(Catalogue, Family,
-			Map("profile", Profile, "window_class", Catalogue["window_class_prefix"] . Id, "home", Request["home"]))
+			Map("profile", Profile, "window_class", Catalogue["window_class_prefix"] . Id, "home", Request["home"]),
+			Request["program"])
 		Words.Push(Word)
 	Definition := Catalogue["families"].Has(Family) ? Catalogue["families"][Family] : Map()
 	if Definition.Get("share_user_settings", false) {
 		; As macOS does: the clone reads the main instance's settings, keybindings
 		; and snippets, while its windows, state and accounts stay its own.
-		Plan["links"].Push(Map("link", Profile . "\User", "target", Request["roaming"] . "\Code\User"))
+		; An executable the catalogue does not list keeps VS Code's Code settings.
+		Folders := AppCloner_UserFolders(Catalogue, Family, Request["program"])
+		Settings := IsObject(Folders) ? Folders["settings"] : "Code"
+		Plan["links"].Push(Map("link", Profile . "\User", "target", Request["roaming"] . "\" . Settings . "\User"))
 	}
 	OpenItem := Request.Get("open_item", "")
 	if OpenItem != "" {

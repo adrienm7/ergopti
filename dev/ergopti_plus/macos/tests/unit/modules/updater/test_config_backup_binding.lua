@@ -12,11 +12,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local DEFAULTS = helpers.shared("modules/updater/defaults.json")
+local DEFAULTS = helpers.shared("updater/data/defaults.json")
 
 --- Loads the binding over stubbed file ports.
 --- @param tree table path -> "file" | "dir" | "link_file" | "link_dir"
@@ -24,12 +24,12 @@ local DEFAULTS = helpers.shared("modules/updater/defaults.json")
 local function with_binding(tree, body)
 	helpers.with_fresh_modules({
 		"modules.updater.config_backup",
-		"adapters.file_system",
-		"infra.fs_dir",
+		"core.fs.adapters.file_system",
+		"core.fs.engine.dir",
 		"infra.config_paths",
-		"infra.paths",
+		"core.fs.engine.paths",
 	}, function()
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.adapters.file_system"] = {
 			path_status = function(path)
 				local kind = tree[path]
 				if not kind then return "absent" end
@@ -61,7 +61,7 @@ local function with_binding(tree, body)
 				return text
 			end,
 		}
-		package.loaded["infra.fs_dir"] = {
+		package.loaded["core.fs.engine.dir"] = {
 			try_entries = function(dir)
 				local names = {}
 				for path in pairs(tree) do
@@ -77,9 +77,9 @@ local function with_binding(tree, body)
 			get_config_dir = function() return "/Users/me/" .. AppDirs.config.macos_relative .. "/" end,
 			ensure_dir = function() return true end,
 		}
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative)
-				if relative == "modules/updater/defaults.json" then return DEFAULTS end
+				if relative == "updater/data/defaults.json" then return DEFAULTS end
 				return nil
 			end,
 		}
@@ -125,4 +125,4 @@ local handle = assert(io.open(DEFAULTS, "rb"))
 local defaults = assert(Json.decode(handle:read("*a")), "defaults.json must decode")
 handle:close()
 
-require("test.config_backup_binding_contract").register(helpers, { defaults = defaults, listing = stub_listing })
+require("tests.lua.settings.backup_binding_contract").register(helpers, { defaults = defaults, listing = stub_listing })

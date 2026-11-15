@@ -28,23 +28,23 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
-local WebviewResult = require("adapters.webview_result")
-local RunningApplication = require("adapters.running_application")
-local OwnWindow = require("adapters.own_window")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local RunningApplication = require("platform.focus.running_application")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
-local Json       = require("json")
-local FileSystem = require("adapters.file_system")
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local i18n       = require("infra.i18n")
-local TimerScheduler = require("adapters.timer_scheduler")
-local PacedJob   = require("infra.paced_job")
-local PacedJson  = require("infra.paced_json")
+local Json       = require("core.text.engine.json")
+local FileSystem = require("core.fs.adapters.file_system")
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local i18n       = require("core.i18n.engine.i18n")
+local TimerScheduler = require("core.events.timer_scheduler")
+local PacedJob   = require("core.timing.engine.paced_job")
+local PacedJson  = require("core.timing.engine.paced_json")
 local Projection = require("ui.metrics_typing.projection")
 local Snapshot   = require("ui.metrics_typing.snapshot")
 
@@ -959,7 +959,7 @@ function M.show()
 		return rollback_startup_webview(webview, "prior poller cleanup remains pending")
 	end
 	local poll_ok, poll_candidate, poll_committed = xpcall(function()
-		return TimerScheduler.every(require("infra.timings").sec("ui", "metrics_typing_poll_ms"), function()
+		return TimerScheduler.every(require("core.timing.engine.timings").sec("ui", "metrics_typing_poll_ms"), function()
 		if generation ~= _generation or M._wv ~= webview then return end
 		pcall(function()
 			submit_javascript(generation, webview, "request poll", "window._lua_request", function(req)

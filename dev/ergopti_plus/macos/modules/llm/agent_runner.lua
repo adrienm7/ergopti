@@ -30,7 +30,7 @@
 ---    field refuses like the tone actions.
 --- 4. One transport per system, each behind one function taking the backend and
 ---    its payload, so a new request format plugs in there. A chat backend gets
----    a plain chat body built by llm/vision.lua (the local server, a chat
+---    a plain chat body built by ai/engine/prediction/vision.lua (the local server, a chat
 ---    provider) or a Backboard message. System 1 has a second kind: Jev, asked
 ---    its choice question through a decisions provider (TypeSafe's System One
 ---    protocol) or through Backboard with a "typesafe/" model. Neither the text
@@ -44,28 +44,28 @@
 ---    (modules/llm/agent_learning.lua).
 ---
 --- The pure logic (prompts, triage, validation, labels) is shared:
---- _shared/lua/llm/agent.lua, configured by _shared/modules/llm/agent.json.
+--- _shared/ai/engine/agent/agent.lua, configured by _shared/ai/data/agent.json.
 --- ==============================================================================
 
 local M = {}
 
-local Agent          = require("llm.agent")
-local AgentPlan      = require("llm.request_plan.agent")
-local Vision         = require("llm.vision")
-local Rewrite        = require("llm.rewrite")
-local Formats        = require("llm.remote_formats")
+local Agent          = require("ai.engine.agent.agent")
+local AgentPlan      = require("ai.engine.request_plan.agent")
+local Vision         = require("ai.engine.prediction.vision")
+local Rewrite        = require("ai.engine.prediction.rewrite")
+local Formats        = require("ai.engine.api.remote_formats")
 local ProviderUses   = require("modules.llm.provider_uses")
-local Logger         = require("infra.logger")
-local i18n           = require("infra.i18n")
-local Paths          = require("infra.paths")
+local Logger         = require("core.logger.engine.logger")
+local i18n           = require("core.i18n.engine.i18n")
+local Paths          = require("core.fs.engine.paths")
 local Manifest       = require("infra.manifest_reader")
-local FileSystem     = require("adapters.file_system")
-local JsonCodec      = require("adapters.json_codec")
-local WindowInfo     = require("adapters.window_info")
-local SystemInfo     = require("adapters.system_info")
-local TimerScheduler = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
-local ConfigKeys = require("config_keys")
+local FileSystem     = require("core.fs.adapters.file_system")
+local JsonCodec      = require("core.fs.adapters.json_codec")
+local WindowInfo     = require("platform.focus.window_info")
+local SystemInfo     = require("platform.system.info")
+local TimerScheduler = require("core.events.timer_scheduler")
+local TextUtils = require("core.text.engine.utils_core")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "llm.agent_runner"
 
@@ -146,14 +146,14 @@ local _mode_persister = nil
 -- =====================================
 -- =====================================
 
---- Returns the decoded _shared/modules/llm/agent.json, read once. A missing or
+--- Returns the decoded _shared/ai/data/agent.json, read once. A missing or
 --- malformed file is a broken install and raises.
 --- @return table config
 function M.config()
 	if _config then return _config end
 	local path = Paths.shared_llm_path("agent.json")
 	local raw = path and FileSystem.read(path) or nil
-	if type(raw) ~= "string" then error("agent_runner: _shared/modules/llm/agent.json is unreadable") end
+	if type(raw) ~= "string" then error("agent_runner: _shared/ai/data/agent.json is unreadable") end
 	local config, decode_error = JsonCodec.decode(raw)
 	if type(config) ~= "table" then
 		error("agent_runner: agent.json is not valid JSON: " .. tostring(decode_error))
@@ -204,7 +204,7 @@ end
 --- @param ... any Values of its {1}, {2}, … placeholders.
 local function show_notice(key, ...)
 	local text = i18n.format(key, ...)
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	local ok_show, shown = false, nil
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.show) == "function" then
 		ok_show, shown = pcall(tooltip.show, text, true, true)
@@ -866,7 +866,7 @@ function M.run_command()
 	-- A modal dialog must not open inside the event tap that dispatched the action.
 	local called, handle, committed = pcall(TimerScheduler.after, 0, function()
 		if not published or not is_current(generation, "command") then return end
-		local dialog = dependency("infra.dialog_util", "text_prompt")
+		local dialog = dependency("core.ui.engine.dialog_util", "text_prompt")
 		if not dialog then return end
 		local ok_label = i18n.get("button.ok")
 		local ok, button, typed = pcall(dialog.text_prompt, i18n.get("dialog.agent.command_title"),
@@ -970,7 +970,7 @@ local function auto_blocker()
 	-- asked for (an explicit prediction, an answer, the agent's own offer) does.
 	local activity = engine.ai_activity()
 	facts.ai_busy = activity == "explicit" or (engine.is_visible() and activity ~= "automatic")
-	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local ok_tooltip, tooltip = pcall(require, "core.ui.ui.tooltip")
 	facts.hotstring_preview = ok_tooltip and type(tooltip) == "table"
 		and type(tooltip.is_hotstring_visible) == "function" and tooltip.is_hotstring_visible() == true
 	facts.focus_blocked = not (facts.live or facts.ai_busy or facts.hotstring_preview)

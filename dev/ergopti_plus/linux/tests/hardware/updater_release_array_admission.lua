@@ -11,6 +11,8 @@ local M = require("modules.updater.manager")
 -- A checkout's "local" version deliberately skips canonical asset admission.
 M.current_version = function() return "1.0.0" end
 M.release_api_url = function() return origin .. "/releases?per_page=100" end
+-- Assets are admitted only under the release page's own /download/<tag>/ path (UPX-002).
+M.releases_page_url = function() return origin .. "/releases" end
 local native_get, receipt = M._http_client.get
 M._http_client.get = function(url, headers, options, callback)
 	return native_get(url, headers, options, function(result)
@@ -32,7 +34,7 @@ end
 local failures = 0
 for index = 1, 11 do
 	local metadata_file = assert(io.open(root .. "/expected-" .. index .. ".json", "rb"))
-	local metadata = assert(require("json").decode(metadata_file:read("*a")))
+	local metadata = assert(require("core.text.engine.json").decode(metadata_file:read("*a")))
 	assert(metadata_file:close())
 	local answer, calls
 	assert(M.check_for_updates("main", function(available, release, err, result)
@@ -53,8 +55,8 @@ for index = 1, 11 do
 	else
 		good = answer.available == true and answer.release and answer.release.tag == metadata.tag
 			and answer.result.state == "available" and answer.error == nil
-			and answer.release.download_url == origin .. "/never-requested-bundle"
-			and answer.release.checksum_url == origin .. "/never-requested-checksum"
+			and answer.release.download_url == origin .. "/releases/download/" .. answer.release.tag .. "/" .. M.LINUX_ASSET_NAME
+			and answer.release.checksum_url == origin .. "/releases/download/" .. answer.release.tag .. "/" .. M.LINUX_CHECKSUM_ASSET_NAME
 			and M.get_cached_release() == answer.release
 	end
 	if not good then failures = failures + 1 end

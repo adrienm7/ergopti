@@ -121,7 +121,7 @@ local function build_tray(on, extra)
 		ManifestMenu.build = function(...)
 			local args = table.pack(...)
 			previous_build(table.unpack(args, 1, args.n))
-			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.renderer" }, function()
+			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.engine.renderer" }, function()
 				return helpers.load_with_stubs("infra.manifest_menu").build(table.unpack(args, 1, args.n))
 			end)
 		end
@@ -131,8 +131,8 @@ local function build_tray(on, extra)
 	end)
 
 	local errors = {}
-	package.loaded["infra.logger"] = nil
-	local real_logger = require("infra.logger")
+	package.loaded["core.logger.engine.logger"] = nil
+	local real_logger = require("core.logger.engine.logger")
 	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	spy.error = function(module_name, fmt, ...)
@@ -140,10 +140,10 @@ local function build_tray(on, extra)
 		errors[#errors + 1] = tostring(module_name) .. ": " .. (ok and text or tostring(fmt))
 		return real_logger.error(module_name, fmt, ...)
 	end
-	package.loaded["infra.logger"] = spy
+	package.loaded["core.logger.engine.logger"] = spy
 
 	helpers.load_with_stubs("ui.menu.builder")
-	CaptionFixture.install(require("infra.i18n"))
+	CaptionFixture.install(require("core.i18n.engine.i18n"))
 	-- The provider rows the builders hand the renderer, before it drops what no
 	-- tray can use: an action on a row that opens a submenu is lost there.
 	local ManifestMenu = require("infra.manifest_menu")
@@ -153,7 +153,7 @@ local function build_tray(on, extra)
 		if list_id == "top_level" then provided = rows end
 		return render_rows(rows, list_id)
 	end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.build_language_menu_items = function()
 		return { { label = "Français", checked = true, action = function() end } }
 	end
@@ -205,7 +205,7 @@ local function build_tray(on, extra)
 	local builder = require("ui.menu.builder")
 	local ok, tray = pcall(builder.generate, ctx, mods, actions)
 	ManifestMenu.render_rows = render_rows
-	package.loaded["infra.logger"] = nil
+	package.loaded["core.logger.engine.logger"] = nil
 	helpers.assert_true(ok, "Builder.generate raised: " .. tostring(tray))
 	helpers.assert_true(type(provided) == "table", "the tray root must reach the renderer")
 	observed.group_on = group_on
@@ -218,7 +218,7 @@ end
 --- @param key string
 --- @return table|nil
 local function provider_row(rows, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(rows or {}) do
 		if type(row.label) == "string" and row.label:sub(1, #text) == text then return row end
 	end
@@ -230,7 +230,7 @@ end
 --- @param key string
 --- @return table|nil
 local function top_row(tray, key)
-	local text = require("infra.i18n").get(key)
+	local text = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(tray or {}) do
 		if type(row.title) == "string" and row.title:sub(1, #text) == text then return row end
 	end
@@ -243,7 +243,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens each feature submenu with its switch, ticked " .. tostring(posture), function()
 			local tray, _, observed, errors = build_tray(posture)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local checked = 0
 			for _, category in ipairs(CATEGORIES) do
 				local parent = top_row(tray, category.title)
@@ -279,13 +279,13 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 		["menu.tapholds.title"] = "tap_holds_menu", ["menu.gestures.title"] = "gestures_menu",
 	}
 	helpers.it("greys every gated manifest menu but its enable and reader rows", function()
-		require("test.category_off_contract").assert_every_gated_menu(helpers,
-			require("infra.manifest_menu"), require("infra.i18n"), "hs")
+		require("tests.lua.category_off_contract").assert_every_gated_menu(helpers,
+			require("infra.manifest_menu"), require("core.i18n.engine.i18n"), "hs")
 	end)
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("applies the category-off rule to the built tray, on " .. tostring(posture), function()
 			local tray = build_tray(posture)
-			local i18n, Contract = require("infra.i18n"), require("test.category_off_contract")
+			local i18n, Contract = require("core.i18n.engine.i18n"), require("tests.lua.category_off_contract")
 			local ManifestMenu = require("infra.manifest_menu")
 			for _, category in ipairs(CATEGORIES) do
 				Contract.assert_category(helpers, i18n, ManifestMenu.get_array(MENU_KEYS[category.title]),
@@ -300,7 +300,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens « Combinaisons de touches » with its own switch, ticked " .. tostring(posture), function()
 			local tray = build_tray(posture)
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local group = nil
 			local label = i18n.get("menu.shortcuts.key_combinations")
 			for _, row in ipairs(top_row(tray, "menu.shortcuts.title").menu or {}) do
@@ -400,15 +400,16 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 					requests[#requests + 1] = scope .. ":" .. mode
 					return true
 				end })
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local rows = top_row(tray, "menu.hotstrings.title").menu
 			helpers.assert_eq(rows[2].title, i18n.get("common.restore_recommended"))
 			helpers.assert_eq(rows[3].title, i18n.get("common.clear_to_system"))
 			for index = 2, 3 do
 				if type(rows[index].fn) == "function" then rows[index].fn() end
 			end
-			helpers.assert_eq(requests, paused and {} or { "hotstrings:recommended", "hotstrings:clear" },
-				"a paused session never reaches the scope")
+			-- A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+			helpers.assert_eq(requests, { "hotstrings:recommended", "hotstrings:clear" },
+				"a paused session still reaches the scope")
 			for _, line in ipairs(errors) do
 				helpers.assert_true(line:find("scope_", 1, true) == nil, "the renderer reported: " .. line)
 			end

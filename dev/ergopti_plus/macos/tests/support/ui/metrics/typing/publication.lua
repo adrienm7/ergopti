@@ -7,7 +7,7 @@
 --- Quoted payload bytes and publication metadata remain independently observable.
 --- ==============================================================================
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local M = {}
 local CALL = "window.publishTypingMetricsData("
 local PREFIX = CALL .. "JSON.parse("

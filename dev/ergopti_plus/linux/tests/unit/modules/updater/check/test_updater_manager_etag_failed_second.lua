@@ -27,18 +27,18 @@ helpers.describe("modules.updater.manager", function()
 
 	local function release(tag, prerelease)
 		return string.format('{"tag_name":"%s","prerelease":%s,"assets":['
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/bundle"},'
-			.. '{"name":"%s","browser_download_url":"https://example.invalid/%s/sum"}]}',
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_ASSET_NAME .. '"},'
+			.. '{"name":"%s","browser_download_url":"https://github.com/adrienm7/ergopti/releases/download/%s/' .. M.LINUX_CHECKSUM_ASSET_NAME .. '"}]}',
 			tag, tostring(prerelease), M.LINUX_ASSET_NAME, tag, M.LINUX_CHECKSUM_ASSET_NAME, tag)
 	end
 
 	helpers.it("linux-updater-etag: a failed second page keeps the accepted first-page association", function()
-		local previous_fs, previous_manager = package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"]
-		local real_fs = require("adapters.file_system")
-		package.loaded["adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
+		local previous_fs, previous_manager = package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"]
+		local real_fs = require("core.fs.adapters.file_system")
+		package.loaded["core.fs.adapters.file_system"] = setmetatable({ exists = function() return true end }, { __index = real_fs })
 		package.loaded["modules.updater.manager"] = nil
 		local loaded, fresh = pcall(require, "modules.updater.manager")
-		package.loaded["adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
+		package.loaded["core.fs.adapters.file_system"], package.loaded["modules.updater.manager"] = previous_fs, previous_manager
 		helpers.assert_true(loaded and type(fresh) == "table", tostring(fresh))
 		local entries = {}
 		for index = 1, 20 do entries[index] = '{"tag_name":"v1.0.' .. index .. '"}' end
@@ -81,17 +81,17 @@ helpers.describe("modules.updater.manager", function()
 	-- before fetching and a 304 then read as "nothing available": an update
 	-- vanished at the next check, and a manual check said there was none.
 	helpers.it("a 304 keeps the release the previous 200 found available", function()
-		local real_fs = require("adapters.file_system")
-		local previous_fs = package.loaded["adapters.file_system"]
+		local real_fs = require("core.fs.adapters.file_system")
+		local previous_fs = package.loaded["core.fs.adapters.file_system"]
 		local previous_manager = package.loaded["modules.updater.manager"]
 		-- The ETag cache directory exists, so the request is conditional as soon
 		-- as the list it names is held.
-		package.loaded["adapters.file_system"] = setmetatable({
+		package.loaded["core.fs.adapters.file_system"] = setmetatable({
 			exists = function() return true end,
 		}, { __index = real_fs })
 		package.loaded["modules.updater.manager"] = nil
 		local fresh = require("modules.updater.manager")
-		package.loaded["adapters.file_system"] = previous_fs
+		package.loaded["core.fs.adapters.file_system"] = previous_fs
 		package.loaded["modules.updater.manager"] = previous_manager
 
 		local list = "[" .. release("v0.0.0-dev.140", true) .. "," .. release("v1.2.0", false) .. "]"

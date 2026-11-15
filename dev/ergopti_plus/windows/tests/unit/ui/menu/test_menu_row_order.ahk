@@ -4,7 +4,7 @@
 ; MODULE: Menu Row Order Vectors (Windows)
 ; DESCRIPTION:
 ; Replays _shared/tests/corpus/menu/row_order_vectors.json through the Windows
-; reader, as _shared/lua/test/menu_row_order_contract.lua does on macOS and Linux,
+; reader, as _shared/tests/lua/menu/row_order_contract.lua does on macOS and Linux,
 ; and pins the two Windows readers of hotstring_config_categories to the rule.
 ; ==============================================================================
 

@@ -6,7 +6,7 @@
 --- Encapsulates SQLite interactions for the Linux keystats persistence layer.
 --- Uses the `sqlite3` CLI binary (available on every Linux distro) via io.popen
 --- — zero C-library vendoring required. Bootstraps the canonical schema from
---- _shared/data/db/schema.sql and provides INSERT helpers for the core event
+--- _shared/metrics/data/db/schema.sql and provides INSERT helpers for the core event
 --- and aggregate tables consumed by the shared metrics dashboard.
 ---
 --- This module is the Linux counterpart to macOS's modules/keystats/sqlite_writer.lua
@@ -34,29 +34,31 @@
 --- ==============================================================================
 
 local M = {}
-local Errors = require("adapter_errors")
-local TextUtils = require("text_utils")
+local Errors = require("diagnostics.engine.adapter_errors")
+local TextUtils = require("core.text.engine.utils_core")
 
-local Logger        = require("logger.shim")
+local Logger        = require("core.logger.engine.shim")
 local SqliteCommand = require("modules.keystats.sqlite_command")
 local TextCipher    = require("modules.keystats.text_cipher")
-local MigrationPlan = require("keystats.text_migration")
-local EventIdPolicy = require("sqlite.event_id_policy")
-local Json          = require("json")
-local NativePath    = require("native_path")
-local MediaStore    = require("keystats.media_store")
-local AppCategoryStore = require("keystats.app_category_store")
-local RegularFileReader = require("infra.regular_file_reader")
-local ErrorDescription = require("error_description")
-local Queries = require("keystats.queries")
-local TokenEncoding = require("keystats.token_encoding")
+local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
+local EventIdPolicy = require("core.fs.engine.sqlite.event_id_policy")
+local Json          = require("core.text.engine.json")
+local NativePath    = require("core.fs.engine.native_path")
+local MediaStore    = require("metrics.engine.media.store")
+local AppCategoryStore = require("metrics.engine.apps.category_store")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
+local FileSystem = require("core.fs.adapters.file_system")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
+local Queries = require("metrics.engine.queries")
+local LocalTime = require("metrics.engine.local_time")
+local TokenEncoding = require("metrics.engine.privacy.token_encoding")
 local PrivateSqlite = nil
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
 -- over with the same number and two independent caps would disagree the day
 -- either is tuned.
-local SESSION_DURATIONS_CAP = require("keystats.aggregator_helpers").SESSION_DURATIONS_CAP
+local SESSION_DURATIONS_CAP = require("metrics.engine.aggregator.helpers").SESSION_DURATIONS_CAP
 
 local LOG = "modules.keystats.sqlite_writer"
 
@@ -267,6 +269,20 @@ local function _reserve_event_ids(count)
 	return first
 end
 
+--- Renders one raw row of this device with its recorded offset: Linux stamps
+--- `ts` in UTC, and the row stores the local UTC offset of that instant here
+--- (maintainer decision KMD-1 of 11 November 2026), what hour-of-day, night
+--- wakes and the other drivers' rebuilds read the lived local time from.
+--- @param name string Catalogue statement (events.*).
+--- @param dialect string Catalogue dialect.
+--- @param params table The row's values, without utc_offset_min.
+--- @return string sql
+local function _render_event(name, dialect, params)
+	assert(params.utc_offset_min == nil, "a Linux row's offset is the one of its UTC instant")
+	params.utc_offset_min = LocalTime.offset_of_utc(params.ts)
+	return Queries.render(name, dialect, params)
+end
+
 --- Reads the canonical schema file from the _shared tree.
 --- @return string|nil Schema SQL, or nil on failure.
 local function _read_schema()
@@ -275,14 +291,14 @@ local function _read_schema()
 	-- made schema loading depend on the process's current directory rather than
 	-- on where the driver is installed. Started from anywhere but one exact
 	-- directory, the keystats came up with no schema at all.
-	local Paths = require("infra.paths")
-	local schema_path = Paths.shared("data/db/schema.sql")
+	local Paths = require("core.fs.engine.paths")
+	local schema_path = Paths.shared("metrics/data/db/schema.sql")
 	if not schema_path then
 		Logger.error(LOG, "Cannot locate the shared tree — schema.sql is unreachable.")
 		return nil
 	end
 
-	local content, status, detail = require("adapters.file_system").read_with_status(schema_path)
+	local content, status, detail = require("core.fs.adapters.file_system").read_with_status(schema_path)
 	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "Cannot read schema.sql at %s: %s.", schema_path, ErrorDescription.describe(detail or status))
 		return nil
@@ -292,9 +308,9 @@ end
 
 --- Reads packaged media data through the existing classified native file port.
 local function _read_media_resource(relative)
-	local path = require("infra.paths").shared(relative)
+	local path = require("core.fs.engine.paths").shared(relative)
 	if type(path) ~= "string" then return nil end
-	local body, status = require("adapters.file_system").read_with_status(path)
+	local body, status = require("core.fs.adapters.file_system").read_with_status(path)
 	if status ~= "ok" or type(body) ~= "string" then
 		Logger.error(LOG, "Cannot read packaged semantic media resource.")
 		return nil
@@ -302,13 +318,57 @@ local function _read_media_resource(relative)
 	return body
 end
 
+--- Reads, in one sqlite3 process, the two facts an open checks before writing:
+--- the raw tables that lack utc_offset_min and the device registry's DDL. Each
+--- sqlite3 query is a shell and a process (about 4 ms of boot), and neither
+--- read depends on the other's upgrade: the registry rebuild touches devices
+--- alone, never a raw table. The missing tables come first, one known name
+--- per line, so the DDL is the exact remainder (multiline, as sqlite_master
+--- keeps it) and can never be mistaken for one of them.
+--- @return table|nil missing Raw table names without the column, nil when the read failed.
+--- @return string|nil devices_sql The registry DDL as the CLI prints it, "" when absent.
+local function _read_open_probe()
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
+	local output = _query_output(UtcOffsetColumn.missing_query()
+		.. "\nSELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
+	if output == nil then return nil, nil end
+	local known = {}
+	for _, name in ipairs(UtcOffsetColumn.TABLES) do known[name] = true end
+	local missing, position = {}, 1
+	while true do
+		local line, after = output:match("^([^\n]*)\n()", position)
+		if not line or not known[line] then break end
+		missing[#missing + 1] = line
+		position = after
+	end
+	return missing, output:sub(position)
+end
+
+--- Adds utc_offset_min to the raw tables of a store created before it (maintainer
+--- decision KMD-1 of 11 November 2026) and retires the purge triggers written
+--- before it, in one transaction; _ensure_media_schema, next in the same open,
+--- creates the current triggers. A fresh store has the column from schema.sql.
+--- @param missing table Raw table names without the column, from _read_open_probe.
+--- @return boolean True once every raw table has the column.
+local function _ensure_utc_offset_column(missing)
+	local UtcOffsetColumn = require("metrics.engine.utc_offset_column")
+	local statements = UtcOffsetColumn.statements(missing)
+	if #statements == 0 then return true end
+	if not _exec_raw_batch(table.concat(statements, "\n")) then
+		Logger.error(LOG, "The UTC offset column could not be added; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store gained the UTC offset column on %d raw table(s); older rows keep none.", #missing)
+	return true
+end
+
 --- Admits only the committed five-key policy and additive schema before writes.
 --- The purge tombstone triggers (purge_schema.sql) join the same startup
 --- transaction, so a store bootstrapped before them applies a tombstone too.
 local function _ensure_media_schema()
-	local schema = _read_media_resource("data/db/media_schema.sql")
-	local purge = _read_media_resource("data/db/purge_schema.sql")
-	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
+	local schema = _read_media_resource("metrics/data/db/media_schema.sql")
+	local purge = _read_media_resource("metrics/data/db/purge_schema.sql")
+	local catalogue = _read_media_resource("layouts/data/keycodes/metrics_media_keys.json")
 	if schema == nil or purge == nil or catalogue == nil then return false end
 	local ok, policy, transaction = pcall(function()
 		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema .. "\n" .. purge)
@@ -352,15 +412,11 @@ local LEGACY_DEVICE_SCHEMAS = {
 --- Upgrades databases created before Linux was accepted by devices.os.
 --- The raw event tables deliberately have no foreign keys, but registration
 --- must still succeed so the database remains portable across all three OSes.
-local function _ensure_linux_device_schema()
+--- @param current_sql string The registry DDL read by _read_open_probe.
+local function _ensure_linux_device_schema(current_sql)
 	-- sqlite_master preserves multiline DDL. The scalar helper reads only its
 	-- first line, so it missed the existing Linux CHECK and rebuilt the current
 	-- registry on every start, dropping indexes and requiring a write lock.
-	local current_sql = _query_output("SELECT sql FROM sqlite_master WHERE type='table' AND name='devices';")
-	if current_sql == nil then
-		Logger.error(LOG, "Cannot inspect the existing device registry schema.")
-		return false
-	end
 	if current_sql:find("linux", 1, true) then return true end
 	if not LEGACY_DEVICE_SCHEMAS[current_sql] then
 		Logger.error(LOG, "Cannot safely upgrade an unrecognized legacy device registry schema.")
@@ -371,7 +427,7 @@ local function _ensure_linux_device_schema()
 	-- they made every legacy store they reached look user-extended, so the
 	-- upgrade was refused for good. They are this schema's own: the rebuild
 	-- drops them and _ensure_media_schema, next in the same open, creates them.
-	local purge = _read_media_resource("data/db/purge_schema.sql")
+	local purge = _read_media_resource("metrics/data/db/purge_schema.sql")
 	if purge == nil then return false end
 	local owned_triggers, owned_names, drops = {}, {}, {}
 	for name in purge:gmatch("CREATE TRIGGER IF NOT EXISTS ([%w_]+)") do
@@ -447,7 +503,7 @@ function M.has_private_file_debt() return PrivateSqlite ~= nil and PrivateSqlite
 --- A minimal daemon without luv may still read the last committed database.
 --- @return boolean
 function M.flush_transport_available()
-	return require("infra.sqlite_batch_process").is_available() == true
+	return require("core.fs.engine.sqlite_batch_process").is_available() == true
 end
 
 --- Reserves a private, unique folder for this attempt. Earlier backups are
@@ -544,6 +600,52 @@ function M.ensure_token_encoding()
 	return true
 end
 
+--- The meta keys of the awake_ms definition (maintainer decision KMD-3 of
+--- 11 November 2026): awake_ms is the time of finished keep-awake sessions, as
+--- on Windows and macOS, no longer sampled unlocked uptime.
+M.AWAKE_DEFINITION = { key = "linux_awake_ms_definition", value = "keep_awake_sessions",
+	since_key = "linux_awake_ms_since" }
+
+--- Moves a store's awake_ms to the keep-awake definition, once. The days this
+--- device recorded before hold sampled unlocked uptime, which no other driver
+--- measures and no rebuild reproduces (every rebuild sums the keep-awake
+--- passive periods): they are set to what a rebuild gives, 0, in the same
+--- transaction that records the definition and the first local date it holds
+--- for, so a reader tells the two periods apart and never adds them.
+--- @param device_id string This device's id.
+--- @param today string The local date, "YYYY-MM-DD".
+--- @return boolean True once the store holds the current definition.
+function M.ensure_awake_definition(device_id, today)
+	assert(type(device_id) == "string" and device_id ~= "", "the awake_ms migration needs the device id")
+	assert(type(today) == "string" and today:match("^%d%d%d%d%-%d%d%-%d%d$"), "the awake_ms migration needs the local date")
+	local definition = M.AWAKE_DEFINITION
+	local recorded = _query_output(string.format("SELECT 'definition:' || hex(CAST(value AS BLOB)) FROM meta WHERE key='%s';",
+		definition.key))
+	if recorded == nil then
+		Logger.error(LOG, "Cannot read the awake_ms definition of the metrics store.")
+		return false
+	end
+	local expected = definition.value:gsub(".", function(ch) return string.format("%02X", ch:byte()) end)
+	if recorded == "definition:" .. expected .. "\n" then return true end
+	if recorded ~= "" then
+		Logger.error(LOG, "The metrics store names an unknown awake_ms definition.")
+		return false
+	end
+	local quoted = device_id:gsub("'", "''")
+	local batch = table.concat({
+		string.format("UPDATE agg_system_day SET awake_ms = 0 WHERE device_id = '%s';", quoted),
+		string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s','%s');", definition.key, definition.value),
+		string.format("INSERT OR REPLACE INTO meta (key, value) VALUES ('%s','%s');", definition.since_key, today),
+	}, "\n")
+	if not _exec_raw_batch(batch) then
+		Logger.error(LOG, "The awake_ms migration was refused; the store is unchanged.")
+		return false
+	end
+	Logger.info(LOG, "Metrics store moved to the keep-awake awake_ms definition (from %s; earlier sampled uptime cleared).",
+		today)
+	return true
+end
+
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
@@ -575,12 +677,15 @@ function M.open_db(db_path)
 
 	_db_path = db_path
 
-	-- Ensure the parent directory exists.
+	-- Ensure the parent directory exists. The metadata probe runs in process;
+	-- the shell and mkdir it spares were a process on every start.
 	local dir = NativePath.dirname(db_path) or "."
-	os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
+	if not FileSystem.exists(dir) then
+		os.execute(string.format("mkdir -p %s 2>/dev/null", TextUtils.shell_quote(dir)))
+	end
 
 	-- Typed records stay private even when the selected parent is shared.
-	PrivateSqlite = PrivateSqlite or require("infra.private_sqlite_file")
+	PrivateSqlite = PrivateSqlite or require("core.fs.engine.private_sqlite_file")
 	local private, privacy_error = PrivateSqlite.admit(_db_path)
 	if not private then
 		Logger.error(LOG, "SQLite permissions admission refused: %s.", privacy_error)
@@ -628,8 +733,21 @@ function M.open_db(db_path)
 			Logger.success(LOG, "Schema bootstrapped successfully.")
 		end
 	end
-	if not _ensure_linux_device_schema() then
+	local missing_utc, devices_sql = _read_open_probe()
+	if missing_utc == nil then
+		Logger.error(LOG, "Cannot inspect the device registry and the raw tables' UTC offset column.")
+		_bootstrapped = false
+		_db_path = nil
+		return false, "store_refused"
+	end
+	if not _ensure_linux_device_schema(devices_sql) then
 		Logger.error(LOG, "Unable to upgrade device registry for Linux support.")
+		_bootstrapped = false
+		_db_path = nil
+		return false, "store_refused"
+	end
+
+	if not _ensure_utc_offset_column(missing_utc) then
 		_bootstrapped = false
 		_db_path = nil
 		return false, "store_refused"
@@ -822,7 +940,7 @@ _raw_sql.typing = function(device_id, events, first_id, derived)
 
 		-- WPM is a fractional rate in a REAL column, not an integer counter. The
 		-- pointer activity is since the application's previous row (pointer_metrics).
-		statements[i] = Queries.render("events.typing", "cli_json", {
+		statements[i] = _render_event("events.typing", "cli_json", {
 			device_id = device_id, id = event_id,
 			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
 			app = ev.app or "unknown", title = ev.title or "", url = "", field_role = "",
@@ -880,7 +998,7 @@ end
 _raw_sql.hotstrings = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.hotstring", "cli_json", {
+		statements[#statements + 1] = _render_event("events.hotstring", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -938,7 +1056,7 @@ _raw_sql.llm = function(device_id, events, first_id)
 			Logger.error(LOG, "LLM event batch refused: '%s' is not an events_llm kind.", tostring(kind))
 			return nil
 		end
-		statements[i] = Queries.render("events.llm", "cli_json", {
+		statements[i] = _render_event("events.llm", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = ev.ts or os.date("!%Y-%m-%d %H:%M:%S"), date = ev.date or os.date("%Y-%m-%d"),
 			app = ev.app or "unknown", kind = kind,
@@ -980,7 +1098,7 @@ end
 _raw_sql.shortcuts = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.shortcut", "cli_json", {
+		statements[#statements + 1] = _render_event("events.shortcut", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -1007,7 +1125,7 @@ end
 _raw_sql.switches = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.app_switch", "cli_json", {
+		statements[#statements + 1] = _render_event("events.app_switch", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts or os.date("!%Y-%m-%d %H:%M:%S")),
 			date = _text(ev.date or os.date("%Y-%m-%d")),
@@ -1025,7 +1143,7 @@ end
 _raw_sql.windows = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
-		statements[#statements + 1] = Queries.render("events.window_switch", "cli_json", {
+		statements[#statements + 1] = _render_event("events.window_switch", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), app = _text(ev.app),
 			prev_title = _text(ev.prev_title), next_title = _text(ev.next_title),
@@ -1048,7 +1166,7 @@ _raw_sql.sessions = function(device_id, events, first_id)
 			Logger.error(LOG, "Session event batch refused: '%s' is not an events_session kind.", tostring(ev.kind))
 			return nil
 		end
-		statements[#statements + 1] = Queries.render("events.session", "cli_json", {
+		statements[#statements + 1] = _render_event("events.session", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind,
 			duration_ms = type(ev.duration_ms) == "number" and math.floor(ev.duration_ms) or nil,
@@ -1064,7 +1182,7 @@ _raw_sql.system = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(type(ev.action) == "string" and ev.action ~= "", "a system event needs its action")
-		statements[#statements + 1] = Queries.render("events.system", "cli_json", {
+		statements[#statements + 1] = _render_event("events.system", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), action = ev.action,
 			metadata_json = type(ev.metadata) == "table" and Json.encode(ev.metadata) or nil,
@@ -1079,7 +1197,7 @@ _raw_sql.network = function(device_id, events, first_id)
 	local statements = {}
 	for i, ev in ipairs(events) do
 		assert(type(ev.kind) == "string" and ev.kind ~= "", "a network event needs its kind")
-		statements[#statements + 1] = Queries.render("events.network", "cli_json", {
+		statements[#statements + 1] = _render_event("events.network", "cli_json", {
 			device_id = device_id, id = first_id + i - 1,
 			ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
 			meta_json = Json.encode(type(ev.meta) == "table" and ev.meta or {}),
@@ -1087,6 +1205,49 @@ _raw_sql.network = function(device_id, events, first_id)
 	end
 	return table.concat(statements, "\n")
 end
+
+--- Renders clipboard copy, paste and burst rows as the Windows events_clipboard
+--- rows, through the one statement both Lua drivers share.
+--- @param events table Array of { ts, date, kind, app, meta }.
+_raw_sql.clipboard = function(device_id, events, first_id)
+	local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
+	local statements = {}
+	for i, ev in ipairs(events) do
+		assert(ClipboardEvents.KINDS[ev.kind] and type(ev.meta) == "table", "Invalid clipboard event")
+		local ts = _text(ev.ts)
+		statements[#statements + 1] = ClipboardEvents.insert_sql({
+			device_id = device_id, id = first_id + i - 1,
+			ts = ts, date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
+			meta_json = Json.encode(ev.meta), utc_offset_min = LocalTime.offset_of_utc(ts),
+		})
+	end
+	return table.concat(statements, "\n")
+end
+
+--- Renders one family of the Windows generic (kind, app, meta_json) rows.
+--- @param statement string Catalogue statement.
+--- @param kinds table The family's kinds and their metadata keys.
+--- @return function renderer (device_id, events, first_id) -> sql
+local function _kind_meta_rows(statement, kinds)
+	return function(device_id, events, first_id)
+		local statements = {}
+		for i, ev in ipairs(events) do
+			assert(kinds[ev.kind] ~= nil and type(ev.meta) == "table", "Invalid " .. statement .. " event")
+			statements[i] = _render_event(statement, "cli_json", {
+				device_id = device_id, id = first_id + i - 1,
+				ts = _text(ev.ts), date = _text(ev.date), kind = ev.kind, app = _text(ev.app),
+				meta_json = Json.encode(ev.meta),
+			})
+		end
+		return table.concat(statements, "\n")
+	end
+end
+
+--- Window geometry, state and monitor changes as the Windows events_window_topo rows.
+_raw_sql.window_topo = _kind_meta_rows("events.window_topo", require("metrics.engine.system.window_topology").KINDS)
+
+--- Capture-program presence as the Windows events_av rows.
+_raw_sql.av = _kind_meta_rows("events.av", require("metrics.engine.capture_presence").KINDS)
 
 --- Renders the portable trigger ROI payload without dropping its typed metadata.
 --- @param events table Array of { ts, date, kind, app, meta }.
@@ -1102,7 +1263,7 @@ _raw_sql.roi = function(device_id, events, first_id)
 			end
 			assert(type(event.meta.session_saved) == "number" and type(event.meta.session_fired) == "number", "Incomplete ROI snapshot")
 		end
-		statements[index] = Queries.render("events.roi", "cli_json", {
+		statements[index] = _render_event("events.roi", "cli_json", {
 			device_id = device_id, id = first_id + index - 1,
 			ts = event.ts, date = event.date, kind = event.kind, app = event.app,
 			meta_json = Json.encode(event.meta),
@@ -1147,6 +1308,36 @@ function M.insert_network_events(device_id, events)
 	local first_id = _reserve_event_ids(#events)
 	if not first_id then return false end
 	local sql = _compose_raw("network", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw clipboard batch and returns its native receipt.
+function M.insert_clipboard_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("clipboard", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw window-topology batch and returns its native receipt.
+function M.insert_window_topo_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("window_topo", device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
+end
+
+--- Commits one canonical raw capture-presence batch and returns its native receipt.
+function M.insert_av_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _compose_raw("av", device_id, events, first_id)
 	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
@@ -1411,7 +1602,7 @@ end
 -- so the three drivers cap at the same place; the schema's own comment says the
 -- trimming belongs to the ingest pipeline, which is here.
 local TITLE_CAP_PER_APP_DAY =
-	require("keystats.aggregator_helpers").TITLE_CAP_PER_APP_DAY
+	require("metrics.engine.aggregator.helpers").TITLE_CAP_PER_APP_DAY
 
 --- Upserts one window title's counters for an application-day.
 ---
@@ -1826,9 +2017,9 @@ function M.start_flush(device_id, payload)
 	if not M.is_available() or (_flush_owner and not _flush_owner:is_settled()) then return nil end
 	assert(type(device_id) == "string" and device_id ~= "")
 	assert(type(payload) == "table" and type(payload.raw) == "table" and type(payload.upserts) == "table")
-	local Process = require("infra.sqlite_batch_process")
+	local Process = require("core.fs.engine.sqlite_batch_process")
 	if not Process.is_available() then return nil end
-	local timeout_ms = require("infra.timings").ms("keystats", "sqlite_operation_timeout_ms")
+	local timeout_ms = require("core.timing.engine.timings").ms("keystats", "sqlite_operation_timeout_ms")
 	local function array(values)
 		assert(type(values) == "table", "Invalid SQLite flush array")
 		local length, entries = #values, 0
@@ -1852,6 +2043,9 @@ function M.start_flush(device_id, payload)
 	payload.raw.system = payload.raw.system or {}
 	payload.raw.media = payload.raw.media or {}
 	payload.raw.network = payload.raw.network or {}
+	payload.raw.clipboard = payload.raw.clipboard or {}
+	payload.raw.window_topo = payload.raw.window_topo or {}
+	payload.raw.av = payload.raw.av or {}
 	payload.raw.roi = payload.raw.roi or {}
 	array(payload.raw.roi)
 	-- New ROI text cannot enter an owned persistence operation under encryption.
@@ -1868,7 +2062,7 @@ function M.start_flush(device_id, payload)
 	local media_threshold_ms = payload.media_threshold_ms
 	local path, count = _db_path, 0
 	local families = { "typing", "hotstrings", "shortcuts", "switches", "llm", "windows", "sessions", "system", "media",
-		"network", "roi" }
+		"network", "clipboard", "window_topo", "av", "roi" }
 	for _, name in ipairs(families) do
 		array(payload.raw[name])
 		count = count + #payload.raw[name]

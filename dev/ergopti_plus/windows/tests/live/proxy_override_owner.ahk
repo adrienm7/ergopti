@@ -46,14 +46,14 @@ ConfigCommitUpdates(Path, Updates, Context, WriterFn := 0, NotifyFn := 0, Publis
 	return true
 }
 
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\json.ahk
-#Include ..\..\adapters\crypto.ahk
-#Include ..\..\adapters\file_system.ahk
-#Include ..\..\adapters\process_lifecycle.ahk
-#Include ..\..\adapters\shell_runner.ahk
-#Include ..\..\adapters\http_client.ahk
-#Include ..\..\ui\proxy_override.ahk
+#Include ..\..\core\logger\engine\tick_count.ahk
+#Include ..\..\core\text\engine\json.ahk
+#Include ..\..\core\crypto\crypto.ahk
+#Include ..\..\core\fs\adapters\file_system.ahk
+#Include ..\..\core\process\adapters\lifecycle.ahk
+#Include ..\..\core\process\adapters\shell_runner.ahk
+#Include ..\..\core\network\adapters\http_client.ahk
+#Include ..\..\core\network\proxy_override.ahk
 
 _OwnerMain(A_Args[1])
 
@@ -72,7 +72,7 @@ _OwnerMain(PlanPath) {
 	Plan := JsonParse(FileRead(PlanPath, "UTF-8"))
 	_SharedDir := Plan["shared"]
 	_VendorDir := Plan["vendor"]
-	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	_OwnerTexts := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\en.json", "UTF-8"))
 	Declaration := ProxyOverride_Declaration()
 	Features := Map(Declaration["section"], Map(Declaration["key"], Plan["stored"] is String ? Plan["stored"] : ""))
 	Result := Map("published", ProxyOverride_Publish(Plan["stored"]))

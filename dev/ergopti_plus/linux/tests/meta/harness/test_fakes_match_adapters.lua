@@ -35,13 +35,13 @@ local Fakes = helpers.load_module("tests.fakes")
 -- underscore) are excluded: they are seams for the real adapter's own tests and
 -- carry no contract for a caller.
 local PAIRS = {
-	{ adapter = "adapters.uinput_writer",   make = function() return Fakes.uinput_writer() end },
-	{ adapter = "adapters.evdev_reader",    make = function() return Fakes.evdev_reader() end },
-	{ adapter = "adapters.shell_runner",    make = function() return Fakes.shell_runner() end },
-	{ adapter = "adapters.storage",         make = function() return Fakes.storage() end },
+	{ adapter = "platform.input.uinput_writer",   make = function() return Fakes.uinput_writer() end },
+	{ adapter = "platform.input.evdev_reader",    make = function() return Fakes.evdev_reader() end },
+	{ adapter = "core.process.adapters.shell_runner",    make = function() return Fakes.shell_runner() end },
+	{ adapter = "core.fs.adapters.storage",         make = function() return Fakes.storage() end },
 	{ adapter = "adapters.clipboard",       make = function() return Fakes.clipboard() end },
-	{ adapter = "adapters.timer_scheduler", make = function() return Fakes.timer_scheduler() end },
-	{ adapter = "adapters.notifier",        make = function() return Fakes.notifier() end },
+	{ adapter = "core.events.timer_scheduler", make = function() return Fakes.timer_scheduler() end },
+	{ adapter = "platform.system.notifier",        make = function() return Fakes.notifier() end },
 	-- Not under adapters/, but the same relationship and the same failure mode:
 	-- four test files each carried their own literal table of writer methods, and
 	-- adding four functions to the writer broke all four at the call site.

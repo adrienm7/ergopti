@@ -9,24 +9,24 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.json_codec",
-	"adapters.file_system",
+	"core.fs.adapters.json_codec",
+	"core.fs.adapters.file_system",
 	"hs",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"modules.llm.network_env",
 	"modules.llm.opaque_network_admission",
 	"ui.download_window",
 	"ui.download_window.javascript",
-	"ui.ui_builder",
-	"infra.paths",
-	"infra.deferred_work",
+	"core.ui.ui.builder",
+	"core.fs.engine.paths",
+	"core.timing.engine.deferred_work",
 	"ui.menu.menu_llm.model_switcher",
 	"ui.menu.menu_llm.prediction_lock_registry",
 	"ui.menu.menu_llm.models_manager_mlx_download",
@@ -80,7 +80,7 @@ local function with_fixture(plan, callback)
 				tasks = {launcher = {}, tail = {}},
 			}
 
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				classify_no_follow = function(path)
 					if plan.session_classify_failure then return nil, "error" end
 					if controls.files[path] == nil then return nil, "absent" end
@@ -477,15 +477,15 @@ local function with_fixture(plan, callback)
 				local ok, rendered = pcall(string.format, tostring(message), ...)
 				records.errors[#records.errors + 1] = ok and rendered or tostring(message)
 			end
-			package.loaded["infra.logger"] = logger_stub
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.logger.engine.logger"] = logger_stub
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 				format = function(key, value) return key .. ":" .. tostring(value) end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				block_alert = function() return "button.cancel" end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(...)
 					records.notifications[#records.notifications + 1] = table.pack(...)
 					return true
@@ -515,11 +515,11 @@ local function with_fixture(plan, callback)
 			}
 			if plan.real_window then
 				_G.hs.timer.secondsSinceEpoch = function() return 100 end
-				package.loaded["infra.paths"] = { shared = function()
+				package.loaded["core.fs.engine.paths"] = { shared = function()
 					return helpers.driver_root() .. "../_shared"
 				end }
-				package.loaded["infra.deferred_work"] = { after = function() return true end }
-				package.loaded["ui.ui_builder"] = {
+				package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+				package.loaded["core.ui.ui.builder"] = {
 					get_app_geometry = function() return { width = 460, height = 380 } end,
 					show_webview = function(options)
 						local native = { options = options }

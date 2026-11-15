@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -27,8 +27,8 @@ local function read_json(path)
 	return assert(json.decode(raw), path .. " is not valid JSON")
 end
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 package.loaded["modules.gestures.engine"] = nil
 package.loaded["modules.gestures.actions"] = nil
 package.loaded["modules.gestures.conflicts"] = nil
@@ -60,7 +60,7 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 	--- @param ui_locale string
 	--- @param scenario function
 	local function with_interface(ui_locale, scenario)
-		local i18n = package.loaded["infra.i18n"]
+		local i18n = package.loaded["core.i18n.engine.i18n"]
 		local saved_get, saved_format, saved_locale = i18n.get, i18n.format, i18n.get_locale
 		i18n.get_locale = function() return ui_locale end
 		i18n.get = function(key)
@@ -77,8 +77,8 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 	end
 
 	helpers.it("lists the interface language first, then every shipped locale in menu order", function()
-		local names = read_json("data/locale_names.json")
-		local order = read_json("data/locale_order.json").order
+		local names = read_json("core/i18n/data/locale_names.json")
+		local order = read_json("core/i18n/data/locale_order.json").order
 		with_interface("fr", function()
 			local choices = Actions.llm_language_choices()
 			helpers.assert_eq(#choices, 22, "the interface language and the 21 shipped locales")
@@ -91,7 +91,7 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 			end
 
 			local prompt = Actions.parameter_prompt(ACTION)
-			helpers.assert_eq(prompt, "Languages:\n" .. tostring(read_json("modules/llm/translate.json").max_language_bytes),
+			helpers.assert_eq(prompt, "Languages:\n" .. tostring(read_json("ai/data/translate.json").max_language_bytes),
 				"the InputBox substitutes the declared byte limit instead of a locale catalogue")
 		end)
 	end)
@@ -104,6 +104,6 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 
 	helpers.it("refuses with the llm_language error text", function()
 		helpers.assert_eq(Actions.parameter_error(ACTION),
-			package.loaded["infra.i18n"].get("dialog.gestures.param_err_llm_language"))
+			package.loaded["core.i18n.engine.i18n"].get("dialog.gestures.param_err_llm_language"))
 	end)
 end)

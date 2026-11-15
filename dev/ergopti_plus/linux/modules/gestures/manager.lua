@@ -24,7 +24,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. Slot key-space and action catalogue shared with the other drivers,
----    generated from `_shared/modules/actions/actions.toml` into
+---    generated from `_shared/shortcuts/data/actions/actions.toml` into
 ---    `_generated/action_catalogue.lua` so none of them can drift.
 --- 2. NO default bindings on this driver. The desktop acts on the same gesture —
 ---    every compositor claims 3- and 4-finger swipes, and two-finger motion is
@@ -37,36 +37,36 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local BindingIdentity = require("config_binding_identity")
-local KeyboardPublication = require("config_keyboard_publication")
-local BindingPublication = require("config_binding_publication")
-local Paths = require("infra.paths")
-local Timings = require("infra.timings")
-local Monotonic = require("infra.monotonic")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local BindingIdentity = require("settings.engine.publication.binding_identity")
+local KeyboardPublication = require("settings.engine.publication.keyboard_publication")
+local BindingPublication = require("settings.engine.publication.binding_publication")
+local Paths = require("core.fs.engine.paths")
+local Timings = require("core.timing.engine.timings")
+local Monotonic = require("core.logger.engine.monotonic")
 local Manifest = require("infra.manifest_reader")
-local ParameterLabel = require("action_parameter_label")
-local ProgramParameter = require("program_parameter")
+local ParameterLabel = require("shortcuts.engine.action_parameter_label")
+local ProgramParameter = require("settings.engine.program_parameter")
 local ProgramOwner = require("modules.gestures.program_owner")
 local UserActions = require("modules.gestures.user_actions")
-local UserActionParameter = require("user_action_parameter")
+local UserActionParameter = require("shortcuts.engine.user_action_parameter")
 local WindowSwitch = require("adapters.window_switch")
-local PromptAction = require("llm.prompt_action")
-local Vision = require("llm.vision")
-local AppParameter = require("app_parameter")
-local TomlCodec = require("toml_codec")
-local i18n = require("infra.i18n")
-local KeyNames = require("keycodes.key_names")
+local PromptAction = require("ai.engine.prediction.prompt_action")
+local Vision = require("ai.engine.prediction.vision")
+local AppParameter = require("apps.engine.parameter")
+local TomlCodec = require("core.text.engine.toml_codec")
+local i18n = require("core.i18n.engine.i18n")
+local KeyNames = require("platform.input.keycodes.key_names")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local AiActions = require("modules.shortcuts.ai_actions")
-local ShellRunner = require("adapters.shell_runner")
-local DesktopNavigation = require("desktop_navigation")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local DesktopNavigation = require("keyboard.engine.desktop_navigation")
 local SystemActions = require("modules.gestures.system_actions")
 local BackgroundCommands = require("modules.gestures.background_commands")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
+local ConfigKeys = require("settings.engine.keys")
 
 -- Retain the admitted issuer at owner construction. Later module/export swaps
 -- cannot appoint another producer or certify unavailable custody.
@@ -92,7 +92,7 @@ if type(DEFAULT_ENABLED) ~= "boolean" then
 end
 
 -- Actions the shared catalogue describes as a single xdotool combo, generated
--- from _shared/modules/actions/actions.toml. Loaded once at require time.
+-- from _shared/shortcuts/data/actions/actions.toml. Loaded once at require time.
 --
 -- Fails loudly rather than falling back to an empty table: an empty table means
 -- 26 gestures silently do nothing, which is indistinguishable from a user
@@ -104,10 +104,10 @@ if not _ok_emit or type(_EMIT_ROWS) ~= "table" then
 		.. "26 gesture actions will not fire. Run `npm run gen`.", tostring(_EMIT_ROWS))
 	_EMIT_ROWS = {}
 end
-local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
+local _writer_ok, TomlWriter = pcall(require, "core.text.engine.toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
 
--- The Linux action catalogue, generated from _shared/modules/actions/actions.toml
+-- The Linux action catalogue, generated from _shared/shortcuts/data/actions/actions.toml
 -- by tools/codegen/codegen-action-catalogue.cjs and already filtered to this
 -- platform: the slot key-space, the picker order with heading levels and locale
 -- keys, and per-action metadata (label key, parameter kind, requirements).
@@ -209,7 +209,7 @@ local _click_holds = require("modules.gestures.click_hold").new(function() retur
 -- =========================================
 
 -- The gesture slot key-space (tap/swipe slot names) is the SINGLE SOURCE shared
--- with the macOS driver, declared once in _shared/modules/actions/actions.toml
+-- with the macOS driver, declared once in _shared/shortcuts/data/actions/actions.toml
 -- under [slots] and carried into this driver's generated catalogue. Only the
 -- default action VALUES below stay Linux-specific.
 
@@ -350,7 +350,7 @@ local MODIFIER_ACTION_COMMANDS = {}
 local MODIFIER_ACTION_GROUPS = {}
 
 local function load_modifier_chords()
-	local path = Paths.shared("modules/actions/modifier_chords.json")
+	local path = Paths.shared("shortcuts/data/actions/modifier_chords.json")
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Could not resolve the shared modifier chords JSON path.")
 		return nil
@@ -364,7 +364,7 @@ local function load_modifier_chords()
 		Logger.warn(LOG, "Shared modifier chords JSON unreadable at '%s'.", path)
 		return nil
 	end
-	local ok_json, json = pcall(require, "json")
+	local ok_json, json = pcall(require, "core.text.engine.json")
 	if not ok_json or type(json) ~= "table" or type(json.decode) ~= "function" then
 		Logger.warn(LOG, "JSON decoder unavailable — modifier chord actions skipped.")
 		return nil
@@ -458,7 +458,7 @@ local MEDIA_TOOL_TIMEOUT_S = 1
 -- missing or refuses. The fallback was `xdotool key XF86...`, which exits zero
 -- and presses nothing under Wayland, so a missing brightnessctl or playerctl
 -- left the action dead with no error.
-local BrightnessActions = require("brightness_actions")
+local BrightnessActions = require("shortcuts.engine.brightness_actions")
 local Brightness = BrightnessActions.load()
 local MEDIA_ACTIONS = {
 	vol_up          = { tool = "pactl set-sink-volume @DEFAULT_SINK@ +5%", key = "XF86AudioRaiseVolume" },
@@ -473,7 +473,7 @@ local MEDIA_ACTIONS = {
 
 --- The webview window each `open_*` action toggles, by action id: closed
 --- opens it, covered brings it to the front, frontmost closes it
---- (ui/webview_manager.lua toggle()).
+--- (core/ui/ui/webview_manager.lua toggle()).
 ---
 --- Data rather than branches so the set can be compared against the shared
 --- catalogue by a gate: a table has a length, a chain of `elseif` does not.
@@ -502,7 +502,7 @@ local OPEN_WINDOW_OPENER = {
 --- freezing them at load would open the wrong directory under a changed
 --- environment.
 local OPEN_PATH = {
-	["open_script_source"]      = function() return require("infra.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
+	["open_script_source"]      = function() return require("core.fs.engine.paths").driver_root() .. "/ergopti_hotstrings.lua" end,
 	["open_config"]             = function(Paths) return Paths.config("config.toml") end,
 	["open_personal_info"]      = function(Paths) return Paths.config("personal_info.toml") end,
 	["open_personal_hotstrings"] = function(Paths) return Paths.config("personal_hotstrings.toml") end,
@@ -638,7 +638,7 @@ local SETTINGS_APPLICATIONS = {
 local BUILTIN_HANDLERS = {
 	["run_program"] = function(binding) return M.run_program(binding) end,
 	-- The user's own command line and file or folder: each value is decoded by
-	-- _shared/lua/user_action_parameter and never logged.
+	-- _shared/user_action_parameter and never logged.
 	["run_command"] = function(binding)
 		local fields = UserActionParameter.parse("command", M.get_action_parameter(binding, "run_command"))
 		if not fields then
@@ -659,7 +659,7 @@ local BUILTIN_HANDLERS = {
 	end,
 	["alt_tab_monitor"] = function(binding) return M.run_window_switch(binding) end,
 	["open_system_settings"] = function()
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		for _, application in ipairs(SETTINGS_APPLICATIONS) do
 			if Shell.has_command(application) then
 				run_background(shell_quote(application))
@@ -780,7 +780,7 @@ local function _execute_action(action_name, go_next, binding)
 	local function _open_driver_surface(name)
 		local window = OPEN_WINDOW[name]
 		if window then
-			local ok, Webview = pcall(require, "ui.webview_manager")
+			local ok, Webview = pcall(require, "core.ui.ui.webview_manager")
 			if not ok or type(Webview.toggle) ~= "function" then
 				-- Loud, because the user asked for a window and none appeared. A
 				-- headless daemon (no GTK, no display) is the ordinary reason and it
@@ -819,7 +819,7 @@ local function _execute_action(action_name, go_next, binding)
 		-- xdg-open on a file that does not exist fails silently, so say so here
 		-- instead: a personal_*.toml the user has never created is the common case
 		-- and "nothing happened" is not a usable answer.
-		local kind, detail, code = require("infra.native_directory").target_kind(target)
+		local kind, detail, code = require("core.fs.engine.native_directory").target_kind(target)
 		if kind == nil and code == "ENOENT" and not target:match("/$") then
 			Logger.warn(LOG, "'%s' points at '%s', which does not exist yet.", name, target)
 		elseif kind == nil and code ~= "ENOENT" then
@@ -838,7 +838,7 @@ local function _execute_action(action_name, go_next, binding)
 	--
 	-- 26 elseif branches used to sit here, each spelling out a combo that the
 	-- macOS and Windows registries also spelled out in their own vocabularies.
-	-- They now come from _shared/modules/actions/actions.toml via
+	-- They now come from _shared/shortcuts/data/actions/actions.toml via
 	-- _generated/gesture_emit_actions.lua. The combos are X11 keysym syntax and
 	-- are Linux's own: Linux and Windows agree far more often than either agrees
 	-- with macOS (alt+F4 and ctrl+Right on both, against cmd+w and alt+right).
@@ -924,7 +924,7 @@ local function _execute_action(action_name, go_next, binding)
 			run_background = function(command) return BackgroundCommands.run(command, action_name, true) end,
 			clipboard = require("adapters.clipboard"),
 			emit_combo = require("modules.gestures.combo_emitter").press,
-			sleep_ms = require("adapters.event_loop").sleep_ms,
+			sleep_ms = require("core.events.loop").sleep_ms,
 		})
 		if not ok then Logger.error(LOG, "Action '%s' failed: %s.", action_name, tostring(err)) end
 		return
@@ -1069,21 +1069,22 @@ function M.get_executable_action_names()
 end
 
 --- Whether one requirement token from the catalogue holds on this machine.
---- @param token string "tool:<binary>", "session:x11", "session:workspaces" or "ai:on".
+--- @param token string "tool:<binary>", "session:x11", "session:workspaces",
+---   "file_manager:folder" or "ai:on".
 --- @return boolean|nil True/false when proven, nil when it cannot be told —
 ---   a probe that could not read the machine must never take a binding away.
 --- @return string|nil hint Localized reason when the requirement is absent.
 local function requirement_holds(token)
 	local tool = token:match("^tool:(.+)$")
 	if tool then
-		local ok, Shell = pcall(require, "adapters.shell_runner")
+		local ok, Shell = pcall(require, "core.process.adapters.shell_runner")
 		if not ok or type(Shell.has_command) ~= "function" then return nil, nil end
 		if Shell.has_command(tool, true) then return true, nil end
 		local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return tool end)
 		return false, hint
 	end
 	if token == "session:x11" then
-		local ok, Display = pcall(require, "infra.display_server")
+		local ok, Display = pcall(require, "core.ui.engine.display_server")
 		if not ok or type(Display.kind) ~= "function" then return nil, nil end
 		local kind = Display.kind()
 		if kind == Display.X11 then return true, nil end
@@ -1102,6 +1103,13 @@ local function requirement_holds(token)
 		end
 		if reason == "unsupported" then return false, i18n.get("dialog.action_picker.requires_workspaces") end
 		return nil, nil
+	end
+	if token == "file_manager:folder" then
+		-- A file manager that publishes its windows' folders (Nautilus): with
+		-- only Thunar, Dolphin or another one installed, the row stays greyed
+		-- with the reason (core/fs/adapters/file_manager_folder.lua).
+		if require("core.fs.adapters.file_manager_folder").supported_installed() then return true, nil end
+		return false, i18n.get("platform_reason.action_file_manager_folder_is_unreadable_on_linux")
 	end
 	if token == "ai:on" then
 		-- The AI menu's switch: nothing of the AI runs while it is off, so the
@@ -1291,6 +1299,8 @@ end
 
 local preserve_scope_clicks = {}
 local stop_reading_preserving_clicks
+-- Defined with the dispatch below; declared here for the incremental tracker.
+local answering_slot
 
 --- Persists and applies the master gesture state as one transaction.
 --- @param enabled boolean
@@ -1427,7 +1437,7 @@ function M.get_action_parameter_spec(action_name)
 	return M.ACTION_PARAMETER_SPECS[action_name]
 end
 
--- The parameter kinds the shortcuts manager parses (_shared/lua/send_input).
+-- The parameter kinds the shortcuts manager parses (_shared/platform/input).
 local SEND_INPUT_KINDS = { text = true, key = true, shortcut = true }
 
 --- Replaces the {1} of a localized template on plain indices: the detail may
@@ -1513,7 +1523,7 @@ function M.get_action_parameter_prompt(action_name)
 	if UserActionParameter.KINDS[spec] then return i18n.get(UserActionParameter.PROMPT_KEYS[spec]) end
 	if spec == "wrap_pair" then
 		local Shortcuts = shortcuts_manager()
-		local WrapPair = require("wrap_pair")
+		local WrapPair = require("keyboard.engine.wrap_pair")
 		local samples = WrapPair.describe(Shortcuts and Shortcuts.get_wrap_pair_list() or {})
 		local template = i18n.get("dialog.gestures.param_wrap_pair")
 		local at = template:find("{1}", 1, true)
@@ -1523,7 +1533,7 @@ function M.get_action_parameter_prompt(action_name)
 	if SEND_INPUT_KINDS[spec] then
 		local vocabulary = send_vocabulary()
 		local detail = spec == "text" and tostring(vocabulary.text_max_code_points)
-			or require("send_input").describe_keys(vocabulary)
+			or require("platform.input.send_input").describe_keys(vocabulary)
 		return fill_placeholder(i18n.get("dialog.gestures.param_" .. spec), detail)
 	end
 	if spec == "llm_prompt" then
@@ -1632,7 +1642,7 @@ end
 --- Captures the actual binding and exact canonical source before native acquisition.
 local function capture_program(binding)
 	if _persist ~= true or type(binding) ~= "string" or not admit_mutation() then return nil end
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 
 	local runtime, section, id = binding_action(binding)
 	if runtime ~= "run_program" then return nil end
@@ -1673,7 +1683,10 @@ function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
 	local inhibitor = package.loaded["modules.keep_awake"]
-	if paused == true and inhibitor and inhibitor.stop() ~= true then commands_settled = false end
+	-- Keep-awake stops with the pause and comes back on resume when it ran.
+	if type(paused) == "boolean" and inhibitor and inhibitor.set_paused(paused) ~= true then
+		commands_settled = false
+	end
 	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
 	return _program_owner.set_paused(paused) and commands_settled
 end
@@ -1716,8 +1729,8 @@ local function capture_window(binding)
 		pair_guard = require("modules.shortcuts.key_combinations").capture_action(binding, action)
 		if type(pair_guard) ~= "function" or pair_guard() ~= true then return nil end
 	end
-	local FileSystem = require("adapters.file_system")
-	local Keyboard = require("adapters.keyboard_hook")
+	local FileSystem = require("core.fs.adapters.file_system")
+	local Keyboard = require("platform.input.keyboard_hook")
 	local physical = Keyboard.physical_source_receipt()
 	if type(physical) ~= "table" or physical.ready ~= true then return nil end
 	if section == "tap_hold" then
@@ -2026,7 +2039,8 @@ function M.apply_scope(mode, deferred)
 	if _parameter_configuration_owner ~= nil then return false end
 	if mode ~= "recommended" and mode ~= "clear" then return false, "invalid gesture scope mode" end
 	if not retire_window_operation() then return false, "native window retirement remains pending" end
-	if _is_paused() then return false, "gesture configuration is paused" end
+	-- A pause stops typing, not configuration (EDD-1): the reader may restart
+	-- under a pause, and dispatch keeps refusing every gesture until resume.
 	if not _persist or type(_config_path) ~= "string" then return false, "gesture persistence is not initialized" end
 	if _scope_owner and _scope_owner.pending() then
 		if not _scope_owner.retry_restore() then return false, "gesture runtime rollback remains pending" end
@@ -2058,7 +2072,7 @@ end
 --- The gesture participant of a composed scope, bound to the retained owner.
 --- @return table participant See config_scope_composition.
 function M.scope_participant()
-	return require("config_scope_participant").synchronous({
+	return require("settings.engine.scope.participant").synchronous({
 		apply = function(mode) return M.apply_scope(mode, true) end,
 		owner = function() return _scope_owner end,
 	})
@@ -2200,6 +2214,12 @@ local function new_incremental(units_x, units_y)
 	return require("modules.gestures.incremental_tracker").new({
 		units_x = units_x, units_y = units_y,
 		mode_of = M.get_mode, step_of = M.get_sensitivity,
+		-- The mode and step are the answering slot's: an axis slot standing in
+		-- for an unbound direction slot keeps its own x1 or incremental.
+		slot_of = function(slot, fingers, direction, dominant)
+			local answer, _, answer_direction = answering_slot(slot, fingers, direction, false, dominant)
+			return answer, answer_direction
+		end,
 		-- Each step runs the slot exactly as a completed swipe would, through
 		-- the same pause, click-fence and axis-slot rules.
 		fire = function(_, fingers, direction, count)
@@ -2243,12 +2263,50 @@ end
 --- @param value number Millimetres, within the shared range.
 --- @return boolean committed
 function M.set_sensitivity(slot, value)
-	local step = require("gestures.sensitivity").coerce(value)
+	local step = require("gestures.engine.sensitivity").coerce(value)
 	if M.DEFAULT_SENSITIVITIES[slot] == nil or step == nil then
 		Logger.warn(LOG, "Refusing gesture step '%s' for '%s'.", tostring(value), tostring(slot))
 		return false
 	end
 	return set_slot_setting(_sensitivities, SENSITIVITIES_SECTION, slot, step)
+end
+
+--- The slot that answers a gesture, and its action.
+---
+--- A straight horizontal swipe whose direction slot is unbound runs the axis
+--- slot of its finger count. The direction slot wins when both are bound, so
+--- an explicit left/right choice is never overridden. Diagonals and taps have
+--- no axis slot. The decoder already applied the shared direction thresholds;
+--- an incremental slot reaches here once per step of travel
+--- (modules/gestures/incremental_tracker.lua), each step through this rule,
+--- and the tracker takes its mode and step from the same answer, as macOS
+--- takes them from resolveSwipeSlot's.
+---
+--- A diagonal whose own slot is unbound runs the slot of its dominant straight
+--- direction (and that one's axis slot), as macOS does; a bound diagonal keeps
+--- its own (maintainer decision of 11 November 2026).
+--- @param slot string The gesture's own slot.
+--- @param dominant string|nil A diagonal's dominant straight direction.
+--- @return string slot, string|nil action, string direction The direction that answers.
+answering_slot = function(slot, fingers, direction, tap, dominant)
+	local action = _actions[slot]
+	if (not action or action == "none") and not tap and dominant and direction:find("_", 1, true) then
+		local straight = string.format("swipe_%d_%s", math.min(fingers, 5), dominant)
+		local answer, answer_action, answer_direction = answering_slot(straight, fingers, dominant, false, nil)
+		if answer_action and answer_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: its dominant direction %s answers.", slot, answer)
+			return answer, answer_action, answer_direction
+		end
+	end
+	if (not action or action == "none") and not tap and (direction == "left" or direction == "right") then
+		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(fingers, 5)]
+		local axis_action = axis_slot and _actions[axis_slot]
+		if axis_action and axis_action ~= "none" then
+			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
+			return axis_slot, axis_action, direction
+		end
+	end
+	return slot, action, direction
 end
 
 --- Runs the action bound to a gesture the decoder has already classified.
@@ -2271,22 +2329,8 @@ function M.dispatch_gesture(gesture)
 		return false
 	end
 
-	local action = _actions[slot]
-	-- A straight horizontal swipe whose direction slot is unbound runs the axis
-	-- slot of its finger count. The direction slot wins when both are bound, so
-	-- an explicit left/right choice is never overridden. Diagonals and taps have
-	-- no axis slot. The decoder already applied the shared direction thresholds;
-	-- an incremental slot reaches here once per step of travel
-	-- (modules/gestures/incremental_tracker.lua), each step through this rule.
-	if (not action or action == "none") and not gesture.tap
-		and (gesture.direction == "left" or gesture.direction == "right") then
-		local axis_slot = AXIS_SLOT_FOR_FINGERS[math.min(gesture.fingers, 5)]
-		local axis_action = axis_slot and _actions[axis_slot]
-		if axis_action and axis_action ~= "none" then
-			Logger.debug(LOG, "%s is unbound: the horizontal axis slot %s answers.", slot, axis_slot)
-			slot, action = axis_slot, axis_action
-		end
-	end
+	local action
+	slot, action = answering_slot(slot, gesture.fingers, gesture.direction, gesture.tap, gesture.dominant)
 	if (_parameter_configuration_owner ~= nil or _gesture_click_fence ~= nil) and (action == "left_click_toggle" or action == "right_click_toggle") then return false end
 	if not action or action == "none" then
 		-- Not a warning. Linux ships no default bindings, so an unbound slot is
@@ -2298,7 +2342,7 @@ function M.dispatch_gesture(gesture)
 
 	-- A pause stops every gesture but the script-control ones, which are how the
 	-- user resumes; the reader keeps running so those still arrive.
-	if _is_paused() and not ScriptActions.is_script_action(action) then
+	if _is_paused() and not ScriptActions.runs_while_paused(action) then
 		Logger.debug(LOG, "Gesture %s → %s held back: the script is paused.", slot, action)
 		return false
 	end
@@ -2358,7 +2402,7 @@ function M.start_reading()
 	if _reading then return true end
 
 	local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
-	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 	local ok_decoder, Decoder = pcall(require, "modules.gestures.mt_decoder")
 	if not (ok_finder and ok_reader and ok_decoder) then
 		Logger.error(LOG, "Gesture reading needs touchpad_finder, evdev_reader and mt_decoder — one is missing.")
@@ -2381,10 +2425,20 @@ function M.start_reading()
 		return false
 	end
 
-	_decoder = Decoder.new()
+	local units_x, units_y = Finder.read_resolution(touchpad.path)
+	-- The third-contact rule measures millimetres: the pad's resolution, or
+	-- libinput's assumed size for a pad that reports none (tap_detector).
+	local mm_x, mm_y = units_x, units_y
+	if not (mm_x and mm_y) then
+		mm_x, mm_y = require("modules.gestures.tap_detector").units_per_mm(Finder.read_axes(touchpad.path))
+	end
+	if not (mm_x and mm_y) then
+		Logger.warn(LOG, "%s reports no MT axes: a resting thumb beside a pair cannot be told from a third finger.",
+			touchpad.path)
+	end
+	_decoder = Decoder.new({ units_per_mm = (mm_x and mm_y) and { x = mm_x, y = mm_y } or nil })
 	_touchpad = touchpad
 	_reading = true
-	local units_x, units_y = Finder.read_resolution(touchpad.path)
 	_incremental = new_incremental(units_x, units_y)
 	if _incremental then
 		Logger.info(LOG, "%s: %d x %d units per mm; incremental swipes count millimetres.", touchpad.path, units_x, units_y)
@@ -2409,7 +2463,7 @@ function M.pump()
 	if _is_paused() then M.release_clicks() end
 	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
-	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+	local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 	if not ok_reader then return 0 end
 
 	local drained, status = Reader.drain(function(event)
@@ -2443,13 +2497,21 @@ function M.release_clicks()
 	return _click_holds.release_all()
 end
 
+--- Releases the held buttons at a physical key press, as Windows' click hold
+--- does (click.ahk GestureOnKeyDown); a press with nothing held costs nothing.
+--- @return boolean True when nothing is held or every mouseup was acknowledged.
+function M.release_clicks_on_activity()
+	if not _click_holds.holding() then return true end
+	return M.release_clicks()
+end
+
 --- Stops reading the touchpad.
 --- @return boolean True only when the reader acknowledges closure.
 local function stop_reading(preserve_clicks)
 	if not _scope_native and not admit_mutation() then return false end
 	local clicks_retired = preserve_clicks == true or M.release_clicks()
 	if _reading then
-		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
+		local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
 		local called, acknowledged, detail = false, nil, "reader close is unavailable"
 		if ok_reader and type(Reader) == "table" and type(Reader.close) == "function" then
 			called, acknowledged, detail = pcall(Reader.close, Reader.TOUCHPAD)
@@ -2644,6 +2706,36 @@ function M.scope_legacy_operations(config)
 	return operations
 end
 
+--- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
+--- outdated configuration, reported and left out. With `mark`, the entries the
+--- loader takes are marked for the unused-key cleanup instead of applied: the
+--- cleanup offered every saved mode and step for deletion before.
+--- @param config table Decoded config.toml.
+--- @param mark function|nil mark(...segments) from config_unused_keys.
+local function load_slot_settings(config, mark)
+	local section = type(config.gestures) == "table" and config.gestures or {}
+	local Sensitivity = require("gestures.engine.sensitivity")
+	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
+		-- A case variant reads in its manifest spelling, as Windows' loader admits it.
+		if type(slot) == "string" then
+			mode = ConfigOutdated.canonical_enum_value(Manifest.find_entry_by_path(MODES_SECTION .. "." .. slot), mode)
+		end
+		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
+			if mark then mark("gestures", "modes", slot) else _modes[slot] = mode end
+		else
+			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
+		end
+	end
+	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
+		local step = Sensitivity.coerce(value)
+		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
+			if mark then mark("gestures", "sensitivities", slot) else _sensitivities[slot] = step end
+		else
+			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
+		end
+	end
+end
+
 --- Marks every config.toml path the gesture loader takes.
 --- @param config table Decoded config.toml.
 --- @param mark function mark(...segments) from config_unused_keys.
@@ -2663,29 +2755,7 @@ function M.mark_config_reads(config, mark)
 		param = function(section_name, key) mark_at(section_name, key) end,
 		enabled = function() mark(CONFIG_SECTION, "enabled") end,
 	})
-end
-
---- Reads [gestures.modes] and [gestures.sensitivities]; an invalid entry is
---- outdated configuration, reported and left out.
---- @param config table Decoded config.toml.
-local function load_slot_settings(config)
-	local section = type(config.gestures) == "table" and config.gestures or {}
-	local Sensitivity = require("gestures.sensitivity")
-	for slot, mode in pairs(type(section.modes) == "table" and section.modes or {}) do
-		if M.DEFAULT_MODES[slot] ~= nil and (mode == M.MODE_SINGLE or mode == M.MODE_INCREMENTAL) then
-			_modes[slot] = mode
-		else
-			ConfigOutdated.report({ "gestures", "modes", tostring(slot) }, "not a swipe slot mode (x1 or incremental)", Logger)
-		end
-	end
-	for slot, value in pairs(type(section.sensitivities) == "table" and section.sensitivities or {}) do
-		local step = Sensitivity.coerce(value)
-		if M.DEFAULT_SENSITIVITIES[slot] ~= nil and step ~= nil then
-			_sensitivities[slot] = step
-		else
-			ConfigOutdated.report({ "gestures", "sensitivities", tostring(slot) }, "not a swipe slot step in range", Logger)
-		end
-	end
+	load_slot_settings(config, mark)
 end
 
 local function load_user_config(path)

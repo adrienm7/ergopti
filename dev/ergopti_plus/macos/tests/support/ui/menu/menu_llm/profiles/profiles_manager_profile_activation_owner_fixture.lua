@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 
 local MODULES = {
-	"adapters.timer_scheduler",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
+	"core.events.timer_scheduler",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
 	"infra.manifest_menu",
-	"infra.notifications",
+	"core.ui.engine.notifications",
 	"modules.llm",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -48,17 +48,17 @@ local function with_profiles_fixture(options, body)
 		local error_count = 0
 		local editor_calls = 0
 		local timers = {}
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			block_alert = function() return "button.delete" end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 		}
 		local logger = helpers.make_logger_stub()
 		logger.error = function() error_count = error_count + 1 end
-		package.loaded["infra.logger"] = logger
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_, callback)
 				local handle = { callback = callback, timer = {} }
 				timers[#timers + 1] = handle
@@ -67,21 +67,21 @@ local function with_profiles_fixture(options, body)
 			onSettled = function(handle, callback) handle.on_settled = callback; return true end,
 			cancel = function(handle) handle.timer = nil; if handle.on_settled then handle.on_settled() end; return true end,
 		}
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
 			manifest_path = function()
-				return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+				return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 			end,
-			json_decode = require("json").decode,
-			i18n = package.loaded["infra.i18n"],
-			logger = package.loaded["infra.logger"],
+			json_decode = require("core.text.engine.json").decode,
+			i18n = package.loaded["core.i18n.engine.i18n"],
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			render_rows = function(rows) return rows end,
 			command_row = renderer.command_row,
 			template_rows = renderer.template_rows,
 		}
-		package.loaded["infra.notifications"] = {notify = function()
+		package.loaded["core.ui.engine.notifications"] = {notify = function()
 			notification_count = notification_count + 1
 			return true
 		end}

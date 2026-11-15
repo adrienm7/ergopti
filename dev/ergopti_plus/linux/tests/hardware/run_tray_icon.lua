@@ -148,6 +148,14 @@ local rows = {
 	} },
 	{ title = "Quit probe", fn = function() os.exit(0) end },
 }
+-- A toggle republishes a tree of the same shape with one check flipped: the
+-- tray updates that row in place, so the host sees every row keep its id.
+local toggle = { title = "Toggle probe", checked = false }
+toggle.fn = function()
+	toggle.checked = not toggle.checked
+	TrayMenu.setMenu(rows)
+end
+table.insert(rows, #rows, toggle)
 rows[#rows + 1] = { title = "Rebuild probe", fn = function()
 	rebuilds = rebuilds + 1
 	rows[#rows + 1] = { title = "Rebuilt marker" }

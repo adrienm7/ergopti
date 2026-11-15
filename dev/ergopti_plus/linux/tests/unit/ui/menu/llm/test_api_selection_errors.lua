@@ -21,7 +21,7 @@ local function isolated(body)
 		assert(uv.os_setenv(name, scratch .. "/" .. name))
 	end
 	for _, name in ipairs({ "ui.menu.llm_backend_rows", "modules.llm.prediction_engine", "modules.llm.api_entries",
-		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "adapters.storage" }) do
+		"modules.llm.api_remote", "infra.llm_preferences", "infra.config_paths", "core.fs.adapters.storage" }) do
 		package.loaded[name] = nil
 	end
 	local function write(path, content)
@@ -41,7 +41,7 @@ local function isolated(body)
 		assert(uv.fs_rmdir(path))
 	end
 	local ok, why = xpcall(function()
-		local Json = require("json")
+		local Json = require("core.text.engine.json")
 		local Paths = require("infra.config_paths")
 		assert(uv.fs_mkdir(Paths.config_home(), 448))
 		assert(uv.fs_mkdir(Paths.get_config_dir(), 448))
@@ -106,7 +106,7 @@ local function assert_refused(state, expected)
 	helpers.assert_eq(state.read(state.config_path), state.config)
 	helpers.assert_eq(state.seen.changed, 0)
 	helpers.assert_eq(#state.seen.errors, 1, "the refused selection must reach the native error dialog")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	helpers.assert_eq(state.seen.errors[1].text, i18n.get("dialog.bulk_toggle.save_failed"))
 	helpers.assert_eq(state.seen.errors[1].title, i18n.get("common.error_title"))
 end
@@ -141,7 +141,7 @@ helpers.describe("API menu selection persistence errors", function()
 			helpers.assert_eq(state.read(state.api_path), state.original, "no key is written in plaintext")
 			helpers.assert_eq(state.entries.active().id, "before")
 			helpers.assert_eq(#state.seen.errors, 1)
-			local template = require("infra.i18n").get("menu.llm.api_key_no_secret_store")
+			local template = require("core.i18n.engine.i18n").get("menu.llm.api_key_no_secret_store")
 			helpers.assert_true(template:find("{1}", 1, true) ~= nil, "the message carries the reason")
 			helpers.assert_eq(state.seen.errors[1].text, (template:gsub("{1}", "secret-tool is not installed")))
 			Fake.uninstall()

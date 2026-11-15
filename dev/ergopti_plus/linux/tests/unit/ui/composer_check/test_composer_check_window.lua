@@ -17,7 +17,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "logger.shim", "ui.field_check.composer_check" }
+local MODULES = { "core.logger.engine.shim", "ui.field_check.composer_check" }
 
 --- A composer environment that completes every step.
 --- @param calls table Receives "save" / "remove".
@@ -60,7 +60,7 @@ local function with_window(build_env, body)
 	local logger = helpers.make_logger_stub()
 	logger.evidence = function(_, message, ...) world.evidence[#world.evidence + 1] = string.format(message, ...) end
 	logger.error = function(_, message, ...) world.errors[#world.errors + 1] = string.format(message, ...) end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["ui.field_check.composer_check"] = nil
 	local ok, err = xpcall(function()
 		local Window = require("ui.field_check.composer_check")
@@ -168,8 +168,8 @@ helpers.describe("composer check window (Linux)", function()
 	end)
 
 	helpers.it("declares the row once for every platform and routes it in the menu (composer-check)", function()
-		local Json = require("json")
-		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json", "rb"))
+		local Json = require("core.text.engine.json")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json", "rb"))
 		local manifest = Json.decode(handle:read("*a"))
 		handle:close()
 		local rows = {}

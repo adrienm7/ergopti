@@ -2,24 +2,24 @@
 
 --- Exercises canonical assignment loading, sparse publication and save baselines.
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
+local Codec = require("core.text.engine.toml_codec")
 
 local function with_fixture(source, body)
-	local names = { "adapters.file_system", "adapters.storage", "infra.preferences",
-		"infra.config_paths", "infra.paths", "modules.shortcuts.tap_keys", "adapters.keyboard_geometry" }
+	local names = { "core.fs.adapters.file_system", "core.fs.adapters.storage", "infra.preferences",
+		"infra.config_paths", "core.fs.engine.paths", "modules.shortcuts.tap_keys", "platform.input.keyboard_geometry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0 }
 	local ok, err = pcall(function()
 		helpers.load_with_stubs("infra.preferences")
-		package.loaded["adapters.storage"] = setmetatable({}, { __index = function()
+		package.loaded["core.fs.adapters.storage"] = setmetatable({}, { __index = function()
 			return function() error("canonical assignments must not consult legacy storage") end
 		end })
 		package.loaded["infra.config_paths"] = { get = function(name)
 			assert(name == "ConfigTomlPath"); return "config"
 		end }
-		package.loaded["infra.paths"] = { shared = function(rel) return helpers.shared(rel) end }
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.fs.engine.paths"] = { shared = function(rel) return helpers.shared(rel) end }
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function(path)
 				local file = assert(io.open(path, "rb")); local value = file:read("*a"); file:close(); return value
 			end,
@@ -35,8 +35,8 @@ local function with_fixture(source, body)
 		package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
 		local preferences = require("infra.preferences")
 		preferences.load("config")
-		package.loaded["adapters.keyboard_geometry"] = nil
-		require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
+		package.loaded["platform.input.keyboard_geometry"] = nil
+		require("tests.support.keyboard_geometry").initialize(require("platform.input.keyboard_geometry"))
 		local taps = require("modules.shortcuts.tap_keys")
 		local assignable = function(action) return action == "send_text" or action == "screen_capture" end
 		body(taps, preferences, control, assignable)
@@ -54,7 +54,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			taps.mark_config_reads(Codec.decode(control.content), function(...) marks[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(marks["shortcuts.tap_keys.number_row_left"], true)
 			helpers.assert_nil(marks["shortcuts.tap_keys.foreign"])
-			local scan = require("config_unused_keys").find_in_source(control.content,
+			local scan = require("settings.engine.migration.unused_keys").find_in_source(control.content,
 				require("ui.menu.unused_keys_cleanup").collect)
 			helpers.assert_eq(scan.status, "ok")
 			helpers.assert_eq(#scan.keys, 1)

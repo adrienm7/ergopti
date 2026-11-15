@@ -46,7 +46,7 @@ local function keyboard_frame_json(relative)
 	local file = assert(io.open(helpers.shared(relative), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("adapters.json_codec").decode(text))
+	return assert(require("core.fs.adapters.json_codec").decode(text))
 end
 
 helpers.describe("menu_keyboard_slots: complete declared group frame", function()
@@ -56,7 +56,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local group = physical_groups(shortcuts)[1]
 		local slot = group.prefix .. "a"
 		local fixed = { label = "Independent fixed row", action = function() error("a fixed row must not run during build") end }
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local add_label = (i18n.get("menu.shortcuts.alt_add"):gsub("{1}", i18n.get("key_name.option")))
 		local restore_label = i18n.get("common.restore_recommended")
 		local clear_label = i18n.get("common.clear_to_system")
@@ -104,8 +104,8 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 	it("names each group's modifiers in its heading and Add row in all twenty-one catalogues", function()
 		local ui, shortcuts = fresh()
 		local ctx = make_ctx()
-		local i18n = require("infra.i18n")
-		local locales = keyboard_frame_json("data/locale_order.json").order
+		local i18n = require("core.i18n.engine.i18n")
+		local locales = keyboard_frame_json("core/i18n/data/locale_order.json").order
 		helpers.assert_eq(#locales, 21, "this assertion covers every actual supported catalogue")
 		-- Spelled here, not read from the driver: the groups are Option, Ctrl,
 		-- Ctrl + Shift, Cmd and Cmd + Shift, each modifier under the shared key
@@ -121,7 +121,7 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		local previous_get = i18n.get
 		local ok, detail = xpcall(function()
 			for _, locale in ipairs(locales) do
-				local catalogue = keyboard_frame_json("data/locales/" .. locale .. ".json")
+				local catalogue = keyboard_frame_json("core/i18n/data/locales/" .. locale .. ".json")
 				i18n.get = function(key) return catalogue[key] or key end
 				local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
 				helpers.assert_eq(#rows, 5)
@@ -147,17 +147,17 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		if not ok then error(detail, 0) end
 	end)
 
-	it("refuses a retained physical Add callback while the actual context is paused", function()
+	-- EDD-1: a slot edited while paused is saved at once and bound by the
+	-- resume (paused-slot-change), so Add opens its picker while paused.
+	it("(paused-slot-change) opens the Add picker while the actual context is paused", function()
 		local ui, shortcuts, picker = fresh()
 		local ctx = make_ctx()
-		local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
-		local action = rows[1].items[#rows[1].items].action
 		ctx.paused = true
-		helpers.assert_eq(action(), false, "retained Add must recheck the current pause owner")
-		helpers.assert_eq(#picker.opened, 0, "refused Add opens no lazy picker")
-		ctx.paused = false
-		action()
-		helpers.assert_eq(#picker.opened, 1, "resume retains the real native slot picker")
+		local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
+		local add = rows[1].items[#rows[1].items]
+		helpers.assert_eq(add.disabled == true, false, "Add is live while paused")
+		add.action()
+		helpers.assert_eq(#picker.opened, 1, "a paused Add opens the real native slot picker")
 	end)
 
 	it("refuses Add callbacks captured from an explicitly disabled group", function()

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu.preview_transaction"
 local KEYS = {
 	preview_star_enabled = true,

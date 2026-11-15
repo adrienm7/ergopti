@@ -129,10 +129,10 @@ local function load_inventory_context(options)
 		for _, owner in ipairs(OWNER_IDS) do late(owner) end
 	end
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.keycodes"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,
@@ -147,11 +147,11 @@ local function load_inventory_context(options)
 		SG_NAMES = { "none", "script_pause_toggle" },
 		AX_NAMES = {},
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = options.when_idle or function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			if ctx.fence then return nil end
@@ -169,7 +169,7 @@ local function load_inventory_context(options)
 		end,
 		admission_open = function() return ctx.fence == nil end,
 	}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function() return { kind = "one-shot" }, true end,
 		every = function() return { kind = "watchdog" }, true end,
 		cancel = function() return true end,
@@ -204,7 +204,7 @@ local function load_inventory_context(options)
 	package.loaded["platform.remap.onboarding"] = {
 		stop = invoke("remap_onboarding", "pause"),
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		hide_forced = invoke("tooltip", "pause"),
 	}
 	package.loaded["modules.keystats"] = {

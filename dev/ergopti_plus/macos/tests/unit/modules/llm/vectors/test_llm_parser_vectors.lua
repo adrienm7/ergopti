@@ -19,8 +19,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local JsonCodec = require("adapters.json_codec")
-local ResponseClassifier = require("llm.remote_response_classifier")
+local JsonCodec = require("core.fs.adapters.json_codec")
+local ResponseClassifier = require("ai.engine.policy.remote_response_classifier")
 
 
 

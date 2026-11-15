@@ -10,13 +10,13 @@
 
 local helpers = require("tests.helpers")
 
-local Sandbox = require("test.config_unused_keys_contract").sandbox
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
 
-local Toml = require("toml_codec")
+local Toml = require("core.text.engine.toml_codec")
 
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
-local Base64 = require("compat.base64")
+local Base64 = require("core.lifecycle.engine.compat.base64")
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
 --- Every native owner is fresh; all module identities/absence are journalled.
@@ -55,12 +55,12 @@ end
 
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
-		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings", "adapters.storage" }
+		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings", "core.fs.adapters.storage" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local ok, err = pcall(function()
 			package.loaded["infra.config_paths"] = { config = function() return path end }
-			package.loaded["adapters.storage"] = require("tests.fakes").storage({ initial = {
+			package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({ initial = {
 				["llm.profiles.active"] = "raw", ["llm.profiles.num_predictions"] = 9,
 			} })
 			body(require("modules.llm.profile_settings"), path)

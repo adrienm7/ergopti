@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local KEY = "menu_reload_replay"
 
@@ -22,7 +22,7 @@ local function fixture()
 	for _, level in ipairs({ "info", "warn", "error" }) do
 		logger[level] = function(_, fmt, ...) logs[level][#logs[level] + 1] = string.format(fmt, ...) end
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["ui.menu.click_gate"] = nil
 	local ClickGate = require("ui.menu.click_gate")
 	local f = { logs = logs, store = {}, timers = {}, clock = 1000, terminal = false,
@@ -54,6 +54,11 @@ local function fixture()
 		schedule = function(_, callback) f.timers[#f.timers + 1] = callback; return true end,
 		notify_lost = function() f.lost = f.lost + 1; return true end,
 		now = function() return f.clock end,
+		around_click = function(path, run)
+			f.scopes = f.scopes or {}
+			f.scopes[#f.scopes + 1] = path
+			return run()
+		end,
 	})
 	f.items = f.tree()
 	--- Fires the timers armed so far, in order.
@@ -184,6 +189,15 @@ helpers.describe("menubar click gate", function()
 	helpers.it("(menu-click-plain) runs an ordinary click at once", function()
 		local f = fixture()
 		click(f); helpers.assert_eq(f.runs, 1); helpers.assert_eq(#f.timers, 0)
+	end)
+
+	helpers.it("(menu-click-scope) runs a clicked row inside its owner's scope, with the row's path", function()
+		local f = fixture()
+		click(f)
+		helpers.assert_eq(f.runs, 1)
+		helpers.assert_eq(f.scopes, { { "Features", "Preview" } })
+		f.terminal = true; click(f)
+		helpers.assert_eq(#f.scopes, 1, "a held click is no click on the current tree")
 	end)
 
 	helpers.it("(menu-click-wrap-once) keeps the gate of a reused subtree", function()

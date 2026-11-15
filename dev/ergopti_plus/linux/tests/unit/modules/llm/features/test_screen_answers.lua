@@ -23,9 +23,9 @@
 
 local helpers = require("tests.helpers")
 local Fakes = require("tests.fakes")
-local Json = require("json")
-local Base64 = require("compat.base64")
-local Vision = require("llm.vision")
+local Json = require("core.text.engine.json")
+local Base64 = require("core.lifecycle.engine.compat.base64")
+local Vision = require("ai.engine.prediction.vision")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 -- The bytes the fake capture writes: a PNG signature and a body
@@ -48,7 +48,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.llm.vision_request", "modules.llm.local_model_probe", "modules.llm.local_model_offer",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -90,12 +90,12 @@ local function scenario(opts, body)
 		local world = { posts = {}, probes = {}, model_offers = {}, model_installs = {}, ollama = {}, notices = {}, captures = {}, shown = nil, typed = {},
 			cancelled_owners = {} }
 		local entries = opts.entries or { CEREBRAS, OPENAI }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, headers, options, callback)
 				world.probes[#world.probes + 1] = { url = url, owner = options.owner, callback = callback }
 				return true
@@ -185,7 +185,7 @@ local function scenario(opts, body)
 		world.engine = engine
 		world.handlers = engine.action_handlers()
 		world.config = Json.decode(assert(io.open(helpers.driver_root()
-			.. "/../_shared/modules/llm/vision.json", "r")):read("*a"))
+			.. "/../_shared/ai/data/vision.json", "r")):read("*a"))
 
 		--- The remote server answers request `index` with an OpenAI-shaped `text`.
 		function world.respond(index, text)
@@ -216,9 +216,9 @@ end
 
 helpers.it("vision configuration refuses a FIFO rather than blocking", function()
 	local uv = require("luv")
-	local Paths = require("infra.paths")
+	local Paths = require("core.fs.engine.paths")
 	local original_shared, original_request = Paths.shared, package.loaded["modules.llm.vision_request"]
-	local source = assert(original_shared("modules/llm/vision.json"))
+	local source = assert(original_shared("ai/data/vision.json"))
 	local dir = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti-vision-XXXXXX"))
 	local path = dir .. "/vision.json"
 	local made = os.execute("mkfifo '" .. path .. "'")
@@ -226,7 +226,7 @@ helpers.it("vision configuration refuses a FIFO rather than blocking", function(
 	package.loaded["modules.llm.vision_request"] = nil
 	local Request = require("modules.llm.vision_request")
 	Paths.shared = function(relative)
-		if relative == "modules/llm/vision.json" then return path end
+		if relative == "ai/data/vision.json" then return path end
 		return original_shared(relative)
 	end
 	local exited, process = false, nil
@@ -281,11 +281,11 @@ end)
 
 helpers.describe("screen answers: native preflight refusal ownership", function()
 	helpers.it("a refused cancellation cannot replace the existing vision request or its model", function()
-		local names = { "adapters.http_client", "modules.llm.local_model_probe", "modules.llm.vision_request" }
+		local names = { "core.network.adapters.http_client", "modules.llm.local_model_probe", "modules.llm.vision_request" }
 		local previous = {}
 		for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 		local probes, posts, refused = {}, {}, true
-		package.loaded["adapters.http_client"] = {
+		package.loaded["core.network.adapters.http_client"] = {
 			get = function(url, _, options, callback)
 				probes[#probes + 1] = { url = url, owner = options.owner, callback = callback }
 				return true
@@ -342,13 +342,13 @@ end
 --- The locale string the prompts receive for {language}.
 --- @return string
 local function language()
-	return require("infra.i18n").get_locale()
+	return require("core.i18n.engine.i18n").get_locale()
 end
 
 --- @param key string
 --- @return string
 local function notice(key)
-	return require("infra.i18n").get(key)
+	return require("core.i18n.engine.i18n").get(key)
 end
 
 --- The candidate texts on offer.

@@ -32,7 +32,7 @@ end
 --- Real hardlinks and stale bytes are exercised by the separate native-owner suite.
 local function mock_source_observations()
 	mock("infra.personal_file_adoption", nil)
-	mock("adapters.file_system", {
+	mock("core.fs.adapters.file_system", {
 		path_status = function(path)
 			local inode = 0
 			for index = 1, #path do inode = inode + path:byte(index) * index end
@@ -70,7 +70,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		})
 		-- A flat dir: one canonical file (must be skipped at prefix=="") + two
 		-- extension TOMLs returned out of order to prove the loader sorts them.
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then
 					return { "zebra.toml", "alpha.toml", "personal_hotstrings.toml", "_index.toml" }
@@ -140,7 +140,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			-- Every directory in this fixture contains exactly one further "loop"
 			-- entry that resolves back to a directory — a growing-path cycle.
 			entries = function(_dir) return { "loop" } end,
@@ -193,7 +193,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 				return nil
 			end,
 		})
-		mock("infra.fs_dir", {
+		mock("core.fs.engine.dir", {
 			entries = function(dir)
 				if dir == "/fake/hot" then return { "a__b.toml", "a" } end
 				if dir == "/fake/hot/a" then return { "b.toml" } end
@@ -212,7 +212,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- Capture Logger.warn calls without silencing them (same pattern as
 		-- tests/meta/architecture/test_healthcheck_api_contract.lua).
 		package.loaded["infra.personal_hotstrings"] = nil
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local warnings = {}
 		local orig_warn = Logger.warn
@@ -258,10 +258,10 @@ end)
 
 helpers.describe("personal-file descriptors: independent cross-driver corpus", function()
 	helpers.it("preserves exact relative components without borrowing mutable arrays", function()
-		local PersonalFiles = require("hotstrings.personal_files")
+		local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 		local handle = assert(io.open(helpers.shared("tests/corpus/hotstrings/personal_file_descriptors.json"), "r"))
 		local content = assert(handle:read("*a")); assert(handle:close())
-		local corpus = assert(require("json").decode(content))
+		local corpus = assert(require("core.text.engine.json").decode(content))
 		helpers.assert_eq(#corpus.vectors, 13, "the independent corpus must not become vacuous")
 		local identities = {}
 		for _, vector in ipairs(corpus.vectors) do

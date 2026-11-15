@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local IBM = {
 	id = "ibm_fixture", label = "IBM fixture", base_url = "https://us-south.ml.cloud.ibm.com/ml/gateway/v1",
@@ -29,19 +29,19 @@ local MESSAGES = { { role = "system", content = "S" }, { role = "user", content 
 --- Runs body against the real api_remote over a scripted HTTP client and clock.
 --- @param body function body(remote, calls, clock)
 local function with_remote(body)
-	local names = { "adapters.http_client", "modules.llm.api_remote", "infra.monotonic", "logger.shim",
-		"adapters.timer_scheduler" }
+	local names = { "core.network.adapters.http_client", "modules.llm.api_remote", "core.logger.engine.monotonic", "core.logger.engine.shim",
+		"core.events.timer_scheduler" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls, clock = {}, { now = 1000, ticks = {} }
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		after = function(_, fn)
 			if clock.throw_schedule then clock.ticks[#clock.ticks + 1] = fn; error("scheduler unavailable") end
 			clock.ticks[#clock.ticks + 1] = fn
 			return { armed = true }
 		end,
 	}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, request_body, callback)
 			calls[#calls + 1] = { url = url, headers = headers, body = request_body, callback = callback }
 			if clock.sync_refusal then callback({ ok = false, status = 401 }); return false end
@@ -61,7 +61,7 @@ local function with_remote(body)
 		get = function() return false end,
 		cancel = function() return true end,
 	}
-	package.loaded["infra.monotonic"] = {
+	package.loaded["core.logger.engine.monotonic"] = {
 		now_ms = function() return clock.now * 1000 end,
 		now_sec = function() return clock.now end,
 	}
@@ -73,13 +73,13 @@ local function with_remote(body)
 			logs[#logs + 1] = level .. ": " .. (formatted and text or tostring(fmt))
 		end
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	clock.logs = logs
 	package.loaded["modules.llm.api_remote"] = nil
 	local ok, err = pcall(function()
 		local remote = require("modules.llm.api_remote")
 		remote._reset_for_test()
-		local auth = assert(require("llm.api_token_exchange").parse({
+		local auth = assert(require("ai.engine.api.token_exchange").parse({
 			kind = "token_exchange", token_url = "https://iam.cloud.ibm.com/identity/token",
 			body = { grant_type = "urn:ibm:params:oauth:grant-type:apikey", apikey = "{key}" },
 			token_field = "access_token", expires_field = "expires_in",
@@ -174,7 +174,9 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			local endpoint, reason = remote.endpoint(ENTRY, ENTRY.model)
 			helpers.assert_nil(endpoint)
-			helpers.assert_eq(reason, "the token exchange answered HTTP 400")
+			-- The request carries the exchange's status first (access_failure), then the service's message.
+			helpers.assert_eq(reason,
+				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
 			helpers.assert_eq(#calls, 1, "no second exchange at once")
 			clock.now = clock.now + 61
 			remote.endpoint(ENTRY, ENTRY.model)
@@ -203,10 +205,10 @@ helpers.describe("Access-token providers: the key is exchanged, never sent", fun
 			answer(calls, 1, 401, { errorMessage = "no" })
 			helpers.assert_eq(#calls, 1)
 			helpers.assert_eq(verdict.ok, false)
-			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401")
+			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401: no")
 			remote.test(ENTRY, function(ok, detail) verdict = { ok = ok, detail = detail } end)
 			helpers.assert_eq(#calls, 1, "a second test within the pause asks nothing")
-			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401")
+			helpers.assert_eq(verdict.detail, "the token exchange answered HTTP 401: no")
 		end)
 	end)
 end)
@@ -412,6 +414,9 @@ helpers.describe("Access-token providers: the first request waits for the token 
 		end)
 	end)
 
+	-- AID-2 (decided by the maintainer on 2026-11-11): an exchange answering 400
+	-- (an unknown IAM key, OAuth invalid_grant) is a refused credential, never
+	-- retried, and the request fails with the service's own message.
 	helpers.it("a refused exchange answers the waiting chat with its reason (access-token-lease)", function()
 		with_remote(function(remote, calls)
 			local result
@@ -419,15 +424,39 @@ helpers.describe("Access-token providers: the first request waits for the token 
 			answer(calls, 1, 400, { errorMessage = "Provided API key could not be found" })
 			helpers.assert_eq(#calls, 1, "no completion")
 			helpers.assert_eq(result[1], "")
-			helpers.assert_eq(result[2], "the token exchange answered HTTP 400")
+			helpers.assert_eq(result[2],
+				"HTTP 400: the token exchange answered HTTP 400: Provided API key could not be found")
+			helpers.assert_true(require("ai.engine.policy.failure_class").is_authentication_failure(result[2]),
+				"a 400 exchange is a refused credential: never retried")
 		end)
+	end)
+
+	-- Windows carries the exchange's status into the request failure
+	-- (_LLMRemote_AccessFailInfo), so a refused key is never retried; the Lua
+	-- failure was the bare reason, which the shared classifier cannot read, and
+	-- the engine spent its whole retry budget (AIS-001, access-refusal-status).
+	helpers.it("a refused exchange fails the chat as a refused credential (access-refusal-status)", function()
+		local FailureClass = require("ai.engine.policy.failure_class")
+		for _, status in ipairs({ 401, 403 }) do
+			with_remote(function(remote, calls)
+				local result
+				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+				answer(calls, 1, status, { errorMessage = "no" })
+				helpers.assert_eq(result[2], "HTTP " .. status .. ": the token exchange answered HTTP " .. status .. ": no")
+				helpers.assert_true(FailureClass.is_authentication_failure(result[2]), "never retried")
+				result = nil
+				remote.chat(ENTRY, nil, MESSAGES, nil, nil, function(text, err) result = { text, err } end)
+				helpers.assert_eq(#calls, 1, "the pause asks nothing")
+				helpers.assert_true(FailureClass.is_authentication_failure(result[2]), "nor within the pause")
+			end)
+		end
 	end)
 
 	helpers.it("the model listing waits for the token too (access-token-lease)", function()
 		with_remote(function(remote, calls)
 			local listed
 			local get_url, get_headers
-			package.loaded["adapters.http_client"].get = function(url, headers, _, callback)
+			package.loaded["core.network.adapters.http_client"].get = function(url, headers, _, callback)
 				get_url, get_headers = url, headers
 				callback({ ok = true, status = 200, body = Json.encode({ data = { { id = "ibm/granite-4-h-small" } } }) })
 				return true

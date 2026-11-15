@@ -11,10 +11,10 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_event_loop%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
 
 local luv = require("luv")
-local native = require("adapters.event_loop")
+local native = require("core.events.loop")
 local idle, periodic, leaked = 0, 0, 0
 local timed_out = false
 local watchdog = luv.new_timer()

@@ -47,17 +47,17 @@ if arg and arg[1] == "--classifier" then return { frames_match = frames_match } 
 
 -- Cold Hook construction pins the genuine first Reader authority before any
 -- backend or fixture callback. Transport observation below grants no authority.
-local Hook = require("adapters.keyboard_hook")
+local Hook = require("platform.input.keyboard_hook")
 local ffi = require("ffi")
-local Input = require("infra.input_event")
-local Names = require("infra.device_names")
+local Input = require("platform.input.event")
+local Names = require("platform.input.device_names")
 local Finder = require("modules.hotstrings.device_finder")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 local Engine = require("platform.remap.tap_hold_engine")
 local Native = require("platform.remap.key_combination_engine")
 local Owner = require("modules.shortcuts.key_combinations")
@@ -332,8 +332,8 @@ end
 --- @param first_signal string Actual initial terminal signal.
 local function signal_shutdown(first_signal)
 	local uv = require("luv")
-	local NativeTimer = require("infra.native_timer")
-	local signals = require("infra.signal_handlers")
+	local NativeTimer = require("core.timing.engine.native_timer")
+	local signals = require("core.lifecycle.engine.shutdown.signal_handlers")
 	assert(signals.is_settled(), "no preceding signal installation may remain owned")
 	local file = assert(io.open("ergopti_hotstrings.lua", "r"))
 	local text = file:read("*a"); assert(file:close())
@@ -351,7 +351,7 @@ local function signal_shutdown(first_signal)
 	local owners = {}
 	local final_registry = compile_signal_code("return " .. final,
 		setmetatable({ privacy_owners = owners }, { __index = _G }))()
-	local coordinator = require("infra.shutdown_coordinator").new({
+	local coordinator = require("core.lifecycle.engine.shutdown.coordinator").new({
 		pre_wait = { { name = "external native cleanup", wait_for_ack = true, stop = function() return state.ready end } },
 		final_wait = final_registry,
 		keyboard_hook = Hook,
@@ -434,7 +434,7 @@ end
 
 --- Runs genuine kernel scenarios with separately handwritten wire oracles.
 local function run()
-	assert(rawequal(package.loaded["adapters.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
+	assert(rawequal(package.loaded["platform.input.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
 	local template = ffi.new("char[?]", #"/tmp/ergopti-input-owner-XXXXXX" + 1, "/tmp/ergopti-input-owner-XXXXXX")
 	local created = ffi.C.mkdtemp(template); assert(created ~= nil, "exclusive private fixture namespace")
 	namespace = ffi.string(created); config_path = namespace .. "/config.toml"
@@ -750,7 +750,7 @@ local function cleanup(callback, label)
 end
 cleanup(function() if Hook then Hook.stop(); return not Hook.isRunning() end; return true end, "final actual Hook stop")
 cleanup(function()
-	local signals = package.loaded["infra.signal_handlers"]
+	local signals = package.loaded["core.lifecycle.engine.shutdown.signal_handlers"]
 	if not signals and not signal_timer and not signal_deadline then return true end
 	local uv = require("luv")
 	if signal_timer then uv.timer_stop(signal_timer); uv.close(signal_timer); signal_timer = nil end

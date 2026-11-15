@@ -8,10 +8,10 @@
 --- ===============================================================================
 
 local M = {}
-local Policy = require("llm.enable_admission")
-local Http = require("adapters.http_client")
-local Timings = require("infra.timings")
-local Logger = require("logger.shim")
+local Policy = require("ai.engine.settings.enable_admission_core")
+local Http = require("core.network.adapters.http_client")
+local Timings = require("core.timing.engine.timings")
+local Logger = require("core.logger.engine.shim")
 local LOG = "modules.llm.enable_admission"
 local OWNER = "llm_enable_admission"
 

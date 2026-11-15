@@ -23,7 +23,7 @@
 --- release tags — while the user-configurable magic key, the most obviously
 --- user-controlled value of the three, kept its raw interpolation.
 ---
---- The helper now lives once in _shared/lua/text_utils (escape_gsub_replacement)
+--- The helper now lives once in _shared/core/text/engine (escape_gsub_replacement)
 --- and the two former local copies delegate to it, so a fourth call site cannot
 --- reintroduce the bug by copying a stale private helper.
 --- ==============================================================================
@@ -89,7 +89,7 @@ helpers.describe("registry survives a regex-metacharacter magic key", function()
 		-- space becomes "%20", whose "%2" reads as capture reference #2. That raised
 		-- inside an hs.timer callback, where the error reaches only the HS Console,
 		-- so the search silently never opened for any multi-word selection.
-		local text_utils = helpers.load_with_stubs("infra.text_utils")
+		local text_utils = helpers.load_with_stubs("core.text.engine.utils")
 
 		local encoded  = "hello%20world%2Ffoo"
 		local template = "https://example.com/search?q=%s"

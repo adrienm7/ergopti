@@ -9,12 +9,12 @@ import subprocess
 import tempfile
 
 WORKER = r"""
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local target, endpoint, kind = os.getenv("HC_TARGET"), os.getenv("HC_SOURCE_PATH"), os.getenv("HC_KIND")
 local regular = os.getenv("HC_REGULAR") == "1"
 local old_open = io.open
 io.open = function(path, mode) if path == target then return old_open(endpoint, mode) end return old_open(path, mode) end
-local reader = require("infra.regular_file_reader")
+local reader = require("core.fs.engine.regular_file_reader")
 local old_source = reader.open_source
 reader.open_source = function(path) return old_source(path == target and endpoint or path) end
 local bridge = require("ui.healthcheck.bridge")
@@ -32,10 +32,10 @@ if kind == "snapshot" then
     end
 elseif kind == "cpu" then
     local schema = bridge.config().schema
-    package.loaded["adapters.timer_scheduler"] = { HAS_ASYNC = true,
+    package.loaded["core.events.timer_scheduler"] = { HAS_ASYNC = true,
         after = function() return { armed = true } end, cancel = function() return true end }
-    package.loaded["adapters.http_client"] = { HAS_ASYNC = false }
-    package.loaded["adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
+    package.loaded["core.network.adapters.http_client"] = { HAS_ASYNC = false }
+    package.loaded["core.process.adapters.shell_runner"] = { HAS_ASYNC = false, has_command = function() return false end }
     local results = {}
     local run = require("ui.healthcheck.probes").start(schema, {}, {}, function(id, result) results[id] = result end)
     if regular then assert(results.cpu_load == nil, "valid first sample must wait for the timer")
@@ -118,7 +118,7 @@ def main():
                     HC_REGULAR="1" if shape in ("regular", "file-link") else "0",
                     HC_CHAR="1" if shape == "char-link" else "0",
                     XDG_CONFIG_HOME=str(root / "config"),
-                    LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                    LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 )
                 try:
                     result = subprocess.run(

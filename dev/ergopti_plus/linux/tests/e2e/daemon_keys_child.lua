@@ -30,9 +30,13 @@
 local CONFIG, DEVICE, SCRIPT = arg[1], arg[2], arg[3]
 local MAGIC_REPEAT = os.getenv("ERGOPTI_E2E_MAGIC_REPEAT") or "none"
 local TAP_COLLISION = MAGIC_REPEAT:match("^tap%-") ~= nil
-if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/modules/hotstrings/magickey.toml" end
+if MAGIC_REPEAT ~= "none" then CONFIG = "../_shared/hotstrings/data/catalogue/magickey.toml" end
+-- The autocorrection scenarios type against the shipped common sections.
+if (os.getenv("ERGOPTI_E2E_AUTOCORRECT") or "none") ~= "none" then
+	CONFIG = "../_shared/hotstrings/data/catalogue"
+end
 arg = { "--device", DEVICE, "--config", CONFIG }
-package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
 
 -- On a Windows checkout the daemon's POSIX edges (HOME, /tmp, mkdir -p, sh
 -- and coreutils) are emulated for this test process as tests/run.lua does for
@@ -48,7 +52,7 @@ require("tests.win_compat").install()
 -- the desktop's PRIMARY selection, focused field and action side effects.
 local TAP_WRAP = os.getenv("ERGOPTI_E2E_TAP_WRAP") or "none"
 local selection = { primary = "", reads = 0, attempts = 0, queued = 0, executed = 0, focused = false }
-local selection_config = nil
+local selection_config, selection_folder = nil, nil
 -- ERGOPTI_E2E_DYNAMIC=dates: the same private config with the built-in date
 -- rules switched on in the file, as a user's config.toml would hold them.
 local DYNAMIC = os.getenv("ERGOPTI_E2E_DYNAMIC") or "none"
@@ -64,15 +68,61 @@ local function with_date_rules(content)
 	end
 	return content
 end
-if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" then
+-- ERGOPTI_E2E_AUTOCORRECT=<section> (items 104, 105): the same private config
+-- with one common autocorrection section switched on and the other two left
+-- off, so a scenario proves each section fires alone.
+local AUTOCORRECT = os.getenv("ERGOPTI_E2E_AUTOCORRECT") or "none"
+local AUTOCORRECT_SECTIONS = { names = true, abbreviations = true, technical_terms = true }
+assert(AUTOCORRECT == "none" or AUTOCORRECT_SECTIONS[AUTOCORRECT], "unknown autocorrection scenario")
+--- The neutral template with the autocorrection category and one of its common
+--- sections chosen, as the menu writes them, the other two sections off.
+--- @param content string
+--- @return string
+local function with_autocorrection_section(content)
+	assert(not content:find("[hotstrings.groups]", 1, true), "the template now holds category choices")
+	local lines = { "", "[hotstrings.groups]", "autocorrection = true", "", "[hotstrings.modules.autocorrection]" }
+	for _, section in ipairs({ "names", "abbreviations", "technical_terms" }) do
+		lines[#lines + 1] = section .. " = " .. tostring(section == AUTOCORRECT)
+	end
+	return content .. table.concat(lines, "\n") .. "\n"
+end
+-- ERGOPTI_E2E_CASCADE=<arrows>[,consume] (item 50): the same private config
+-- with hotstrings.cascade_max_arrows set, and with "consume" the Space and Enter
+-- delimiters consumed (hotstrings.terminator_consume), as the menu writes them.
+local CASCADE = os.getenv("ERGOPTI_E2E_CASCADE") or "none"
+local cascade_arrows, cascade_consume = CASCADE:match("^(%d+)(.*)$")
+assert(CASCADE == "none" or (cascade_arrows and (cascade_consume == "" or cascade_consume == ",consume")),
+	"unknown cascade scenario")
+--- The neutral template with the cascade bound and delimiter consumption.
+--- @param content string
+--- @return string
+local function with_cascade(content)
+	local key = "\ncascade_max_arrows = "
+	local at = assert(content:find(key, 1, true), "the template lost cascade_max_arrows")
+	local line_end = assert(content:find("\n", at + 1, true), "the template's cascade line is unterminated")
+	content = content:sub(1, at - 1) .. key .. cascade_arrows .. content:sub(line_end)
+	if cascade_consume == ",consume" then
+		content = content .. "\n[hotstrings.terminator_consume]\nspace = true\nenter = true\n"
+	end
+	return content
+end
+if TAP_WRAP ~= "none" or MAGIC_REPEAT ~= "none" or DYNAMIC ~= "none" or CASCADE ~= "none"
+	or AUTOCORRECT ~= "none" then
 	local modes = { accepted = true, unassigned = true, modified = true, refused = true, reopened = true }
 	assert(TAP_WRAP == "none" or modes[TAP_WRAP], "unknown tap/wrap scenario")
 	local Paths = require("infra.config_paths")
 	local original = Paths.config
-	selection_config = os.tmpname()
+	-- Named config.toml in a folder of its own: the tap-hold import checks the
+	-- file it reads [mod_combos] from is the driver's config.toml by name.
+	selection_folder = os.tmpname()
+	os.remove(selection_folder)
+	assert(os.execute("mkdir -p '" .. selection_folder .. "'"), "the private config folder could not be created")
+	selection_config = selection_folder .. "/config.toml"
 	local template = assert(io.open("_generated/config_template.toml", "rb"))
 	local content = template:read("*a")
 	if DYNAMIC == "dates" then content = with_date_rules(content) end
+	if CASCADE ~= "none" then content = with_cascade(content) end
+	if AUTOCORRECT ~= "none" then content = with_autocorrection_section(content) end
 	local file = assert(io.open(selection_config, "wb"))
 	assert(file:write(content))
 	assert(file:close())
@@ -98,7 +148,7 @@ if CLOCK == "seconds" then
 	local previous_luv, previous_preload = package.loaded.luv, package.preload.luv
 	package.loaded.luv = nil
 	package.preload.luv = function() error("the scripted clock selects the coarse source") end
-	local clock_loaded, coarse_clock = pcall(require, "infra.monotonic")
+	local clock_loaded, coarse_clock = pcall(require, "core.logger.engine.monotonic")
 	package.loaded.luv, package.preload.luv = previous_luv, previous_preload
 	assert(clock_loaded, coarse_clock)
 	assert(coarse_clock.backend() == "os.time" and not coarse_clock.has_hires(), "expected real coarse clock")
@@ -106,7 +156,7 @@ elseif CLOCK ~= "system" then
 	error("ERGOPTI_E2E_CLOCK must be system or seconds, not " .. CLOCK)
 end
 
-local Codes = require("infra.evdev_codes")
+local Codes = require("platform.input.evdev_codes")
 
 --- @param text string
 --- @return table UTF-8 characters.
@@ -140,7 +190,7 @@ local scripted_writer, injected_refusal = nil, false
 local callbacks = {}
 local queued_during_output = false
 local ai_characters = {}
-package.preload["adapters.uinput_writer"] = function()
+package.preload["platform.input.uinput_writer"] = function()
 	-- Actual Writer transactions over controlled byte ports, never native input.
 	scripted_writer = require("tests.fakes").uinput_writer({
 		on_emit = function(code, value)
@@ -168,7 +218,7 @@ package.preload["adapters.uinput_writer"] = function()
 	return scripted_writer
 end
 
-local hook = require("adapters.keyboard_hook")
+local hook = require("platform.input.keyboard_hook")
 hook.start = function(options)
 	callbacks = options
 	if os.getenv("ERGOPTI_E2E_QUEUE_OUTPUT") == "1" then
@@ -201,7 +251,7 @@ local MENU_ROWS_FILE = os.getenv("ERGOPTI_E2E_MENU_ROWS")
 --- @param items table Top-level rows the tray was handed.
 --- @return string receipt
 local function agent_receipt(items)
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local agent_title, ai_title = i18n.get("menu.agent.title"), i18n.get("menu.llm.title")
 	local function actions(row)
 		local n = type(row.fn) == "function" and 1 or 0
@@ -243,6 +293,8 @@ if MENU_ROWS_FILE then
 				return true
 			end,
 			pump = function() return 0 end,
+			-- No GLib context behind this fake: the idle wait polls input alone.
+			wait_companion = function() return nil end,
 			destroy = function() live = false end,
 			is_live = function() return live end,
 		}
@@ -254,11 +306,11 @@ end
 -- engine, which the demo configuration loads: its cancel path runs on every
 -- Backspace and once wiped the hotstring buffer.
 local WITH_LLM = os.getenv("ERGOPTI_E2E_LLM") == "1"
-for _, name in ipairs(MENU_ROWS_FILE and {} or { "ui.tooltip.preview", "ui.tooltip.llm", "adapters.tray_menu",
+for _, name in ipairs(MENU_ROWS_FILE and {} or { "core.ui.ui.tooltip.preview", "core.ui.ui.tooltip.llm", "adapters.tray_menu",
 	"ui.menu.builder", "modules.updater.manager",
-	"modules.gestures.manager", "adapters.window_info", "adapters.process_lifecycle",
-	"ui.webview_manager",
-	"infra.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "adapters.notifier" }) do
+	"modules.gestures.manager", "platform.focus.window_info", "core.process.adapters.lifecycle",
+	"core.ui.ui.webview_manager",
+	"core.fs.engine.file_watchers", "ui.wpm.widget", "modules.keystats.system_metrics", "platform.system.notifier" }) do
 	package.preload[name] = function() error("disabled for the daemon key scenarios") end
 end
 if not MENU_ROWS_FILE and not WITH_LLM then
@@ -267,7 +319,7 @@ end
 if not MENU_ROWS_FILE then
 	-- All scripted key scenarios declare an ordinary owned application/window.
 	-- The same source owns privacy context and the exact AI output target.
-	package.preload["adapters.window_info"] = function()
+	package.preload["platform.focus.window_info"] = function()
 		local function info()
 			return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" }
 		end
@@ -375,7 +427,7 @@ if MAGIC_REPEAT ~= "none" then
 		repeat_controller = make_actions(options)
 		return repeat_controller
 	end
-	local Gate = require("infra.input_capture_gate")
+	local Gate = require("platform.input.capture_gate")
 	local make_gate = Gate.new
 	Gate.new = function(options)
 		repeat_gate = make_gate(options)
@@ -400,10 +452,10 @@ if MAGIC_REPEAT ~= "none" then
 end
 
 -- A focused ordinary text field, conclusively.
-package.preload["adapters.atspi_focus_watch"] = function()
+package.preload["platform.focus.atspi_focus_watch"] = function()
 	return require("tests.support.focus_watch_fixture")
 end
-package.preload["adapters.secure_field_detector"] = function()
+package.preload["platform.focus.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
 		publishFocus = function() return true end,
@@ -420,11 +472,11 @@ end
 -- Advance only this controlled selection clock; production never sleeps here.
 local settle_selection = function() end
 if TAP_WRAP ~= "none" then
-	local Clock = require("infra.monotonic")
+	local Clock = require("core.logger.engine.monotonic")
 	local original, elapsed_ms = Clock.now_ms, 0
 	Clock.now_ms = function() return original() + elapsed_ms end
 	settle_selection = function()
-		elapsed_ms = elapsed_ms + require("infra.timings").ms("privacy", "focus_settle_ms")
+		elapsed_ms = elapsed_ms + require("core.timing.engine.timings").ms("privacy", "focus_settle_ms")
 	end
 end
 
@@ -434,10 +486,10 @@ local CONTROL_MODS = { CBS = { ctrl = true } }
 
 local final_screen = nil
 
-package.preload["adapters.event_loop"] = function()
+package.preload["core.events.loop"] = function()
 	-- Keep the real deferred queue: boot schedules crash reporting before the
 	-- loop begins, and dropping that boundary would conceal startup failures.
-	local adapter = dofile("adapters/event_loop.lua")
+	local adapter = dofile("core/events/loop.lua")
 	local native_run = adapter.run
 	local function play(loop)
 		-- A settled async observation is published by the next actual daemon tick.
@@ -573,7 +625,8 @@ package.preload["adapters.event_loop"] = function()
 					"the real word-reset owner must acknowledge the arrow policy")
 			elseif token == "SELECT" then
 				i = i + #token + 2
-				callbacks.onClick()
+				-- The hook calls onClick with the pressed button's code (BTN_LEFT, 0x110).
+				callbacks.onClick(0x110)
 				selection.primary = selection.primary == "" and "selected" or "fresh"
 				screen = chars(selection.primary)
 				selection.focused = true
@@ -637,7 +690,7 @@ package.preload["adapters.event_loop"] = function()
 		final_screen = string.format("SCREEN %q", table.concat(screen))
 	end
 	adapter.run = function(loop)
-		local uv, signals = require("luv"), require("infra.signal_handlers")
+		local uv, signals = require("luv"), require("core.lifecycle.engine.shutdown.signal_handlers")
 		local active_signals = 0
 		uv.walk(function(handle)
 			if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then
@@ -682,7 +735,7 @@ local function publish_expected_failure()
 		failure_published = true
 		print(final_screen)
 		print("E2E_EXPECTED_FAILURE injection output_debt=true signals_settled="
-			.. tostring(require("infra.signal_handlers").is_settled()))
+			.. tostring(require("core.lifecycle.engine.shutdown.signal_handlers").is_settled()))
 		io.stdout:flush()
 	end
 	return true
@@ -700,6 +753,7 @@ assert(main_ok, main_error)
 if selection_config then
 	os.remove(selection_config)
 	os.remove(selection_config .. ".tmp")
+	os.remove(selection_folder)
 end
 
 -- A screen receipt is useful only after Main and native owners exit cleanly.

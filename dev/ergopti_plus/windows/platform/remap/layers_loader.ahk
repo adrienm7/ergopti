@@ -3,13 +3,13 @@
 ; ==============================================================================
 ; MODULE: Keymap Layers — AutoHotkey Loader
 ; DESCRIPTION:
-; Reads a layer file — Ergopti's _shared/keymap/layers.recommended.toml or the
+; Reads a layer file — Ergopti's _shared/layouts/data/layers.recommended.toml or the
 ; user's layers.toml in the configuration folder — at run time, validates it
-; against the physical-key registry (_shared/data/keycodes/physical_keys.json)
-; and the layer vocabulary (_shared/keymap/layer_actions.toml), and resolves
+; against the physical-key registry (_shared/layouts/data/keycodes/physical_keys.json)
+; and the layer vocabulary (_shared/layouts/data/layer_actions.toml), and resolves
 ; every binding for one OS. Nothing is generated or compiled: the driver reads
 ; the same data files the macOS and Linux drivers read through
-; _shared/lua/keymap/layers.lua, and _shared/tests/corpus/keymap_layers/
+; _shared/layouts/engine/layers/layers.lua, and _shared/tests/corpus/keymap_layers/
 ; vectors.json holds all three loaders (and tools/lib/keymap-layers.cjs) to one
 ; answer.
 ;
@@ -68,7 +68,7 @@ KeymapLayers_LoadContext(SharedDir) {
 	if !(SharedDir is String) || SharedDir == ""
 		throw ValueError("KeymapLayers_LoadContext needs the _shared folder path.", -1)
 	Root := RTrim(SharedDir, "\/")
-	RegistryPath := Root . "\data\keycodes\physical_keys.json"
+	RegistryPath := Root . "\layouts\data\keycodes\physical_keys.json"
 	; FileRead throws on a missing or locked file, which is the answer we want
 	; for shipped data.
 	Registry := JsonParse(FSReadStrict(RegistryPath))
@@ -96,7 +96,7 @@ KeymapLayers_UserFilePathFromVocabulary(SharedDir, ConfigDir) {
 ; The vocabulary's sections, as the shared TOML helper returns them; throws when
 ; the shipped file is missing or unreadable.
 _KL_ReadVocabulary(Root) {
-	VocabularyPath := Root . "\keymap\layer_actions.toml"
+	VocabularyPath := Root . "\layouts\data\layer_actions.toml"
 	if !FileExist(VocabularyPath)
 		throw Error("The layer vocabulary is missing at '" . VocabularyPath . "'.", -2)
 	Sections := TOML_ParseFreshFile(VocabularyPath)

@@ -170,7 +170,7 @@ TestGestures_SharedModifierChordsAreRegisteredAndLabelled() {
         . KeyNameLabel("win") . " + " . KeyNameLabel("enter"), _GestureActionLabel("ctrl_shift_alt_win_enter"),
         "full modifier matrix must include special keys")
     ; The real French catalogue: Shift, Enter and Space read in French.
-    French := JsonParse(FileRead(_SharedDir . "\data\locales\fr.json", "UTF-8"))
+    French := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\fr.json", "UTF-8"))
     Fr := (Key) => French.Has(Key) ? French[Key] : Key
     Parts := GESTURE_MODIFIER_ACTION_PARTS["ctrl_shift_alt_win_enter"]
     AssertEqual("Ctrl + Maj + Alt + Win + Entrée", KeyNameChordLabel(Parts.Modifiers, Parts.KeyDef, Fr),
@@ -255,15 +255,17 @@ TestGestures_ToggleUIRejectsLiveActivationRefusal() {
 	Exists := _GTUI_ResultSequence([true, true])
 	Open := _GTUI_CallRecorder()
 	Activate := _GTUI_CallRecorder(false)
-	Message := ""
+	; The caught state is the verdict: a refusal raised with an empty message
+	; still surfaces, and a message sentinel read it as swallowed.
+	Surfaced := false
 	try {
 		_GestureGenericToggleUIWith(
 			(*) => 123, Open, (*) => true, Exists, (*) => 456, Activate)
-	} catch as Err {
-		Message := Err.Message
+	} catch {
+		Surfaced := true
 	}
 
-	AssertTrue(Message != "", "a live activation refusal must surface as an error")
+	AssertTrue(Surfaced, "a live activation refusal must surface as an error")
 	AssertEqual(1, Activate.calls, "the live window must receive one activation attempt")
 	AssertEqual(2, Exists.calls, "the refusal must be classified against current existence")
 	AssertEqual(0, Open.calls, "a still-live window must not be duplicated")

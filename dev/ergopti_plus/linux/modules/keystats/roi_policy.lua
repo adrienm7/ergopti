@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local M = {}
-local KEY = require("config_keys").KEY
+local KEY = require("settings.engine.keys").KEY
 local Cipher = require("modules.keystats.text_cipher")
 local Preferences = require("infra.metrics_preferences")
 

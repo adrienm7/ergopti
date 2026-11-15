@@ -120,7 +120,7 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 	end)
 
 	helpers.it("stores the shared \"never\" debounce as -1 and reads it back (llm-debounce-never)", function()
-		local Debounce = require("llm.request_plan.debounce")
+		local Debounce = require("ai.engine.request_plan.debounce")
 		local settings, storage = load_settings()
 		helpers.assert_true(settings.set("debounce_ms", Debounce.NEVER_MS))
 		helpers.assert_eq(storage.get("llm.trigger.debounce_ms"), -1)
@@ -144,27 +144,27 @@ local function with_url_request(options, body)
 		["llm.trigger.url_bar_filter_enabled"] = true,
 	} }))
 	replace("modules.llm.trigger_settings", nil)
-	replace("adapters.atspi_focus", nil)
-	local atspi = require("adapters.atspi_focus")
+	replace("platform.focus.atspi_focus", nil)
+	local atspi = require("platform.focus.atspi_focus")
 	atspi._set_command_runner_for_test(function()
 		observed.probes = observed.probes + 1
 		if options.probe_throw then error("controlled accessibility failure") end
 		if options.probe_unknown then return false, "" end
-		return true, "FOCUS:" .. require("json").encode({ role = 61,
+		return true, "FOCUS:" .. require("core.text.engine.json").encode({ role = 61,
 			name = options.url and "Address and search bar" or "Document text",
 			attributes = {}, active_scope = true, native_bus_name = ":1.42",
 			native_object_path = "/org/a11y/atspi/accessible/7" })
 	end)
-	replace("adapters.secure_field_detector", options.detector)
-	replace("adapters.window_info", { focused_snapshot = function()
+	replace("platform.focus.secure_field_detector", options.detector)
+	replace("platform.focus.window_info", { focused_snapshot = function()
 		observed.windows = observed.windows + 1
 		if options.window_throw then error("controlled native window failure") end
 		return { appId = options.app, windowTitle = "Owned document", bundleId = "", executablePath = "" }, "x11:123:42"
 	end })
-	replace("adapters.process_lifecycle", nil)
-	local lifecycle = require("adapters.process_lifecycle")
+	replace("core.process.adapters.lifecycle", nil)
+	local lifecycle = require("core.process.adapters.lifecycle")
 	if options.replace_lifecycle then
-		replace("adapters.process_lifecycle", { getForegroundApp = function()
+		replace("core.process.adapters.lifecycle", { getForegroundApp = function()
 			if options.lifecycle_throw then error("controlled lifecycle failure") end
 			return options.foreground
 		end })
@@ -375,7 +375,7 @@ end)
 helpers.describe("LLM trigger settings: tray reachability", function()
 	helpers.it("renders the declared trigger submenu and changes a privacy filter", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
@@ -412,7 +412,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 
 	helpers.it("offers the minimum request interval next to the idle time and saves a preset (request-floor-setting)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local menu = menu_builder.build({
 			is_paused = function() return false end,
@@ -445,7 +445,7 @@ helpers.describe("LLM trigger settings: tray reachability", function()
 
 	helpers.it("offers the \"never\" idle time as macOS does and shows it as the current choice (llm-debounce-never)", function()
 		local settings, storage = load_settings({["llm.enabled"] = true, ["llm.models.selected"] = "ollama"})
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local menu_builder = helpers.load_module("ui.menu.builder")
 		local function build()
 			return menu_builder.build({
@@ -497,10 +497,10 @@ end)
 --- Reads independent combinations without deriving expectations from setters.
 --- @return table corpus
 local function trigger_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/automatic_trigger_controls.json"), "rb"))
 	local raw = file:read("*a")
 	file:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Exercises real menu projection and the manifest-backed durable setting owner.
@@ -545,11 +545,11 @@ local function with_trigger_menu(options, body)
 		return many(values, source)
 	end
 	if options.label or options.first then
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
-				local root = assert(require("json").decode(raw))
+				local root = assert(require("core.text.engine.json").decode(raw))
 				if options.label then root.llm_trigger_menu[2].i18n = options.label end
 				if options.first then
 					local row = table.remove(root.llm_trigger_menu, 2)
@@ -557,7 +557,7 @@ local function with_trigger_menu(options, body)
 				end
 				return root
 			end,
-			i18n = require("infra.i18n"), logger = require("logger.shim"),
+			i18n = require("core.i18n.engine.i18n"), logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 	end
@@ -584,7 +584,7 @@ local function with_trigger_menu(options, body)
 	local parent
 	local function walk(rows)
 		for _, row in ipairs(rows or {}) do
-			if row.title == require("infra.i18n").get("menu.llm.trigger_menu_title") and type(row.menu) == "table" then parent = row end
+			if row.title == require("core.i18n.engine.i18n").get("menu.llm.trigger_menu_title") and type(row.menu) == "table" then parent = row end
 			if row.menu then walk(row.menu) end
 		end
 	end
@@ -601,7 +601,7 @@ end
 local function trigger_row(parent, key)
 	-- A greyed row is drawn « label — reason » (33c0db4fa4 gave the privacy
 	-- filters their save_unavailable reason), so the label is its prefix.
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, row in ipairs(parent.menu) do
 		if type(row.title) == "string" and (row.title == label or row.title:sub(1, #label + 1) == label .. " ") then
 			return row
@@ -639,13 +639,13 @@ helpers.describe("LLM shared automatic trigger controls", function()
 	helpers.it("takes shared labels and reordering into actual projection (shared-automatic-triggers)", function()
 		local corpus = trigger_corpus()
 		with_trigger_menu({states = {false, true}, label = corpus.alternate_i18n, first = true}, function(parent, _, _, observed)
-			helpers.assert_eq(parent.menu[1].title, require("infra.i18n").get(corpus.alternate_i18n))
+			helpers.assert_eq(parent.menu[1].title, require("core.i18n.engine.i18n").get(corpus.alternate_i18n))
 			helpers.assert_true(parent.menu[2].menu ~= nil, "numeric debounce provider follows the reordered shared check")
 			helpers.assert_eq(observed.writes, 0)
 		end)
 	end)
 
-	helpers.it("reads current values and refuses stale commands after pause or master withdrawal (shared-automatic-triggers)", function()
+	helpers.it("reads current values, commits while paused and refuses stale commands after master withdrawal (shared-automatic-triggers)", function()
 		for _, expected in ipairs(trigger_corpus().rows) do
 			local options = {states = {false, false}, count = 2}
 			with_trigger_menu(options, function(parent, settings, storage, observed, profiles)
@@ -654,10 +654,11 @@ helpers.describe("LLM shared automatic trigger controls", function()
 				helpers.assert_eq(profiles.set("num_predictions", 1), true)
 				helpers.assert_eq(row.fn(), true)
 				helpers.assert_eq(settings.get(expected.native), false, "held callback toggles the effective current bool")
-				local writes, redraws = observed.writes, observed.redraws
 				options.paused = true
-				helpers.assert_eq(row.fn(), false)
+				helpers.assert_eq(row.fn(), true, "a pause stops typing, not configuration (EDD-1)")
+				helpers.assert_eq(settings.get(expected.native), true)
 				options.paused = false
+				local writes, redraws = observed.writes, observed.redraws
 				options.enabled = false
 				helpers.assert_eq(row.fn(), false)
 				helpers.assert_eq(observed.writes, writes)
@@ -688,10 +689,10 @@ end)
 --- Reads the independent privacy declarations and boolean pairs.
 --- @return table corpus
 local function privacy_corpus()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/privacy_trigger_controls.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 helpers.describe("Shared privacy trigger native owners", function()
@@ -722,13 +723,24 @@ helpers.describe("Shared privacy trigger native owners", function()
 		end
 	end)
 
-	for _, condition in ipairs({"pause", "master withdrawn", "foreign source", "runtime disagreement"}) do
+	helpers.it("commits held privacy commands while paused, read on resume (shared-privacy-triggers)", function()
+		for _, expected in ipairs(privacy_corpus().rows) do
+			local options = {states = {false, false}, privacy_states = {false, false}}
+			with_trigger_menu(options, function(parent, settings)
+				local row = trigger_row(parent, expected.i18n)
+				options.paused = true
+				helpers.assert_eq(row.fn(), true)
+				helpers.assert_eq(settings.get(expected.linux), true)
+			end)
+		end
+	end)
+
+	for _, condition in ipairs({"master withdrawn", "foreign source", "runtime disagreement"}) do
 		helpers.it("refuses held privacy commands after " .. condition .. " (shared-privacy-triggers)", function()
 			for _, expected in ipairs(privacy_corpus().rows) do
 				local options = {states = {false, false}, privacy_states = {false, false}}
 				with_trigger_menu(options, function(parent, settings, storage, observed)
 					local row = trigger_row(parent, expected.i18n)
-					if condition == "pause" then options.paused = true end
 					if condition == "master withdrawn" then options.enabled = false end
 					if condition == "foreign source" then
 						storage.values["llm.future_trigger_parameter"] = 73
@@ -777,7 +789,7 @@ end)
 
 helpers.describe("Shared privacy intent vectors", function()
 	helpers.it("replays strict bool types, owner revisions and exact backend identities (shared-privacy-triggers)", function()
-		local corpus, policy = privacy_corpus(), require("llm.trigger_policy")
+		local corpus, policy = privacy_corpus(), require("ai.engine.policy.trigger_policy")
 		for _, vector in ipairs(corpus.vectors) do
 			local expected, current = {}, {}
 			for key, value in pairs(corpus.snapshot) do expected[key], current[key] = value, value end

@@ -21,20 +21,20 @@ end
 
 
 local function fresh_apps()
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	for _, name in ipairs({
 		"modules.shortcuts.actions.apps",
-		"adapters.timer_scheduler",
-		"adapters.shell_runner",
+		"core.events.timer_scheduler",
+		"core.process.adapters.shell_runner",
 		"adapters.app_launcher",
-		"adapters.window_info",
-		"adapters.window_manager",
-		"adapters.synthetic_input",
+		"platform.focus.window_info",
+		"platform.focus.window_manager",
+		"platform.input.synthetic_input",
 		"adapters.clipboard",
-		"infra.logger",
-		"infra.notifications",
-		"infra.i18n",
-		"infra.text_utils",
+		"core.logger.engine.logger",
+		"core.ui.engine.notifications",
+		"core.i18n.engine.i18n",
+		"core.text.engine.utils",
 		"tests.stubs.hs",
 		"hs",
 	}) do package.loaded[name] = nil end
@@ -246,7 +246,7 @@ local function fresh_apps()
 		return true, handle
 	end
 
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		open = function(target, callback) return start_shell("open", target, callback) end,
 		applescript = function(script, callback)
 			return start_shell("applescript", script, callback)
@@ -258,8 +258,8 @@ local function fresh_apps()
 			return fixture.launch_result
 		end,
 	}
-	package.loaded["adapters.window_manager"] = { activate = function() return false end }
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_manager"] = { activate = function() return false end }
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = fixture.focused_app_id } end,
 	}
 	local function complete(tx, status)
@@ -268,7 +268,7 @@ local function fresh_apps()
 		for _, callback in ipairs(tx.completed) do callback(tx, status) end
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		begin = function() return { completed = {}, dispatched = {}, batch = {} } end,
 		on_complete = function(tx, callback)
 			if tx.status then callback(tx, tx.status)
@@ -291,15 +291,15 @@ local function fresh_apps()
 		end,
 		cancel = function(tx) return complete(tx, "cancelled") end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(...)
 			fixture.notifications[#fixture.notifications + 1] = table.pack(...)
 			return true
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = {
 		applescript_format = function(template, value)
 			return (template:gsub("%%s", value))
 		end,
@@ -307,10 +307,10 @@ local function fresh_apps()
 
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.apps"] = nil
 	fixture.subject = require("modules.shortcuts.actions.apps")
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	return fixture
 end
 
@@ -639,7 +639,7 @@ end)
 helpers.describe("ChatGPT URL diagnostics", function()
 	helpers.it("opens the exact conversation URL without logging it", function()
 		local fixture = fresh_apps()
-		local logger = require("infra.logger")
+		local logger = require("core.logger.engine.logger")
 		local original, logs = logger.debug, {}
 		logger.debug = function(_, fmt, ...) logs[#logs + 1] = string.format(fmt, ...) end
 		local url = "https://chatgpt.com/c/private-conversation?prompt=private-prompt"

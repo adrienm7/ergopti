@@ -29,11 +29,11 @@ local STUBBED_MODULES = {
 	"modules.keystats.aggregator",
 	"modules.keystats.rotation",
 	"modules.keystats.export",
-	"keystats.metrics",
-	"adapters.file_system",
-	"adapters.ledger_append",
+	"metrics.engine.metrics",
+	"core.fs.adapters.file_system",
+	"core.fs.adapters.ledger_append",
 	"tests.support.keystats.absent_ledger_file_system",
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 local function make_state()
@@ -91,8 +91,8 @@ local function run_unowned_case(failure)
 	package.loaded["modules.keystats.export"] = {
 		init = function() calls.export_init = calls.export_init + 1 end,
 	}
-	package.loaded["keystats.metrics"] = {}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["metrics.engine.metrics"] = {}
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			helpers.assert_true(path:sub(-#DEVICE_PATH_SUFFIX) == DEVICE_PATH_SUFFIX,
 				"the classified read must inspect the enumerated device identity")
@@ -123,7 +123,7 @@ local function run_unowned_case(failure)
 	end
 	local timer_handle = make_timer_handle(nil)
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local module = helpers.load_with_stubs("modules.keystats.log_manager", {
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end
@@ -258,8 +258,8 @@ local function run_publication_case(failure)
 		get_device_short_id = function() return "" end,
 		get_sqlite_path = function() return "" end,
 	}
-	package.loaded["keystats.metrics"] = {}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["metrics.engine.metrics"] = {}
+	package.loaded["core.fs.adapters.file_system"] = {
 		read_with_status = function(path)
 			calls.classified_reads = calls.classified_reads + 1
 			if calls.classified_reads == 1 then
@@ -310,7 +310,7 @@ local function run_publication_case(failure)
 	end
 	local timer_handle = make_publication_timer_handle(nil)
 
-	package.loaded["adapters.timer_scheduler"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
 	local module = require("tests.support.keystats.absent_ledger_file_system").load({
 		execute = function(command)
 			if command:find("ioreg", 1, true) then return HOST_SIGNATURE end

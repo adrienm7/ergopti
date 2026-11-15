@@ -49,13 +49,14 @@ end
 --- Runs one prompt result through the real menu callback.
 --- @param raw string Prompt text.
 --- @param outcome string Runtime setter outcome.
+--- @param paused boolean|nil Whether the menu is built and clicked while paused.
 --- @return table fixture Observed state, calls, and callback result.
-local function run_menu_action(raw, outcome)
-	local saved_dialog = package.loaded["infra.dialog_util"]
-	local saved_notifications = package.loaded["infra.notifications"]
+local function run_menu_action(raw, outcome, paused)
+	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
+	local saved_notifications = package.loaded["core.ui.engine.notifications"]
 	local saved_lifecycle = package.loaded["ui.menu.keymap_lifecycle"]
 	local saved_custom = package.loaded["ui.menu.menu_hotstrings_custom"]
-	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0 }
+	local calls = { sets = 0, clears = 0, saves = 0, updates = 0, notices = 0, alerts = {} }
 	local state = {
 		keymap = true,
 		hotstrings = { personal = true, custom = true },
@@ -65,10 +66,11 @@ local function run_menu_action(raw, outcome)
 		custom_close_on_add = false,
 	}
 
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		text_prompt = function() return "OK", raw end,
+		block_alert = function(title, body) calls.alerts[#calls.alerts + 1] = { title, body } end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(_title, _body, kind)
 			helpers.assert_eq(kind, "error")
 			calls.notices = calls.notices + 1
@@ -79,11 +81,11 @@ local function run_menu_action(raw, outcome)
 
 	local ok, fixture_or_err = xpcall(function()
 		local Custom = require("ui.menu.menu_hotstrings_custom")
-		local shortcut_prefix = require("infra.i18n").get("menu.hotstrings.shortcut_prefix")
+		local shortcut_prefix = require("core.i18n.engine.i18n").get("menu.hotstrings.shortcut_prefix")
 		helpers.assert_true(type(shortcut_prefix) == "string" and shortcut_prefix ~= "",
 			"the localized shortcut prefix must be available")
 		local ctx = {
-			paused = false,
+			paused = paused == true,
 			state = state,
 			hotfiles = { "personal.toml" },
 			get_group_name = function() return "personal" end,
@@ -110,8 +112,8 @@ local function run_menu_action(raw, outcome)
 		return { result = row.fn(), state = state, calls = calls }
 	end, debug.traceback)
 
-	package.loaded["infra.dialog_util"] = saved_dialog
-	package.loaded["infra.notifications"] = saved_notifications
+	package.loaded["core.ui.engine.dialog_util"] = saved_dialog
+	package.loaded["core.ui.engine.notifications"] = saved_notifications
 	package.loaded["ui.menu.keymap_lifecycle"] = saved_lifecycle
 	package.loaded["ui.menu.menu_hotstrings_custom"] = saved_custom
 	if not ok then error(fixture_or_err, 0) end
@@ -124,7 +126,7 @@ end
 --- editor transaction, rather than the fixture, decide which handle is current.
 --- @param body function Callback receiving editor and registrar fixture.
 local function with_editor_registrar(body)
-	local saved_registrar = package.loaded["adapters.hotkey_registrar"]
+	local saved_registrar = package.loaded["platform.input.hotkey_registrar"]
 	local saved_editor = package.loaded["ui.hotstring_editor"]
 	local calls = { bind = 0, unbind = 0, enable = 0, order = {} }
 	local handles = {}
@@ -164,7 +166,7 @@ local function with_editor_registrar(body)
 		return true
 	end
 
-	package.loaded["adapters.hotkey_registrar"] = registrar
+	package.loaded["platform.input.hotkey_registrar"] = registrar
 	package.loaded["ui.hotstring_editor"] = nil
 	local ok, err = xpcall(function()
 		local Editor = helpers.load_with_stubs("ui.hotstring_editor")
@@ -175,7 +177,7 @@ local function with_editor_registrar(body)
 			refuse_unbind = function(handle) refuse_unbind[handle] = true end,
 		})
 	end, debug.traceback)
-	package.loaded["adapters.hotkey_registrar"] = saved_registrar
+	package.loaded["platform.input.hotkey_registrar"] = saved_registrar
 	package.loaded["ui.hotstring_editor"] = saved_editor
 	if not ok then error(err, 0) end
 end
@@ -188,7 +190,12 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 		helpers.assert_eq(fixture.calls.sets, 0)
 		helpers.assert_eq(fixture.calls.saves, 0)
 		helpers.assert_eq(fixture.calls.updates, 0)
-		helpers.assert_eq(fixture.calls.notices, 1)
+		-- The refusal names the accepted form instead of a generic failure (value-validation).
+		local i18n = require("core.i18n.engine.i18n")
+		helpers.assert_eq(fixture.calls.alerts, {
+			{ i18n.get("shortcut_utils.format_invalid"), i18n.get("shortcut_utils.format_hint") },
+		})
+		helpers.assert_eq(fixture.calls.notices, 0, "no generic failure notice")
 		helpers.assert_eq(fixture.state.custom_editor_shortcut,
 			{ mods = { "ctrl" }, key = "A" })
 	end)
@@ -226,6 +233,18 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 		helpers.assert_eq(fixture.calls.saves, 1)
 		helpers.assert_eq(fixture.calls.updates, 1)
 		helpers.assert_eq(fixture.calls.notices, 0)
+		helpers.assert_eq(fixture.state.custom_editor_shortcut,
+			{ mods = { "alt" }, key = "K" })
+	end)
+
+	-- EDD-1, the maintainer's decision of 2026-11-14: a paused change is saved
+	-- at once and the hotkey moves on resume (the menu's resume listener binds
+	-- it). Before, the row had no action while paused.
+	helpers.it("(paused-slot-change) saves a paused shortcut without binding it", function()
+		local fixture = run_menu_action("option+k", "true", true)
+		helpers.assert_eq(fixture.result, true)
+		helpers.assert_eq(fixture.calls.sets, 0, "the hotkey waits for the resume")
+		helpers.assert_eq(fixture.calls.saves, 1)
 		helpers.assert_eq(fixture.state.custom_editor_shortcut,
 			{ mods = { "alt" }, key = "K" })
 	end)
@@ -297,10 +316,10 @@ end)
 --- @param timer_result boolean|nil Actual scheduler receipt.
 --- @return table observation Recorded native admissions.
 local function editor_observation(vector, deferred_pause, timer_result, label_key)
-	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "infra.deferred_work", "adapters.timer_scheduler", "infra.manifest_menu", "infra.paths", "infra.i18n" }, function()
+	return helpers.with_stub_scope({ "ui.menu.menu_hotstrings_custom", "core.timing.engine.deferred_work", "core.events.timer_scheduler", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n" }, function()
 		local calls, scheduled, callback = 0, 0, nil
 		local current = vector.initial_paused
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(_delay, work)
 				scheduled = scheduled + 1
 				if timer_result == false then return nil, false end
@@ -308,7 +327,7 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 				return {}, true
 			end,
 		}
-		package.loaded["infra.deferred_work"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
 		package.loaded["ui.menu.menu_hotstrings_custom"] = nil
 		local Custom = require("ui.menu.menu_hotstrings_custom")
 		local ctx = {
@@ -332,7 +351,7 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 			declaration[1].i18n = label_key
 		end
 		local built = Custom.build_custom(ctx, { group_counts = {} })
-		local wanted = require("infra.i18n").get(label_key or "menu.hotstrings.open_editor")
+		local wanted = require("core.i18n.engine.i18n").get(label_key or "menu.hotstrings.open_editor")
 		local found
 		for _, row in ipairs(built.submenu) do if row.title == wanted then found = row end end
 		assert(found, "the shared personal editor command must be reachable")
@@ -346,10 +365,10 @@ local function editor_observation(vector, deferred_pause, timer_result, label_ke
 end
 
 helpers.describe("shared personal editor command", function()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/personal_editor_command.json"), "rb"))
 	local text = assert(file:read("*a"))
 	assert(file:close())
-	local vectors = assert(require("adapters.json_codec").decode(text)).vectors
+	local vectors = assert(require("core.fs.adapters.json_codec").decode(text)).vectors
 	for _, vector in ipairs(vectors) do
 		helpers.it("shared-personal-editor: " .. vector.name, function()
 			local observed = editor_observation(vector)
@@ -362,10 +381,12 @@ helpers.describe("shared personal editor command", function()
 		helpers.assert_eq(observed.calls, 1)
 		helpers.assert_eq(observed.enabled, true)
 	end)
-	helpers.it("shared-personal-editor: rechecks pause after its deferred admission", function()
+	-- The editor is configuration: a pause arriving during its deferred
+	-- admission does not withdraw it (EDD-1, edd1-paused-writes).
+	helpers.it("shared-personal-editor: opens after a pause during its deferred admission", function()
 		local observed = editor_observation(vectors[1], true)
 		helpers.assert_eq(observed.scheduled, 1)
-		helpers.assert_eq(observed.calls, 0)
+		helpers.assert_eq(observed.calls, 1)
 	end)
 	helpers.it("shared-personal-editor: refuses an unacknowledged native timer", function()
 		local observed = editor_observation(vectors[1], false, false)

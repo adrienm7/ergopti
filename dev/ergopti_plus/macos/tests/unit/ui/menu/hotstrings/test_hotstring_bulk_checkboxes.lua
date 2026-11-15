@@ -269,8 +269,8 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
 			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
 			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
-			local deferred = require("infra.deferred_work")
-			local shell = require("adapters.shell_runner")
+			local deferred = require("core.timing.engine.deferred_work")
+			local shell = require("core.process.adapters.shell_runner")
 			local original = deferred.after
 			local original_open = shell.open
 			local callback, opened
@@ -303,28 +303,28 @@ end)
 --- @param committed boolean Native scheduling acknowledgement.
 --- @param body function Real category callback observations.
 local function with_category_file(committed, body, change_label)
-	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
-		"adapters.timer_scheduler", "adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
+	helpers.with_stub_scope({ "infra.manifest_menu", "core.timing.engine.deferred_work",
+		"core.events.timer_scheduler", "core.process.adapters.shell_runner", "modules.keymap", "modules.dynamic_hotstrings",
 		"ui.menu.menu_hotstrings", "ui.menu.menu_hotstrings_custom" }, function()
 		-- Category file opening neither starts nor inspects these unrelated engines.
 		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
 		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
 		local callbacks, launches = {}, {}
-		package.loaded["adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
-		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
+		package.loaded["core.process.adapters.shell_runner"] = { open = function(path) launches[#launches + 1] = path; return true end }
+		package.loaded["core.events.timer_scheduler"] = { after = function(_, callback)
 			callbacks[#callbacks + 1] = callback
 			return {}, committed
 		end }
 		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-		package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
-			platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+		package.loaded["infra.manifest_menu"] = assert(require("menu.engine.renderer").new({
+			platform = "hs", manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
 			json_decode = function(bytes)
 				local document = hs.json.decode(bytes)
 				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
 				return document
 			end,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["ui.menu.menu_hotstrings"] = nil
 		hotstrings = require("ui.menu.menu_hotstrings")
@@ -370,7 +370,7 @@ helpers.describe("shared category file command", function()
 			local ctx = context(true, true)
 			ctx.hotfile_paths = { alpha = "/user/a.toml" }
 			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
-			package.loaded["adapters.shell_runner"].open = nil
+			package.loaded["core.process.adapters.shell_runner"].open = nil
 			helpers.assert_eq(command.fn(), false)
 			helpers.assert_eq(#callbacks, 0)
 			helpers.assert_eq(#launches, 0)
@@ -382,12 +382,12 @@ end)
 
 --- The actual common-category owner consumes a fresh genuine manifest renderer.
 local function with_common_section_frame(body)
-	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
+	return helpers.with_stub_scope({ "core.logger.engine.logger", "infra.manifest_menu", "ui.menu.menu_hotstrings",
 		"ui.menu.menu_hotstrings_custom", "ui.menu.menu_hotstrings_management" }, function()
-		local translator = require("infra.i18n")
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+		local translator = require("core.i18n.engine.i18n")
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode, i18n = translator, logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer
 		local hotstrings = require("ui.menu.menu_hotstrings")
@@ -456,13 +456,13 @@ local function with_personal_info_leaf(body)
 			callbacks[#callbacks + 1], native_timers[#native_timers + 1] = callback, native
 			return native
 		end
-		package.loaded["adapters.timer_scheduler"] = nil
-		package.loaded["infra.deferred_work"] = nil
+		package.loaded["core.events.timer_scheduler"] = nil
+		package.loaded["core.timing.engine.deferred_work"] = nil
 		package.loaded["infra.manifest_menu"] = nil
 		package.loaded["ui.menu.menu_hotstrings"] = nil
 		local timer
 		local called, detail = xpcall(function()
-			timer = require("adapters.timer_scheduler")
+			timer = require("core.events.timer_scheduler")
 			local renderer = assert(require("infra.manifest_menu"))
 			local hotstrings = require("ui.menu.menu_hotstrings")
 			local ctx = context(true, true)
@@ -489,7 +489,7 @@ local function with_personal_info_leaf(body)
 end
 
 local function personal_info_native(rows)
-	local title = require("infra.i18n").get("menu.shortcuts.edit_personal_info")
+	local title = require("core.i18n.engine.i18n").get("menu.shortcuts.edit_personal_info")
 	for _, row in ipairs(rows or {}) do if row.title == title then return row end end
 end
 
@@ -497,7 +497,7 @@ helpers.describe("personal-info editor original declared leaf (Mac)", function()
 	helpers.it("personal-info Mac leaf: retains original checkbox, exact native callback and deferred protected opener", function()
 		with_personal_info_leaf(function(f)
 			local template, supplied = f.renderer.template_rows, nil
-			local timer = require("adapters.timer_scheduler")
+			local timer = require("core.events.timer_scheduler")
 			local schedule, delay = timer.after, nil
 			local called, detail = xpcall(function()
 				f.renderer.template_rows = function(key, ...)

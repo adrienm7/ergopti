@@ -13,7 +13,7 @@
 #Include ../test_framework.ahk
 #Include host_capability_gate.ahk
 
-_FNEF_Receipt(State) => Map("state", State, "name", "example", "why", "the fixture probe reports it missing")
+_FNEF_Receipt(State) => Map("state", State, "hosted_ci", "required", "name", "example", "why", "the fixture probe reports it missing")
 
 _FNEF_GatedFailure(State) {
 	TestRequireHostCapability(_FNEF_Receipt.Bind(State))

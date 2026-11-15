@@ -22,26 +22,39 @@ end
 
 local GNOME_SOURCES = "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]\n"
 local GNOME_MRU = "[('xkb', 'fr+ergopti'), ('xkb', 'fr')]\n"
+-- The call the Ergopti GNOME Shell extension answers (platform/desktop_focus/gnome/extension.js).
+local function activate(id)
+	return "gdbus call --session --dest org.gnome.Shell --object-path /org/ergopti/InputSource --method "
+		.. "org.ergopti.InputSource1.Activate '" .. id .. "'"
+end
 local KDE_CALL = "gdbus call --session --dest org.kde.keyboard --object-path /Layouts --method org.kde.KeyboardLayouts."
-local KDE_LIST = "([('fr', 'ergopti', 'French (Ergopti)'), ('us', '', \"English (US, int'l)\"), ('de', 'neo', 'German (Neo 2)')],)\n"
+-- The reply's middle field is the user's display label, never the variant
+-- (Plasma 6.6.4, checked on Wayland and X11): the variants are kxkbrc's.
+local KDE_LIST = "([('fr', '', 'French (Ergopti)'), ('us', 'us', \"English (US, int'l)\"), ('de', 'DE', 'German (Neo 2)')],)\n"
+local KXKBRC = "[Layout]\nDisplayNames=,,DE\nLayoutList=fr,us,de\nUse=true\nVariantList=ergopti,,neo\n"
 local X11_QUERY = "rules:      evdev\nmodel:      pc105\nlayout:     fr,us,de\nvariant:    ergopti,,neo\n"
 
 --- A port whose commands answer from a table and are recorded in order.
 --- @param backend string|nil
---- @param answers table "program arg1 arg2…" -> stdout, or false for a failure.
+--- @param answers table "program arg1 arg2…" -> stdout, false for a failure, or
+---   { stderr = text } for a failure that printed text.
 --- @param deferred boolean|nil When true, commands answer only on flush().
 --- @return table port, table calls, function flush
 local function fake_port(backend, answers, deferred)
 	local calls, waiting = {}, {}
 	local port = {
 		backend = function() return backend end,
+		kde_config = function() return answers.kxkbrc end,
 		run = function(program, args, on_done)
 			local line = program .. " " .. table.concat(args, " ")
 			calls[#calls + 1] = line
 			local answer = answers[line]
-			if answer == nil and program ~= "gsettings" and program ~= "setxkbmap" then return false end
+			if answer == nil and program ~= "gsettings" and program ~= "setxkbmap" then
+				return false
+			end
 			local function answer_now()
 				if answer == false then on_done({ ok = false, error = "exit code 1" })
+				elseif type(answer) == "table" then on_done({ ok = false, error = "exit code 1", stderr = answer.stderr })
 				else on_done({ ok = true, stdout = answer or "" }) end
 			end
 			if deferred then waiting[#waiting + 1] = answer_now else answer_now() end
@@ -58,6 +71,9 @@ local function gnome_answers()
 	return {
 		["gsettings get org.gnome.desktop.input-sources sources"] = GNOME_SOURCES,
 		["gsettings get org.gnome.desktop.input-sources mru-sources"] = GNOME_MRU,
+		[activate("xkb:fr")] = "(true,)\n",
+		[activate("xkb:fr+ergopti")] = "(true,)\n",
+		[activate("ibus:mozc-jp")] = "(true,)\n",
 	}
 end
 
@@ -78,7 +94,8 @@ helpers.describe("input source switch: parsers", function()
 	helpers.it("reads the KDE daemon's layouts and index, and refuses what it cannot read", function()
 		local layouts = Switch.parse_kde_layouts(KDE_LIST)
 		helpers.assert_eq(#layouts, 3)
-		helpers.assert_eq(layouts[1].variant, "ergopti")
+		helpers.assert_eq(layouts[1].label, "")
+		helpers.assert_eq(layouts[3].label, "DE", "the middle field is the display label")
 		helpers.assert_eq(layouts[2].name, "English (US, int'l)", "a double-quoted name keeps its apostrophe")
 		helpers.assert_eq(#Switch.parse_kde_layouts("([],)"), 0)
 		helpers.assert_eq(Switch.parse_kde_layouts("([('fr;rm', '', 'x')],)"), nil, "a name outside XKB's alphabet")
@@ -103,21 +120,29 @@ helpers.describe("input source switch: parsers", function()
 end)
 
 helpers.describe("input source switch: plans", function()
-	helpers.it("puts the GNOME target first in the recent sources, then sets its index", function()
+	-- GNOME Shell 46 ignores runtime writes of mru-sources and current and keeps
+	-- its in-memory recent list on a sources change (container proof, 2026-11-10):
+	-- the Ergopti Shell extension activates the source the way the Shell does.
+	helpers.it("switches GNOME through the Ergopti Shell extension, never the sources list (gnome-runtime-switch)", function()
 		local listing = {
 			backend = Switch.GNOME,
 			sources = Switch.parse_gnome_sources(GNOME_SOURCES),
 			mru = Switch.parse_gnome_sources(GNOME_MRU),
 		}
-		local steps = Switch.plan(listing, "xkb:fr")
-		helpers.assert_eq(#steps, 2)
-		helpers.assert_eq(steps[1].program .. " " .. table.concat(steps[1].args, " "),
-			"gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]")
-		helpers.assert_eq(table.concat(steps[2].args, " "), "set org.gnome.desktop.input-sources current 0")
-		local ibus = Switch.plan(listing, "ibus:mozc-jp")
-		helpers.assert_eq(ibus[1].args[4], "[('ibus', 'mozc-jp'), ('xkb', 'fr+ergopti'), ('xkb', 'fr')]",
-			"a source absent from the recent list joins it at the head")
-		helpers.assert_eq(ibus[2].args[4], "2")
+		local function lines(steps)
+			local out = {}
+			for index, step in ipairs(steps) do out[index] = step.program .. " " .. table.concat(step.args, " ") end
+			return out
+		end
+		helpers.assert_eq(lines(Switch.plan(listing, "xkb:fr+ergopti")), { activate("xkb:fr+ergopti") })
+		helpers.assert_eq(Switch.plan(listing, "xkb:fr+ergopti")[1].expect, "(true,)",
+			"the extension answers whether the Shell listed the source")
+		helpers.assert_eq(lines(Switch.plan(listing, "ibus:mozc-jp")), { activate("ibus:mozc-jp") })
+		for _, id in ipairs({ "xkb:fr", "xkb:fr+ergopti", "ibus:mozc-jp" }) do
+			for _, step in ipairs(Switch.plan(listing, id)) do
+				helpers.assert_true(step.program ~= "gsettings", "the user's sources are never rewritten")
+			end
+		end
 		local none, reason = Switch.plan(listing, "xkb:us")
 		helpers.assert_eq(none, nil)
 		helpers.assert_true(reason:find("not configured", 1, true) ~= nil, reason)
@@ -135,15 +160,15 @@ end)
 
 helpers.describe("input source switch: switcher", function()
 	helpers.it("linux-x11-active-group: waits for owned group acknowledgement and retirement", function()
-		local names = { "adapters.owned_process", "luv", "infra.paths", "_generated.native_runtime" }
+		local names = { "core.process.adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls = {}
-		package.loaded["adapters.owned_process"] = { start = function(program, args, options, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(program, args, options, callback)
 			calls[#calls + 1] = { program = program, args = args, options = options, done = callback }
 			return { started = false, error = "dispatch refused until retired" }
 		end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() return "/literal?root" end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/literal?root" end }
 		package.loaded["_generated.native_runtime"] = { x11 = "libX11-test.so.9" }
 		local port = Switch.native_port()
 		local received = {}
@@ -166,13 +191,13 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-x11-active-group: query and rejected layout never start the group worker", function()
-		local previous = package.loaded["adapters.owned_process"]
+		local previous = package.loaded["core.process.adapters.owned_process"]
 		local calls = {}
-		package.loaded["adapters.owned_process"] = { start = function(program, args, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(program, args, _, callback)
 			calls[#calls + 1] = { program = program, args = args, done = callback }; return {}
 		end }
 		local port = Switch.native_port()
-		package.loaded["adapters.owned_process"] = previous
+		package.loaded["core.process.adapters.owned_process"] = previous
 		local query, rejected
 		port.run("setxkbmap", { "-query" }, function(result) query = result end)
 		calls[1].done({ ok = true, stdout = "layout: us" })
@@ -184,29 +209,29 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-x11-active-group: worker setup errors complete as refusals", function()
-		local old_process, old_luv, old_paths = package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["infra.paths"]
+		local old_process, old_luv, old_paths = package.loaded["core.process.adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"]
 		local done
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback) done = callback; return {} end }
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback) done = callback; return {} end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() error("unavailable") end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() error("unavailable") end }
 		local port = Switch.native_port()
 		local result
 		port.run("setxkbmap", { "-layout", "fr" }, function(value) result = value end)
 		done({ ok = true })
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(result.error, "X11 group worker could not start")
-		package.loaded["adapters.owned_process"], package.loaded["luv"], package.loaded["infra.paths"] = old_process, old_luv, old_paths
+		package.loaded["core.process.adapters.owned_process"], package.loaded["luv"], package.loaded["core.fs.engine.paths"] = old_process, old_luv, old_paths
 	end)
 
 	helpers.it("linux-x11-active-group: invalid declared soname never reaches a worker", function()
-		local names = { "adapters.owned_process", "luv", "infra.paths", "_generated.native_runtime" }
+		local names = { "core.process.adapters.owned_process", "luv", "core.fs.engine.paths", "_generated.native_runtime" }
 		local old = {}; for _, name in ipairs(names) do old[name] = package.loaded[name] end
 		local calls, done = 0, nil
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback)
 			calls = calls + 1; done = callback; return {}
 		end }
 		package.loaded["luv"] = { os_getpid = function() return 123 end, exepath = function() return "/runtime/luajit" end }
-		package.loaded["infra.paths"] = { driver_root = function() return "/driver" end }
+		package.loaded["core.fs.engine.paths"] = { driver_root = function() return "/driver" end }
 		package.loaded["_generated.native_runtime"] = { x11 = "../unexpected.so" }
 		local port, result = Switch.native_port(), nil
 		port.run("setxkbmap", { "-layout", "fr" }, function(value) result = value end)
@@ -217,14 +242,14 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("linux-layout-start-debt: native refused start waits for settlement callback", function()
-		local previous = package.loaded["adapters.owned_process"]
+		local previous = package.loaded["core.process.adapters.owned_process"]
 		local pending
-		package.loaded["adapters.owned_process"] = { start = function(_, _, _, callback)
+		package.loaded["core.process.adapters.owned_process"] = { start = function(_, _, _, callback)
 			pending = callback
 			return { started = false, error = "native allocation refused" }
 		end }
 		local port = Switch.native_port()
-		package.loaded["adapters.owned_process"] = previous
+		package.loaded["core.process.adapters.owned_process"] = previous
 		local delivered = false
 		local accepted = port.run("setxkbmap", { "-query" }, function() delivered = true end)
 		helpers.assert_eq(accepted, true, "the returned owner still has physical retirement to acknowledge")
@@ -234,7 +259,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-settlement: waits for an outstanding listing", function()
 		local pending, settled, changed = nil, false, nil
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending = callback; return true end })
 		switcher.refresh(function(value) changed = value end)
 		helpers.assert_eq(switcher.is_settled(), false)
@@ -247,7 +272,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: an older completion cannot replace newer choices", function()
 		local pending, completed = {}, {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
 		switcher.refresh(function(changed) completed[#completed + 1] = changed end)
@@ -258,7 +283,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: an old refresh cannot replace a switcher's newer listing", function()
 		local pending = {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.refresh()
 		local switched
@@ -271,7 +296,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: a refresh waits for an active switch", function()
 		local pending = {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		local switched
 		switcher.select("fr", function(ok) switched = ok end)
@@ -287,7 +312,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: reentrant completion refreshes before settlement", function()
 		local pending, settled, refresh_done = {}, false, false
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback) pending[#pending + 1] = callback; return true end })
 		switcher.select("fr", function(ok)
 			helpers.assert_true(ok)
@@ -304,7 +329,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 	helpers.it("linux-layout-refresh-order: synchronous deferred refreshes all retire before settlement", function()
 		local calls, pending, events = 0, {}, {}
-		local switcher = Switch.new({ backend = function() return Switch.X11 end,
+		local switcher = Switch.new({ kde_config = function() return nil end, backend = function() return Switch.X11 end,
 			run = function(_, _, callback)
 				calls = calls + 1
 				if calls <= 2 then pending[calls] = callback else callback({ ok = true, stdout = "layout: fr\n" }) end
@@ -336,7 +361,7 @@ helpers.describe("input source switch: switcher", function()
 
 	helpers.it("lists a KDE session's layouts from the keyboard daemon with the active one", function()
 		local port, calls = fake_port(Switch.KDE, {
-			[KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 2,)\n",
+			[KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 2,)\n", kxkbrc = KXKBRC,
 		})
 		local switcher = Switch.new(port)
 		local changed
@@ -352,7 +377,7 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("switches a KDE session by the daemon's index and fails when it refuses", function()
-		local answers = { [KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+		local answers = { [KDE_CALL .. "getLayoutsList"] = KDE_LIST, [KDE_CALL .. "getLayout"] = "(uint32 0,)", kxkbrc = KXKBRC,
 			[KDE_CALL .. "setLayout 2"] = "(true,)\n", [KDE_CALL .. "setLayout 1"] = "(false,)\n" }
 		local port, calls = fake_port(Switch.KDE, answers)
 		local switcher = Switch.new(port)
@@ -368,35 +393,87 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_true(tostring(result[2]):find("not configured in this KDE session", 1, true) ~= nil)
 	end)
 
+	helpers.it("names a KDE layout the same on Wayland and X11, from kxkbrc (kde-layout-id-session-types)", function()
+		local wayland = "([('us', '', 'English (US)'), ('fr', '', 'French (BEPO)'), ('fr', 'FR', 'French')],)"
+		local x11 = "([('us', 'us', 'English (US)'), ('fr', 'fr', 'French (BEPO)'), ('fr', 'FR', 'French')],)"
+		local config = "[Layout]\nLayoutList=us,fr,fr\nVariantList=,bepo,\nDisplayNames=,,FR\n"
+		local ids = {}
+		for _, list in ipairs({ wayland, x11 }) do
+			local port = fake_port(Switch.KDE, { [KDE_CALL .. "getLayoutsList"] = list,
+				[KDE_CALL .. "getLayout"] = "(uint32 0,)", kxkbrc = config })
+			local switcher = Switch.new(port)
+			switcher.refresh()
+			local names = {}
+			for _, choice in ipairs(switcher.choices()) do names[#names + 1] = choice.id end
+			ids[#ids + 1] = table.concat(names, " ")
+		end
+		helpers.assert_eq(ids[1], "us fr(bepo) fr", "Wayland")
+		helpers.assert_eq(ids[2], ids[1], "X11 names the same layouts the same")
+		local function listed(answers)
+			local port = fake_port(Switch.KDE, answers)
+			local switcher = Switch.new(port)
+			switcher.refresh()
+			return #switcher.choices()
+		end
+		helpers.assert_eq(listed({ [KDE_CALL .. "getLayoutsList"] = wayland, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+			kxkbrc = "[Layout]\nLayoutList=us,de\n" }), 0, "kxkbrc and the daemon disagree: nothing is listed")
+		helpers.assert_eq(listed({ [KDE_CALL .. "getLayoutsList"] = wayland, [KDE_CALL .. "getLayout"] = "(uint32 0,)",
+			kxkbrc = false }), 0, "an unreadable kxkbrc lists nothing")
+		local plain = fake_port(Switch.KDE, { [KDE_CALL .. "getLayoutsList"] = "([('us', 'us', 'English (US)')],)",
+			[KDE_CALL .. "getLayout"] = "(uint32 0,)" })
+		local switcher = Switch.new(plain)
+		switcher.refresh()
+		helpers.assert_eq(switcher.choices()[1].id, "us", "no configured layout list: the session default, no variant")
+	end)
+
 	helpers.it("reads the current sources before every switch and runs the plan in order", function()
-		local answers = gnome_answers()
-		answers["gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]"] = ""
-		answers["gsettings set org.gnome.desktop.input-sources current 0"] = ""
-		local port, calls = fake_port(Switch.GNOME, answers)
+		local port, calls = fake_port(Switch.GNOME, gnome_answers())
 		local switcher = Switch.new(port)
 		local result
 		switcher.select("xkb:fr", function(ok, detail) result = { ok, detail } end)
 		helpers.assert_eq(result[1], true, tostring(result[2]))
-		helpers.assert_eq(#calls, 4)
-		helpers.assert_eq(calls[1], "gsettings get org.gnome.desktop.input-sources sources")
-		helpers.assert_eq(calls[4], "gsettings set org.gnome.desktop.input-sources current 0")
+		helpers.assert_eq(calls, { "gsettings get org.gnome.desktop.input-sources sources",
+			"gsettings get org.gnome.desktop.input-sources mru-sources", activate("xkb:fr") })
 		helpers.assert_true(switcher.is_settled())
 	end)
 
-	helpers.it("stops at the first failed command and reports it", function()
-		local answers = gnome_answers()
-		answers["gsettings set org.gnome.desktop.input-sources mru-sources [('xkb', 'fr'), ('xkb', 'fr+ergopti')]"] = false
-		local port, calls = fake_port(Switch.GNOME, answers)
-		local result
-		Switch.new(port).select("xkb:fr", function(ok, detail) result = { ok, detail } end)
-		helpers.assert_eq(result[1], false)
-		helpers.assert_true(tostring(result[2]):find("gsettings failed", 1, true) ~= nil, tostring(result[2]))
-		helpers.assert_eq(#calls, 3, "the index is not written after a refused source list")
+	helpers.it("refuses with a named code when the GNOME Shell extension is absent (gnome-runtime-switch)", function()
+		for _, error_name in ipairs({ "UnknownMethod", "UnknownObject", "UnknownInterface" }) do
+			local answers = gnome_answers()
+			answers[activate("xkb:fr")] = { stderr = "Error: GDBus.Error:org.freedesktop.DBus.Error." .. error_name
+				.. ": Object does not exist at path '/org/ergopti/InputSource'\n" }
+			local result
+			Switch.new((fake_port(Switch.GNOME, answers))).select("xkb:fr", function(...) result = { ... } end)
+			helpers.assert_eq(result[1], false, error_name)
+			helpers.assert_eq(result[3], Switch.GNOME_EXTENSION_MISSING, error_name)
+			helpers.assert_true(result[2]:find("focus@ergopti.fr", 1, true) ~= nil, result[2])
+		end
 	end)
 
-	helpers.it("runs a queued resume after the old GNOME index write fails", function()
+	helpers.it("stops at the first failed command and reports it without the extension code", function()
 		local answers = gnome_answers()
-		answers["gsettings set org.gnome.desktop.input-sources current 0"] = false
+		answers[activate("xkb:fr")] = { stderr = "Error: Timeout was reached\n" }
+		local port, calls = fake_port(Switch.GNOME, answers)
+		local result
+		Switch.new(port).select("xkb:fr", function(...) result = { ... } end)
+		helpers.assert_eq(result[1], false)
+		helpers.assert_true(tostring(result[2]):find("gdbus failed", 1, true) ~= nil, tostring(result[2]))
+		helpers.assert_eq(result[3], nil, "a timeout is not an absent extension")
+		helpers.assert_eq(#calls, 3)
+	end)
+
+	helpers.it("reports a source the Shell does not list as refused", function()
+		local answers = gnome_answers()
+		answers[activate("xkb:fr")] = "(false,)\n"
+		local result
+		Switch.new((fake_port(Switch.GNOME, answers))).select("xkb:fr", function(...) result = { ... } end)
+		helpers.assert_eq(result[1], false)
+		helpers.assert_true(result[2]:find("refused the switch: (false,)", 1, true) ~= nil, result[2])
+	end)
+
+	helpers.it("runs a queued resume after a GNOME switch fails", function()
+		local answers = gnome_answers()
+		answers[activate("xkb:fr")] = false
 		local port, calls, flush = fake_port(Switch.GNOME, answers, true)
 		local switcher, results, settled = Switch.new(port), {}, false
 		switcher.select("xkb:fr", function(ok) results[#results + 1] = { "pause", ok } end)
@@ -404,7 +481,7 @@ helpers.describe("input source switch: switcher", function()
 		switcher.when_settled(function() settled = true end)
 		flush()
 		helpers.assert_eq(results, { { "pause", false }, { "resume", true } })
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 1")
+		helpers.assert_eq(calls[#calls], activate("xkb:fr+ergopti"))
 		helpers.assert_true(settled)
 	end)
 
@@ -426,7 +503,7 @@ helpers.describe("input source switch: switcher", function()
 		helpers.assert_eq(results[2], "pause=true:nil")
 		helpers.assert_eq(results[3], "last=true:nil")
 		helpers.assert_true(settled, "the listener runs once nothing runs or waits")
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
+		helpers.assert_eq(calls[#calls], activate("ibus:mozc-jp"))
 	end)
 
 	helpers.it("waits for a switch started by an earlier settlement listener", function()
@@ -461,8 +538,8 @@ helpers.describe("input source switch: switcher", function()
 		flush()
 		helpers.assert_eq(table.concat(results, ","),
 			"first=true:nil,older=false:superseded by a later switch,newest=true:nil")
-		helpers.assert_eq(calls[#calls], "gsettings set org.gnome.desktop.input-sources current 2")
-		helpers.assert_eq(#calls, 8, "the superseded switch must issue no native commands")
+		helpers.assert_eq(calls[#calls], activate("ibus:mozc-jp"))
+		helpers.assert_eq(#calls, 6, "the superseded switch must issue no native commands (two reads and one call per switch)")
 		helpers.assert_true(switcher.is_settled())
 	end)
 
@@ -490,10 +567,30 @@ helpers.describe("input source switch: switcher", function()
 	end)
 
 	helpers.it("rejects a port without its two functions and a switch without an id", function()
-		assert_refused("needs a port with backend and run", Switch.new, { backend = function() end })
+		assert_refused("needs a port with backend, run and kde_config", Switch.new, { backend = function() end })
 		local switcher = Switch.new(fake_port(Switch.GNOME, gnome_answers()))
 		assert_refused("a layout id is required", switcher.select, "", function() end)
 		assert_refused("a completion callback is required", switcher.select, "xkb:fr")
+	end)
+end)
+
+helpers.describe("input source switch: native port", function()
+	helpers.it("reads kxkbrc from the XDG config root config_paths resolves", function()
+		local uv = require("luv")
+		local root = os.tmpname()
+		os.remove(root)
+		assert(uv.fs_mkdir(root, 448))
+		local handle = assert(io.open(root .. "/kxkbrc", "wb"))
+		handle:write(KXKBRC)
+		handle:close()
+		local previous = os.getenv("XDG_CONFIG_HOME")
+		assert(uv.os_setenv("XDG_CONFIG_HOME", root))
+		local ok, text = pcall(function() return Switch.native_port().kde_config() end)
+		if previous then uv.os_setenv("XDG_CONFIG_HOME", previous) else uv.os_unsetenv("XDG_CONFIG_HOME") end
+		os.remove(root .. "/kxkbrc")
+		uv.fs_rmdir(root)
+		helpers.assert_true(ok, tostring(text))
+		helpers.assert_eq(text, KXKBRC, "the KDE configuration comes from config_paths.config_home()")
 	end)
 end)
 

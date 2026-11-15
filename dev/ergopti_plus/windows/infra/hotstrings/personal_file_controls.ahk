@@ -7,7 +7,7 @@
 ; metadata publication. Generic TOML provenance never grants this capability.
 ; ==============================================================================
 
-#Include %A_LineFile%\..\..\..\..\_shared\modules\hotstrings\personal_scope.ahk
+#Include %A_LineFile%\..\..\..\..\_shared\hotstrings\data\catalogue\personal_scope.ahk
 
 /** Owns the current additional-file catalogue and its closed native capabilities. */
 class PersonalFileControls {

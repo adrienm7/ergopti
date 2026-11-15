@@ -37,7 +37,7 @@ local DEFAULTS = {
 --- @param inputs table Partial inputs, merged over the defaults.
 --- @return table
 local function resolve(inputs)
-	local resolver = helpers.load_module("hotstrings.delay_resolver")
+	local resolver = helpers.load_module("hotstrings.engine.delay_resolver")
 	local merged = {}
 	for k, v in pairs(DEFAULTS) do merged[k] = v end
 	for k, v in pairs(inputs or {}) do merged[k] = v end
@@ -226,7 +226,7 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 
 	helpers.it("reads the shared defaults rather than a local literal", function()
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
-		-- 750 ms is declared once, in _shared/modules/hotstrings/defaults.toml,
+		-- 750 ms is declared once, in _shared/hotstrings/data/catalogue/defaults.toml,
 		-- and read by all three drivers. A driver carrying its own copy expands at
 		-- a different speed from the one the user configured elsewhere.
 		helpers.assert_eq(config.get_global_default_delay_ms(), 750,
@@ -262,9 +262,9 @@ helpers.describe("hotstrings_config: resolving through the driver", function()
 	-- which tests had run before it. Asserting the EFFECT instead of the return
 	-- value removes the ambiguity entirely.
 	helpers.it("accepts the fields it owns and ignores the ones it does not", function()
-		local shell = helpers.load_module("adapters.shell_runner")
+		local shell = helpers.load_module("core.process.adapters.shell_runner")
 		shell._reset_runner()
-		package.loaded["adapters.shell_runner"] = shell
+		package.loaded["core.process.adapters.shell_runner"] = shell
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local config_dir = os.tmpname()
 		os.remove(config_dir)

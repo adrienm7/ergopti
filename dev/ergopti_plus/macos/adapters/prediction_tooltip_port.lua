@@ -4,7 +4,7 @@
 --- MODULE: Prediction Tooltip Port Adapter (Hammerspoon)
 --- DESCRIPTION:
 --- Hammerspoon implementation of the TooltipRenderer port of the shared request
---- plan (_shared/lua/llm/request_plan/ports.lua): show, hide and is_visible over
+--- plan (_shared/ai/engine/request_plan/ports.lua): show, hide and is_visible over
 --- the prediction tooltip. The engine and the streaming handler describe what to
 --- draw as one named view; this adapter spells it out as the positional
 --- arguments tooltip.show_predictions takes, so the twelve-argument call lives
@@ -20,7 +20,7 @@
 ---    as the tooltip offers them, and a missing one raises where it is used.
 --- ==============================================================================
 
-local Ports = require("llm.request_plan.ports")
+local Ports = require("ai.engine.request_plan.ports")
 
 local M = {}
 

@@ -19,10 +19,10 @@ local helpers, Engine, DOWN, UP, SHIFT, CTRL, CAPS, KEY_A, trail =
 	Fixture.KEY_A, Fixture.trail
 local Loader = require("platform.remap.tap_hold_loader")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local SPACE = 57
-local DEFAULTS_PATH = require("infra.paths").shared("tap_hold/defaults.toml")
+local DEFAULTS_PATH = require("core.fs.engine.paths").shared("tap_hold/data/defaults.toml")
 
 -- The keys of the field report, each with the shipped 200 ms threshold.
 local KEYS = {
@@ -55,11 +55,15 @@ local function write_file(path, text)
 	fh:close()
 end
 
---- A writer bound to a throwaway tap_hold.toml.
---- @return table writer, string path, table state { reloads }
+--- A writer bound to the tap_hold.toml of a throwaway folder, whose
+--- config.toml holds the window.
+--- @return table writer, string path, table state { reloads }, string config_path
 local function fresh_writer()
-	local path = os.tmpname()
-	os.remove(path)
+	local dir = os.tmpname()
+	os.remove(dir)
+	local made = os.execute('mkdir "' .. dir .. '"')
+	assert(made == true or made == 0, "the isolated configuration folder must exist")
+	local path = dir .. "/tap_hold.toml"
 	local state = { reloads = 0 }
 	local writer = helpers.load_module("platform.remap.tap_hold_writer")
 	writer.init({
@@ -67,10 +71,17 @@ local function fresh_writer()
 		reload = function() state.reloads = state.reloads + 1; return true end,
 		is_tap_action = function(id) return id == "copy" end,
 		canonical_hold = function(kind, id)
-			return require("tap_hold.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
+			return require("tap_hold.engine.hold_options").canonical(kind, id, Loader.load(DEFAULTS_PATH, nil).hold_picker)
 		end,
 	})
-	return writer, path, state
+	return writer, path, state, dir .. "/config.toml"
+end
+
+--- Removes a fresh_writer() folder and the files it may hold.
+local function discard(path)
+	local dir = path:match("^(.*)/[^/]+$")
+	for _, name in ipairs({ "tap_hold.toml", "config.toml", "config.toml.tmp" }) do os.remove(dir .. "/" .. name) end
+	os.execute('rmdir "' .. dir .. '"')
 end
 
 helpers.describe("tap-hold engine: a modifier key pressed alone (lone-tap-window)", function()
@@ -122,56 +133,69 @@ helpers.describe("tap-hold engine: a modifier key pressed alone (lone-tap-window
 	end)
 end)
 
-helpers.describe("tap-hold storage: the window in tap_hold.toml (lone-tap-window)", function()
+helpers.describe("tap-hold storage: the window in config.toml (lone-tap-window)", function()
 
-	helpers.it("loads the manifest default when the file sets no window (lone-tap-window)", function()
+	helpers.it("loads the manifest default when config.toml sets no window (lone-tap-window)", function()
 		local default = Manifest.default_for(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
 		helpers.assert_eq(Loader.load(DEFAULTS_PATH, nil).lone_tap_max_ms, default)
 		helpers.assert_eq(Loader.LONE_TAP_DEFAULT_MS, default)
 	end)
 
 	helpers.it("round-trips the writer's value through the loader, 0 included (lone-tap-window)", function()
-		local writer, path, state = fresh_writer()
+		local writer, path, state, config_path = fresh_writer()
 		for _, ms in ipairs({ 750, 0, 1500 }) do
 			helpers.assert_true(writer.set_lone_tap_max_ms(ms), "a valid window is written")
-			helpers.assert_eq(Loader.load(DEFAULTS_PATH, path).lone_tap_max_ms, ms, "the engine runs the stored window")
+			helpers.assert_eq(Loader.load(DEFAULTS_PATH, path, config_path).lone_tap_max_ms, ms,
+				"the engine runs the stored window")
 		end
 		helpers.assert_eq(state.reloads, 3, "each change is in force at once")
-		os.remove(path)
+		helpers.assert_nil(io.open(path, "r"), "tap_hold.toml is not written: the window is a config.toml row")
+		discard(path)
 	end)
 
 	helpers.it("refuses an invalid window in the writer and writes nothing (lone-tap-window)", function()
-		local writer, path, state = fresh_writer()
+		local writer, path, state, config_path = fresh_writer()
 		for _, bad in ipairs({ -1, 12.5, "1000", math.huge }) do
 			helpers.assert_eq(writer.set_lone_tap_max_ms(bad), false, "refused: " .. tostring(bad))
 		end
-		local written = io.open(path, "r")
-		if written then written:close() end
-		helpers.assert_nil(written, "no file is written")
+		for _, file in ipairs({ path, config_path }) do
+			local written = io.open(file, "r")
+			if written then written:close() end
+			helpers.assert_nil(written, "no file is written")
+		end
 		helpers.assert_eq(state.reloads, 0)
+		discard(path)
 	end)
 
 	helpers.it("reads an invalid stored window as the manifest default (lone-tap-window)", function()
-		local path = os.tmpname()
+		local config_path = os.tmpname()
 		for _, stored in ipairs({ "-5", "12.5", '"1000"', "true" }) do
-			write_file(path, "[tap_hold]\nlone_modifier_tap_max_ms = " .. stored .. "\n")
-			helpers.assert_eq(Loader.load(DEFAULTS_PATH, path).lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS,
+			write_file(config_path, "[tap_holds]\nlone_modifier_tap_max_ms = " .. stored .. "\n")
+			helpers.assert_eq(Loader.load(DEFAULTS_PATH, nil, config_path).lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS,
 				"refused: " .. stored)
 		end
+		os.remove(config_path)
+	end)
+
+	helpers.it("never reads a window left in tap_hold.toml (lone-tap-window)", function()
+		local path = os.tmpname()
+		write_file(path, "[tap_hold]\nlone_modifier_tap_max_ms = 0\n")
+		helpers.assert_eq(Loader.load(DEFAULTS_PATH, path).lone_tap_max_ms, Loader.LONE_TAP_DEFAULT_MS,
+			"config.toml owns the window since config schema v22")
 		os.remove(path)
 	end)
 
-	helpers.it("lets the scope transaction write and clear the window (lone-tap-window)", function()
-		local writer = fresh_writer()
+	helpers.it("a scope render routes no window into tap_hold.toml and drops a stale one (lone-tap-window)", function()
+		local writer, path = fresh_writer()
 		local preset = Loader.preset_keys(DEFAULTS_PATH)
-		local rows = { { section = "tap_holds", key = "lone_modifier_tap_max_ms", value = 1000 } }
-		local text = writer.render_scope("recommended", {}, rows, preset)
-		helpers.assert_eq(require("toml_codec").decode(text).tap_hold.lone_modifier_tap_max_ms, 1000)
+		local rows = { { section = ConfigKeys.KEY.TAP_HOLDS, key = ConfigKeys.LEAF.LONE_MODIFIER_TAP_MAX_MS, value = 1000 } }
+		helpers.assert_eq((pcall(writer.render_scope, "recommended", {}, rows, preset)), false,
+			"a manifest row is a config.toml row")
 		local cleared = writer.render_scope("clear",
-			require("toml_codec").decode("[tap_hold]\nlone_modifier_tap_max_ms = 0\n"),
-			{ { section = "tap_holds", key = "lone_modifier_tap_max_ms", delete = true } }, preset)
-		local decoded = require("toml_codec").decode(cleared)
+			require("core.text.engine.toml_codec").decode("[tap_hold]\nlone_modifier_tap_max_ms = 0\n"), {}, preset)
+		local decoded = require("core.text.engine.toml_codec").decode(cleared)
 		helpers.assert_nil(decoded.tap_hold and decoded.tap_hold.lone_modifier_tap_max_ms)
+		discard(path)
 	end)
 end)
 
@@ -180,7 +204,7 @@ helpers.describe("tap-hold menu choices: the manifest's one list (lone-tap-windo
 	-- The three menus used to hold their own copy of the list (duplicate-constant
 	-- ratchet); they read the feature's preset_values now.
 	helpers.it("offers the feature's preset_values, Off first, and refuses a feature without them", function()
-		local LoneTap = require("tap_hold.lone_tap")
+		local LoneTap = require("tap_hold.engine.lone_tap")
 		local feature = Manifest.find_entry_by_path(ConfigKeys.KEY.TAP_HOLDS_LONE_MODIFIER_TAP_MAX_MS)
 		helpers.assert_type(feature.preset_values, "table", "the generated manifest carries the presets")
 		local choices = LoneTap.choices(feature)

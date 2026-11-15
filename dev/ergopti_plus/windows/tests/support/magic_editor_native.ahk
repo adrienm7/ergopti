@@ -12,7 +12,7 @@
 #Warn All, StdOut
 
 #Include %A_ScriptDir%\..\..\infra\chord.ahk
-#Include %A_ScriptDir%\..\..\adapters\hotkey_registrar.ahk
+#Include %A_ScriptDir%\..\..\platform\input\hotkey_registrar.ahk
 
 LoggerDebug(*) => 0
 LoggerWarn(*) => 0

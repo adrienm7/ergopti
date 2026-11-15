@@ -8,9 +8,9 @@
 --- ==============================================================================
 
 local M = {}
-local WebviewResult = require("adapters.webview_result")
+local WebviewResult = require("core.ui.adapters.webview_result")
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "download_window.javascript"
 
 --- Creates diagnostic ownership for one progress-window operation.

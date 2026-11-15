@@ -16,23 +16,23 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"hs",
-	"infra.dialog_util",
-	"infra.i18n",
-	"infra.logger",
-	"infra.notifications",
-	"infra.text_utils",
+	"core.ui.engine.dialog_util",
+	"core.i18n.engine.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.text.engine.utils",
 	"modules.llm",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
 	-- FileSystem captures hs when it loads; bind it to this fixture's probe.
-	"adapters.file_system",
+	"core.fs.adapters.file_system",
 	-- Storage captures hs too: the prelude reads the proxy override through it.
-	"adapters.storage",
-	"adapters.shell_runner",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
-	"adapters.http_client",
+	"core.fs.adapters.storage",
+	"core.process.adapters.shell_runner",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
+	"core.network.adapters.http_client",
 	"ui.download_window",
 	"ui.menu.menu_llm.profile_label",
 	"ui.menu.menu_llm.model_switcher",
@@ -66,7 +66,7 @@ end
 --- @param callback function Fixture body.
 local function with_fixture(save_results, callback)
 	local saved_hs = _G.hs
-	local saved_shell_runner = package.loaded["adapters.shell_runner"]
+	local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 	local outcome = table.pack(xpcall(function()
 		helpers.with_fresh_modules(MODULES, function()
 			local pull_done
@@ -121,18 +121,18 @@ local function with_fixture(save_results, callback)
 			}
 			_G.hs = hs_fixture
 			package.loaded["hs"] = hs_fixture
-			package.loaded["infra.logger"] = logger
-			package.loaded["infra.i18n"] = {get = function(key) return key end}
-			package.loaded["infra.notifications"] = {notify = function() return true end}
-			package.loaded["infra.text_utils"] = {shell_quote = function(value) return value end}
-			package.loaded["infra.dialog_util"] = {block_alert = function() return "button.cancel" end}
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+			package.loaded["core.ui.engine.notifications"] = {notify = function() return true end}
+			package.loaded["core.text.engine.utils"] = {shell_quote = function(value) return value end}
+			package.loaded["core.ui.engine.dialog_util"] = {block_alert = function() return "button.cancel" end}
 			package.loaded["modules.llm.ollama_binary"] = {
 				resolve = function() return "/fixture/ollama" end,
 			}
 			package.loaded["modules.llm.ollama_server_command"] = {
 				build = function() return "fixture" end,
 			}
-			package.loaded["adapters.shell_runner"] = {
+			package.loaded["core.process.adapters.shell_runner"] = {
 				spawn = function(_, _, done)
 					return {
 						start = function()
@@ -142,8 +142,8 @@ local function with_fixture(save_results, callback)
 					}
 				end,
 			}
-			package.loaded["adapters.timer_scheduler"] = {}
-			package.loaded["adapters.http_client"] = {
+			package.loaded["core.events.timer_scheduler"] = {}
+			package.loaded["core.network.adapters.http_client"] = {
 				new = function()
 					local client = { settled = false, observers = {} }
 					function client.post(_, _, _, done)
@@ -183,7 +183,7 @@ local function with_fixture(save_results, callback)
 			package.loaded["ui.menu.menu_llm.profile_label"] = {
 				format = function(label) return label end,
 			}
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done)
 					local task = {label = label, on_done = on_done}
 					if label == "Ollama model pull" then pull_done = on_done end
@@ -281,7 +281,7 @@ local function with_fixture(save_results, callback)
 		end)
 	end, debug.traceback))
 	_G.hs = saved_hs
-	package.loaded["adapters.shell_runner"] = saved_shell_runner
+	package.loaded["core.process.adapters.shell_runner"] = saved_shell_runner
 	if not outcome[1] then error(outcome[2], 0) end
 end
 

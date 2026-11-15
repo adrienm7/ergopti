@@ -642,10 +642,10 @@ _CUK_ActionParameterLabels() {
 	global _I18nCache, _I18nCacheLoaded, _SharedDir, GestureActionParameters
 	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded, SavedParameters := GestureActionParameters
 	try {
-		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		Locales := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locale_order.json", "UTF-8"))["order"]
 		AssertEqual(21, Locales.Length)
 		for Locale in Locales {
-			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			Strings := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Locale . ".json", "UTF-8"))
 			_I18nCache := Strings, _I18nCacheLoaded := true
 			for Action in ["open_url", "search_web", "wrap_selection", "send_text", "send_key", "send_shortcut"] {
 				Label := Strings["sg_actions." . Action]

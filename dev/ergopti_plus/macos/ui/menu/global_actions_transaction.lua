@@ -24,9 +24,9 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local ChordCatalogue = require("infra.script_chord_catalogue")
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
 local LOG = "menu_global_actions"
 local DISABLED_ACTION = "none"

@@ -14,11 +14,11 @@ local OutputFixture = require("tests.support.toml_output_fixture")
 --- Reads the independent custom-command identity used by each native provider.
 --- @return table expected Canonical command expectation.
 local function custom_command_expected()
-	local path = require("infra.paths").shared("tests/corpus/menus/word_expander_add_controls.json")
+	local path = require("core.fs.engine.paths").shared("tests/corpus/menus/word_expander_add_controls.json")
 	local file = assert(io.open(path, "rb"))
 	local text = file:read("*a")
 	file:close()
-	local corpus = assert(require("adapters.json_codec").decode(text))
+	local corpus = assert(require("core.fs.adapters.json_codec").decode(text))
 	return corpus
 end
 
@@ -52,35 +52,35 @@ end
 --- @param callback function Assertion callback, outside production catches.
 local function with_fixture(outcome, callback, locale)
 	return helpers.with_stub_scope({
-		"adapters.file_system", "infra.fs_dir", "infra.logger", "infra.preferences",
-		"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "infra.manifest_reader",
-		"infra.notifications", "modules.hotstrings.hotstrings_config", "keymap.terminators",
+		"core.fs.adapters.file_system", "core.fs.engine.dir", "core.logger.engine.logger", "infra.preferences",
+		"core.ui.engine.dialog_util", "core.i18n.engine.i18n", "infra.manifest_menu", "infra.manifest_reader",
+		"core.ui.engine.notifications", "modules.hotstrings.hotstrings_config", "layouts.engine.layers.terminators",
 		"ui.menu.keymap_lifecycle", "ui.menu.menu_hotstrings_management", "ui.menu.preferences_transaction",
 		"ui.hotstrings_config_window",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
-		local Terminators = require("keymap.terminators")
+		local Terminators = require("layouts.engine.layers.terminators")
 		local calls = { adds = 0, prompts = 0, consumes = 0, writes = 0, saves = 0, updates = 0, notices = 0, rollbacks = 0 }
 		local translations = {}
 		if not locale then
-			local file = assert(io.open(require("infra.paths").shared("data/locales/en.json"), "rb"))
+			local file = assert(io.open(require("core.fs.engine.paths").shared("core/i18n/data/locales/en.json"), "rb"))
 			local raw = file:read("*a")
 			file:close()
-			local english = assert(require("adapters.json_codec").decode(raw))
+			local english = assert(require("core.fs.adapters.json_codec").decode(raw))
 			translations["button.ok"], translations["button.cancel"] = english["button.ok"], english["button.cancel"]
 		end
 		if locale then
-			local file = assert(io.open(require("infra.paths").shared("data/locales/" .. locale .. ".json"), "rb"))
+			local file = assert(io.open(require("core.fs.engine.paths").shared("core/i18n/data/locales/" .. locale .. ".json"), "rb"))
 			local raw = file:read("*a")
 			file:close()
-			translations = assert(require("adapters.json_codec").decode(raw))
+			translations = assert(require("core.fs.adapters.json_codec").decode(raw))
 		end
 		local translate = function(key) return translations[key] or key end
-		package.loaded["infra.i18n"] = { get = translate }
+		package.loaded["core.i18n.engine.i18n"] = { get = translate }
 		local active_context, current_outcome = nil, outcome
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function(_, _, _, affirmative, cancel)
 				calls.prompts = calls.prompts + 1
 				if current_outcome == "pause_after_prompt" then active_context.paused = true end
@@ -102,18 +102,18 @@ local function with_fixture(outcome, callback, locale)
 				return current_outcome == "consume_no" and translate("dialog.hotstrings.consume_no") or translate("dialog.hotstrings.consume_yes")
 			end,
 		}
-		local command_renderer = assert(require("menu.renderer").new({
+		local command_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
 			json_decode = function(raw)
-				local value = require("adapters.json_codec").decode(raw)
+				local value = require("core.fs.adapters.json_codec").decode(raw)
 				if outcome == "config_shared_label" and type(value.hotstrings_delays_menu) == "table" then
 					value.hotstrings_delays_menu[1].i18n = "button.ok"
 				end
 				return value
 			end,
 			i18n = { get = translate, section = translate },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = command_renderer.command_row,
@@ -132,7 +132,7 @@ local function with_fixture(outcome, callback, locale)
 			end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return "★" end }
-		package.loaded["infra.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = function() return { delay = 0.1, has_override = false } end,
 		}
@@ -253,7 +253,7 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 				helpers.assert_eq(fixture.calls.saves, 1)
 				helpers.assert_eq(fixture.calls.writes, 1)
 				helpers.assert_eq(fixture.calls.updates, 1)
-				local decoded = require("toml_codec").decode(fixture.read())
+				local decoded = require("core.text.engine.toml_codec").decode(fixture.read())
 				helpers.assert_eq(decoded.foreign.keep, "untouched")
 				helpers.assert_eq(decoded.hotstrings.terminators[1].future.keep, 17)
 				helpers.assert_eq(decoded.hotstrings.terminators[2].char, custom_command_expected().target.char)
@@ -273,10 +273,21 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 			end)
 		end)
 	end
-	for _, outcome in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "pause_after_invalid_alert", "input_cancel", "input_empty", "input_error", "consume_cancel", "consume_nil", "consume_unknown" }) do
-		helpers.it("keeps native Add unpublished after " .. outcome, function()
+	-- A pause stops typing, not configuration (EDD-1): a pause at any step of
+	-- the Add dialogs no longer withdraws it (edd1-paused-writes).
+	for _, outcome in ipairs({ "late_pause", "pause_after_prompt", "pause_after_consume", "pause_after_invalid_alert" }) do
+		helpers.it("publishes native Add after " .. outcome .. " (edd1-paused-writes)", function()
 			with_fixture(outcome, function(fixture)
 				if outcome == "late_pause" then fixture.context.paused = true end
+				helpers.assert_eq(fixture.action(), true)
+				helpers.assert_eq(runtime_has_definition(fixture), true)
+				helpers.assert_eq(fixture.calls.updates, 1)
+			end)
+		end)
+	end
+	for _, outcome in ipairs({ "input_cancel", "input_empty", "input_error", "consume_cancel", "consume_nil", "consume_unknown" }) do
+		helpers.it("keeps native Add unpublished after " .. outcome, function()
+			with_fixture(outcome, function(fixture)
 				local result = fixture.action()
 				helpers.assert_eq(runtime_has_definition(fixture), false)
 				helpers.assert_eq(fixture.read(), SOURCE)
@@ -284,9 +295,6 @@ helpers.describe("custom delimiter Add declaration and acknowledged native owner
 				helpers.assert_eq(fixture.calls.writes, 0)
 				helpers.assert_eq(fixture.calls.updates, 0)
 				helpers.assert_eq(result, false)
-				if outcome == "late_pause" then helpers.assert_eq(fixture.calls.prompts, 0) end
-				if outcome == "pause_after_prompt" then helpers.assert_eq(fixture.calls.consumes, 0) end
-				if outcome == "pause_after_invalid_alert" then helpers.assert_eq(fixture.calls.prompts, 1) end
 			end)
 		end)
 	end
@@ -319,7 +327,7 @@ helpers.describe("custom delimiter Add uses actual supplied native button labels
 				helpers.assert_eq(runtime_has_definition(fixture), true, locale)
 				helpers.assert_eq(fixture.calls.writes, 1, locale)
 				helpers.assert_eq(fixture.calls.updates, 1, locale)
-				local decoded = require("toml_codec").decode(fixture.read())
+				local decoded = require("core.text.engine.toml_codec").decode(fixture.read())
 				helpers.assert_eq(decoded.hotstrings.terminators[1].future.keep, 17, locale)
 				helpers.assert_eq(decoded.foreign.keep, "untouched", locale)
 				admitted = admitted + 1
@@ -341,10 +349,10 @@ end)
 --- Reads the independent command and existing native window identity.
 --- @return table corpus Historical command expectation.
 local function delay_settings_command_expected()
-	local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/delays_settings_command.json"), "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return assert(require("adapters.json_codec").decode(bytes))
+	return assert(require("core.fs.adapters.json_codec").decode(bytes))
 end
 
 helpers.describe("declared delay configuration command: actual macOS provider", function()
@@ -377,20 +385,21 @@ helpers.describe("declared delay configuration command: actual macOS provider", 
 					helpers.assert_eq(observations.callback_result, false)
 					helpers.assert_eq(fixture.read(), SOURCE, "refused refresh writes preserve the real physical source")
 				else
-					helpers.assert_eq(require("toml_codec").decode(fixture.read()).foreign.keep, "untouched")
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(fixture.read()).foreign.keep, "untouched")
 				end
 			end)
 		end)
 	end
 
-	helpers.it("preserves the existing paused disabled row without acquiring its window", function()
+	-- A pause stops typing, not configuration (EDD-1): the settings window opens.
+	helpers.it("opens the settings window from the paused row (edd1-paused-writes)", function()
 		with_fixture("config_paused", function(fixture)
 			local observations = { opens = 0 }
 			package.loaded["ui.hotstrings_config_window"] = { open = function() observations.opens = observations.opens + 1 end }
-			helpers.assert_eq(fixture.delay_rows[1].disabled, true)
-			if fixture.delay_rows[1].action then fixture.delay_rows[1].action() end
-			helpers.assert_eq(observations.opens, 0)
-			helpers.assert_eq(fixture.calls.saves, 0)
+			helpers.assert_true(fixture.delay_rows[1].disabled ~= true)
+			fixture.delay_rows[1].action()
+			helpers.assert_eq(observations.opens, 1)
+			helpers.assert_eq(fixture.calls.saves, 0, "opening the window writes no preferences")
 		end)
 	end)
 

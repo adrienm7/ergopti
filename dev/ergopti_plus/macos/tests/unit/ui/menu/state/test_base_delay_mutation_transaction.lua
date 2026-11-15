@@ -32,23 +32,23 @@ end
 
 local function with_fixture(outcome, callback)
 	return helpers.with_stub_scope({
-		"infra.preferences", "adapters.file_system", "infra.logger", "infra.dialog_util",
-		"infra.i18n", "infra.manifest_menu", "infra.notifications", "ui.menu.menu_hotstrings_management",
+		"infra.preferences", "core.fs.adapters.file_system", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.i18n.engine.i18n", "infra.manifest_menu", "core.ui.engine.notifications", "ui.menu.menu_hotstrings_management",
 		"modules.hotstrings.hotstrings_config", "ui.menu.base_delay_transaction",
 		"ui.menu.preferences_transaction", "ui.menu.global_actions_transaction", "ui.menu.menu_state",
 	}, function()
 		local Preferences = helpers.load_with_stubs("infra.preferences")
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		local Transaction = require("ui.menu.preferences_transaction")
 		local Global = require("ui.menu.global_actions_transaction")
 		local Baseline = require("ui.menu.base_delay_transaction")
 		local MenuState = require("ui.menu.menu_state")
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		local renderer = assert(require("menu.renderer").new({ platform = "hs",
-			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		local renderer = assert(require("menu.engine.renderer").new({ platform = "hs",
+			manifest_path = function() return require("core.fs.engine.paths").shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
 			i18n = { get = function(key) return key end, section = function(key) return key end },
-			logger = require("infra.logger"),
+			logger = require("core.logger.engine.logger"),
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			native_child_rows = renderer.native_child_rows, get_root = renderer.get_root, template_rows = renderer.template_rows, get_array = renderer.get_array, check_row = renderer.check_row,
@@ -145,12 +145,12 @@ local function with_fixture(outcome, callback)
 			owner = Baseline.new({ state = state, keymap = keymap, admission = global.run_exclusive,
 				paused = function() return paused end, save_prefs = raw_save })
 			local raw, button, prompt_raises = "750", "button.ok", false
-			package.loaded["infra.dialog_util"] = { text_prompt = function(...)
+			package.loaded["core.ui.engine.dialog_util"] = { text_prompt = function(...)
 				observed.prompt = table.pack(...)
 				if prompt_raises then error("injected prompt refusal", 0) end
 				return button, raw
 			end }
-			package.loaded["infra.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() calls.notices = calls.notices + 1 end }
 			local context = { state = state, keymap = keymap, paused = false,
 				commit_base_delay = owner.set,
 				save_prefs = function() return global.run_exclusive("Legacy save", raw_save) end,

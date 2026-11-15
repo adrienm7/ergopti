@@ -11,8 +11,8 @@ local helpers = require("tests.helpers")
 local LeaseContract = require("platform.remap.lease_contract")
 local M = {}
 local REAL_MODULES = {
-	"adapters.file_system", "infra.fs_dir", "platform.remap.ke_variables",
-	"adapters.json_codec", "adapters.shell_runner", "infra.deferred_work",
+	"core.fs.adapters.file_system", "core.fs.engine.dir", "platform.remap.ke_variables",
+	"core.fs.adapters.json_codec", "core.process.adapters.shell_runner", "core.timing.engine.deferred_work",
 }
 
 local TOKENS = {
@@ -22,17 +22,17 @@ local TOKENS = {
 }
 
 local STUB_MODULES = {
-	"infra.logger",
+	"core.logger.engine.logger",
 	"infra.config_paths",
-	"infra.timings",
+	"core.timing.engine.timings",
 	"platform.remap.defaults",
 	"platform.remap.config",
 	"platform.remap.generator",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
-	"adapters.timer_scheduler",
+	"platform.input.hotkey_registrar",
+	"core.events.timer_scheduler",
 	"modules.keystats.kc_bridge",
 	"modules.gestures.engine",
 	"modules.shortcuts",
@@ -130,7 +130,7 @@ local function with_remap(options, body)
 				}
 			end
 		end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 		package.loaded["infra.config_paths"] = {
 			get = function() return "tests/unit/platform/remap/activation-layout-barrier.toml" end,
@@ -142,7 +142,7 @@ local function with_remap(options, body)
 			["debounce.layout_tis_settle_ms"] = 0.5,
 			["ui.onboarding_startup_delay_ms"] = 2,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function(category, key)
 				local value = timings_sec[category .. "." .. key]
 				helpers.assert_true(value ~= nil, "unexpected timing read: " .. category .. "." .. key)
@@ -368,7 +368,7 @@ local function with_remap(options, body)
 			end,
 			stop_input_source_watcher = function() return true end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			unbind = function(handle)
 				if handle then handle.enabled = false end
 				return true
@@ -432,7 +432,7 @@ local function with_remap(options, body)
 			return timer
 		end
 
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function(delay, callback)
 				local handle = {
 					fired = false,

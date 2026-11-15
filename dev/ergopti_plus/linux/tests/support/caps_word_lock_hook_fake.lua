@@ -8,7 +8,7 @@
 --- with no captured keyboard. It records every call, keeps the emitter and
 --- the loss callback the manager handed over, and can refuse the lock or end
 --- the hold the way the hook does. The real hook's behaviour is proven by
---- tests/unit/adapters/keyboard_hook/test_keyboard_hook_caps_word_lock.lua.
+--- tests/unit/platform/input/keyboard_hook/test_caps_word_lock.lua.
 --- ==============================================================================
 
 local M = {}

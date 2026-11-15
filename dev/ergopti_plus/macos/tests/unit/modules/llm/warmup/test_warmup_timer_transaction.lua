@@ -27,9 +27,9 @@ local helpers = require("tests.helpers")
 -- ===========================================
 
 local MODULE_NAMES = {
-	"adapters.timer_scheduler",
-	"infra.logger",
-	"infra.timings",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"modules.llm.warmup_controller",
 }
 
@@ -97,9 +97,9 @@ local function with_fixture(options, scenario)
 	end
 
 	local function noop() end
-	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.timings"] = {
+	package.loaded["core.events.timer_scheduler"] = scheduler
+	package.loaded["core.logger.engine.logger"] = setmetatable({}, { __index = function() return noop end })
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 1 end,
 	}
 
@@ -139,10 +139,10 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 	local saved = {}
 	local saved_hs = _G.hs
 	local owned_modules = {
-		"adapters.timer_scheduler",
+		"core.events.timer_scheduler",
 		"hs",
-		"infra.logger",
-		"infra.timings",
+		"core.logger.engine.logger",
+		"core.timing.engine.timings",
 		"modules.llm.warmup_controller",
 		"tests.stubs.hs",
 	}
@@ -163,7 +163,7 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 			end
 		end,
 	}, { __index = function() return function() end end })
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 
 	local timer_stub = { timers = {} }
 	function timer_stub.new(_, callback)
@@ -191,7 +191,7 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 	end
 	function timer_stub.secondsSinceEpoch() return 0 end
 
-	local scheduler = helpers.load_with_stubs("adapters.timer_scheduler", {
+	local scheduler = helpers.load_with_stubs("core.events.timer_scheduler", {
 		timer = timer_stub,
 	})
 	local production_on_settled = scheduler.onSettled
@@ -203,9 +203,9 @@ local function with_real_scheduler_fixture(stop_mode, scenario)
 		calls.observer_registered = registered
 		return registered
 	end
-	package.loaded["adapters.timer_scheduler"] = scheduler
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.timings"] = { sec = function() return 1 end }
+	package.loaded["core.events.timer_scheduler"] = scheduler
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.warmup_controller"] = nil
 
 	local controller = require("modules.llm.warmup_controller")

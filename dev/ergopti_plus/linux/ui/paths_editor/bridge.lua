@@ -10,8 +10,8 @@
 local M = {}
 M.bridge_name = "hsPaths"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 local ConfigDirPicker = require("ui.config_dir_picker")
 local Version = require("infra.version")
 local LOG = "bridge.hsPaths"
@@ -25,7 +25,7 @@ local function dependency(state, field, module_name)
 end
 
 local function push(state, function_name, payload)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" then return false end
 	local ok, encoded = pcall(Json.encode, payload)
 	if not ok or type(encoded) ~= "string" then
@@ -43,7 +43,7 @@ end
 --- @param target string "logs" or "config".
 --- @return boolean pushed
 local function push_browse_result(state, path, target)
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" then return false end
 	local ok_path, encoded_path = pcall(Json.encode, path)
 	local ok_target, encoded_target = pcall(Json.encode, target)
@@ -90,7 +90,7 @@ local function build_initial_payload(state)
 		logsDir = config_paths.get_logs_dir(),
 		defaultLogsDir = config_paths.default_logs_dir(),
 		version = state._version or Version.VERSION,
-		strings = build_strings(dependency(state, "i18n", "infra.i18n")),
+		strings = build_strings(dependency(state, "i18n", "core.i18n.engine.i18n")),
 	}
 end
 
@@ -98,7 +98,7 @@ local function hide(state, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		return context.close_owned_window() == true
 	end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.hide) ~= "function" then return false end
 	local ok, hidden = pcall(manager.hide, APP_NAME)
 	return ok and hidden ~= false
@@ -112,25 +112,25 @@ function M.on_message(payload, state, context)
 	state = type(state) == "table" and state or {}
 	if type(payload) ~= "table" then return nil end
 	local action = payload.action
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local epoch = type(context) == "table" and context.epoch or nil
 	local current_epoch = manager and manager.current_epoch
 	local native_current = manager and manager.page_current
 	local function page_current()
 		if epoch == nil then return true end
 		if context.app_name ~= APP_NAME or type(current_epoch) ~= "function"
-			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager
+			or dependency(state, "webview_manager", "core.ui.ui.webview_manager") ~= manager
 			or manager.current_epoch ~= current_epoch then return false end
 		local ok, observed = pcall(current_epoch, APP_NAME)
 		if not ok or observed ~= epoch or manager.current_epoch ~= current_epoch
-			or dependency(state, "webview_manager", "ui.webview_manager") ~= manager then return false end
+			or dependency(state, "webview_manager", "core.ui.ui.webview_manager") ~= manager then return false end
 		if action == "ready" or action == "cancel" then return true end
 		if type(native_current) ~= "function" or manager.page_current ~= native_current then return false end
 		local checked, live = pcall(native_current, APP_NAME, epoch)
 		if not checked or live ~= true or manager.current_epoch ~= current_epoch
 			or manager.page_current ~= native_current then return false end
 		local reread, final = pcall(current_epoch, APP_NAME)
-		return reread and final == epoch and dependency(state, "webview_manager", "ui.webview_manager") == manager
+		return reread and final == epoch and dependency(state, "webview_manager", "core.ui.ui.webview_manager") == manager
 			and manager.current_epoch == current_epoch
 			and manager.page_current == native_current
 	end
@@ -149,9 +149,9 @@ function M.on_message(payload, state, context)
 			if type(getter) == "function" then current = getter() end
 		end
 		local selected, select_err = ConfigDirPicker.pick(
-			dependency(state, "shell", "adapters.shell_runner"),
+			dependency(state, "shell", "core.process.adapters.shell_runner"),
 			config_paths,
-			dependency(state, "i18n", "infra.i18n"),
+			dependency(state, "i18n", "core.i18n.engine.i18n"),
 			current
 		)
 		if not page_current() then return { picked = false } end
@@ -185,7 +185,7 @@ function M.on_message(payload, state, context)
 				-- A folder the next start could not use is refused now rather than
 				-- stored: install() would fall back to stdout for it.
 				if normalized ~= nil and normalized ~= "" and normalized ~= config_paths.default_logs_dir() then
-					local sink = dependency(state, "logger_sink", "infra.logger_sink")
+					local sink = dependency(state, "logger_sink", "core.logger.engine.sink")
 					if not sink or type(sink.prepare_dir) ~= "function" then
 						normalized, refusal = nil, "the logs folder cannot be prepared"
 					else
@@ -210,7 +210,7 @@ function M.on_message(payload, state, context)
 			if logs_dir ~= nil then
 				-- The daemon outlives this editor's reload, so the running sink is
 				-- moved now; until it is, every opener names the folder it writes.
-				local sink = dependency(state, "logger_sink", "infra.logger_sink")
+				local sink = dependency(state, "logger_sink", "core.logger.engine.sink")
 				local moved, move_err = false, "the logger sink cannot be moved"
 				if sink and type(sink.repoint) == "function" then moved, move_err = sink.repoint() end
 				if moved ~= true then

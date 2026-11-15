@@ -35,7 +35,7 @@ local REAL_MODULES = {
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.click_gate",
 	-- Captures hs at require time; each boot gets a fresh stub table.
-	"adapters.timer_scheduler",
+	"core.events.timer_scheduler",
 }
 
 --- Deep-copies plain Lua data so fixture snapshots cannot alias live state.
@@ -78,7 +78,7 @@ end
 function M.boot(opts)
 	opts = opts or {}
 	local noop = function() end
-	local hs_stub = helpers.load_with_stubs("infra.logger") and _G.hs
+	local hs_stub = helpers.load_with_stubs("core.logger.engine.logger") and _G.hs
 	hs_stub.__reset()
 
 	local logs = { errors = {}, warns = {} }
@@ -112,15 +112,15 @@ function M.boot(opts)
 	local refused_saves = 0
 
 	for _, name in ipairs(REAL_MODULES) do package.loaded[name] = nil end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = { notify = noop }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = { notify = noop }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.text.engine.utils"] = {
 		escape_gsub_replacement = function(value) return value end,
 		shell_quote = function(value) return value end,
 	}
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_delay, callback)
 			deferred[#deferred + 1] = callback
 			return true
@@ -200,12 +200,12 @@ function M.boot(opts)
 		end,
 		destroy = noop,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		request_exit = function() return true end,
 		is_pending = function() return fixture.terminal_pending == true end,
 	}

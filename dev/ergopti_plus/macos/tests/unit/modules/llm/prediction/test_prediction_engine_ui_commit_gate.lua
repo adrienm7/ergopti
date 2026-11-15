@@ -4,7 +4,7 @@
 --- MODULE: Prediction-engine UI commit gate regressions
 --- DESCRIPTION:
 --- Drives the real prediction engine with a controllable tooltip. A backend
---- request, watchdog, timing chain, or duplicate-suppression signature must not
+--- request, timing chain, or duplicate-suppression signature must not
 --- be committed until the loading surface reports strict success. Failed,
 --- missing, and throwing UI results must close only the generation that still
 --- owns the attempt, while a deliberately disabled preview remains a quiet
@@ -57,30 +57,28 @@ local DEFAULTS = {
 --- @return table fixture Observable fixture fields and the loaded engine.
 local function load_fixture(loading_result, options)
 	options = options or {}
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 
 	local fixture = {
 		builds = 0,
 		fetches = 0,
-		watchdogs = 0,
 		chain_starts = 0,
 		hides = 0,
 		cancels = 0,
-		watchdog_stops = 0,
 		loading_calls = 0,
 		tint_calls = 0,
 	}
 	fixture.options = options
 
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function(_section, key)
 			return 0.1
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
-	package.loaded["adapters.timer_scheduler"] = PortFakes.timer_scheduler({
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
 		after = function(_delay, callback)
 			return { timer = { stop = function() end }, callback = callback }, true
 		end,
@@ -90,6 +88,7 @@ local function load_fixture(loading_result, options)
 		DEFAULT_STATE = DEFAULTS,
 		get_current_model = function() return "test-model" end,
 		get_backend = function() return "ollama" end,
+		request_settings = function() return { backend = "ollama", model = "test-model" } end,
 		get_active_profile = function() return nil end,
 		is_backend_ready = function() return true end,
 		set_runtime_llm_enabled = function() end,
@@ -138,14 +137,6 @@ local function load_fixture(loading_result, options)
 			end
 			return partial, success, failure
 		end,
-		arm_watchdog = function()
-			fixture.watchdogs = fixture.watchdogs + 1
-			return resolve_result(options.watchdog_result, true)
-		end,
-		stop_watchdog = function()
-			fixture.watchdog_stops = fixture.watchdog_stops + 1
-			return true
-		end,
 		reset_failure_count = function() end,
 	}
 	package.loaded["modules.llm.app_filter"] = { is_blocked = function() return false end }
@@ -178,7 +169,7 @@ local function load_fixture(loading_result, options)
 			return resolve_result(options.tint_result, nil)
 		end,
 	}
-	package.loaded["ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
+	package.loaded["core.ui.ui.tooltip"] = PortFakes.complete_tooltip(tooltip)
 
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local Engine = require("modules.llm.prediction_engine")
@@ -219,8 +210,6 @@ helpers.describe("prediction_engine: loading UI is the request commit gate", fun
 				"the negative control must reach the real loading call")
 			helpers.assert_eq(fixture.chain_starts, 0,
 				"chain timing must not arm before the loading surface commits")
-			helpers.assert_eq(fixture.watchdogs, 0,
-				"the watchdog must not arm for a request the user cannot see")
 			helpers.assert_eq(fixture.fetches, 0,
 				"the backend must not run for a request whose UI commit failed")
 			helpers.assert_eq(fixture.hides, 1,
@@ -259,7 +248,6 @@ helpers.describe("prediction_engine: loading UI is the request commit gate", fun
 		helpers.assert_eq(fixture.builds, 0,
 			"preview-disabled mode must stop before prompt construction")
 		helpers.assert_eq(fixture.loading_calls, 0)
-		helpers.assert_eq(fixture.watchdogs, 0)
 		helpers.assert_eq(fixture.fetches, 0)
 		helpers.assert_eq(fixture.hides, 0,
 			"the quiet disabled path must not be misclassified as a UI failure")
@@ -303,8 +291,6 @@ helpers.describe("prediction_engine: async callback failures revoke request owne
 				"a callback dependency throw must revoke the loading/prediction surface")
 			helpers.assert_eq(fixture.cancels, 1,
 				"cleanup must cancel the request whose callback can no longer complete")
-			helpers.assert_eq(fixture.watchdog_stops, 1,
-				"cleanup must stop the watchdog rather than leave a late callback armed")
 		end)
 	end
 
@@ -322,8 +308,6 @@ helpers.describe("prediction_engine: async callback failures revoke request owne
 			fixture.on_success({}, 1, true, false)
 			helpers.assert_eq(fixture.hides, 1,
 				"the strict hide negative control must reach the real cleanup stage")
-			helpers.assert_eq(fixture.watchdog_stops, 1,
-				"watchdog cancellation is a sibling cleanup stage, not hide-dependent")
 			helpers.assert_eq(fixture.cancels, 1,
 				"backend cancellation must still execute after a native hide failure")
 		end)
@@ -353,29 +337,9 @@ helpers.describe("prediction_engine: every pre-fetch stage commits strictly", fu
 			helpers.assert_eq(fixture.loading_calls, 1)
 			helpers.assert_eq(fixture.chain_starts, 1,
 				"the negative control must reach the production chain-timing call")
-			helpers.assert_eq(fixture.watchdogs, 0)
 			helpers.assert_eq(fixture.fetches, 0)
 			helpers.assert_eq(fixture.hides, 1,
 				"a failed timing commit must close the loading surface")
-		end)
-	end
-
-	for _, case in ipairs({
-		{ name = "false", value = false },
-		{ name = "nil", value = NIL_RESULT },
-		{ name = "throw", value = function() error("timer creation failed") end },
-	}) do
-		helpers.it("rejects a " .. case.name .. " watchdog-arm result", function()
-			local fixture = load_fixture(true, { watchdog_result = case.value })
-			fixture.engine.perform_check(true)
-
-			helpers.assert_eq(fixture.loading_calls, 1)
-			helpers.assert_eq(fixture.chain_starts, 1)
-			helpers.assert_eq(fixture.watchdogs, 1,
-				"the negative control must reach the watchdog boundary")
-			helpers.assert_eq(fixture.fetches, 0,
-				"backend dispatch requires a proven live watchdog")
-			helpers.assert_eq(fixture.hides, 1)
 		end)
 	end
 
@@ -389,7 +353,6 @@ helpers.describe("prediction_engine: every pre-fetch stage commits strictly", fu
 			"the negative control must throw while constructing real render arguments")
 		helpers.assert_eq(fixture.loading_calls, 0,
 			"show_loading cannot run after its tint argument failed")
-		helpers.assert_eq(fixture.watchdogs, 0)
 		helpers.assert_eq(fixture.fetches, 0)
 		helpers.assert_eq(fixture.hides, 1,
 			"an argument-construction throw must use the same fail-closed reset")
@@ -401,7 +364,6 @@ helpers.describe("prediction_engine: every pre-fetch stage commits strictly", fu
 		})
 		fixture.engine.perform_check(true)
 
-		helpers.assert_eq(fixture.watchdogs, 1)
 		helpers.assert_eq(fixture.fetches, 1,
 			"the negative control must reach the real backend dispatch boundary")
 		helpers.assert_eq(fixture.hides, 1,
@@ -412,8 +374,6 @@ helpers.describe("prediction_engine: every pre-fetch stage commits strictly", fu
 		local fixture = load_fixture(true, { callback_factory_error = true })
 		fixture.engine.perform_check(true)
 		helpers.assert_eq(fixture.loading_calls, 1)
-		helpers.assert_eq(fixture.watchdogs, 0,
-			"no watchdog exists until callback construction commits")
 		helpers.assert_eq(fixture.fetches, 0,
 			"a backend request cannot be owned without completion callbacks")
 		helpers.assert_eq(fixture.hides, 1,
@@ -428,21 +388,20 @@ helpers.describe("prediction_engine: every pre-fetch stage commits strictly", fu
 
 		helpers.assert_eq(fixture.fetches, 0,
 			"an uninitialised handler must not dispatch callbacks that can never settle")
-		helpers.assert_eq(fixture.watchdogs, 0)
 		helpers.assert_eq(fixture.hides, 1,
 			"the loading surface must be revoked when callback ownership is absent")
 	end)
 
-	helpers.it("does not rate-limit a retry after watchdog construction failed", function()
+	helpers.it("does not rate-limit a retry after a pre-dispatch stage failed", function()
 		local fixture = load_fixture(true, {
-			watchdog_result = false,
+			chain_result = false,
 			min_interval = 60,
 		})
 		fixture.engine.perform_check(false)
 		helpers.assert_eq(fixture.fetches, 0,
 			"the negative control must fail before backend dispatch")
 
-		fixture.options.watchdog_result = true
+		fixture.options.chain_result = true
 		fixture.engine.perform_check(false)
 		helpers.assert_eq(fixture.fetches, 1,
 			"a failed pre-dispatch attempt must not consume the backend rate-limit window")

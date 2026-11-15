@@ -8,8 +8,8 @@ local root, temporary, source_root = assert(arg[1]), assert(arg[2]), assert(arg[
 local driver = source_root .. "/static/ergopti_plus/macos"
 local shared = root .. "/static/ergopti_plus/_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
-local json = require("json")
+	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+local json = require("core.text.engine.json")
 local function request(message)
 	message.kind = "request"
 	assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())
@@ -34,6 +34,12 @@ function sqlite.open(path)
 	function database:close() return call("close") end
 	function database:nrows(sql)
 		local rows = assert(call("rows", sql), detail)
+		-- SQL NULL crosses the bridge as JSON null, which the legacy decoder turns
+		-- into a table; lsqlite3 returns nil, so the bridge does too (as the cold
+		-- rollover bridge does). A NULL next_app is how a closed interval persists.
+		for _, row in ipairs(rows) do
+			for key, value in pairs(row) do if type(value) == "table" then row[key] = nil end end
+		end
 		local index = 0
 		return function() index = index + 1; return rows[index] end
 	end
@@ -99,14 +105,14 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["adapters.file_system"] = logger, file_system
-	package.loaded["infra.paths"] = { shared = function(path) return shared .. "/" .. path end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value)
+	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
-	package.loaded["adapters.timer_scheduler"] = { after = function()
+	package.loaded["core.events.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
@@ -143,9 +149,9 @@ local function find(fn, key)
 	for i=1,100 do local n,v=debug.getupvalue(fn,i); if n==key then return v end; if n==nil then break end end
 	error("Missing actual writer upvalue: "..key)
 end
-package.loaded["infra.logger"]=helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
-helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
+helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
 	local leaf=hs
@@ -162,20 +168,20 @@ shell.run(function(capture, observed, native)
 	package.loaded["hs.fs"],package.loaded["hs.sqlite3"]=fs,sqlite
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
-	package.loaded["infra.logger"]=log
+	package.loaded["core.logger.engine.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
-	package.loaded["adapters.file_system"]=file_system
+	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
-	package.loaded["infra.dialog_util"]={alert=function() end}
+	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
-	package.loaded["adapters.process_lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
+	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
-	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
+	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
 	package.loaded["modules.gestures.engine"]={}
 	package.loaded["modules.gestures.actions"]={}
@@ -193,13 +199,13 @@ shell.run(function(capture, observed, native)
 	leaf.axuielement={applicationElementForPID=function() return app_element end,applicationElement=function() return app_element end,windowElement=function() return nil end,observer={new=function()
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
-	local Accepted=require("keystats.physical_accepted_context")
+	local Accepted=require("metrics.engine.capture.physical_accepted_context")
 	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
-	package.loaded["adapters.shell_runner"]={spawn=native.dependencies.spawn}
+	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
 	control=require("modules.shortcuts.script_control")
 	manager=require("modules.keystats.log_manager")
 	local keystats=require("modules.keystats")
@@ -327,7 +333,7 @@ shell.run(function(capture, observed, native)
 		return result
 	end
 	-- Stop completed before the persistence-only reload; old Session/capabilities never reopen.
-	for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+	for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 	ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 	receipt.live=snapshot()
 	for _,phase in ipairs({"rebuild_one","rebuild_two"}) do
@@ -336,7 +342,7 @@ shell.run(function(capture, observed, native)
 		assert(database:exec("UPDATE ngram_keycodes SET c=999;")==sqlite.OK)
 		assert(database:exec("UPDATE meta SET value='0' WHERE key='aggregate_cache_revision';")==sqlite.OK)
 		assert(manager.stop({process_exit=true}))
-		for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 		receipt[phase]=snapshot()
 		helpers.assert_eq(receipt[phase],receipt.live,"Real raw rebuild must recover independent totals")
@@ -355,8 +361,8 @@ local root, temporary, source_root = assert(arg[1]), assert(arg[2]), assert(arg[
 local driver = source_root .. "/static/ergopti_plus/macos"
 local shared = root .. "/static/ergopti_plus/_shared"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/lua/?.lua;" .. shared .. "/lua/?/init.lua;" .. package.path
-local json = require("json")
+	.. root .. "/static/ergopti_plus/macos/?.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. package.path
+local json = require("core.text.engine.json")
 local function request(message)
 	message.kind = "request"
 	assert(io.stdout:write(json.encode(message) .. "\n")); assert(io.stdout:flush())
@@ -381,6 +387,12 @@ function sqlite.open(path)
 	function database:close() return call("close") end
 	function database:nrows(sql)
 		local rows = assert(call("rows", sql), detail)
+		-- SQL NULL crosses the bridge as JSON null, which the legacy decoder turns
+		-- into a table; lsqlite3 returns nil, so the bridge does too (as the cold
+		-- rollover bridge does). A NULL next_app is how a closed interval persists.
+		for _, row in ipairs(rows) do
+			for key, value in pairs(row) do if type(value) == "table" then row[key] = nil end end
+		end
 		local index = 0
 		return function() index = index + 1; return rows[index] end
 	end
@@ -446,14 +458,14 @@ local function ports()
 		host = { localizedName = function() return "Fixture" end } }
 	package.loaded["hs.fs"], package.loaded["hs.timer"] = fs, timer
 	package.loaded["hs.json"], package.loaded["hs.sqlite3"] = json, sqlite
-	package.loaded["infra.logger"], package.loaded["adapters.file_system"] = logger, file_system
-	package.loaded["infra.paths"] = { shared = function(path) return shared .. "/" .. path end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value)
+	package.loaded["core.logger.engine.logger"], package.loaded["core.fs.adapters.file_system"] = logger, file_system
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return shared .. "/" .. path end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value)
 		return "'" .. value:gsub("'", "'\\''") .. "'"
 	end }
 	package.loaded["modules.keystats.text_cipher"] = {}
-	package.loaded["adapters.timer_scheduler"] = { after = function()
+	package.loaded["core.events.timer_scheduler"] = { after = function()
 		return { committed = true, timer = {} }, true
 	end, cancel = function(handle) handle.timer = nil; return true end, now = os.time }
 	complete_batch_offset = complete_batch_offset or require("modules.keystats.export")._last_complete_batch_offset
@@ -490,9 +502,9 @@ local function find(fn, key)
 	for i=1,100 do local n,v=debug.getupvalue(fn,i); if n==key then return v end; if n==nil then break end end
 	error("Missing actual writer upvalue: "..key)
 end
-package.loaded["infra.logger"]=helpers.make_logger_stub()
+package.loaded["core.logger.engine.logger"]=helpers.make_logger_stub()
 helpers.load_with_stubs("adapters.physical_observation_clock")
-helpers.with_fresh_modules({ "adapters.shell_runner" }, function()
+helpers.with_fresh_modules({ "core.process.adapters.shell_runner" }, function()
 shell.run(function(capture, observed, native)
 	native.frames.clock={version=1,domain="mach_absolute_time",numer=1,denom=1}
 	local leaf=hs
@@ -509,20 +521,20 @@ shell.run(function(capture, observed, native)
 	package.loaded["hs.fs"],package.loaded["hs.sqlite3"]=fs,sqlite
 	local log=helpers.make_logger_stub()
 	log.error=function(_,msg,...) logs[#logs+1]=string.format(msg,...) end
-	package.loaded["infra.logger"]=log
+	package.loaded["core.logger.engine.logger"]=log
 	package.loaded["infra.config_paths"]={metrics_dir=function() return metrics end,metrics_cache_dir=function() return temporary.."/ergopti_metrics" end,get_config_dir=function() return temporary end}
-	package.loaded["adapters.file_system"]=file_system
+	package.loaded["core.fs.adapters.file_system"]=file_system
 	package.loaded["modules.keystats.text_cipher"]={is_enabled=function() return false end}
 	package.loaded["modules.keystats.export"]=nil
 	complete_batch_offset=require("modules.keystats.export")._last_complete_batch_offset
 	package.loaded["modules.keystats.export"]={ cleanup = function() return true end, _last_complete_batch_offset=complete_batch_offset,init=function() end,sync_foreign_data_sql=function() return {} end,get_native_app_category=function() return "other" end}
 	package.loaded["infra.manifest_reader"]={default_for=function() return true end}
-	package.loaded["infra.dialog_util"]={alert=function() end}
+	package.loaded["core.ui.engine.dialog_util"]={alert=function() end}
 	local kc_running=false
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
-	package.loaded["adapters.process_lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
+	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
-	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
+	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
 	package.loaded["modules.gestures.engine"]={}
 	package.loaded["modules.gestures.actions"]={}
@@ -540,13 +552,13 @@ shell.run(function(capture, observed, native)
 	leaf.axuielement={applicationElementForPID=function() return app_element end,applicationElement=function() return app_element end,windowElement=function() return nil end,observer={new=function()
 		local o={}; function o:addWatcher() return self end; function o:removeWatcher() return self end; function o:callback(fn) observations.ax=fn;return self end;function o:start() return self end;function o:stop() return self end;return o end}}
 	-- The same declared native projection leaf model as existing managed-session controls.
-	local Accepted=require("keystats.physical_accepted_context")
+	local Accepted=require("metrics.engine.capture.physical_accepted_context")
 	package.loaded["adapters.physical_history_context"]={new=function(owner,history,borrowed)
 		local c,k=borrowed.capture,borrowed.clock
 		local ct,kt=c.identity(),k.identity(owner)
 		return Accepted.new(owner,{current=function() return c.current(ct)==true and c.admitted(ct)~=nil and k.current(owner,kt)==true end,revision=history.retained_count,convert=tonumber,resolve_interval=function(first,last) return history.resolve_interval(ct,kt,first,last) end,calendar=function() return calendar end,on_refused=function() history.stop(ct) end})
 	end}
-	package.loaded["adapters.shell_runner"]={spawn=native.dependencies.spawn}
+	package.loaded["core.process.adapters.shell_runner"]={spawn=native.dependencies.spawn}
 	control=require("modules.shortcuts.script_control")
 	manager=require("modules.keystats.log_manager")
 	local keystats=require("modules.keystats")
@@ -634,7 +646,7 @@ shell.run(function(capture, observed, native)
 	-- Two cancelled intervals still credit their original presses, no held duration.
 	assert(manager.stop({process_exit=true}))
 	local function reopen()
-		for _,name in ipairs({"adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
+		for _,name in ipairs({"core.fs.adapters.ledger_append", "modules.keystats.log_manager","modules.keystats.sqlite_writer","modules.keystats.aggregator","modules.keystats.aggregator.state","modules.keystats.aggregator.core","modules.keystats.aggregator.events","modules.keystats.aggregator.sql"}) do package.loaded[name]=nil end
 		ports();manager=require("modules.keystats.log_manager");assert(manager.init(state))
 	end
 	reopen();receipt.reopened=snapshot()

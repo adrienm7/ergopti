@@ -4,7 +4,7 @@
 --- MODULE: Hotstring Engine (Linux — thin re-export)
 --- DESCRIPTION:
 --- Re-exports the canonical pure-Lua hotstring engine from the shared library
---- at _shared/lua/hotstring_engine/. Placing the canonical implementation in
+--- at _shared/hotstrings/engine/matcher/. Placing the canonical implementation in
 --- _shared/ lets every Lua-based driver (Hammerspoon, Linux, future drivers)
 --- share a single source of truth for the matching algorithm.
 ---
@@ -15,12 +15,12 @@
 --- delegates to the canonical implementation.
 --- ==============================================================================
 
--- Resolve the path to _shared/lua/ relative to this file's location so the
+-- Resolve the path to _shared/ relative to this file's location so the
 -- engine can be required without the caller needing to configure LUA_PATH.
 -- __FILE__ is not available in standard Lua; we use a debug trick that works
 -- in both LuaJIT and Lua 5.4 (which both support debug.getinfo).
 local _this_file = debug.getinfo(1, "S").source:gsub("^@", "")
--- Navigate: …/linux/modules/hotstrings/ → …/linux/ → …/_shared/lua/
+-- Navigate: …/linux/modules/hotstrings/ → …/linux/ → …/_shared/
 --
 -- _linux_root already IS the driver root — the pattern above strips
 -- modules/hotstrings/ — so _shared is ONE level up, not two. This read "../../"
@@ -33,12 +33,12 @@ local _this_file = debug.getinfo(1, "S").source:gsub("^@", "")
 -- A backslash is a Linux filename byte, and the shared path owner is not yet
 -- reachable: split at slashes alone.
 local _linux_root = _this_file:match("^(.*/)modules/hotstrings/")
-local _shared_lua = _linux_root and (_linux_root .. "../_shared/lua") or nil
+local _shared_lua = _linux_root and (_linux_root .. "../_shared") or nil
 
 if _shared_lua then
 	-- Prepend to package.path only when the entry is not already present.
 	local entry = _shared_lua .. "/?.lua"
-	if not package.loaded["infra.literal_module_loader"] and not package.path:find(entry, 1, true) then
+	if not package.loaded["core.lifecycle.engine.literal_module_loader"] and not package.path:find(entry, 1, true) then
 		package.path = entry .. ";" .. package.path
 	end
 end
@@ -46,8 +46,8 @@ end
 -- Delegate to the shared implementation; the only addition is the permanent
 -- match counter and (at DEBUG) timing span, kept here so the shared engine,
 -- which the other drivers load, carries no Linux-only instrumentation.
-local Shared = require("hotstring_engine")
-local Perf = require("infra.perf_counters")
+local Shared = require("hotstrings.engine.matcher")
+local Perf = require("core.logger.engine.perf_counters")
 
 local M = setmetatable({}, { __index = Shared })
 

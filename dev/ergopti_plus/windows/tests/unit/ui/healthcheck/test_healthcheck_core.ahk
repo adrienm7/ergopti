@@ -14,10 +14,10 @@ _TestHC_NativeWindowTitle() {
 	global _I18nCache, _I18nCacheLoaded, _SharedDir
 	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded
 	try {
-		Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+		Locales := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locale_order.json", "UTF-8"))["order"]
 		AssertEqual(21, Locales.Length)
 		for Locale in Locales {
-			Strings := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+			Strings := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Locale . ".json", "UTF-8"))
 			Label := Strings["menu.debug.healthcheck"]
 			_I18nCache := Map("menu.debug.healthcheck", Label), _I18nCacheLoaded := true
 			Window := _HC_NewWindow()

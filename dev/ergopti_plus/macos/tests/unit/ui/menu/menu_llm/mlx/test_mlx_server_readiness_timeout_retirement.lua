@@ -10,16 +10,16 @@
 --- =============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULE_NAMES = {
-	"infra.notifications",
-	"infra.logger",
-	"infra.i18n",
+	"core.ui.engine.notifications",
+	"core.logger.engine.logger",
+	"core.i18n.engine.i18n",
 	"infra.config_paths",
 	"modules.llm.api_common",
-	"adapters.task_lifecycle",
-	"adapters.timer_scheduler",
+	"core.process.adapters.task_lifecycle",
+	"core.events.timer_scheduler",
 	"modules.llm.api_mlx",
 	"ui.menu.menu_llm.models_manager_mlx_server",
 }
@@ -48,8 +48,8 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 			local timers = {}
 			local server_tasks = {}
 
-			package.loaded["infra.notifications"] = { notify = noop }
-			package.loaded["infra.logger"] = {
+			package.loaded["core.ui.engine.notifications"] = { notify = noop }
+			package.loaded["core.logger.engine.logger"] = {
 				today_log_path = function() return "/tmp/ergopti-hs025.log" end,
 				debug = noop,
 				info = noop,
@@ -59,7 +59,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 					return xpcall(callback, debug.traceback, ...)
 				end,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 			package.loaded["infra.config_paths"] = {
 				get = function(key)
 					helpers.assert_eq(key, "MlxActiveModelPath")
@@ -80,7 +80,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				mark_load_failed = noop,
 			}
 
-			package.loaded["adapters.timer_scheduler"] = {
+			package.loaded["core.events.timer_scheduler"] = {
 				after = function(delay, callback)
 					local handle = {
 						delay = delay,
@@ -100,7 +100,7 @@ helpers.describe("HS-025: MLX readiness timeout retirement", function()
 				end,
 			}
 
-			package.loaded["adapters.task_lifecycle"] = {
+			package.loaded["core.process.adapters.task_lifecycle"] = {
 				native = function(label, _, on_done, stream_or_args, args)
 					local task = {
 						label = label,

@@ -19,6 +19,10 @@
 ---    keys that fired it woke them straight back up.
 --- 5. force_quit_frontmost killed unasked (decision of 2026-09-29), and a kill
 ---    confirmed in a dialog must target the window active before the question.
+--- 7. open_terminal_here and new_text_file_here had no Linux handler: they act
+---    only in the folder core/fs/adapters/file_manager_folder.lua proved, start the
+---    terminal detached in it, create the file exclusively under the first free
+---    name, reveal it in the same Nautilus process, and say why otherwise.
 --- 6. minimize_all, eject_all_disks, open_emoji_picker, pick_color,
 ---    screen_capture_instant and ocr_screenshot were declared for Windows and
 ---    macOS only. Their Linux commands run here in a real shell against stub
@@ -180,8 +184,8 @@ helpers.describe("Linux system actions", function()
 	-- The window and its process are read before the question: once the
 	-- dialog's own window is gone, the one the window manager focuses may be another
 	-- application's, and a window closed meanwhile has no process to resolve.
-	-- The owned dialog host's command words (ui/native_dialog.lua).
-	local DIALOG = require("ui.native_dialog").command()
+	-- The owned dialog host's command words (core/ui/ui/native_dialog.lua).
+	local DIALOG = require("core.ui.ui.native_dialog").command()
 	local FORCE_QUIT_KILL = '[ "$(xdotool getwindowpid "$win" 2>/dev/null)" = "$pid" ] && kill -KILL "$pid"'
 
 	helpers.it("force_quit_frontmost kills only behind the owned question, window read first (force-quit-confirm)",
@@ -273,9 +277,37 @@ helpers.describe("Linux system actions", function()
 			local command = unwrap(run[1])
 			helpers.assert_true(command:sub(1, #head) == head,
 				"the question comes first, with Cancel focused: " .. command)
-			local chained = " && { gio trash --empty; }"
+			local chained = " && { " .. require("modules.gestures.system_actions").EMPTY_TRASH .. "; }"
 			helpers.assert_eq(command:sub(-#chained), chained, "the trash is emptied only on Continue")
 		end)
+	end)
+
+	-- Measured on Ubuntu 24.04 (tests/hardware/run_desktop_actions_live.lua):
+	-- without GVfs, `gio trash --empty` exits 0 and leaves the trash full, so
+	-- the action reported success for nothing. It now fails unless the home
+	-- trash (XDG trash specification) is empty afterwards.
+	helpers.it("empty_trash fails when the trash is still full afterwards (system-actions-empty-trash)", function()
+		local SystemActions = require("modules.gestures.system_actions")
+		local dir = os.tmpname(); os.remove(dir)
+		assert(os.execute("mkdir -p '" .. dir .. "/bin' '" .. dir .. "/data/Trash/files'"))
+		local function run(gio_body, trashed)
+			local gio = assert(io.open(dir .. "/bin/gio", "w")); gio:write("#!/bin/sh\n", gio_body, "\n"); gio:close()
+			os.execute("chmod +x '" .. dir .. "/bin/gio'; rm -rf '" .. dir .. "/data/Trash/files'; mkdir -p '"
+				.. dir .. "/data/Trash/files'")
+			if trashed then local fh = assert(io.open(dir .. "/data/Trash/files/" .. trashed, "w")); fh:write("x"); fh:close() end
+			local status = os.execute("PATH='" .. dir .. "/bin':\"$PATH\" XDG_DATA_HOME='" .. dir .. "/data' sh -c "
+				.. require("core.text.engine.utils_core").shell_quote(SystemActions.EMPTY_TRASH))
+			return status == true or status == 0
+		end
+		local ok, err = pcall(function()
+			helpers.assert_eq(run("exit 0", "kept.txt"), false, "a no-op empty that leaves a file reports failure")
+			helpers.assert_eq(run("exit 0", ".hidden"), false, "a hidden file left in the trash counts")
+			helpers.assert_eq(run("rm -f \"$XDG_DATA_HOME\"/Trash/files/*; exit 0", "gone.txt"), true,
+				"an empty that empties the trash succeeds")
+			helpers.assert_eq(run("exit 1", nil), false, "gio's own failure still fails")
+		end)
+		os.execute("rm -rf '" .. dir .. "'")
+		assert(ok, err)
 	end)
 
 	-- On GNOME and KDE none of the clients exists: the chain was backgrounded
@@ -308,6 +340,126 @@ helpers.describe("Linux system actions", function()
 		helpers.assert_eq(written[1], "")
 	end)
 
+	--- Runs body with a scripted folder owner and a recording notifier.
+	local function with_folder(answer, body)
+		local notices = {}
+		local folder_port = {
+			available = function() return true end,
+			read_active_folder = function() return answer() end,
+			reveal_command = function(folder, path) return "reveal " .. folder.bus .. " " .. path end,
+		}
+		with_modules({
+			["core.fs.adapters.file_manager_folder"] = folder_port,
+			["platform.focus.application_notifier"] = { send = function(message) notices[#notices + 1] = message; return true end },
+		}, function() body(notices) end)
+	end
+
+	helpers.it("open_terminal_here starts the session terminal detached in the proven folder (system-actions)", function()
+		with_folder(function() return { path = "/home/ana/My dir", bus = ":1.9" } end, function(notices)
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("open_terminal_here", "tap_3")
+				local run = launched(commands)
+				helpers.assert_eq(#run, 1)
+				helpers.assert_true(run[1]:match("^cd %-%- '/home/ana/My dir' && setsid '[%w%-]+' </dev/null >/dev/null 2>&1 &$")
+					~= nil, run[1])
+			end)
+			helpers.assert_eq(notices, {})
+		end)
+	end)
+
+	helpers.it("file-manager folder refusals say why and run nothing (system-actions)", function()
+		local i18n = require("core.i18n.engine.i18n")
+		local SystemActions = require("modules.gestures.system_actions")
+		for reason, key in pairs(SystemActions.FOLDER_REFUSALS) do
+			for _, action in ipairs({ "open_terminal_here", "new_text_file_here" }) do
+				with_folder(function() return nil, reason, "Thunar" end, function(notices)
+					with_recorded_shell(function(commands)
+						Gestures.execute_action(action, "tap_3")
+						helpers.assert_eq(#launched(commands), 0, action .. " " .. reason)
+					end)
+					local expected = i18n.get(key):gsub("{1}", "Thunar")
+					helpers.assert_eq(notices, { expected }, action .. " " .. reason)
+				end)
+			end
+		end
+		helpers.assert_eq(SystemActions.FOLDER_REFUSALS.unsupported_file_manager, "system_actions.file_manager_unsupported")
+	end)
+
+	helpers.it("(nui-007-failure-level) a terminal or new-file failure is an error notice", function()
+		local levels = {}
+		with_modules({
+			["core.fs.adapters.file_manager_folder"] = {
+				available = function() return true end,
+				read_active_folder = function() return { path = "/nonexistent/ergopti-nui-007", bus = ":1.9" } end,
+				reveal_command = function() return "reveal" end,
+			},
+			["platform.focus.application_notifier"] = { send = function(message, opts)
+				levels[#levels + 1] = { message = message, level = opts and opts.level }
+				return true
+			end },
+			["modules.gestures.user_actions"] = {
+				resolve_terminal = function() return nil end,
+				detached_command = function() return "true" end,
+			},
+		}, function()
+			with_recorded_shell(function()
+				Gestures.execute_action("open_terminal_here", "tap_3")
+				Gestures.execute_action("new_text_file_here", "tap_3")
+			end)
+		end)
+		local i18n = require("core.i18n.engine.i18n")
+		helpers.assert_eq(levels, {
+			{ message = i18n.get("user_actions.terminal_unavailable"), level = "error" },
+			{ message = i18n.get("system_actions.new_text_file_failed"), level = "error" },
+		}, "Windows and user_actions show these failures as errors")
+	end)
+
+	helpers.it("new_text_file_here creates the first free name exclusively and reveals it (system-actions)", function()
+		local dir = os.tmpname()
+		os.remove(dir)
+		local made = os.execute("mkdir '" .. dir .. "'")
+		helpers.assert_true(made == true or made == 0)
+		local base = require("core.i18n.engine.i18n").get("system_actions.new_text_file_name")
+		local taken = assert(io.open(dir .. "/" .. base .. ".txt", "w"))
+		taken:write("kept")
+		taken:close()
+		with_folder(function() return { path = dir, bus = ":1.9" } end, function(notices)
+			with_recorded_shell(function(commands)
+				Gestures.execute_action("new_text_file_here", "tap_3")
+				local run = launched(commands)
+				helpers.assert_eq(#run, 1)
+				helpers.assert_eq(unwrap(run[1]), "reveal :1.9 " .. dir .. "/" .. base .. " 2.txt")
+			end)
+			helpers.assert_eq(notices, {})
+		end)
+		local kept = assert(io.open(dir .. "/" .. base .. ".txt", "r"))
+		helpers.assert_eq(kept:read("*a"), "kept", "an existing file is never overwritten")
+		kept:close()
+		local created = io.open(dir .. "/" .. base .. " 2.txt", "r")
+		helpers.assert_not_nil(created, "the second name is created")
+		helpers.assert_eq(created:read("*a"), "")
+		created:close()
+		os.execute("rm -rf '" .. dir .. "'")
+	end)
+
+	helpers.it("create_new_text_file stops on a refusal other than an existing name (system-actions)", function()
+		local SystemActions = require("modules.gestures.system_actions")
+		local tried = {}
+		local path = SystemActions.create_new_text_file("/srv/x", function(candidate)
+			tried[#tried + 1] = candidate
+			if #tried == 1 then return false, 17 end
+			return false, 13
+		end)
+		helpers.assert_nil(path)
+		helpers.assert_eq(#tried, 2)
+		local count = 0
+		helpers.assert_nil(SystemActions.create_new_text_file("/srv/x/", function()
+			count = count + 1
+			return false, "EEXIST"
+		end))
+		helpers.assert_eq(count, SystemActions.NEW_FILE_NAME_ATTEMPTS)
+	end)
+
 	helpers.it("never sends Ctrl+C to a terminal for make_executable_selection", function()
 		local Open = require("modules.shortcuts.open_selection")
 		Open._set_deps_for_test({ focused_app = function() return "gnome-terminal-server" end,
@@ -319,7 +471,7 @@ helpers.describe("Linux system actions", function()
 					emit("ctrl+c"); return false, "", "no_file_selection"
 				end },
 				["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
-				["adapters.event_loop"] = { sleep_ms = function() return true end },
+				["core.events.loop"] = { sleep_ms = function() return true end },
 			}, function() Gestures.execute_action("make_executable_selection", "tap_3") end)
 		end)
 		Open._set_deps_for_test(nil)
@@ -343,7 +495,7 @@ helpers.describe("Linux system actions", function()
 						return true, "file:///home/ana/run.sh", nil
 					end },
 					["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo; return true end },
-					["adapters.event_loop"] = { sleep_ms = function() return true end },
+					["core.events.loop"] = { sleep_ms = function() return true end },
 				}, function()
 					with_recorded_shell(function(commands)
 						Gestures.execute_action("make_executable_selection", "tap_3")
@@ -369,7 +521,7 @@ helpers.describe("Linux system actions", function()
 				end,
 			},
 			["modules.gestures.combo_emitter"] = { press = function(combo) combos[#combos + 1] = combo return true end },
-			["adapters.event_loop"] = { sleep_ms = function() return true end },
+			["core.events.loop"] = { sleep_ms = function() return true end },
 		}, function()
 			with_recorded_shell(function(commands)
 				Gestures.execute_action("make_executable_selection", "tap_3")
@@ -391,8 +543,8 @@ helpers.describe("Linux system actions", function()
 					read_selection_uri_list = function() return report[1], report[2], report[3] end,
 				},
 				["modules.gestures.combo_emitter"] = { press = function() return true end },
-				["adapters.event_loop"] = { sleep_ms = function() return true end },
-				["adapters.application_notifier"] = { send = function() return true end },
+				["core.events.loop"] = { sleep_ms = function() return true end },
+				["platform.focus.application_notifier"] = { send = function() return true end },
 			}, function()
 				with_recorded_shell(function(commands)
 					Gestures.execute_action("make_executable_selection", "tap_3")
@@ -803,7 +955,7 @@ helpers.describe("Linux system actions", function()
 			local cached_runner = package.loaded["modules.gestures.background_commands"]
 			package.loaded["modules.gestures.background_commands"] = nil
 			local ok, failure = pcall(function()
-				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "logger.shim", logger)
+				local Fresh = helpers.load_module_with_dependency("modules.gestures.manager", "core.logger.engine.shim", logger)
 				local real = os.execute
 				local function dispatch(answer)
 					errors = {}

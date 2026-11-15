@@ -31,8 +31,8 @@ local function with_action(route, mode, action, body)
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	for name in pairs(saved) do
-		if name:match("^modules%.") or name:match("^adapters%.") or name:match("^infra%.")
-			or name:match("^config_binding") or name == "logger.shim" then package.loaded[name] = nil end
+		if helpers.is_driver_module(name)
+			or name:match("^config_binding") or name == "core.logger.engine.shim" then package.loaded[name] = nil end
 	end
 	local path = os.tmpname()
 	local injector
@@ -63,13 +63,13 @@ local function with_action(route, mode, action, body)
 		routes.config = function(name) return name == "config.toml" and path or config_route(name) end
 		require("tests.support.text_owner_fixture").with(function(guard)
 			local world = { keys = {}, held = {}, reads = 0, writes = 0, lifecycle = 0, errors = {} }
-			local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 			logger.set_sink(function() end)
 			logger.set_error_observer(function(_, _, message) world.errors[#world.errors + 1] = message end)
-			package.loaded["logger.shim"], environment.Logger = logger, logger
+			package.loaded["core.logger.engine.shim"], environment.Logger = logger, logger
 			local pending, clipboard = nil, "ok"
-			local quote = require("adapters.shell_runner").quote
-			package.loaded["adapters.shell_runner"] = {
+			local quote = require("core.process.adapters.shell_runner").quote
+			package.loaded["core.process.adapters.shell_runner"] = {
 				has_command = function() return true end, quote = quote,
 				exec_checked = function(command)
 					if command:find("dialog_host.lua", 1, true) then return true, "" end
@@ -78,13 +78,13 @@ local function with_action(route, mode, action, body)
 				with_exact_stdin = function(command, text) pending = text; return command end,
 				run = function() clipboard = pending; world.writes = world.writes + 1; return true end,
 			}
-			package.loaded["infra.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
+			package.loaded["core.ui.engine.display_server"] = { UNKNOWN = "unknown", kind = function() return "x11" end,
 				is_x11 = function() return true end, is_wayland = function() return false end }
-			package.loaded["adapters.window_info"] = { focused_app_id = function() return "owned-editor" end }
-			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, find = function()
+			package.loaded["platform.focus.window_info"] = { focused_app_id = function() return "owned-editor" end }
+			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
 				return { path = "controlled-touchpad", name = "controlled", max_fingers = 3 }
 			end }
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad",
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
 				open = function() return true end, close = function() return true end }
 			local layout = require("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
@@ -96,15 +96,15 @@ local function with_action(route, mode, action, body)
 			end })
 			local function lifecycle() world.lifecycle = world.lifecycle + 1 end
 			environment.script_actions = require("modules.shortcuts.script_actions").new({ reset = lifecycle, reload = lifecycle, quit = lifecycle })
-			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "adapters.event_loop",
+			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
-				keyboard_hook = "adapters.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "infra.monotonic",
+				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
 				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
-			environment.input_capture_gate = require("infra.input_capture_gate").new()
+			environment.input_capture_gate = require("platform.input.capture_gate").new()
 			environment.on_char = function() error("The bound chord must not become a text callback") end
 			environment.privacy_owners = {}
 			evaluate(assert(source:match("\n\t\t(gestures%.init%b())")), environment)
@@ -175,12 +175,15 @@ helpers.describe("dry-run configured actions", function()
 			end
 		end
 		for _, action in ipairs({ "script_pause_toggle", "script_reload", "script_quit" }) do
-			helpers.it("dry-run-actions preserves " .. route .. " " .. action, function()
+			-- SCD-1: a keyboard slot (grabbed or observed) runs nothing in dry-run,
+			-- a script action included; the other routes keep their script actions.
+			local slot = route == "keyboard" or route == "observe"
+			helpers.it("dry-run-actions " .. (slot and "suspends " or "preserves ") .. route .. " " .. action, function()
 				with_action(route, "dry", action, function(world)
-					helpers.assert_eq(world.lifecycle, 1)
+					helpers.assert_eq(world.lifecycle, slot and 0 or 1)
 					helpers.assert_eq(#world.keys, 0)
 					helpers.assert_eq(world.reads, 0)
-					if route ~= "observe" then helpers.assert_true(world.consumed) end
+					if route ~= "observe" then helpers.assert_eq(world.consumed, not slot) end
 				end)
 			end)
 		end

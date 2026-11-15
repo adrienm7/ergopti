@@ -15,10 +15,10 @@ local helpers = require("tests.helpers")
 --- @param pathwatcher table Native pathwatcher test double.
 --- @return table module Fresh bridge module.
 local function load_bridge(scheduler, pathwatcher)
-	package.loaded["adapters.timer_scheduler"] = scheduler
+	package.loaded["core.events.timer_scheduler"] = scheduler
 	package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	return helpers.load_with_stubs("modules.keystats.kc_bridge", {
 		pathwatcher = pathwatcher,
 		keycodes = { map = {} },
@@ -188,23 +188,23 @@ helpers.describe("keystats parent requires KC bridge commitment", function()
 		package.loaded["modules.keystats.kc_bridge"] = {
 			init = function() return false end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.timings"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 1 end,
 			sec = function() return 1 end,
 		}
 		package.loaded["infra.manifest_reader"] = { default_for = function() return false end }
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.dialog_util"] = {}
-		package.loaded["infra.teardown_transaction"] = {}
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.dialog_util"] = {}
+		package.loaded["core.lifecycle.engine.shutdown.teardown_transaction"] = {}
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "." end, metrics_dir = function() return "./metrics" end,
 	metrics_cache_dir = function() return "./metrics_cache" end }
 		for _, name in ipairs({
 			"adapters.input_source_broker", "modules.keystats.log_manager",
-			"modules.keystats.context_tracker", "keystats.metrics",
-			"modules.keystats.watchers", "adapters.process_lifecycle",
-			"adapters.keyboard_hook", "adapters.event_provenance",
-			"adapters.synthetic_input",
+			"modules.keystats.context_tracker", "metrics.engine.metrics",
+			"modules.keystats.watchers", "core.process.adapters.lifecycle",
+			"platform.input.keyboard_hook", "adapters.event_provenance",
+			"platform.input.synthetic_input",
 		}) do package.loaded[name] = {} end
 
 		local loaded, err = pcall(require, "modules.keystats.init")

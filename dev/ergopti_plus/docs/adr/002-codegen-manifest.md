@@ -27,15 +27,15 @@ the driver's internal registry exactly, creating a fourth source of truth.
 ## Decision
 
 Maintain a **single authoritative TOML manifest** at
-`static/ergopti_plus/_shared/modules/features/manifest.toml` and generate all
+`static/ergopti_plus/_shared/settings/data/features/manifest.toml` and generate all
 driver-specific feature registries from it at build time.
 
 The build script (`tools/build/build-features-manifest.js`, exposed as
 `npm run build:manifest`) reads `manifest.toml` (and
-`static/ergopti_plus/_shared/tap_hold/defaults.toml`) and emits:
+`static/ergopti_plus/_shared/tap_hold/data/defaults.toml`) and emits:
 
 - `static/ergopti_plus/windows/_generated/features_manifest.ahk` — AHK `Map`
-- `static/ergopti_plus/_shared/lua/features/manifest_data.lua` — the Lua table
+- `static/ergopti_plus/_shared/settings/engine/features/manifest_data.lua` — the Lua table
   macOS and Linux share, written once; each driver's
   `_generated/features_manifest.lua` projects it through
   `features.manifest` when it loads
@@ -84,10 +84,10 @@ repository so drivers can boot without running the build step.
 
 ## Evidence in the codebase
 
-- Source manifest: `static/ergopti_plus/_shared/modules/features/manifest.toml`
-- Schema: `static/ergopti_plus/_shared/modules/features/manifest.schema.json`
+- Source manifest: `static/ergopti_plus/_shared/settings/data/features/manifest.toml`
+- Schema: `static/ergopti_plus/_shared/settings/data/features/manifest.schema.json`
 - Build script: `tools/build/build-features-manifest.js`
 - npm script: `package.json` → `"build:manifest"`
 - Generated AHK output: `static/ergopti_plus/windows/_generated/features_manifest.ahk`
-- Generated Lua output: `static/ergopti_plus/_shared/lua/features/manifest_data.lua`
-  (projected by `_shared/lua/features/manifest.lua`)
+- Generated Lua output: `static/ergopti_plus/_shared/settings/engine/features/manifest_data.lua`
+  (projected by `_shared/settings/engine/features/manifest.lua`)

@@ -5,10 +5,12 @@
 local h = require("tests.helpers")
 local with_fs = require("tests.support.file_system_transaction_fixture").with_fixture
 local with_remap = require("tests.support.remap_transaction_fixture")
-local Codec = require("toml_codec")
-local entries = { { id = "left_shift+right_shift" } }
+local Codec = require("core.text.engine.toml_codec")
+-- A macOS combination; config.toml names it by its pair id.
+local entries = { { id = "esc_tab" } }
+local PAIR = "escape_then_tab"
 local actions = { { id = "none" }, { id = "escape" }, { id = "layer" }, { id = "caps_word" } }
-local SOURCE = '# retained comment\n[mod_combos]\nenabled = false\nsymmetric = true\nsimultaneous_threshold_ms = 87\n[mod_combos.config."left_shift+right_shift"]\ntap = "escape" # tap source\nhold = "layer"\ncombo = "caps_word" # owned slot\nfuture = { token = "untouched" }\n[mod_combos.config.future_pair]\ntap = "unknown_future_action"\n[gesture_parameters]\nfuture_action = "opaque argv and punctuation"\n'
+local SOURCE = '# retained comment\n[mod_combos]\nenabled = false\nsymmetric = true\nsimultaneous_threshold_ms = 87\n[mod_combos.config.escape_then_tab]\ntap = "escape" # tap source\nhold = "layer"\ncombo = "caps_word" # owned slot\nfuture = { token = "untouched" }\n[mod_combos.config.future_pair]\ntap = "unknown_future_action"\n[gesture_parameters]\nfuture_action = "opaque argv and punctuation"\n'
 local function seed(path, source)
  local file = assert(io.open(path, "wb")); assert(file:write(source)); assert(file:close())
 end
@@ -17,7 +19,11 @@ local function read(path)
 end
 local function scoped(run, lock)
  return with_fs(function(fixture)
-  local path = os.tmpname():gsub("\\", "/")
+  -- The chords are config.toml rows, read beside the route: a config.toml
+  -- route is its own companion, so every path below names the published file.
+  local dir = os.tmpname():gsub("\\", "/")
+  os.remove(dir); assert(os.execute('mkdir "' .. dir .. '"'))
+  local path = dir .. "/config.toml"
   local adapter = fixture.make_adapter(nil, nil, nil, nil, lock)
   -- Controlled final-admission port: the actual FileSystem pipeline performs
   -- its disk, source, staging and cleanup work; this test port checks the
@@ -43,7 +49,7 @@ local function scoped(run, lock)
     return run(Config, adapter, path)
    end)
   end, debug.traceback))
-  os.remove(path); os.remove(fixture.write_lock_path(path))
+  os.remove(path); os.remove(fixture.write_lock_path(path)); os.execute('rmdir "' .. dir .. '"')
   if not result[1] then error(result[2], 0) end
   return table.unpack(result, 2, result.n)
  end)
@@ -63,10 +69,10 @@ h.describe("chord copy actual fresh source producer", function()
    h.assert_true(published:find('future = { token = "untouched" }\n', 1, true) ~= nil)
    h.assert_true(published:find('future_action = "opaque argv and punctuation"\n', 1, true) ~= nil)
    local saved = Codec.decode(published).mod_combos
-   h.assert_eq(saved.config[entries[1].id].combo, "escape")
-   h.assert_eq(saved.config[entries[1].id].hold, "layer")
+   h.assert_eq(saved.config[PAIR].combo, "escape")
+   h.assert_eq(saved.config[PAIR].hold, "layer")
    h.assert_eq(saved.enabled, false); h.assert_eq(saved.symmetric, true); h.assert_eq(saved.simultaneous_threshold_ms, 87)
-   h.assert_eq(require("config_file_inverse").restore(receipt, adapter), true)
+   h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), true)
    h.assert_eq(read(path), SOURCE)
   end)
  end)
@@ -83,7 +89,7 @@ h.describe("chord copy actual fresh source producer", function()
  end)
  h.it("rejects occupied source and unknown current slots before any disk publication", function()
   scoped(function(Config, _, path)
-   for _, bytes in ipairs({ '[mod_combos', 'mod_combos = []', '[mod_combos.config."left_shift+right_shift"]\ntap = "unknown_action"' }) do
+   for _, bytes in ipairs({ '[mod_combos', 'mod_combos = []', '[mod_combos.config.escape_then_tab]\ntap = "unknown_action"' }) do
     seed(path, bytes)
     local prepared, refusal = pcall(Config.prepare_copy_taps_to_chords, entries, actions, path)
     h.assert_eq(prepared, false); h.assert_type(refusal, "string"); h.assert_true(#refusal > 0)
@@ -115,16 +121,16 @@ h.describe("chord copy actual fresh source producer", function()
    adapter.write_if_unchanged_admitted = real_write
    h.assert_eq(accepted, false); h.assert_eq(type(receipt.publication_cleanup), "function")
    h.assert_eq(read(path), plan.candidate)
-   h.assert_eq(require("config_file_inverse").restore(receipt, adapter), false)
+   h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), false)
    h.assert_eq(cleanup_calls, 1); h.assert_eq(read(path), plan.candidate)
-   released = true; h.assert_eq(require("config_file_inverse").restore(receipt, adapter), true)
+   released = true; h.assert_eq(require("settings.engine.migration.file_inverse").restore(receipt, adapter), true)
    h.assert_eq(cleanup_calls, 2); h.assert_eq(read(path), SOURCE)
   end)
  end)
  h.it("the Mac facade copies fresh disk slots rather than cached boot slots and waits for its deploy ACK", function()
   scoped(function(Config, _, path)
    with_remap(function(fixture)
-    local remap, calls = fixture.load_enabled_remap()
+    local remap, calls = fixture.load_enabled_remap({ mod_combo_id = entries[1].id })
     local port = package.loaded["platform.remap.config"]
     port.prepare_copy_taps_to_chords = function(actual_entries, _, actual_path)
      return Config.prepare_copy_taps_to_chords(actual_entries, actions, actual_path)
@@ -141,7 +147,7 @@ h.describe("chord copy actual fresh source producer", function()
     h.assert_eq(remap.get_combo_combo_action(entries[1].id), "escape")
     h.assert_eq(remap.get_combo_tap_action(entries[1].id), "escape")
     h.assert_eq(remap.get_combo_hold_action(entries[1].id), "layer")
-    h.assert_eq(Codec.decode(read(path)).mod_combos.config[entries[1].id].combo, "escape")
+    h.assert_eq(Codec.decode(read(path)).mod_combos.config[PAIR].combo, "escape")
     h.assert_eq(remap.set_combo_combo_action(entries[1].id, "caps_word"), false)
     pending(true, "controlled owned generation ready")
     h.assert_eq(completed, 1); h.assert_eq(result, true); h.assert_eq(changed, 1)
@@ -151,7 +157,7 @@ h.describe("chord copy actual fresh source producer", function()
  end)
  h.it("owns the Mac fresh read before reentrant setters and refuses a changed publish source", function()
   with_remap(function(fixture)
-   local remap, calls = fixture.load_enabled_remap()
+   local remap, calls = fixture.load_enabled_remap({ mod_combo_id = entries[1].id })
    calls.copy_source = SOURCE
    local setter_admitted
    calls.copy_read = function() setter_admitted = remap.set_combo_tap_action(entries[1].id, "caps_word") end
@@ -170,7 +176,7 @@ h.describe("chord copy session refusal registry", function()
  h.it("refuses a session write registration after preparation before native publication", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    Writer.refuse_writes(path, "unsupported schema/session")
    local calls, native = 0, adapter.write_if_unchanged
    adapter.write_if_unchanged = function(...)
@@ -185,7 +191,7 @@ h.describe("chord copy session refusal registry", function()
  h.it("refuses a session write registration during the publication boundary", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local calls, native = 0, adapter.write_if_unchanged
    adapter.write_if_unchanged = function(...)
     calls = calls + 1
@@ -215,7 +221,7 @@ h.describe("chord copy final logical admission", function()
  h.it("checks registry registration during the real final native source read", function()
   scoped(function(Config, adapter, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local native, reads = adapter.read_with_status, 0
    adapter.read_with_status = function(...)
     local bytes, status, detail = native(...); reads = reads + 1
@@ -241,7 +247,7 @@ h.describe("chord copy final logical admission", function()
  h.it("the actual facade rechecks its routed source after the final native read", function()
   scoped(function(Config, adapter, path)
    with_remap(function(fixture)
-    local remap, calls = fixture.load_enabled_remap()
+    local remap, calls = fixture.load_enabled_remap({ mod_combo_id = entries[1].id })
     local port = package.loaded["platform.remap.config"]
     port.prepare_copy_taps_to_chords = function(actual_entries, _, actual_path)
      return Config.prepare_copy_taps_to_chords(actual_entries, actions, actual_path)
@@ -281,7 +287,7 @@ h.describe("chord copy final criterion registry reentry", function()
  h.it("rechecks session refusal registered by the final caller criterion", function()
   scoped(function(Config, _, path)
    local plan = Config.prepare_copy_taps_to_chords(entries, actions, path)
-   local Writer = require("toml_codec.writer")
+   local Writer = require("core.text.engine.toml_codec.writer")
    local criteria = 0
    local accepted = Config.publish_copy_taps_to_chords(plan, path, function()
     criteria = criteria + 1

@@ -17,8 +17,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Formats = require("llm.remote_formats")
+local Json = require("core.text.engine.json")
+local Formats = require("ai.engine.api.remote_formats")
 
 local MESSAGES = {
 	{ role = "system", content = "Continue the text." },
@@ -42,11 +42,11 @@ end
 --- logger that keeps every line with its level.
 --- @param body function body(remote, calls, logs)
 local function with_remote(body)
-	local names = { "adapters.http_client", "logger.shim", "modules.llm.api_remote" }
+	local names = { "core.network.adapters.http_client", "core.logger.engine.shim", "modules.llm.api_remote" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local calls, logs = {}, {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, request_body, callback, options)
 			calls[#calls + 1] = { url = url, headers = headers, body = Json.decode(request_body), callback = callback,
 				options = options }
@@ -64,7 +64,7 @@ local function with_remote(body)
 	for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 		logger[level] = recorder(level)
 	end
-	package.loaded["logger.shim"] = logger
+	package.loaded["core.logger.engine.shim"] = logger
 	package.loaded["modules.llm.api_remote"] = nil
 	local remote = require("modules.llm.api_remote")
 	remote._reset_for_test()
@@ -104,9 +104,9 @@ end
 -- =========================================
 
 helpers.describe("New providers: listed in catalogue order, each where it can serve", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 	-- Every local server of the shipped catalogue, in its order
-	local local_ids = read_shared("modules/llm/local_servers.json").server_order
+	local local_ids = read_shared("ai/data/local_servers.json").server_order
 	local expected_order = {}
 	for _, id in ipairs(catalogue.provider_order) do expected_order[#expected_order + 1] = id end
 	for _, id in ipairs(local_ids) do expected_order[#expected_order + 1] = id end
@@ -165,7 +165,7 @@ end)
 -- =========================================
 
 helpers.describe("New providers: the OpenAI-format ones send to their own base_url", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 
 	for _, id in ipairs({ "openrouter", "groq", "together", "fireworks" }) do
 		helpers.it(id .. ": chat completions under its base_url, with a Bearer key", function()
@@ -193,7 +193,7 @@ end)
 -- =========================================
 
 helpers.describe("Backboard: an assistant per key, then one message per request", function()
-	local base = read_shared("modules/llm/api_providers.json").providers.backboard.base_url
+	local base = read_shared("ai/data/api_providers.json").providers.backboard.base_url
 
 	helpers.it("the first request creates the assistant, then sends the message; the next reuses it", function()
 		with_remote(function(remote, calls)
@@ -230,9 +230,11 @@ helpers.describe("Backboard: an assistant per key, then one message per request"
 			remote.chat(BACKBOARD, nil, MESSAGES, {}, nil, function(_, err) err1 = err end)
 			calls[1].callback({ ok = false, status = 401, body = "", error_body = '{"message":"Invalid API key"}' })
 			helpers.assert_eq(#calls, 1, "no message without an assistant")
-			helpers.assert_true(err1:find("HTTP 401: Invalid API key", 1, true) ~= nil, err1)
-			-- The provider's own text may echo the key: the log withholds it.
-			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: details withheld."), 1)
+			-- The creation's status stays first: a refused key is never retried.
+			helpers.assert_true(err1:find("HTTP 401: the Backboard assistant could not be created: Invalid API key", 1, true)
+				~= nil, err1)
+			-- The provider's own text may echo the key: the log names the status only.
+			helpers.assert_eq(#logged(logs, "warn", "Remote request failed: HTTP 401."), 1)
 			for _, line in ipairs(logs) do
 				helpers.assert_true(not line.text:find("Invalid API key", 1, true), "never the backend text: " .. line.text)
 			end
@@ -281,7 +283,7 @@ end)
 -- =========================================
 
 helpers.describe("Decisions: Jev answers typed questions and never chats", function()
-	local catalogue = read_shared("modules/llm/api_providers.json")
+	local catalogue = read_shared("ai/data/api_providers.json")
 
 	helpers.it("decide() posts the shared body to the full endpoint with a Bearer key", function()
 		with_remote(function(remote, calls)
@@ -337,7 +339,7 @@ end)
 -- ============================================
 
 helpers.describe("Jev through Backboard: the questions in system_one, the answers found and located", function()
-	local base = read_shared("modules/llm/api_providers.json").providers.backboard.base_url
+	local base = read_shared("ai/data/api_providers.json").providers.backboard.base_url
 	local JEV = { provider = "backboard", token = "bb", model = "typesafe/jev-1.13" }
 	local ANSWERS = { intent = { choice = "calendar", probabilities = { calendar = 0.9, none = 0.1 } } }
 	local LOCATIONS = {

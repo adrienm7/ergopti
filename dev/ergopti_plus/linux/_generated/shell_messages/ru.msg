@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/ru.msg
-# AUTO-GENERATED from _shared/data/locales/ru.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/ru.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Сетевой модуль LuaJIT собран из исходного кода.
 build_luv.recipe_required=Для нативной сборки luv нужен её исходный рецепт.
 install.already_installed={1} — уже установлено
 install.archive_digest_unavailable=обновления с сохранённым дескриптором требуют настоящей среды OpenSSL3; возможность остаётся недоступной.
+install.bytecode_skipped=Не удалось создать предкомпилированные модули — Ergopti запускается из исходного кода, немного медленнее.
 install.capability_verified={1} — возможность проверена
 install.command_still_missing={1} установлен, но '{2}' по-прежнему не найден.
 install.daemon_manual=Чтобы запустить службу вручную:
 install.daemon_running=Служба работает в фоновом режиме. Чтобы проверить её состояние:
+install.focus_integration_enabled=интеграция фокуса {1} включена
+install.focus_integration_failed=Не удалось включить интеграцию фокуса {1} — правила для отдельных приложений на этом рабочем столе остаются неактивными.
+install.focus_integration_next_login=интеграция фокуса {1} установлена (вступит в силу при следующем входе)
+install.focus_integration_updated=интеграция фокуса {1} обновлена
 install.gnome_extension_active=расширение GNOME AppIndicator — уже включено
 install.gnome_extension_enabled=расширение GNOME AppIndicator включено
 install.gnome_extension_failed=Не удалось включить расширение AppIndicator — без него GNOME не показывает значок.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — проверка зависим
 install.section_deps_skipped=Зависимости пропущены (--no-deps)
 install.section_done=Установка завершена
 install.section_files=Установка файлов
+install.section_focus=Активное приложение в Wayland (GNOME, KDE)
 install.section_lua_deps=Необязательные зависимости Lua (цикл событий, таймеры, webview, сигналы)
 install.section_permissions=Права на ввод (нужен sudo)
 install.section_services=Создание пользовательских служб systemd
@@ -79,6 +85,7 @@ install.xdg_autostart=автозапуск XDG: {1}
 launch.already_running=Ergopti+ уже запущен в этом сеансе ({1} занят); этот запуск отклонён.
 launch.authorization_failed=Авторизация доступа к вводу отменена или не удалась.
 launch.groups_unavailable=Сеанс не смог получить настроенные группы ввода.
+launch.restarting=Ergopti+ уже запущен в этом сеансе; ему отправлен запрос на завершение, затем он будет перезапущен.
 launch.session_lock_invalid=Папка блокировки сеанса должна задаваться абсолютным путём.
 launcher.dependencies_installed=Зависимости установлены.
 launcher.driver_missing=Ошибка: каталог драйвера Linux не найден: {1}

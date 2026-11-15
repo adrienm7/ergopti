@@ -91,9 +91,9 @@ local function run_stream_case(case)
 			return { choices = { { delta = { content = "world" } } } }, nil
 		end
 		if raw == '{"choices":[1]}' or raw == '{"choices":[]}' or raw == '{"choices":false}'
-			or raw == '{"choices":1}' or raw == '{"choices":{}}' then return require("json").decode(raw), nil end
+			or raw == '{"choices":1}' or raw == '{"choices":{}}' then return require("core.text.engine.json").decode(raw), nil end
 		if raw == '{"error":{"message":"generation failed"}}' then
-			return require("json").decode(raw), nil
+			return require("core.text.engine.json").decode(raw), nil
 		end
 		if raw ~= (case.expected_payload or JSON_SINGLE) then
 			return nil, "unexpected SSE payload"

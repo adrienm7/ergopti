@@ -15,14 +15,14 @@
 ---    the dash comes from the locale.
 --- ==============================================================================
 
-local TextUtils = require("text_utils")
-local Paths     = require("infra.paths")
-local JsonCodec = require("adapters.json_codec")
+local TextUtils = require("core.text.engine.utils_core")
+local Paths     = require("core.fs.engine.paths")
+local JsonCodec = require("core.fs.adapters.json_codec")
 local M = {}
 
 -- The brand and emoji come from the file the three drivers and the model page
 -- share; only the description key after the em dash is this menu's own.
-local BRANDS_PATH = "modules/llm/backends.json"
+local BRANDS_PATH = "ai/data/backends.json"
 local DESCRIPTION_KEYS = {
 	mlx    = "menu.llm.backend_mlx_suffix",
 	ollama = "menu.llm.backend_ollama_suffix",
@@ -120,7 +120,7 @@ end
 function M.option(backend)
 	local option = OPTIONS[backend]
 	if not option then error("backend_labels.option: unknown backend " .. tostring(backend)) end
-	return option.brand .. " " .. EM_DASH .. " " .. require("infra.i18n").get(option.description_key)
+	return option.brand .. " " .. EM_DASH .. " " .. require("core.i18n.engine.i18n").get(option.description_key)
 end
 
 --- What an option names: its label before the first em dash, trimmed, or the

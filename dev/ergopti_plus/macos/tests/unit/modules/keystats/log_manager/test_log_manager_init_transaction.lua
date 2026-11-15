@@ -27,14 +27,14 @@ local EmptyLedger = require("tests.support.keystats.absent_ledger_file_system")
 helpers.describe("log_manager — initialization transaction", function()
 	helpers.it("rolls back a post-publication throw and retries the full init (keystats-log-init-transaction)", function()
 		local slots = {
-			"infra.logger",
-			"adapters.file_system",
+			"core.logger.engine.logger",
+			"core.fs.adapters.file_system",
 			"modules.keystats.sqlite_writer",
 			"modules.keystats.aggregator",
 			"modules.keystats.rotation",
 			"modules.keystats.export",
-			"keystats.metrics",
-			"adapters.ledger_append", "modules.keystats.log_manager",
+			"metrics.engine.metrics",
+			"core.fs.adapters.ledger_append", "modules.keystats.log_manager",
 		}
 		local saved = {}
 		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
@@ -59,8 +59,8 @@ helpers.describe("log_manager — initialization transaction", function()
 			logger.success = function(_, message, ...)
 				success_messages[#success_messages + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function()
 					return [[{"device_id":"device-stable","name":"Test Mac","os":"darwin","host_signature":"fallback:unknown","created_at":"2026-08-13 00:00:00.000"}]], "ok"
 				end,
@@ -108,7 +108,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				init = function() end,
 				sync_foreign_data_sql = function() return {} end,
 			}
-			package.loaded["keystats.metrics"] = {
+			package.loaded["metrics.engine.metrics"] = {
 				compute_wpm_from_events = function() return 0 end,
 			}
 

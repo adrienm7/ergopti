@@ -96,10 +96,10 @@ local function load_log_manager()
 		_last_complete_batch_offset = 0,
 	}
 
-	package.loaded["infra.i18n"]    = { t = function(key) return key end }
-	package.loaded["infra.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
-	local saved_file_system = package.loaded["adapters.file_system"]
-package.loaded["adapters.file_system"] = {
+	package.loaded["core.i18n.engine.i18n"]    = { t = function(key) return key end }
+	package.loaded["core.timing.engine.timings"] = { ms = function() return 1000 end, sec = function() return 1.0 end }
+	local saved_file_system = package.loaded["core.fs.adapters.file_system"]
+package.loaded["core.fs.adapters.file_system"] = {
 	write = function() return true end,
 	create_if_absent = function() return true, "created" end,
 	read = function() return nil end,
@@ -110,7 +110,7 @@ package.loaded["adapters.file_system"] = {
 		fs      = { attributes = function() return nil end, dir = function() return function() return nil end end },
 		execute = function() return "" end,
 	})
-	package.loaded["adapters.file_system"] = saved_file_system
+	package.loaded["core.fs.adapters.file_system"] = saved_file_system
 	lm.init({
 		LOG_DIR = "/tmp/test_process_exit_stop",
 		CACHE_DIR = "/tmp/test_process_exit_stop/cache",

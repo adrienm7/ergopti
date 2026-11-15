@@ -12,8 +12,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
-local scanner = require("toml_codec.record_scanner")
+local codec = require("core.text.engine.toml_codec")
+local scanner = require("core.text.engine.toml_codec.record_scanner")
 
 --- Counts string.sub calls (the per-character allocation) while `body` runs.
 --- @param body function
@@ -59,7 +59,7 @@ end)
 
 helpers.describe("toml reader and string decoding: cost is bounded by structure", function()
 	helpers.it("parses a long hotstring entry line with a handful of slices", function()
-		local reader = require("toml_codec.reader")
+		local reader = require("core.text.engine.toml_codec.reader")
 		local trigger, output = string.rep("t", 800), string.rep("o", 800)
 		local document = '[ok]\n"' .. trigger .. '" = { output = "' .. output .. '", is_word = true }\n'
 		local calls, parsed = count_sub_calls(function() return reader.parse_text(document) end)
@@ -71,7 +71,7 @@ helpers.describe("toml reader and string decoding: cost is bounded by structure"
 	end)
 
 	helpers.it("decodes a plain basic string without a pass over its bytes", function()
-		local basic = require("toml_codec.basic_string")
+		local basic = require("core.text.engine.toml_codec.basic_string")
 		local original, chars = string.char, 0
 		string.char = function(...) chars = chars + 1; return original(...) end
 		local ok, decoded = pcall(basic.unescape_body, string.rep("plain text ", 400))
@@ -82,7 +82,7 @@ helpers.describe("toml reader and string decoding: cost is bounded by structure"
 	end)
 
 	helpers.it("still rejects raw controls, a bare quote and a bad escape", function()
-		local basic = require("toml_codec.basic_string")
+		local basic = require("core.text.engine.toml_codec.basic_string")
 		helpers.assert_nil(basic.unescape_body("a\1b"))
 		helpers.assert_nil(basic.unescape_body("a\127b"))
 		helpers.assert_nil(basic.unescape_body("a\0b"))

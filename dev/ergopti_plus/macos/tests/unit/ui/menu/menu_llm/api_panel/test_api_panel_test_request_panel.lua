@@ -26,10 +26,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("dispatches the shared probe to the active entry", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -64,10 +64,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("notifies reply excerpt and latency on success", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -107,10 +107,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("notifies failure without the token", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -143,10 +143,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("appends the server verdict to the failure notification", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -181,10 +181,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("reports the active API entry display name", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -220,10 +220,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("lists Add before the separator", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -259,10 +259,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("lists Test before Remove, Delete last", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -300,10 +300,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("discards a stale completion after entry switch", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -346,10 +346,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("names every entry after its provider and model (api-entry-auto-name)", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -383,10 +383,10 @@ helpers.describe("API panel test request", function()
 	helpers.it("disables the row with no active entry and refuses without a spec", function()
 		helpers.with_fresh_modules({
 			"modules.llm",
-			"infra.i18n",
-			"infra.logger",
-			"infra.dialog_util",
-			"infra.notifications",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.ui.engine.dialog_util",
+			"core.ui.engine.notifications",
 			"infra.manifest_menu",
 			"ui.menu.menu_llm.api_panel",
 		}, function()
@@ -426,15 +426,15 @@ helpers.describe("API panel test request", function()
 end)
 
 helpers.describe("Active API commands: canonical labels and retained owner", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, locale in ipairs({ "ar", "da", "de", "en", "es", "cs", "fr", "he", "hi", "it",
 		"ja", "ko", "no", "nl", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("uses the actual shared active commands in " .. locale, function()
 			helpers.with_fresh_modules(owned, function()
-				local file = assert(io.open(helpers.driver_root() .. "../_shared/data/locales/" .. locale .. ".json", "rb"))
+				local file = assert(io.open(helpers.driver_root() .. "../_shared/core/i18n/data/locales/" .. locale .. ".json", "rb"))
 				local raw = file:read("*a"); assert(file:close())
-				local labels = require("adapters.json_codec").decode(raw)
+				local labels = require("core.fs.adapters.json_codec").decode(raw)
 				local entry = { id = "chosen", provider = "openai", model = "test-model", token = "inert" }
 				install_doubles({ entries = { entry }, active_id = entry.id, spec = {}, locale_strings = labels })
 				local declaration = package.loaded["infra.manifest_menu"].get_array("llm_api_active_commands")
@@ -474,8 +474,8 @@ helpers.describe("Active API commands: canonical labels and retained owner", fun
 end)
 
 helpers.describe("Active API commands: strict native pause receipt", function()
-	local owned = { "modules.llm", "infra.i18n", "infra.logger", "infra.dialog_util",
-		"infra.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
+	local owned = { "modules.llm", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.ui.engine.dialog_util",
+		"core.ui.engine.notifications", "infra.manifest_menu", "ui.menu.menu_llm.api_panel" }
 	for _, fault in ipairs({ "missing", "nil", "number", "table", "throw" }) do
 		helpers.it("refuses a retained request after the native pause reader becomes " .. fault, function()
 			helpers.with_fresh_modules(owned, function()
@@ -507,7 +507,7 @@ helpers.describe("Active API commands: strict native pause receipt", function()
 			ctx.is_paused = function() return paused end
 			ctx.keymap.reset_predictions_for_configuration = function() resets = resets + 1; return true end
 			package.loaded["modules.llm"].persist_api_entries = function() writes = writes + 1 end
-			package.loaded["infra.dialog_util"].block_alert = function(_, _, affirmative)
+			package.loaded["core.ui.engine.dialog_util"].block_alert = function(_, _, affirmative)
 				paused = true
 				return affirmative
 			end

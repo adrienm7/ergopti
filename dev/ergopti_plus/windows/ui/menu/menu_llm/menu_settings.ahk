@@ -26,7 +26,8 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\..\_generated\config_keys.ahk
-#Include ../../../../_shared/modules/llm/trigger_policy.ahk
+#Include %A_LineFile%\..\..\..\..\core\lifecycle\engine\value_check.ahk
+#Include ../../../../_shared/ai/data/trigger_policy.ahk
 
 
 
@@ -114,11 +115,13 @@ LLM_Menu_BuildTriggerMenu(InstantCommand := unset, AfterCommand := unset, Privac
 
 /**
  * Reads the live trigger menu admission without coupling it to variant count.
+ * A pause stops typing, not configuration (EDD-1): the rows commit while
+ * suspended and the engine reads them when typing resumes.
  * @returns {Boolean} Whether a native setting command may be delivered.
  */
 _LLM_Menu_TriggerReady(*) {
 	global _LLM_Menu
-	return _LLM_Menu["enabled"] && !A_IsSuspended
+	return _LLM_Menu["enabled"]
 }
 
 /** Captures actual privacy runtime and exact canonical file without publication. */
@@ -552,7 +555,7 @@ _LLM_Menu_StreamingCommand(Expected, Command) {
  */
 _LLM_Menu_ShowAllReady() {
 	global _LLM_Menu
-	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"] || A_IsSuspended ? true : false)
+	return LLM_DisplayShowAllReady(_LLM_Menu["n_predictions"], !_LLM_Menu["enabled"])
 }
 
 _LLM_Menu_DisplayRows(Position := "all") {
@@ -674,11 +677,30 @@ _LLM_Menu_TryNormalizeIntegerPrompt(Result, Raw, Key, &Normalized,
 	Normalized := false
 	if Result != "OK"
 		return false
-	if !NumberTryParseInputInteger(Raw, &Parsed)
+	Declarations := LLM_Option_IntegerDeclarations()
+	if Declarations.Has(Key) {
+		; The shared value schema owns the grammar, the range and its refusal text.
+		Typed := ValueCheckParseEntry(ValueCheckEntryFor(Declarations[Key]), String(Raw))
+		if !Typed["ok"]
+			return _LLM_Menu_NotifyRefusal(Declarations[Key], Typed, Raw, NotifyFn)
+		Parsed := Integer(Typed["value"])
+	} else if !NumberTryParseInputInteger(Raw, &Parsed)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
 	if !LLM_Option_TryNormalize(Key, Parsed, &Normalized)
 		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
 	return true
+}
+
+; Shows a value schema refusal: the localized text naming the accepted range,
+; through the injected notifier when there is one, else the shared presenter.
+_LLM_Menu_NotifyRefusal(SchemaKey, Typed, Raw, NotifyFn := 0) {
+	if HasMethod(NotifyFn, "Call") {
+		try LoggerWarn("LLMMenu", "Typed value for {1} refused ({2}).", SchemaKey, Typed["reason"])
+		NotifyFn.Call(ValueCheckRenderMessage(ValueCheckMessageParts(ValueCheckEntryFor(SchemaKey), Typed),
+			(K) => t(K)), t("dialog.value_check.title"))
+	} else
+		ValueCheckShowRefusal(SchemaKey, Typed, Raw)
+	return false
 }
 
 _LLM_Menu_TryNormalizePortPrompt(Result, Raw, &Normalized, NotifyFn := 0) {
@@ -696,8 +718,12 @@ _LLM_Menu_TryNormalizeTemperaturePrompt(Result, Raw, &Normalized,
 	if Result != "OK"
 		return false
 	Raw := StrReplace(Raw, ",", ".")
-	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized)
-		return _LLM_Menu_NotifyInvalidInput(NotifyFn)
+	if !LLM_Option_TryNormalizeTemperature(Raw, &Normalized) {
+		; The refusal names the shared value schema's range (and its two decimals).
+		Entry := ValueCheckEntryFor(ConfigKey.LLM_GENERATION_TEMPERATURE)
+		Refusal := Map("ok", false, "reason", "wrong_type", "min", Entry["min"], "max", Entry["max"])
+		return _LLM_Menu_NotifyRefusal(ConfigKey.LLM_GENERATION_TEMPERATURE, Refusal, Raw, NotifyFn)
+	}
 	return true
 }
 
@@ -1054,7 +1080,7 @@ _LLM_Menu_TestPredictionSend(Sample, OnSuccess, OnFail, Current) {
 		Entry := _LLM_Engine_GetActiveApiEntry()
 		if (Entry == "")
 			throw Error("no API entry is selected")
-		_LLM_Engine_ResolveRemoteTransport().Call(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
+		_LLM_Engine_Port("http").Post(Entry, System, Sample, Temperature, OnSuccess, OnFail, "", "", "", 0, Current)
 		return
 	}
 	LLM_OllamaGenerate_Async(LLM_ResolveOllamaTag(_LLM_Menu["model"]), System, Sample, Temperature, OnSuccess, OnFail,

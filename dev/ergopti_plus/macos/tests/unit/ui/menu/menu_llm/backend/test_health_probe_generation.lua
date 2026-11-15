@@ -15,9 +15,9 @@ local MODULES = {
 	"ui.menu.menu_llm.backend_panel",
 	"modules.llm",
 	"ui.menu.shortcut_utils",
-	"infra.logger",
-	"infra.notifications",
-	"infra.i18n",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
+	"core.i18n.engine.i18n",
 	"ui.menu.menu_llm.models_manager",
 	"ui.menu.menu_llm.profiles_manager",
 	"ui.menu.menu_llm.profile_label",
@@ -79,12 +79,12 @@ local function build_fixture(callback, options)
 			llm_user_profiles = {},
 		}
 
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.notifications"] = { notify = noop }
-		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
-		local profile_strings = assert(require("json").decode(locale_file:read("*a")))
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "r"))
+		local profile_strings = assert(require("core.text.engine.json").decode(locale_file:read("*a")))
 		assert(locale_file:close())
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key:match("^menu%.profiles%.") or key:match("^llm%.profile%.") then return profile_strings[key] or key end
 			return helpers.I18N_PLACEHOLDER_FORMATS[key] or key
 		end }
@@ -240,12 +240,12 @@ local function build_fixture(callback, options)
 				return ({ ready = "🟢", warming = "🟡", unreachable = "🔴" })[status]
 			end,
 		}
-		local presentation_renderer = assert(require("menu.renderer").new({
+		local presentation_renderer = assert(require("menu.engine.renderer").new({
 			platform = "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("adapters.json_codec").decode,
-			i18n = { get = package.loaded["infra.i18n"].get, section = package.loaded["infra.i18n"].get },
-			logger = package.loaded["infra.logger"],
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.fs.adapters.json_codec").decode,
+			i18n = { get = package.loaded["core.i18n.engine.i18n"].get, section = package.loaded["core.i18n.engine.i18n"].get },
+			logger = package.loaded["core.logger.engine.logger"],
 		}))
 		package.loaded["infra.manifest_menu"] = {
 			command_row = native_renderer.command_row,

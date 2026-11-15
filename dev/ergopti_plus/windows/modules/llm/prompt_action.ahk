@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: Prompt Action Parameter (AHK)
 ; DESCRIPTION:
-; AutoHotkey port of _shared/lua/llm/prompt_action.lua. Encodes and decodes
+; AutoHotkey port of _shared/ai/engine/prediction/prompt_action.lua. Encodes and decodes
 ; the per-binding parameter of the "llm_prompt_prediction" action: which prompt
 ; profile to run and how many predictions to request.
 ;
@@ -23,6 +23,8 @@
 
 #Requires AutoHotkey v2.0
 #Include %A_LineFile%\..\..\..\_generated\config_keys.ahk
+; The shared value schema owns the prediction count's bounds.
+#Include %A_LineFile%\..\..\..\core\lifecycle\engine\value_check.ahk
 
 
 
@@ -38,8 +40,8 @@
 global LLM_PROMPT_ACTION_SEPARATOR := "|"
 
 ; Bounds of a binding's own prediction count, those of the AI menu's setting
-global LLM_PROMPT_ACTION_MIN_PREDICTIONS := 1
-global LLM_PROMPT_ACTION_MAX_PREDICTIONS := 10
+global LLM_PROMPT_ACTION_MIN_PREDICTIONS := ValueCheckEntryFor(ConfigKey.LLM_PROFILES_NUM_PREDICTIONS)["min"]
+global LLM_PROMPT_ACTION_MAX_PREDICTIONS := ValueCheckEntryFor(ConfigKey.LLM_PROFILES_NUM_PREDICTIONS)["max"]
 
 ; Longest accepted profile id; generated custom ids stay well below it
 global LLM_PROMPT_ACTION_MAX_ID_LENGTH := 128

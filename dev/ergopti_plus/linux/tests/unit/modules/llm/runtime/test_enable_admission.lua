@@ -13,10 +13,10 @@ local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function with_owner(body, options)
 	options = options or {}
-	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
+	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "adapters.keyboard_hook",
-		"adapters.shell_runner", "infra.i18n", "window_titles" }
+		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "platform.input.keyboard_hook",
+		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -40,7 +40,7 @@ local function with_owner(body, options)
 		new = function() return nil, "fixture_runtime_unavailable" end,
 	}
 	world.owned_http = {}
-	package.loaded["adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
+	package.loaded["core.network.adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
 	package.loaded["modules.llm.enable_admission"] = nil
 	world.owner = require("modules.llm.enable_admission").new({
 		snapshot = function()
@@ -108,7 +108,7 @@ local function with_owner(body, options)
 		return world.engine, preferences
 	end
 	function world.use_native_notice()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function(name) return name == "zenity" end,
 			quote = function(value) return "'" .. value:gsub("'", "'\\''") .. "'" end,
 			exec_checked = function()
@@ -116,9 +116,9 @@ local function with_owner(body, options)
 				return true, world.native_answer or "replacement_1\n"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["window_titles"] = { compose = function(value) return value end }
-		local Hook = helpers.load_module("adapters.keyboard_hook")
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil
 		return Hook
 	end
@@ -303,7 +303,7 @@ helpers.describe("Linux prediction enable publication", function()
 				-- This mode explicitly owns a partial native allocation despite refusal.
 				world.owned_http.refused_dispatch_acquired = mode == "cleanup_debt"
 				local Hook = world.use_native_notice()
-				local Reader = require("adapters.evdev_reader")
+				local Reader = require("platform.input.evdev_reader")
 				local grab = Reader.grab
 				if mode == "regrab" then Reader.grab = function() return false end end
 				world.during_dialog = function()

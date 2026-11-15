@@ -17,8 +17,8 @@ local function load_real_sticky_pause_owner()
 		if type(name) == "string" and (name:match("^modules%.gestures%.actions")
 			or name == "modules.gestures.sticky_modifiers"
 			or name == "modules.gestures"
-			or name == "adapters.modifier_injector"
-			or name == "adapters.timer_scheduler") then
+			or name == "platform.input.modifier_injector"
+			or name == "core.events.timer_scheduler") then
 			package.loaded[name] = nil
 		end
 	end
@@ -60,20 +60,20 @@ local function load_real_sticky_pause_owner()
 	end
 
 	local deferred = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "foreign", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		defer_after_callback = function(_label, callback)
 			deferred[#deferred + 1] = callback
 			return true
 		end,
 	}, { __index = function() return function() return true end end })
 
-	local TimerScheduler = require("adapters.timer_scheduler")
-	local Injector = require("adapters.modifier_injector")
+	local TimerScheduler = require("core.events.timer_scheduler")
+	local Injector = require("platform.input.modifier_injector")
 	local Sticky = require("modules.gestures.sticky_modifiers")
 
 	local function permissive(overrides)
@@ -81,20 +81,20 @@ local function load_real_sticky_pause_owner()
 			__index = function() return function() return true end end,
 		})
 	end
-	package.loaded["infra.notifications"] = { notify = function() end }
-	package.loaded["infra.paths"] = { shared = function(path) return "missing/" .. path end }
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = permissive({
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
+	package.loaded["core.fs.engine.paths"] = { shared = function(path) return "missing/" .. path end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = permissive({
 		escape_gsub_replacement = function(value) return value end,
 	})
-	package.loaded["adapters.file_system"] = permissive({ read = function() return nil end })
-	package.loaded["adapters.key_state"] = permissive({
+	package.loaded["core.fs.adapters.file_system"] = permissive({ read = function() return nil end })
+	package.loaded["platform.input.key_state"] = permissive({
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	})
-	package.loaded["adapters.shell_runner"] = permissive()
-	package.loaded["infra.termination_coordinator"] = permissive()
+	package.loaded["core.process.adapters.shell_runner"] = permissive()
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = permissive()
 	local function scoped_child(pause_name, resume_name, query_name, pending_name)
 		local paused = {}
 		return {
@@ -131,7 +131,7 @@ local function load_real_sticky_pause_owner()
 		default_for = function() return false end,
 		recommended_for = function() return "none" end,
 	}
-	package.loaded["adapters.timer_scheduler"] = TimerScheduler
+	package.loaded["core.events.timer_scheduler"] = TimerScheduler
 	reset_module("modules.gestures")
 	local gestures = require("modules.gestures")
 

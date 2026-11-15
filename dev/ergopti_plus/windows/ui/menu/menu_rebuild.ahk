@@ -12,7 +12,7 @@
 ; ==============================================================================
 
 #Include ../../infra/phase_stats.ahk
-#Include ../../infra/perf_budget.ahk
+#Include ../../core/logger/engine/perf_budget.ahk
 
 
 
@@ -150,6 +150,24 @@ TrayMenuStage_AddFeature(Label, Target) {
 		return
 	}
 	_TrayMenuStage.Push(Map("kind", "submenu", "label", Label, "target", Target,
+		"feature", true))
+}
+
+; Stages one FEATURE row that is a command, not a submenu (Ergopti Studio): it
+; is registered like every action row (RegisterMenuItem keeps the startup
+; admission) and recorded with the feature rows, so a pause greys it too.
+TrayMenuStage_AddFeatureAction(Label, Callback) {
+	global _TrayMenuStage, _TrayFeatureHeadLabels
+	if (Label == "")
+		throw ValueError("A tray feature action row requires a label")
+	if !IsObject(_TrayMenuStage) {
+		RegisterMenuItem(A_TrayMenu, Label, Callback)
+		if !_TrayFeatureLabelsHas(_TrayFeatureHeadLabels, Label)
+			_TrayFeatureHeadLabels.Push(Label)
+		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
+		return
+	}
+	_TrayMenuStage.Push(Map("kind", "action", "label", Label, "target", Callback,
 		"feature", true))
 }
 
@@ -778,7 +796,9 @@ _RebuildHotstringsLiveOnce() {
 	}
 	try LoggerStart("Menu", "Rebuilding hotstrings in-process (live toggle)…")
 	try {
-		try SetTimer(RegisterEmojisSymbolsDeferred, 0)
+		; A boot's emoji/symbol slices still pending would register into the
+		; cleared registry: the inline pass below replaces them.
+		HSE_DeferredRegistrationCancel()
 		; HSE_RebuildInProgress is the fence: HSE_FindMatchAtEnd returns no match while
 		; it is set, so an InputHook OnChar can never observe the empty or
 		; partially-populated registry — keystrokes simply pass through unexpanded for

@@ -22,7 +22,7 @@
 ; on the cache registrar's own call-site text, so it could only ever police that
 ; one site — the class of loaders was never covered.
 ;
-; NOTE ON SCOPE: this file covers the loaders in infra/toml/toml_loader.ahk plus
+; NOTE ON SCOPE: this file covers the loaders in core/text/engine/toml/loader.ahk plus
 ; the cache registrar. The live personal-editor reload path
 ; (ReloadPersonalSection, infra/hotstrings/personal_toml_io.ahk) is the same class
 ; and is tracked separately.

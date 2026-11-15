@@ -57,7 +57,7 @@ local function load_keystats(options)
 	}
 
 	package.loaded["modules.keystats.init"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["modules.keymap"] = {}
 
@@ -66,7 +66,7 @@ local function load_keystats(options)
 		local ok, rendered = pcall(string.format, fmt, ...)
 		ctx.errors[#ctx.errors + 1] = ok and rendered or tostring(fmt)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function() return true end,
 	}
@@ -75,7 +75,7 @@ local function load_keystats(options)
 		metrics_dir = function() return "/tmp/ergopti-test/metrics" end,
 		metrics_cache_dir = function() return "/tmp/ergopti-test/cache" end,
 	}
-	package.loaded["infra.dialog_util"] = { alert = function() end }
+	package.loaded["core.ui.engine.dialog_util"] = { alert = function() end }
 
 	package.loaded["modules.keystats.log_manager"] = {
 		init = function(state)
@@ -164,7 +164,7 @@ local function load_keystats(options)
 		end,
 		caffeinate_cb = function() ctx.caffeinate_calls = (ctx.caffeinate_calls or 0) + 1 end,
 	}
-	package.loaded["adapters.process_lifecycle"] = {
+	package.loaded["core.process.adapters.lifecycle"] = {
 		onAppActivate = function(callback) ctx.activation_callback = callback end,
 		start = function()
 			ctx.process_start_calls = ctx.process_start_calls + 1
@@ -177,7 +177,7 @@ local function load_keystats(options)
 			return results[ctx.process_stop_calls] ~= false
 		end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(start_options)
 			ctx.keyboard_start_calls = ctx.keyboard_start_calls + 1
 			if type(start_options) == "table" then

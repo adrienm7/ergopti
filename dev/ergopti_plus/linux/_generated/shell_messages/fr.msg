@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/fr.msg
-# AUTO-GENERATED from _shared/data/locales/fr.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/fr.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=Module réseau LuaJIT compilé depuis les sources.
 build_luv.recipe_required=La compilation native de luv requiert sa recette source.
 install.already_installed={1} — déjà installé
 install.archive_digest_unavailable=les mises à jour à descripteur conservé exigent un vrai environnement OpenSSL3 ; la capacité reste indisponible.
+install.bytecode_skipped=Les modules précompilés n'ont pas pu être créés — Ergopti démarre depuis les sources, un peu plus lentement.
 install.capability_verified={1} — capacité vérifiée
 install.command_still_missing={1} a été installé, mais '{2}' reste introuvable.
 install.daemon_manual=Pour démarrer le daemon manuellement :
 install.daemon_running=Le daemon tourne en arrière-plan. Pour vérifier son état :
+install.focus_integration_enabled=intégration du focus {1} activée
+install.focus_integration_failed=Impossible d'activer l'intégration du focus {1} — les règles par application restent inactives sur ce bureau.
+install.focus_integration_next_login=intégration du focus {1} installée (effective à la prochaine connexion)
+install.focus_integration_updated=intégration du focus {1} mise à jour
 install.gnome_extension_active=extension GNOME AppIndicator — déjà active
 install.gnome_extension_enabled=extension GNOME AppIndicator activée
 install.gnome_extension_failed=Impossible d’activer l’extension AppIndicator — sans elle, GNOME n’affiche pas l’icône.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — vérification des dépendances
 install.section_deps_skipped=Dépendances ignorées (--no-deps)
 install.section_done=Installation terminée
 install.section_files=Installation des fichiers
+install.section_focus=Application active sous Wayland (GNOME, KDE)
 install.section_lua_deps=Dépendances Lua optionnelles (boucle d’événements, minuteries, webviews, signaux)
 install.section_permissions=Permissions d’entrée (nécessite sudo)
 install.section_services=Création des services systemd utilisateur
@@ -79,6 +85,7 @@ install.xdg_autostart=démarrage automatique XDG : {1}
 launch.already_running=Ergopti+ tourne déjà dans cette session ({1} est verrouillé) ; ce lancement a été refusé.
 launch.authorization_failed=L’autorisation d’accès au clavier a été annulée ou a échoué.
 launch.groups_unavailable=La session n’a pas pu obtenir ses groupes d’accès au clavier configurés.
+launch.restarting=Ergopti+ tourne déjà dans cette session ; il est invité à quitter, puis redémarré.
 launch.session_lock_invalid=Le dossier du verrou de session doit être un chemin absolu.
 launcher.dependencies_installed=Dépendances installées.
 launcher.driver_missing=Erreur : répertoire du driver Linux introuvable : {1}

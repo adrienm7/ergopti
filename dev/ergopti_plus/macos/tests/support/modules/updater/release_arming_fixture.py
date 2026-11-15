@@ -15,19 +15,19 @@ CONTROL_TIMEOUT_SECONDS = 10
 CAPTURE = r"""
 assert(_VERSION == "Lua 5.4", "Release arming controls require Lua 5.4")
 local driver, shared, app, staged, pid, override = table.unpack(arg)
-package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/lua/?.lua;' .. shared .. '/lua/?/init.lua;' .. package.path
-local Json = require('json')
+package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. shared .. '/?.lua;' .. shared .. '/?/init.lua;' .. package.path
+local Json = require('core.text.engine.json')
 local logger = {}
 for _, name in ipairs({'start','success','trace','done','info','debug','warn','error'}) do logger[name]=function() end end
-package.preload['infra.logger']=function() return logger end
-package.preload['infra.paths']=function() return {shared=function(path)
+package.preload['core.logger.engine.logger']=function() return logger end
+package.preload['core.fs.engine.paths']=function() return {shared=function(path)
     assert(path=='../macos/adapters/release_stage.sh');return driver..'/adapters/release_stage.sh'
 end} end
-package.preload['adapters.file_system']=function() return {read=function(path)
+package.preload['core.fs.adapters.file_system']=function() return {read=function(path)
     local file=assert(io.open(path,'rb'));local body=assert(file:read('a'));assert(file:close());return body
 end} end
-package.preload['adapters.json_codec']=function() return Json end
-package.preload['adapters.shell_runner']=function() return {} end
+package.preload['core.fs.adapters.json_codec']=function() return Json end
+package.preload['core.process.adapters.shell_runner']=function() return {} end
 local installer=require('modules.updater.release_installer')
 installer._getenv=function(name)
     if name=='ERGOPTI_LAUNCHER_EXECUTABLE' then return app..'/Contents/MacOS/ErgoptiPlus' end

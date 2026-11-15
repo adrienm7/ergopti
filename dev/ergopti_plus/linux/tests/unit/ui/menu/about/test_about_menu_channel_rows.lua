@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 
 --- The submenu of the top-level row whose title is the translation of `key`.
 local function submenu_of(items, key)
-	local label = require("infra.i18n").get(key)
+	local label = require("core.i18n.engine.i18n").get(key)
 	for _, item in ipairs(items) do
 		if item.title == label then return item.menu end
 	end
@@ -39,7 +39,7 @@ local function fake_updater(subscribed)
 			return true
 		end,
 		get_check_interval = function() return real.INTERVAL_PRESETS[1].seconds end,
-		get_menu_label = function() return require("infra.i18n").get("menu.about.check_for_updates") end,
+		get_menu_label = function() return require("core.i18n.engine.i18n").get("menu.about.check_for_updates") end,
 		get_state = function() return "idle" end,
 		get_cached_release = function() return nil end,
 		check_for_updates = function() calls.checks = calls.checks + 1 return true end,
@@ -66,22 +66,22 @@ local function bind_action_owners(items, source_run)
 		if type(item.fn) == "function" then
 			local action = item.fn
 			item.fn = function(...)
-				local Installation = require("infra.installation")
+				local Installation = require("core.lifecycle.engine.installation")
 				local original_owner = Installation.is_source_run
 				local original_progress = package.loaded["ui.download_window.bridge"]
-				local original_webview = package.loaded["ui.webview_manager"]
+				local original_webview = package.loaded["core.ui.ui.webview_manager"]
 				local arguments = packed(...)
 				Installation.is_source_run = function() return source_run == true end
 				package.loaded["ui.download_window.bridge"] = { show = function() return nil end }
 				local result = packed(pcall(function()
 					-- Keep the real consent/window path, with this click's native SDK
 					-- explicitly unavailable instead of inheriting an earlier GTK owner.
-					helpers.load_module_with_dependency("ui.webview_manager", "lgi", false)
+					helpers.load_module_with_dependency("core.ui.ui.webview_manager", "lgi", false)
 					return action(unpack_results(arguments, 1, arguments.n))
 				end))
 				Installation.is_source_run = original_owner
 				package.loaded["ui.download_window.bridge"] = original_progress
-				package.loaded["ui.webview_manager"] = original_webview
+				package.loaded["core.ui.ui.webview_manager"] = original_webview
 				if not result[1] then error(result[2], 0) end
 				return unpack_results(result, 2, result.n)
 			end
@@ -94,7 +94,7 @@ end
 --- @param source_run boolean|nil True to build the tray of a local version.
 local function build(up, changed, source_run)
 	local Version = require("infra.version")
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_identity = Version.identity
 	local real_is_source_run = Installation.is_source_run
 	Version.identity = function() return IDENTITY end
@@ -115,14 +115,14 @@ end
 helpers.describe("tray (linux): the About submenu owns the updater rows", function()
 
 	helpers.it("restores exact click owners after the controlled action raises", function()
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local original_owner = Installation.is_source_run
 		local original_progress = package.loaded["ui.download_window.bridge"]
-		local original_webview = package.loaded["ui.webview_manager"]
+		local original_webview = package.loaded["core.ui.ui.webview_manager"]
 		local original_lgi = package.loaded["lgi"]
 		local original_preload = package.preload["lgi"]
 		local rows = bind_action_owners({ { fn = function()
-			local Webview = require("ui.webview_manager")
+			local Webview = require("core.ui.ui.webview_manager")
 			helpers.assert_true(Webview ~= original_webview, "the click must own a fresh actual page manager")
 			helpers.assert_eq(Webview._create_gtk_window("update_check", "unused", nil), false,
 				"the click must refuse the exact unavailable native acquisition")
@@ -133,7 +133,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		helpers.assert_eq(err, "Controlled tray action refusal", "preserve the action failure")
 		helpers.assert_eq(Installation.is_source_run, original_owner, "restore the exact installation owner")
 		helpers.assert_eq(package.loaded["ui.download_window.bridge"], original_progress, "restore the exact progress owner")
-		helpers.assert_eq(package.loaded["ui.webview_manager"], original_webview, "restore the exact page owner")
+		helpers.assert_eq(package.loaded["core.ui.ui.webview_manager"], original_webview, "restore the exact page owner")
 		helpers.assert_eq(package.loaded["lgi"], original_lgi, "restore the exact native SDK cache")
 		helpers.assert_eq(package.preload["lgi"], original_preload, "restore the exact native SDK loader")
 	end)
@@ -146,7 +146,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("one channel submenu, titled with the subscribed channel, right before the check row", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local template = i18n.get("menu.about.channel_menu")
 		helpers.assert_true(template:find("{channel}", 1, true) ~= nil,
 			"the title template must carry its placeholder, got '" .. template .. "'")
@@ -182,7 +182,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("a local version greys the channel submenu with its reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(fake_updater("dev"), nil, true), "menu.about.title")
 		helpers.assert_true(rows ~= nil, "the About submenu must be drawn")
 		local picker = rows[CHANNEL_AT]
@@ -197,7 +197,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	helpers.it("no channel is a flat row of the About submenu any more", function()
 		local up = fake_updater("dev")
 		local rows = submenu_of(build(up), "menu.about.title")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, row in ipairs(rows) do
 			for _, id in ipairs(up.CHANNELS.ids()) do
 				helpers.assert_true(row.title ~= i18n.get(up.CHANNELS.channel(id).menu_label_key),
@@ -215,7 +215,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		end
 		helpers.assert_eq(calls.set, ids, "each row must subscribe to its own channel, in registry order")
 		helpers.assert_eq(changed.count, #ids, "the tray is redrawn so the tick follows the channel")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local rows = submenu_of(build(up), "menu.about.title")
 		helpers.assert_eq(rows[CHANNEL_AT].title, (i18n.get("menu.about.channel_menu"):gsub("{channel}",
 			i18n.get(up.CHANNELS.channel(ids[#ids]).label_key))),
@@ -256,7 +256,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local ok, err = pcall(function()
 			local rows = submenu_of(build(up, changed), "menu.about.title")
 			local row = rows[CHANNEL_AT + 1]
-			local wording = require("infra.i18n").get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
+			local wording = require("core.i18n.engine.i18n").get("menu.about.restart_to_finish_install"):gsub("{tag}.*$", "")
 			helpers.assert_true(row.title:find(wording, 1, true) == 1, row.title)
 			helpers.assert_true(row.title:find("v0.0.0-dev.139", 1, true) ~= nil, row.title)
 			row.fn()
@@ -274,19 +274,19 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- parent row names the preset in force in words. A value outside the presets
 	-- read as raw seconds ("Check frequency: 600") with no ticked row.
 	helpers.it("the frequency picker lists the shared presets with translated labels", function()
-		local Json = require("json")
-		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/updater/defaults.json", "rb"))
+		local Json = require("core.text.engine.json")
+		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/updater/data/defaults.json", "rb"))
 		local presets = Json.decode(handle:read("*a")).timing.check_interval_presets
 		handle:close()
 		helpers.assert_true(#presets >= 5, "the shared presets must be present")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		for _, pair in ipairs({ { 86400, "1d" }, { 600, "5m" }, { 0, "never" } }) do
 			local up = fake_updater("dev")
 			up.get_check_interval = function() return pair[1] end
 			local rows = submenu_of(build(up), "menu.about.title")
 			local picker = rows[CHANNEL_AT + 2]
 			helpers.assert_eq(picker.title,
-				require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. pair[2])),
+				require("core.i18n.engine.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. pair[2])),
 				"the parent row names the preset in force for " .. pair[1] .. " s")
 			helpers.assert_eq(#picker.menu, #presets, "one row per shared preset")
 			local ticked = 0
@@ -307,7 +307,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- left live, they offered a check whose result could not be installed, and
 	-- left out (as on Windows and macOS) nobody could tell the feature existed.
 	helpers.it("(update-rows-greyed-on-local-2026-10-01) a local version draws the update rows greyed with their reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up, calls = fake_updater("dev")
 		local rows = submenu_of(build(up, nil, true), "menu.about.title")
 		local reason = i18n.get("menu.about.source_run_reason")
@@ -315,7 +315,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 		local first = up.INTERVAL_PRESETS[1].code
 		local expected = {
 			i18n.get("menu.about.check_for_updates"),
-			require("locale.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. first)),
+			require("core.i18n.engine.label_value").compose(i18n.get, i18n.get("menu.about.frequency_menu"), i18n.get("menu.about.frequency." .. first)),
 		}
 		local found = {}
 		for index, row in ipairs(rows) do
@@ -343,7 +343,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- to replace it: the frequency row is greyed with that reason (no background
 	-- check runs) and an available release offers no live Update row.
 	helpers.it("a system package greys the frequency and update rows with the package reason", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up, calls = fake_updater("dev")
 		up.installation_kind = function() return "package" end
 		up.get_state = function() return "available" end
@@ -372,7 +372,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	-- and no digest: its Update row is greyed with the check-only reason and the
 	-- bridge starts no download for it.
 	helpers.it("check-only: a feed-only release greys the update row and starts no download", function()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local up = fake_updater("dev")
 		up.get_state = function() return "available" end
 		local release = { tag = "v9.9.9", notes = "", download_url = "", checksum_url = "", check_only = true }
@@ -398,7 +398,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 			download_update = function() touched = touched + 1 return true end,
 			install_update_async = function() touched = touched + 1 return true end,
 		}
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, started = pcall(function()
@@ -411,7 +411,7 @@ helpers.describe("tray (linux): the About submenu owns the updater rows", functi
 	end)
 
 	helpers.it("a system package is offered no download by the update-check bridge", function()
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local release = { tag = "v9.9.9", download_url = "https://release/archive", checksum_url = "https://release/sum" }
@@ -460,18 +460,18 @@ local function channel_corpus()
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_channel_rows.json", "rb"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 helpers.describe("tray (linux): published About channel choices", function()
 	helpers.it("retains the captured two states through the actual About provider", function()
 		local corpus = channel_corpus()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local prior = i18n.get
 		local ok, detail = pcall(function()
 			for _, locale in ipairs({ "en", "fr" }) do
-				local handle = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. locale .. ".json", "rb"))
-				local labels = assert(require("json").decode(handle:read("*a")))
+				local handle = assert(io.open(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/" .. locale .. ".json", "rb"))
+				local labels = assert(require("core.text.engine.json").decode(handle:read("*a")))
 				handle:close()
 				i18n.get = function(key) return labels[key] or key end
 				for index, state in ipairs(corpus.states) do
@@ -510,7 +510,7 @@ helpers.describe("tray (linux): published About channel choices", function()
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT]
 			helpers.assert_eq(#row.menu, 2)
 			for index, choice in ipairs(choices) do
-				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, require("core.i18n.engine.i18n").get(choice.i18n))
 				row.menu[index].fn()
 			end
 			helpers.assert_eq(requests.set, corpus.reordered_values)
@@ -555,17 +555,17 @@ local function frequency_corpus()
 	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/update_check_frequency.json", "rb"))
 	local raw = assert(handle:read("*a"))
 	assert(handle:close())
-	return assert(require("json").decode(raw))
+	return assert(require("core.text.engine.json").decode(raw))
 end
 
 --- Exercises the actual manager and menu around durable writer and timer ports.
 local function with_frequency_owner(refusal, body)
-	local names = {"adapters.timer_scheduler", "adapters.storage", "modules.updater.manager"}
+	local names = {"core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager"}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local writer = require("toml_codec.writer")
+	local writer = require("core.text.engine.toml_codec.writer")
 	local previous_write = writer.batch_write
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local previous_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return false end
 	local obs = {timers = {}, cancels = 0, writes = 0, redraws = {count = 0}, requests = 0}
@@ -573,7 +573,7 @@ local function with_frequency_owner(refusal, body)
 	local original = "[updater]\ncheck_interval_seconds = 3600\nfuture_interval_option = 42\n"
 	local file = assert(io.open(path, "wb"))
 	assert(file:write(original)); assert(file:close())
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		HAS_ASYNC = true,
 		after = function(delay, fn)
 			local handle = {delay = delay, fn = fn, armed = true}
@@ -582,7 +582,7 @@ local function with_frequency_owner(refusal, body)
 		end,
 		cancel = function(handle) obs.cancels = obs.cancels + 1; handle.armed = false; return true end,
 	}
-	package.loaded["adapters.storage"] = require("tests.fakes").storage({initial = {}})
+	package.loaded["core.fs.adapters.storage"] = require("tests.fakes").storage({initial = {}})
 	package.loaded["modules.updater.manager"] = nil
 	local up = require("modules.updater.manager")
 	up._now = function() return 1700000000 end
@@ -615,8 +615,8 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			local up = fake_updater("dev")
 			up.get_check_interval = function() return expected.stored end
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
-			local i18n = require("infra.i18n")
-			helpers.assert_eq(row.title, require("locale.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
+			local i18n = require("core.i18n.engine.i18n")
+			helpers.assert_eq(row.title, require("core.i18n.engine.label_value").compose(i18n.get, i18n.get(corpus.i18n), i18n.get("menu.about.frequency." .. expected.code)))
 			helpers.assert_eq(#row.menu, #corpus.choices)
 			for index, choice in ipairs(corpus.choices) do
 				helpers.assert_eq(row.menu[index].title, i18n.get(choice.i18n))
@@ -651,7 +651,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 		helpers.it("refuses cadence publication when the owned timer cannot stop: " .. refusal .. " (update-frequency-timer-receipt)", function()
 			with_frequency_owner(nil, function(up, obs, path)
 				local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
-				local timer = package.loaded["adapters.timer_scheduler"]
+				local timer = package.loaded["core.events.timer_scheduler"]
 				local previous_cancel = timer.cancel
 				local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
 				timer.cancel = function()
@@ -680,7 +680,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 	helpers.it("refuses cadence publication when a replacement timer is not armed (update-frequency-timer-receipt)", function()
 		with_frequency_owner(nil, function(up, obs)
 			local row = submenu_of(build(up, obs.redraws), "menu.about.title")[CHANNEL_AT + 2]
-			local timer = package.loaded["adapters.timer_scheduler"]
+			local timer = package.loaded["core.events.timer_scheduler"]
 			local previous_after, attempts = timer.after, 0
 			local current_timer, timer_count = obs.timers[#obs.timers], #obs.timers
 			timer.after = function()
@@ -739,7 +739,7 @@ helpers.describe("shared updater frequency choices (Linux)", function()
 			local row = submenu_of(build(up), "menu.about.title")[CHANNEL_AT + 2]
 			helpers.assert_eq(#row.menu, #choices)
 			for index, choice in ipairs(choices) do
-				helpers.assert_eq(row.menu[index].title, require("infra.i18n").get(choice.i18n))
+				helpers.assert_eq(row.menu[index].title, require("core.i18n.engine.i18n").get(choice.i18n))
 				row.menu[index].fn()
 				helpers.assert_eq(calls[index], choice.value)
 			end
@@ -753,11 +753,11 @@ end)
 --- Exercises the real About provider with unrelated tray surfaces isolated.
 --- @param alternative boolean True to independently replace the declaration's label and reason.
 local function with_source_command(alternative, callback)
-	local names = { "ui.menu.builder", "infra.manifest_menu", "infra.paths", "infra.i18n",
-		"window_titles", "action_parameter_label", "hotstrings.extensions", "hotstrings.languages",
-		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
-		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
-		"llm.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
+	local names = { "ui.menu.builder", "infra.manifest_menu", "core.fs.engine.paths", "core.i18n.engine.i18n",
+		"core.ui.engine.window_titles", "shortcuts.engine.action_parameter_label", "hotstrings.engine.extensions", "hotstrings.engine.languages",
+		"_generated.locale_table", "layouts.engine.layers.magic_key_source", "modules.hotstrings.magic_key",
+		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "core.ui.ui.modal", "core.ui.ui.text_prompt",
+		"ai.engine.policy.trigger_policy", "infra.version", "core.lifecycle.engine.installation", "ui.menu.start_at_login" }
 	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
@@ -766,23 +766,23 @@ local function with_source_command(alternative, callback)
 		local labels = { ["menu.about.source_run_reason"] = "Source checkout: use an installed release.",
 			["common.restore_recommended"] = "Canonical alternate label",
 			["common.clear_to_system"] = "Canonical alternate reason: inert control." }
-		package.loaded["infra.i18n"] = { get = function(key) return labels[key] or key end,
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return labels[key] or key end,
 			section = function(key) return labels[key] or key end }
 		local source = debug.getinfo(1, "S").source:gsub("^@", "")
 		local driver = assert(source:match("^(.*)/tests/unit/ui/"))
 		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
-		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_file = assert(io.open(driver .. "/../_shared/core/i18n/data/locales/en.json", "rb"))
 		local header_raw = header_file:read("*a")
 		assert(header_file:close())
-		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_labels = assert(require("core.text.engine.json").decode(assert(header_raw)))
 		local header_brand = assert(header_labels["menu.builder.active_brand"])
 		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		labels["menu.builder.active_brand"] = header_brand
-		package.loaded["infra.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
+		package.loaded["core.fs.engine.paths"] = { shared = function(relative) return driver .. "/../_shared/" .. relative end }
 		package.loaded["infra.version"] = { identity = function()
 			return {kind = "local", version = "", commit = "known"}
 		end }
-		package.loaded["infra.installation"] = { is_source_run = function() return true end }
+		package.loaded["core.lifecycle.engine.installation"] = { is_source_run = function() return true end }
 		package.loaded["ui.menu.start_at_login"] = {
 			command_available = function() return true end,
 			enabled = function() return false end,
@@ -810,8 +810,8 @@ local function with_source_command(alternative, callback)
 			declaration[1].i18n = "common.restore_recommended"
 			declaration[1].disabled_reason_key = "common.clear_to_system"
 		end
-		local handle = assert(io.open(driver .. "/../_shared/modules/updater/defaults.json", "rb"))
-		local timing = require("json").decode(assert(handle:read("*a"))).timing
+		local handle = assert(io.open(driver .. "/../_shared/updater/data/defaults.json", "rb"))
+		local timing = require("core.text.engine.json").decode(assert(handle:read("*a"))).timing
 		assert(handle:close())
 		local up = { get_channel = function() return "dev" end, set_channel = effect,
 			get_check_interval = function() return timing.default_check_interval_sec end,
@@ -895,7 +895,7 @@ helpers.describe("Linux About channel durable receipts", function()
 	for _, outcome in ipairs({"false", "nil", "number", "throw"}) do
 		helpers.it("retries actual updater persistence after refusal without changing canonical bytes (channel-ack durable " .. outcome .. ")", function()
 			with_frequency_owner(nil, function(up, obs, path, original)
-				local writer = require("toml_codec.writer")
+				local writer = require("core.text.engine.toml_codec.writer")
 				local previous_write = writer.batch_write
 				local refusing, writes = true, 0
 				writer.batch_write = function(...)
@@ -947,7 +947,7 @@ end
 helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("retains actual rendered version-separator-channel order", function()
 		local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/about_version_separator.json", "rb"))
-		local expected = assert(require("json").decode(handle:read("*a"))); assert(handle:close())
+		local expected = assert(require("core.text.engine.json").decode(handle:read("*a"))); assert(handle:close())
 		helpers.assert_eq(require("infra.manifest_menu").get_root()[expected.section], expected.rows)
 		local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
 		helpers.assert_not_nil(rows[expected.version_index])
@@ -957,7 +957,7 @@ helpers.describe("About version separator shared fragment (Linux)", function()
 	helpers.it("consumes alternate presentation and platform hiding in the actual provider", function()
 		with_version_fragment({{type = "label", id = "version_fragment_probe", i18n = "menu.about.title"}}, function()
 			local rows = submenu_of(build((fake_updater("dev"))), "menu.about.title")
-			helpers.assert_eq(rows[2].title, require("infra.i18n").get("menu.about.title"))
+			helpers.assert_eq(rows[2].title, require("core.i18n.engine.i18n").get("menu.about.title"))
 			helpers.assert_eq(rows[2].disabled, true)
 			helpers.assert_eq(rows[2].fn, nil)
 		end)

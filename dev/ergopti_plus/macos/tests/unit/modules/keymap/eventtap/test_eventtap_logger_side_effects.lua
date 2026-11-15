@@ -18,12 +18,12 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
-	"infra.logger", "adapters.log_transport", "adapters.event_provenance",
-	"adapters.synthetic_input",
-	"infra.paths", "infra.timings",
+	"core.logger.engine.logger", "core.logger.adapters.log_transport", "adapters.event_provenance",
+	"platform.input.synthetic_input",
+	"core.fs.engine.paths", "core.timing.engine.timings",
 	"modules.llm", "modules.llm.prediction_engine", "modules.keystats",
-	"ui.tooltip", "modules.hotstrings.hotstrings_config", "adapters.tooltip_renderer",
-	"adapters.file_system",
+	"core.ui.ui.tooltip", "modules.hotstrings.hotstrings_config", "core.ui.adapters.tooltip_renderer",
+	"core.fs.adapters.file_system",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
@@ -100,7 +100,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		instrument_timer(hs_stub.timer, "new", "timer_new")
 		instrument_timer(hs_stub.timer.delayed, "new", "timer_delayed_new")
 		local file_system_write_calls = 0
-		package.loaded["adapters.file_system"] = setmetatable({
+		package.loaded["core.fs.adapters.file_system"] = setmetatable({
 			write = function()
 				file_system_write_calls = file_system_write_calls + 1
 				return false, "filesystem publication is forbidden from keyDown"
@@ -110,14 +110,14 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		package.loaded["hs.json"] = hs_stub.json
 		package.loaded["hs.sqlite3"] = hs_stub.sqlite3
 		package.loaded["hs.timer"] = hs_stub.timer
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			ms = function() return 100 end,
 			sec = function() return 0.1 end,
 		}
-		package.loaded["infra.paths"] = {
+		package.loaded["core.fs.engine.paths"] = {
 			shared = function(relative) return helpers.shared(relative) end,
 			shared_llm_path = function(relative)
-				return helpers.shared("modules/llm/" .. tostring(relative or ""))
+				return helpers.shared("ai/data/" .. tostring(relative or ""))
 			end,
 		}
 		local function noop() end
@@ -138,7 +138,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			notify_synthetic = noop,
 			set_buffer = noop,
 		}, { __index = function() return noop end })
-		package.loaded["ui.tooltip"] = setmetatable({
+		package.loaded["core.ui.ui.tooltip"] = setmetatable({
 			tint = function() return {} end,
 			is_visible = function() return false end,
 			is_hotstring_visible = function() return false end,
@@ -147,7 +147,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 		package.loaded["modules.hotstrings.hotstrings_config"] = {
 			resolve = function() return nil end,
 		}
-		package.loaded["adapters.tooltip_renderer"] = { hide = function() return true end }
+		package.loaded["core.ui.adapters.tooltip_renderer"] = { hide = function() return true end }
 
 		local sent = {}
 		local bootstrap_requests = {}
@@ -195,7 +195,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 			cancel = function() return true end,
 		}
 
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		Logger.set_level("DEBUG")
 		local port = 49152
@@ -262,7 +262,7 @@ helpers.describe("logger: real keyDown callback has no blocking side effect", fu
 
 		local keymap = require("modules.keymap.init")
 		helpers.assert_type(keymap, "table")
-		local synthetic_input = require("adapters.synthetic_input")
+		local synthetic_input = require("platform.input.synthetic_input")
 		local original_enter_callback = synthetic_input.enter_callback
 		synthetic_input.enter_callback = function()
 			error("causal interceptor failure")

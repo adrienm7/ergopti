@@ -35,10 +35,10 @@
 
 local M = {}
 
-local Logger = require("infra.logger")
-local CrashReport = require("crash_report")
-local NativePath = require("native_path")
-local i18n   = require("infra.i18n")
+local Logger = require("core.logger.engine.logger")
+local CrashReport = require("diagnostics.engine.reports.crash_report")
+local NativePath = require("core.fs.engine.native_path")
+local i18n   = require("core.i18n.engine.i18n")
 
 local LOG = "crash_reporter"
 
@@ -135,14 +135,14 @@ end
 --- stays. A refusal is logged and never fails the save that triggered it.
 --- @param dir string Absolute report directory ending in a separator.
 local function _enforce_retention(dir)
-	local names, listed, list_err = require("infra.fs_dir").try_entries(dir)
+	local names, listed, list_err = require("core.fs.engine.dir").try_entries(dir)
 	if not listed then
 		Logger.warn(LOG, "Crash report retention skipped, the folder cannot be listed: %s.", tostring(list_err))
 		return
 	end
 	local expired = CrashReport.expired(names)
 	if #expired == 0 then return end
-	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	local adapter_ok, FileSystem = pcall(require, "core.fs.adapters.file_system")
 	if not adapter_ok or type(FileSystem) ~= "table" or type(FileSystem.remove_exact) ~= "function" then
 		Logger.error(LOG, "Crash report retention cannot delete: the file system adapter is unavailable.")
 		return
@@ -165,7 +165,7 @@ end
 --- @return string|nil path
 --- @return string|nil error_message
 local function _create_unique_report(dir, stem, json_str)
-	local adapter_ok, FileSystem = pcall(require, "adapters.file_system")
+	local adapter_ok, FileSystem = pcall(require, "core.fs.adapters.file_system")
 	if not adapter_ok or type(FileSystem) ~= "table"
 		or type(FileSystem.create_if_absent) ~= "function" then
 		return nil, "atomic create-if-absent persistence is unavailable"
@@ -254,7 +254,7 @@ function M.report(err, context)
 		-- steps, which a report without a page completes at once
 		local ok_run, snap = pcall(hc.run, { complete_local = true })
 		if ok_run and type(snap) == "table" and type(snap.sections) == "table" then
-			-- The version 2 snapshot of _shared/modules/diagnostics/schema.json
+			-- The version 2 snapshot of _shared/diagnostics/data/schema.json
 			local sections = snap.sections
 			local system, versions = sections.system or {}, sections.versions or {}
 			local developer, issues = sections.developer or {}, sections.issues or {}
@@ -349,7 +349,8 @@ function M.save(report)
 	-- log tail may quote a token, an account name or a path. A redactor that
 	-- cannot answer refuses the report; no raw fallback is written.
 	local admitted, json_str = pcall(function()
-		return Logger.redact_message(CrashReport.encode(CrashReport.build(report)))
+		local redacted = CrashReport.redact(CrashReport.build(report), Logger.redact_message)
+		return redacted and CrashReport.encode(redacted) or nil
 	end)
 	if not admitted or type(json_str) ~= "string" then
 		Logger.error(LOG, "Crash report refused: the privacy redactor is unavailable (%s).",
@@ -384,7 +385,7 @@ function M.prompt_user(report)
 	-- Required lazily: lib.notifications requires lib.logger, and crash_reporter is
 	-- itself reachable from the logger's error paths, so a top-level require would
 	-- tighten that cycle for a dependency only this one function needs.
-	local ok_notify, Notifications = pcall(require, "infra.notifications")
+	local ok_notify, Notifications = pcall(require, "core.ui.engine.notifications")
 	local can_notify = ok_notify and type(Notifications) == "table"
 		and type(Notifications.notify) == "function"
 

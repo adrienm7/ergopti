@@ -12,10 +12,10 @@
 local helpers = require("tests.helpers")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Json = require("json")
-local Classifier = require("llm.remote_response_classifier")
+local Json = require("core.text.engine.json")
+local Classifier = require("ai.engine.policy.remote_response_classifier")
 
 -- Tolerance for comparing a computed dollar cost with the catalogue's price
 local COST_TOLERANCE = 1e-12
@@ -24,7 +24,7 @@ local COST_TOLERANCE = 1e-12
 --- @param model string
 --- @return table { in, out }
 local function catalogue_price(model)
-	local fh = assert(io.open(SHARED .. "modules/llm/api_providers.json", "r"))
+	local fh = assert(io.open(SHARED .. "ai/data/api_providers.json", "r"))
 	local raw = fh:read("*a")
 	fh:close()
 	local prices = Classifier.parse_prices(Json.decode(raw).model_prices)
@@ -34,11 +34,11 @@ end
 --- Runs one case with the HTTP adapter scripted.
 --- @param test function Receives the loaded module and the queued requests.
 local function isolated(test)
-	local names = { "adapters.http_client", "modules.llm.api_remote" }
+	local names = { "core.network.adapters.http_client", "modules.llm.api_remote" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local calls = {}
-	package.loaded["adapters.http_client"] = {
+	package.loaded["core.network.adapters.http_client"] = {
 		post = function(url, headers, body, callback)
 			calls[#calls + 1] = { url = url, body = body, callback = callback }
 			return true
@@ -56,13 +56,13 @@ end
 
 for _, initial in ipairs({ "absent", "false" }) do
 	helpers.it("remote usage fixture restores an " .. initial .. " HTTP owner", function()
-		local previous = package.loaded["adapters.http_client"]
+		local previous = package.loaded["core.network.adapters.http_client"]
 		local expected
 		if initial == "false" then expected = false end
-		package.loaded["adapters.http_client"] = expected
+		package.loaded["core.network.adapters.http_client"] = expected
 		local ok, detail = pcall(isolated, function() end)
-		local restored = package.loaded["adapters.http_client"]
-		package.loaded["adapters.http_client"] = previous
+		local restored = package.loaded["core.network.adapters.http_client"]
+		package.loaded["core.network.adapters.http_client"] = previous
 		assert(ok, detail)
 		helpers.assert_true(rawequal(restored, expected), "fixture must restore the exact prior cache value")
 	end)

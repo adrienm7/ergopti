@@ -11,9 +11,9 @@ local function main()
 	local root, temporary = assert(arg[3]), assert(arg[2])
 	local driver = root .. "/static/ergopti_plus/macos"
 	package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?.lua;"
-		.. root .. "/static/ergopti_plus/_shared/lua/?/init.lua;" .. package.path
-	local Json = require("json")
+		.. root .. "/static/ergopti_plus/_shared/?.lua;"
+		.. root .. "/static/ergopti_plus/_shared/?/init.lua;" .. package.path
+	local Json = require("core.text.engine.json")
 	local Helpers = require("tests.helpers")
 	local Lfs = require("lfs")
 	local phase = assert(os.getenv("ERGOPTI_COLD_NGRAM_PHASE"))
@@ -188,11 +188,11 @@ local function main()
 				timer = {new = new_timer, absoluteTime = function() return 1000000000 end,
 					secondsSinceEpoch = function() return 1792497600 end},
 			})
-			package.loaded["adapters.file_system"] = adapter
+			package.loaded["core.fs.adapters.file_system"] = adapter
 			local logger = Helpers.make_logger_stub()
 			logger.error = function(_, message, ...) errors[#errors + 1] = string.format(message, ...) end
 			logger.warn = function(_, message, ...) warnings[#warnings + 1] = string.format(message, ...) end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			os.date = function(format, epoch)
 				if format == "%Y-%m-%d" and epoch == nil then return active_day end
 				return real_date(format, epoch)
@@ -207,7 +207,7 @@ local function main()
 			manager = require("modules.keystats.log_manager")
 			writer = require("modules.keystats.sqlite_writer")
 			rotation = require("modules.keystats.rotation")
-			scheduler = require("adapters.timer_scheduler")
+			scheduler = require("core.events.timer_scheduler")
 			assert(require("modules.keystats.text_cipher").is_enabled() == false,
 				"regression requires native default unencrypted typing rows")
 			local before_ingest

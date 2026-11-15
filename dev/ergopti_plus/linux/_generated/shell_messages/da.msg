@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/da.msg
-# AUTO-GENERATED from _shared/data/locales/da.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/da.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=LuaJIT-netværksmodul bygget fra kildekoden.
 build_luv.recipe_required=Den native kompilering af luv kræver sin kildeopskrift.
 install.already_installed={1} — allerede installeret
 install.archive_digest_unavailable=opdateringer med fastholdt deskriptor kræver en egentlig OpenSSL3-runtime; funktionen forbliver utilgængelig.
+install.bytecode_skipped=De forudkompilerede moduler kunne ikke oprettes — Ergopti starter fra kildekoden, lidt langsommere.
 install.capability_verified={1} — funktion bekræftet
 install.command_still_missing={1} blev installeret, men '{2}' findes stadig ikke.
 install.daemon_manual=Sådan starter du dæmonen manuelt:
 install.daemon_running=Dæmonen kører i baggrunden. Sådan kontrollerer du dens status:
+install.focus_integration_enabled={1}-fokusintegration aktiveret
+install.focus_integration_failed=Kunne ikke aktivere {1}-fokusintegrationen — regler pr. program forbliver inaktive på dette skrivebord.
+install.focus_integration_next_login={1}-fokusintegration installeret (træder i kraft ved næste login)
+install.focus_integration_updated={1}-fokusintegration opdateret
 install.gnome_extension_active=GNOME AppIndicator-udvidelse — allerede aktiv
 install.gnome_extension_enabled=GNOME AppIndicator-udvidelse aktiveret
 install.gnome_extension_failed=Kunne ikke aktivere AppIndicator-udvidelsen — uden den viser GNOME ikke ikonet.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — kontrol af afhængigheder
 install.section_deps_skipped=Afhængigheder sprunget over (--no-deps)
 install.section_done=Installation fuldført
 install.section_files=Installerer filer
+install.section_focus=Aktivt program under Wayland (GNOME, KDE)
 install.section_lua_deps=Valgfrie Lua-afhængigheder (hændelsesløkke, timere, webviews, signaler)
 install.section_permissions=Inputtilladelser (kræver sudo)
 install.section_services=Opretter systemd-brugertjenesterne
@@ -79,6 +85,7 @@ install.xdg_autostart=XDG-autostart: {1}
 launch.already_running=Ergopti+ kører allerede i denne session ({1} er optaget); denne start blev afvist.
 launch.authorization_failed=Godkendelsen af inputadgang blev annulleret eller mislykkedes.
 launch.groups_unavailable=Sessionen kunne ikke få sine konfigurerede inputgrupper.
+launch.restarting=Ergopti+ kører allerede i denne session; det bliver bedt om at afslutte og genstartes derefter.
 launch.session_lock_invalid=Sessionslåsens mappe skal være en absolut sti.
 launcher.dependencies_installed=Afhængigheder installeret.
 launcher.driver_missing=Fejl: Linux-driverens mappe blev ikke fundet: {1}

@@ -9,14 +9,14 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNERS = {
-	"infra.file_watchers", "infra.ui_restore", "infra.git_status", "infra.fs_dir",
-	"infra.logger", "infra.i18n", "infra.notifications", "reload_gate",
-	"adapters.timer_scheduler", "error_description", "number_policy", "adapters.file_system",
+	"core.fs.engine.file_watchers", "infra.ui_restore", "infra.git_status", "core.fs.engine.dir",
+	"core.logger.engine.logger", "core.i18n.engine.i18n", "core.ui.engine.notifications", "core.lifecycle.engine.reload.gate",
+	"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "core.fs.adapters.file_system",
 }
 
 M.CONFIG_ROOT = "/fake/config/"
 M.CONFIG_TOML = M.CONFIG_ROOT .. "hammerspoon/config.toml"
-M.KARABINER_TOML = M.CONFIG_ROOT .. "hammerspoon/config_karabiner.toml"
+M.KARABINER_TOML = M.CONFIG_ROOT .. "hammerspoon/tap_hold.toml"
 M.HOTSTRING_TOML = M.CONFIG_ROOT .. "francais.toml"
 
 --- Runs a real file-watcher controller over deterministic external boundaries.
@@ -34,9 +34,9 @@ function M.with_watchers(body, options)
 		return helpers.with_fresh_modules(OWNERS, function()
 			local defer_calls = 0
 			for _, name in ipairs(OWNERS) do package.loaded[name] = nil end
-			package.loaded["infra.logger"] = options.logger or helpers.make_logger_stub()
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["core.logger.engine.logger"] = options.logger or helpers.make_logger_stub()
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
 			package.loaded["infra.ui_restore"] = {
 				defer_reload = function(fn)
 					defer_calls = defer_calls + 1
@@ -49,8 +49,8 @@ function M.with_watchers(body, options)
 			package.loaded["infra.git_status"] = {
 				operation_in_progress = options.git_probe or function() return false end,
 			}
-			package.loaded["infra.file_watchers"] = nil
-			local watchers = require("infra.file_watchers")
+			package.loaded["core.fs.engine.file_watchers"] = nil
+			local watchers = require("core.fs.engine.file_watchers")
 			local clock, reloads, scheduled_count = 0, 0, 0
 			local callbacks, watcher_paths, pending = {}, {}, nil
 			host.pathwatcher = { new = function(path, callback)

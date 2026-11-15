@@ -14,11 +14,11 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
-local Share = require("healthcheck.share")
+local Json = require("core.text.engine.json")
+local Share = require("diagnostics.engine.healthcheck.share")
 
 -- The application folder under every XDG base, from the shared registry.
-local FOLDER = require("app_dirs").linux.folder_name
+local FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
 
 local HOME = "/home/jdoe"
 local LOGS_DIR = "/var/tmp/ergopti_report_logs"
@@ -38,13 +38,13 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
-	local schema = shared_json("modules/diagnostics/schema.json")
-	schema.export_strings = shared_json("data/locales/en.json")
+	local schema = shared_json("diagnostics/data/schema.json")
+	schema.export_strings = shared_json("core/i18n/data/locales/en.json")
 	return {
 		schema     = schema,
-		templates  = shared_json("modules/diagnostics/issue_templates.json"),
-		redaction  = shared_json("modules/diagnostics/redaction.json"),
-		repository = shared_json("modules/updater/defaults.json").github,
+		templates  = shared_json("diagnostics/data/issue_templates.json"),
+		redaction  = shared_json("diagnostics/data/redaction.json"),
+		repository = shared_json("updater/data/defaults.json").github,
 	}
 end
 
@@ -112,7 +112,7 @@ end
 local function approved_text(long)
 	local config = documents()
 	return Share.document(host_snapshot(long), config.schema,
-		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+		require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key)).text
 end
 
 --- Receives the explicit completion from these deliberately inline effect ports.
@@ -225,7 +225,7 @@ helpers.describe("healthcheck page actions (linux)", function()
 	-- an ERROR, which created that very file, counted as a session error and
 	-- would raise the error dialog (open-missing-file)
 	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
-		local Logger = require("logger")
+		local Logger = require("core.logger.engine")
 		local emitted = 0
 		Logger.set_sink(function(_, variant)
 			if variant == "warn" or variant == "error" then emitted = emitted + 1 end
@@ -268,7 +268,7 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		if adjust then adjust(overrides) end
 		local window_opened = false
 		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
-		local previous_manager = package.loaded["ui.webview_manager"]
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
 			open = function() window_opened = true; return true end,
 			build_snapshot = function()
@@ -276,14 +276,14 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 				snapshot.sections.paths = { diagnostics_dir = LOGS_DIR .. "/diagnostics" }
 				return snapshot
 			end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local ok, result = pcall(function()
 			local outcome
 			Report.report_bug(overrides, function(value) outcome = value end)
 			return outcome
 		end)
 		package.loaded["ui.healthcheck.bridge"] = previous_bridge
-		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, window_opened
 	end
@@ -321,17 +321,17 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
 		local calls = {}
 		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
-		local previous_manager = package.loaded["ui.webview_manager"]
+		local previous_manager = package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
 			build_snapshot = function() return host_snapshot(false) end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local ok, result = pcall(function()
 			local outcome
 			Report.suggest_feature(recording(calls), function(value) outcome = value end)
 			return outcome
 		end)
 		package.loaded["ui.healthcheck.bridge"] = previous_bridge
-		package.loaded["ui.webview_manager"] = previous_manager
+		package.loaded["core.ui.ui.webview_manager"] = previous_manager
 		helpers.assert_true(ok, tostring(result))
 		helpers.assert_eq(result, true)
 		local repo = documents().repository
@@ -348,14 +348,14 @@ end)
 -- real regular-file write and close failures through the production save effect.
 helpers.describe("healthcheck checked save receipts (linux)", function()
 	local function default_save(write, mkdir_ok, reveal_ok)
-		local saved_fs = package.loaded["adapters.file_system"]
-		local saved_shell = package.loaded["adapters.shell_runner"]
+		local saved_fs = package.loaded["core.fs.adapters.file_system"]
+		local saved_shell = package.loaded["core.process.adapters.shell_runner"]
 		local writes, directories = {}, {}
-		package.loaded["adapters.file_system"] = { write_new = function(path, text)
+		package.loaded["core.fs.adapters.file_system"] = { write_new = function(path, text)
 			writes[#writes + 1] = { path = path, text = text }
 			return write(path, text)
 		end }
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			quote = function(value) return "'" .. value .. "'" end,
 			run = function(command) directories[#directories + 1] = command; return mkdir_ok ~= false end,
 		}
@@ -365,8 +365,8 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 				if reveal_ok == false then overrides.reveal = function(_, done) done({ ok = false, code = 23 }) end end
 			end)
 		end)
-		package.loaded["adapters.file_system"] = saved_fs
-		package.loaded["adapters.shell_runner"] = saved_shell
+		package.loaded["core.fs.adapters.file_system"] = saved_fs
+		package.loaded["core.process.adapters.shell_runner"] = saved_shell
 		helpers.assert_true(ok, tostring(result))
 		return result, calls, writes, directories
 	end
@@ -379,7 +379,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		overrides = recording(calls)
 		overrides.save = nil
 		local snapshot, config = host_snapshot(false), documents()
-		local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+		local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 		local paths = { diagnostics_dir = dir, logs_dir = dir }
 		local function save()
 			return completed(Report, { action = "save", text = document.text, name = document.name }, paths,
@@ -402,7 +402,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 			local dir = os.tmpname(); os.remove(dir); local executed = os.execute("mkdir -p '" .. dir .. "'"); assert(executed == true or executed == 0)
 			local calls, overrides = {}, nil; overrides = recording(calls); overrides.save = nil
 			local snapshot, config = host_snapshot(false), documents()
-			local document = Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key))
+			local document = Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			local target, collision = dir .. "/protected", dir .. "/" .. document.name
 			local f = assert(io.open(target, "wb")); f:write("protected"); f:close()
 			local command = kind == "symlink" and ("ln -s '" .. target .. "' '" .. collision .. "'")
@@ -466,7 +466,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 		local config = documents()
 		for _, vector in ipairs(corpus.vectors) do
 			local document = Share.document(vector.snapshot, config.schema,
-				require("infra.i18n").get(config.schema.share_policy.notice_key))
+				require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key))
 			for _, canary in ipairs(vector.canaries) do
 				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
 			end
@@ -592,10 +592,10 @@ end)
 --- production argv executable to an owned file, never to a desktop handler.
 local function with_native_opener(script, controls, body)
 	local uv = require("luv")
-	local old_owned, old_desktop = package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"]
+	local old_owned, old_desktop = package.loaded["core.process.adapters.owned_process"], package.loaded["adapters.desktop_opener"]
 	local old_report = package.loaded["ui.healthcheck.report"]
-	local timer, native = require("infra.native_timer"), {}
-	local timeout = require("infra.timings").ms("ui", "desktop_open_timeout_ms")
+	local timer, native = require("core.timing.engine.native_timer"), {}
+	local timeout = require("core.timing.engine.timings").ms("ui", "desktop_open_timeout_ms")
 	for key, value in pairs(uv) do native[key] = value end
 	function native.timer_start(handle, ms, interval, callback)
 		if ms == timeout then
@@ -603,7 +603,7 @@ local function with_native_opener(script, controls, body)
 		end
 		return uv.timer_start(handle, ms, interval, callback)
 	end
-	local Owned = helpers.load_module_with_dependency("adapters.owned_process", "luv", native)
+	local Owned = helpers.load_module_with_dependency("core.process.adapters.owned_process", "luv", native)
 	local Desktop = helpers.load_module("adapters.desktop_opener")
 	local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/diagnostic_opener_XXXXXX"))
 	local executable, target = root .. "/private-opener", root .. "/report.md"
@@ -614,7 +614,7 @@ local function with_native_opener(script, controls, body)
 	local state = { outcomes = {}, requests = 0, current = true, root = root, target = target }
 	Desktop._set_deps_for_test({ start = function(program, args, options, done)
 		helpers.assert_eq(program, uv.exepath())
-		helpers.assert_eq(args, { require("infra.paths").driver_root() .. "/adapters/desktop_opener_worker.lua", target, tostring(timeout) })
+		helpers.assert_eq(args, { require("core.fs.engine.paths").driver_root() .. "/adapters/desktop_opener_worker.lua", target, tostring(timeout) })
 		helpers.assert_eq(options.timeout_ms, timeout)
 		state.requests = state.requests + 1
 		if controls.refuse then return nil, "controlled opener admission refused" end
@@ -642,7 +642,7 @@ local function with_native_opener(script, controls, body)
 		for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
 		assert(uv.fs_rmdir(root))
 	end)
-	package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"] = old_owned, old_desktop
+	package.loaded["core.process.adapters.owned_process"], package.loaded["adapters.desktop_opener"] = old_owned, old_desktop
 	package.loaded["ui.healthcheck.report"] = old_report
 	if not cleaned then error(cleanup_err, 0) end
 	if not ok then error(detail, 0) end
@@ -691,9 +691,9 @@ end)
 helpers.describe("feature opener cancellation ownership", function()
 	helpers.it("(feature-opener-cancel) a nested request survives cancellation of its predecessor", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
-		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"]
+		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["core.ui.ui.webview_manager"]
 		package.loaded["ui.healthcheck.bridge"] = { config = documents, build_snapshot = function() return host_snapshot(false) end }
-		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		package.loaded["core.ui.ui.webview_manager"] = { get_daemon_state = function() return {} end }
 		local calls, outcomes, cancellations, reenter = {}, {}, 0, true
 		local effects = recording({})
 		effects.open_url = function(_, done)
@@ -711,7 +711,7 @@ helpers.describe("feature opener cancellation ownership", function()
 			calls[2]({ ok = false, code = 23, error = "private opener refused" })
 			helpers.assert_eq(outcomes, { false })
 		end, debug.traceback)
-		package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"] = old_bridge, old_manager
+		package.loaded["ui.healthcheck.bridge"], package.loaded["core.ui.ui.webview_manager"] = old_bridge, old_manager
 		if not ok then error(detail, 0) end
 	end)
 end)
@@ -719,7 +719,7 @@ end)
 helpers.describe("diagnostic opener late port failure", function()
 	helpers.it("(diagnostic-opener-late) logs an exception after inline completion without a second outcome", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
-		local Logger = require("logger.shim")
+		local Logger = require("core.logger.engine.shim")
 		local held, errors, results = Logger.error, {}, {}
 		Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
 		local ok, detail = xpcall(function()
@@ -745,7 +745,7 @@ helpers.describe("redaction context carries the configuration directory (config-
 		local context = Report.redaction_context(overrides)
 		helpers.assert_eq(context.config_dir, dir)
 		helpers.assert_eq(
-			require("diagnostics.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
+			require("diagnostics.engine.reports.redact").apply("read '" .. dir .. "/hotstrings/my_pack/a.toml'", documents().redaction, context),
 			"read '<config>/hotstrings/<name>/<name>'")
 	end)
 end)
@@ -757,7 +757,7 @@ local function completed_action_for(Report, action, config, context, overrides, 
 end
 
 helpers.describe("opt-in day log in the report actions (day-log-host)", function()
-	local DayLogHost = require("healthcheck.day_log")
+	local DayLogHost = require("diagnostics.engine.healthcheck.day_log")
 	local LOG_TEXT = "2026-09-24 09:00:00:001 [INFO] [A] opened /home/jdoe/x\n2026-09-24 09:00:01:002 [INFO] [B] token=abcdefghijkl\n"
 	local REDACTED = "2026-09-24 09:00:00:001 [INFO] [A] opened ~/x\n2026-09-24 09:00:01:002 [INFO] [B] token=<secret>\n"
 
@@ -767,14 +767,14 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local calls = {}
 		local overrides = recording(calls)
 		local config = documents()
-		config.day_log = shared_json("modules/diagnostics/day_log.json")
+		config.day_log = shared_json("diagnostics/data/day_log.json")
 		local snapshot = host_snapshot(false)
 		local context = Report.redaction_context(overrides)
 		local function run(action)
 			return completed_action_for(Report, action, config, context, overrides, snapshot)
 		end
 		local function text(with_log)
-			return Share.document(snapshot, config.schema, require("infra.i18n").get(config.schema.share_policy.notice_key),
+			return Share.document(snapshot, config.schema, require("core.i18n.engine.i18n").get(config.schema.share_policy.notice_key),
 				with_log).text
 		end
 		return { calls = calls, config = config, snapshot = snapshot, context = context, run = run, text = text }
@@ -813,7 +813,7 @@ helpers.describe("opt-in day log in the report actions (day-log-host)", function
 		local text = f.text(true)
 		helpers.assert_true(text:find("day_log_attachment.included | true", 1, true) ~= nil, "the report records the attachment")
 		local document = Share.document(f.snapshot, f.config.schema,
-			require("infra.i18n").get(f.config.schema.share_policy.notice_key), true)
+			require("core.i18n.engine.i18n").get(f.config.schema.share_policy.notice_key), true)
 		local result = f.run({ action = "save", text = text, name = document.name, day_log = true })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#f.calls.save, 2)

@@ -11,17 +11,17 @@
 
 local helpers = require("tests.helpers")
 local SourceFile = require("tests.support.source_file")
-local ONE_SHOT_DATA = assert(require("json").decode(SourceFile.read(helpers.shared("tap_hold/one_shot_shift.json"))))
+local ONE_SHOT_DATA = assert(require("core.text.engine.json").decode(SourceFile.read(helpers.shared("tap_hold/data/one_shot_shift.json"))))
 
 local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
 	"modules.diagnostics.hid_diagnostic_mailbox",
-	"adapters.synthetic_input", "adapters.event_provenance",
-	"adapters.timer_scheduler",
-	"infra.logger", "infra.perf", "infra.hotpath_profiler",
-	"infra.manifest_reader", "infra.keycodes", "keymap.terminators",
+	"platform.input.synthetic_input", "adapters.event_provenance",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger", "core.logger.engine.perf", "infra.hotpath_profiler",
+	"infra.manifest_reader", "platform.input.keycodes", "layouts.engine.layers.terminators",
 }
 
 local function noop() end
@@ -133,7 +133,7 @@ local function load_fixture(prepare_input)
 
 	local epoch = {}
 	local register_calls, unregister_calls = 0, 0
-	package.loaded["adapters.synthetic_input"] = api({
+	package.loaded["platform.input.synthetic_input"] = api({
 		current_action_epoch = function() return epoch, 0 end,
 		register_action_listener = function()
 			register_calls = register_calls + 1
@@ -248,13 +248,13 @@ local function load_fixture(prepare_input)
 		is_ignored_window = function() return false, 1 end,
 		is_secure_field = function() return false, 1 end,
 	})
-	package.loaded["keymap.terminators"] = api({ matches_magic_event = function() return false end })
-	package.loaded["infra.logger"] = api({
+	package.loaded["layouts.engine.layers.terminators"] = api({ matches_magic_event = function() return false end })
+	package.loaded["core.logger.engine.logger"] = api({
 		LEVELS = { DEBUG = 10 },
 		is_enabled = function() return false end,
 		pcall = function(_, fn, ...) return pcall(fn, ...) end,
 	})
-	package.loaded["infra.perf"] = api({ is_enabled = function() return false end })
+	package.loaded["core.logger.engine.perf"] = api({ is_enabled = function() return false end })
 	package.loaded["infra.hotpath_profiler"] = api({ now = function() return 0 end })
 	package.loaded["infra.manifest_reader"] = {
 		default_for = function(key)
@@ -266,7 +266,7 @@ local function load_fixture(prepare_input)
 			return false
 		end,
 	}
-	package.loaded["infra.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
+	package.loaded["platform.input.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
 
 	if prepare_input then prepare_input(controls) end
 
@@ -323,7 +323,7 @@ helpers.describe("keymap start: exact native commitment", function()
 			package.loaded["modules.keymap.tap_copy"] = { new = function() return watch end }
 			local fixture = load_fixture()
 			local admission_open = true
-			package.loaded["adapters.synthetic_input"].admission_open = function() return admission_open end
+			package.loaded["platform.input.synthetic_input"].admission_open = function() return admission_open end
 			package.loaded["adapters.event_provenance"].classify_with_fence = function() return nil, "foreign" end
 			helpers.assert_true(fixture.keymap.start())
 			local event = { getKeyCode = function() return 56 end, getFlags = function() return { shift = true } end }
@@ -363,7 +363,7 @@ helpers.describe("keymap start: exact native commitment", function()
 			fixture = load_fixture()
 			package.loaded["modules.keymap.registry"].is_group_enabled = function() return true end
 			package.loaded["modules.keymap.registry"].is_section_enabled = function() return true end
-			package.loaded["adapters.synthetic_input"].admission_open = function() return true end
+			package.loaded["platform.input.synthetic_input"].admission_open = function() return true end
 			helpers.assert_eq(fixture.keymap.start(), true)
 			helpers.assert_eq(fixture.keymap.set_magic_key_source("KeyJ"), true)
 			helpers.assert_eq(fixture.keymap.pause_processing(), true)
@@ -465,7 +465,7 @@ helpers.describe("keymap start: exact native commitment", function()
 
 	helpers.it("keeps an already committed keymap live on a duplicate start (keymap-partial-start-fence)", function()
 		local fixture = load_fixture()
-		local synthetic = package.loaded["adapters.synthetic_input"]
+		local synthetic = package.loaded["platform.input.synthetic_input"]
 		local provenance = package.loaded["adapters.event_provenance"]
 		local entered = 0
 		synthetic.admission_open = function() return true end
@@ -486,7 +486,7 @@ helpers.describe("keymap start: exact native commitment", function()
 		fixture.controls.tap_failure_ordinal = 2
 		fixture.controls.tap_failure_mode = "disabled"
 		fixture.controls.replay_pending = true
-		local synthetic = package.loaded["adapters.synthetic_input"]
+		local synthetic = package.loaded["platform.input.synthetic_input"]
 		local provenance = package.loaded["adapters.event_provenance"]
 		local entered = 0
 		synthetic.admission_open = function() return true end
@@ -829,13 +829,13 @@ end)
 local INPUT_MODULES = {
 	"hs", "tests.stubs.hs", "adapters.one_shot_shift",
 	"modules.keymap.one_shot_shift", "modules.keymap.control_sentinels",
-	"modules.keymap.magic_key_source", "adapters.event_clock",
-	"infra.key_event_health", "infra.keystroke_integrity", "infra.deferred_work",
-	"adapters.text_sender", "adapters.keyboard_geometry", "modules.llm.app_filter",
-	"infra.hotstring_engine", "hotstring_engine", "infra.text_utils", "text_utils",
-	"compat.utf8", "keycodes", "keymap.control_signals", "tap_hold.one_shot_shift",
-	"unicode_case", "unicode_case.init", "unicode_case.data", "error_description", "number_policy",
-	"logger.shim", "hotstrings.personal_files", "native_path", "toml_codec.key_path", "toml_codec.basic_string",
+	"modules.keymap.magic_key_source", "core.events.clock",
+	"core.logger.engine.key_event_health", "core.logger.engine.keystroke_integrity", "core.timing.engine.deferred_work",
+	"platform.input.text_sender", "platform.input.keyboard_geometry", "modules.llm.app_filter",
+	"infra.hotstring_engine", "hotstrings.engine.matcher", "core.text.engine.utils", "core.text.engine.utils_core",
+	"core.lifecycle.engine.compat.utf8", "platform.input.keycodes.core", "layouts.engine.layers.control_signals", "tap_hold.engine.one_shot_shift_core",
+	"core.text.engine.unicode_case", "core.text.engine.unicode_case.init", "core.text.engine.unicode_case.data", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy",
+	"core.logger.engine.shim", "hotstrings.engine.catalogue.personal_files", "core.fs.engine.native_path", "core.text.engine.toml_codec.key_path", "core.text.engine.toml_codec.basic_string",
 	"platform.remap", "modules.shortcuts.keyboard_shortcuts",
 }
 for _, name in ipairs(RESET_MODULES) do INPUT_MODULES[#INPUT_MODULES + 1] = name end
@@ -848,7 +848,7 @@ local function with_input_fixture(callback)
 		local fixture = load_fixture(function(controls)
 			controls.input_open = true
 			hs.timer.absoluteTime = function() return host_ns end
-			synthetic = package.loaded["adapters.synthetic_input"]
+			synthetic = package.loaded["platform.input.synthetic_input"]
 			synthetic.STALE_PHYSICAL_EVENT_MS = 500
 			synthetic.admission_open = function() return controls.input_open end
 			synthetic.enter_callback = function() return true end
@@ -857,12 +857,12 @@ local function with_input_fixture(callback)
 			package.loaded["adapters.event_provenance"].classify_with_fence = function()
 				return nil, "foreign", nil, controls.physical_replay == true
 			end
-			package.loaded["infra.logger"].error = function(_, message)
+			package.loaded["core.logger.engine.logger"].error = function(_, message)
 				calls.errors[#calls.errors + 1] = message
 			end
-			package.loaded["adapters.text_sender"] = {}
+			package.loaded["platform.input.text_sender"] = {}
 			package.loaded["modules.llm.app_filter"] = {}
-			package.loaded["adapters.keyboard_geometry"] = {}
+			package.loaded["platform.input.keyboard_geometry"] = {}
 			package.loaded["modules.keymap.magic_key_source"] = {
 				needs_geometry = function() return false end,
 				owns = function(code) return controls.magic_code == code end,
@@ -889,9 +889,9 @@ local function with_input_fixture(callback)
 			end }
 			package.loaded["platform.remap"] = { get_sticky_timeout = function() return 2000 end }
 		end)
-		local clock = require("adapters.event_clock")
+		local clock = require("core.events.clock")
 		clock.reset()
-		require("infra.key_event_health").reset()
+		require("core.logger.engine.key_event_health").reset()
 		local properties = hs.eventtap.event.properties
 		local function event(code, text, age, repeat_flag, is_up)
 			local raw, unicode = 0, text
@@ -993,7 +993,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 
 	helpers.it("keeps reserved stale controls consumed and publishes their existing signals", function()
 		with_input_fixture(function(fixture)
-			local codes = require("keycodes")
+			local codes = require("platform.input.keycodes.core")
 			for _, code in ipairs({ codes.F20_LAYER_NAV_ENTERED, codes.F19_LAYER_NAV_EXITED }) do
 				helpers.assert_true(fixture.down(fixture.event(code, "", 1200)))
 				helpers.assert_true(fixture.up(fixture.event(code, "", 1, 0, true)))
@@ -1019,7 +1019,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 				helpers.assert_true(fixture.state.start_is_line_start)
 			end
 			helpers.assert_eq(fixture.quarantine_values, {})
-			helpers.assert_eq(require("infra.key_event_health").counts().stale_passed, 0)
+			helpers.assert_eq(require("core.logger.engine.key_event_health").counts().stale_passed, 0)
 			helpers.assert_eq(fixture.calls.emitted, {})
 			helpers.assert_true(fixture.down(fixture.event(1, "é")),
 				"pass-through controls must not spend the existing one-shot arm")
@@ -1035,7 +1035,7 @@ helpers.describe("ordinary stale input before transformations (stale-physical-tr
 			helpers.assert_true(fixture.down(fixture.event(1, "é", 1200)))
 			helpers.assert_eq(fixture.calls.emitted, { "É" })
 			helpers.assert_true(fixture.up(fixture.event(1, "é", 1, 0, true)))
-			local counts = require("infra.key_event_health").counts()
+			local counts = require("core.logger.engine.key_event_health").counts()
 			helpers.assert_eq(counts.downs + counts.ups, 0,
 				"the already-observed physical replay must not be counted twice")
 			helpers.assert_eq(counts.stale_passed, 0)

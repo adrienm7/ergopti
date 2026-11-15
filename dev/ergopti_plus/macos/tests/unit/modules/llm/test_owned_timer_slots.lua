@@ -2,7 +2,7 @@
 
 --- Replays the shared owned timer slots and checks both dependency checkers use them.
 local helpers = require("tests.helpers")
-local Contract = require("test.owned_timer_slots_contract")
+local Contract = require("tests.lua.owned_timer_slots_contract")
 Contract.register(helpers)
 --- Finds one dependency checker by its module header, not by its path.
 --- @param header string The checker's MODULE banner.

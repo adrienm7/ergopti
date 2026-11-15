@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- Sends a screenshot to the vision model an llm_screen_region, llm_screen_full
 --- or llm_screen_error binding names and returns the model's answer text. The
---- request bodies come from the shared _shared/lua/llm/vision.lua; this module
+--- request bodies come from the shared _shared/ai/engine/prediction/vision.lua; this module
 --- adds the address and the credentials.
 ---
 --- FEATURES & RATIONALE:
@@ -22,10 +22,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Json = require("json")
-local Vision = require("llm.vision")
-local LocalModelPolicy = require("llm.local_model_policy")
+local Logger = require("core.logger.engine.shim")
+local Json = require("core.text.engine.json")
+local Vision = require("ai.engine.prediction.vision")
+local LocalModelPolicy = require("ai.engine.ollama.local_model_policy")
 
 local LOG = "modules.llm.vision_request"
 
@@ -84,9 +84,9 @@ end
 --- @return table|nil config
 function M.config()
 	if _config then return _config end
-	local path = require("infra.paths").shared("modules/llm/vision.json")
+	local path = require("core.fs.engine.paths").shared("ai/data/vision.json")
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_config(text)
 	if not config then
@@ -113,7 +113,7 @@ function M.backend_choices(default_models, use)
 	end
 	local choices = { {
 		value = Vision.LOCAL_BACKEND,
-		label = require("infra.i18n").get("llm.vision.local_backend"),
+		label = require("core.i18n.engine.i18n").get("llm.vision.local_backend"),
 		defaultModel = defaults[Vision.LOCAL_BACKEND] or "",
 	} }
 	for _, provider in ipairs(require("modules.llm.api_remote").providers_for(use or "vision")) do
@@ -239,8 +239,8 @@ function M.send(target, body, on_done)
 		_active_request = nil
 		on_done(text, err)
 	end
-	local HttpClient = require("adapters.http_client")
-	local Timings = require("infra.timings")
+	local HttpClient = require("core.network.adapters.http_client")
+	local Timings = require("core.timing.engine.timings")
 	-- Image and transcription never enter the logs; only the encoded size does.
 	Logger.info(LOG, "Vision request → %s (format=%s, %d byte(s)).",
 		require("modules.llm.api_remote").redact_url(target.url), target.format, #encoded)
@@ -291,7 +291,7 @@ end
 --- Withdraws the vision request in flight; its callback is not called.
 --- @return boolean cancelled
 function M.cancel()
-	if require("adapters.http_client").cancel(OWNER) ~= true then return false end
+	if require("core.network.adapters.http_client").cancel(OWNER) ~= true then return false end
 	_request_epoch = _request_epoch + 1
 	if _active_request then _active_request.terminal = true end
 	_active_request = nil

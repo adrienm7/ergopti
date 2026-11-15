@@ -21,24 +21,24 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
-local WebviewResult = require("adapters.webview_result")
-local RunningApplication = require("adapters.running_application")
-local OwnWindow = require("adapters.own_window")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local WebviewResult = require("core.ui.adapters.webview_result")
+local RunningApplication = require("platform.focus.running_application")
+local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
-local Json       = require("json")
-local ui_builder = require("ui.ui_builder")
-local Logger     = require("infra.logger")
-local Paths      = require("infra.paths")
-local dialog     = require("infra.dialog_util")
-local i18n       = require("infra.i18n")
-local FileSystem = require("adapters.file_system")
+local Json       = require("core.text.engine.json")
+local ui_builder = require("core.ui.ui.builder")
+local Logger     = require("core.logger.engine.logger")
+local Paths      = require("core.fs.engine.paths")
+local dialog     = require("core.ui.engine.dialog_util")
+local i18n       = require("core.i18n.engine.i18n")
+local FileSystem = require("core.fs.adapters.file_system")
 local ConfigPaths = require("infra.config_paths")
-local TimerScheduler = require("adapters.timer_scheduler")
-local CategoryStore = require("keystats.app_category_store")
+local TimerScheduler = require("core.events.timer_scheduler")
+local CategoryStore = require("metrics.engine.apps.category_store")
 
 local LOG = "metrics_apps"
 
@@ -603,9 +603,11 @@ local function prompt_score_then_save(app_name, chosen_cat, default_score, gener
 		tostring(default_score or 0), i18n.get("button.ok"), i18n.get("common.cancel"))
 	if not owner_is_current(generation, webview) then return false end
 	if btn ~= i18n.get("button.ok") then return end
-	local score = tonumber(score_str)
-	if not score or not CategoryStore.score_valid(score) then
-		dialog.block_alert(i18n.get("common.warning"), i18n.get("metrics_apps.score_error"), i18n.get("button.ok"))
+	-- The shared value schema owns the range and its localized refusal.
+	local score, refusal = CategoryStore.parse_score_entry(score_str, i18n.get)
+	if score == nil then
+		Logger.warn(LOG, "Typed score '%s' for '%s' refused.", tostring(score_str), tostring(app_name))
+		dialog.block_alert(i18n.get("dialog.value_check.title"), refusal, i18n.get("button.ok"))
 		return
 	end
 	if not category_source_current(source_snapshot) then

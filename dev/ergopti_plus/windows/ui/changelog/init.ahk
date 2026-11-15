@@ -81,7 +81,7 @@ global CHANGELOG_HOST_ACCESS_ALLOW := 1
 ; Release sources, tried in order: the REST API, then the public Atom feed on
 ; github.com, which corporate proxies usually leave reachable when they block
 ; or throttle api.github.com. Mirrors release_sources in
-; _shared/modules/updater/defaults.json (pinned by
+; _shared/updater/data/defaults.json (pinned by
 ; tools/test/test-changelog-network-resilience.cjs).
 global CHANGELOG_API_URL_TEMPLATE  := "https://" . Identifiers.Hosts.GITHUB_API . "/repos/{owner}/{repo}/releases?per_page=20"
 global CHANGELOG_FEED_URL_TEMPLATE := "https://" . Identifiers.Hosts.GITHUB . "/{owner}/{repo}/releases.atom"
@@ -107,11 +107,8 @@ global _CLW_FeedStarter := 0
  */
 Changelog_Open(Channel) {
 	global UPDATER_REQUEST_ORIGIN_MANUAL
-	if A_IsSuspended
-		return _Updater_RefuseManualWhileSuspended()
+	; A pause stops typing, not the changelog (UPD-2).
 	Request := _Updater_NewRequestContext(UPDATER_REQUEST_ORIGIN_MANUAL)
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
 	return _CLW_OpenCapturedRequest(Channel, Request)
 }
 
@@ -236,7 +233,7 @@ _CLW_BuildWindow(Channel, Request) {
 	loader := _VendorDir . "\64bit\WebView2Loader.dll"
 
 	try {
-		; Reuse the shared session environment (infra/webview_utils.ahk) so no
+		; Reuse the shared session environment (core/ui/engine/webview/utils.ahk) so no
 		; second Chromium process boots and reopens are near-instant.
 		CreatedController := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
 	} catch as Err {
@@ -562,10 +559,8 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		_CLW_OnPageReady(ExpectedWindowEpoch)
 		return
 	}
-	; WebMessageReceived bypasses native Suspend. A click born paused refuses
-	; visibly; a click interrupted during TryGet retains one resume terminal.
-	if Request.BornSuspended
-		return _Updater_RefuseManualWhileSuspended()
+	; A click while paused is a click (UPD-2): the request policy still drops
+	; one whose channel changed meanwhile.
 	if !_Updater_RequestMayPublish(Request)
 		return
 
@@ -1374,12 +1369,12 @@ _CLW_HtmlUrl() {
 }
 
 /**
- * Returns the https:// virtual-host URL for _shared/data/locales/ (trailing slash).
+ * Returns the https:// virtual-host URL for _shared/core/i18n/data/locales/ (trailing slash).
  * @returns {string}
  */
 _CLW_LocalesUrl() {
 	global CHANGELOG_VHOST
-	return "https://" . CHANGELOG_VHOST . "/data/locales/"
+	return "https://" . CHANGELOG_VHOST . "/core/i18n/data/locales/"
 }
 
 /**
@@ -1389,7 +1384,7 @@ _CLW_LocalesUrl() {
  */
 _CLW_I18nApplyScript() {
 	global _SharedDir, _I18nLocale
-	json_path := _SharedDir . "\data\locales\" . _I18nLocale . ".json"
+	json_path := _SharedDir . "\core\i18n\data\locales\" . _I18nLocale . ".json"
 	json_str  := "{}"
 	if FileExist(json_path)
 		try json_str := FileRead(json_path, "UTF-8")

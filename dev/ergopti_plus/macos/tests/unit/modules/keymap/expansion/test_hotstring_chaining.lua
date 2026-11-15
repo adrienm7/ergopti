@@ -14,7 +14,7 @@
 
 local helpers = require("tests.helpers")
 
-local _     = helpers.load_with_stubs("infra.logger")
+local _     = helpers.load_with_stubs("core.logger.engine.logger")
 local State = helpers.load_with_stubs("modules.keymap.state")
 
 local STAR = "★"
@@ -34,7 +34,7 @@ local SIGN = "\u{26A0}\u{FE0F}"
 --- @param entries table Array of { trigger, replacement } star (auto) entries.
 --- @return table state, table expander
 local function fresh_engine(entries)
-	package.loaded["ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
+	package.loaded["core.ui.ui.tooltip"]        = { hide = function() end, hide_forced = function() end }
 	package.loaded["modules.keystats"] = {
 		notify_synthetic = function() end,
 		set_buffer       = function() end,
@@ -48,8 +48,8 @@ local function fresh_engine(entries)
 			package.loaded[name] = nil
 		end
 	end
-	package.loaded["infra.text_utils"]           = nil
-	package.loaded["text_utils"]                 = nil
+	package.loaded["core.text.engine.utils"]           = nil
+	package.loaded["core.text.engine.utils_core"]                 = nil
 
 	local R = require("modules.keymap.registry")
 	local E = require("modules.keymap.expander")

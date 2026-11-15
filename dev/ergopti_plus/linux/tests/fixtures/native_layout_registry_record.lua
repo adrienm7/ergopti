@@ -10,25 +10,26 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_layout_registry_record%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
-require("compat.utf8").install()
+	.. root .. "/../_shared/?.lua;" .. root .. "/../_shared/?/init.lua;" .. package.path
+require("core.lifecycle.engine.compat.utf8").install()
 local folder, kind = assert(arg[1]), assert(arg[2])
 for _, key in ipairs({ "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_RUNTIME_DIR" }) do
 	assert(assert(os.getenv(key)):sub(1, #folder + 1) == folder .. "/", "each worker requires its own XDG roots")
 end
-local Shell, Json, uv = require("adapters.shell_runner"), require("json"), require("luv")
+local Shell, Json, uv = require("core.process.adapters.shell_runner"), require("core.text.engine.json"), require("luv")
 local ConfigPaths = require("infra.config_paths")
 -- Ergopti's own Python is installed: the record fixture never downloads it.
 package.loaded["modules.keymap.managed_python"] = { ensure = function(_, done) done(true, "python3") end }
-local Registry, Runner = require("modules.keymap.layout_registry"), require("adapters.process_runner")
-local Reader, Native = require("infra.regular_file_reader"), require("infra.regular_file_writer")
+local Registry, Runner = require("modules.keymap.layout_registry"), require("core.process.adapters.runner")
+local Reader, Native = require("core.fs.engine.regular_file_reader"), require("core.fs.engine.regular_file_writer")
 local open, rename, reader_open, native_open = io.open, os.rename, Reader.open, Native.open
 local settings = assert(Registry.settings())
 local local_dir = ConfigPaths.config(settings.local_folder) .. "/"
 assert(local_dir:sub(1, #folder + 1) == folder .. "/", "the actual production locator must stay private")
 assert(Shell.run("mkdir -p -- " .. Shell.quote(local_dir)))
 local path, target = local_dir .. settings.installed_file, folder .. "/target"
-local stage = path .. ".tmp"
+-- The native writer stages under this process's name (CFD-1).
+local stage = require("core.lifecycle.engine.stage_owner").stage_path(path)
 local function write(candidate, bytes)
 	local file = assert(open(candidate, "wb")); assert(file:write(bytes)); assert(file:close())
 end

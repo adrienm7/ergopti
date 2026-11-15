@@ -37,9 +37,9 @@ local MODEL = "some-model"
 local function load_api_mlx()
 	for _, m in ipairs({
 		"modules.llm.api_mlx", "modules.llm.api_mlx_discovery",
-		"adapters.timer_scheduler", "infra.logger",
+		"core.events.timer_scheduler", "core.logger.engine.logger",
 	}) do package.loaded[m] = nil end
-	_ = helpers.load_with_stubs("infra.logger")
+	_ = helpers.load_with_stubs("core.logger.engine.logger")
 
 	local ctl = { wall = 0, awake = 0, notifications = {}, pending = nil }
 	function ctl.advance_awake(seconds)
@@ -50,7 +50,7 @@ local function load_api_mlx()
 		ctl.wall = ctl.wall + seconds
 	end
 
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		now   = function() return ctl.wall end,
 		awake_time = function() return ctl.awake end,
 		after = function(_d, _fn) return { stop = function() end } end,
@@ -69,12 +69,12 @@ local function load_api_mlx()
 		get_completions_endpoint = function() return nil end,
 		get_chat_endpoint      = function() return nil end,
 	}
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(title, body, kind)
 			table.insert(ctl.notifications, { title = title, body = body, kind = kind })
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(k) return k end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(k) return k end }
 
 	local ApiMlx = helpers.load_with_stubs("modules.llm.api_mlx")
 	return ApiMlx, ctl

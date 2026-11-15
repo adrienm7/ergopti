@@ -16,7 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local codec = require("toml_codec")
+local codec = require("core.text.engine.toml_codec")
 
 local SOURCE = table.concat({
 	"[llm]",
@@ -29,9 +29,9 @@ local SOURCE = table.concat({
 
 helpers.describe("AI agent settings (macOS)", function()
 	helpers.it("loads each setting at its owner and saves it back unchanged", function()
-		helpers.with_fresh_modules({ "infra.preferences", "adapters.file_system" }, function()
+		helpers.with_fresh_modules({ "infra.preferences", "core.fs.adapters.file_system" }, function()
 			local source = SOURCE
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read_with_status = function() return source, "ok" end,
 				write = function() error("unguarded publication") end,
 				write_if_unchanged = function(_, content)

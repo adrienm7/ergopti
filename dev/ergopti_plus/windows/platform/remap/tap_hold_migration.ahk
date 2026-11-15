@@ -4,8 +4,8 @@
 ; MODULE: Tap-Hold File Migration (Windows)
 ; DESCRIPTION:
 ; Versions a user's tap_hold.toml. It reads ``[_meta] schema_version``, replays
-; the steps of _shared/tap_hold/migrations.toml on the typed document and stamps
-; the result. The Windows counterpart of _shared/lua/tap_hold/migrate.lua and of
+; the steps of _shared/tap_hold/data/migrations.toml on the typed document and stamps
+; the result. The Windows counterpart of _shared/tap_hold/engine/migrate.lua and of
 ; linux/platform/remap/tap_hold_writer.lua's migrate_file; the corpus
 ; _shared/tests/corpus/tap_hold_migrations pins the semantics of all of them.
 ;
@@ -106,7 +106,7 @@ TapHoldMigrationRegistry() {
 	global _SharedDir
 	static Registry := 0
 	if !(Registry is Map) {
-		Path := _SharedDir . "\tap_hold\migrations.toml"
+		Path := _SharedDir . "\tap_hold\data\migrations.toml"
 		Source := FSReadUtf8Exact(Path)
 		if !(Source is String)
 			throw Error("Cannot read the tap-hold migration registry '" . Path . "'.")

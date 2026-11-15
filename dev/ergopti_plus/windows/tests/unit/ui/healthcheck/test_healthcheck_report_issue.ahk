@@ -268,7 +268,7 @@ _THPA_SuggestFeature() {
 	Calls := []
 	AssertTrue(HealthCheck_SuggestFeature(_THPA_Effects(Calls)))
 	AssertEqual(1, Calls.Length, _THPA_Join(Calls))
-	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
+	GitHub := JsonParse(FileRead(_SharedDir . "\updater\data\defaults.json", "UTF-8"))["github"]
 	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
 		. "/issues/new?template=feature_request.yml&"
 	AssertEqual(Prefix, SubStr(Calls[1], 1, StrLen(Prefix)))
@@ -291,7 +291,7 @@ _THPA_MenuReportBug() {
 	Copied := SubStr(Calls[1], StrLen("copy:") + 1)
 	AssertTrue(InStr(Copied, "# ErgoptiPlus diagnostics") = 1, "The clipboard holds the approved report")
 	AssertTrue(InStr(Calls[2], ":" . Copied) > 0, "The attachment holds the same approved report")
-	GitHub := JsonParse(FileRead(_SharedDir . "\modules\updater\defaults.json", "UTF-8"))["github"]
+	GitHub := JsonParse(FileRead(_SharedDir . "\updater\data\defaults.json", "UTF-8"))["github"]
 	Prefix := "open_url:https://github.com/" . GitHub["owner"] . "/" . GitHub["repo"]
 		. "/issues/new?template=bug_report.yml&"
 	AssertEqual(Prefix, SubStr(Calls[4], 1, StrLen(Prefix)), "Not a bare URL: the bug template is selected")

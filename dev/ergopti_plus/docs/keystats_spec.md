@@ -289,7 +289,7 @@ static/ergopti_plus/windows/modules/keystats/
   context_tracker.ahk; foreground app, window title, password field
   log_writer.ahk     ; append_log → today.log (UTF-8 JSONL)
   ingest.ahk         ; today.log → data.sql (texte) + db.sqlite (mirror)
-  schema.ahk         ; chargement DDL et migrations depuis _shared/data/db/
+  schema.ahk         ; chargement DDL et migrations depuis _shared/metrics/data/db/
   watchers.ahk       ; WTS / power / wifi / audio / app focus
   sensors.ahk        ; mouse poll, system load, battery
   device_id.ahk      ; UUID + host_signature + fork-on-mismatch (§16)
@@ -351,7 +351,7 @@ réécriture d’UI, juste un launcher différent par OS.
 
 ## 14. Schéma SQLite — DDL canonique
 
-Fichier de référence : `_shared/data/db/schema.sql`. Bit-identique entre
+Fichier de référence : `_shared/metrics/data/db/schema.sql`. Bit-identique entre
 les drivers (`schema_version` empêche les divergences).
 
 ```sql
@@ -1074,8 +1074,8 @@ avant le premier démarrage s'il veut une mise au propre absolue.
 
 Séance 2 (extraction UI partagée + branchement HS) :
 
-- `static/ergopti_plus/_shared/data/db/schema.sql` — DDL canonique.
-- `static/ergopti_plus/_shared/data/db/migrations/0001_initial.sql`.
+- `static/ergopti_plus/_shared/metrics/data/db/schema.sql` — DDL canonique.
+- `static/ergopti_plus/_shared/metrics/data/db/migrations/0001_initial.sql`.
 - `static/ergopti_plus/_shared/ui/metrics_apps/{index.html,*.js,style.css}`.
 - `static/ergopti_plus/_shared/ui/metrics_typing/{index.html,*.js,style.css,README.md}`.
 - `static/ergopti_plus/_shared/scripts/data_sql_parser.lua` — utilitaire

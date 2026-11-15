@@ -3,11 +3,11 @@
 local helpers = require("tests.helpers")
 local Gesture = require("tests.support.gesture_actions_fixture")
 local Native = require("tests.support.synthetic_input_fixture")
-require("infra.logger")
+require("core.logger.engine.logger")
 local M = {}
 function M.with_world(options, callback)
-	return helpers.with_stub_scope({ "adapters.window_manager", "native_app_switcher_owner",
-		"adapters.storage", "adapters.event_provenance", "tests.stubs.hs", "hs", "logger.shim" }, function()
+	return helpers.with_stub_scope({ "platform.focus.window_manager", "core.ui.engine.native_app_switcher_owner",
+		"core.fs.adapters.storage", "adapters.event_provenance", "tests.stubs.hs", "hs", "core.logger.engine.shim" }, function()
 		return Gesture.with_fixture(function(fresh)
 			fresh()
 			local f = Native.make({ absolute_time = 0, epoch = 1900000000 })

@@ -35,8 +35,8 @@ local helpers, fake_config =
 helpers.describe("extension category gates: one acknowledged batch", function()
 	local function gate_action(config, enabled, changed)
 		local mb = helpers.load_module("ui.menu.builder")
-		local label = require("infra.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
-		local extension = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local label = require("core.i18n.engine.i18n").get(enabled and "menu.hotstrings.check_all" or "menu.hotstrings.uncheck_all")
+		local extension = string.format(require("core.i18n.engine.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -50,7 +50,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		error("the native extension gate command was not rendered")
 	end
 	local function observe_click(action)
-		local execute, modal = os.execute, require("ui.modal")
+		local execute, modal = os.execute, require("core.ui.ui.modal")
 		local run, notices, releases = modal.run, {}, 0
 		modal.run = function(callback) releases = releases + 1; return callback() end
 		os.execute = function(command)
@@ -65,8 +65,8 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		local directory = os.tmpname()
 		assert(os.remove(directory))
 		directory = directory .. "-ergopti-gate-batch"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path = directory .. "/config.toml"
 		local state = initial and "true" or "false"
 		local sections = '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[hotstrings.modules.sfbsreduction]\ncomma = true\n[hotstrings.modules.foreign]\nfx = true\n'
@@ -82,10 +82,10 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 			package.loaded["modules.hotstrings.hotstrings_config"] = nil
 			package.loaded["modules.hotstrings.loader"] = nil
 			local paths = {}
-			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			for key, value in pairs(require("core.fs.engine.paths")) do paths[key] = value end
 			-- The private fixture has no external installed layout roots.
 			paths.extension_roots = function() return {} end
-			package.loaded["infra.paths"] = paths
+			package.loaded["core.fs.engine.paths"] = paths
 			local loader = require("modules.hotstrings.loader")
 			local native_find = loader.find_toml_files
 			package.loaded["modules.hotstrings.loader"] = {
@@ -110,7 +110,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 					} }
 				end,
 			}
-			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstrings.engine.matcher").new()
 			local changed = 0
 			assert(config._set_config_file_for_test(path))
 			assert(config.init(engine, directory, function() changed = changed + 1 end))
@@ -121,7 +121,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 		local restored = Terminators.restore_configuration(catalogue)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(restored, "the exact delimiter catalogue is restored")
 		assert(removed == true, "the owned private fixture is retired")
 		if not ok then error(err, 0) end
@@ -163,7 +163,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 			with_real_gate_owner(not enabled, function(c)
 				local rename, attempts, redraws = os.rename, 0, 0
 				os.rename = function(from, to)
-					if from == c.path .. ".tmp" and to == c.path then
+					if from == helpers.stage_path(c.path) and to == c.path then
 						attempts = attempts + 1
 						if attempts == 2 then return false, "inert second publication refusal" end
 					end
@@ -197,7 +197,7 @@ helpers.describe("extension category gates: one acknowledged batch", function()
 				with_real_gate_owner(not enabled, function(c)
 					local rename, attempts, redraws = os.rename, 0, 0
 					os.rename = function(from, to)
-						if from == c.path .. ".tmp" and to == c.path then
+						if from == helpers.stage_path(c.path) and to == c.path then
 							attempts = attempts + 1
 							if outcome == "throw" then error("inert batch publication refusal") end
 							if outcome == "nil" then return nil, "inert batch publication refusal" end
@@ -272,7 +272,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		local builder = helpers.load_module("ui.menu.builder")
 		local ctx = { config = config, _version = "9.9.9", paused = false, on_menu_changed = changed }
 		local key = kind == "global" and "menu.hotstrings.tooltip_default" or "menu.hotstrings.delay_magic_key"
-		local title = require("locale.label_value").compose(require("infra.i18n").get, require("infra.i18n").get(key), "")
+		local title = require("core.i18n.engine.label_value").compose(require("core.i18n.engine.i18n").get, require("core.i18n.engine.i18n").get(key), "")
 		local found
 		local function find(rows)
 			for _, row in ipairs(rows or {}) do
@@ -285,7 +285,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		return found
 	end
 	local function observe(action, answer, before_return)
-		local prompt, modal = require("ui.text_prompt"), require("ui.modal")
+		local prompt, modal = require("core.ui.ui.text_prompt"), require("core.ui.ui.modal")
 		local ask, run, execute = prompt.ask, modal.run, os.execute
 		local asks, notices, releases = {}, {}, 0
 		prompt.ask = function(...)
@@ -355,8 +355,8 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(#notices, outcome == "true" and 0 or 1)
 				helpers.assert_eq(releases, #notices)
 				if #notices > 0 then
-					helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
-						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+					helpers.assert_true(notices[1]:find(require("core.process.adapters.shell_runner").quote(
+						require("core.i18n.engine.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
 				end
 			end)
 		end
@@ -383,8 +383,8 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 	end
 	local function with_native_owner(body)
 		local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-ergopti-delay-ack"
-		local quote = require("adapters.shell_runner").quote
-		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local quote = require("core.process.adapters.shell_runner").quote
+		assert(require("core.process.adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
 		local path, config_path = directory .. "/hotstrings_overrides.toml", directory .. "/config.toml"
 		local foreign = '[future]\nlabel = "independent" # unrelated future comment\nnested = { values = [2, 7], on = true }\n'
 		-- The base expansion delay (0.4 s) is the canonical config.toml leaf; the category
@@ -402,7 +402,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 			local config = require("modules.hotstrings.hotstrings_config")
 			assert(config._set_config_file_for_test(config_path))
 			assert(config._set_override_config_dir_for_test(directory))
-			assert(config.init(require("hotstring_engine").new(), directory))
+			assert(config.init(require("hotstrings.engine.matcher").new(), directory))
 			config._set_categories_for_test({ magickey = { delay = 0.3 } })
 			body({ config = config, path = path, config_path = config_path, original = original, foreign = foreign,
 				config_original = config_original })
@@ -410,7 +410,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 		preferences._set_file_for_test(nil)
 		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 		for name, value in pairs(loaded) do package.loaded[name] = value end
-		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		local removed = require("core.process.adapters.shell_runner").run("rm -rf " .. quote(directory))
 		assert(removed == true, "only the owned private directory is retired")
 		if not called then error(err, 0) end
 	end
@@ -426,7 +426,8 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 				helpers.assert_eq(read(c.path), c.original)
 				helpers.assert_eq(read(c.config_path), c.config_original)
 				helpers.assert_eq(#notices, 1)
-				helpers.assert_not_nil(notices[1]:find(require("infra.i18n").get("menu.hotstrings.delay_invalid_body"), 1, true))
+				-- The shared value schema's refusal names the accepted range in ms.
+				helpers.assert_not_nil(notices[1]:find("3600000", 1, true), notices[1])
 			end)
 		end)
 		for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
@@ -439,7 +440,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local before = kind == "global" and c.config_original or c.original
 					local rename, writes = os.rename, 0
 					os.rename = function(from, to)
-						if from == target .. ".tmp" and to == target then
+						if from == helpers.stage_path(target) and to == target then
 							writes = writes + 1
 							if outcome == "throw" then error("inert owned delay publication refusal") end
 							if outcome == "nil" then return nil, "inert refusal" end
@@ -461,7 +462,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local retry, committed, _, retry_notices = observe(action, "900")
 					helpers.assert_true(retry);helpers.assert_eq(committed, true);helpers.assert_eq(changed, 1);helpers.assert_eq(#retry_notices, 0)
 					local disk = read(target)
-					local decoded = require("toml_codec").decode(disk)
+					local decoded = require("core.text.engine.toml_codec").decode(disk)
 					if kind == "global" then
 						helpers.assert_eq(decoded.hotstrings.expansion_delay, 0.9, "the base delay is the canonical leaf")
 						helpers.assert_eq(decoded.future.user, "kept", "unrelated canonical data is retained")
@@ -472,7 +473,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 						helpers.assert_eq(decoded.magickey.delay_offset, 0.5, "the delay is stored as an offset of the 0.4 s base")
 						helpers.assert_nil(decoded.magickey.delay, "the absolute spelling is never written")
 					end
-					assert(c.config.init(require("hotstring_engine").new(), c.path:match("^(.*)/")))
+					assert(c.config.init(require("hotstrings.engine.matcher").new(), c.path:match("^(.*)/")))
 					helpers.assert_eq(kind == "global" and c.config.get_base_delay() or c.config.resolve("magickey", nil).delay, 0.9,
 						"a real disk reload agrees with the acknowledged value")
 				end)
@@ -493,7 +494,7 @@ helpers.describe("hotstring delay rows: durable owner acknowledgement", function
 					local disk = read(target)
 					helpers.assert_true(disk:find("# another owner changed the physical source", 1, true) ~= nil,
 						"the foreign edit is kept")
-					helpers.assert_eq(require("toml_codec").decode(disk).hotstrings.expansion_delay, 0.9)
+					helpers.assert_eq(require("core.text.engine.toml_codec").decode(disk).hotstrings.expansion_delay, 0.9)
 					return
 				end
 				helpers.assert_true(called);helpers.assert_eq(result, false);helpers.assert_eq(changed, 0)
@@ -511,8 +512,8 @@ end)
 helpers.describe("category fixture process status: actual normalized owner", function()
 	for _, abi in ipairs({ "numeric", "compat52" }) do
 		helpers.it("keeps real directory/write/cleanup acknowledgement under " .. abi, function()
-			local previous = package.loaded["adapters.shell_runner"]
-			local shell = helpers.load_module("adapters.shell_runner")
+			local previous = package.loaded["core.process.adapters.shell_runner"]
+			local shell = helpers.load_module("core.process.adapters.shell_runner")
 			local execute = os.execute
 			local directory = os.tmpname();assert(os.remove(directory));directory = directory .. "-section-abi"
 			local seen = { calls = 0 }
@@ -536,7 +537,7 @@ helpers.describe("category fixture process status: actual normalized owner", fun
 				seen.absent = io.open(directory .. "/physical", "rb") == nil
 			end)
 			os.execute = execute
-			package.loaded["adapters.shell_runner"] = previous
+			package.loaded["core.process.adapters.shell_runner"] = previous
 			-- Cleanup is physical even if an earlier candidate acknowledgement refused.
 			if not seen.absent then shell.run("rm -rf " .. shell.quote(directory)) end
 			helpers.assert_true(called, issue)
@@ -550,8 +551,8 @@ helpers.describe("category fixture process status: actual normalized owner", fun
 	end
 	for _, outcome in ipairs({ "false", "nil", "number", "text", "throw" }) do
 		helpers.it("does not acknowledge the real failed process with receipt " .. outcome, function()
-			local previous = package.loaded["adapters.shell_runner"]
-			local shell = helpers.load_module("adapters.shell_runner")
+			local previous = package.loaded["core.process.adapters.shell_runner"]
+			local shell = helpers.load_module("core.process.adapters.shell_runner")
 			local execute, seen = os.execute, {}
 			os.execute = function(command)
 				seen.calls = (seen.calls or 0) + 1
@@ -564,7 +565,7 @@ helpers.describe("category fixture process status: actual normalized owner", fun
 			end
 			local called, result = pcall(shell.run, "sh -c 'exit 1'")
 			os.execute = execute
-			package.loaded["adapters.shell_runner"] = previous
+			package.loaded["core.process.adapters.shell_runner"] = previous
 			helpers.assert_true(called)
 			helpers.assert_eq(seen.calls, 1, "the refusal still executed the actual independent failed child")
 			helpers.assert_true(seen.native[1] ~= 0 and seen.native[1] ~= true)

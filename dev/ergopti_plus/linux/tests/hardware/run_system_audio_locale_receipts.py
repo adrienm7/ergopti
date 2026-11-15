@@ -34,7 +34,8 @@ sample(0)
 local day = assert(sample(interval))
 local expected = os.getenv("ERGOPTI_NATIVE_AUDIO_MUTED") == "true" and interval or 0
 assert(day.audio_muted_ms == expected, "localized native mute state lost or invented elapsed time")
-assert(day.awake_ms == interval and day.sleep_ms == 0)
+-- Unlocked time is no field of its own: awake_ms is keep-awake time (KMD-3).
+assert(day.awake_ms == 0 and day.sleep_ms == 0)
 """
 
 
@@ -97,7 +98,7 @@ def main():
                                 "LANGUAGE": locale.split("_")[0],
                                 "XDG_CONFIG_HOME": str(root / (locale + str(muted)) / "config"),
                                 "ERGOPTI_NATIVE_AUDIO_MUTED": "true" if muted else "false",
-                                "LUA_PATH": "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                                "LUA_PATH": "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                             }
                         )
                         try:

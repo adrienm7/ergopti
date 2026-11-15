@@ -168,7 +168,7 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
             "LUA_CPATH": ";;",
             "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
             "ERGOPTI_LITERAL_DRIVER_ROOT": str(driver),
-            "ERGOPTI_LITERAL_SHARED_ROOT": str(app / "_shared/lua"),
+            "ERGOPTI_LITERAL_SHARED_ROOT": str(app / "_shared"),
             "ERGOPTI_RUNTIME_PREFIX": str(usr),
         }
         for name in (
@@ -208,7 +208,7 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
 assert(os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'), 'relative entry did not export its root')
 assert(os.getenv('ERGOPTI_LITERAL_DAEMON')=='1', 'daemon did not export its search order')
 local shared=assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT'))
-local child=assert(io.popen('luajit ./adapters/atspi_context_worker.lua bus / 0 '..string.format('%q',shared)..' 1 invalid 2>&1'))
+local child=assert(io.popen('luajit ./platform/focus/atspi_context_worker.lua bus / 0 '..string.format('%q',shared)..' 1 invalid 2>&1'))
 local result=child:read('*a'); child:close()
 assert(result:find('context worker parent already exited',1,true), result)
 exit(n) end
@@ -219,7 +219,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
             run(
                 [
                     usr / "bin/luajit",
-                    driver / "adapters/sqlite_process_worker.lua",
+                    driver / "core/process/adapters/sqlite_process_worker.lua",
                     str(os.getpid()),
                     db,
                 ],
@@ -233,7 +233,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
             run(
                 [
                     usr / "bin/luajit",
-                    "./adapters/sqlite_process_worker.lua",
+                    "./core/process/adapters/sqlite_process_worker.lua",
                     str(os.getpid()),
                     relative_db,
                 ],
@@ -255,7 +255,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         proxy = run(
             [
                 usr / "bin/luajit",
-                driver / "platform/network/system_proxy_probe.lua",
+                driver / "core/network/adapters/system_proxy_probe.lua",
                 app / "_shared",
             ],
             env=env,
@@ -263,7 +263,11 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         )
         assert "proxy-request-invalid" in proxy
         runtime_probe = subprocess.run(
-            [usr / "bin/luajit", driver / "platform/network/runtime_probe.lua", app / "_shared"],
+            [
+                usr / "bin/luajit",
+                driver / "core/network/adapters/runtime_probe.lua",
+                app / "_shared",
+            ],
             env=env,
             text=True,
             capture_output=True,
@@ -286,11 +290,11 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         context = subprocess.run(
             [
                 usr / "bin/luajit",
-                "./adapters/atspi_context_worker.lua",
+                "./platform/focus/atspi_context_worker.lua",
                 "bus",
                 "/",
                 "0",
-                app / "_shared/lua",
+                app / "_shared",
                 str(os.getpid()),
                 "invalid",
             ],
@@ -306,12 +310,12 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         watch = subprocess.run(
             [
                 usr / "bin/luajit",
-                "./adapters/atspi_focus_watch_worker.lua",
+                "./platform/focus/atspi_focus_watch_worker.lua",
                 "0",
                 "0",
                 "0",
                 "0",
-                app / "_shared/lua",
+                app / "_shared",
             ],
             cwd=driver,
             env=env,
@@ -321,7 +325,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         )
         assert watch.returncode == 1 and "stopped without authority" in watch.stderr, watch.stderr
         dialog = subprocess.run(
-            [usr / "bin/luajit", driver / "ui/dialog_host.lua", "--invalid"],
+            [usr / "bin/luajit", driver / "core/ui/ui/dialog_host.lua", "--invalid"],
             env=env,
             text=True,
             capture_output=True,
@@ -345,26 +349,26 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         admission = r"""source "$1/install/native_modules_env.sh"
 ergopti_admit_native_modules "$1" required
 export ERGOPTI_LITERAL_DRIVER_ROOT="$1" ERGOPTI_LITERAL_SHARED_ROOT="$2"
-exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv("ERGOPTI_LITERAL_NATIVE_MODULES")=="1"); assert(loadfile(d.."/infra/literal_module_loader.lua"))().install(d,os.getenv("ERGOPTI_LITERAL_SHARED_ROOT")); assert(type(require("luv").new_timer)=="function"); assert(type(require("lfs").attributes)=="function")'
+exec "$3" -e 'local d=os.getenv("ERGOPTI_LITERAL_DRIVER_ROOT"); assert(os.getenv("ERGOPTI_LITERAL_NATIVE_MODULES")=="1"); assert(loadfile(d.."/core/lifecycle/engine/literal_module_loader.lua"))().install(d,os.getenv("ERGOPTI_LITERAL_SHARED_ROOT")); assert(type(require("luv").new_timer)=="function"); assert(type(require("lfs").attributes)=="function")'
 """
         run(
-            ["bash", "-c", admission, "native-test", driver, app / "_shared/lua", luajit],
+            ["bash", "-c", admission, "native-test", driver, app / "_shared", luajit],
             env=standalone,
         )
         direct_native = r"""
 local d=os.getenv('LITERAL_DRIVER'); local s=os.getenv('LITERAL_SHARED')
-assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,s,nil,'direct')
+assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,s,nil,'direct')
 local ok,err=pcall(require,'lfs')
 assert(not ok and err:find('error loading',1,true), 'direct entry must retain host native errors')
 """
         direct_native_env = dict(
-            standalone, LITERAL_DRIVER=str(driver), LITERAL_SHARED=str(app / "_shared/lua")
+            standalone, LITERAL_DRIVER=str(driver), LITERAL_SHARED=str(app / "_shared")
         )
         run([luajit, "-e", direct_native], env=direct_native_env)
         lua = r"""
 local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT')
 local s=os.getenv('ERGOPTI_LITERAL_SHARED_ROOT')
-local owner=assert(loadfile(d..'/infra/literal_module_loader.lua'))().install(d,s,os.getenv('ERGOPTI_RUNTIME_PREFIX'),'daemon')
+local owner=assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))().install(d,s,os.getenv('ERGOPTI_RUNTIME_PREFIX'),'daemon')
 package.path=os.getenv('LITERAL_HOST')..'/?.lua;'..package.path
 package.preload.lfs=function() return 'preload' end
 assert(require('lfs')=='preload')
@@ -380,10 +384,10 @@ local broken, native_err=pcall(require,'literal_broken')
 assert(not broken and native_err:find('literal_broken',1,true) and native_err:find('error loading',1,true))
 local ok,err=pcall(require,'literal_module_absent')
 assert(not ok and err:find('literal_module_absent',1,true))
-assert(owner.searchpath('infra.regular_file_reader',package.path))
-local stream= require('toml_codec.source_open').open(os.getenv('LITERAL_FIFO'))
+assert(owner.searchpath('core.fs.engine.regular_file_reader',package.path))
+local stream= require('core.text.engine.toml_codec.source_open').open(os.getenv('LITERAL_FIFO'))
 assert(stream==nil, 'FIFO must be refused')
-local writer = require('toml_codec.writer')
+local writer = require('core.text.engine.toml_codec.writer')
 local written = writer.publish_if_unchanged(os.getenv('LITERAL_FIFO'), 'k=1\n', nil, {status='absent'})
 assert(not written, 'FIFO create-only publication must be refused')
 print('ok')
@@ -393,7 +397,7 @@ print('ok')
         assert run([usr / "bin/luajit", "-e", lua], env=env, cwd=scratch) == "ok\n"
         order = r"""
 local d=os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT')
-local owner=assert(loadfile(d..'/infra/literal_module_loader.lua'))()
+local owner=assert(loadfile(d..'/core/lifecycle/engine/literal_module_loader.lua'))()
 owner.install(d,os.getenv('LITERAL_ALTERNATE_SHARED'),nil,os.getenv('LITERAL_MODE'))
 assert(require('literal_collision') == os.getenv('LITERAL_EXPECTED'))
 """

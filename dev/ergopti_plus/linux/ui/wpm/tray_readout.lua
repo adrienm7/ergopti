@@ -13,25 +13,25 @@
 ---    ignored by others (KDE among them); an icon is drawn by all of them, so
 ---    the number is painted into the icon itself.
 --- 2. Everything it decides is shared: the label, the colour, when to show —
----    _shared/lua/wpm_widget/model.lua, the same code the macOS menu bar
+---    _shared/metrics/engine/wpm_widget_model.lua, the same code the macOS menu bar
 ---    readout runs, from the same canon.
 --- 3. Two icon files, alternated. Panels cache an icon by its path, so writing
 ---    a new number to the same file does not always redraw it; a new path does.
 --- ==============================================================================
 
 local M = {}
-local TableUtil = require("table_util")
+local TableUtil = require("core.text.engine.table_util")
 
-local Logger    = require("logger.shim")
+local Logger    = require("core.logger.engine.shim")
 local Constants = require("infra.wpm_constants")
-local Timings   = require("infra.timings")
+local Timings   = require("core.timing.engine.timings")
 local Manifest  = require("infra.manifest_reader")
 local Preferences = require("infra.metrics_preferences")
 local ConfigPaths = require("infra.config_paths")
-local Shell     = require("adapters.shell_runner")
-local Model     = require("wpm_widget.model")
+local Shell     = require("core.process.adapters.shell_runner")
+local Model     = require("metrics.engine.wpm_widget_model")
 local Widget    = require("ui.wpm.widget")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "ui.wpm.tray_readout"
 
@@ -361,18 +361,20 @@ end
 --- Refreshes the readout. Called from the daemon's periodic tick.
 --- @param stats table|nil From keystats.get_live_stats().
 --- @param now_s number Monotonic seconds.
+--- @param paused boolean|nil The script's pause: the readout hides, as on
+---   Windows and macOS.
 --- @return table|nil The frame shown, or nil when hidden.
-function M.tick(stats, now_s)
+function M.tick(stats, now_s, paused)
 	if _restore_debt or not Preferences.admit() then return nil end
 	if not _state.running then return nil end
-	if _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
+	if paused ~= true and _state.last_update_s and (now_s - _state.last_update_s) < UPDATE_S then return nil end
 	_state.last_update_s = now_s
 	if not settle_pending() then return nil end
 	local canon = Constants.load()
 	if not canon then return nil end
 	local frame = Model.menubar_frame(canon, stats, Widget.frame_options(now_s, _state.use_colors))
 	local Tray = tray()
-	if not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
+	if paused == true or not Model.menubar_visible(stats, frame.source, Widget.tooltip_visible()) then
 		if _state.handle and Tray then
 			local hidden = clone(_state.presentation or {})
 			hidden.active = false

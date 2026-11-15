@@ -12,22 +12,22 @@ local helpers = require("tests.helpers")
 --- Runs a scenario with retained native callbacks and restores module overrides.
 --- @param scenario function Callback receiving the window and native records.
 local function with_window(scenario)
-	local keys = { "ui.download_window", "ui.ui_builder", "infra.deferred_work", "infra.logger",
-		"adapters.timer_scheduler", "error_description", "number_policy" }
+	local keys = { "ui.download_window", "core.ui.ui.builder", "core.timing.engine.deferred_work", "core.logger.engine.logger",
+		"core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }
 	local saved, prior_hs = {}, _G.hs
 	for _, key in ipairs(keys) do saved[key] = package.loaded[key] end
-	for _, name in ipairs({ "adapters.timer_scheduler", "error_description", "number_policy" }) do
+	for _, name in ipairs({ "core.events.timer_scheduler", "diagnostics.engine.reports.error_description", "core.text.engine.number_policy" }) do
 		package.loaded[name] = nil
 	end
 	local records = { windows = {}, timers = {}, bridges = {} }
-	package.loaded["infra.logger"] = nil
-	package.loaded["infra.deferred_work"] = {
+	package.loaded["core.logger.engine.logger"] = nil
+	package.loaded["core.timing.engine.deferred_work"] = {
 		after = function(_, callback)
 			records.timers[#records.timers + 1] = callback
 			return true
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 460, height = 380 } end,
 		show_webview = function(opts)
 			local native = { opts = opts, codes = {} }
@@ -118,7 +118,7 @@ helpers.describe("download window exact native owners", function()
 			helpers.assert_eq(window.hide(), false)
 			local codes, timers = #native.codes, #records.timers
 			local discarded = {}
-			require("infra.logger").debug = function(_, message, ...)
+			require("core.logger.engine.logger").debug = function(_, message, ...)
 				discarded[#discarded + 1] = string.format(message, ...)
 			end
 			window.update(50, 20, 40, "late output")
@@ -268,7 +268,7 @@ helpers.describe("download window pending payload retention", function()
 	helpers.it("retains initialization and latest progress across a pre-ready log burst", function()
 		with_window(function(window, records)
 			local warnings = {}
-			require("infra.logger").warn = function(_, message, ...)
+			require("core.logger.engine.logger").warn = function(_, message, ...)
 				warnings[#warnings + 1] = string.format(message, ...)
 			end
 			helpers.assert_true(window.show({ kind = "mlx_model", model = "fixture-model" }))

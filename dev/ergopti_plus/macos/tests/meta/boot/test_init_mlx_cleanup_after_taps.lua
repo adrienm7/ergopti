@@ -23,7 +23,7 @@ local function read_cleanup_src()
 end
 
 local function assert_async_cleanup(src)
-	helpers.assert_true(src:find('require("adapters.shell_runner")', 1, true) ~= nil,
+	helpers.assert_true(src:find('require("core.process.adapters.shell_runner")', 1, true) ~= nil,
 		"boot cleanup must depend on the asynchronous ShellRunner adapter")
 	helpers.assert_true(src:find("ShellRunner.spawn", 1, true) ~= nil,
 		"boot cleanup must spawn its shell pipeline")

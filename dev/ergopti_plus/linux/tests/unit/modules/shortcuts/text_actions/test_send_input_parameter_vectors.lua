@@ -6,7 +6,7 @@
 --- Replays _shared/tests/corpus/action_parameters/send_input_vectors.json, which
 --- the macOS and Windows suites replay too, through the gesture validator and the
 --- shortcuts manager's parser over the real vocabulary
---- (_shared/modules/actions/send_keys.json), then fires the three actions from a
+--- (_shared/shortcuts/data/actions/send_keys.json), then fires the three actions from a
 --- binding and checks the exact synthetic input: the text the injector types and
 --- the evdev codes pressed on the daemon's uinput device.
 ---
@@ -16,9 +16,9 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-require("test.action_parameter_label_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
+require("tests.lua.core.action_parameter_label_contract")(helpers, json, helpers.driver_root() .. "/../_shared")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/action_parameters/send_input_vectors.json"
 
@@ -224,14 +224,14 @@ end)
 
 helpers.it("send-input vocabulary refuses a FIFO without blocking", function()
 	local uv = require("luv")
-	local Shell = require("adapters.shell_runner")
+	local Shell = require("core.process.adapters.shell_runner")
 	local path = os.tmpname()
 	os.remove(path)
 	assert(Shell.run("mkfifo -- " .. Shell.quote(path)))
 	local code = string.format([[package.path = %q
-local paths = require("infra.paths")
+local paths = require("core.fs.engine.paths")
 local original = paths.shared
-paths.shared = function(name) if name == "modules/actions/send_keys.json" then return %q end; return original(name) end
+paths.shared = function(name) if name == "shortcuts/data/actions/send_keys.json" then return %q end; return original(name) end
 local ok = pcall(require("modules.shortcuts.manager").send_vocabulary)
 assert(not ok, "a FIFO is not a vocabulary")
 ]], package.path, path)
@@ -242,7 +242,7 @@ assert(not ok, "a FIFO is not a vocabulary")
 		exited, status, signal = true, code, sig
 		uv.timer_stop(timer); uv.close(timer); uv.close(child)
 	end))
-	assert(require("infra.native_timer").start(uv, timer, 2000, 0, function()
+	assert(require("core.timing.engine.native_timer").start(uv, timer, 2000, 0, function()
 		expired = true; child:kill("sigkill")
 	end))
 	while not exited do uv.run("once") end

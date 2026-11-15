@@ -12,8 +12,8 @@
 ---    the group's _meta.color + any user override. "llm" and the canon's
 ---    [neutral_sources] take the canon's own colours.
 --- 3. Nothing restated: every colour, the neutral sources and the label come
----    from _shared/modules/wpm_widget/constants.toml through the shared model
----    (_shared/lua/wpm_widget/model.lua), which the Linux driver runs too.
+---    from _shared/metrics/data/wpm_widget/constants.toml through the shared model
+---    (_shared/metrics/engine/wpm_widget_model.lua), which the Linux driver runs too.
 --- ==============================================================================
 
 local M = {}
@@ -28,10 +28,10 @@ local hs = hs
 -- =================================
 -- =================================
 
-local Logger = require("infra.logger")
-local Paths = require("infra.paths")
-local TomlCodec = require("toml_codec")
-local WPMModel = require("wpm_widget.model")
+local Logger = require("core.logger.engine.logger")
+local Paths = require("core.fs.engine.paths")
+local TomlCodec = require("core.text.engine.toml_codec")
+local WPMModel = require("metrics.engine.wpm_widget_model")
 
 local LOG = "wpm_shared"
 
@@ -44,7 +44,7 @@ local _canon = nil
 --- @return table|nil
 function M.canon()
 	if _canon then return _canon end
-	local canon, err = WPMModel.load(Paths.shared("modules/wpm_widget/constants.toml"), TomlCodec.decode)
+	local canon, err = WPMModel.load(Paths.shared("metrics/data/wpm_widget/constants.toml"), TomlCodec.decode)
 	if not canon then
 		Logger.error(LOG, "The WPM canon is unusable (%s).", tostring(err))
 		return nil
@@ -66,7 +66,7 @@ end
 --- The unit under the number, in the user's language.
 --- @return string
 function M.unit_label()
-	return require("infra.i18n").get("menu.metrics.wpm_unit")
+	return require("core.i18n.engine.i18n").get("menu.metrics.wpm_unit")
 end
 
 

@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Thin runtime API on top of the codegen'd ``_generated/features_manifest.ahk``,
 ; which is produced by ``npm run build:manifest`` from the single source of
-; truth at ``_shared/modules/features/manifest.toml``.
+; truth at ``_shared/settings/data/features/manifest.toml``.
 ;
 ; FEATURES & RATIONALE:
 ; 1. Defensive optional include: the generated manifest is committed and

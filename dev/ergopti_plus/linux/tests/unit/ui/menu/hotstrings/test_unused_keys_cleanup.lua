@@ -15,9 +15,9 @@
 -- The cases replace these entries; the module end puts them back.
 local restore_loaded = require("tests.helpers").keep_loaded({ "modules.gestures.manager" })
 local helpers   = require("tests.helpers")
-local Contract  = require("test.config_unused_keys_contract")
-local Engine    = require("config_unused_keys")
-local TomlCodec = require("toml_codec")
+local Contract  = require("tests.lua.settings.unused_keys_contract")
+local Engine    = require("settings.engine.migration.unused_keys")
+local TomlCodec = require("core.text.engine.toml_codec")
 
 local Sandbox = Contract.sandbox
 
@@ -292,7 +292,7 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 				"",
 			}, "\n")
 			local scan
-			local reported = require("config_outdated").collect_reports(function()
+			local reported = require("settings.engine.migration.outdated").collect_reports(function()
 				scan = Engine.find_in_source(source, Cleanup.collect)
 			end)
 			local offered, warned = {}, {}
@@ -410,7 +410,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		}
 		local ok, detail = pcall(function()
 			local mb = helpers.load_module("ui.menu.builder")
-			local label = require("infra.i18n").get("menu.global.clean_unused_keys")
+			local label = require("core.i18n.engine.i18n").get("menu.global.clean_unused_keys")
 			local row = find_row(mb.build({ _version = "test", on_quit = function() end }), label)
 			helpers.assert_true(row ~= nil, "the Configuration menu must expose cleanup")
 			local callback = row.fn or row.action
@@ -468,7 +468,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 	end)
 end)
 
-require("test.config_cleanup_roots_contract").register(helpers, {
+require("tests.lua.settings.cleanup_roots_contract").register(helpers, {
 	driver = "linux", collect = Cleanup.collect, find = Cleanup.find,
 })
 

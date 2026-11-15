@@ -1,9 +1,9 @@
 --- modules/keymap/llm_context.lua
 --- Bounded independent text and privacy boundary for the AI typing context.
-local ContextBuffer = require("llm.context_buffer")
+local ContextBuffer = require("ai.engine.policy.context_buffer")
 local LlmContextLimit = require("infra.llm_context_limit")
 local ComposedText = require("infra.composed_text")
-local text_utils = require("text_utils")
+local text_utils = require("core.text.engine.utils_core")
 local M = {}
 
 local function update(state, text, mark)

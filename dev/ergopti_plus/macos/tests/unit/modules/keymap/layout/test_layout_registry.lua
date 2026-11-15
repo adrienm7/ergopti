@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local REGISTRY_DIR = helpers.driver_root() .. "/../../layouts/registry/"
 local CHANNEL = require("modules.updater").installed_channel()
@@ -100,6 +100,12 @@ local function manager(options)
 		decode_json = Json.decode,
 		encode_json = Json.encode,
 		read = function(path) return state.files[path] end,
+		read_bounded = function(path, max_bytes)
+			local text = state.files[path]
+			if text == nil then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end,
 		write = function(path, content) state.files[path] = content; return true end,
 		create = function(path, content)
 			if state.files[path] ~= nil then return false, "exists" end
@@ -515,15 +521,15 @@ helpers.describe("layout manager (macOS): installing", function()
 		local candidate = "verified replacement layout"
 		entry.size, entry.sha256, entry.version = #candidate, string.rep("0", 64), "replacement"
 		local before = state.files[LOCAL_DIR .. "ergol.keylayout"]
-		local original = package.loaded["config_file_inverse"]
-		package.loaded["config_file_inverse"] = { for_current_writer = function() error("owner unavailable") end }
+		local original = package.loaded["settings.engine.migration.file_inverse"]
+		package.loaded["settings.engine.migration.file_inverse"] = { for_current_writer = function() error("owner unavailable") end }
 		local ok, err = xpcall(function()
 			local refused = run(function(done) registry.install_local(entry, candidate, done, deps) end)
 			helpers.assert_eq(refused.ok, false)
 			helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], before)
 			helpers.assert_nil(registry.snapshot(deps).busy)
 		end, debug.traceback)
-		package.loaded["config_file_inverse"] = original
+		package.loaded["settings.engine.migration.file_inverse"] = original
 		if not ok then error(err, 0) end
 	end)
 	helpers.it("preserves a real edited layout during uninstall", function()
@@ -1114,7 +1120,7 @@ helpers.describe("layout manager: cold input-source conventions (iso-typing-conv
 end)
 
 
-require("test.layout_installed_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1127,7 +1133,7 @@ require("test.layout_installed_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_installed_update_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_update_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1140,7 +1146,7 @@ require("test.layout_installed_update_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_installed_extension_manager_contract")(helpers, Json, {
+require("tests.lua.layouts.installed_extension_manager_contract")(helpers, Json, {
 	manager = manager,
 	run = run,
 	entry = entry_of("ergol"),
@@ -1153,7 +1159,7 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 	end,
 })
 
-require("test.layout_composer_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_contract")(helpers, Json, {
 	name = "macOS",
 	platform = "macos",
 	shortcuts = "full",
@@ -1166,7 +1172,7 @@ require("test.layout_composer_contract")(helpers, Json, {
 	selections = function(state) return #state.selected end,
 })
 
-require("test.composer_check_contract")(helpers, Json, {
+require("tests.lua.layouts.composer_check_contract")(helpers, Json, {
 	name = "macOS",
 	manager = manager,
 	files = shipped_files,
@@ -1193,7 +1199,7 @@ require("test.composer_check_contract")(helpers, Json, {
 })
 
 helpers.describe("layout composer (macOS): a layout macOS turns on at the next login", function()
-	local fixture_dir = helpers.driver_root() .. "/../_shared/modules/layouts/composer_check/"
+	local fixture_dir = helpers.driver_root() .. "/../_shared/layouts/data/composer_check/"
 	local function shipped(name)
 		local handle = assert(io.open(fixture_dir .. name, "rb"))
 		local text = handle:read("*a")
@@ -1218,5 +1224,103 @@ helpers.describe("layout composer (macOS): a layout macOS turns on at the next l
 		local id = assert(LayoutRegistry.composer_settings()).id
 		helpers.assert_true(state.pending[id] ~= nil and state.pending[id].select == true,
 			"the boot after the login selects it")
+	end)
+end)
+
+helpers.describe("layout editor files (macOS): the registry stores what the editor saves", function()
+	helpers.it("saves a source in the store folder and reopens it as the last one", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local saved
+		helpers.assert_true(LayoutRegistry.source_save({ filename = "mine.toml", text = "a = 1\n" },
+			function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[2]) .. " " .. tostring(saved[3]))
+		helpers.assert_eq(state.files["/cfg/layout_sources/mine.toml"], "a = 1\n")
+		local opened
+		helpers.assert_true(LayoutRegistry.source_open(function(data) opened = data end, deps))
+		helpers.assert_eq(opened.filename, "mine.toml")
+		helpers.assert_eq(opened.text, "a = 1\n")
+		local refused
+		LayoutRegistry.source_save({ filename = "../escape.toml", text = "x" }, function(...) refused = { ... } end, deps)
+		helpers.assert_eq(refused[1], false)
+		helpers.assert_eq(refused[2], "source_invalid_file")
+	end)
+
+	helpers.it("writes a download of the editor to the Downloads folder without replacing a file", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		deps.downloads_dir = function() return "/Users/u/Downloads" end
+		state.files["/Users/u/Downloads"] = ""
+		state.files["/Users/u/Downloads/mine.klc"] = "kept"
+		local written
+		helpers.assert_true(LayoutRegistry.source_export({ filename = "mine.klc", data = "//5r" },
+			function(...) written = { ... } end, deps))
+		helpers.assert_true(written[1], tostring(written[2]) .. " " .. tostring(written[3]))
+		helpers.assert_eq(written[4], "/Users/u/Downloads/mine (2).klc")
+		helpers.assert_eq(state.files["/Users/u/Downloads/mine (2).klc"], "\255\254k")
+		helpers.assert_eq(state.files["/Users/u/Downloads/mine.klc"], "kept")
+	end)
+
+	helpers.it("keeps Ergopti Studio's personal layouts in the editor folder (studio-layout-store)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local text = '{"id":"user_mine","rows":{"KeyQ":["q",null,null,null]}}'
+		local saved
+		helpers.assert_true(LayoutRegistry.studio_save({ id = "user_mine", text = text },
+			function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[2]) .. " " .. tostring(saved[3]))
+		helpers.assert_true(state.files["/cfg/layout_sources/studio_layouts.json"] ~= nil)
+		local listed
+		helpers.assert_true(LayoutRegistry.studio_list(function(...) listed = { ... } end, deps))
+		helpers.assert_eq(listed, { true, { text } })
+		local removed
+		helpers.assert_true(LayoutRegistry.studio_remove({ id = "user_mine" }, function(...) removed = { ... } end, deps))
+		helpers.assert_true(removed[1])
+		LayoutRegistry.studio_list(function(...) listed = { ... } end, deps)
+		helpers.assert_eq(listed, { true, {} })
+	end)
+
+	helpers.it("keeps one fingering profile as given and restores the defaults (studio-fingering-profile)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir = "/cfg/"
+		local loaded
+		helpers.assert_true(LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps))
+		helpers.assert_eq(loaded, { true }, "no saved profile is the defaults")
+		local text = '{"id":"mine","fingers":{"Digit6":"right_index"},"home":{}}'
+		local saved
+		helpers.assert_true(LayoutRegistry.studio_profile_save({ text = text }, function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[3]))
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text })
+		for _, refused in ipairs({ {}, { text = "" }, { text = "[1]" }, { text = "{broken" } }) do
+			LayoutRegistry.studio_profile_save(refused, function(...) saved = { ... } end, deps)
+			helpers.assert_eq(saved[2], "studio_invalid_layout")
+		end
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text }, "a refused profile changes nothing")
+		LayoutRegistry.studio_profile_save({ reset = true }, function(...) saved = { ... } end, deps)
+		helpers.assert_true(saved[1])
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true }, "reset restores the defaults")
+		state.files["/cfg/layout_sources/studio_profile.json"] = "{broken"
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded[1], false)
+		helpers.assert_eq(loaded[2], "studio_unreadable")
+	end)
+
+	helpers.it("reads only a generated corpus file for the Studio page (studio-corpus-tables)", function()
+		local LayoutRegistry, deps, state = manager({ files = shipped_files() })
+		deps.config_dir, deps.shared_dir = "/cfg/", "/shared/"
+		local script = 'var LAYOUT_ANALYSIS_CORPORA = {}; LAYOUT_ANALYSIS_CORPORA["fr_swann"] = {};\n'
+		state.files["/shared/ui/layout_analysis/_generated/corpus_fr_swann.js"] = script
+		local read
+		helpers.assert_true(LayoutRegistry.studio_corpus({ id = "fr_swann" }, function(...) read = { ... } end, deps))
+		helpers.assert_eq(read, { true, script, "studio_corpus_unavailable" })
+		-- An id can name no other file, and a corpus that is not shipped is refused.
+		for _, id in ipairs({ "../../layouts/data/defaults", "fr/swann", "FR", "", "absent_corpus" }) do
+			helpers.assert_true(LayoutRegistry.studio_corpus({ id = id }, function(...) read = { ... } end, deps))
+			helpers.assert_eq(read[1], false, id)
+			helpers.assert_eq(read[2], "studio_corpus_unavailable", id)
+		end
 	end)
 end)

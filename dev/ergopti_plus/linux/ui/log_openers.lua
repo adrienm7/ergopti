@@ -19,10 +19,10 @@
 
 local M = {}
 
-local Logger     = require("logger.shim")
-local LoggerSink = require("infra.logger_sink")
-local RegularFileReader = require("infra.regular_file_reader")
-local ErrorDescription = require("error_description")
+local Logger     = require("core.logger.engine.shim")
+local LoggerSink = require("core.logger.engine.sink")
+local RegularFileReader = require("core.fs.engine.regular_file_reader")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 
 local LOG = "log_openers"
 
@@ -63,8 +63,8 @@ end
 --- @param key string i18n key.
 --- @return boolean delivered
 local function notify_default(key)
-	local message = require("infra.i18n").get(key)
-	return require("adapters.application_notifier").send(message, { level = "info" }) == true
+	local message = require("core.i18n.engine.i18n").get(key)
+	return require("platform.focus.application_notifier").send(message, { level = "info" }) == true
 end
 
 

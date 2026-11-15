@@ -44,22 +44,22 @@
 
 local M = {}
 local hs           = hs
-local Logger       = require("infra.logger")
-local i18n         = require("infra.i18n")
-local Paths        = require("infra.paths")
+local Logger       = require("core.logger.engine.logger")
+local i18n         = require("core.i18n.engine.i18n")
+local Paths        = require("core.fs.engine.paths")
 local llm_progress = require("ui.download_window")
 local ApiCommon    = require("modules.llm.api_common")
-local TaskLifecycle = require("adapters.task_lifecycle")
-local TimerScheduler = require("adapters.timer_scheduler")
-local Timings = require("infra.timings")
+local TaskLifecycle = require("core.process.adapters.task_lifecycle")
+local TimerScheduler = require("core.events.timer_scheduler")
+local Timings = require("core.timing.engine.timings")
 local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owner")
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 local PythonInterpreter = require("adapters.python_interpreter")
 local NetworkEnv = require("modules.llm.network_env")
 local NetworkAdmission = require("modules.llm.opaque_network_admission")
-local TextUtils = require("text_utils")
-local NativePath = require("native_path")
+local TextUtils = require("core.text.engine.utils_core")
+local NativePath = require("core.fs.engine.native_path")
 
 local LOG = "mlx_deps"
 
@@ -156,8 +156,8 @@ local _active_tasks = {}
 -- when activation or cancellation refuses, and the task descriptor survives
 -- until its one native terminal callback proves process settlement.
 -- The bootstrap's named timers (initial, hide, deadline), owned from request
--- to native settlement by the shared slots (_shared/lua/owned_timer_slots.lua).
-local _timers = require("owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
+-- to native settlement by the shared slots (_shared/core/timing/engine/owned_timer_slots.lua).
+local _timers = require("core.timing.engine.owned_timer_slots").new({ scheduler = TimerScheduler, logger = Logger, log = LOG })
 local _owned_timers = _timers.slots
 local _task_owner = nil
 -- A failed receipt rollback remains owned even before a native task exists.
@@ -252,7 +252,7 @@ function M.venv_dir()
 	if config_ok and type(config_dir) == "string" and config_dir ~= "" then
 		local home_ok, home = pcall(os.getenv, "HOME")
 		if not home_ok or type(home) ~= "string" or home:sub(1, 1) ~= "/" then return nil end
-		return home .. "/" .. require("app_dirs").macos.support_relative .. "/mlx-venv"
+		return home .. "/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/mlx-venv"
 	end
 	local hs_root = resolve_hs_root()
 	return hs_root and (hs_root .. "/.venv") or nil

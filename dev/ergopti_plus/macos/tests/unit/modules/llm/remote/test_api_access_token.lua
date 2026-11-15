@@ -17,12 +17,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 local SHARED = helpers.driver_root() .. "/../_shared/"
-package.path = SHARED .. "lua/?.lua;" .. SHARED .. "lua/?/init.lua;" .. package.path
+package.path = SHARED .. "?.lua;" .. SHARED .. "?/init.lua;" .. package.path
 
-local Exchange = require("llm.api_token_exchange")
+local Exchange = require("ai.engine.api.token_exchange")
 
 --- Finds one upvalue, searching nested closures.
 local function find_upvalue(fn, target, seen)
@@ -204,7 +204,8 @@ helpers.describe("Access-token providers (macOS)", function()
 		api.prepare_access("ibm_fixture", "bad-key", function(ok, reason) again = { ok, reason } end)
 		helpers.assert_eq(#posts, 1, "no second exchange at once")
 		helpers.assert_eq(again[1], false)
-		helpers.assert_eq(again[2], "the token exchange answered HTTP 400")
+		helpers.assert_eq(again[2], "the token exchange answered HTTP 400: Provided API key could not be found",
+			"the service's own message explains the refusal (AID-2)")
 	end)
 
 	helpers.it("a Vertex AI service-account key is exchanged for a signed assertion, one slice per tick", function()

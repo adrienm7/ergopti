@@ -5,12 +5,12 @@
 --- DESCRIPTION:
 --- Verifies three structural invariants of the hexagonal architecture:
 ---
---- 1. ADAPTER PRESENCE — Every port spec in _shared/core/ports/*.spec.js has a
----    matching adapter file in static/ergopti_plus/windows/adapters/ and in
----    static/ergopti_plus/macos/adapters/. A missing adapter means a port
+--- 1. ADAPTER PRESENCE — Every port spec in _shared/core/ports/*.spec.js has an
+---    adapter listed in _shared/core/ports/adapters.json, on Windows and on macOS,
+---    and that file exists. A missing adapter means a port
 ---    contract exists on paper but is not honoured by a driver.
 ---
---- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/core/domain/*.spec.js
+--- 2. DOMAIN TEST COVERAGE — Every domain spec in _shared/core/text/data/domain/*.spec.js
 ---    has at least one corresponding test file in at least one driver's test
 ---    suite. An untested domain spec is a dead letter.
 ---
@@ -84,13 +84,6 @@ local function base_name(path)
 	return name:gsub("%.[^.]+$", ""):gsub("%.spec$", "")
 end
 
---- Converts a PascalCase identifier to snake_case.
---- @param s string PascalCase string (e.g. "KeyboardHook").
---- @return string snake_case string (e.g. "keyboard_hook").
-local function to_snake_case(s)
-	return s:gsub("(%u)", function(c) return "_" .. c:lower() end):gsub("^_", "")
-end
-
 
 
 
@@ -103,9 +96,17 @@ end
 
 helpers.describe("meta: port-adapter coverage", function()
 	local shared_ports  = SHARED_DIR .. "/core/ports"
-	local ahk_adapters  = REPO_ROOT .. "/static/ergopti_plus/windows/adapters"
-	local hs_adapters   = REPO_ROOT .. "/static/ergopti_plus/macos/adapters"
-	local linux_adapters = REPO_ROOT .. "/static/ergopti_plus/linux/adapters"
+	-- Where each adapter lives, by repository path: the structure plan moves
+	-- adapters into the features they serve, often renamed, so the table
+	-- (shared with tools/test/test-port-adapter-matrix.cjs) follows each move.
+	local table_fh = assert(io.open(shared_ports .. "/adapters.json", "r"), "adapters.json is unreadable")
+	local adapters = require("core.text.engine.json").decode(table_fh:read("a")).adapters
+	table_fh:close()
+	local function adapter_path(port, driver)
+		local homes = adapters[port]
+		local rel = homes and homes[driver]
+		return rel and (REPO_ROOT .. "/" .. rel) or ("(no " .. driver .. " entry in adapters.json)")
+	end
 
 	local spec_files   = list_files(shared_ports, "js")
 	local missing_ahk  = 0
@@ -118,10 +119,9 @@ helpers.describe("meta: port-adapter coverage", function()
 		spec_count = spec_count + 1
 
 		local raw_name    = base_name(spec_path)
-		local snake_name  = to_snake_case(raw_name)
-		local ahk_file    = ahk_adapters   .. "/" .. snake_name .. ".ahk"
-		local hs_file     = hs_adapters    .. "/" .. snake_name .. ".lua"
-		local linux_file  = linux_adapters .. "/" .. snake_name .. ".lua"
+		local ahk_file    = adapter_path(raw_name, "windows")
+		local hs_file     = adapter_path(raw_name, "macos")
+		local linux_file  = adapter_path(raw_name, "linux")
 
 		local ahk_fh = io.open(ahk_file, "r")
 		if ahk_fh then
@@ -195,7 +195,7 @@ end)
 -- =================================================
 
 helpers.describe("meta: domain spec test coverage", function()
-	local domain_dir = SHARED_DIR .. "/core/domain"
+	local domain_dir = SHARED_DIR .. "/core/text/data/domain"
 	local ahk_tests  = REPO_ROOT .. "/static/ergopti_plus/windows/tests"
 	local hs_tests   = REPO_ROOT .. "/static/ergopti_plus/macos/tests"
 
@@ -242,7 +242,7 @@ helpers.describe("meta: domain spec test coverage", function()
 	end
 
 	helpers.it(string.format("every domain spec has a driver test (%d specs)", spec_count), function()
-		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/core/domain — check REPO_ROOT")
+		helpers.assert_true(spec_count > 0, "no *.spec.js files found in _shared/core/text/data/domain — check REPO_ROOT")
 		helpers.assert_true(uncovered == 0,
 			string.format("%d domain spec(s) have no driver test", uncovered))
 	end)
@@ -279,8 +279,8 @@ end)
 -- history above records paying for, bump after bump, as though prose were an
 -- OS call. The ratchet is tighter than it has ever been now, because the
 -- numbers finally mean what they say.
-local LUA_HS_BASELINE       = 634  -- hs.* calls in macos/modules/ and macos/infra/ (+1 from the 2026-07-22 audit's Space-edge perf fix: modules/gestures/actions.lua's _cached_all_spaces adds one hs.timer.secondsSinceEpoch() to age a short-lived cache of the Space LAYOUT — a NET REDUCTION in OS work, since it removes an hs.spaces.allSpaces() private-API round-trip from every space navigation on the gesture frame callback, where a stall shows up directly as input lag; the sibling logger flush fix in the same pass was deliberately made count-based rather than time-based so it needed no clock read at all. bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into infra/personal_hotstrings during boot-orchestrator thinning; +4 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +2 from PF-1: modules/keystats/timestamp.lua:13,16 and modules/llm/api_common.lua:151 are pure docstring/comment mentions of hs.* (this scanner does not skip comments) — NOT new OS calls, a documented false-positive class of this meta-test. The other PF-1 contributors were fixed rather than baseline-bumped: the CapsWord probe watchdog in platform/remap/watchers.lua now schedules through adapters/timer_scheduler instead of raw hs.timer.doAfter, and the duplicated "Respects per-section enable/disable state stored in hs.settings." docstring copy-pasted from registry_index.lua into registry_groups.lua's load_toml was reworded to point at the actual owner instead of repeating the implementation detail. modules/shortcuts/actions/system_pixel.lua:19's `local pasteboard = hs.pasteboard` is a genuine 4th copy of the same one-line alias created when system.lua was split into sub-modules (each is a separate Lua chunk needing its own upvalue — inlining it at the single call site would not reduce the count, since the hs.pasteboard reference would just move to that line instead) — counted here as unavoidable, not deduped further; +1 from F-MED-18: platform/remap/ke_lifecycle.lua's notify_karabiner_ready() cooldown branch now arms a genuine hs.timer.doAfter retry so a deferred "Karabiner ready" notification is no longer silently dropped forever — this whole module already uses raw hs.timer.doAfter extensively and is not yet migrated to adapters/timer_scheduler, so this one new call is left consistent with its many untouched siblings rather than converting a single call site in isolation; +7 from the 2026-07-01 audit's parallel multi-group implementation pass: each fix group verified its OWN hs.* delta in an isolated worktree before merging, so no single group saw the cumulative total. Traced line-by-line post-merge: modules/llm/init.lua +3 (two new Logger.error() strings and one comment in auto_detect_backend/set_active_profile literally spell out "hs.http.asyncGet"/describe hs.timer.doAfter while fixing F-MED-5/F-MED-6 — no new API call, the underlying asyncGet/doAfter call sites are unchanged), modules/llm/api_token_crypto.lua +1 and modules/llm/api_remote.lua +1 (new docstrings for F-MED-9's decrypt_async/prewarm_active_entry_decrypt reference "hs.execute"/"hs.settings"/"hs.task" descriptively), modules/llm/mlx_deps_checker.lua +1 (F-LOW-10's reset_bootstrap_state docstring mentions "hs.task"), and +1 from a cross-group blind spot the same way (another comment-only mention, same false-positive class) — all 7 confirmed to be comment/log-string text, not new OS call sites; verified via `git diff <pre-merge>..HEAD -- modules lib` that no actual new hs.* call was introduced; +2 from DC-1: modules/keystats/aggregator/core.lua's load_shared_kc_to_finger() adds one genuine `pcall(hs.json.decode, content)` call to load the shared azerty.json keycode catalogue — the exact same load-shared-JSON-at-module-level pattern modules/shortcuts/actions/text.lua's load_shared_groups() already uses for the wrap-symbols catalogue (already counted in this baseline) — plus one PF-1-class comment mention ("hs.json.decode rejects it" in the BOM-stripping comment, same line-adjacent to the real call); +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one genuine `pcall(hs.json.decode, raw)` to load the shared _shared/modules/hotstrings/priority.json collision-priority tiers (dropping the hand-copied literals per plan item 14), the same load-shared-JSON-at-module-level pattern as DC-1 above. +1 from 2026-07-29: modules/keymap/utils.lua gained a COMMENT naming hs.window.timeout() while explaining why the ignored-window AX probe is served from cache and refreshed off the tap — this scanner does not strip comments, so it is a documented false positive, NOT a new OS call; verified with `git diff -- modules lib` showing the only added hs. token is inside a comment block.
-local LUA_IO_OS_BASELINE    = 75   -- io.open / os.execute calls in macos/modules/ and macos/infra/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into infra/personal_hotstrings; +5 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one io.open to read the shared _shared/modules/hotstrings/priority.json before decoding it — a genuine module-level shared-data load replacing the hand-copied priority literals per plan item 14; +1 / -1 from moving ui/menu/preferences.lua to infra/preferences.lua (2026-08-02, Lot 5): config persistence used outside the menu — init.lua and ui/onboarding both require it — so it is cross-cutting plumbing, not menu code. The driver's total is UNCHANGED; this is the per-tree design working as intended, and the reason each tree got its own frozen pair in the first place. The UI baselines below drop by the same amount, so the relocation cannot be used to launder OS calls in either direction. +5 / -5 the same way from extracting the resolution half of ui/menu/menu_paths.lua into infra/config_paths.lua (2026-08-02, Lot 7): the paths.toml read/write and the mkdir fallback moved tree, the driver total is unchanged, and the UI pair below drops by the same five.)
+local LUA_HS_BASELINE       = 634  -- hs.* calls in macos/modules/ and macos/infra/ (+1 from the 2026-07-22 audit's Space-edge perf fix: modules/gestures/actions.lua's _cached_all_spaces adds one hs.timer.secondsSinceEpoch() to age a short-lived cache of the Space LAYOUT — a NET REDUCTION in OS work, since it removes an hs.spaces.allSpaces() private-API round-trip from every space navigation on the gesture frame callback, where a stall shows up directly as input lag; the sibling logger flush fix in the same pass was deliberately made count-based rather than time-based so it needed no clock read at all. bumped: hs.timer.secondsSinceEpoch() added to vscode_bridge for AX-call TTL cache +1, and ke_lifecycle.kill_async for microsecond-precision script path +1; +2 from relocating hs.fs.attributes + hs.json.decode out of init.lua into infra/personal_hotstrings during boot-orchestrator thinning; +4 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +2 from PF-1: modules/keystats/timestamp.lua:13,16 and modules/llm/api_common.lua:151 are pure docstring/comment mentions of hs.* (this scanner does not skip comments) — NOT new OS calls, a documented false-positive class of this meta-test. The other PF-1 contributors were fixed rather than baseline-bumped: the CapsWord probe watchdog in platform/remap/watchers.lua now schedules through adapters/timer_scheduler instead of raw hs.timer.doAfter, and the duplicated "Respects per-section enable/disable state stored in hs.settings." docstring copy-pasted from registry_index.lua into registry_groups.lua's load_toml was reworded to point at the actual owner instead of repeating the implementation detail. modules/shortcuts/actions/system_pixel.lua:19's `local pasteboard = hs.pasteboard` is a genuine 4th copy of the same one-line alias created when system.lua was split into sub-modules (each is a separate Lua chunk needing its own upvalue — inlining it at the single call site would not reduce the count, since the hs.pasteboard reference would just move to that line instead) — counted here as unavoidable, not deduped further; +1 from F-MED-18: platform/remap/ke_lifecycle.lua's notify_karabiner_ready() cooldown branch now arms a genuine hs.timer.doAfter retry so a deferred "Karabiner ready" notification is no longer silently dropped forever — this whole module already uses raw hs.timer.doAfter extensively and is not yet migrated to adapters/timer_scheduler, so this one new call is left consistent with its many untouched siblings rather than converting a single call site in isolation; +7 from the 2026-07-01 audit's parallel multi-group implementation pass: each fix group verified its OWN hs.* delta in an isolated worktree before merging, so no single group saw the cumulative total. Traced line-by-line post-merge: modules/llm/init.lua +3 (two new Logger.error() strings and one comment in auto_detect_backend/set_active_profile literally spell out "hs.http.asyncGet"/describe hs.timer.doAfter while fixing F-MED-5/F-MED-6 — no new API call, the underlying asyncGet/doAfter call sites are unchanged), modules/llm/api_token_crypto.lua +1 and modules/llm/api_remote.lua +1 (new docstrings for F-MED-9's decrypt_async/prewarm_active_entry_decrypt reference "hs.execute"/"hs.settings"/"hs.task" descriptively), modules/llm/mlx_deps_checker.lua +1 (F-LOW-10's reset_bootstrap_state docstring mentions "hs.task"), and +1 from a cross-group blind spot the same way (another comment-only mention, same false-positive class) — all 7 confirmed to be comment/log-string text, not new OS call sites; verified via `git diff <pre-merge>..HEAD -- modules lib` that no actual new hs.* call was introduced; +2 from DC-1: modules/keystats/aggregator/core.lua's load_shared_kc_to_finger() adds one genuine `pcall(hs.json.decode, content)` call to load the shared azerty.json keycode catalogue — the exact same load-shared-JSON-at-module-level pattern modules/shortcuts/actions/text.lua's load_shared_groups() already uses for the wrap-symbols catalogue (already counted in this baseline) — plus one PF-1-class comment mention ("hs.json.decode rejects it" in the BOM-stripping comment, same line-adjacent to the real call); +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one genuine `pcall(hs.json.decode, raw)` to load the shared _shared/hotstrings/data/catalogue/priority.json collision-priority tiers (dropping the hand-copied literals per plan item 14), the same load-shared-JSON-at-module-level pattern as DC-1 above. +1 from 2026-07-29: modules/keymap/utils.lua gained a COMMENT naming hs.window.timeout() while explaining why the ignored-window AX probe is served from cache and refreshed off the tap — this scanner does not strip comments, so it is a documented false positive, NOT a new OS call; verified with `git diff -- modules lib` showing the only added hs. token is inside a comment block.
+local LUA_IO_OS_BASELINE    = 75   -- io.open / os.execute calls in macos/modules/ and macos/infra/ (bumped after errors-sink + diagnostic + menu + sg feature work; +1 from relocating the priority.json io.open out of init.lua into infra/personal_hotstrings; +5 from audit F4 relocating the keyboard-layout install/TIS glue out of ui/menu/menu_keyboard_layout.lua into modules/keymap/{layout_install,input_sources} — not new OS calls, ui/ is outside this scan; +1 from DC-4: modules/keymap/registry.lua's _load_priority_tiers() adds one io.open to read the shared _shared/hotstrings/data/catalogue/priority.json before decoding it — a genuine module-level shared-data load replacing the hand-copied priority literals per plan item 14; +1 / -1 from moving ui/menu/preferences.lua to infra/preferences.lua (2026-08-02, Lot 5): config persistence used outside the menu — init.lua and ui/onboarding both require it — so it is cross-cutting plumbing, not menu code. The driver's total is UNCHANGED; this is the per-tree design working as intended, and the reason each tree got its own frozen pair in the first place. The UI baselines below drop by the same amount, so the relocation cannot be used to launder OS calls in either direction. +5 / -5 the same way from extracting the resolution half of ui/menu/menu_paths.lua into infra/config_paths.lua (2026-08-02, Lot 7): the paths.toml read/write and the mkdir fallback moved tree, the driver total is unchanged, and the UI pair below drops by the same five.)
 
 -- macos/ui/ — the menus and windows. First measured 2026-07-31 at 630 hs.* and
 -- 65 io.open/os.execute lines; not a regression, this tree had simply never been
@@ -315,6 +315,9 @@ helpers.describe("meta: _shared/ code purity", function()
 	for _, file_path in ipairs(shared_files) do
 		-- Skip spec files — they may reference pattern names in documentation strings
 		if file_path:match("%.spec%.js$") then goto continue end
+		-- Generated tables are a tool's data output, not shared logic; their
+		-- embedded _comment text names files such as codegen-*-hs.cjs.
+		if file_path:find("/_generated/", 1, true) then goto continue end
 		scanned = scanned + 1
 
 		local body = SourceFile.read(file_path)
@@ -383,7 +386,13 @@ local function count_lua_pattern(files, pattern, adapters_prefix)
 	local count = 0
 	local details = {}
 	for _, file_path in ipairs(files) do
-		if file_path:find(adapters_prefix, 1, true) then goto continue end
+		-- Every adapters/ folder is the isolation layer, the driver's own and a
+		-- feature's (core/ui/adapters): a structure move must not turn an
+		-- adapter's OS calls into a regression of the tree it lands in.
+		if file_path:find(adapters_prefix, 1, true)
+			or file_path:find("/adapters/", #DRIVER_ROOT, true) then
+			goto continue
+		end
 		local body = SourceFile.read(file_path)
 		local line_num = 0
 		for line in (body .. "\n"):gmatch("([^\n]*)\n") do
@@ -471,9 +480,12 @@ helpers.describe("meta: lua module OS-API purity baseline", function()
 	local macos_root = DRIVER_ROOT
 
 	local all_lua_files = {}
-	for _, dir in ipairs({ "modules", "infra", "platform" }) do
+	for _, dir in ipairs({ "modules", "infra", "platform", "core" }) do
 		for _, f in ipairs(list_files(macos_root .. dir, "lua")) do
-			all_lua_files[#all_lua_files + 1] = f
+			-- A UI source counts in the ui pair below, wherever it lives.
+			if not helpers.is_ui_source(f:sub(#DRIVER_ROOT + 1)) then
+				all_lua_files[#all_lua_files + 1] = f
+			end
 		end
 	end
 
@@ -483,7 +495,15 @@ end)
 -- The menus and windows. Every hs.* line here is a call the UI makes without
 -- going through a port, and the tree is two thirds the size of modules+lib.
 helpers.describe("meta: lua ui OS-API purity baseline", function()
-	purity_ratchet("ui", list_files(DRIVER_ROOT .. "ui", "lua"), LUA_HS_BASELINE_UI, LUA_IO_OS_BASELINE_UI)
+	-- Every UI source of the driver, wherever its feature keeps it.
+	local ui_files = {}
+	for _, f in ipairs(list_files(DRIVER_ROOT, "lua")) do
+		local relative = f:sub(#DRIVER_ROOT + 1)
+		if not relative:match("^tests/") and helpers.is_ui_source(relative) then
+			ui_files[#ui_files + 1] = f
+		end
+	end
+	purity_ratchet("ui", ui_files, LUA_HS_BASELINE_UI, LUA_IO_OS_BASELINE_UI)
 end)
 
 -- The entry point. list_files is recursive, so it is named directly rather than

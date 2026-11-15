@@ -28,8 +28,8 @@
 local helpers = require("tests.helpers")
 
 package.loaded["modules.llm.prediction_engine"] = nil
-package.loaded["infra.logger"] = nil
-helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Minimal core_llm surface: prediction_engine reads DEFAULT_STATE at load time
 -- and queries the backend during perform_check, which this test never reaches.
@@ -56,8 +56,6 @@ package.loaded["modules.llm.app_filter"] = {
 package.loaded["modules.llm.streaming_handler"] = {
 	init                = function(_cfg) return true end,
 	build_callbacks     = function(_cfg) return function() end, function() end, function() end end,
-	arm_watchdog        = function(_cfg) return true end,
-	stop_watchdog       = function() return true end,
 	reset_failure_count = function() end,
 	cancel_streaming    = function() return true end,
 }
@@ -65,10 +63,10 @@ package.loaded["modules.llm.api_common"] = {
 	MIN_CALL_INTERVAL_SEC         = 0.5,
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 }
-package.loaded["infra.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
-package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["core.i18n.engine.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
+package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 -- set_navigate_callback and set_enter_validates are called at module load time.
-package.loaded["ui.tooltip"] = {
+package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,
 	set_enter_validates   = function(_) end,
 	set_chain_start       = function(_) return true end,

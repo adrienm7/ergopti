@@ -55,13 +55,13 @@ end
 -- is a separate production debt. The stock builder's daily loop remains below.
 local function with_foreground(port, callback)
 	helpers.with_stub_scope({
-		"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "adapters.shell_runner",
-		"core.llm.managed_ollama_daemon_receipt", "core.llm.managed_ollama_daemon_lifecycle",
+		"modules.llm.api_ollama", "adapters.managed_ollama_daemon", "core.process.adapters.shell_runner",
+		"core.lifecycle.engine.core.managed_ollama_daemon_receipt", "core.lifecycle.engine.core.managed_ollama_daemon_lifecycle",
 		"modules.llm.ollama_binary", "modules.llm.ollama_server_command", "modules.llm.managed_native_python",
-		"modules.llm.ollama_endpoint", "adapters.file_system", "adapters.task_lifecycle",
-		"adapters.http_client", "adapters.timer_scheduler", "adapters.json_codec",
+		"modules.llm.ollama_endpoint", "core.fs.adapters.file_system", "core.process.adapters.task_lifecycle",
+		"core.network.adapters.http_client", "core.events.timer_scheduler", "core.fs.adapters.json_codec",
 		"modules.llm.api_common", "modules.llm.parser", "modules.llm.profiles",
-		"modules.llm.progressive_reveal", "infra.logger", "infra.notifications", "infra.i18n",
+		"modules.llm.progressive_reveal", "core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n",
 		"modules.shortcuts.script_control", "ui.menu.menu_llm.models_manager_ollama",
 		"ui.menu.menu_llm.requirement_operation_registry",
 	}, function()
@@ -70,24 +70,24 @@ local function with_foreground(port, callback)
 		local owner_script = helpers.driver_root() .. "modules/llm/managed_ollama_serve.py"
 		local logger = helpers.make_logger_stub()
 		logger.today_log_path = function() return SENTINEL_LOG end
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.notifications"] = { notify = function() return true end }
-		package.loaded["adapters.http_client"] = { new = function()
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.ui.engine.notifications"] = { notify = function() return true end }
+		package.loaded["core.network.adapters.http_client"] = { new = function()
 			return { cancel = function() return true end, isActive = function() return false end,
 				isSettled = function() return true end }
 		end }
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			after = function() error("rollover context control must not acquire a detached launch or readiness timer") end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
+		package.loaded["core.fs.adapters.json_codec"] = { encode = function() return "{}" end, decode = function() return {} end }
 		package.loaded["modules.llm.ollama_binary"] = {
 			SOURCE_NATIVE_MANAGED = "native_managed",
 			resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 			native_candidate = function() return "/fixture/ollama", { admission = 30, idle = 60, retirement = 10 } end,
 		}
 		package.loaded["modules.llm.managed_native_python"] = { resolve = function() return "/fixture/python" end }
-		package.loaded["adapters.file_system"] = { exists = function(path)
+		package.loaded["core.fs.adapters.file_system"] = { exists = function(path)
 			helpers.assert_eq(path, owner_script, "the real builder must ask for its canonical source owner")
 			return true
 		end }
@@ -127,7 +127,7 @@ local function with_foreground(port, callback)
 			fixture.builds[#fixture.builds + 1] = table.pack(...)
 			return build(...)
 		end
-		fixture.api, fixture.overrides, fixture.shell = api, overrides, require("adapters.shell_runner")
+		fixture.api, fixture.overrides, fixture.shell = api, overrides, require("core.process.adapters.shell_runner")
 		fixture.owner_script, fixture.nonce = owner_script, nonce
 		local ok, err = xpcall(function() callback(fixture) end, debug.traceback)
 		for _, task in ipairs(fixture.tasks) do
@@ -138,7 +138,7 @@ local function with_foreground(port, callback)
 end
 
 local function assert_native_context(fixture, task, port)
-	local text_utils = require("infra.text_utils")
+	local text_utils = require("core.text.engine.utils")
 	helpers.assert_eq(#fixture.builds, 1, "only the API may build the foreground daemon command")
 	local input = fixture.builds[1]
 	helpers.assert_eq(input.n, 5)
@@ -165,7 +165,7 @@ end
 helpers.describe("Ollama daemon log rollover", function()
 	helpers.it("POSIX-quotes the executable and stable configured directory", function()
 		local Builder = require("modules.llm.ollama_server_command")
-		local text_utils = require("infra.text_utils")
+		local text_utils = require("core.text.engine.utils")
 		local ollama_bin = "/Applications/Ollama O'Brien/$bin/ollama"
 		local log_dir = "/Users/O'Brien/$logs/Ergopti Logs"
 		local command, command_err = Builder.build(
@@ -236,7 +236,7 @@ helpers.describe("Ollama daemon log rollover", function()
 	end)
 
 	helpers.it("delegates a verified runtime's daemon launch to ApiOllama ownership", function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local original_log = Logger.today_log_path
 		local previous_progress = package.loaded["ui.download_window"]
@@ -264,7 +264,7 @@ helpers.describe("Ollama daemon log rollover", function()
 				return true
 			end,
 		}
-		package.loaded["adapters.task_lifecycle"] = nil
+		package.loaded["core.process.adapters.task_lifecycle"] = nil
 		Logger.today_log_path = function() return SENTINEL_LOG end
 
 		local Checker = helpers.load_with_stubs("modules.llm.ollama_deps_checker", {

@@ -15,7 +15,7 @@ local load_inventory_context = fixtures.load_inventory_context
 
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
-	local input = package.loaded["adapters.synthetic_input"]
+	local input = package.loaded["platform.input.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end
 		tx.status, tx.sealed = status, true
@@ -55,7 +55,7 @@ local function load_real_wpm_surface(module_name)
 	local cancel_mode = "true"
 	local handles = {}
 	local cancellations = {}
-	package.loaded["adapters.timer_scheduler"] = {
+	package.loaded["core.events.timer_scheduler"] = {
 		every = function(_, callback)
 			local handle = { callback = callback }
 			handles[#handles + 1] = handle
@@ -69,7 +69,7 @@ local function load_real_wpm_surface(module_name)
 			return true
 		end,
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.keystats"] = {
 		get_live_stats = function() return { wpm = 0 } end,
 	}
@@ -81,13 +81,13 @@ local function load_real_wpm_surface(module_name)
 	}
 	-- A healthy idle surface still needs its canonical display configuration.
 	-- Keep only the scheduler timings controlled by this ownership fixture.
-	package.loaded["infra.paths"] = { shared = helpers.shared }
-	package.loaded["infra.timings"] = {
+	package.loaded["core.fs.engine.paths"] = { shared = helpers.shared }
+	package.loaded["core.timing.engine.timings"] = {
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,
 	}
-	package.loaded["adapters.graphics_renderer"] = {}
-	package.loaded["ui.tooltip"] = { is_visible = function() return false end }
+	package.loaded["core.ui.adapters.graphics_renderer"] = {}
+	package.loaded["core.ui.ui.tooltip"] = { is_visible = function() return false end }
 	reset_module(module_name)
 	local surface = require(module_name)
 	return surface, {
@@ -150,9 +150,9 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		return "selected words"
 	end
 	hs_stub.pasteboard.writeAllData = function() return true end
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = { sec = function() return 0.2 end }
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		emit_key_stroke = function() return true end,
 		defer_after_callback = function() return false end,
 	}, { __index = function() return function() return true end end })
@@ -185,12 +185,12 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 		})
 		package.loaded["modules.gestures.engine"] = gesture_engine
 		package.loaded["modules.gestures.conflicts"] = permissive()
-		package.loaded["infra.notifications"] = { notify = function() end }
+		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}
-		package.loaded["adapters.timer_scheduler"] = permissive({
+		package.loaded["core.events.timer_scheduler"] = permissive({
 			cancel = function() return true end,
 		})
 		package.loaded["modules.gestures"] = nil

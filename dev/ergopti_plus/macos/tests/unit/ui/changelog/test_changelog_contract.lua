@@ -26,7 +26,7 @@ helpers.describe("Changelog Bridge Contract", function()
 		with_changelog(function(changelog, state, post)
 			helpers.assert_true(changelog.open())
 			local logged = {}
-			local Logger = package.loaded["infra.logger"]
+			local Logger = package.loaded["core.logger.engine.logger"]
 			local original_warn = Logger.warn
 			Logger.warn = function(_, fmt, ...) logged[#logged + 1] = string.format(fmt, ...) end
 			for _, refused in ipairs({

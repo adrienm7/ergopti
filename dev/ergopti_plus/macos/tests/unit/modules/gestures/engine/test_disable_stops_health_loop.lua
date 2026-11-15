@@ -27,7 +27,7 @@ local with_fixture = require("tests.support.gesture_runtime_fixture").with_fixtu
 --- @return table active Active handles in creation order.
 local function active_timers()
 	local active = {}
-	for _, handle in ipairs(require("adapters.timer_scheduler").handles) do
+	for _, handle in ipairs(require("core.events.timer_scheduler").handles) do
 		if handle.active then active[#active + 1] = handle end
 	end
 	return active
@@ -109,7 +109,7 @@ helpers.describe("gestures runtime exists only while Gestures is ON", function()
 			helpers.assert_eq(#runtime.primer_handles, 0, "OFF must never construct a primer")
 			helpers.assert_eq(runtime.frame_callback_registrations, 0,
 				"OFF must never register a touch frame callback")
-			helpers.assert_eq(#require("adapters.timer_scheduler").handles, 0,
+			helpers.assert_eq(#require("core.events.timer_scheduler").handles, 0,
 				"OFF must never arm a discovery timer")
 			helpers.assert_eq(#runtime.wake_handles, 0, "OFF must never construct a wake watcher")
 			assert_runtime_released(runtime, watcher, "boot OFF")

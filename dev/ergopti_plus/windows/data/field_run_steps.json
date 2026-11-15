@@ -1,5 +1,5 @@
 {
-	"_comment": "The Windows developer field run's steps, run by infra/field_run.ahk under the shared protocol (_shared/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each step is a Debug tray check run without its window: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
+	"_comment": "The Windows developer field run's steps, run by infra/field_run.ahk under the shared protocol (_shared/diagnostics/data/field_run_protocol.json) when tools/dev/collect-windows-field-report.ps1 asks a developer driver started from this clone. Each step is a Debug tray check run without its window: no person is needed. A request names its own deadline within deadline_seconds; the default covers every step at its own deadline.",
 	"deadline_seconds": { "default": 300, "min": 30, "max": 1800 },
 	"steps": [
 		{

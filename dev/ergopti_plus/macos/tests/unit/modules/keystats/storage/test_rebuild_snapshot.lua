@@ -4,8 +4,8 @@
 local function child()
  local root, temporary = assert(arg[3]), assert(arg[2])
  local driver = root .. '/static/ergopti_plus/macos'
- package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. root .. '/static/ergopti_plus/_shared/lua/?.lua;' .. root .. '/static/ergopti_plus/_shared/lua/?/init.lua;' .. package.path
- local json = require('json')
+ package.path = driver .. '/?.lua;' .. driver .. '/?/init.lua;' .. root .. '/static/ergopti_plus/_shared/?.lua;' .. root .. '/static/ergopti_plus/_shared/?/init.lua;' .. package.path
+ local json = require('core.text.engine.json')
  local function request(message)
   message.kind = 'request'; assert(io.stdout:write(json.encode(message) .. '\n')); assert(io.stdout:flush())
   return assert(json.decode(assert(io.stdin:read('*l'))))
@@ -20,7 +20,7 @@ local function child()
  local clock_calls = 0
  local function clock() clock_calls = clock_calls + 1; return case == 'budget' and clock_calls > 1 and 300000001 or 0 end
  if case == 'quarantinelease' then
-  local helpers = require('tests.helpers'); package.loaded['infra.logger'] = helpers.make_logger_stub()
+  local helpers = require('tests.helpers'); package.loaded['core.logger.engine.logger'] = helpers.make_logger_stub()
   local writer = helpers.load_with_stubs('modules.keystats.sqlite_writer', { sqlite3 = sqlite })
   for i=1,math.huge do local name=debug.getupvalue(writer.get_db,i); assert(name)
    if name == '_db' then debug.setupvalue(writer.get_db,i,owner); break end end
@@ -84,7 +84,7 @@ local function child()
 end
 if arg and arg[0] and arg[0]:match('test_rebuild_snapshot%.lua$') then child(); return end
 local helpers = require('tests.helpers')
-local quote = require('text_utils').shell_quote
+local quote = require('core.text.engine.utils_core').shell_quote
 local source = assert(debug.getinfo(1, 'S').source):gsub('^@', '')
 helpers.describe('SQLite rebuild snapshot', function()
  for _, case in ipairs({ 'normal', 'finish', 'cancel', 'same', 'external', 'switched', 'commit', 'targetfinish', 'budget', 'quarantinelease' }) do

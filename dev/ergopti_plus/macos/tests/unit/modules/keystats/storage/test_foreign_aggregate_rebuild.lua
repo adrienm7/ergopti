@@ -56,10 +56,10 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	end)
 
 	helpers.it("skips an unidentifiable foreign folder instead of rebuilding it forever", function()
-		helpers.with_stub_scope({ "infra.logger", "infra.fs_dir", "modules.keystats.export" }, function()
+		helpers.with_stub_scope({ "core.logger.engine.logger", "core.fs.engine.dir", "modules.keystats.export" }, function()
 			local ledger_opens, sql_calls, rebuilds, device_rows = 0, 0, 0, 0
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 			local export = helpers.load_with_stubs("modules.keystats.export", {
 				fs = { attributes = function() return { size = 100 } end },
 			})
@@ -96,8 +96,8 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	end)
 
 	helpers.it("requires current matching metadata even when a device row already exists", function()
-		helpers.with_stub_scope({ "infra.fs_dir", "modules.keystats.export" }, function()
-			package.loaded["infra.fs_dir"] = { try_entries = function() return { "foreign" }, true end }
+		helpers.with_stub_scope({ "core.fs.engine.dir", "modules.keystats.export" }, function()
+			package.loaded["core.fs.engine.dir"] = { try_entries = function() return { "foreign" }, true end }
 			local export = helpers.load_with_stubs("modules.keystats.export", {
 				fs = { attributes = function() return { size = 100 } end },
 			})
@@ -162,7 +162,7 @@ helpers.describe("keystats: foreign sync rebuilds UI aggregate partitions", func
 	helpers.it("migrates existing aggregate caches, not only a brand-new tmp cache", function()
 		local manager = read_source("local function _mark_aggregate_cache_rebuilt") -- modules/keystats/log_manager.lua
 		local writer = read_source("local function _read_schema_sql") -- modules/keystats/sqlite_writer.lua
-		local schema = read_shared("data/db/schema.sql")
+		local schema = read_shared("metrics/data/db/schema.sql")
 		helpers.assert_true(manager:find("aggregate_cache_revision", 1, true) ~= nil,
 			"log manager must gate rebuilds with a durable aggregate-cache revision")
 		helpers.assert_true(writer:find('{ "aggregate_cache_revision", "0" }', 1, true) ~= nil,
@@ -177,15 +177,15 @@ helpers.describe("keystats-device-log-privacy", function()
 	for _, phase in ipairs({ "clear", "replay" }) do
 		helpers.it("keystats-device-log-privacy: " .. phase .. " refusal keeps its error without logging the device prefix", function()
 			helpers.with_stub_scope({
-				"infra.logger", "adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
+				"core.logger.engine.logger", "core.fs.adapters.ledger_append", "modules.keystats.log_manager", "modules.keystats.sqlite_writer",
 				"modules.keystats.aggregator", "modules.keystats.rotation", "modules.keystats.export",
-				"keystats.metrics", "adapters.file_system", "adapters.timer_scheduler",
+				"metrics.engine.metrics", "core.fs.adapters.file_system", "core.events.timer_scheduler",
 			}, function()
 				local messages, queries = {}, {}
 				local identity = "private-foreign-device"
 				local logger = helpers.make_logger_stub()
 				logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
-				package.loaded["infra.logger"] = logger
+				package.loaded["core.logger.engine.logger"] = logger
 				local db = {}
 				function db:exec(sql)
 					queries[#queries + 1] = sql

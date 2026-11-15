@@ -5,17 +5,17 @@
 -- Retain the native loop issuer before the fixture snapshots package.loaded.
 local NativeLoop = require("luv")
 local helpers = require("tests.helpers")
-local Codec = require("toml_codec")
-local Shared = require("tap_hold.key_combinations")
-local KeyCatalog = require("tap_hold.key_catalog")
-local HoldOptions = require("tap_hold.hold_options")
+local Codec = require("core.text.engine.toml_codec")
+local Shared = require("tap_hold.engine.key_combinations")
+local KeyCatalog = require("tap_hold.engine.key_catalog")
+local HoldOptions = require("tap_hold.engine.hold_options")
 local function with_menu(body)
 	local saved = {}; for name,value in pairs(package.loaded) do saved[name]=value end
 	local ok,err=pcall(function()
 		require("tests.support.key_combination_declaration_fixture").install_unavailable()
-		local Paths=require("infra.paths")
-		local file=assert(io.open(Paths.shared("tap_hold/defaults.toml"),"rb"));local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
-		file=assert(io.open(Paths.shared("data/locales/en.json"),"rb"));local locale=require("json").decode(file:read("*a"));assert(file:close())
+		local Paths=require("core.fs.engine.paths")
+		local file=assert(io.open(Paths.shared("tap_hold/data/defaults.toml"),"rb"));local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
+		file=assert(io.open(Paths.shared("core/i18n/data/locales/en.json"),"rb"));local locale=require("core.text.engine.json").decode(file:read("*a"));assert(file:close())
 		local function t(key) return locale[key] or key end
 		local state={source="",paused=false,edits={},prompts=0,pickers=0,errors=0}
 		local keys,holds=KeyCatalog.for_platform(defaults,"linux"),HoldOptions.build(defaults.tap_hold.hold_picker)
@@ -27,11 +27,11 @@ local function with_menu(body)
 			files={read_with_status=function() return state.source,"ok" end},is_paused=function() return state.paused end,
 			actions=gestures,changed=function() return true end});Pair.set_instance(owner)
 		package.loaded["infra.key_combinations_scope"]={retry_restore=function() return true end,
-			edit=function(rows,_,receipt)
+			edit=function(rows,receipt)
 				if receipt.guard()~=true then return false end
 				state.edits[#state.edits+1]=rows;return true
 			end,set_enabled=function() return true end}
-		package.loaded["infra.i18n"]={get=t,section=t,get_locale=function() return "en" end}
+		package.loaded["core.i18n.engine.i18n"]={get=t,section=t,get_locale=function() return "en" end}
 		package.loaded["infra.manifest_menu"]=nil
 		local renderer=require("infra.manifest_menu")
 		package.loaded["ui.menu.key_combinations"]=nil
@@ -106,12 +106,20 @@ helpers.describe("bounded actual ordered-pair menu",function()
 			helpers.assert_eq(state.edits[1][1].value,"shift")
 		end)
 	end)
-	for _,mode in ipairs({"cancel","unknown","source","paused"}) do
+	-- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+	helpers.it("publishes a hold picked while paused (edd1-paused-writes)",function()
+		with_menu(function(state)
+			state.click(state.find("Hold 1 + hold 2 → "))
+			state.paused=true
+			helpers.assert_true(state.hold.confirm("shift"))
+			helpers.assert_eq(#state.edits,1)
+		end)
+	end)
+	for _,mode in ipairs({"cancel","unknown","source"}) do
 		helpers.it("refuses "..mode.." without any publication and keeps the picker open (key-combination-hold-picker)",function()
 			with_menu(function(state)
 				state.click(state.find("Hold 1 + hold 2 → "))
 				if mode=="source" then state.source="[unrelated]\nchanged=true\n" end
-				if mode=="paused" then state.paused=true end
 				if mode~="cancel" then
 					helpers.assert_eq(state.hold.confirm(mode=="unknown" and "copy" or "shift"),false,
 						"a refused pick returns false, so the bridge keeps the picker open")
@@ -133,10 +141,10 @@ local EXPECTED_LINUX_KEYS = {
 --- @param relative string Shared data file.
 --- @return table
 local function read_locale_data(relative)
-	local file = assert(io.open(require("infra.paths").shared(relative), "rb"))
+	local file = assert(io.open(require("core.fs.engine.paths").shared(relative), "rb"))
 	local bytes = assert(file:read("*a"))
 	assert(file:close())
-	return assert(require("json").decode(bytes))
+	return assert(require("core.text.engine.json").decode(bytes))
 end
 
 --- Replaces the native availability probes of the action picker for one callback.
@@ -147,7 +155,7 @@ end
 --- @param callback function Runs with the probes answering without a spawn.
 local function with_controlled_probes(callback)
 	local targets = {
-		{ require("adapters.shell_runner"), "has_command", function() return true end },
+		{ require("core.process.adapters.shell_runner"), "has_command", function() return true end },
 		{ require("adapters.window_switch"), "available", function() return true, nil, nil end },
 		{ require("modules.gestures.program_owner"), "available", function() return true end },
 		{ require("modules.gestures.workspace_switcher"), "detect", function() return {}, nil end },
@@ -168,7 +176,7 @@ end
 local function with_canonical_locale_menu(callback)
 	with_menu(function(state)
 		local preference = "en"
-		package.loaded["adapters.storage"] = {
+		package.loaded["core.fs.adapters.storage"] = {
 			get = function(key) return key == "locale" and preference or nil end,
 			set = function(key, value)
 				assert(key == "locale" and type(value) == "string")
@@ -181,8 +189,8 @@ local function with_canonical_locale_menu(callback)
 		package.loaded["infra.script_scope"] = {
 			retry_locale = function() return true end,
 			edit_locale = function(value)
-				if package.loaded["adapters.storage"].set("locale", value) ~= true then return false end
-				local native = require("infra.i18n")
+				if package.loaded["core.fs.adapters.storage"].set("locale", value) ~= true then return false end
+				local native = require("core.i18n.engine.i18n")
 				local token = { pending = function() return false end }
 				assert(native.scope_acquire(token))
 				local receipt = assert(native.scope_capture(token))
@@ -192,10 +200,10 @@ local function with_canonical_locale_menu(callback)
 				return applied
 			end,
 		}
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu" }) do
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }) do
 			package.loaded[name] = nil
 		end
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		i18n.init()
 		local renderer = require("infra.manifest_menu")
 		local provider = require("ui.menu.key_combinations")
@@ -221,7 +229,7 @@ local function with_canonical_locale_menu(callback)
 		}
 		function state.build(code)
 			assert(i18n.set_locale(code) == true)
-			assert(i18n.get_locale() == code and require("infra.locale").current_locale() == code)
+			assert(i18n.get_locale() == code and require("core.i18n.engine.locale").current_locale() == code)
 			return provider.build(context, ui)
 		end
 		function state.pair_rows(rows)
@@ -257,7 +265,7 @@ local function check_locale_matrix(state, rows, strings)
 		for _, second in ipairs(EXPECTED_LINUX_KEYS) do
 			if first ~= second then
 				cursor = cursor + 1
-				local KeyNames = require("keycodes.key_names")
+				local KeyNames = require("platform.input.keycodes.key_names")
 				local first_label = strings[KeyNames.i18n(first, "linux")]
 				local second_label = strings[KeyNames.i18n(second, "linux")]
 				helpers.assert_true(type(first_label) == "string" and first_label ~= "")
@@ -292,11 +300,11 @@ end
 helpers.describe("actual Linux ordered-pair translations", function()
 	helpers.it("renders the independent complete matrix in all 21 canonical locales without reloading owners", function()
 		with_canonical_locale_menu(function(state)
-			local order = read_locale_data("data/locale_order.json").order
+			local order = read_locale_data("core/i18n/data/locale_order.json").order
 			helpers.assert_eq(#order, 21)
 			helpers.assert_eq(state.i18n.list_locales(), order, "real i18n discovers the canonical language set/order")
 			for _, code in ipairs(order) do
-				local strings = read_locale_data("data/locales/" .. code .. ".json")
+				local strings = read_locale_data("core/i18n/data/locales/" .. code .. ".json")
 				check_locale_matrix(state, state.build(code), strings)
 				helpers.assert_eq(state.preference(), code)
 			end
@@ -306,8 +314,8 @@ helpers.describe("actual Linux ordered-pair translations", function()
 	end)
 	helpers.it("changes live captions and preserves captured setter receipts across locale switches and back", function()
 		with_canonical_locale_menu(function(state)
-			local english = read_locale_data("data/locales/en.json")
-			local french = read_locale_data("data/locales/fr.json")
+			local english = read_locale_data("core/i18n/data/locales/en.json")
+			local french = read_locale_data("core/i18n/data/locales/fr.json")
 			local first = check_locale_matrix(state, state.build("en"), english)
 			local saved_label = first[1].title
 			local saved_picker = state.pick(first[1])

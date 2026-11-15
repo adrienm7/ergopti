@@ -17,7 +17,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 local ASSET = "ergopti-plus-linux.tar.gz"
 local DIGEST = string.rep("ab", 32)
@@ -49,7 +49,7 @@ local LIST = Json.encode({
 --- they do not qualify native FD sealing, HTTP, hashing or tar installation.
 local function native_fixture(ctx, options)
 	local dependency = {}
-	for _, name in ipairs({ "infra.archive_output", "infra.monotonic" }) do
+	for _, name in ipairs({ "infra.archive_output", "core.logger.engine.monotonic" }) do
 		dependency[name] = { value = package.loaded[name] }
 	end
 	local owners, now = {}, 0.25
@@ -168,7 +168,7 @@ local function native_fixture(ctx, options)
 	end
 	-- Literal portable clock port, isolated to this model's module cache.
 	-- The production monotonic backend is neither replaced globally nor qualified here.
-	package.loaded["infra.monotonic"] = { has_hires = function() return true end,
+	package.loaded["core.logger.engine.monotonic"] = { has_hires = function() return true end,
 		backend = function() return "luv.hrtime" end, now_ms = function() return now end }
 	package.loaded["infra.archive_output"] = { native_artifact = make_artifact }
 	ctx.manager._http_client.get_owned = function(url, headers, opts, done)
@@ -203,13 +203,13 @@ local function native_fixture(ctx, options)
 		bind_document_clock = function()
 			-- The authentic document fixture owns this clock after its handshake.
 			-- Delegate that same model time to the unit-only native capability port.
-			local clock = package.loaded["infra.monotonic"]
+			local clock = package.loaded["core.logger.engine.monotonic"]
 			assert(type(clock) == "table")
 			local read, hires = rawget(clock, "now_ms"), rawget(clock, "has_hires")
 			assert(type(read) == "function" and type(hires) == "function" and hires() == true)
 			now = read()
 			assert(type(now) == "number" and now >= 0 and now < math.huge)
-			package.loaded["infra.monotonic"] = {
+			package.loaded["core.logger.engine.monotonic"] = {
 				has_hires = hires,
 				backend = function() return "luv.hrtime" end, -- Explicit modeled capability, not native evidence.
 				now_ms = function() now = read(); return now end,
@@ -238,7 +238,7 @@ local function harness(opts)
 	package.loaded["infra.version"] = setmetatable({ VERSION = opts.version or "0.0.0-dev.140" },
 		{ __index = RealVersion })
 	-- The suite runs from a checkout, which is a source run: each case says.
-	local Installation = require("infra.installation")
+	local Installation = require("core.lifecycle.engine.installation")
 	local real_is_source_run = Installation.is_source_run
 	Installation.is_source_run = function() return opts.source_run == true end
 	local manager = helpers.load_module("modules.updater.manager")
@@ -530,11 +530,11 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 	helpers.it("a background check announces a newer release and downloads nothing", function()
 		local Fakes = helpers.load_module("tests.fakes")
 		local saved = {}
-		for _, name in ipairs({ "adapters.timer_scheduler", "adapters.storage", "modules.updater.manager" }) do
+		for _, name in ipairs({ "core.events.timer_scheduler", "core.fs.adapters.storage", "modules.updater.manager" }) do
 			saved[name] = package.loaded[name]
 		end
 		local timers = {}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			HAS_ASYNC = true,
 			after = function(delay, fn)
 				local handle = { armed = true, delay = delay, fn = fn }
@@ -543,7 +543,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 			end,
 			cancel = function(handle) handle.armed = false; return true end,
 		}
-		package.loaded["adapters.storage"] = Fakes.storage({ initial = {} })
+		package.loaded["core.fs.adapters.storage"] = Fakes.storage({ initial = {} })
 		package.loaded["modules.updater.manager"] = nil
 		local M = require("modules.updater.manager")
 		local Installer = require("modules.updater.installer")
@@ -567,7 +567,7 @@ helpers.describe("updater: nothing installs without a click (Linux)", function()
 		local config_path = os.tmpname()
 		pcall(os.remove, config_path)
 		-- An installed build: the checkout the suite runs from checks for nothing.
-		local Installation = require("infra.installation")
+		local Installation = require("core.lifecycle.engine.installation")
 		local real_is_source_run = Installation.is_source_run
 		Installation.is_source_run = function() return false end
 		local ok, err = pcall(function()

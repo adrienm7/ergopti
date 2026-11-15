@@ -1,0 +1,273 @@
+{
+	"_description": "Reference vectors of the layout analysis engine (tools/test/test-layout-analysis-engine.cjs): a layout of the shared library, a keyboard, a tiny text and the metric values computed by hand from the definitions of docs/design/layout-analysis.md. Percentages are shares of the key bigrams or trigrams without a thumb key, of keystrokes or of characters, as each definition says.",
+	"schema_version": 1,
+	"vectors": [
+		{
+			"name": "same finger, other key",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "ed",
+			"expect": {
+				"sfb": 100,
+				"repeat": 0,
+				"roll_in": 0
+			}
+		},
+		{
+			"name": "same key twice is a repeat, not an SFB",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "ee",
+			"expect": {
+				"sfb": 0,
+				"repeat": 100
+			}
+		},
+		{
+			"name": "pinky to ring is an inward roll",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "as",
+			"expect": {
+				"roll_in": 100,
+				"roll_out": 0,
+				"scissors": 0
+			}
+		},
+		{
+			"name": "ring to pinky is an outward roll",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "sa",
+			"expect": {
+				"roll_out": 100,
+				"roll_in": 0
+			}
+		},
+		{
+			"name": "middle two rows below the ring: full scissor",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "cw",
+			"expect": {
+				"scissors": 100,
+				"half_scissors": 0,
+				"roll_out": 100
+			}
+		},
+		{
+			"name": "middle above the ring is the hand's natural shape: no scissor",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "ex",
+			"expect": {
+				"scissors": 0,
+				"half_scissors": 0
+			}
+		},
+		{
+			"name": "ring above middle one row apart: half scissor",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "wd",
+			"expect": {
+				"half_scissors": 100,
+				"scissors": 0,
+				"roll_in": 100
+			}
+		},
+		{
+			"name": "index on its inner column beside the middle: lateral stretch",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "te",
+			"expect": {
+				"lsb": 100,
+				"roll_out": 100
+			}
+		},
+		{
+			"name": "other hands: hand change",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "aj",
+			"expect": {
+				"hand_change": 100,
+				"sfb": 0
+			}
+		},
+		{
+			"name": "one hand, one direction inward: 3-key inward roll",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "asd",
+			"expect": {
+				"roll3_in": 100,
+				"roll_in": 100
+			}
+		},
+		{
+			"name": "one hand, one direction outward: 3-key outward roll",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "dsa",
+			"expect": {
+				"roll3_out": 100,
+				"roll_out": 100
+			}
+		},
+		{
+			"name": "one hand, direction change with the index: redirect",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "sfd",
+			"expect": {
+				"redirect": 100,
+				"redirect_bad": 0
+			}
+		},
+		{
+			"name": "one hand, direction change without the index: bad redirect",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "sda",
+			"expect": {
+				"redirect": 100,
+				"redirect_bad": 100
+			}
+		},
+		{
+			"name": "left right left: alternation",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "ajs",
+			"expect": {
+				"alternation": 100,
+				"sfs": 0
+			}
+		},
+		{
+			"name": "first and third key on one finger: same-finger skipgram",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "eid",
+			"expect": {
+				"sfs": 100,
+				"alternation": 100
+			}
+		},
+		{
+			"name": "a dead key adds its own keystroke to the n-grams",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"text": "êa",
+			"expect": {
+				"dead_key_usage": 50,
+				"hand_change": 50,
+				"roll_out": 50,
+				"alternation": 0,
+				"roll3_in": 0,
+				"roll3_out": 0
+			}
+		},
+		{
+			"name": "Shift is pressed by the other hand's pinky",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "A",
+			"expect": {
+				"modifier_usage": 100,
+				"pinky_load": 100,
+				"hand_imbalance": 0
+			}
+		},
+		{
+			"name": "home key: no travel",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "f",
+			"expect": {
+				"distance": 0,
+				"home_row": 100,
+				"finger_imbalance": 83.5,
+				"hand_imbalance": 100
+			}
+		},
+		{
+			"name": "top row key: one stagger step from home",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "r",
+			"expect": {
+				"distance": 19.636291,
+				"top_row": 100
+			}
+		},
+		{
+			"name": "ortho board: straight up",
+			"layout": "qwerty",
+			"keyboard": "ortho",
+			"text": "r",
+			"expect": {
+				"distance": 19.05
+			}
+		},
+		{
+			"name": "missing character is unsupported",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "aé",
+			"expect": {
+				"unsupported": 50
+			}
+		},
+		{
+			"name": "a typographic apostrophe falls back to the plain one",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "a’",
+			"expect": {
+				"unsupported": 0
+			}
+		},
+		{
+			"name": "7th right column",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "]",
+			"expect": {
+				"outer_column": 100,
+				"pinky_load": 100
+			}
+		},
+		{
+			"name": "digits are lost on the 40 % and 3 x 10 boards",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "a1",
+			"expect": {
+				"compact_fit": 75,
+				"direct_digits": 100
+			}
+		},
+		{
+			"name": "AZERTY digits need Shift",
+			"layout": "azerty",
+			"keyboard": "iso",
+			"text": "a",
+			"expect": {
+				"direct_digits": 0
+			}
+		},
+		{
+			"name": "QWERTY shortcut letters on the left hand",
+			"layout": "qwerty",
+			"keyboard": "iso",
+			"text": "a",
+			"expect": {
+				"shortcut_left": 61.203008,
+				"char_coverage": 62.091503
+			}
+		}
+	]
+}

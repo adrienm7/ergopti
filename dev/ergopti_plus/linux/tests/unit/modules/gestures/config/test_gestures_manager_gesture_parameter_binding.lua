@@ -37,22 +37,22 @@ end)
 
 
 
-require("test.tap_binding_publication_contract").register(require("tests.helpers"), "linux")
+require("tests.lua.keyboard.tap_binding_publication_contract").register(require("tests.helpers"), "linux")
 
 
 
 
-require("test.binding_publication_authority_contract").register(require("tests.helpers"), "linux")
+require("tests.lua.binding_publication_authority_contract").register(require("tests.helpers"), "linux")
 
 
 
 
-require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "linux")
+require("tests.lua.layouts.keyboard_binding_publication_contract").register(require("tests.helpers"), "linux")
 
 
 
 
-require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "linux")
+require("tests.lua.settings.script_binding_publication_contract").register_late(require("tests.helpers"), "linux")
 
 
 
@@ -73,7 +73,7 @@ helpers.describe("gesture private generated publication authority", function()
 		local logger, previous_warn
 		local function defer(callback) undo[#undo + 1] = callback end
 		local okay, detail = xpcall(function()
-			logger = require("logger.shim"); previous_warn = logger.warn
+			logger = require("core.logger.engine.shim"); previous_warn = logger.warn
 			local manager = helpers.load_module(owner_name)
 			local source = require(source_name)
 			helpers.assert_true(rawequal(rawget(package.loaded, owner_name), manager))
@@ -259,9 +259,9 @@ helpers.describe("gesture private generated publication authority", function()
 		owned(function(manager, source, defer)
 			-- Private fresh reporting/cleanup owners retain the preexisting singleton's
 			-- warning state. Their production bodies are unchanged and later restored.
-			package.loaded.config_outdated, package.loaded.config_unused_keys = nil, nil
-			local outdated = require("config_outdated")
-			local cleanup = require("config_unused_keys")
+			package.loaded["settings.engine.migration.outdated"], package.loaded["settings.engine.migration.unused_keys"] = nil, nil
+			local outdated = require("settings.engine.migration.outdated")
+			local cleanup = require("settings.engine.migration.unused_keys")
 			manager = helpers.load_module(owner_name)
 			local content = [[# Independently written real cleanup source
 [linux.action_parameters]

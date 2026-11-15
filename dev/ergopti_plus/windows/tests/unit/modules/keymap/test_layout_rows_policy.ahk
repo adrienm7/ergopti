@@ -16,6 +16,7 @@
 #Requires AutoHotkey v2.0
 
 #Include %A_LineFile%\..\..\..\..\fixtures\layout_row_host_character.ahk
+#Include %A_LineFile%\..\..\..\..\fixtures\host_capability_probes.ahk
 
 
 
@@ -29,7 +30,7 @@ _LRP_Corpus() {
 _LRP_SharedCorpus() {
 	global _SharedDir, LAYOUT_ROWS_POLICY_IDS
 	Corpus := _LRP_Corpus()
-	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\data\keycodes\physical_keys.json"))
+	Registry := JsonParse(FSReadUtf8Exact(_SharedDir . "\layouts\data\keycodes\physical_keys.json"))
 	Rows := LayoutRowsPolicyKeys(Registry)
 	AssertEqual(4, LAYOUT_ROWS_POLICY_IDS.Length, "four row switches")
 	for Row in LAYOUT_ROWS_POLICY_IDS {
@@ -124,9 +125,9 @@ _LRPS_ChildSource(BodyName := "layout_row_passthrough_body.ahk", ExtraSource := 
 	; Other entry points in the included module name services this narrow child
 	; never calls. Runtime unset reads still throw; only load-time warnings stop.
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn VarUnset, Off`n"
-	Code .= "#Include " . _DriverDir . "\infra\json.ahk`n"
-	Code .= "#Include " . _DriverDir . "\adapters\file_system.ahk`n"
-	Code .= "#Include " . _SharedDir . "\modules\features\layout_rows_policy.ahk`n"
+	Code .= "#Include " . _DriverDir . "\core\text\engine\json.ahk`n"
+	Code .= "#Include " . _DriverDir . "\core\fs\adapters\file_system.ahk`n"
+	Code .= "#Include " . _SharedDir . "\settings\data\features\layout_rows_policy.ahk`n"
 	Owner := _DriverProductionFileForSymbol("_LayoutRowPassthrough")
 	AssertTrue(Owner != "", "the genuine row sender must have one production owner")
 	Code .= "#Include " . Owner . "`n"
@@ -283,8 +284,8 @@ _LRPE_ChildSource() {
 	At := RegExMatch(Source, Pattern, &Criterion)
 	AssertTrue(At > 0, "the actual static edge criterion must be found")
 	AssertEqual(0, RegExMatch(Source, Pattern, , At + Criterion.Len), "the edge cohort must have one real static criterion")
-	Extra := "#Include " . _DriverDir . "\adapters\key_state.ahk`n"
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra := "#Include " . _DriverDir . "\platform\input\key_state.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	for Name in ["KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
 		"KeylayoutEmulation_NumberRowLevels", "TapHoldKanaAltGrHeld"] {
 		Definition := _DriverFuncBody(Name)
@@ -345,7 +346,7 @@ _LRPN_ChildSource() {
 		Includes := Resolved
 	}
 	Extra := Includes
-	Extra .= "#Include " . _SharedDir . "\modules\features\number_row_policy.ahk`n"
+	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	; The extracted digit emitters share their real native/recorder selector.
 	; Only its final SendEvent boundary is the child's passive output port.
 	for Name in ["KeylayoutEmulation_KeyCodes", "KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
@@ -428,10 +429,20 @@ for _LRCZ_Sc in ["SC00C", "SC00D"]
 _LRNF_ChildSource() {
 	return _LRPS_ChildSource("layout_row_native_flags_body.ahk")
 }
+
+; The virtual key this thread's active layout gives SC010, the physical key
+; both native row probes inject and expect to type a letter.
+_LRN_TopRowVk() => DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+
+; Probed before the child opens its window, so a layout without a top-row
+; letter neither activates a window nor injects a key.
+_LRNF_Case(Mode) {
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(_LRN_TopRowVk()))
+	_LRPS_LevelCustody(0, false, _LRNF_ChildSource,
+		[Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags")
+}
 for _LRNF_Mode in ["plain", "held", "released"]
-	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)",
-		_LRPS_LevelCustody.Bind(0, false, _LRNF_ChildSource,
-			[_LRNF_Mode, "--allow-explicit-owned-edit-row-flags"], "PASS layout-row-native-flags"))
+	Test("layout row native modifier flags: " . _LRNF_Mode . " (layout-row-native-flags)", _LRNF_Case.Bind(_LRNF_Mode))
 
 _LRNX_Receiver(Record, WParam, LParam, Message, Hwnd) {
 	if Hwnd != Record["edit"].Hwnd || WParam != Record["vk"]
@@ -459,6 +470,8 @@ _LRNX_Case(Mode) {
 	static RetirementDebt := 0
 	if IsObject(RetirementDebt)
 		throw Error("A prior external receiver probe retains its owned process/window retirement debt.")
+	TopRowVk := _LRN_TopRowVk()
+	TestRequireHostCapability(TestTopRowLetterReceipt.Bind(TopRowVk))
 	Root := A_Temp . "\ergopti_external_row_flags_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999)
 	Record := Map("window", 0, "edit", 0, "vk", 0, "receipt", Root . "\received.txt", "received", 0, "typed", "", "failure", 0)
 	State := {Code: -1, Output: "", ErrorText: "", Calls: 0}
@@ -478,7 +491,7 @@ _LRNX_Case(Mode) {
 		Record["edit"].Focus()
 		for Name in ["Ctrl", "Alt", "Shift", "LWin", "RWin"]
 			AssertTrue(!GetKeyState(Name, "P") && !GetKeyState(Name), "release modifiers before native external row input")
-		Record["vk"] := DllCall("MapVirtualKeyW", "UInt", 0x10, "UInt", 3, "UInt")
+		Record["vk"] := TopRowVk
 		AssertTrue(Record["vk"] >= 0x41 && Record["vk"] <= 0x5A)
 		ExpectedHost := _LRN_HostCharacter(Record["vk"], Mode != "plain", DllCall("GetKeyboardLayout", "UInt", 0, "Ptr"))
 		OnMessage(0x100, Receiver)

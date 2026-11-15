@@ -4,7 +4,7 @@
 --- MODULE: Field Run (Linux) Tests
 --- DESCRIPTION:
 --- The collector's no-click request protocol: the declaration is read from the
---- shared _shared/data/field_run_protocol.json and the Linux steps file it names,
+--- shared _shared/diagnostics/data/field_run_protocol.json and the Linux steps file it names,
 --- with no protocol key repeated; a changed shared rule stops the module; a
 --- request runs every step once and writes one result each, then the
 --- configuration guard and the done marker, every document with the keys the
@@ -21,8 +21,8 @@
 local helpers = require("tests.helpers")
 
 -- The application folder under every XDG base, from the shared registry.
-local APP_FOLDER = require("app_dirs").linux.folder_name
-local Json = require("json")
+local APP_FOLDER = require("core.fs.engine.app_dirs").linux.folder_name
+local Json = require("core.text.engine.json")
 local FieldRun = require("infra.field_run")
 
 local FOLDER = "/run/user/1000/" .. APP_FOLDER .. "/field-run"
@@ -121,18 +121,26 @@ helpers.describe("Linux field run (linux-field-run)", function()
 	helpers.it("refuses a FIFO declaration without blocking (field-run-source-admission)", function()
 		if package.config:sub(1, 1) == "\\" then return end
 		local uv = require("luv")
-		local quote = require("text_utils").shell_quote
+		local quote = require("core.text.engine.utils_core").shell_quote
 		local dir = assert(uv.fs_mkdtemp(uv.os_tmpdir() .. "/ergopti-field-source-XXXXXX"))
-		assert(uv.fs_mkdir(dir .. "/data", 448))
+		-- Every folder of the protocol's place, which the layout decides.
+		local folders, at = {}, dir
+		for part in (FieldRun.PROTOCOL_PATH:match("^(.*)/[^/]+$") or ""):gmatch("[^/]+") do
+			at = at .. "/" .. part; assert(uv.fs_mkdir(at, 448)); folders[#folders + 1] = at
+		end
+		-- The protocol lives in a folder of the shared root; none made means the place was misread.
+		helpers.assert_true(#folders > 0, "the protocol's folders were made")
 		local fifo = dir .. "/" .. FieldRun.PROTOCOL_PATH
 		local made = os.execute("mkfifo " .. quote(fifo))
 		assert(made == true or made == 0)
 		local root = helpers.driver_root()
-		local code = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/lua/?.lua;")
+		local code = "package.path=" .. string.format("%q", root .. "/?.lua;" .. root .. "/../_shared/?.lua;")
 			.. "..package.path; assert(not pcall(require('infra.field_run').load, " .. string.format("%q", dir)
 			.. ", " .. string.format("%q", root) .. "))"
 		local result = os.execute("timeout 3 " .. quote(uv.exepath()) .. " -e " .. quote(code))
-		assert(os.remove(fifo)); assert(uv.fs_rmdir(dir .. "/data")); assert(uv.fs_rmdir(dir))
+		assert(os.remove(fifo))
+		for index = #folders, 1, -1 do assert(uv.fs_rmdir(folders[index])) end
+		assert(uv.fs_rmdir(dir))
 		helpers.assert_true(result == true or result == 0, "a FIFO declaration must refuse promptly")
 	end)
 

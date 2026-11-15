@@ -4,18 +4,18 @@
 --- MODULE: Selection Translation Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/translate_vectors.json through the shared
---- translation helpers (_shared/lua/llm/translate.lua), which macOS and Linux
+--- translation helpers (_shared/ai/engine/prediction/translate.lua), which macOS and Linux
 --- use and the AutoHotkey port replays too: the binding parameter, the target
 --- language it resolves to, the prompt, the user turn and the answer reading.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Translate = require("llm.translate")
+local Translate = require("ai.engine.prediction.translate")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -35,8 +35,8 @@ end
 
 helpers.describe("translation helpers replay the shared translate corpus", function()
 	local corpus = read_json("tests/corpus/llm/translate_vectors.json")
-	local config = read_json("modules/llm/translate.json")
-	local names = read_json("data/locale_names.json")
+	local config = read_json("ai/data/translate.json")
+	local names = read_json("core/i18n/data/locale_names.json")
 	helpers.it("preserves Markdown and code in translation content", function()
 		for _, answer in ipairs({ "TRANSLATION: **Bonjour** `x**2`", "**TRANSLATION:** **Bonjour** `x**2`" }) do
 			helpers.assert_eq(Translate.extract(config, answer), "**Bonjour** `x**2`")
@@ -85,9 +85,9 @@ end)
 
 helpers.describe("the translation target choices follow the language menu", function()
 	helpers.it("offers the interface language first, then every shipped locale in menu order", function()
-		local config = read_json("modules/llm/translate.json")
-		local names = read_json("data/locale_names.json")
-		local order = read_json("data/locale_order.json")
+		local config = read_json("ai/data/translate.json")
+		local names = read_json("core/i18n/data/locale_names.json")
+		local order = read_json("core/i18n/data/locale_order.json")
 		local choices = Translate.choices(names, order, config, "Interface")
 		helpers.assert_eq(choices[1].value, config.ui_value)
 		helpers.assert_eq(choices[1].label, "Interface")

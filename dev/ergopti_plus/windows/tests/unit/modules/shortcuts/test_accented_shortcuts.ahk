@@ -108,14 +108,21 @@ _ACS_RegistrationCase() {
 			(Name, *) => Names.Push(Name),
 			(Args*) => HotIfCalls.Push(Args.Length),
 			_ACS_KeysPerLayout)
-		AssertEqual(18, Count, "three keys times six modifier chords")
-		AssertEqual(18, Names.Length)
+		AssertEqual(24, Count, "three keys times eight modifier chords")
+		AssertEqual(24, Names.Length)
 		Joined := ""
 		for Name in Names
 			Joined .= Name . " "
-		for Expected in ["^SC003", "^+SC003", "!SC008", "!+SC008", "#SC00B", "#+SC00B"]
+		for Expected in ["^SC003", "^+SC003", "!SC008", "!+SC008", "#SC00B", "#+SC00B", "<^<!SC003", "<^<!+SC00B"]
 			Assert(InStr(Joined, Expected . " ") > 0, Expected . " must be registered")
 		AssertEqual(0, InStr(Joined, "^!"), "Ctrl+Alt is AltGr and must stay untouched")
+		AssertEqual(0, InStr(Joined, ">!"), "AltGr's right Alt is never a chord (SCD-2)")
+		; SCD-2: the left Ctrl+Alt chord resolves the key like the others, so
+		; Ctrl+Alt+é sends Ctrl+Alt and the logical letter.
+		Plain := AccentedShortcutResolve("^SC003", _ACS_KeysPerLayout(1))
+		AssertTrue(Plain != "", "the AZERTY é key resolves a logical letter")
+		AssertEqual(Plain, AccentedShortcutResolve("<^<!SC003", _ACS_KeysPerLayout(1)),
+			"Ctrl+Alt+é sends the same logical letter as Ctrl+é")
 		AssertEqual(2, HotIfCalls.Length, "the HotIf context must be opened then closed")
 		AssertEqual(0, HotIfCalls[2], "the HotIf context must be reset after registration")
 		AssertThrows(() => AccentedShortcuts_Register([1],
@@ -252,8 +259,8 @@ _ACS_NumberRowPolicyCache() {
 		; The fake native profile is already cached. Keep the production default
 		; KeysFn so this also proves registration selects the native inventory.
 		Count := AccentedShortcuts_Register([Azerty], (Name, *) => Names.Push(Name), (Args*) => 0)
-		AssertEqual(18, Count, "digits mode must still register the three hidden native accent positions")
-		AssertEqual(18, Names.Length)
+		AssertEqual(24, Count, "digits mode must still register the three hidden native accent positions")
+		AssertEqual(24, Names.Length)
 
 		Features["layout"]["direct_access_digits"] := "native"
 		AssertEqual(Native, _AccentedShortcutKeysCached(Azerty, _ACS_AzertyScanCode),

@@ -4,7 +4,7 @@
 --- MODULE: Features Manifest Reader Tests (Hammerspoon)
 --- DESCRIPTION:
 --- A2 — macOS now reads feature defaults from the shared codegen'd manifest
---- (`_generated/features_manifest.lua`, single source `_shared/modules/features/manifest.toml`)
+--- (`_generated/features_manifest.lua`, single source `_shared/settings/data/features/manifest.toml`)
 --- via `lib.manifest_reader`, the counterpart of the AHK `manifest_reader.ahk`
 --- that the Windows driver already builds its whole `Features` map from.
 ---
@@ -20,8 +20,8 @@
 local helpers = require("tests.helpers")
 
 -- manifest_reader logs through lib.logger; load the stub first.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local Manifest = require("infra.manifest_reader")
 

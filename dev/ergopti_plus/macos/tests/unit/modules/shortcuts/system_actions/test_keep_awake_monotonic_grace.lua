@@ -19,23 +19,23 @@ local OWNED_MODULES = {
 	"modules.shortcuts.actions.text",
 	"modules.gestures",
 	"modules.keystats.log_manager",
-	"infra.notifications",
-	"infra.key_event_health",
-	"infra.logger",
-	"infra.text_utils",
-	"infra.timings",
-	"infra.i18n",
-	"infra.keycodes",
+	"core.ui.engine.notifications",
+	"core.logger.engine.key_event_health",
+	"core.logger.engine.logger",
+	"core.text.engine.utils",
+	"core.timing.engine.timings",
+	"core.i18n.engine.i18n",
+	"platform.input.keycodes",
 	"modules.keymap.control_sentinels",
-	"adapters.key_state",
-	"adapters.keyboard_geometry",
-	"adapters.synthetic_input",
+	"platform.input.key_state",
+	"platform.input.keyboard_geometry",
+	"platform.input.synthetic_input",
 	"adapters.event_provenance",
-	"adapters.event_clock",
-	"adapters.timer_scheduler",
-	"adapters.storage",
-	"error_description",
-	"number_policy",
+	"core.events.clock",
+	"core.events.timer_scheduler",
+	"core.fs.adapters.storage",
+	"diagnostics.engine.reports.error_description",
+	"core.text.engine.number_policy",
 }
 
 
@@ -107,18 +107,18 @@ local function with_awake(callback)
 
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, format, ...) world.errors[#world.errors + 1] = string.format(format, ...) end
-			package.loaded["infra.logger"] = logger
-			package.loaded["infra.timings"] = {
+			package.loaded["core.logger.engine.logger"] = logger
+			package.loaded["core.timing.engine.timings"] = {
 				sec = function(group, key)
 					local seconds = { tick_min_ms = 1, tick_max_ms = 5, return_delay_ms = 0.2 }
 					assert(group == "keep_awake" and seconds[key] ~= nil, "unexpected keep-awake timing")
 					return seconds[key]
 				end,
 			}
-			package.loaded["infra.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.keycodes"] = { F18_WAKE_OS = 79 }
+			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+			package.loaded["platform.input.keycodes"] = { F18_WAKE_OS = 79 }
 			local stored = {}
-			package.loaded["adapters.storage"] = {
+			package.loaded["core.fs.adapters.storage"] = {
 				get = function(key) return stored[key] end,
 				set = function(key, value) stored[key] = value; return true end,
 			}
@@ -127,12 +127,12 @@ local function with_awake(callback)
 			for _, name in ipairs({
 				"modules.shortcuts.actions.system_pixel", "modules.shortcuts.actions.system_mouse",
 				"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-				"modules.gestures", "infra.notifications", "infra.key_event_health",
-				"infra.text_utils", "modules.keymap.control_sentinels", "adapters.key_state",
-				"adapters.keyboard_geometry", "modules.keystats.log_manager",
+				"modules.gestures", "core.ui.engine.notifications", "core.logger.engine.key_event_health",
+				"core.text.engine.utils", "modules.keymap.control_sentinels", "platform.input.key_state",
+				"platform.input.keyboard_geometry", "modules.keystats.log_manager",
 			}) do package.loaded[name] = {} end
 			local System = require("modules.shortcuts.actions.system")
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_eq(System.toggle_awake(), true, "a healthy native watcher and tick must activate")
 			helpers.assert_eq(System.is_awake_active(), true)
 			helpers.assert_eq(#world.taps, 1)

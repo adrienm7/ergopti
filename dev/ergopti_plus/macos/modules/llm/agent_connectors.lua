@@ -23,12 +23,12 @@
 
 local M = {}
 
-local Agent       = require("llm.agent")
-local Logger      = require("infra.logger")
-local Errors      = require("adapter_errors")
-local ShellRunner = require("adapters.shell_runner")
-local FileSystem  = require("adapters.file_system")
-local TextUtils = require("text_utils")
+local Agent       = require("ai.engine.agent.agent")
+local Logger      = require("core.logger.engine.logger")
+local Errors      = require("diagnostics.engine.adapter_errors")
+local ShellRunner = require("core.process.adapters.shell_runner")
+local FileSystem  = require("core.fs.adapters.file_system")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "llm.agent_connectors"
 

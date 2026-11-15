@@ -16,8 +16,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Sandbox = require("test.config_unused_keys_contract").sandbox
-local TomlCodec = require("toml_codec")
+local Sandbox = require("tests.lua.settings.unused_keys_contract").sandbox
+local TomlCodec = require("core.text.engine.toml_codec")
 
 -- evdev codes of the four keys.
 local KEY_ENTER, KEY_BACKSPACE, KEY_DELETE, KEY_ESC = 28, 14, 111, 1
@@ -116,7 +116,7 @@ helpers.describe("Linux script-management chords (script-chords-three-os-2026-09
 	helpers.it("script-chord: refuses a switch change racing the file write", function()
 		with_chords(nil, function(Chords, log)
 			helpers.assert_eq(Chords.chords_enabled(), true)
-			local Writer = require("toml_codec.writer")
+			local Writer = require("core.text.engine.toml_codec.writer")
 			local original = Writer.batch_write
 			local external = "[shortcuts.script_control]\nchords_enabled = false\n"
 			local ok, err = pcall(function()
@@ -251,6 +251,32 @@ helpers.describe('script chord after a pause cycle', function()
       assert(script.toggle_pause()); assert(script.toggle_pause())
       log.run()
       helpers.assert_eq(log.executed, {'script_reload@script__script_altgr_backspace'})
+    end)
+  end)
+  -- The maintainer's decision of 2026-11-14: a chord changed while paused is
+  -- saved at once and runs from the resume. Before, moving the pause toggle off
+  -- AltGr + Enter while paused left the daemon with no chord back.
+  helpers.it('(paused-chord-change) keeps the resume chord until the resume', function()
+    with_chords('[shortcuts.script_control]\nscript_altgr_backspace = "none"\n', function(chords, log)
+      local script = require('modules.shortcuts.script_actions').new({reset=function() end,reload=function() end,quit=function() end})
+      chords.init({is_paused=script.is_paused,pause_epoch=script.pause_epoch,defer=function(fn) log.deferred[#log.deferred+1]=fn; return true end})
+      assert(script.toggle_pause())
+      helpers.assert_eq(chords.set_action('script_altgr_enter', 'none'), true, 'a paused assignment is saved')
+      helpers.assert_eq(chords.set_action('script_altgr_backspace', 'script_pause_toggle'), true, 'a paused assignment is saved')
+      helpers.assert_eq(chords.get_action('script_altgr_enter'), 'none', 'the configured value is the new one at once')
+      local file = assert(io.open(log.path, 'rb'))
+      local saved = TomlCodec.decode(file:read('a'))
+      file:close()
+      helpers.assert_eq(saved.shortcuts.script_control.script_altgr_enter, 'none', 'the change is written at once')
+      helpers.assert_eq(chords.set_chords_enabled(false), true, 'a paused switch is saved')
+      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR}), true, 'the chord active at pause time still resumes')
+      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}), false, 'the new chord waits for the resume')
+      log.run()
+      helpers.assert_eq(log.executed, {'script_pause_toggle@script__script_altgr_enter'})
+      assert(chords.set_chords_enabled(true))
+      assert(script.toggle_pause())
+      helpers.assert_eq(chords.on_key({code=KEY_ENTER,mods=ALTGR}), false, 'the paused change applies on resume')
+      helpers.assert_eq(chords.on_key({code=KEY_BACKSPACE,mods=ALTGR}), true, 'the paused change applies on resume')
     end)
   end)
 end)

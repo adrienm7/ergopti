@@ -13,7 +13,7 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "adapters.field_probe_ports" }
+local MODULES = { "core.logger.engine.logger", "adapters.field_probe_ports" }
 
 --- Lists a folder's entries, sorted.
 --- @param dir string Folder.
@@ -36,7 +36,7 @@ local function log_facts(dir)
 		local logger = helpers.make_logger_stub()
 		logger.logs_dir = function() return dir .. "/" end
 		logger.today_log_path = function() return dir .. "/ErgoptiPlus_2026-10-30.log" end
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["adapters.field_probe_ports"] = nil
 		-- The folder listing the stub serves is the real folder's
 		local real = {}

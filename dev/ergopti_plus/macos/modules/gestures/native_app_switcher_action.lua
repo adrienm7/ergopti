@@ -3,10 +3,10 @@
 --- Joins native input and per-parent action lifecycle without direct activation.
 local M = {}
 local Facade = require("modules.gestures.native_app_switcher")
-local Input = require("adapters.synthetic_input")
+local Input = require("platform.input.synthetic_input")
 local Runtime = require("adapters.system_switcher_runtime")
-local Timings = require("infra.timings")
-local Logger = require("infra.logger")
+local Timings = require("core.timing.engine.timings")
+local Logger = require("core.logger.engine.logger")
 local LOG = "gestures.native_app_switcher"
 local initialized, input_initialized, active = false, false, nil
 local scopes = {}

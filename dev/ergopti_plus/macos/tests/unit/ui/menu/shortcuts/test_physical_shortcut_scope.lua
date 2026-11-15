@@ -1,6 +1,6 @@
 --- tests/unit/ui/menu/shortcuts/test_physical_shortcut_scope.lua
 
-local helpers=require('tests.helpers');local Fixture=require('tests.support.physical_shortcut_scope_fixture');local Codec=require('toml_codec')
+local helpers=require('tests.helpers');local Fixture=require('tests.support.physical_shortcut_scope_fixture');local Codec=require('core.text.engine.toml_codec')
 local source='[shortcuts]\nenabled = true\nkeyboard = { foreign = 17 }\n[gestures]\naction_parameters = { tap_4__open_url="https://apple.com", future={keep=9} }\n[future]\nkeep=7\n'
 local rows={{section='shortcuts.keyboard',key='physical_none_KeyJ',value='send_text'},{section='gestures.action_parameters',key='keyboard__physical_none_KeyJ__send_text',value='★'}}
 helpers.describe('Mac actual physical scope edits',function()
@@ -64,7 +64,7 @@ helpers.describe('Mac actual physical scope edits',function()
     helpers.assert_eq(f.controls.physical_input(),true,'queue an admitted committed frame')
     local token,entered={},false
     local snapshot=f.prefs.source_snapshot
-    local files=package.loaded['adapters.file_system'];local read=files.read_with_status
+    local files=package.loaded['core.fs.adapters.file_system'];local read=files.read_with_status
     local function reenter()
      if entered then return end;entered=true
      if seam=='parameter_change' then helpers.assert_eq(f.gestures.set_action_parameter('keyboard__physical_none_KeyJ','send_text','changed'),true)
@@ -90,7 +90,7 @@ helpers.describe('Mac actual physical scope edits',function()
  for _, mode in ipairs({'action_conflict','none_conflict','publication_conflict'}) do
   helpers.it('(physical-preflight) refuses '..mode..' before opening delivery',function()
    Fixture.run(function(f)
-    local registrar=require('adapters.hotkey_registrar')
+    local registrar=require('platform.input.hotkey_registrar')
     local conflict=mode=='action_conflict' or mode=='none_conflict'
     registrar.has_physical_conflict=function() return conflict end
     local updates=mode=='none_conflict' and {{section='shortcuts.keyboard',key='physical_none_KeyJ',value='none',intent='keyboard_assignment'}} or rows
@@ -140,9 +140,9 @@ end)
 helpers.describe('Actual shared physical editor to Mac native scope',function()
  helpers.it('(physical-editor-ui) Unicode Add and Remove publish through exact actual source-return ACK',function()
   Fixture.run(function(f)
-   local Json=require('json');local file=assert(io.open(helpers.shared("data/keycodes/physical_keys.json")));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json")));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=f.gestures,parameter_section='gestures.action_parameters',positions={},capture=f.owner.capture_editor_inventory,current=f.owner.editor_source_current,commit=f.owner.edit,label=f.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=f.gestures,parameter_section='gestures.action_parameters',positions={},capture=f.owner.capture_editor_inventory,current=f.owner.editor_source_current,commit=f.owner.edit,label=f.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    helpers.assert_eq(#editor.open().entries,0)
    helpers.assert_eq(editor.choose({code='KeyJ',mods={},request_id=1}),true);helpers.assert_eq(callback('send_text','★'),true)
    helpers.assert_eq(f.files.config,source,'Draft never publishes scalar/assignment')
@@ -153,9 +153,9 @@ helpers.describe('Actual shared physical editor to Mac native scope',function()
  end)
  helpers.it('(physical-editor-ui) stale native private source refuses draft without overwrite',function()
   Fixture.run(function(f)
-   local Json=require('json');local file=assert(io.open(helpers.shared("data/keycodes/physical_keys.json")));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
+   local Json=require('core.text.engine.json');local file=assert(io.open(helpers.shared("layouts/data/keycodes/physical_keys.json")));local model=require('shortcuts.engine.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=f.gestures,parameter_section='gestures.action_parameters',positions={},capture=f.owner.capture_editor_inventory,current=f.owner.editor_source_current,commit=f.owner.edit,label=f.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
+   local editor=require('shortcuts.engine.physical_editor').new({model=model,catalogue=f.gestures,parameter_section='gestures.action_parameters',positions={},capture=f.owner.capture_editor_inventory,current=f.owner.editor_source_current,commit=f.owner.edit,label=f.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    editor.open();editor.choose({code='KeyJ',mods={},request_id=1});helpers.assert_eq(callback('send_text','★'),true)
    local private=f.prefs.source_snapshot('config');helpers.assert_eq(f.prefs.replace_source('config',private,{status=private.status,content=private.content}),true)
    helpers.assert_eq(editor.save(selected.token).committed,false);helpers.assert_eq(f.files.config,source)
@@ -179,8 +179,8 @@ local function assert_legacy(document)
 end
 local function planner_for(actions)
  local root=helpers.driver_root():gsub('/$','')..'/../_shared/'
- local file=assert(io.open(root..'data/keycodes/physical_keys.json','rb'));local registry=require('json').decode(file:read('*a'));assert(file:close())
- return require('shortcuts.physical_entries').new(require('shortcuts.physical_slots').new(registry),actions,{parameter_section='gestures.action_parameters'})
+ local file=assert(io.open(root..'layouts/data/keycodes/physical_keys.json','rb'));local registry=require('core.text.engine.json').decode(file:read('*a'));assert(file:close())
+ return require('shortcuts.engine.physical_entries').new(require('shortcuts.engine.physical_slots').new(registry),actions,{parameter_section='gestures.action_parameters'})
 end
 helpers.describe('Mac explicit physical entries preserve unrelated legacy semantics',function()
  helpers.it('does not invent a Unicode/J entry from accent letters or legacy magic defaults',function()
@@ -236,7 +236,7 @@ helpers.describe("Mac unqualified physical delivery admission",function()
  helpers.it("(partial-physical-admission) refuses physical output from an unqualified native owner",function()
   local initial=source:gsub('foreign = 17','physical_none_KeyJ="send_text", foreign = 17')
   Fixture.run(function(f)
-   helpers.assert_eq(f.controls.native_delivery_available(),false)
+   helpers.assert_eq(f.controls.native_delivery_available(),true,'the production getter')
    f.controls.delivery_available=false
    helpers.assert_eq(f.owner.physical_delivery_available(),false)
    helpers.assert_eq(f.controls.physical_input(),false)
@@ -300,7 +300,7 @@ helpers.describe("Mac scope None and deletion preserve original collision admiss
 		helpers.it("(physical-nav-scope-regression) absent Navigation owner retains " .. mode, function()
 			Fixture.run(function(f)
 				local original_remap = package.loaded["platform.remap"]
-				local registrar = require("adapters.hotkey_registrar")
+				local registrar = require("platform.input.hotkey_registrar")
 				local original_conflict, calls = registrar.has_physical_conflict, 0
 				local claim = {}
 				helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)

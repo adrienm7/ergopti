@@ -24,8 +24,8 @@ def load(name, path):
     return module
 
 
-POLICY = load("ergopti_hint_runtime", SHARED / "python/managed_ollama_runtime.py")
-HINT = load("ergopti_hint_policy", SHARED / "python/managed_ollama_hint.py")
+POLICY = load("ergopti_hint_runtime", SHARED / "ai/adapters/python/managed_ollama_runtime.py")
+HINT = load("ergopti_hint_policy", SHARED / "ai/adapters/python/managed_ollama_hint.py")
 NATIVE = load("ergopti_hint_native", DRIVER / "platform/ollama_hint_metadata.py")
 
 
@@ -49,7 +49,7 @@ def receive(
     def read(path):
         return NATIVE.read_regular(path, maximum, progress=progress)
 
-    raw_budget = read(driver.parent / "_shared/modules/network/bootstrap_retry.json")
+    raw_budget = read(driver.parent / "_shared/core/network/data/bootstrap_retry.json")
     if expected_policy_sha256 is not None and POLICY.sha256(raw_budget) != expected_policy_sha256:
         raise POLICY.RuntimeRefusal("metadata")
     selected_budgets = HINT.canonical_budgets(POLICY, raw_budget)
@@ -61,7 +61,7 @@ def receive(
     progress()
     if HINT.budgets(POLICY, read(driver / "modules/llm/network-retry.sh")) != selected_budgets:
         raise POLICY.RuntimeRefusal("metadata")
-    shared = driver.parent / "_shared/modules/llm"
+    shared = driver.parent / "_shared/ai/data"
     bootstrap = POLICY.metadata_bytes(read(shared / "managed_ollama_bootstrap.json"))
     if (
         type(bootstrap.get("maximum_metadata_bytes")) is not int

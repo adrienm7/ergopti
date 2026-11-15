@@ -15,16 +15,16 @@ ffi.cdef[[
 	int getrlimit(int resource, struct ergopti_capture_rlimit *limit);
 	int setrlimit(int resource, const struct ergopti_capture_rlimit *limit);
 ]]
-local Logger = require("logger.shim")
+local Logger = require("core.logger.engine.shim")
 local CANARY = "ERGOPTI_SYNTHETIC_PRIVATE_CAPTURE_CANARY"
 local checks, failures = 0, 0
 Logger.set_level("debug")
 
 local function fresh_shell()
-	package.loaded["adapters.shell_runner"] = nil
+	package.loaded["core.process.adapters.shell_runner"] = nil
 	Logger.ring_buffer_clear()
 	Logger.reset_dedup()
-	return require("adapters.shell_runner")
+	return require("core.process.adapters.shell_runner")
 end
 
 local function assert_private_failure(shell, command)

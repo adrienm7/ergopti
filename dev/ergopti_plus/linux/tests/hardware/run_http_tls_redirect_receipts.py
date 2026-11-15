@@ -18,7 +18,7 @@ import threading
 
 LUA_REQUEST = r"""
 local uv = require("luv")
-local HTTP = require("adapters.http_client")
+local HTTP = require("core.network.adapters.http_client")
 assert(uv.getuid() ~= 0, "native TLS checks require an ordinary user")
 local url = assert(os.getenv("ERGOPTI_NATIVE_TLS_URL"))
 local method = assert(os.getenv("ERGOPTI_NATIVE_TLS_METHOD"))
@@ -155,7 +155,7 @@ def main():
                 CURL_CA_BUNDLE=str(cert),
                 NO_PROXY="127.0.0.1,localhost",
                 no_proxy="127.0.0.1,localhost",
-                LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;",
+                LUA_PATH="./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;;",
                 ERGOPTI_NATIVE_TLS_URL=url,
                 ERGOPTI_NATIVE_TLS_METHOD=method,
                 ERGOPTI_NATIVE_TLS_EXPECTED=expected,

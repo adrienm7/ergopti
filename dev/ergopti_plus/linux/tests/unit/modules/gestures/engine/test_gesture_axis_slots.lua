@@ -26,7 +26,7 @@ local BTN_TOUCH = 0x14a
 local TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }
 local EMITTER = "modules.gestures.combo_emitter"
 local MANAGER = "modules.gestures.manager"
-local READER = "adapters.evdev_reader"
+local READER = "platform.input.evdev_reader"
 
 --- The evdev events of one whole gesture, landing, moving and lifting.
 --- @param fingers integer Contacts reported through BTN_TOOL_*.
@@ -157,11 +157,21 @@ helpers.describe("gesture axis slots: reachable from the touchpad", function()
 			"the unbound right direction falls back to the axis slot")
 	end)
 
-	helpers.it("keeps vertical, diagonal and tap gestures off the horizontal axis", function()
+	helpers.it("keeps vertical and tap gestures off the horizontal axis", function()
 		local bindings = { swipe_3_horiz = "tab_next" }
 		helpers.assert_eq(#pump(bindings, 3, 0, -600), 0, "a vertical swipe is not on the horizontal axis")
-		helpers.assert_eq(#pump(bindings, 3, 600, -600), 0, "a diagonal has its own slots, not the axis")
 		helpers.assert_eq(#pump(bindings, 3, 0, 0), 0, "a tap is not a swipe")
+	end)
+
+	-- Decided by the maintainer on 2026-11-11: an unbound diagonal runs its
+	-- dominant straight slot, and that slot's own fallback; a bound one wins.
+	helpers.it("runs an unbound diagonal's dominant direction, a bound diagonal its own (diagonal-unbound-fallback)", function()
+		local axis_only = pump({ swipe_3_horiz = "tab_next" }, 3, 600, -400)
+		helpers.assert_eq(#axis_only, 1, "a mostly horizontal diagonal reaches the horizontal axis slot")
+		local vertical_only = pump({ swipe_3_horiz = "tab_next" }, 3, 400, -600)
+		helpers.assert_eq(#vertical_only, 0, "a mostly vertical one has no horizontal slot to fall back to")
+		local bound, M = pump({ swipe_3_right_up = "tab_prev", swipe_3_right = "tab_next" }, 3, 600, -400)
+		helpers.assert_eq(bound, { M.emit_combo_for("tab_prev") }, "a bound diagonal keeps its own slot")
 	end)
 
 	helpers.it("gives two fingers no axis slot", function()
@@ -196,7 +206,7 @@ helpers.describe("gesture axis slots: no advertised slot is unreachable", functi
 
 	helpers.it("dispatches every slot the manager offers when only it is bound", function()
 		local slots
-		with_manager({}, nil, function(M) slots = require("table_util").sorted_keys(M.DEFAULT_GESTURES) end)
+		with_manager({}, nil, function(M) slots = require("core.text.engine.table_util").sorted_keys(M.DEFAULT_GESTURES) end)
 		helpers.assert_true(#slots > 0, "the manager offers gesture slots")
 		local axis = 0
 		for _, slot in ipairs(slots) do

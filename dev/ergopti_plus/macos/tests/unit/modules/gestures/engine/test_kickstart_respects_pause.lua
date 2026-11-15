@@ -40,8 +40,8 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 		local reset_modules = {
 			"modules.gestures.init", "modules.gestures.engine",
 			"modules.gestures.actions", "modules.gestures.conflicts",
-			"infra.notifications", "infra.logger", "infra.manifest_reader",
-			"infra.timings", "hs._asm.undocumented.touchdevice",
+			"core.ui.engine.notifications", "core.logger.engine.logger", "infra.manifest_reader",
+			"core.timing.engine.timings", "hs._asm.undocumented.touchdevice",
 			"hs.caffeinate.watcher",
 		}
 		for _, name in ipairs(reset_modules) do
@@ -71,15 +71,15 @@ helpers.describe("gestures: the HID kickstart is silent while paused", function(
 
 		local function noop() end
 		local function committed() return true end
-		package.loaded["infra.notifications"] = { notify = noop }
-		package.loaded["infra.logger"] = setmetatable({
+		package.loaded["core.ui.engine.notifications"] = { notify = noop }
+		package.loaded["core.logger.engine.logger"] = setmetatable({
 			pcall = function(_, fn, ...) return pcall(fn, ...) end,
 		}, { __index = function() return noop end })
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return false end,
 			recommended_for = function() return "none" end,
 		}
-		package.loaded["infra.timings"] = {
+		package.loaded["core.timing.engine.timings"] = {
 			sec = function() return 1 end,
 		}
 		package.loaded["modules.gestures.engine"] = setmetatable({

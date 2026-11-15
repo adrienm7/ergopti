@@ -11,8 +11,8 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
-local Shell = require("adapters.shell_runner")
+require("core.lifecycle.engine.compat.utf8").install()
+local Shell = require("core.process.adapters.shell_runner")
 local Writer = require("modules.keystats.sqlite_writer")
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-sqlite-burst-keys-XXXXXX"))
 local database = root .. "/metrics.sqlite"

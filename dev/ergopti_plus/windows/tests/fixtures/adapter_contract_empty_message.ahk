@@ -20,8 +20,8 @@ EnvSet("ERGOPTI_AHK_RESULTS_FILE", A_Args[2])
 OnError(_ACMF_Fatal)
 
 #Include ../test_framework.ahk
-#Include ../unit/adapters/test_adapter_contract_vectors.ahk
-#Include ../unit/adapters/test_adapter_contract_vectors_system.ahk
+#Include ../unit/platform/system/test_adapter_contract_vectors.ahk
+#Include ../unit/platform/system/test_adapter_contract_vectors_system.ahk
 
 _ACMF_Endpoint() {
 	global _ACMF_Mode, _ACMF_Calls

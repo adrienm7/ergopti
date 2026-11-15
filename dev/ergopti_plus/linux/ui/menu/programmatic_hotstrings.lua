@@ -9,16 +9,16 @@
 --- ==============================================================================
 
 local M = {}
-local Policy = require("menu.programmable_hotstrings")
+local Policy = require("menu.engine.programmable_hotstrings")
 local Manifest = require("infra.manifest_menu")
 local Preferences = require("infra.hotstring_preferences")
-local Shell = require("adapters.shell_runner")
-local Prompt = require("ui.text_prompt")
-local I18n = require("infra.i18n")
-local Logger = require("logger.shim")
-local ENABLED = require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED
-local TIME = require("config_keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS
-local Publication = require("dynamic_hotstrings.menu_publication").new()
+local Shell = require("core.process.adapters.shell_runner")
+local Prompt = require("core.ui.ui.text_prompt")
+local I18n = require("core.i18n.engine.i18n")
+local Logger = require("core.logger.engine.shim")
+local ENABLED = require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_ENABLED
+local TIME = require("settings.engine.keys").KEY.HOTSTRINGS_DYNAMIC_USER_CODE_TIME_ACTIVATION_SECONDS
+local Publication = require("hotstrings.engine.dynamic.menu_publication").new()
 
 --- Builds declared controls for the daemon's exact programmable runtime.
 --- @param ctx table Menu context with dynamic owner and refresh callback.
@@ -33,9 +33,6 @@ function M.build(ctx)
 	end
 	return Policy.build({ manifest = Manifest, i18n = I18n.get, get = get,
 		master = function() return current() and native.is_enabled() == true end,
-		paused = function()
-			return ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() ~= false
-		end,
 		set = function(enabled, seconds)
 			if not current() then return false end
 			local committed = Publication.commit(native, enabled, seconds, function()
@@ -53,6 +50,10 @@ function M.build(ctx)
 		problem = function() return current() and native.user_code_problem() or nil end,
 		prompt = function(milliseconds)
 			return Prompt.ask(I18n.get("menu.hotstrings.user_code.title"), I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds))
+		end,
+		refusal = function(message)
+			Logger.warn("programmable_hotstrings", "Typed activation delay refused.")
+			require("ui.menu.menu_dialogs").show_error(message, I18n.get("dialog.value_check.title"))
 		end,
 	})
 end

@@ -30,14 +30,14 @@
 
 local M = {}
 
-local Logger      = require("logger.shim")
-local IssueLink   = require("diagnostics.issue_link")
-local Redact      = require("diagnostics.redact")
-local Share       = require("healthcheck.share")
-local ReportRunner = require("healthcheck.report")
-local ConfigKeys = require("config_keys")
+local Logger      = require("core.logger.engine.shim")
+local IssueLink   = require("diagnostics.engine.reports.issue_link")
+local Redact      = require("diagnostics.engine.reports.redact")
+local Share       = require("diagnostics.engine.healthcheck.share")
+local ReportRunner = require("diagnostics.engine.healthcheck.report")
+local ConfigKeys = require("settings.engine.keys")
 
-local LOG = "healthcheck.report"
+local LOG = "diagnostics.engine.healthcheck.report"
 local EEXIST = 17 -- Linux exclusive-create collision receipt.
 
 
@@ -63,15 +63,15 @@ end
 local DEFAULT_EFFECTS = {
 	copy = function(text) return require("adapters.clipboard").write(text) == true end,
 	make_dir = function(dir)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		return Shell.run("mkdir -p " .. Shell.quote(dir))
 	end,
 	save = function(dir, name, text)
-		local Shell = require("adapters.shell_runner")
+		local Shell = require("core.process.adapters.shell_runner")
 		if not Shell.run("mkdir -p " .. Shell.quote(dir)) then return nil, "cannot create " .. dir end
 		local stem, extension = name:match("^(.*)(%.[^.]+)$")
 		stem, extension = stem or name, extension or ""
-		local files = require("adapters.file_system")
+		local files = require("core.fs.adapters.file_system")
 		for index = 0, 999 do
 			local path = dir .. "/" .. stem .. (index == 0 and "" or "-" .. index) .. extension
 			local written, errno = files.write_new(path, text)
@@ -81,7 +81,7 @@ local DEFAULT_EFFECTS = {
 		return nil, "no unused diagnostic report name"
 	end,
 	exists = function(path)
-		local called, kind = pcall(require("infra.native_directory").target_kind, path)
+		local called, kind = pcall(require("core.fs.engine.native_directory").target_kind, path)
 		return called and kind ~= nil
 	end,
 	-- No portable "select this file" exists across file managers; the folder
@@ -90,7 +90,7 @@ local DEFAULT_EFFECTS = {
 	open = xdg_open,
 	open_url = xdg_open,
 	notify = function(title, body, level)
-		require("adapters.application_notifier").send(body ~= "" and body or title, { title = title, level = level })
+		require("platform.focus.application_notifier").send(body ~= "" and body or title, { title = title, level = level })
 		return true
 	end,
 	identity = function()
@@ -177,7 +177,7 @@ local menu_request = Runner.menu_request
 --- @return table snapshot, table documents
 local function menu_snapshot(complete_local)
 	local bridge = require("ui.healthcheck.bridge")
-	return bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false, false, complete_local == true),
+	return bridge.build_snapshot(require("core.ui.ui.webview_manager").get_daemon_state(), false, false, complete_local == true),
 		bridge.config()
 end
 
@@ -193,7 +193,7 @@ function M.report_bug(overrides, complete)
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
 		local document = Share.document(snapshot, documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		return M.perform({ action = "report", text = document.text, fields = document.fields },
 			snapshot.sections.paths, documents, M.redaction_context(overrides), overrides, snapshot, owner)
 	end)
@@ -207,7 +207,7 @@ function M.suggest_feature(overrides, complete)
 	return menu_request(ConfigKeys.COMMAND.SUGGEST_FEATURE, overrides, complete, function(owner)
 		local snapshot, documents = menu_snapshot()
 		local document = Share.document(snapshot, documents.schema,
-			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			require("core.i18n.engine.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		return M.perform({ action = ConfigKeys.COMMAND.SUGGEST_FEATURE, url = url }, {}, documents, {}, overrides, nil, owner)
 	end)

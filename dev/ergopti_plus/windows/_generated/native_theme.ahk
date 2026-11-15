@@ -1,5 +1,5 @@
 ﻿; _generated/native_theme.ahk
-; AUTO-GENERATED from _shared/data/native_theme.toml.
+; AUTO-GENERATED from _shared/core/ui/data/native_theme.toml.
 ; DO NOT EDIT BY HAND: run `npm run gen` to refresh.
 #Requires AutoHotkey v2.0
 

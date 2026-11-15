@@ -6,7 +6,7 @@
 --- Carries out one action of the AI agent once the user accepted it: a
 --- calendar event or a reminder, a mail draft, or one of the user's own tools.
 --- One function per action type; the payloads (the iCalendar file, the mailto:
---- link) come from the shared _shared/lua/llm/agent.lua, so the three drivers
+--- link) come from the shared _shared/ai/engine/agent/agent.lua, so the three drivers
 --- hand the system the same bytes.
 ---
 --- FEATURES & RATIONALE:
@@ -27,10 +27,10 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local Agent = require("llm.agent")
-local Utf8 = require("compat.utf8")
-local ShellRunner = require("adapters.shell_runner")
+local Logger = require("core.logger.engine.shim")
+local Agent = require("ai.engine.agent.agent")
+local Utf8 = require("core.lifecycle.engine.compat.utf8")
+local ShellRunner = require("core.process.adapters.shell_runner")
 
 local LOG = "modules.llm.agent_connectors"
 
@@ -144,14 +144,14 @@ local DEFAULT_DEPS = {
 		if not loaded or type(native.update_time) ~= "function" then return nil, "native clock unavailable" end
 		local refreshed = pcall(native.update_time)
 		if not refreshed then return nil, "native clock refresh refused" end
-		return require("adapters.owned_process").start(executable, args, options, function(result)
+		return require("core.process.adapters.owned_process").start(executable, args, options, function(result)
 			callback({ ok = result.ok, code = result.exit_code, error = result.error })
 		end)
 	end,
 	has_command = function(name) return ShellRunner.has_command(name) end,
 	private_dir = private_dir,
 	write_file = function(path, content)
-		local fh, _, _, remove_owned, current_image = require("infra.regular_file_writer").open(path, "wx")
+		local fh, _, _, remove_owned, current_image = require("core.fs.engine.regular_file_writer").open(path, "wx")
 		if not fh then return false, nil, nil, false end
 		-- Retain the native cleanup receipt even on an incomplete write.
 		local wrote, written = pcall(fh.write, fh, content)
@@ -194,7 +194,7 @@ function M.cleanup()
 				removed_file = called and removed == true
 				if not removed_file then
 					local checked, kind, _, code = pcall(function()
-						return require("infra.native_directory").target_kind(file.path)
+						return require("core.fs.engine.native_directory").target_kind(file.path)
 					end)
 					removed_file = checked and kind == nil and code == "ENOENT"
 				end

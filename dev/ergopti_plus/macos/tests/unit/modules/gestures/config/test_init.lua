@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 -- Clear sub-modules so they are re-required fresh (avoids contamination from stubs in other tests)
 package.loaded["modules.gestures.engine"] = nil

@@ -17,9 +17,9 @@ local function load_fixture(keystats)
 		if type(name) == "string" and (
 			name:match("^modules%.keymap")
 			or name == "modules.keystats"
-			or name:match("^adapters%.")
-			or name == "infra.logger"
-			or name == "infra.timings"
+			or helpers.is_driver_module(name)
+			or name == "core.logger.engine.logger"
+			or name == "core.timing.engine.timings"
 		) then
 			package.loaded[name] = nil
 		end
@@ -30,8 +30,8 @@ local function load_fixture(keystats)
 	local clock = SyntheticStack.install_timer_clock(hs_stub)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.timings"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.timing.engine.timings"] = {
 		-- The hot-path profiler, loaded through the expander, reads its slow threshold.
 		ms = function(_, key)
 			assert(key == "hotpath_slow_ms", "unexpected millisecond timing " .. tostring(key))
@@ -46,7 +46,7 @@ local function load_fixture(keystats)
 	return {
 		hs = hs_stub,
 		clock = clock,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
 end
@@ -69,7 +69,7 @@ end
 helpers.describe("clipboard output reaches synthetic telemetry", function()
 	helpers.it("shares native time across parallel restore timers and rearms (clipboard-native-fixture-clock)", function()
 		local fixture = load_fixture()
-		local interval = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local interval = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		local observed = {}
 		local function delivered() observed[#observed + 1] = fixture.clock.now() end
 		local first = fixture.hs.timer.new(interval, delivered)
@@ -151,7 +151,7 @@ helpers.describe("clipboard output reaches synthetic telemetry", function()
 			end
 		end
 		helpers.assert_eq(restores, 1, "one exact completion must own one clipboard restoration")
-		helpers.assert_true(fixture.clock.now() >= require("infra.timings").sec("debounce", "clipboard_paste_settle_ms"),
+		helpers.assert_true(fixture.clock.now() >= require("core.timing.engine.timings").sec("debounce", "clipboard_paste_settle_ms"),
 			"delivering the restoration timer must spend the native host interval")
 		helpers.assert_eq(fixture.hs.pasteboard.readAllData(), original,
 			"the production restore must retain every original type and binary byte")

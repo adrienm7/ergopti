@@ -15,16 +15,16 @@ local fixture = require("tests.support.text_owner_fixture")
 --- @param body function Receives result, wire, writes, state and stopped count.
 local function injection(boundary, body)
 	fixture.with(function(guard, state)
-		local names = { "adapters.clipboard", "adapters.shell_runner", "infra.display_server",
-			"adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.keyboard_hook", "logger.shim" }
+		local names = { "adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
+			"adapters.keyboard_layout", "modules.hotstrings.injector", "platform.input.keyboard_hook", "core.logger.engine.shim" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local rows, writes, commands, held, stopped = {}, {}, {}, {}, 0
 		local errors = {}
-		local logger = assert(dofile(require("infra.paths").shared("lua/logger/init.lua")))
+		local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
 		logger.set_sink(function() end)
 		logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local transitioned = false
 		local restoration_recovered = false
 		local function transition(point)
@@ -39,7 +39,7 @@ local function injection(boundary, body)
 			end
 		end
 		local clipboard = "SAVED"
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function() return true end,
 			-- A completed write is what the next read sees, as on a real clipboard.
 			exec_checked = function(command)
@@ -65,11 +65,11 @@ local function injection(boundary, body)
 				return false
 			end,
 		}
-		package.loaded["infra.display_server"] = {
+		package.loaded["core.ui.engine.display_server"] = {
 			is_wayland = function() return false end, is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() stopped = stopped + 1 end,
 		}

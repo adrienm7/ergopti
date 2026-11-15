@@ -75,14 +75,14 @@ _ULIG_CheckIsNumberGuard() {
 	try {
 		; Keep the historical test identity, but check the actual owner instead
 		; of pinning IsNumber(), which also accepted malformed numeric strings.
-		for Raw in ["fast", "0", 0.5, -1, 1.0e100] {
+		for Raw in ["fast", "0", 0.5, -1, 1.0e100, 2147483648] {
 			_IniCache := Map("updater", Map("check_interval_seconds", Raw))
 			UPDATER_CHECK_INTERVAL := -1
 			Updater_LoadCheckInterval()
 			AssertEqual(UPDATER_DEFAULT_INTERVAL, UPDATER_CHECK_INTERVAL,
 				"malformed or out-of-domain cadence must retain the default without throwing: " . String(Raw))
 		}
-		for Raw in [0, 3600] {
+		for Raw in [0, 3600, 2592000] {
 			_IniCache := Map("updater", Map("check_interval_seconds", Raw))
 			Updater_LoadCheckInterval()
 			AssertEqual(Raw, UPDATER_CHECK_INTERVAL, "valid native presets must keep their actual cadence")

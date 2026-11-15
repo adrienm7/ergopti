@@ -27,13 +27,13 @@ local FRAME_DT_SEC = 0.008
 local function play(ga, fingers, dx, dy)
 	local hs = _G.hs
 	local saved_clock, saved_absolute = hs.timer.secondsSinceEpoch, hs.timer.absoluteTime
-	local saved_scheduler = package.loaded["adapters.timer_scheduler"]
-	local saved_timings = package.loaded["infra.timings"]
+	local saved_scheduler = package.loaded["core.events.timer_scheduler"]
+	local saved_timings = package.loaded["core.timing.engine.timings"]
 	local clock = 3000.0
 	hs.timer.secondsSinceEpoch = function() return clock end
 	hs.timer.absoluteTime = function() return clock * 1e9 end
-	package.loaded["adapters.timer_scheduler"] = nil
-	package.loaded["infra.timings"] = nil
+	package.loaded["core.events.timer_scheduler"] = nil
+	package.loaded["core.timing.engine.timings"] = nil
 	package.loaded["modules.gestures.engine"] = nil
 	hs.eventtap.__reset()
 
@@ -65,15 +65,14 @@ local function play(ga, fingers, dx, dy)
 		clock = clock + FRAME_DT_SEC
 	end
 	for _ = 1, 10 do frame(0, 0) end
-	-- Few, large steps: a slow diagonal would lock its first small move to the
-	-- dominant axis, which is the engine's existing behaviour for every slot.
+	-- Few, large steps; a slow diagonal is pinned by test_diagonal_reversal.lua.
 	local steps = 8
 	for i = 1, steps do frame(dx * i / steps, dy * i / steps) end
 	Engine.process_frame({})
 	Engine.stop()
 	hs.timer.secondsSinceEpoch, hs.timer.absoluteTime = saved_clock, saved_absolute
-	package.loaded["adapters.timer_scheduler"] = saved_scheduler
-	package.loaded["infra.timings"] = saved_timings
+	package.loaded["core.events.timer_scheduler"] = saved_scheduler
+	package.loaded["core.timing.engine.timings"] = saved_timings
 	package.loaded["modules.gestures.engine"] = nil
 	return fired
 end
@@ -111,7 +110,13 @@ helpers.describe("gestures.engine: horizontal axis slots", function()
 	helpers.it("vertical swipes and other finger counts do not run an axis slot", function()
 		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 0, 20), "vertical")
 		eq(0, #play({ swipe_3_horiz = "word_next" }, 4, 20, 0), "4 fingers")
-		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 20, 20), "diagonal")
+	end)
+
+	-- Decided by the maintainer on 2026-11-11: an unbound diagonal runs its
+	-- dominant straight slot and that slot's own fallback, as on Linux.
+	helpers.it("an unbound diagonal reaches the axis slot through its dominant direction (diagonal-unbound-fallback)", function()
+		eq(1, #play({ swipe_3_horiz = "word_next" }, 3, 20, 20), "a 45 degree tie is horizontal")
+		eq(0, #play({ swipe_3_horiz = "word_next" }, 3, 12, 20), "a mostly vertical diagonal has no horizontal slot")
 	end)
 
 	helpers.it("nothing fires when neither slot is bound", function()

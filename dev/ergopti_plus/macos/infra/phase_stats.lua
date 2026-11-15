@@ -7,7 +7,7 @@
 --- latency: per-key hot path stages, menu build items, boot sub-stages, config
 --- parses, child processes. The bookkeeping (counts, totals, maxima, the
 --- attribution ring and the per-family evidence lines) is the shared
---- _shared/lua/phase_stats_core.lua, which the Linux driver runs as well; this
+--- _shared/metrics/engine/perf/phase_stats_core.lua, which the Linux driver runs as well; this
 --- module adds what is specific to Hammerspoon: the nanosecond clock and the
 --- periodic flush timer.
 ---
@@ -24,7 +24,7 @@
 ---    and reject a second start, like every stateful module.
 --- ==============================================================================
 
-local Core = require("phase_stats_core")
+local Core = require("metrics.engine.perf.phase_stats_core")
 
 local LOG = "phase_stats"
 
@@ -42,14 +42,14 @@ end
 local M = Core.new({
 	now_ns = now_ns,
 	info_enabled = function()
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		return Logger.is_enabled(Logger.LEVELS.INFO)
 	end,
-	evidence = function(format, ...) require("infra.logger").evidence(LOG, format, ...) end,
+	evidence = function(format, ...) require("core.logger.engine.logger").evidence(LOG, format, ...) end,
 	-- The log-volume figures ride on the memory line: both are process-wide and
 	-- one record per interval is what the CI and the diagnostics read.
 	memory_note = function(interval_sec)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		return string.format("Log volume over %d s: %s.", math.floor(interval_sec),
 			Logger.volume_text(Logger.volume_interval()))
 	end,
@@ -71,14 +71,14 @@ local _handle = nil
 --- @param interval_sec number|nil Flush interval in seconds.
 --- @return boolean started
 function M.start(interval_sec)
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	if _handle ~= nil then
 		Logger.error(LOG, "Phase summary timer is already running; a second start is refused.")
 		return false
 	end
 	local interval = interval_sec or M.DEFAULT_INTERVAL_SEC
 	Logger.start(LOG, "Starting the phase summary timer (every %d s)…", interval)
-	local handle, committed = require("adapters.timer_scheduler").every(interval, function()
+	local handle, committed = require("core.events.timer_scheduler").every(interval, function()
 		M.flush(interval)
 	end)
 	if committed ~= true then
@@ -94,10 +94,10 @@ end
 --- @return boolean stopped
 function M.stop_reporting()
 	if _handle == nil then return true end
-	local Logger = require("infra.logger")
+	local Logger = require("core.logger.engine.logger")
 	Logger.start(LOG, "Stopping the phase summary timer…")
 	M.flush()
-	local settled = require("adapters.timer_scheduler").cancel(_handle)
+	local settled = require("core.events.timer_scheduler").cancel(_handle)
 	if settled ~= true then
 		Logger.error(LOG, "The phase summary timer could not be stopped.")
 		return false

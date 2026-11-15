@@ -10,12 +10,12 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
 local Manifest = require("infra.manifest_reader")
-local AppIdentity = require("llm.app_identity")
-local NEVER_MS = require("llm.request_plan.debounce").NEVER_MS
-local ConfigKeys = require("config_keys")
+local AppIdentity = require("ai.engine.policy.app_identity")
+local NEVER_MS = require("ai.engine.request_plan.debounce").NEVER_MS
+local ConfigKeys = require("settings.engine.keys")
 local KEY, LEAF = ConfigKeys.KEY, ConfigKeys.LEAF
 
 -- Exported so the menu offers the same choice the file stores.
@@ -25,11 +25,12 @@ local LOG = "modules.llm.trigger_settings"
 local PREF_PREFIX = "llm.trigger."
 
 local DEFINITIONS = {
+	-- The ranges are the shared value schema's declarations.
 	debounce_ms = {
 		path = KEY.LLM_TRIGGER_DEBOUNCE_MS,
 		type = "number",
-		min = 50,
-		max = 10000,
+		min = require("settings.engine.value_check").declaration(KEY.LLM_TRIGGER_DEBOUNCE_MS).min,
+		max = require("settings.engine.value_check").declaration(KEY.LLM_TRIGGER_DEBOUNCE_MS).max,
 		presets = { 50, 100, 200, 300, 500, 750, 1000, 2000 },
 		-- The one value outside the range: no automatic trigger at all.
 		never = NEVER_MS,
@@ -38,8 +39,8 @@ local DEFINITIONS = {
 	min_request_interval_ms = {
 		path = KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS,
 		type = "number",
-		min = 0,
-		max = 10000,
+		min = require("settings.engine.value_check").declaration(KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS).min,
+		max = require("settings.engine.value_check").declaration(KEY.LLM_TRIGGER_MIN_REQUEST_INTERVAL_MS).max,
 		presets = { 0, 100, 200, 300, 500, 750, 1000, 2000, 5000 },
 	},
 	instant_on_word_end = {

@@ -38,12 +38,12 @@ for _, directory in ipairs({".config", ".config/ergopti", ".data", ".state", ".c
 end
 
 -- Cold Hook pins the genuine Reader before observation/classification callbacks.
-local Hook = require("adapters.keyboard_hook")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
+local Hook = require("platform.input.keyboard_hook")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
 local Finder = require("modules.hotstrings.device_finder")
-local Names = require("infra.device_names")
+local Names = require("platform.input.device_names")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
 local Manager = require("platform.remap.tap_hold_manager")
@@ -52,11 +52,11 @@ local Gestures = require("modules.gestures.manager")
 local ScriptActions = require("modules.shortcuts.script_actions")
 local Scope = require("infra.key_combinations_scope")
 local Paths = require("infra.config_paths")
-local SharedPaths = require("infra.paths")
-local Files = require("adapters.file_system")
-local Codec = require("toml_codec")
+local SharedPaths = require("core.fs.engine.paths")
+local Files = require("core.fs.adapters.file_system")
+local Codec = require("core.text.engine.toml_codec")
 local Hotstrings = require("modules.hotstrings.engine")
-local Monotonic = require("infra.monotonic")
+local Monotonic = require("core.logger.engine.monotonic")
 
 local source_name = "Ergopti simultaneous controlled virtual source " .. tostring(ffi.C.getpid())
 local output_slot = "simultaneous-native-output"
@@ -234,7 +234,7 @@ local function run()
 	Gestures.init({config_path=config_path,persist=true,enabled=false,is_paused=script.is_paused})
 	assert(Manager.init({keyboard_hook=Hook,execute_action=Gestures.execute_action,
 		action_names=Gestures.get_executable_action_names,on_text_injected=function() hotstrings:reset() end,
-		defaults_path=SharedPaths.shared("tap_hold/defaults.toml"),user_path=tap_path}), "original saved Manager startup")
+		defaults_path=SharedPaths.shared("tap_hold/data/defaults.toml"),user_path = tap_path, config_path = require("tests.support.tap_hold_fixture").config_path(tap_path)}), "original saved Manager startup")
 	manager_initialized = true
 	Hook.start({intercept=true,requireOutputBroker=true,outputBroker=broker,onEmitRaw=Writer.emit})
 	assert(Hook.isRunning() and Layout.publish_current_capture(), "actual grabbed session and current inverse publication")
@@ -247,10 +247,10 @@ local function run()
 	burst(15,58); expect(COPY,8,"saved symmetric reverse pair dispatches the original copy action once")
 	completed[#completed + 1] = "symmetric-copy"
 
-	assert(Scope.edit({{section="mod_combos.config.tab_then_caps_lock",key="combo",value="none"}}, script.is_paused, edit_source()),
+	assert(Scope.edit({{section="mod_combos.config.tab_then_caps_lock",key="combo",value="none"}}, edit_source()),
 		"original publisher clears only the known third slot")
 	local before = assert(Writer.output_view(output))
-	assert(Scope.copy_taps_to_chords(script.is_paused, edit_source()), "original owner copies real saved taps")
+	assert(Scope.copy_taps_to_chords(edit_source()), "original owner copies real saved taps")
 	local saved = assert(Files.read_with_status(config_path))
 	local document = assert(Codec.decode(saved))
 	check(document.category_enabled.key_combinations == true and document.mod_combos.enabled == true
@@ -264,10 +264,15 @@ local function run()
 	burst(58,15); expect(COPY,8,"reloaded copied slot dispatches through the original catalogue")
 	completed[#completed + 1] = "published-reload-copy"
 
+	-- A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12):
+	-- the copy still runs, and an unchanged one leaves each file byte for byte.
+	local saved_config = assert(Files.read_with_status(config_path))
+	local saved_chords = assert(Files.read_with_status(tap_path))
 	script.toggle_pause()
 	assert(script.is_paused() and not Manager.is_active(), "real script controller withdraws remapping")
-	check(Scope.copy_taps_to_chords(script.is_paused) == false and Files.read_with_status(config_path) == saved,
-		"paused original policy refuses copy and preserves exact saved bytes")
+	check(Scope.copy_taps_to_chords(edit_source()) == true and Files.read_with_status(config_path) == saved_config
+		and Files.read_with_status(tap_path) == saved_chords,
+		"a paused session still copies its configuration and an unchanged copy keeps the exact saved bytes")
 	burst(58,15); expect(PASSTHROUGH,8,"paused session forwards the original edges without business copy")
 	script.toggle_pause(); assert(not script.is_paused() and Manager.is_active())
 	burst(58,15); expect(COPY,8,"real resume restores the saved simultaneous route")

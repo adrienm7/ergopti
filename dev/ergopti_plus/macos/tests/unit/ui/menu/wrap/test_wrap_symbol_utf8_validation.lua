@@ -17,13 +17,13 @@ local function run_action(responses)
 	local result
 	helpers.with_fresh_modules({
 		"ui.menu.menu_shortcuts",
-		"infra.logger",
-		"infra.deferred_work",
-		"infra.fs_dir",
-		"infra.dialog_util",
+		"core.logger.engine.logger",
+		"core.timing.engine.deferred_work",
+		"core.fs.engine.dir",
+		"core.ui.engine.dialog_util",
 		"modules.shortcuts",
 		"modules.shortcuts.actions.text",
-		"infra.i18n",
+		"core.i18n.engine.i18n",
 		"ui.menu.menu_utils",
 		"infra.manifest_menu",
 		"ui.menu.shortcut_utils",
@@ -34,10 +34,10 @@ local function run_action(responses)
 		local alerts = 0
 		local saves = 0
 		local updates = 0
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.deferred_work"] = { after = function() return true end }
-		package.loaded["infra.fs_dir"] = { entries = function() return {} end }
-		package.loaded["infra.dialog_util"] = {
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.deferred_work"] = { after = function() return true end }
+		package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
+		package.loaded["core.ui.engine.dialog_util"] = {
 			text_prompt = function()
 				prompt_index = prompt_index + 1
 				local response = responses[prompt_index]
@@ -56,7 +56,7 @@ local function run_action(responses)
 			WRAP_GROUPS = {},
 			build_active_wrap_pairs = function() return {} end,
 		}
-		package.loaded["infra.i18n"] = {
+		package.loaded["core.i18n.engine.i18n"] = {
 			get = function(key) return key end,
 			section = function(key) return key end,
 			decorate_section = function(value) return value end,

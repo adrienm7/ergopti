@@ -33,20 +33,20 @@ local function load_menu(start_result)
 		set_disabled_apps = function() end,
 	}, { __index = function() return function() end end })
 	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
-	package.loaded["infra.dialog_util"] = {
+	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(_, body) ctx.alerts[#ctx.alerts + 1] = body; return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = nil
-	local renderer_i18n = require("infra.i18n")
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = nil
+	local renderer_i18n = require("core.i18n.engine.i18n")
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	-- The switch is the command registered for the manifest's metrics_toggle
 	-- row, captured where the menu hands it to the renderer.
-	local renderer = assert(require("menu.renderer").new({
+	local renderer = assert(require("menu.engine.renderer").new({
 		platform = "hs",
 		manifest_path = function()
-			return helpers.driver_root() .. "../_shared/modules/menu/menu_manifest.json"
+			return helpers.driver_root() .. "../_shared/menu/data/menu_manifest.json"
 		end,
-		json_decode = require("adapters.json_codec").decode,
+		json_decode = require("core.fs.adapters.json_codec").decode,
 		i18n = renderer_i18n,
 		logger = helpers.make_logger_stub(),
 	}))
@@ -57,7 +57,7 @@ local function load_menu(start_result)
 		end
 	renderer.build = capture
 	package.loaded["infra.manifest_menu"] = renderer
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["ui.wpm.wpm_menubar"] = {
 		start = function() ctx.menubar_starts = ctx.menubar_starts + 1 end,
 		stop = function() end, set_use_source_colors = function() end,

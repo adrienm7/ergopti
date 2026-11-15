@@ -16,10 +16,10 @@ local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 
 local function with_owner(body, options)
 	options = options or {}
-	local names = { "adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
+	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
-		"adapters.shell_runner", "infra.i18n", "window_titles", "modules.llm.runtime_factory" }
+		"modules.llm.local_servers", "modules.llm.api_entries", "platform.input.keyboard_hook",
+		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { calls = {}, commits = {}, rejects = {}, changes = 0, cancels = {}, cancel_ok = true }
@@ -37,7 +37,7 @@ local function with_owner(body, options)
 		end,
 	}
 	world.owned_http = {}
-	package.loaded["adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
+	package.loaded["core.network.adapters.http_client"] = require("tests.support.owned_http_fixture").attach(Http, world.owned_http)
 	package.loaded["modules.llm.enable_admission"] = nil
 	world.owner = require("modules.llm.enable_admission").new({
 		snapshot = function()
@@ -105,7 +105,7 @@ local function with_owner(body, options)
 		return world.engine, preferences
 	end
 	function world.use_native_notice()
-		package.loaded["adapters.shell_runner"] = {
+		package.loaded["core.process.adapters.shell_runner"] = {
 			has_command = function(name) return name == "zenity" end,
 			quote = function(value) return "'" .. value:gsub("'", "'\\''") .. "'" end,
 			exec_checked = function()
@@ -113,9 +113,9 @@ local function with_owner(body, options)
 				return true, world.native_answer or "replacement_1\n"
 			end,
 		}
-		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["window_titles"] = { compose = function(value) return value end }
-		local Hook = helpers.load_module("adapters.keyboard_hook")
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil
 		return Hook
 	end
@@ -164,8 +164,8 @@ end
 --- Runs the real repair, engine, profiles, probe and chat graph over owned OS ports.
 --- @param body function Receives actual producers and the retained service capability.
 local function with_managed_responses(body)
-	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "llm.runtime_repair",
-		"modules.llm.model_inventory", "infra.managed_http_deadline" }
+	local names = { "modules.llm.api_ollama", "modules.llm.local_model_probe", "ai.engine.local_servers.runtime_repair",
+		"modules.llm.model_inventory", "core.network.engine.managed_http_deadline" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local popen = io.popen
 	local ok, failure = xpcall(function()
@@ -173,7 +173,7 @@ local function with_managed_responses(body)
 			require("tests.support.modules.llm.runtime.inventory_fixture").install(world)
 			local engine = world.load_engine()
 			local profiles = require("modules.llm.profiles")
-			local Repair = require("llm.runtime_repair")
+			local Repair = require("ai.engine.local_servers.runtime_repair")
 			world.responses, world.posts, world.observations = {}, {}, 0
 			world.runtime_valid, world.service_current = true, true
 			local engine_port, proof, app_source, app_epoch
@@ -241,7 +241,7 @@ local function with_managed_responses(body)
 			assert(world.ready, "the actual explicit repair acquired its version probe")
 			world.ready:answer({ ok = true, status = 200, body = '{"version":"0.24.0"}' })
 			helpers.assert_true(engine.is_enabled()); helpers.assert_eq(world.controller:app_status(), "running")
-			local Http = package.loaded["adapters.http_client"]
+			local Http = package.loaded["core.network.adapters.http_client"]
 			Http.postStream = function(url, _, _, _, chunk, done)
 				world.posts[#world.posts + 1] = { url = url, chunk = chunk, done = done }; return true
 			end

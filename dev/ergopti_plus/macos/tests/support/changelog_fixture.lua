@@ -10,18 +10,18 @@ local helpers = require("tests.helpers")
 
 -- The real shared updater defaults: release sources are part of the contract.
 local FIXTURE_DIR = (debug.getinfo(1, "S").source:gsub("^@", ""):match("^(.*)[/\\]") or ".")
-local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/modules/updater/defaults.json"
+local SHARED_DEFAULTS = FIXTURE_DIR .. "/../../../_shared/updater/data/defaults.json"
 -- The real update-channel registry: the channel ids the window accepts.
-local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/modules/updater/channels.json"
-local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/modules/network/managed_network.json"
-local SHARED_HEADER_POLICY = FIXTURE_DIR .. "/../../../_shared/data/http/header_policy.json"
+local SHARED_CHANNELS = FIXTURE_DIR .. "/../../../_shared/updater/data/channels.json"
+local SHARED_NETWORK_POLICY = FIXTURE_DIR .. "/../../../_shared/core/network/data/managed_network.json"
+local SHARED_HEADER_POLICY = FIXTURE_DIR .. "/../../../_shared/core/network/data/http/header_policy.json"
 
 --- The repository identity of the shared defaults, the updater's own source.
 local function read_shared_github()
 	local handle = assert(io.open(SHARED_DEFAULTS, "r"))
 	local raw = handle:read("*a")
 	handle:close()
-	return assert(require("json").decode(raw)).github
+	return assert(require("core.text.engine.json").decode(raw)).github
 end
 
 local function with_changelog(callback)
@@ -30,15 +30,15 @@ local function with_changelog(callback)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			"ui.changelog",
-			"ui.ui_builder",
-			"adapters.file_system",
-			"adapters.json_codec",
-			"adapters.http_client",
-			"adapters.timer_scheduler",
-			"infra.deferred_work",
-			"infra.i18n",
-			"infra.logger",
-			"infra.paths",
+			"core.ui.ui.builder",
+			"core.fs.adapters.file_system",
+			"core.fs.adapters.json_codec",
+			"core.network.adapters.http_client",
+			"core.events.timer_scheduler",
+			"core.timing.engine.deferred_work",
+			"core.i18n.engine.i18n",
+			"core.logger.engine.logger",
+			"core.fs.engine.paths",
 			"modules.shortcuts.script_control",
 			"hs",
 			"tests.stubs.hs",
@@ -81,7 +81,7 @@ local function with_changelog(callback)
 			-- The real HttpClient owns redirects, so the window never reaches the
 			-- opaque auto-follow entry: asyncGet fails the case that uses it.
 			hs_stub.http.asyncGet = function()
-				error("the changelog must request through adapters.http_client, not hs.http.asyncGet")
+				error("the changelog must request through core.network.adapters.http_client, not hs.http.asyncGet")
 			end
 			hs_stub.http.doAsyncRequest = function(url, method, _, headers, on_response, _, explicit_redirect)
 				state.callbacks[#state.callbacks + 1] = on_response
@@ -117,7 +117,7 @@ local function with_changelog(callback)
 				end
 				return bridge
 			end
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(seconds, callback, label)
 					-- Request deadlines are observed separately so lifecycle timers
 					-- keep their historical indexes.
@@ -126,10 +126,10 @@ local function with_changelog(callback)
 					return true
 				end,
 			}
-			package.loaded["infra.i18n"] = {
+			package.loaded["core.i18n.engine.i18n"] = {
 				get = function(key) return key end,
 			}
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			-- The real adapter's symlink-safe inspection needs hs.fs; the fixture
 			-- only has to hand the controller the shared defaults bytes.
 			local function read_file(path)
@@ -139,7 +139,7 @@ local function with_changelog(callback)
 				handle:close()
 				return text
 			end
-			package.loaded["adapters.file_system"] = {
+			package.loaded["core.fs.adapters.file_system"] = {
 				read = read_file,
 				-- The native header policy reads its shared law through this bound.
 				read_bounded = function(path, max_bytes)
@@ -149,16 +149,16 @@ local function with_changelog(callback)
 					return text, "ok"
 				end,
 			}
-			package.loaded["infra.paths"] = {
+			package.loaded["core.fs.engine.paths"] = {
 				shared = function(relative)
-					if relative == "modules/updater/defaults.json" then return SHARED_DEFAULTS end
-					if relative == "modules/updater/channels.json" then return SHARED_CHANNELS end
-					if relative == "modules/network/managed_network.json" then return SHARED_NETWORK_POLICY end
-					if relative == "data/http/header_policy.json" then return SHARED_HEADER_POLICY end
+					if relative == "updater/data/defaults.json" then return SHARED_DEFAULTS end
+					if relative == "updater/data/channels.json" then return SHARED_CHANNELS end
+					if relative == "core/network/data/managed_network.json" then return SHARED_NETWORK_POLICY end
+					if relative == "core/network/data/http/header_policy.json" then return SHARED_HEADER_POLICY end
 					return "/shared/" .. tostring(relative)
 				end,
 			}
-			package.loaded["ui.ui_builder"] = {
+			package.loaded["core.ui.ui.builder"] = {
 				build_injected_html = function() return "<html><head></head></html>" end,
 				force_focus = function()
 					state.focuses = state.focuses + 1

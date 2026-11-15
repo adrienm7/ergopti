@@ -62,7 +62,7 @@ local function load_active_remap(options)
 		if calls.phase_listener then calls.phase_listener(phase, TOKEN) end
 	end
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		start = noop, debug = noop, info = noop, warn = noop,
 		error = function(_, message, ...)
 			calls.errors[#calls.errors + 1] = string.format(message, ...)
@@ -202,7 +202,7 @@ local function load_active_remap(options)
 		start_input_source_watcher = function() return true end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = { unbind = function() return true end }
+	package.loaded["platform.input.hotkey_registrar"] = { unbind = function() return true end }
 	package.loaded["modules.keystats.kc_bridge"] = {
 		clear_managed_set = function() return true end,
 		refresh_managed_set = function()
@@ -214,7 +214,7 @@ local function load_active_remap(options)
 	}
 	package.loaded["modules.gestures.engine"] = {}
 	package.loaded["modules.shortcuts"] = { is_paused = function() return false end }
-	package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 	-- layers.toml, read at every regeneration, lives in get_config_dir(); none
 	-- unless the test hands a folder of its own.
 	package.loaded["infra.config_paths"] = {

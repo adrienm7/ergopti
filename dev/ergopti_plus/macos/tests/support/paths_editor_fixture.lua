@@ -7,7 +7,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 --- Loads a pristine paths editor behind an already-initialized resolver and
 --- records native bridge/webview creation.
@@ -29,7 +29,7 @@ local function load_fixture(show_result)
 	logger.error = function(_, fmt, ...)
 		calls.errors[#calls.errors + 1] = string.format(fmt, ...)
 	end
-	package.loaded["infra.logger"] = logger
+	package.loaded["core.logger.engine.logger"] = logger
 	package.loaded["infra.config_paths"] = {
 		is_initialized = function() return true end,
 		init = function()
@@ -57,7 +57,7 @@ local function load_fixture(show_result)
 			if calls.delete_throws then error("synthetic paths editor delete refusal") end
 		end,
 	}
-	package.loaded["ui.ui_builder"] = {
+	package.loaded["core.ui.ui.builder"] = {
 		get_app_geometry = function() return { width = 620, height = 480 } end,
 		get_centered_frame = function(w, h) return { x = 0, y = 0, w = w, h = h } end,
 		show_webview = function(opts)

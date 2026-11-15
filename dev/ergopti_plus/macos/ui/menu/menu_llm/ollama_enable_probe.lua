@@ -6,8 +6,8 @@
 --- Owns read-only version requests until their exact native cleanup settles.
 --- ==============================================================================
 
-local HttpClient = require("adapters.http_client")
-local Admission = require("llm.enable_admission")
+local HttpClient = require("core.network.adapters.http_client")
+local Admission = require("ai.engine.settings.enable_admission_core")
 local M = {}
 
 

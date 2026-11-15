@@ -41,8 +41,8 @@ local function load_lifecycle()
 			ctx.logs[#ctx.logs + 1] = level .. ":" .. tostring(message)
 		end
 	end
-	package.loaded["infra.logger"] = logger
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.logger.engine.logger"] = logger
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function()
 			if ctx.fail_notification_once then
 				ctx.fail_notification_once = false
@@ -51,8 +51,8 @@ local function load_lifecycle()
 			ctx.notifications = ctx.notifications + 1
 		end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.text_utils"] = { shell_quote = function(value) return value end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
+	package.loaded["core.text.engine.utils"] = { shell_quote = function(value) return value end }
 	package.loaded["platform.remap.ke_paths"] = {
 		CORE_SERVICE = "/stock/Karabiner-Core-Service",
 		GRABBER = "/stock/karabiner_grabber",

@@ -14,9 +14,9 @@ local helpers = require("tests.helpers")
 --- Supply only genuine Layout format strings that the complete caption API now reads.
 --- This is fixture input, never an expectation regenerated from the native producer.
 local function install_legacy_layout_formats(translator)
-	translator = translator or require("infra.i18n")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
+	translator = translator or require("core.i18n.engine.i18n")
+	local file = assert(io.open(helpers.shared("core/i18n/data/locales/en.json"), "rb"))
+	local catalogue = assert(require("core.text.engine.json").decode(file:read("*a")))
 	assert(file:close())
 	local original_get = translator.get
 	translator.get = function(key)
@@ -72,8 +72,8 @@ end
 
 
 local function with_switch_frame(callback, labels, configure)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"infra.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
+	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "core.i18n.engine.i18n",
+		"core.ui.engine.notifications", "modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
 		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
 		local installer = require("modules.keymap.layout_install")
 		local fixture = {records = {{id = "French", name = "French", selected = false}}, saves = 0, updates = 0, effects = 0}
@@ -92,7 +92,7 @@ local function with_switch_frame(callback, labels, configure)
 		installer.install_user = forbidden
 		if configure then configure(fixture, installer) end
 		package.loaded["modules.keymap.layout_registry"] = {picker = function() return fixture.custom or {layouts = {}, active = ""} end, select = forbidden}
-		local translator = require("infra.i18n")
+		local translator = require("core.i18n.engine.i18n")
 		local original_get = translator.get
 		translator.get = function(key)
 			if labels then return labels[key] or key end

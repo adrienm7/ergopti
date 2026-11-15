@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
 -- The servers these tests drive. Every other catalogue server is stopped in
 -- the fake scan (with_backend), so a longer catalogue changes no scenario.
@@ -122,7 +122,7 @@ end
 local function with_panel(scenario)
 	local owned = {
 		"ui.menu.menu_llm.local_server_panel", "ui.menu.menu_llm.api_panel", "modules.llm",
-		"infra.dialog_util", "infra.notifications", "infra.deferred_work",
+		"core.ui.engine.dialog_util", "core.ui.engine.notifications", "core.timing.engine.deferred_work",
 	}
 	with_backend(function(api, LocalServers, world)
 		helpers.with_fresh_modules(owned, function()
@@ -131,7 +131,7 @@ local function with_panel(scenario)
 			-- Deferred work runs at once unless a scenario holds it to model the
 			-- menu build that has not returned yet.
 			world.deferred, world.hold_deferred = {}, false
-			package.loaded["infra.deferred_work"] = {
+			package.loaded["core.timing.engine.deferred_work"] = {
 				after = function(delay, callback, label)
 					world.deferred[#world.deferred + 1] = { delay = delay, label = label, callback = callback }
 					if not world.hold_deferred then callback() end
@@ -145,13 +145,13 @@ local function with_panel(scenario)
 					callback(true, nil, true)
 				end,
 			}
-			package.loaded["infra.dialog_util"] = {
+			package.loaded["core.ui.engine.dialog_util"] = {
 				text_prompt = function(_, _, default, ok_label, cancel_label)
 					world.last_default = default
 					return world.dialog_answer[1] == "OK" and ok_label or cancel_label, world.dialog_answer[2]
 				end,
 			}
-			package.loaded["infra.notifications"] = {
+			package.loaded["core.ui.engine.notifications"] = {
 				notify = function(title, body, kind, on_click)
 					world.notices[#world.notices + 1] = { title = title, body = body, kind = kind, on_click = on_click }
 					return true

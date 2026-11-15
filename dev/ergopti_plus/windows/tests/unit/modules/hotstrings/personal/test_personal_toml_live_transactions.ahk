@@ -188,7 +188,7 @@ _PTIOCR_ReentrantWriterCannotSplitDurableAndLivePublication() {
 		AssertEqual(4, _PTIOCR_ReloadEvents.Length,
 			"both complete two-section candidates must publish without a mixed suffix")
 		AssertEqual("A-alpha", _PTIOCR_ReloadEvents[1],
-			"a mutation of the native editor alias during staging must not alter A's detached snapshot")
+			"a mutation of the caller's model alias during staging must not alter A's detached snapshot")
 		AssertEqual("A-beta", _PTIOCR_ReloadEvents[2])
 		AssertEqual("B-alpha", _PTIOCR_ReloadEvents[3])
 		AssertEqual("B-beta", _PTIOCR_ReloadEvents[4])
@@ -275,13 +275,14 @@ _PTIOCX_Reload(Data, SectionName, FeatureConfig) {
 	_PTIOCX_ReloaderWasCritical := _PTIOCX_ReloaderWasCritical || A_IsCritical
 }
 
-; Suspend can be active before admission or arrive while the complete stage is
-; being written. Neither sequence may reach atomic replacement or live HSE.
-_PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
+; A pause stops typing, not configuration (EDD-1, maintainer decision
+; 2026-11-12): Suspend active before admission, or arriving while the complete
+; stage is written, still publishes the save (edd1-paused-writes).
+_PTIOCX_SuspendStillPublishes() {
 	global ScriptInformation, _ReadPersonalTomlCache
 	global _PTIOCX_WriteCalls, _PTIOCX_ReplaceCalls, _PTIOCX_ReloadCalls
 	global _PTIOCX_WriterWasCritical, _PTIOCX_ReplacerWasCritical
-	global PERSONAL_TOML_COMMIT_FAILED
+	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_OK
 	Path := A_Temp . "\\ergopti_personal_suspend_transaction_"
 		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
 	Original := '[_meta]`ndescription = "old"`n'
@@ -298,15 +299,17 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 
 		_PTIOCX_Reset()
 		Suspend(1)
-		AssertEqual(PERSONAL_TOML_COMMIT_FAILED,
+		AssertEqual(PERSONAL_TOML_COMMIT_OK,
 			PersonalTomlCommitAndReload(Data, 0, _PTIOCX_WriteStage.Bind(),
 				_PTIOCX_ReplaceStage.Bind(), 0, 0, _PTIOCX_Reload.Bind()))
-		AssertEqual(0, _PTIOCX_WriteCalls,
-			"a save received under Suspend must fail before staging")
-		AssertEqual(0, _PTIOCX_ReplaceCalls)
-		AssertEqual(0, _PTIOCX_ReloadCalls)
-		AssertEqual(Original, FileRead(Path, "UTF-8-RAW"))
+		AssertEqual(1, _PTIOCX_WriteCalls,
+			"a save received under Suspend is staged")
+		AssertEqual(1, _PTIOCX_ReplaceCalls, "and replaces the file")
+		AssertTrue(FileRead(Path, "UTF-8-RAW") != Original, "the suspended save is durable")
 		Suspend(0)
+		FileDelete(Path)
+		FileAppend(Original, Path, "UTF-8-RAW")
+		_ReadPersonalTomlCache := false
 
 		_PTIOCX_Reset()
 		TerminalBundle := _ConfigWriteTerminalTryAcquire([Path])
@@ -322,22 +325,20 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 		} finally _ConfigWriteTerminalRelease(TerminalBundle)
 
 		_PTIOCX_Reset("suspend-stage")
-		AssertEqual(PERSONAL_TOML_COMMIT_FAILED,
+		AssertEqual(PERSONAL_TOML_COMMIT_OK,
 			PersonalTomlCommitAndReload(Data, 0, _PTIOCX_WriteStage.Bind(),
 				_PTIOCX_ReplaceStage.Bind(), 0, 0, _PTIOCX_Reload.Bind()))
 		AssertTrue(A_IsSuspended,
-			"the injected stage seam must place the final authorization under Suspend")
+			"the injected stage seam places the final authorization under Suspend")
 		AssertEqual(1, _PTIOCX_WriteCalls)
-		AssertEqual(0, _PTIOCX_ReplaceCalls,
-			"a suspension observed after staging must refuse the atomic replacement")
-		AssertEqual(0, _PTIOCX_ReloadCalls,
-			"a refused durable publication must never mutate the live registry")
-		AssertEqual(Original, FileRead(Path, "UTF-8-RAW"))
+		AssertEqual(1, _PTIOCX_ReplaceCalls,
+			"a suspension observed after staging still replaces the file")
+		AssertTrue(FileRead(Path, "UTF-8-RAW") != Original)
 		AssertFalse(_PTIOCX_WriterWasCritical,
-			"the suspend-aware owner must not make staging Critical")
+			"the owner must not make staging Critical")
 		AssertFalse(_PTIOCX_ReplacerWasCritical)
 		_PTIOP_AssertLeaseFree(Path,
-			"every suspended refusal must release the personal path owner")
+			"every suspended save must release the personal path owner")
 	} finally {
 		if A_IsSuspended
 			Suspend(0)
@@ -349,8 +350,8 @@ _PTIOCX_SuspendRefusesBeforeDurableAndLivePublication() {
 		_PTIOCX_Reset()
 	}
 }
-Test("personal-toml-live-transaction: Suspend refuses admission and post-stage publication",
-	_PTIOCX_SuspendRefusesBeforeDurableAndLivePublication)
+Test("personal-toml-live-transaction: Suspend still publishes the save (edd1-paused-writes)",
+	_PTIOCX_SuspendStillPublishes)
 
 ; A path relocation after request capture must be observed both before atomic
 ; replacement and again before the matching live registry projection.
@@ -535,35 +536,15 @@ Test("personal-toml-live-transaction: deferred reload failure is visible and ret
 ; Guard the sibling call sites as a class: a correct gateway is inert if one
 ; editor returns to the old write-then-reload split sequence.
 _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
-	; Native _SaveData now owns only the detached-model handoff. Its qualified
-	; receipt helper owns the actual durable/live gateway and deferred callback.
-	WrapperBody := _DriverFuncBody("_SaveData")
-	Assert(WrapperBody != "", "the native save wrapper must exist")
-	Assert(InStr(WrapperBody, "return _PersonalEditorSaveEntryCandidate(") > 0,
-		"the native wrapper must return its qualified receipt owner's result")
-	Assert(InStr(WrapperBody, "_PersonalTomlCloneDetached(Data)") > 0,
-		"the native wrapper must hand off a detached complete model")
-	for FunctionName in ["_SaveData", "_PersonalEditorSaveEntryCandidate", "_HsEdWeb_Save"] {
-		Body := _DriverFuncBody(FunctionName)
-		Assert(Body != "", FunctionName . " must exist in the driver source")
-		if FunctionName != "_SaveData"
-			Assert(InStr(Body, "PersonalTomlCommitAndReload(") > 0,
-				FunctionName . " must delegate durable and live publication to the shared gateway")
-		Assert(InStr(Body, "WritePersonalToml(") == 0,
-			FunctionName . " must not release path ownership before its live reload")
-		Assert(InStr(Body, "ReloadPersonalSection(") == 0,
-			FunctionName . " must not own a second, reentrant reload loop")
-	}
-	NativeBody := _DriverFuncBody("_PersonalEditorSaveEntryCandidate")
-	Assert(InStr(NativeBody, "_PersonalEditorEntryCompleted.Bind(Request)") > 0,
-		"the native gateway must bind its exact request for the DEFERRED terminal callback")
-	Assert(InStr(NativeBody, "PERSONAL_TOML_COMMIT_DEFERRED") > 0
-			&& InStr(NativeBody, "return false") > 0,
-		"the native owner must not report a DEFERRED admission as saved")
-	NativeCompletion := _DriverFuncBody("_PersonalEditorEntryCompleted")
-	Assert(NativeCompletion != "" && InStr(NativeCompletion, "editor.hotstrings.err_write") > 0,
-		"the bound native completion must keep a terminal refusal visibly unsaved")
+	; The WebView editor is the only personal-hotstring editor on Windows.
 	WebBody := _DriverFuncBody("_HsEdWeb_Save")
+	Assert(WebBody != "", "_HsEdWeb_Save must exist in the driver source")
+	Assert(InStr(WebBody, "PersonalTomlCommitAndReload(") > 0,
+		"_HsEdWeb_Save must delegate durable and live publication to the shared gateway")
+	Assert(InStr(WebBody, "WritePersonalToml(") == 0,
+		"_HsEdWeb_Save must not release path ownership before its live reload")
+	Assert(InStr(WebBody, "ReloadPersonalSection(") == 0,
+		"_HsEdWeb_Save must not own a second, reentrant reload loop")
 	Assert(InStr(WebBody, "_HsEdWeb_DeferredSaveCompleted") > 0,
 		"the WebView editor must receive a terminal result after DEFERRED")
 	FailureBody := _DriverFuncBody("_HsEdWeb_ReportSaveFailure")
@@ -573,14 +554,15 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 		"a deferred WebView failure must be user-visible, not only logged")
 	WebMessageBody := _DriverFuncBody("_HsEdWeb_OnWebMessage")
 	Assert(WebMessageBody != "")
-	Assert(InStr(WebMessageBody, "_HsEdWeb_ShowSaveFailure") > 0,
-		"a WebView save received under Suspend must surface its refusal")
+	; A pause stops typing, not configuration (EDD-1, edd1-paused-writes).
+	Assert(InStr(WebMessageBody, "A_IsSuspended") == 0,
+		"a WebView save received under Suspend is handled like any other")
 	ShowFailureBody := _DriverFuncBody("_HsEdWeb_ShowSaveFailure")
 	Assert(ShowFailureBody != "")
 	; The failure script is built by one owner the reporter delegates to.
 	FailureJsBody := _DriverFuncBody("_HsEdWeb_SaveFailureJs")
 	Assert(InStr(ShowFailureBody, "_HsEdWeb_SaveFailureJs(") > 0 && InStr(FailureJsBody, "save-toast") > 0,
-		"the suspended refusal must replace the page's optimistic saved toast")
+		"a refused save must replace the page's optimistic saved toast")
 	for FunctionName in ["_PersonalTomlQueueLiveRequest",
 			"_PersonalTomlTryPublishRequest",
 			"_PersonalTomlPublishRequestOwned"] {
@@ -593,7 +575,7 @@ _PTIOCR_AllEditorsUseTheDurableLiveGateway() {
 	Assert(InStr(QueueBody, "Request.CompletionFn") > 0,
 		"the gateway must refuse DEFERRED when no terminal callback can report its outcome")
 }
-Test("personal-toml-live-transaction: native and WebView saves share one gateway",
+Test("personal-toml-live-transaction: the WebView save uses the shared gateway",
 	_PTIOCR_AllEditorsUseTheDurableLiveGateway)
 
 ; The refusal toast script must splice the complete JSON literal bare: a second
@@ -642,7 +624,8 @@ Test("personal TOML: priority domain rejects invalid writer candidates",
 	_PTIO_PriorityDomainRejectsInvalidCandidate)
 
 ; Opening-source consent uses actual private files, the ordinary durable owner,
-; and hidden native Gui identities. Callback bodies collect facts, never assert.
+; and a hidden Gui as the WebView editor window. Callback bodies collect facts,
+; never assert.
 _PT102_CaptureOpening(Source) {
 	if ReadPersonalToml.MaxParams >= 2
 		return ReadPersonalToml(false, Source)
@@ -664,13 +647,8 @@ _PT102_Stage(Context, StagePath, Content) {
 	Written := FSWriteDurable(StagePath, Content)
 	if Context.mode == "stage-foreign"
 		Context.foreign_ack := FSWriteDurable(Context.path, Context.foreign)
-	else if Context.mode == "stage-close" {
-		if _OnEditorClose.MaxParams >= 2
-			_OnEditorClose(Context.window, Context.source["epoch"])
-		else
-			_OnEditorClose()
-		Context.window.Destroy()
-	}
+	else if Context.mode == "stage-close"
+		_HsEdWeb_Close(Context.window)
 	return Written
 }
 
@@ -728,18 +706,14 @@ _PT102_Reload(Context, Data, SectionName, FeatureConfig) {
 _PT102_Commit(Context, Data, Deferred := false) {
 	Args := [Data, 0, _PT102_Stage.Bind(Context), _PT102_Replace.Bind(Context),
 		0, _PT102_Authorize.Bind(Context), _PT102_Reload.Bind(Context),
-		Deferred ? _PT102_Terminal.Bind(Context) : 0, 0]
-	if PersonalTomlCommitAndReload.MaxParams >= 10
-		Args.Push(Context.source)
+		Deferred ? _PT102_Terminal.Bind(Context) : 0, Context.source]
 	return PersonalTomlCommitAndReload(Args*)
 }
 
 _PT102_WithCase(Mode, Body, OwnDirectory := false) {
 	global ScriptInformation, _ReadPersonalTomlCache, _TomlUnreadableFiles
-	global _PersonalEditorGui, _PersonalEditorData, _PersonalEditorSection, _PersonalEditorPrioCtrl
-	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
-	global _PersonalEditorEntryCohort, _PersonalEditorEntryBusy
-	global _HsEdWeb_Gui, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
+	global _HsEdWeb_Gui, _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch, _HsEdWeb_ResetDone
+	global _HsEdWeb_Controller, _HsEdWeb_WebView, _HsEdWeb_MsgSub, _HsEdWeb_NavSub
 	static Sequence := 0, RetainedHandles := Map()
 	if RetainedHandles.Count
 		throw Error("controlled native handle debt blocks successor fixture")
@@ -750,11 +724,9 @@ _PT102_WithCase(Mode, Body, OwnDirectory := false) {
 		Root := A_Temp . "\ergopti_opening_owned_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Sequence
 		Path := Root . "\personal_hotstrings.toml"
 	}
-	Names := ["_ReadPersonalTomlCache", "_TomlUnreadableFiles", "_PersonalEditorGui",
-		"_PersonalEditorData", "_PersonalEditorSection", "_PersonalEditorPrioCtrl",
-		"_PersonalEditorOpeningSource", "_PersonalEditorSessionEpoch",
-		"_PersonalEditorEntryCohort", "_PersonalEditorEntryBusy",
-		"_HsEdWeb_Gui", "_HsEdWeb_OpeningSource", "_HsEdWeb_SessionEpoch"]
+	Names := ["_ReadPersonalTomlCache", "_TomlUnreadableFiles",
+		"_HsEdWeb_Gui", "_HsEdWeb_OpeningSource", "_HsEdWeb_SessionEpoch", "_HsEdWeb_ResetDone",
+		"_HsEdWeb_Controller", "_HsEdWeb_WebView", "_HsEdWeb_MsgSub", "_HsEdWeb_NavSub"]
 	Saved := Map()
 	for Name in Names {
 		Had := IsSet(%Name%)
@@ -779,7 +751,6 @@ _PT102_WithCase(Mode, Body, OwnDirectory := false) {
 			AssertTrue(CreatedRoot, "The native partial-effect fixture owns its private directory exclusively")
 		}
 		Suspend(false)
-		_PersonalEditorEntryCohort := 0, _PersonalEditorEntryBusy := false
 		ScriptInformation["PersonalTomlPath"] := Path
 		_TomlUnreadableFiles := _TomlUnreadableFiles.Clone()
 		_ReadPersonalTomlCache := false
@@ -822,15 +793,19 @@ _PT102_WithCase(Mode, Body, OwnDirectory := false) {
 		}
 		if Mode == "cached"
 			_ReadPersonalTomlCache := _PTIOCR_Model("cached")
-		_PersonalEditorGui := Window
-		_PersonalEditorSessionEpoch := IsSet(_PersonalEditorSessionEpoch) ? _PersonalEditorSessionEpoch + 1 : 1
+		; A hidden Gui stands in for the WebView editor window: these cases own
+		; the file consent, not the page, so no browser is created.
+		_HsEdWeb_Controller := unset, _HsEdWeb_WebView := unset
+		_HsEdWeb_MsgSub := unset, _HsEdWeb_NavSub := unset
+		_HsEdWeb_ResetDone := false
+		_HsEdWeb_Gui := Window
+		_HsEdWeb_SessionEpoch := IsSet(_HsEdWeb_SessionEpoch) ? _HsEdWeb_SessionEpoch + 1 : 1
 		Context.opening_data := _PT102_CaptureOpening(Context.source)
-		Context.source["kind"] := "native"
+		Context.source["kind"] := "webview"
 		Context.source["window"] := Window
-		Context.source["epoch"] := _PersonalEditorSessionEpoch
-		_PersonalEditorOpeningSource := Context.source
-		_PersonalEditorData := Context.opening_data
-		_PersonalEditorSection := "alpha"
+		Context.source["epoch"] := _HsEdWeb_SessionEpoch
+		Context.source["ready"] := true
+		_HsEdWeb_OpeningSource := Context.source
 		Body.Call(Context)
 	} finally {
 		CleanupDebt := false
@@ -982,15 +957,15 @@ Test("personal-opening-source: actual no-delete handle refuses rename without so
 	_PT102_WithCase.Bind("rename-lock", _PT102_ActualRenameRefusal))
 
 _PT102_ConsentIdentityRefusal(Context) {
-	global _PersonalEditorOpeningSource, _PersonalEditorSessionEpoch
+	global _HsEdWeb_OpeningSource, _HsEdWeb_SessionEpoch
 	global PERSONAL_TOML_COMMIT_FAILED
 	Original := FSReadUtf8Exact(Context.path)
 	if Context.mode == "deleted"
 		FileDelete(Context.path)
 	else if Context.mode == "new-session"
-		_PersonalEditorSessionEpoch += 1
+		_HsEdWeb_SessionEpoch += 1
 	else if Context.mode == "copied-receipt"
-		_PersonalEditorOpeningSource := Context.source.Clone()
+		_HsEdWeb_OpeningSource := Context.source.Clone()
 	else if Context.mode == "invalid-presence"
 		Context.source["present"] := "true"
 	Result := _PT102_Commit(Context, _PTIOCR_Model("unowned"))
@@ -1026,7 +1001,7 @@ Test("personal-opening-source: own image preserves all four file and section met
 	_PT102_WithCase.Bind("metadata", _PT102_KnownOverrides))
 
 ; Append to test_personal_toml_live_transactions.ahk. Existing _PT102_WithCase
-; owns the real private personal file, native Gui identity and global cleanup.
+; owns the real private personal file, editor Gui identity and global cleanup.
 ; Callbacks record facts only: assertions happen after the actual transaction.
 _PTA_FinalHotstring(Context) {
 	global ScriptInformation
@@ -1050,7 +1025,7 @@ _PTA_FinalHotstring(Context) {
 		Facts.admitted_before := _PersonalTomlOpeningAuthority(Context.source, Context.path, Owner)
 		switch Context.mode {
 			case "close":
-				_PersonalEditorWindowClose(Context.window, Context.source["epoch"])
+				_HsEdWeb_Close(Context.window)
 				Facts.close_called := true
 			case "pause": Suspend(true)
 			case "released": _PersonalTomlWriteLeaseRelease(Owner)
@@ -1066,7 +1041,8 @@ _PTA_FinalHotstring(Context) {
 		AssertTrue(Facts.admitted_before, "the live genuine session must pass before the cutpoint revokes it")
 		AssertTrue(Facts.stage != "")
 		AssertFalse(FileExist(Facts.stage), "success consumes the stage; refusal cleans it")
-		if Context.mode == "live" {
+		; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+		if Context.mode == "live" || Context.mode == "pause" {
 			AssertTrue(Result)
 			AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
 			AssertEqual(1, Facts.published)
@@ -1114,7 +1090,8 @@ _PTA_FinalMetadata(Context) {
 	AssertFalse(Facts.hook_critical)
 	AssertTrue(Facts.leased, "the genuine patch holds its existing owner through the cutpoint")
 	AssertFalse(FileExist(Facts.stage))
-	if Context.mode == "live" {
+	; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+	if Context.mode == "live" || Context.mode == "pause" {
 		AssertTrue(Result)
 		AssertTrue(FSUtf8ExactMatches(Context.path, Candidate))
 	} else {
@@ -1198,7 +1175,8 @@ _PTA_FinalInformation(Mode) {
 		AssertFalse(Facts.replace_critical, "the existing arbitrary two-argument ReplaceFn ABI stays outside Critical")
 		AssertTrue(Facts.admitted_before)
 		AssertFalse(FileExist(Facts.stage))
-		if Mode == "live" {
+		; A pause stops typing, not configuration (EDD-1): a paused rename publishes (edd1-paused-writes).
+		if Mode == "live" || Mode == "pause" {
 			AssertTrue(Result)
 			AssertTrue(FSUtf8ExactMatches(Path, Candidate))
 			AssertEqual(1, Facts.published)

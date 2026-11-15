@@ -3,12 +3,12 @@
 local helpers = require("tests.helpers")
 local M = {}
 local OWNED = {
-	"platform.remap.watchers", "adapters.shell_runner", "adapters.timer_scheduler",
-	"adapters.input_source_broker", "adapters.task_environment", "infra.launcher_environment",
-	"infra.deferred_work", "diagnostics.runtime_log", "infra.logger", "infra.timings", "infra.keycodes",
-	"adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
+	"platform.remap.watchers", "core.process.adapters.shell_runner", "core.events.timer_scheduler",
+	"adapters.input_source_broker", "core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment",
+	"core.timing.engine.deferred_work", "diagnostics.engine.runtime_log", "core.logger.engine.logger", "core.timing.engine.timings", "platform.input.keycodes",
+	"platform.input.key_state", "adapters.mouse_control", "platform.input.hotkey_registrar",
 	"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
-	"infra.capsword_output", "caps_word.auto_off",
+	"infra.capsword_output", "keyboard.engine.caps_word_auto_off",
 }
 
 --- Owns only this process's modeled native handles; no OS process is spawned.
@@ -17,12 +17,12 @@ local OWNED = {
 --- @return any result
 function M.with_world(options, callback)
 	return helpers.with_stub_scope(OWNED, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
-		package.loaded["infra.timings"] = { sec = function(_, key) return key == "layout_poll_ms" and 1 or 0.1 end }
-		package.loaded["infra.keycodes"] = { F17_CYCLE_WINDOWS = 64, to_name = function() return "f17" end }
-		for _, name in ipairs({ "adapters.key_state", "adapters.mouse_control", "adapters.hotkey_registrar",
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+		package.loaded["core.timing.engine.timings"] = { sec = function(_, key) return key == "layout_poll_ms" and 1 or 0.1 end }
+		package.loaded["platform.input.keycodes"] = { F17_CYCLE_WINDOWS = 64, to_name = function() return "f17" end }
+		for _, name in ipairs({ "platform.input.key_state", "adapters.mouse_control", "platform.input.hotkey_registrar",
 			"platform.remap.lease_contract", "platform.remap.ke_variables", "infra.capsword_auto_off",
-			"infra.capsword_output", "caps_word.auto_off" }) do package.loaded[name] = {} end
+			"infra.capsword_output", "keyboard.engine.caps_word_auto_off" }) do package.loaded[name] = {} end
 		local w = { now = 0, timers = {}, tasks = {}, changes = {} }
 		local function timer(delay, action)
 			local native = { delay = delay, callback = action, live = false }
@@ -62,8 +62,8 @@ function M.with_world(options, callback)
 				return native
 			end },
 		}
-		w.shell = require("adapters.shell_runner")
-		w.scheduler = require("adapters.timer_scheduler")
+		w.shell = require("core.process.adapters.shell_runner")
+		w.scheduler = require("core.events.timer_scheduler")
 		w.watchers = require("platform.remap.watchers")
 		function w.start()
 			local accepted = w.watchers.start_input_source_watcher(function(layout) w.changes[#w.changes + 1] = layout end)

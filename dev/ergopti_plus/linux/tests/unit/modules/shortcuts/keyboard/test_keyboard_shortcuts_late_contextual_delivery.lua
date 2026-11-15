@@ -68,15 +68,15 @@ helpers.describe("keyboard shortcuts: late contextual delivery custody", functio
 	end
 
 	local function with_actual_logger(body)
-		local saved_core, saved_shim = package.loaded["logger"], package.loaded["logger.shim"]
-		package.loaded["logger"], package.loaded["logger.shim"] = nil, nil
-		local logger = require("logger.shim")
+		local saved_core, saved_shim = package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"]
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = nil, nil
+		local logger = require("core.logger.engine.shim")
 		local ok, err = pcall(function()
 			logger.set_level("debug")
 			body(logger)
 		end)
 		logger.set_sink(nil)
-		package.loaded["logger"], package.loaded["logger.shim"] = saved_core, saved_shim
+		package.loaded["core.logger.engine"], package.loaded["core.logger.engine.shim"] = saved_core, saved_shim
 		if not ok then error(err, 0) end
 	end
 
@@ -530,7 +530,7 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 	end
 
 	for _, gate in ipairs({ "master", "paused" }) do
-		helpers.it("(ordinary-live-admission) keeps script control available through " .. gate, function()
+		helpers.it("(ordinary-live-admission) retires a script-action slot through " .. gate .. " (scd1-slot-paused)", function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "script_pause_toggle" })
 			local gestures = require("modules.gestures.manager")
 			local execute, pending, fired = gestures.execute_action, nil, 0
@@ -543,7 +543,9 @@ helpers.describe("keyboard shortcuts: live deferred admission", function()
 				}))
 				admission[gate] = gate == "paused"
 				pending()
-				helpers.assert_eq(fired, 1, "script control remains the user's way back from pause")
+				-- SCD-1: a slot is suspended like on Windows and macOS; the AltGr
+				-- script chords are the way back from a pause.
+				helpers.assert_eq(fired, 0, "a keyboard slot must not run a script action through " .. gate)
 			end)
 			gestures.execute_action = execute
 			drop_config()
@@ -559,7 +561,7 @@ helpers.describe("keyboard shortcuts: admission callback boundaries", function()
 	for _, phase in ipairs({ "capture", "queue acknowledgement", "execution log" }) do
 		helpers.it("(ordinary-live-admission) rechecks pause at " .. phase, function()
 			local shortcuts = load_over_config({ ["shortcuts.keyboard.primary_j"] = "select_line" })
-			local gestures, logger = require("modules.gestures.manager"), require("logger.shim")
+			local gestures, logger = require("modules.gestures.manager"), require("core.logger.engine.shim")
 			local execute, debug_log = gestures.execute_action, logger.debug
 			local pending, fired, queued = nil, 0, 0
 			local admission = { master = true, paused = phase == "capture", inhibited = false }

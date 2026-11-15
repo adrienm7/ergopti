@@ -9,14 +9,14 @@
 --- ==============================================================================
 
 local M = {}
-local WindowTitles = require("window_titles")
-local I18n = require("infra.i18n")
-local Storage = require("adapters.storage")
-local Shell = require("adapters.shell_runner")
-local Logger = require("logger.shim")
+local WindowTitles = require("core.ui.engine.window_titles")
+local I18n = require("core.i18n.engine.i18n")
+local Storage = require("core.fs.adapters.storage")
+local Shell = require("core.process.adapters.shell_runner")
+local Logger = require("core.logger.engine.shim")
 local ManifestMenu = require("infra.manifest_menu")
-local TableUtil = require("table_util")
-local ConfigKeys = require("config_keys")
+local TableUtil = require("core.text.engine.table_util")
+local ConfigKeys = require("settings.engine.keys")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 
@@ -76,17 +76,17 @@ end
 function M.show(group)
 	local key = "gesture_conflict_dismissed." .. group.key
 	if Storage.get(key, false) == true then return true end
-	return require("adapters.event_loop").defer(function()
+	return require("core.events.loop").defer(function()
 		if Storage.get(key, false) == true then return end
 		local title = WindowTitles.compose(I18n.get("menu.gestures.conflict_title"))
 		local message = I18n.get("gesture.slots." .. group.slot) .. "\n" .. I18n.get("gestures.system.warning")
 		local settings = I18n.get("menu.gestures.open_settings")
 		local dismiss = I18n.get("gestures.system.dismiss")
-		local command = require("ui.native_dialog").command() .. " --list --hide-header --no-markup --column=" .. Shell.quote(I18n.get("dialog.action_picker.label"))
+		local command = require("core.ui.ui.native_dialog").command() .. " --list --hide-header --no-markup --column=" .. Shell.quote(I18n.get("dialog.action_picker.label"))
 			.. " --title=" .. Shell.quote(title)
 			.. " --text=" .. Shell.quote(message)
 			.. " -- " .. Shell.quote(settings) .. " " .. Shell.quote(dismiss)
-		local accepted, selected = require("ui.modal").run(function() return Shell.exec_checked(command) end)
+		local accepted, selected = require("core.ui.ui.modal").run(function() return Shell.exec_checked(command) end)
 		if not accepted then return end
 		selected = selected:gsub("[\r\n]+$", "")
 		if selected == settings then M.open_settings()

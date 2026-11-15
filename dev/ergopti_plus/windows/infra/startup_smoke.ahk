@@ -8,9 +8,9 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include ../adapters/system_control.ahk
-#Include ../adapters/file_system.ahk
-#Include tick_count.ahk
+#Include ../platform/system/control.ahk
+#Include ../core/fs/adapters/file_system.ahk
+#Include ../core/logger/engine/tick_count.ahk
 
 ; Both startup receipts report one native runtime identity snapshot. This flag
 ; chooses the launched image; installed-build product policy stays in its owner.

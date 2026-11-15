@@ -28,12 +28,12 @@
 local M = {}
 
 local hs      = hs
-local Logger  = require("infra.logger")
-local NativePath = require("native_path")
-local Timings = require("infra.timings")
-local TimerScheduler = require("adapters.timer_scheduler")
-local TextUtils = require("text_utils")
-local TableUtil = require("table_util")
+local Logger  = require("core.logger.engine.logger")
+local NativePath = require("core.fs.engine.native_path")
+local Timings = require("core.timing.engine.timings")
+local TimerScheduler = require("core.events.timer_scheduler")
+local TextUtils = require("core.text.engine.utils_core")
+local TableUtil = require("core.text.engine.table_util")
 local LOG     = "keystats.kc_bridge"
 
 -- Absolute path to the hand-off log file written by KE shell_command actions.

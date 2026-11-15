@@ -296,14 +296,12 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 	end)
 
 	helpers.it("holds what the Windows block of a special tap holds (tap-no-hold-per-key)", function()
-		local F24 = require("infra.evdev_codes").KEY_F24
+		local F24 = require("platform.input.evdev_codes").KEY_F24
 		local masked_alt_up = F24 .. "↓ " .. F24 .. "↑ 56↑"
 		local cases = {
 			-- tab.ahk 8.1, lalt.ahk 4.3: Alt for the switcher, the monitor on a tap.
 			{ "tab", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
 			{ "left_alt", "alt_tab_monitor", "56↓", masked_alt_up, "alt_tab_monitor" },
-			-- lalt.ahk 4.2: the navigation layer, Tab on a tap.
-			{ "left_alt", "tab", "", "15↓ 15↑", nil },
 			-- rctrl.ahk 7.2: RCtrl itself, Tab on a tap.
 			{ "right_ctrl", "tab", "97↓", "97↑ 15↓ 15↑", nil },
 			-- rctrl.ahk 7.1: Backspace at key-down.
@@ -317,10 +315,80 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 			local out, tap = e:process(code, UP, 100)
 			helpers.assert_eq({ trail(out), tap }, { case[4], case[5] }, key_id .. "/" .. tap_action .. " on a quick release")
 		end
-		-- The layer is held: LAlt+J is Ctrl+Left.
+	end)
+
+	-- tab.ahk 8.1, lalt.ahk 4.3 and rctrl.ahk 7.2 wait for the release with
+	-- KS_WaitReleased(.., TapHoldDuration): no lone tap window, which Linux
+	-- granted them; AltGr's own tap goes through TapHoldOwnImmediateModifier
+	-- and keeps it (strict-tap-no-lone-window).
+	helpers.it("keeps the strict threshold for the Alt-Tab and RCtrl Tab taps (strict-tap-no-lone-window)", function()
+		local nav = require("tests.support.nav_layer_fixture").recommended()
+		local function lone(keys)
+			return Engine.new({ keys = keys, tap_min_ms = 50, lone_tap_max_ms = 1000, one_shot_timeout_ms = 2000,
+				nav_layer = nav, key_text = function() return nil end, plan_text = function() return nil end,
+				one_shot_result = function() return nil end })
+		end
+		local strict = {
+			{ "left_alt", "alt_tab_monitor" }, { "tab", "alt_tab_monitor" }, { "right_ctrl", "tab" },
+		}
+		for _, case in ipairs(strict) do
+			local key_id, tap_action = case[1], case[2]
+			local code = Engine.KEY_CODES[key_id]
+			local e = lone({ [key_id] = { tap_action = tap_action, time_activation_seconds = 0.2 } })
+			e:process(code, DOWN, 0)
+			local out, tap = e:process(code, UP, 600)
+			helpers.assert_nil(tap, key_id .. "/" .. tap_action .. ": no tap past its threshold")
+			helpers.assert_eq(trail(out):find("15↓", 1, true), nil, key_id .. "/" .. tap_action .. ": no Tab typed")
+		end
+		local e = lone({ alt_gr = { tap_action = "tab", time_activation_seconds = 0.2 } })
+		e:process(Engine.KEY_CODES.alt_gr, DOWN, 0)
+		local out = e:process(Engine.KEY_CODES.alt_gr, UP, 600)
+		helpers.assert_eq(trail(out):find("15↓ 15↑", 1, true) ~= nil, true, "AltGr's lone tap keeps the window")
+	end)
+
+	-- lalt.ahk 4.2 needs a hold layer: a Tab tap with no hold is the generic
+	-- tap-only block 4.9 (`*SC038:: _LAltDispatch()`), a Tab at key-down and at
+	-- each repeat, no layer under it (lalt-tab-no-hold-is-tap-only).
+	helpers.it("types LAlt's Tab with no hold at key-down and holds no layer (lalt-tab-no-hold-is-tap-only)", function()
 		local e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 } })
-		e:process(ALT, DOWN, 0)
-		helpers.assert_eq(trail((e:process(KEY_J, DOWN, 50))), "29↓ 105↓", "LAlt with a Tab tap holds the layer")
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "15↓ 15↑", "the Tab goes out at key-down")
+		helpers.assert_eq(trail((e:process(ALT, REPEAT, 500))), "15↓ 15↑", "and again at each repeat")
+		helpers.assert_nil(e:process(KEY_J, DOWN, 550), "J under LAlt is J: no navigation layer is held")
+		e:process(KEY_J, UP, 560)
+		local out, tap = e:process(ALT, UP, 600)
+		helpers.assert_eq({ trail(out), tap }, { "", nil }, "the release types nothing more")
+	end)
+
+	-- lalt.ahk `SC11D & SC038`: with LAlt tapping Tab and no hold modifier and
+	-- RCtrl tapping the one-shot Shift, LAlt struck under RCtrl types Shift+Tab
+	-- at key-down, with or without a hold layer, and OneShotShiftFix disarms the
+	-- one-shot. Linux typed a plain Tab, or held the layer
+	-- (rctrl-one-shot-lalt-shift-tab).
+	helpers.it("types Shift+Tab for LAlt's Tab under RCtrl's one-shot Shift (rctrl-one-shot-lalt-shift-tab)", function()
+		local one_shot = { tap_action = "one_shot_shift", time_activation_seconds = 0.2 }
+		for _, lalt in ipairs({
+			{ tap_action = "tab", time_activation_seconds = 0.2 },
+			{ tap_action = "tab", hold_layer = "nav", time_activation_seconds = 0.2 },
+		}) do
+			local label = lalt.hold_layer and "LAlt holding the layer" or "LAlt with no hold"
+			local e = engine({ left_alt = lalt, right_ctrl = one_shot })
+			e:process(RCTRL, DOWN, 0)
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 50))), "42↓ 15↓ 15↑ 42↑", label .. ": Shift+Tab at key-down")
+			helpers.assert_eq(trail((e:process(ALT, REPEAT, 550))), "42↓ 15↓ 15↑ 42↑", label .. ": and at each repeat")
+			helpers.assert_nil(e:process(KEY_J, DOWN, 560), label .. ": J under it is J, no layer is held")
+			e:process(KEY_J, UP, 570)
+			helpers.assert_eq({ trail((e:process(ALT, UP, 600))) }, { "" }, label .. ": the release types nothing")
+			e:process(RCTRL, UP, 620)
+			helpers.assert_nil(e:process(KEY_A, DOWN, 650), label .. ": RCtrl used as a chord arms nothing")
+			e:process(KEY_A, UP, 660)
+			-- Controls: without RCtrl the Tab is plain; another RCtrl tap is no combo.
+			e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 }, right_ctrl = one_shot })
+			helpers.assert_eq(trail((e:process(ALT, DOWN, 0))), "15↓ 15↑", label .. ": a lone LAlt types Tab")
+		end
+		local e = engine({ left_alt = { tap_action = "tab", time_activation_seconds = 0.2 },
+			right_ctrl = { tap_action = "tab", time_activation_seconds = 0.2 } })
+		e:process(RCTRL, DOWN, 0)
+		helpers.assert_eq(trail((e:process(ALT, DOWN, 50))), "15↓ 15↑", "RCtrl tapping Tab is no one-shot: a plain Tab")
 	end)
 
 	-- lshift_lctrl.ahk 3.1: LCtrl taps only when CapsLock and LAlt were up at

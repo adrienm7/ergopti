@@ -18,28 +18,28 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local leaks   = require("test.menu_off_platform")
+local leaks   = require("tests.lua.menu.off_platform")
 
 local PLATFORM      = "hs"
-local MANIFEST_PATH = "../_shared/modules/menu/menu_manifest.json"
+local MANIFEST_PATH = "../_shared/menu/data/menu_manifest.json"
 
 
 helpers.describe("menu: no off-platform explanation is rendered on macOS", function()
 
 	helpers.it("the real manifest has rows the old renderer showed greyed on macOS", function()
 		local fh = assert(io.open(MANIFEST_PATH, "r"))
-		local root = require("json").decode(fh:read("*a"))
+		local root = require("core.text.engine.json").decode(fh:read("*a"))
 		fh:close()
 		helpers.assert_true(leaks.explained_off_platform_count(root, PLATFORM) > 0,
 			"without such rows the check below cannot fail and proves nothing")
 	end)
 
 	helpers.it("renders every manifest menu for macOS without a platform_reason text", function()
-		package.loaded["menu.renderer"] = nil
-		local found, rendered, greyed = leaks.reason_leaks(require("menu.renderer"), {
+		package.loaded["menu.engine.renderer"] = nil
+		local found, rendered, greyed = leaks.reason_leaks(require("menu.engine.renderer"), {
 			platform      = PLATFORM,
 			manifest_path = MANIFEST_PATH,
-			json_decode   = require("json").decode,
+			json_decode   = require("core.text.engine.json").decode,
 			logger        = helpers.make_logger_stub(),
 		})
 		helpers.assert_true(rendered > 10, "every menu of the shared manifest must render, got " .. rendered)

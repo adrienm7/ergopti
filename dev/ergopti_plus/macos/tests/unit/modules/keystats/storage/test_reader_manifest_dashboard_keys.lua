@@ -19,9 +19,9 @@
 
 local helpers = require("tests.helpers")
 local vectors_file = assert(io.open(helpers.shared("tests/corpus/keystats/manifest_key_vectors.json"), "r"))
-local vectors = require("json").decode(vectors_file:read("*a"))
+local vectors = require("core.text.engine.json").decode(vectors_file:read("*a"))
 vectors_file:close()
-local keys = require("keystats.manifest_keys")
+local keys = require("metrics.engine.view.manifest_keys")
 for _, vector in ipairs(vectors) do
 	helpers.assert_eq(keys.encode(vector.label), vector.key)
 	helpers.assert_eq(keys.decode(vector.key), vector.label)
@@ -32,7 +32,7 @@ end
 --- @param rows table Rows the stubbed statement yields.
 --- @return table reader
 local function reader_answering(table_name, rows)
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end, trace = function() end, done = function() end,
 		info = function() end, start = function() end, success = function() end,
 		warn = function() end, error = function() end,
@@ -50,7 +50,7 @@ end
 
 helpers.describe("macOS manifest: fields under the dashboard's keys", function()
 	helpers.it("keeps reserved application labels separate from system totals", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		local sqlite = {OK = 0, open = function()
 			return {exec = function() return 0 end, close = function() end, nrows = function(_, sql)
 				local rows = {}

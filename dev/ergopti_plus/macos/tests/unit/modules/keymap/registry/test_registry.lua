@@ -10,8 +10,8 @@
 
 local helpers = require("tests.helpers")
 
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 local State = helpers.load_with_stubs("modules.keymap.state")
 local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -21,7 +21,7 @@ local Registry = helpers.load_with_stubs("modules.keymap.registry")
 --- registry module each time so module-level _state resets between calls.
 --- @return table state, table Registry The fresh state and module reference.
 local function fresh_registry()
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.keymap.registry"] = nil
 	package.loaded["modules.keymap.registry_groups"] = nil
 	package.loaded["modules.keymap.registry_index"] = nil
@@ -537,7 +537,7 @@ helpers.describe("personal-file descriptor transport through the real registry",
 		assert(handle:close())
 		local ok, err = pcall(function()
 			local state, R = fresh_registry()
-			local PersonalFiles = require("hotstrings.personal_files")
+			local PersonalFiles = require("hotstrings.engine.catalogue.personal_files")
 			local source = PersonalFiles.describe({ "Équipe", "mémoire.toml" })
 			helpers.assert_true(R.load_toml("personal_ext_memory", path, nil, source))
 			helpers.assert_eq(#state.mappings, 1)

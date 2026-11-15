@@ -3,7 +3,7 @@
 This folder is the catalogue of keyboard layouts ErgoptiPlus can install or
 emulate. The drivers download `index.json` and the chosen `.keylayout` straight
 from this folder of the repository (the URL template, branch and folder are
-declared once in `static/ergopti_plus/_shared/modules/layouts/defaults.json`).
+declared once in `static/ergopti_plus/_shared/layouts/data/defaults.json`).
 
 ## Contents
 
@@ -51,7 +51,7 @@ without enabling it. Two optional manifest tables describe the layout itself:
 
 ```toml
 # The physical key (W3C KeyboardEvent.code, as named in
-# _shared/data/keycodes/physical_keys.json) that types the magic key on this
+# _shared/layouts/data/keycodes/physical_keys.json) that types the magic key on this
 # layout. The user's own choice of key always wins over it.
 [extension.magic_key]
 key = "KeyC"

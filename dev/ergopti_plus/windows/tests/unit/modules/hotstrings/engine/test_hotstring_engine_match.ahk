@@ -309,6 +309,49 @@ TestHSE_CasedFamilyKeepsReplacementCapitals() {
 Test("HSE cased family keeps the replacement's own capitals at any priority",
     TestHSE_CasedFamilyKeepsReplacementCapitals)
 
+; HSE-003 (maintainer decision, 2026-11-12): a no-break or narrow no-break space
+; typed inside a trigger counts as a space, as on macOS and Linux; a trigger
+; starting with a space is a word-boundary guard and gets no variant.
+TestHSE_NbspInsideTriggerFires() {
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("", "la notre", "la nôtre")
+    for Space in [" ", Chr(0xA0), Chr(0x202F)] {
+        Match := _HSE_FeedWordThenSpace("la" . Space . "notre")
+        AssertTrue(Match != "", "la + U+" . Format("{:04X}", Ord(Space)) . " + notre fires")
+        AssertTrue(Match != "" && Match.Replacement == "la nôtre",
+            "the space variant types the entry's own output")
+    }
+}
+Test("HSE no-break space inside a trigger counts as a space (hse-003-nbsp-trigger)",
+    TestHSE_NbspInsideTriggerFires)
+
+TestHSE_NbspVariantsSkipLeadingSpace() {
+    global HSE_StarByTriggerCI
+    HSE_TestReset()
+    CreateCaseSensitiveHotstrings("*", " qz k", "x")
+    AssertTrue(HSE_StarByTriggerCI.Has(" qz k"), "the trigger itself registers")
+    AssertFalse(HSE_StarByTriggerCI.Has(Chr(0xA0) . "qz" . Chr(0xA0) . "k"),
+        "a trigger starting with a space gets no no-break variant")
+    AssertFalse(HSE_StarByTriggerCI.Has(" qz" . Chr(0x202F) . "k"),
+        "nor a narrow no-break variant of its inner space")
+    CreateCaseSensitiveHotstrings("*", "qz k", "x")
+    AssertTrue(HSE_StarByTriggerCI.Has("qz" . Chr(0xA0) . "k")
+        && HSE_StarByTriggerCI.Has("qz" . Chr(0x202F) . "k"),
+        "an inner space registers both no-break variants")
+}
+Test("HSE no-break variants skip a trigger starting with a space (hse-003-nbsp-trigger)",
+    TestHSE_NbspVariantsSkipLeadingSpace)
+
+TestHSE_NbspLiteralFamilyFires() {
+    HSE_TestReset()
+    HSE_RegisterFromTomlFlags(true, "", "la notre", "la nôtre", Map())
+    Match := _HSE_FeedWordThenSpace("la" . Chr(0x202F) . "notre")
+    AssertTrue(Match != "" && Match.Replacement == "la nôtre",
+        "a literal (case-sensitive) entry fires with a narrow no-break space inside")
+}
+Test("HSE literal entry also takes the no-break variants (hse-003-nbsp-trigger)",
+    TestHSE_NbspLiteralFamilyFires)
+
 ; The literal registration (the editor's « Case sensitive » box) emits the output
 ; exactly as written whatever casing was typed: that is the setting for an output
 ; that must never change case, at the priority that wins the collision.
@@ -774,5 +817,107 @@ TestHSE_PlainSpaceColonDDoesNotFire() {
 }
 Test("HSE plain-space colon-D does not fire the comma hotstring (':D' emoji preserved)",
     TestHSE_PlainSpaceColonDDoesNotFire)
+
+; hotstring-deferred-rank-2026-11-11: the boot registers the emoji and symbol
+; rows after ready, but a trigger they share with a later registration (a
+; dynamic hotstring, the repeat key) must still resolve to the row that wins
+; when everything registers inline: the first registered at equal length and
+; priority. A deferred row that took the next sequence number would rank last.
+_HSE_DeferredRankStep(Rows) {
+    return { Rows: Rows, Register: (Run) => _HSE_DeferredRankRegister(Run) }
+}
+
+_HSE_DeferredRankRegister(Run) {
+    for Row in Run
+        HSE_Register("*?", Row[1], () => 0, Map("group", Row[2], "Priority", 10))
+}
+
+_HSE_DeferredRankMatch(Trigger) {
+    HSE_FeedReset(true)
+    Match := ""
+    for Char in StrSplit(Trigger)
+        Match := HSE_FeedChar(Char)
+    return Match
+}
+
+TestHSE_DeferredRowsKeepTheirBootRank() {
+    global HSE_RegistryByGroup
+    HSE_TestReset()
+    try {
+        HSE_Register("*?", "before", () => 0, Map("group", "inline.before", "Priority", 10))
+        HSE_DeferRegistration("Rank probe", [_HSE_DeferredRankStep([["dtx", "deferred.symbols"], ["solo", "deferred.symbols"]])])
+        ; Registered after the deferred block, like the dynamic hotstrings.
+        Later := HSE_Register("*?", "dtx", () => 0, Map("group", "later.dynamic", "Priority", 10))
+        AssertEqual("later.dynamic", _HSE_DeferredRankMatch("dtx").Group,
+            "before its slice runs only the later registration knows the trigger")
+        AssertTrue(HSE_DeferredRegistrationSlice(1000), "one generous slice registers the whole job")
+        AssertFalse(HSE_DeferredRegistrationPending(), "the job is done after its last row")
+        Deferred := HSE_RegistryByGroup["deferred.symbols"][1]
+        AssertTrue(Deferred.Seq < Later.Seq,
+            "a row registered after ready keeps the sequence number of its boot position")
+        AssertTrue(Deferred.Seq > HSE_RegistryByGroup["inline.before"][1].Seq,
+            "and still ranks after what registered before it")
+        AssertEqual("deferred.symbols", _HSE_DeferredRankMatch("dtx").Group,
+            "the shared trigger resolves to the boot-order winner, the deferred row")
+        AssertEqual("deferred.symbols", _HSE_DeferredRankMatch("solo").Group)
+        Next := HSE_Register("*?", "after", () => 0)
+        AssertTrue(Next.Seq > Later.Seq, "a registration after the job continues after the released block")
+    } finally {
+        HSE_DeferredRegistrationCancel()
+        HSE_TestReset()
+    }
+}
+Test("HSE deferred rows keep their boot rank in a collision (hotstring-deferred-rank)",
+    TestHSE_DeferredRowsKeepTheirBootRank)
+
+TestHSE_DeferredRowsRegisterInSlices() {
+    global HSE_RegistryByGroup, HSE_SeqReservation
+    HSE_TestReset()
+    try {
+        Rows := []
+        loop 70
+            Rows.Push(["slice" . A_Index, "deferred.slices"])
+        HSE_DeferRegistration("Slice probe", [_HSE_DeferredRankStep(Rows)])
+        AssertTrue(HSE_DeferredRegistrationSlice(0), "a spent budget ends the slice after one run of rows")
+        AssertTrue(HSE_DeferredRegistrationPending(), "rows remain for the next slice")
+        Registered := HSE_RegistryByGroup["deferred.slices"].Length
+        AssertTrue(Registered > 0 and Registered < 70, "one slice registers part of the rows, not all of them")
+        while HSE_DeferredRegistrationPending()
+            HSE_DeferredRegistrationSlice(0)
+        AssertEqual(70, HSE_RegistryByGroup["deferred.slices"].Length, "every row registers exactly once")
+        AssertEqual(0, HSE_SeqReservation, "the block is released with the last row")
+    } finally {
+        HSE_DeferredRegistrationCancel()
+        HSE_TestReset()
+    }
+}
+Test("HSE deferred rows register across bounded slices (hotstring-deferred-rank)",
+    TestHSE_DeferredRowsRegisterInSlices)
+
+TestHSE_DeferredRowsStopAtARegistryClear() {
+    global HSE_RegistryByGroup
+    HSE_TestReset()
+    try {
+        HSE_DeferRegistration("Clear probe", [_HSE_DeferredRankStep([["gone", "deferred.cleared"]])])
+        ; A full rebuild clears the registry and registers the sections inline.
+        HSE_RegistryClear()
+        AssertFalse(HSE_DeferredRegistrationSlice(1000), "the slice refuses a block the clear dropped")
+        AssertFalse(HSE_DeferredRegistrationPending(), "the stale job is gone")
+        AssertFalse(HSE_RegistryByGroup.Has("deferred.cleared"), "no stale row reaches the new registry")
+        HSE_DeferRegistration("Cancel probe", [_HSE_DeferredRankStep([["kept", "deferred.cancelled"]])])
+        AssertTrue(HSE_DeferredRegistrationCancel(), "a live rebuild cancels the pending job")
+        AssertFalse(HSE_DeferredRegistrationSlice(1000), "a cancelled job registers nothing")
+        AssertFalse(HSE_RegistryByGroup.Has("deferred.cancelled"))
+        First := HSE_Register("*?", "fresh", () => 0)
+        HSE_DeferRegistration("Second probe", [_HSE_DeferredRankStep([["again", "deferred.again"]])])
+        AssertTrue(HSE_DeferredRegistrationSlice(1000), "a cancelled block can be reserved again")
+        AssertTrue(HSE_RegistryByGroup["deferred.again"][1].Seq > First.Seq)
+    } finally {
+        HSE_DeferredRegistrationCancel()
+        HSE_TestReset()
+    }
+}
+Test("HSE deferred rows stop at a registry clear or cancel (hotstring-deferred-rank)",
+    TestHSE_DeferredRowsStopAtARegistryClear)
 
 #Include test_hotstring_scalar_continuation.ahk

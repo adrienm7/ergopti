@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 local lfs = require("lfs")
-local shell_quote = require("text_utils").shell_quote
-local OWNERS = { "ui.log_openers", "infra.logger", "infra.config_paths",
-	"infra.notifications", "adapters.file_system", "infra.fs_dir" }
+local shell_quote = require("core.text.engine.utils_core").shell_quote
+local OWNERS = { "ui.log_openers", "core.logger.engine.logger", "infra.config_paths",
+	"core.ui.engine.notifications", "core.fs.adapters.file_system", "core.fs.engine.dir" }
 
 --- Uses real filesystem outcomes and always reopens its private fixture for cleanup.
 --- @param kind string Physical entry to exercise.
@@ -50,9 +50,9 @@ local function with_entry(kind, check)
 			logger.error = function(_, message, ...)
 				observed.errors[#observed.errors + 1] = string.format(message, ...)
 			end
-			package.loaded["infra.logger"] = logger
+			package.loaded["core.logger.engine.logger"] = logger
 			package.loaded["infra.config_paths"] = {}
-			package.loaded["infra.notifications"] = { notify = function(message)
+			package.loaded["core.ui.engine.notifications"] = { notify = function(message)
 				observed.notified[#observed.notified + 1] = message
 				return observed.notify_ok ~= false
 			end }
@@ -61,7 +61,7 @@ local function with_entry(kind, check)
 				symlinkAttributes = lfs.symlinkattributes,
 				dir = lfs.dir,
 			} })
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			observed.status = FileSystem.path_status(path)
 			observed.open = function(opened)
 				observed.opened[#observed.opened + 1] = opened

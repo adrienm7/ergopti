@@ -175,7 +175,7 @@ helpers.describe("declared Linux simultaneous publication through original owner
   end)
  end)
  helpers.it("requires an explicit Linux copy section and leaves original Mac policy distinct",function()
-  local Shared=require("tap_hold.key_combinations")
+  local Shared=require("tap_hold.engine.key_combinations")
   local text='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="copy"\n[mod_combos.config.caps_lock_then_tab]\ntap="paste"\ncombo="none"\n'
   local options={entries={{id=pair}},settings={simultaneous_threshold_ms=100,combo_symmetric=false},is_action=function(a) return a=="copy" or a=="paste" end}
   helpers.assert_eq(Shared.plan_chord_copy(text,options).rows[1].value,"paste","original Mac source is unchanged")
@@ -249,17 +249,34 @@ helpers.describe("public Linux simultaneous menu uses actual source and scope ow
    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
   end,true)
  end)
- for _,kind in ipairs({'cancel','invalid','paused','source'}) do
+ -- A pause stops typing, not configuration (EDD-1, maintainer decision 2026-11-12).
+ helpers.it('sets the delay while paused (edd1-paused-writes)',function()
+  with_menu(function(s)
+   s.delay_selection='75';s.on_delay=function() s.paused=true end
+   local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
+   helpers.assert_true(row.fn());helpers.assert_eq(s.publications,1)
+  end,true)
+ end)
+ for _,kind in ipairs({'cancel','invalid','source'}) do
   helpers.it('refuses '..kind..' delay without publication',function()
    with_menu(function(s)
     s.delay_selection=kind=='invalid' and '0' or '75'
     if kind=='cancel' then s.delay_selection=nil end
     s.on_delay=function()
-     if kind=='paused' then s.paused=true end
      if kind=='source' then s.bytes[path]=source..'[outside]\nchanged=true\n' end
     end
     local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
     helpers.assert_eq(row.fn(),false);helpers.assert_eq(s.publications,0)
+   end,true)
+  end)
+ end
+ for _,typed in ipairs({'3.5','1001','0x10',' '}) do
+  helpers.it("refuses typed delay '"..typed.."' with the accepted range and no publication (value-validation)",function()
+   with_menu(function(s)
+    s.delay_selection=typed
+    local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
+    helpers.assert_eq(row.fn(),false);helpers.assert_eq(s.publications,0)
+    helpers.assert_eq(s.errors,1,"the refusal is shown once, never dropped silently")
    end,true)
   end)
  end

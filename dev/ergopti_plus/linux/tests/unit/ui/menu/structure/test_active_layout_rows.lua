@@ -32,7 +32,7 @@ local function world(backend, choices)
 		end,
 		select = function(id, on_done)
 			state.selected[#state.selected + 1] = id
-			on_done(state.answer, state.answer and nil or "gsettings failed")
+			on_done(state.answer, state.answer and nil or "gdbus failed", state.code)
 		end,
 	}
 	state.ctx = {
@@ -75,6 +75,18 @@ helpers.describe("active layout rows", function()
 		helpers.assert_eq(state.errors[1], "menu.layout.select_failed", "a refused switch is told")
 	end)
 
+	helpers.it("names the GNOME Shell extension when GNOME refuses for its absence", function()
+		local state = world("gnome", CHOICES)
+		local rows = Rows.rows(state.ctx)
+		state.answer = false
+		state.code = require("adapters.input_source_switch").GNOME_EXTENSION_MISSING
+		rows[1].action()
+		helpers.assert_eq(state.errors[1], "menu.layout.select_failed_gnome_extension")
+		local en = require("core.text.engine.json").decode(read(helpers.driver_root()
+			.. "/../_shared/core/i18n/data/locales/en.json"))
+		helpers.assert_true(type(en["menu.layout.select_failed_gnome_extension"]) == "string", "the key is localized")
+	end)
+
 	helpers.it("shows why on a desktop that cannot change its layout", function()
 		local state = world(nil, {})
 		local rows = Rows.rows(state.ctx)
@@ -98,8 +110,8 @@ helpers.describe("active layout rows", function()
 	end)
 
 	helpers.it("is declared for every driver and provided by the layout menu owner", function()
-		local Json = require("json")
-		local manifest = Json.decode(read(helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json"))
+		local Json = require("core.text.engine.json")
+		local manifest = Json.decode(read(helpers.driver_root() .. "/../_shared/menu/data/menu_manifest.json"))
 		local found
 		for _, row in ipairs(manifest.layout_menu) do
 			if row.id == "active_layouts" then found = row end
@@ -117,7 +129,7 @@ helpers.describe("active layout rows", function()
 		helpers.assert_eq(type(system), "table", "Windows declares its install row")
 		helpers.assert_eq(system.platforms[1], "ahk")
 		helpers.assert_eq(#system.platforms, 1, "the Windows install row is Windows-only")
-		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/data/locales/en.json"))
+		local english = Json.decode(read(helpers.driver_root() .. "/../_shared/core/i18n/data/locales/en.json"))
 		local reason = english[bundle.reason_key]
 		-- The Windows row's label without its parenthetical and ellipsis.
 		local windows_row = english["menu.layout.system_layout_install"]:match("^(.-) %(")

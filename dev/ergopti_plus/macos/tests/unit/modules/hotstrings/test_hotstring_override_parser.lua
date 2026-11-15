@@ -1,3 +1,3 @@
 --- tests/unit/modules/hotstrings/test_hotstring_override_parser.lua
 
-require("test.hotstring_override_parser_contract")(require("tests.helpers"))
+require("tests.lua.hotstrings.override_parser_contract")(require("tests.helpers"))

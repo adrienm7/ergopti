@@ -14,8 +14,8 @@
 local helpers = require("tests.helpers")
 
 -- hotstrings_config logs through lib.logger; load it first under the stub.
-package.loaded["infra.logger"] = nil
-local _ = helpers.load_with_stubs("infra.logger")
+package.loaded["core.logger.engine.logger"] = nil
+local _ = helpers.load_with_stubs("core.logger.engine.logger")
 
 --- Build a unique writable temp path (the module itself creates the file).
 --- @param name string A short discriminator so concurrent cases never collide.
@@ -31,7 +31,7 @@ end
 --- @return table The freshly-initialised module.
 --- @param toml_resolver function|nil Category to TOML path; none by default.
 local function fresh_module(path, toml_resolver)
-	package.loaded["adapters.file_system"] = require("tests.support.file_system_write_stub")
+	package.loaded["core.fs.adapters.file_system"] = require("tests.support.file_system_write_stub")
 	package.loaded["modules.hotstrings.hotstrings_config"] = nil
 	local mod = helpers.load_with_stubs("modules.hotstrings.hotstrings_config")
 	mod.init({ override_path = path, toml_resolver = toml_resolver or function() return nil end })
@@ -78,16 +78,16 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 		local path = temp_path("common_refused")
 		local input = '[autocorrection.caps]\ndelay = 0.3\n# independent original notes\n'
 		write_fixture(path, input)
-		local original = require("toml_codec.writer").publish_if_unchanged
+		local original = require("core.text.engine.toml_codec.writer").publish_if_unchanged
 		local ok, detail = pcall(function()
-			require("toml_codec.writer").publish_if_unchanged = function() return false, "independent refusal" end
+			require("core.text.engine.toml_codec.writer").publish_if_unchanged = function() return false, "independent refusal" end
 			local mod = fresh_module(path)
 			helpers.assert_eq(mod.set_override("autocorrection", "names", "delay", 0.4), false)
 			local handle = assert(io.open(path, "rb")); local bytes = handle:read("*a"); assert(handle:close())
 			helpers.assert_eq(bytes, input)
 			helpers.assert_nil(mod.get_user_override("autocorrection", "names"), "unacknowledged candidates never become live")
 		end)
-		require("toml_codec.writer").publish_if_unchanged = original; os.remove(path)
+		require("core.text.engine.toml_codec.writer").publish_if_unchanged = original; os.remove(path)
 		if not ok then error(detail) end
 	end)
 		helpers.it("(common-autocorrection-split) unverified foreign bytes retain their native owner while requested common registration refuses", function()
@@ -99,7 +99,7 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 			helpers.assert_eq(mod.common_autocorrection_admitted(), false)
 			helpers.with_stub_scope({
 				"modules.keymap.registry", "modules.keymap.registry_groups", "modules.keymap.registry_index",
-				"modules.keymap.state", "modules.keymap.terminators", "adapters.storage", "infra.toml.reader",
+				"modules.keymap.state", "modules.keymap.terminators", "core.fs.adapters.storage", "core.text.engine.toml.reader",
 			}, function()
 				local State = helpers.load_with_stubs("modules.keymap.state")
 				local Registry = helpers.load_with_stubs("modules.keymap.registry")
@@ -109,20 +109,20 @@ helpers.describe("hotstrings_config: common section migration ownership", functi
 				Registry.add("foreign", "Preserved foreign", { is_word = true, is_case_sensitive = true, priority = 50 })
 				Registry.set_group_context(nil)
 				local before, sequence = { state.mappings[1] }, state.seq_counter
-				helpers.assert_true(require("adapters.storage").set("hotstrings_section_autocorrection_names", true))
-				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("modules/hotstrings/autocorrection.toml")), false)
+				helpers.assert_true(require("core.fs.adapters.storage").set("hotstrings_section_autocorrection_names", true))
+				helpers.assert_eq(Registry.load_toml("autocorrection", helpers.shared("hotstrings/data/catalogue/autocorrection.toml")), false)
 				helpers.assert_eq(state.mappings, before, "the actual native transaction keeps every previous mapping")
 				helpers.assert_eq(state.seq_counter, sequence)
 				local Boot = require("infra.common_hotstrings_boot")
 				local hotfiles, hotfile_paths = {}, {}
 				local refused = Boot.load(Registry, "autocorrection",
-					helpers.shared("modules/hotstrings/autocorrection.toml"), nil, hotfiles, hotfile_paths)
+					helpers.shared("hotstrings/data/catalogue/autocorrection.toml"), nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(refused, { committed = false, complete = false, unavailable = { "autocorrection" } })
 				helpers.assert_eq(hotfiles, {}, "cold startup never advertises a refused common group")
 				helpers.assert_nil(hotfile_paths.autocorrection)
 				helpers.assert_eq(state.mappings, before, "cold refusal also leaves prior unrelated native rows intact")
-				helpers.assert_true(require("adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
-				local french_path = helpers.shared("modules/hotstrings/french/autocorrection.toml")
+				helpers.assert_true(require("core.fs.adapters.storage").set(require("modules.keymap.section_keys").current("french_autocorrection", "names"), true))
+				local french_path = helpers.shared("hotstrings/data/catalogue/french/autocorrection.toml")
 				local admitted = Boot.load(Registry, "french_autocorrection", french_path, nil, hotfiles, hotfile_paths)
 				helpers.assert_eq(admitted, { committed = true, complete = true, unavailable = {} })
 				helpers.assert_eq(hotfiles, { "french_autocorrection" }, "unrelated cold groups still load through the actual registry")
@@ -249,7 +249,7 @@ helpers.describe("hotstrings_config: priority override round-trip", function()
 		local mod = fresh_module(override_path, function(category)
 			return category == "ext:demo:phrases" and extension_path or nil
 		end)
-		local Logger = require("infra.logger")
+		local Logger = require("core.logger.engine.logger")
 		helpers.admit_logger_privacy(Logger)
 		local saved, errors = Logger.error, 0
 		Logger.error = function() errors = errors + 1 end

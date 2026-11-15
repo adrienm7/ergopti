@@ -30,7 +30,7 @@ local LITERAL = "Literal {Left} {U+0041}"
 --- @return any result First provider return value.
 local function rules_engine_user_preview()
 	local result
-	helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "dynamic_hotstrings",
+	helpers.with_stub_scope({ "modules.dynamic_hotstrings.rules_engine", "hotstrings.engine.dynamic.core",
 		"modules.dynamic_hotstrings.user_code", "modules.keystats", "modules.keystats.init" }, function()
 		local closed_keystats = {}
 		package.loaded["modules.keystats"] = closed_keystats
@@ -47,6 +47,7 @@ local function rules_engine_user_preview()
 			register_lua_group = function() end,
 			set_post_load_hook = function() end,
 			register_interceptor = function(fn) fixture.interceptor = fn end,
+			dynamic_rule_within_delay = function() return true end,
 			register_preview_provider = function(fn) fixture.provider = fn end,
 			registry_transaction = function(_, mutation) return mutation() == true end,
 			invalidate_hotstring_preview = function() return true end,
@@ -71,17 +72,17 @@ end
 local function render_provider_row(provider_result)
 	local text
 	helpers.with_stub_scope({
-		"adapters.synthetic_input", "adapters.timer_scheduler", "infra.logger",
+		"platform.input.synthetic_input", "core.events.timer_scheduler", "core.logger.engine.logger",
 		"infra.manifest_reader", "modules.hotstrings.hotstrings_config",
 		"modules.keymap.expander", "modules.keystats", "modules.llm",
-		"modules.llm.prediction_engine", "ui.tooltip", "modules.keymap.llm_bridge",
+		"modules.llm.prediction_engine", "core.ui.ui.tooltip", "modules.keymap.llm_bridge",
 	}, function()
 		local scheduled = {}
 		local action_epoch = {}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end,
 			after = function(delay, fn)
 				local handle = { delay = delay, fn = fn }
@@ -91,7 +92,7 @@ local function render_provider_row(provider_result)
 			every = function() return { kind = "diagnostic-pump" }, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.manifest_reader"] = { default_for = function() return MAGIC end }
 		package.loaded["modules.hotstrings.hotstrings_config"] = { resolve = function() return nil end }
 		package.loaded["modules.keymap.expander"] = {
@@ -110,7 +111,7 @@ local function render_provider_row(provider_result)
 			get_llm_enabled = function() return false end,
 			reset = function() return true end,
 		}
-		package.loaded["ui.tooltip"] = {
+		package.loaded["core.ui.ui.tooltip"] = {
 			set_runtime_guard = function() end,
 			set_accept_callback = function() end,
 			set_cancel_callback = function() end,

@@ -26,12 +26,12 @@ end
 local function load_menu_quit_action()
 	-- Reset the shared hs double before installing module doubles captured by
 	-- ui.menu.init at require time.
-	helpers.load_with_stubs("infra.logger")
+	helpers.load_with_stubs("core.logger.engine.logger")
 	local exit_calls = {}
 	local exit_mode = { value = "true" }
 	local stock_calls = { execute = 0, launch = 0, notifications = {}, timers = {}, clock = 0 }
-	local real_scheduler = require("adapters.timer_scheduler")
-	package.loaded["adapters.timer_scheduler"] = setmetatable({
+	local real_scheduler = require("core.events.timer_scheduler")
+	package.loaded["core.events.timer_scheduler"] = setmetatable({
 		after = function(_, callback)
 			stock_calls.timers[#stock_calls.timers + 1] = callback
 			return {}, true
@@ -47,7 +47,7 @@ local function load_menu_quit_action()
 		return true
 	end
 
-	package.loaded["infra.notifications"] = {
+	package.loaded["core.ui.engine.notifications"] = {
 		notify = function(message)
 			stock_calls.notifications[#stock_calls.notifications + 1] = message
 		end,
@@ -68,12 +68,12 @@ local function load_menu_quit_action()
 		end,
 	}
 	package.loaded["ui.hotstring_editor"] = {}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.text_utils"] = {
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.text.engine.utils"] = {
 		shell_quote = function(value) return tostring(value) end,
 		escape_gsub_replacement = function(value) return tostring(value) end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["infra.ui_restore"] = {}
 	package.loaded["infra.preferences"] = {
 		build_initial_state = function()
@@ -132,7 +132,7 @@ local function load_menu_quit_action()
 		publication_pending = function() return stock_calls.publication_blocked == true end,
 		terminal_admission_blocked = function() return stock_calls.publication_blocked == true end,
 	}
-	package.loaded["infra.termination_coordinator"] = {
+	package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"] = {
 		is_pending = function() return exit_mode.kind ~= nil end,
 		pending_kind = function() return exit_mode.kind end,
 		request_user_exit = function(reason)

@@ -36,7 +36,7 @@ _IPR_ChildSource() {
 	; The probe reaches the OS through its own adapters. The child holds a copy
 	; of the probe elsewhere, so the copy's relative includes are replaced by the
 	; real owners of the symbols it calls.
-	Body := RegExReplace(Body, "m)^#Include\s+\.\./adapters/\S+\R", "", &RelativeIncludes)
+	Body := RegExReplace(Body, "m)^#Include\s+\.\./\S+\R", "", &RelativeIncludes)
 	AssertEqual(2, RelativeIncludes, "The probe must include exactly its clock and native adapters")
 	AdapterIncludes := ""
 	for Symbol in ["PerfClockTicks", "InputProbeNativeCallNext", "KS_IsDown"] {

@@ -4,7 +4,7 @@
 --- MODULE: Screen Reading Corpus (shared Lua oracle)
 --- DESCRIPTION:
 --- Replays _shared/tests/corpus/llm/vision_vectors.json through the shared
---- screen-reading helpers (_shared/lua/llm/vision.lua), which macOS and Linux
+--- screen-reading helpers (_shared/ai/engine/prediction/vision.lua), which macOS and Linux
 --- use and the AutoHotkey port replays too: the binding parameter, the vision
 --- model it resolves to, each API dialect's request body and the answer reading.
 ---
@@ -14,12 +14,12 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
+local json = require("core.text.engine.json")
 
-local shared_lua = helpers.shared("lua/")
+local shared_lua = helpers.shared("/")
 package.path = shared_lua .. "?.lua;" .. shared_lua .. "?/init.lua;" .. package.path
 
-local Vision = require("llm.vision")
+local Vision = require("ai.engine.prediction.vision")
 
 --- @param path string Shared-relative JSON path.
 --- @return table decoded
@@ -55,7 +55,7 @@ end
 
 helpers.describe("screen reading helpers replay the shared vision corpus", function()
 	local corpus = read_json("tests/corpus/llm/vision_vectors.json")
-	local config = read_json("modules/llm/vision.json")
+	local config = read_json("ai/data/vision.json")
 	helpers.it("preserves code operators in transcriptions and answers", function()
 		helpers.assert_eq(Vision.extract("**SCREEN:** result = x**2", "SCREEN:"), "result = x**2")
 		helpers.assert_eq(Vision.extract("ANSWER: result = x**2", "ANSWER:"), "result = x**2")
@@ -112,7 +112,7 @@ end)
 
 helpers.describe("vision.json holds what the screen actions need", function()
 	helpers.it("prompts, tags and answers are complete", function()
-		local config = read_json("modules/llm/vision.json")
+		local config = read_json("ai/data/vision.json")
 		helpers.assert_true(config.read_prompt:find(config.screen_tag, 1, true) ~= nil,
 			"the reading prompt must ask for the screen tag")
 		helpers.assert_eq(#config.answers, 3, "reply, translate, explain")
@@ -124,7 +124,7 @@ helpers.describe("vision.json holds what the screen actions need", function()
 	end)
 
 	helpers.it("the error explanation offers the cause, then the fix", function()
-		local config = read_json("modules/llm/vision.json")
+		local config = read_json("ai/data/vision.json")
 		helpers.assert_eq(#config.error_answers, 2)
 		helpers.assert_eq(config.error_answers[1].id, "cause")
 		helpers.assert_eq(config.error_answers[2].id, "fix")

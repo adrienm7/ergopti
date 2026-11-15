@@ -1,6 +1,6 @@
 --- tests/unit/modules/llm/prediction/test_parser_unicode_escapes.lua
 local helpers = require("tests.helpers")
-local Parser = require("llm.parser")
+local Parser = require("ai.engine.api.parser_core")
 
 helpers.describe("prediction Unicode escapes", function()
 	helpers.it("inserts a supplementary character represented by a UTF-16 surrogate pair", function()

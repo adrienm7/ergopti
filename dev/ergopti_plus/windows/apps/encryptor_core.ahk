@@ -4,12 +4,12 @@
 ; MODULE: Encryptor Core (Windows)
 ; DESCRIPTION:
 ; The Windows Encryptor's container and conversion: the port of macOS's
-; encryptor_convert.sh. The container is _shared/data/encryptor/format.json,
+; encryptor_convert.sh. The container is _shared/apps/data/encryptor/format.json,
 ; OpenSSL's enc envelope, so a file encrypted here opens with the macOS and
 ; Linux Encryptors (and `openssl enc -d`), and the other way round.
 ;
 ; FEATURES & RATIONALE:
-; 1. CNG through adapters/crypto.ahk (the PBKDF2 and AES-CBC the keystats
+; 1. CNG through core/crypto/crypto.ahk (the PBKDF2 and AES-CBC the keystats
 ;    cipher already relies on): no OpenSSL to ship, and the password never
 ;    leaves this process, so no command line or file ever holds it.
 ; 2. Every constant is read from the shared format file.
@@ -34,7 +34,7 @@
  * @returns {Map}
  */
 Encryptor_LoadFormat(SharedDir) {
-	Envelope := JsonParse(FileRead(SharedDir . "\data\encryptor\format.json", "UTF-8"))
+	Envelope := JsonParse(FileRead(SharedDir . "\apps\data\encryptor\format.json", "UTF-8"))
 	for Key in ["magic", "salt_bytes", "cipher", "kdf", "kdf_digest", "iterations", "key_bytes", "iv_bytes",
 			"encrypted_extension", "decrypted_fallback_suffix"] {
 		if !Envelope.Has(Key)

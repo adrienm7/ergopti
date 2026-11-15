@@ -31,25 +31,25 @@ local M = {}
 --- @param callback function Receives the constructed subject and observations.
 function M.with_sentinel(callback)
 	local names = {
-		"infra.logger", "infra.notifications", "infra.keycodes", "infra.i18n",
+		"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n",
 		"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-		"adapters.event_provenance", "adapters.synthetic_input",
-		"adapters.timer_scheduler", "adapters.key_state",
+		"adapters.event_provenance", "platform.input.synthetic_input",
+		"core.events.timer_scheduler", "platform.input.key_state",
 		"modules.shortcuts.script_control",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
 		local deferred = {}
 		local tap_handler
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.notifications"] = {notify = function() end}
-		package.loaded["infra.i18n"] = {get = function(key) return key end}
-		package.loaded["infra.keycodes"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.ui.engine.notifications"] = {notify = function() end}
+		package.loaded["core.i18n.engine.i18n"] = {get = function(key) return key end}
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 0x6A,
 			F14_KARABINER_BACKSPACE = 0x6B,
 			F15_KARABINER_ESCAPE = 0x6C,
 			F18_KARABINER_DELETE = 0x4F,
-			SCRIPT_CHORD_SENTINELS = require("keycodes").SCRIPT_CHORD_SENTINELS,
+			SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
 			BACKSPACE = 0x33,
 			RETURN = 0x24,
 			ESCAPE = 0x35,
@@ -66,17 +66,17 @@ function M.with_sentinel(callback)
 			STATUS_UNREADABLE = "unreadable",
 			classify_with_fence = function() return nil, "hardware", nil end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			defer_after_callback = function(_, callback)
 				deferred[#deferred + 1] = callback
 				return true
 			end,
 		}
-		package.loaded["adapters.timer_scheduler"] = {
+		package.loaded["core.events.timer_scheduler"] = {
 			every = function(_, callback) return {callback = callback}, true end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "none" end,
 		}
@@ -122,26 +122,26 @@ end
 --- @param callback function Receives the constructed subject and observations.
 function M.with_configurable(callback)
 	local names = {
-		"infra.logger", "infra.paths", "adapters.file_system",
-		"adapters.hotkey_registrar", "adapters.storage", "modules.gestures.actions",
-		"modules.shortcuts.keyboard_shortcuts", "chord", "infra.config_paths", "infra.preferences",
+		"core.logger.engine.logger", "core.fs.engine.paths", "core.fs.adapters.file_system",
+		"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.gestures.actions",
+		"modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord", "infra.config_paths", "infra.preferences",
 	}
 	return helpers.with_stub_scope(names, function()
 		local logger, failures = callback_logger()
 		local bound_callback
-		local Json = require("json")
-		local catalogue_file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local Json = require("core.text.engine.json")
+		local catalogue_file = assert(io.open(helpers.shared("shortcuts/data/actions/modifier_chords.json"), "rb"))
 		local catalogue = Json.decode(catalogue_file:read("*a"))
 		catalogue_file:close()
 		catalogue.keys = {{id = "a", label = "A"}}
-		package.loaded["infra.logger"] = logger
-		package.loaded["infra.paths"] = {shared = function() return "catalogue.json" end}
-		package.loaded["adapters.file_system"] = {
+		package.loaded["core.logger.engine.logger"] = logger
+		package.loaded["core.fs.engine.paths"] = {shared = function() return "catalogue.json" end}
+		package.loaded["core.fs.adapters.file_system"] = {
 			read = function() return Json.encode(catalogue) end,
 			read_with_status = function() return '[shortcuts.keyboard]\nprimary_a = "throwing_action"\n', "ok" end,
 			write = function() error("callback dispatch must not publish preferences") end,
 		}
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function(_, callback)
 				bound_callback = callback
 				return "callback-hotkey"
@@ -154,7 +154,7 @@ function M.with_configurable(callback)
 			is_assignable = function(action_id) return action_id == "throwing_action" end,
 			execute_single = function() error("gesture exploded") end,
 		}
-		package.loaded["adapters.storage"] = nil
+		package.loaded["core.fs.adapters.storage"] = nil
 		package.loaded["infra.config_paths"] = { get = function() return "callback-fixture-config" end }
 		package.loaded["infra.preferences"] = nil
 		package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil

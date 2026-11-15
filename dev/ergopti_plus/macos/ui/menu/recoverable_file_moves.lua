@@ -18,8 +18,8 @@
 
 local M = {}
 
-local FileSystem = require("adapters.file_system")
-local Logger = require("infra.logger")
+local FileSystem = require("core.fs.adapters.file_system")
+local Logger = require("core.logger.engine.logger")
 
 local LOG = "menu_file_moves"
 local BACKUP_SUFFIX = ".ergopti-reset-backup"

@@ -1,14 +1,19 @@
 # linux/_generated/shell_messages/he.msg
-# AUTO-GENERATED from _shared/data/locales/he.json (linux_shell.* keys).
+# AUTO-GENERATED from _shared/core/i18n/data/locales/he.json (linux_shell.* keys).
 # DO NOT EDIT BY HAND: run `npm run codegen:linux-shell-messages` to refresh.
 build_luv.module_generated=מודול הרשת של LuaJIT נבנה מקוד המקור.
 build_luv.recipe_required=הבנייה המקורית של luv דורשת את מתכון המקור שלה.
 install.already_installed={1} — כבר מותקן
 install.archive_digest_unavailable=עדכונים עם מתאר שמור דורשים סביבת OpenSSL3 אמיתית; היכולת נשארת לא זמינה.
+install.bytecode_skipped=לא ניתן היה ליצור את המודולים המהודרים מראש — Ergopti מופעל מקוד המקור, מעט לאט יותר.
 install.capability_verified={1} — היכולת אומתה
 install.command_still_missing={1} הותקן, אבל '{2}' עדיין לא נמצא.
 install.daemon_manual=כדי להפעיל את השירות ידנית:
 install.daemon_running=השירות פועל ברקע. כדי לבדוק את מצבו:
+install.focus_integration_enabled=שילוב המיקוד של {1} הופעל
+install.focus_integration_failed=לא ניתן להפעיל את שילוב המיקוד של {1} — כללים לפי יישום נשארים לא פעילים בשולחן עבודה זה.
+install.focus_integration_next_login=שילוב המיקוד של {1} הותקן (ייכנס לתוקף בכניסה הבאה)
+install.focus_integration_updated=שילוב המיקוד של {1} עודכן
 install.gnome_extension_active=הרחבת GNOME AppIndicator — כבר פעילה
 install.gnome_extension_enabled=הרחבת GNOME AppIndicator הופעלה
 install.gnome_extension_failed=לא ניתן להפעיל את הרחבת AppIndicator — בלעדיה GNOME לא מציג את הסמל.
@@ -56,6 +61,7 @@ install.section_dependency_check=Ergopti {1} — בדיקת תלויות
 install.section_deps_skipped=התלויות דולגו (‎--no-deps)
 install.section_done=ההתקנה הושלמה
 install.section_files=התקנת קבצים
+install.section_focus=היישום הפעיל תחת Wayland ‏(GNOME,‏ KDE)
 install.section_lua_deps=תלויות Lua אופציונליות (לולאת אירועים, טיימרים, תצוגות אינטרנט, אותות)
 install.section_permissions=הרשאות קלט (נדרש sudo)
 install.section_services=יצירת שירותי המשתמש של systemd
@@ -79,6 +85,7 @@ install.xdg_autostart=הפעלה אוטומטית של XDG: {1}
 launch.already_running=Ergopti+ כבר פועל בהפעלה זו ({1} תפוס); ניסיון ההפעלה הנוסף נדחה.
 launch.authorization_failed=הרשאת הגישה לקלט בוטלה או נכשלה.
 launch.groups_unavailable=ההפעלה לא הצליחה לקבל את קבוצות הקלט שהוגדרו לה.
+launch.restarting=Ergopti+ כבר פועל בהפעלה זו; הוא מתבקש להיסגר ולאחר מכן מופעל מחדש.
 launch.session_lock_invalid=תיקיית נעילת ההפעלה חייבת להיות נתיב מוחלט.
 launcher.dependencies_installed=התלויות הותקנו.
 launcher.driver_missing=שגיאה: תיקיית מנהל ההתקן של Linux לא נמצאה: {1}

@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 
 helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 	helpers.it("keeps both actual resolution loops ordered rather than relying on pairs array traversal", function()
@@ -24,7 +24,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 	end)
 
 	helpers.it("keeps every declared overlapping prefix longest-first", function()
-		local file = assert(io.open(helpers.shared("modules/actions/modifier_chords.json"), "rb"))
+		local file = assert(io.open(helpers.shared("shortcuts/data/actions/modifier_chords.json"), "rb"))
 		local catalogue = Json.decode(file:read("*a")); file:close()
 		local groups = catalogue.platforms.macos.shortcut_groups
 		helpers.assert_true(type(groups) == "table" and #groups > 0)
@@ -44,16 +44,16 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 
 	helpers.it("binds and labels shifted slots through the real declared prefix consumer", function()
 		return helpers.with_stub_scope({
-			"adapters.file_system", "adapters.hotkey_registrar", "infra.paths", "infra.config_paths",
+			"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "infra.config_paths",
 			"infra.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
 		}, function()
 			helpers.load_with_stubs("infra.preferences")
 			local observed = {}
-			package.loaded["infra.paths"] = {shared = helpers.shared}
-			package.loaded["adapters.file_system"] = {read = function(path)
+			package.loaded["core.fs.engine.paths"] = {shared = helpers.shared}
+			package.loaded["core.fs.adapters.file_system"] = {read = function(path)
 				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close(); return bytes
 			end}
-			package.loaded["adapters.hotkey_registrar"] = {
+			package.loaded["platform.input.hotkey_registrar"] = {
 				bind = function(chord) observed[chord] = (observed[chord] or 0) + 1; return chord end,
 				unbind = function() return true end,
 			}
@@ -71,7 +71,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 			helpers.assert_eq(subject.get_slot_label("secondary_shift_a"), "⌃ ⇧ A",
 				"Ctrl is the glyph of the shared key name table, never a caret")
 			helpers.assert_eq(subject.get_slot_label("secondary_space"),
-				"⌃ " .. require("infra.i18n").get("key_name.space"),
+				"⌃ " .. require("core.i18n.engine.i18n").get("key_name.space"),
 				"a named key reads in the user's language, not as the catalogue's English legend")
 			helpers.assert_eq(subject.stop(), true)
 		end)

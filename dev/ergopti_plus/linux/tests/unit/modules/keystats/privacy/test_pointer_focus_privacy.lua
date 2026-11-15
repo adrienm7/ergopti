@@ -17,10 +17,10 @@ local Engine = require("modules.hotstrings.engine")
 --- @param initial_role number Initial native role.
 --- @return table state
 local function fixture(initial_role)
-	local previous = package.loaded["adapters.secure_field_detector"]
-	package.loaded["adapters.secure_field_detector"] = nil
-	local detector = require("adapters.secure_field_detector")
-	package.loaded["adapters.secure_field_detector"] = previous
+	local previous = package.loaded["platform.focus.secure_field_detector"]
+	package.loaded["platform.focus.secure_field_detector"] = nil
+	local detector = require("platform.focus.secure_field_detector")
+	package.loaded["platform.focus.secure_field_detector"] = previous
 	local now, role, primary, reads = 1000, initial_role, "", 0
 	local listener, secure, discards = nil, true, 0
 	local watch = {
@@ -48,7 +48,7 @@ local function fixture(initial_role)
 		type_text = function(text) output[#output + 1] = text; return true end,
 	})
 	local source = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
-	local body = assert(source:read("*a"):match("local function on_click%(%)(.-)\n\tend"), "native pointer callback missing")
+	local body = assert(source:read("*a"):match("local function on_click%(code%)(.-)\n\tend"), "native pointer callback missing")
 	source:close()
 	local factory = assert((loadstring or load)("return function(secure_focus_guard,wrap_on_type,prediction_engine,WordReset,engine,Logger,LOG,TapHold,keystats) "
 		.. "return function() " .. body .. " end end"))()

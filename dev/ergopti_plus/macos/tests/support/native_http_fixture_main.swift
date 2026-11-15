@@ -174,7 +174,7 @@ func fixtureMain() -> Int32 {
 	stages.mark("settings")
 	stages.bindDefaultRoute(settings: settings)
 	let policy = privateSettings.deletingLastPathComponent()
-		.appendingPathComponent("static/ergopti_plus/_shared/modules/network/proxy_policy.json")
+		.appendingPathComponent("static/ergopti_plus/_shared/core/network/data/proxy_policy.json")
 	guard let policyBytes = try? Data(contentsOf: policy),
 		let policyFields = try? JSONSerialization.jsonObject(with: policyBytes) as? [String: Any],
 		let maximum = policyFields["max_selections"] as? NSNumber,

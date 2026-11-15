@@ -73,9 +73,9 @@ local Privacy = require("modules.keystats.privacy_context")
 
 local function with_fixture(callback)
 	local original_lfs = rawget(_G, "lfs")
-	local values = table.pack(pcall(helpers.with_stub_scope, { "modules.keystats.context_tracker", "adapters.secure_field_detector",
-		"adapters.physical_observation_clock", "keystats.physical_context_observation",
-		"native_path", "error_description", "lfs" }, function()
+	local values = table.pack(pcall(helpers.with_stub_scope, { "modules.keystats.context_tracker", "platform.focus.secure_field_detector",
+		"adapters.physical_observation_clock", "metrics.engine.capture.physical_context_observation",
+		"core.fs.engine.native_path", "diagnostics.engine.reports.error_description", "lfs" }, function()
 		local controls = { paused = false, no_window = false, no_focus = false, no_frontmost = false,
 			throw_property = nil, title = "Ordinary window", role = "AXTextField", subrole = nil,
 			queries = {}, clock = 1000000000, records = {}, failures = {}, decision_calls = 0, legacy = {} }
@@ -151,7 +151,7 @@ local function with_fixture(callback)
 		controls.focus = function(focused) return controls.ax_callback(observer, focused, "AXFocusedUIElementChanged", {}) end
 		controls.element, controls.app, controls.observer = element, app, observer
 		controls.window, controls.window_app = window, window_app
-		controls.detector = require("adapters.secure_field_detector")
+		controls.detector = require("platform.focus.secure_field_detector")
 		callback(tracker, state, controls)
 	end))
 	rawset(_G, "lfs", original_lfs)

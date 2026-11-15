@@ -21,7 +21,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MANAGED_FILE = "/Users/test/" .. AppDirs.config.macos_paths_file
 local BUNDLE_DIR = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/macos/"
@@ -186,7 +186,7 @@ local function with_memory_files(initial, fn)
 	end
 
 	local ok, err = xpcall(function()
-		return helpers.with_stub_scope({ "infra.config_paths", "adapters.file_system", "infra.fs_dir" }, function()
+		return helpers.with_stub_scope({ "infra.config_paths", "core.fs.adapters.file_system", "core.fs.engine.dir" }, function()
 			return fn(files, writes, memory)
 		end)
 	end, debug.traceback)

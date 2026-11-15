@@ -11,12 +11,12 @@
 local helpers = require("tests.helpers")
 
 local MODULE_NAMES = {
-	"adapters.http_client",
-	"adapters.json_codec",
-	"adapters.shell_runner",
-	"adapters.timer_scheduler",
-	"infra.logger",
-	"infra.notifications",
+	"core.network.adapters.http_client",
+	"core.fs.adapters.json_codec",
+	"core.process.adapters.shell_runner",
+	"core.events.timer_scheduler",
+	"core.logger.engine.logger",
+	"core.ui.engine.notifications",
 	"modules.llm.api_mlx",
 	"modules.llm.api_mlx_discovery",
 	"modules.llm.api_mlx_fetch",
@@ -197,8 +197,8 @@ local function with_real_mlx_stack(fn)
 		http_requests = {},
 		tasks = {},
 	}
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
-	package.loaded["infra.notifications"] = { notify = function() end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+	package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 	package.loaded["modules.shortcuts.script_control"] = {
 		is_paused = function() return state.script_paused end,
 		get_pause_epoch = function() return state.pause_epoch end,
@@ -238,14 +238,14 @@ end
 local function install_script_control_dependencies(options)
 	options = options or {}
 	local function settled() return true end
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["adapters.event_provenance"] = {}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	local fence
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			fence = { active = true }
@@ -258,7 +258,7 @@ local function install_script_control_dependencies(options)
 			return true
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,
@@ -288,7 +288,7 @@ local function install_script_control_dependencies(options)
 	package.loaded["ui.wpm.wpm_menubar"] = { is_running = function() return false end }
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = settled }
-	package.loaded["ui.tooltip"] = { hide_forced = settled }
+	package.loaded["core.ui.ui.tooltip"] = { hide_forced = settled }
 	package.loaded["modules.keystats"] = { resync_context = settled }
 end
 

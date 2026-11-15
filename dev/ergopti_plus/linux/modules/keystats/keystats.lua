@@ -17,7 +17,7 @@
 --- 3. JSON export: export_session() returns a JSON-serializable snapshot of
 ---    all accumulated metrics — suitable for the shared healthcheck or WPM widget.
 --- 4. SQLite persistence: flush() writes the current session into the
----    canonical SQLite schema (_shared/data/db/schema.sql) via the sqlite_writer
+---    canonical SQLite schema (_shared/metrics/data/db/schema.sql) via the sqlite_writer
 ---    module (sqlite3 CLI wrapper). The shared metrics dashboard reads the same
 ---    schema across macOS, Windows, and Linux.
 --- 5. Graceful degradation: when the sqlite3 binary is absent, flush() writes a
@@ -25,34 +25,34 @@
 --- ==============================================================================
 
 local M = {}
-local ManifestKeys = require("keystats.manifest_keys")
-local TableUtil = require("table_util")
-local StrictUtf8 = require("compat.utf8")
-local ErrorDescription = require("error_description")
+local ManifestKeys = require("metrics.engine.view.manifest_keys")
+local TableUtil = require("core.text.engine.table_util")
+local StrictUtf8 = require("core.lifecycle.engine.compat.utf8")
+local ErrorDescription = require("diagnostics.engine.reports.error_description")
 local Calendar = require("modules.keystats.calendar")
 
-local Logger   = require("logger.shim")
-local Monotonic = require("infra.monotonic")
-local Perf = require("infra.perf_counters")
-local Timings   = require("infra.timings")
-local EvdevCodes = require("infra.evdev_codes")
+local Logger   = require("core.logger.engine.shim")
+local Monotonic = require("core.logger.engine.monotonic")
+local Perf = require("core.logger.engine.perf_counters")
+local Timings   = require("core.timing.engine.timings")
+local EvdevCodes = require("platform.input.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
 local Manifest      = require("infra.manifest_reader")
-local PrivateWindow = require("keystats.private_window")
+local PrivateWindow = require("metrics.engine.view.private_window")
 -- WPM ring cap single-sourced from the shared keystats metrics module so the
 -- per-app rings below never drift from the collector's global ring cap.
-local SharedMetrics    = require("keystats.metrics")
-local Utils            = require("keystats.utils")
-local TokenEncoding    = require("keystats.token_encoding")
+local SharedMetrics    = require("metrics.engine.metrics")
+local Utils            = require("metrics.engine.utils")
+local TokenEncoding    = require("metrics.engine.privacy.token_encoding")
 local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
 local MAX_TYPING_INTERVAL_MS = Timings.ms("keystats", "max_keystroke_delay_ms")
 -- The WPM readouts' live speed and last source, the same tracker macOS reads.
 -- Counted here because every character that reaches the page passes here —
 -- typed, expanded or generated — and only here is it known which it was.
-local LiveWpm = require("keystats.live_wpm")
+local LiveWpm = require("metrics.engine.wpm.live_wpm")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
-local AppCategoryStore = require("keystats.app_category_store")
+local AppCategoryStore = require("metrics.engine.apps.category_store")
 local AppCategoryFile = require("modules.keystats.app_category_file")
 local function new_live_tracker()
 	return LiveWpm.new({
@@ -63,12 +63,12 @@ local function new_live_tracker()
 	})
 end
 local _live = new_live_tracker()
-local Roi = { owner = require("keystats.trigger_roi"), pending = {} }
+local Roi = { owner = require("metrics.engine.privacy.trigger_roi"), pending = {} }
 Roi.state = Roi.owner.new(Monotonic.now_ms(), false)
 
 -- The typing session's start and end and its idle spans (events_session), the
 -- state machine macOS and Windows run, ticked by the periodic flush.
-local SessionEvents = require("keystats.session_events")
+local SessionEvents = require("metrics.engine.system.session_events")
 local function new_session_tracker()
 	return SessionEvents.new({
 		micro_idle_ms = Timings.ms("keystats", "micro_idle_timeout_ms"),
@@ -119,7 +119,7 @@ local TextCipher = require("modules.keystats.text_cipher")
 local TextMigration = require("modules.keystats.text_migration")
 -- The per-device data.sql the macOS and Windows drivers import.
 local MetricsLedger = require("modules.keystats.metrics_ledger")
-local MigrationPlan = require("keystats.text_migration")
+local MigrationPlan = require("metrics.engine.privacy.text_migration_core")
 -- Battery, network, lock and suspend. Optional: a machine with none of the
 -- tools it reads simply reports nothing, and the typing path must not care.
 local SystemMetrics = nil
@@ -128,7 +128,7 @@ if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
 
 -- The nine n-gram families, over the shared driver-agnostic accumulators.
 local AggregateWalker = require("modules.keystats.aggregate_walker")
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 
 local LOG = "modules.keystats.keystats"
 
@@ -173,8 +173,14 @@ local _pending_shortcut_events = {}
 -- LLM prediction events (generation, suggested, dismissed, accepted), buffered like their
 -- siblings and written to events_llm so the dashboard's AI tab has rows on this driver too.
 local _pending_llm_events = {}
--- Connectivity transitions (network_metrics), the Windows events_network rows.
-local _pending_network_events = {}
+-- The generic (kind, app, meta) raw families, one buffer each: connectivity
+-- transitions (network_metrics, events_network), window geometry, state and
+-- monitor changes (topology_metrics, events_window_topo) and capture-program
+-- presence (events_av). One table: the main chunk is at LuaJIT's 200-local limit.
+local _raw_pending = { network = {}, window_topo = {}, av = {} }
+-- Clipboard copy, paste and paste-burst rows (keystats.clipboard_events), the
+-- Windows events_clipboard rows, and the one tracker their burst ring lives in.
+local _clipboard = { pending = {}, tracker = nil }
 local _pending_app_switch_events = {}
 -- Window title changes, written to events_window_switch as Windows and macOS do:
 -- the dashboard's per-application context shifts read them.
@@ -303,7 +309,11 @@ local _suppressed = false
 -- its own: the password flag above is driven by the focused application and is
 -- cleared whenever focus moves, which would silently end a pause the user set.
 -- Never persisted, so every launch starts recording as its settings say.
-local _suspended = false
+-- `script` is the driver's own pause (EDD-1): it stops every metric,
+-- keystrokes, application time, pointer, network, topology and system rows
+-- alike, as macOS and Windows do, apart from the user's Metrics-menu pause.
+-- One table: this chunk is at Lua's limit of 200 locals.
+local _pause = { user = false, script = false }
 
 -- Cross-driver privacy posture, read from the shared features manifest so the
 -- three drivers cannot drift. Linux had none of these: it recorded
@@ -321,8 +331,8 @@ local _suspended = false
 -- relaxed silently tightened again, which is the harmless direction. The master
 -- switch is the other direction: off means off, and it did not stay off.
 local Preferences = require("infra.metrics_preferences")
-local KEY  = require("config_keys").KEY
-local LEAF = require("config_keys").LEAF
+local KEY  = require("settings.engine.keys").KEY
+local LEAF = require("settings.engine.keys").LEAF
 
 --- Persists a boolean, or clears it when it matches the shipped default.
 --- @param key string A config_keys.KEY value.
@@ -384,18 +394,14 @@ local _private_window = false
 -- has no business running once per keystroke.
 local _secure_field = false
 
--- Password managers and credential UIs (case-insensitive substring match on
--- appId). Gated by metrics.secure_filter_enabled.
---
--- NOTE: intentionally distinct from the AT-SPI adapter's
--- secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller list e.g.
--- keepassxc). The adapter is consulted IN ADDITION to this list, never instead
--- of it: it matches exactly, so delegating would NARROW coverage and leak
--- keystrokes. The broad coverage is locked by the "coverage must never narrow"
--- guard in tests/unit/modules/keystats/core/test_keystats.lua.
-local _SECURE_APPS = {
-	"1password", "bitwarden", "keepass", "lastpass",
-}
+-- Password managers and credential UIs: the Linux fragments of the shared list
+-- (_shared/data/secure_apps.json), the one macOS and Windows read, matched as
+-- case-insensitive substrings of the appId. Gated here by
+-- metrics.secure_filter_enabled for recording; the whole-application gate of
+-- text automation is is_context_protected, which no metrics switch turns off
+-- (ADD-1, decided by the maintainer on 2026-11-11). The "coverage must never
+-- narrow" guard in tests/unit/modules/keystats/core/test_keystats.lua locks it.
+local _SECURE_APPS = require("apps.engine.secure_apps").linux_fragments()
 
 -- OS-level authentication prompts. Gated by metrics.system_auth_filter_enabled,
 -- matching the "system_auth" category of the shared no-persist corpus.
@@ -442,7 +448,7 @@ local _storage_blocked = false
 local function may_record()
 	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
-	if _suppressed or _suspended then return false end
+	if _suppressed or _pause.user or _pause.script then return false end
 	if _secure_filter_enabled and _secure_field then return false end
 	if _private_filter_enabled and _private_window then return false end
 	return true
@@ -737,10 +743,10 @@ end
 LedgerSetup.start_import = function(identity, metrics_dir)
 	local LedgerImport = require("modules.keystats.ledger_import")
 	local LedgerRebuild = require("modules.keystats.ledger_rebuild")
-	local Paths = require("infra.paths")
-	local schema_path = Paths.shared("data/db/schema.sql")
-	local schema = schema_path and require("adapters.file_system").read(schema_path)
-	local Digest = require("infra.openssl_digest")
+	local Paths = require("core.fs.engine.paths")
+	local schema_path = Paths.shared("metrics/data/db/schema.sql")
+	local schema = schema_path and require("core.fs.adapters.file_system").read(schema_path)
+	local Digest = require("core.network.engine.openssl_digest")
 	if type(schema) ~= "string" or not Digest.streaming then
 		Logger.error(LOG, "Foreign metrics import refused (%s); other devices' metrics are not shown.",
 			type(schema) ~= "string" and "schema.sql is unreadable" or "no streaming SHA-256")
@@ -830,8 +836,21 @@ function M.init(opts)
 	if registration_ok and registered == true then
 		migration_ok, migrated = pcall(SqliteWriter.ensure_token_encoding)
 	end
+	-- awake_ms follows Windows and macOS (keep-awake sessions); earlier
+	-- sampled uptime is cleared and the definition's first date recorded.
+	if migration_ok and migrated == true then
+		migration_ok, migrated = pcall(SqliteWriter.ensure_awake_definition, _device_id, Calendar.capture().date)
+	end
 	local sqlite_ready = migration_ok and migrated == true
-	if sqlite_ready and identity then LedgerSetup.start(identity, options.metrics_dir) end
+	-- The ledger exporter and the at-rest text migration gate no recording:
+	-- the daemon runs them on its loop's first idle tick (options.defer), off
+	-- the boot path, since each sqlite3 query is a process of its own (about
+	-- 4 ms). Without a defer port (tests, tools) they run at the end of init.
+	local after_admission = {}
+	if sqlite_ready and identity then
+		local metrics_dir = options.metrics_dir
+		after_admission[#after_admission + 1] = function() LedgerSetup.start(identity, metrics_dir) end
+	end
 	local sqlite_unavailable = not SqliteWriter or (open_called and open_result == false and open_reason == "sqlite_unavailable")
 	_storage_blocked = not sqlite_ready and not sqlite_unavailable
 	if sqlite_ready then
@@ -890,9 +909,11 @@ function M.init(opts)
 	-- unconditionally would re-read every stored row at every daemon start, on
 	-- machines that may never have enabled the setting at all.
 	if sqlite_available() then
-		TextMigration.resume(
-			_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
-			_device_id)
+		local mode = _encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT
+		local device = _device_id
+		after_admission[#after_admission + 1] = function()
+			if sqlite_available() then TextMigration.resume(mode, device) end
+		end
 	end
 
 	-- The user's stored choices, applied over the manifest defaults. Here rather
@@ -906,7 +927,7 @@ function M.init(opts)
 
 	_hold_token = {}
 	_hold_focus_app = nil
-	_suspended = false
+	_pause.user = false
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -923,6 +944,13 @@ function M.init(opts)
 
 	Logger.success(LOG, "Keystats initialised (log_dir=%s, password_apps=%d).",
 		_log_dir, #_password_apps)
+	-- A later init or a stop between now and the deferred tick retires these.
+	local generation = _flush_generation
+	local function run_after_admission()
+		if generation ~= _flush_generation or not _sqlite_admitted then return end
+		for _, task in ipairs(after_admission) do task() end
+	end
+	if type(options.defer) == "function" then options.defer(run_after_admission) else run_after_admission() end
 	return not _storage_blocked
 end
 
@@ -1068,10 +1096,10 @@ end
 local function media_policy()
 	if _media_policy == nil then
 		local ok, policy = pcall(function()
-			local path = assert(require("infra.paths").shared("data/keycodes/metrics_media_keys.json"))
-			local body, status = require("adapters.file_system").read_with_status(path)
+			local path = assert(require("core.fs.engine.paths").shared("layouts/data/keycodes/metrics_media_keys.json"))
+			local body, status = require("core.fs.adapters.file_system").read_with_status(path)
 			assert(status == "ok" and type(body) == "string", "the media catalogue is unreadable")
-			return require("keystats.media_store").policy(require("json").decode(body))
+			return require("metrics.engine.media.store").policy(require("core.text.engine.json").decode(body))
 		end)
 		if not ok then
 			Logger.error(LOG, "The media key catalogue was refused; media keys are not counted: %s.",
@@ -1492,26 +1520,47 @@ function M.pointer_distance_availability()
 	return _pointer.availability()
 end
 
+--- Binds what counting the touchpad's tap-to-click needs (pointer_metrics).
+--- @param describe function|nil (source) -> { path, name, units_x, units_y } | nil, reason
+--- @param read_setting function|nil (device) -> tap_to_click_setting answer
+--- @param clock function|nil Monotonic milliseconds.
+function M.bind_touchpads(describe, read_setting, clock)
+	_pointer.bind_touchpads(describe, read_setting, clock)
+end
+
+--- Re-reads the tap-to-click setting of the touchpads in use, from the tick.
+function M.refresh_tap_settings()
+	_pointer.refresh_tap_settings()
+end
+
+--- Whether the touchpad taps are counted with the clicks, for the menu.
+--- @return table { measured, reason? }
+function M.tap_click_availability()
+	return _pointer.tap_click_availability()
+end
+
 --- Records one report of an observed pointer for the mouse columns of
 --- events_typing. The clicks, wheel turns and distance accumulate under the
 --- focused application and are written with its next typing row, as macOS
 --- carries them to the next flushed run. Gated like every recording entry
 --- point, and never for an application whose input stays out of the metrics.
---- @param kind string "press", "motion", "frame", "dropped" or "reset" (pointer_metrics).
+--- @param kind string "press", "motion", "frame", "dropped", "reset" or "contact" (pointer_metrics).
 --- @param code integer|nil evdev code.
 --- @param value integer|nil evdev value.
 --- @param source any|nil Pointer device identity.
-function M.record_pointer(kind, code, value, source)
+--- @param at_us number|nil Kernel time of a frame, in microseconds.
+function M.record_pointer(kind, code, value, source, at_us)
 	if not may_record() or M.is_unrecorded_app(_focused_app_id) then
 		_pointer.discard_frames()
 		_pointer.forget_position()
-		-- Keep device lifecycle and queue-loss state in sync while collection is off.
-		if kind == "reset" or kind == "dropped" or kind == "frame" then
-			_pointer.observe(kind, code, value, source)
+		-- Keep device lifecycle, queue-loss and touch state in sync while
+		-- collection is off; what they would add is not recorded.
+		if kind == "reset" or kind == "dropped" or kind == "frame" or kind == "contact" then
+			_pointer.observe(kind, code, value, source, at_us)
 		end
 		return
 	end
-	local delta = _pointer.observe(kind, code, value, source)
+	local delta = _pointer.observe(kind, code, value, source, at_us)
 	if not delta then return end
 	local clock = capture_input_clock()
 	queue_session_events(forward_session(clock, "input", clock.mono_ms, false), clock)
@@ -1565,20 +1614,72 @@ function M.record_llm_event(app_id, kind, fields)
 end
 
 --- Records one connectivity transition (network_metrics) in events_network.
---- @param kind string One of network_metrics.KINDS.
+--- @param kind string One of keystats.network_transitions.KINDS.
 --- @param fields table|nil Metadata; only the kind's own keys are kept.
 function M.record_network_event(kind, fields)
 	if not may_record() then return end
-	local allowed = require("modules.keystats.network_metrics").KINDS[kind]
+	local allowed = require("metrics.engine.system.network_transitions").KINDS[kind]
 	assert(allowed, "not an events_network kind: " .. tostring(kind))
+	-- Windows' KL_AppendLog refuses every entry while the focused app is
+	-- filtered, connectivity included: the row would name that app.
+	local app = M.last_app() or "unknown"
+	if M.is_unrecorded_app(app) then return end
 	fields = type(fields) == "table" and fields or {}
 	local clock = observe_calendar()
 	local meta = {}
 	for _, name in ipairs(allowed) do meta[name] = fields[name] end
-	_pending_network_events[#_pending_network_events + 1] = {
-		ts = clock.ts, date = clock.date, kind = kind,
-		app = dashboard_app_name(M.last_app() or "unknown"), meta = meta,
+	_raw_pending.network[#_raw_pending.network + 1] = {
+		ts = clock.ts, date = clock.date, kind = kind, app = dashboard_app_name(app), meta = meta,
 	}
+end
+
+--- Records one physical copy or paste chord forwarded to the focused
+--- application (keystats.clipboard_events), with the burst it completes. A copy
+--- refused by a filter clears the copy provenance a later paste would carry.
+--- @param app_id string Focused application identifier.
+--- @param action string "copy" or "paste" (ClipboardEvents.classify_chord).
+--- @param now_ms number Monotonic milliseconds.
+--- @param excluded boolean|nil The daemon's own gate (script pause, privacy
+---   admission, secure field) refused the chord's context.
+function M.record_clipboard_chord(app_id, action, now_ms, excluded)
+	assert(action == "copy" or action == "paste", "not a clipboard chord: " .. tostring(action))
+	assert(type(now_ms) == "number", "a clipboard chord needs its time")
+	local ClipboardEvents = require("metrics.engine.capture.clipboard_events")
+	_clipboard.tracker = _clipboard.tracker
+		or ClipboardEvents.new({ window_ms = Timings.ms("keystats", "paste_burst_window_ms") })
+	if excluded == true or not may_record() or type(app_id) ~= "string" or app_id == ""
+		or M.is_unrecorded_app(app_id) then
+		if action == "copy" then _clipboard.tracker.invalidate() end
+		return
+	end
+	local app = dashboard_app_name(app_id)
+	local rows = action == "copy" and _clipboard.tracker.copy(now_ms, app) or _clipboard.tracker.paste(now_ms, app)
+	local clock = observe_calendar()
+	for _, row in ipairs(rows) do
+		_clipboard.pending[#_clipboard.pending + 1] = {
+			ts = clock.ts, date = clock.date, kind = row.kind, app = app, meta = row.meta,
+		}
+	end
+end
+
+--- Records one window-topology or capture-presence transition (topology_metrics).
+--- The row carries the focused application, as Windows' Keystats.session_app.
+--- @param kind string One of window_topology.KINDS or capture_presence.KINDS.
+--- @param fields table|nil Metadata; only the kind's own keys are kept.
+function M.record_topology_event(kind, fields)
+	if not may_record() then return end
+	-- The raw family of each kind: events_window_topo or events_av.
+	local family, allowed = "window_topo", require("metrics.engine.system.window_topology").KINDS[kind]
+	if not allowed then family, allowed = "av", require("metrics.engine.capture_presence").KINDS[kind] end
+	assert(allowed, "not a window-topology or capture-presence kind: " .. tostring(kind))
+	local app = M.last_app() or "unknown"
+	if M.is_unrecorded_app(app) then return end
+	fields = type(fields) == "table" and fields or {}
+	local clock = observe_calendar()
+	local meta = {}
+	for _, name in ipairs(allowed) do meta[name] = fields[name] end
+	local buffer = _raw_pending[family]
+	buffer[#buffer + 1] = { ts = clock.ts, date = clock.date, kind = kind, app = dashboard_app_name(app), meta = meta }
 end
 
 --- Records successful automated output that is not a static hotstring (LLM,
@@ -2042,6 +2143,10 @@ end
 --- @param title string Exact current native frame title.
 --- @return boolean protected
 function M.is_context_protected(app_id, title)
+	-- A password manager is a secure field as a whole, as on macOS and Windows,
+	-- whatever the metrics filters say: the verdict also gates hotstrings, AI
+	-- requests and clipboard borrowers through the focus guard (ADD-1).
+	if require("apps.engine.secure_apps").is_secure_app("linux", app_id) then return true end
 	return M.is_password_app(app_id) or (_private_filter_enabled and PrivateWindow.matches(title))
 end
 
@@ -2220,8 +2325,8 @@ end
 --- Pauses metrics collection at the user's request. Idempotent. The pause is
 --- independent of the password flag: leaving a secure field does not end it.
 function M.suspend_collection()
-	if not _suspended then
-		_suspended = true
+	if not _pause.user then
+		_pause.user = true
 		_live = new_live_tracker()
 		settle_capture_policy()
 		Logger.info(LOG, "Metrics collection suspended by the user.")
@@ -2230,16 +2335,30 @@ end
 
 --- Ends the user's pause. Nothing typed meanwhile is recovered.
 function M.resume_collection()
-	if _suspended then
-		_suspended = false
+	if _pause.user then
+		_pause.user = false
 		Logger.info(LOG, "Metrics collection resumed by the user.")
 	end
+end
+
+--- Follows the driver's pause: nothing is recorded while it lasts, and the
+--- intervals open at the pause are retired, never credited later.
+--- @param paused boolean The driver's settled pause state.
+function M.set_script_paused(paused)
+	if type(paused) ~= "boolean" then
+		error("keystats.set_script_paused() needs a boolean pause state", 2)
+	end
+	if _pause.script == paused then return end
+	_pause.script = paused
+	if paused then _live = new_live_tracker() end
+	settle_capture_policy()
+	Logger.info(LOG, "Metrics collection %s with the driver.", paused and "paused" or "resumed")
 end
 
 --- Returns whether the user paused metrics collection.
 --- @return boolean
 function M.is_collection_suspended()
-	return _suspended
+	return _pause.user
 end
 
 --- Turns keystroke collection on or off. The Linux driver had no off switch at
@@ -2572,7 +2691,7 @@ function M.get_privacy_state()
 		private_window             = _private_window,
 		secure_field               = _secure_field,
 		suppressed                 = _suppressed,
-		suspended                  = _suspended,
+		suspended                  = _pause.user,
 	}
 end
 
@@ -2604,7 +2723,7 @@ function M.export_session()
 		wpm                = wpm,
 		apps               = apps,
 		suppressed         = _suppressed,
-		suspended          = _suspended,
+		suspended          = _pause.user,
 	}
 end
 
@@ -2627,15 +2746,18 @@ local copy_flush_value = TableUtil.deep_copy
 
 -- The numeric cursor fields an open-walk record keeps, in their fixed order.
 -- No typed text: the open word and sequence are not persisted.
-local OPEN_SESSION_FIELDS = { "char_count", "total_ms" }
-local OPEN_BURST_FIELDS = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" }
+-- One table, not two locals: this chunk is at LuaJIT's 200-local limit.
+local OPEN_WALK_FIELDS = {
+	session = { "char_count", "total_ms" },
+	burst = { "char_count", "sum_delays", "sum_delays_sq", "max_delay" },
+}
 
 --- Encodes the sessions and bursts the walk contexts hold open, canonically, so
 --- an unchanged state encodes to the same text and causes no write.
 --- @param contexts table Walk contexts by application id.
 --- @return string encoded JSON array without raw NUL or newline.
 local function encode_open_walk(contexts)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local function cursor(value, fields)
 		if type(value) ~= "table" then return "null" end
 		local parts = {}
@@ -2649,8 +2771,8 @@ local function encode_open_walk(contexts)
 		local session, burst = ctx.current_session, ctx.current_burst
 		if type(ctx.date) == "string" and type(ctx.app) == "string" and (session or burst) then
 			records[#records + 1] = { date = ctx.date, app = ctx.app, text = "{\"date\":" .. Json.encode(ctx.date)
-				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(session, OPEN_SESSION_FIELDS)
-				.. ",\"burst\":" .. cursor(burst, OPEN_BURST_FIELDS) .. "}" }
+				.. ",\"app\":" .. Json.encode(ctx.app) .. ",\"session\":" .. cursor(session, OPEN_WALK_FIELDS.session)
+				.. ",\"burst\":" .. cursor(burst, OPEN_WALK_FIELDS.burst) .. "}" }
 		end
 	end
 	table.sort(records, function(a, b) return a.date < b.date or (a.date == b.date and a.app < b.app) end)
@@ -2663,7 +2785,7 @@ end
 --- @param encoded string Record text read from the database.
 --- @return table|nil contexts { date, app, current_session?, current_burst? } list; nil when malformed.
 decode_open_walk = function(encoded)
-	local Json = require("json")
+	local Json = require("core.text.engine.json")
 	local ok, records = pcall(Json.decode, encoded)
 	if not ok or type(records) ~= "table" or (next(records) ~= nil and #records == 0) then return nil end
 	local function cursor(value, fields)
@@ -2681,8 +2803,8 @@ decode_open_walk = function(encoded)
 	for index, record in ipairs(records) do
 		if type(record) ~= "table" or type(record.date) ~= "string"
 			or not record.date:match("^%d%d%d%d%-%d%d%-%d%d$") or type(record.app) ~= "string" then return nil end
-		local session_ok, session = cursor(record.session, OPEN_SESSION_FIELDS)
-		local burst_ok, burst = cursor(record.burst, OPEN_BURST_FIELDS)
+		local session_ok, session = cursor(record.session, OPEN_WALK_FIELDS.session)
+		local burst_ok, burst = cursor(record.burst, OPEN_WALK_FIELDS.burst)
 		if not session_ok or not burst_ok then return nil end
 		contexts[index] = { date = record.date, app = record.app, current_session = session, current_burst = burst }
 	end
@@ -2696,7 +2818,7 @@ local function capture_flush(close_session)
 	local date = clock.date
 	local calendar_snapshot = snapshot_calendar(clock)
 	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {}, llm = {}, windows = {},
-		sessions = {}, system = {}, media = {}, network = {}, roi = {} }, upserts = {} }
+		sessions = {}, system = {}, media = {}, network = {}, clipboard = {}, window_topo = {}, av = {}, roi = {} }, upserts = {} }
 	local add = setmetatable({}, { __index = function(_, kind)
 		return function(_, ...)
 			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
@@ -2706,13 +2828,14 @@ local function capture_flush(close_session)
 		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
 		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
 		llm = _pending_llm_events, windows = _pending_window_switch_events, sessions = _pending_session_events,
-		network = _pending_network_events, roi = Roi.pending,
+		network = _raw_pending.network, clipboard = _clipboard.pending, roi = Roi.pending,
+		window_topo = _raw_pending.window_topo, av = _raw_pending.av,
 		system = _pending_system_events, media = _pending_media_events,
 	}
 	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
 	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
 	local _pending_llm_events = buffers.llm
-	local _pending_network_events = buffers.network
+	local _pending_clipboard_events = buffers.clipboard
 	local _pending_window_switch_events = buffers.windows
 	local _pending_session_events = buffers.sessions
 	local _pending_system_events = buffers.system
@@ -2833,10 +2956,12 @@ local function capture_flush(close_session)
 		_pending_shortcut_events = {}
 	end
 	payload.raw.roi = buffers.roi
-	if #_pending_network_events > 0 then
-		payload.raw.network = _pending_network_events
-		_pending_network_events = {}
+	payload.raw.network = buffers.network
+	if #_pending_clipboard_events > 0 then
+		payload.raw.clipboard = _pending_clipboard_events
+		_pending_clipboard_events = {}
 	end
+	payload.raw.window_topo, payload.raw.av = buffers.window_topo, buffers.av
 	if #_pending_llm_events > 0 then
 		payload.raw.llm = _pending_llm_events
 		_pending_llm_events = {}
@@ -3178,7 +3303,10 @@ local function restore_flush_buffers(buffers)
 	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
 	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
 	_pending_llm_events = prepend(buffers.llm, _pending_llm_events)
-	_pending_network_events = prepend(buffers.network, _pending_network_events)
+	_raw_pending.network = prepend(buffers.network, _raw_pending.network)
+	_raw_pending.window_topo = prepend(buffers.window_topo, _raw_pending.window_topo)
+	_raw_pending.av = prepend(buffers.av, _raw_pending.av)
+	_clipboard.pending = prepend(buffers.clipboard, _clipboard.pending)
 	-- A reentrant activation can retire text while this source is detached.
 	-- Nil acquisition owns no append: purge before clearing the reservation or
 	-- a subsequent known-OFF observation would resurrect the revoked source.
@@ -3217,7 +3345,8 @@ local function dispatch_flush(close_session)
 	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
 		and #payload.raw.llm == 0 and #payload.raw.switches == 0 and #payload.raw.windows == 0
 		and #payload.raw.sessions == 0 and #payload.raw.system == 0 and #payload.raw.media == 0
-		and #payload.raw.network == 0 and #payload.raw.roi == 0
+		and #payload.raw.network == 0 and #payload.raw.clipboard == 0 and #payload.raw.roi == 0
+		and #payload.raw.window_topo == 0 and #payload.raw.av == 0
 		and #payload.upserts == 0 then
 		_last_flush_committed = true
 		prune_calendar(snapshot.calendar)
@@ -3231,7 +3360,8 @@ local function dispatch_flush(close_session)
 	_pending_typing_events, _pending_hotstring_events = {}, {}
 	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 	_pending_llm_events = {}
-	_pending_network_events = {}
+	_raw_pending.network, _raw_pending.window_topo, _raw_pending.av = {}, {}, {}
+	_clipboard.pending = {}
 	Roi.pending = {}
 	_pending_window_switch_events = {}
 	_pending_session_events = {}
@@ -3271,7 +3401,7 @@ local function flush_json()
 
 	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
 
-	local FileSystem = require("adapters.file_system")
+	local FileSystem = require("core.fs.adapters.file_system")
 	local previous, status, read_err = FileSystem.read_with_status(path)
 	if status ~= "ok" and status ~= "absent" then
 		Logger.error(LOG, "flush(): cannot read the previous summary at '%s' — %s.", path, tostring(read_err or status))
@@ -3443,7 +3573,9 @@ end
 --- Whether fresh capture still needs a durable reset boundary.
 has_reset_input = function()
 	return next(_pending_typing_events) ~= nil or #_pending_hotstring_events > 0
-		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_pending_network_events > 0 or #Roi.pending > 0
+		or #_pending_shortcut_events > 0 or #_pending_llm_events > 0 or #_raw_pending.network > 0
+		or #_clipboard.pending > 0 or #Roi.pending > 0
+		or #_raw_pending.window_topo > 0 or #_raw_pending.av > 0
 		or #_pending_window_switch_events > 0 or #_pending_session_events > 0
 		or #_pending_system_events > 0 or #_pending_app_switch_events > 0
 end
@@ -3564,18 +3696,18 @@ end
 --- Takes the Export copy of the settled store.
 --- @param request table The owned request.
 function _maintenance.export(request)
-	local Maintenance = require("keystats.metrics_maintenance")
+	local Maintenance = require("metrics.engine.maintenance")
 	local folder, reason = Maintenance.downloads_dir(os.getenv)
 	if not folder then
 		Logger.error(LOG, "Metrics export has no destination: %s.", reason)
 		return _maintenance.finish(request, false)
 	end
-	if not require("adapters.file_system").exists(folder) then
+	if not require("core.fs.adapters.file_system").exists(folder) then
 		Logger.error(LOG, "Metrics export destination %s does not exist.", folder)
 		return _maintenance.finish(request, false)
 	end
 	local path = folder .. "/" .. Maintenance.export_file_name(os.time())
-	local sql = require("keystats.queries").render("export.vacuum_into", "cli_json", { path = path })
+	local sql = require("metrics.engine.queries").render("export.vacuum_into", "cli_json", { path = path })
 	local copied = SqliteWriter.exec_sql(sql) == true
 	_maintenance.finish(request, copied, copied and path or nil)
 end
@@ -3603,8 +3735,11 @@ function _maintenance.advance()
 			end
 			return _maintenance.finish(request, _last_flush_committed == true)
 		end
-		local Maintenance = require("keystats.metrics_maintenance")
+		local Maintenance = require("metrics.engine.maintenance")
 		request.tombstone = Maintenance.tombstone(Calendar.capture().wall_ms / 1000)
+		-- Linux rows stamp ts in UTC; the writer stores the offset of that
+		-- instant, from which the purge reads the tombstone's local time (KMD-1).
+		request.tombstone.ts = request.tombstone.metadata.utc
 		_pending_system_events[#_pending_system_events + 1] = request.tombstone
 		flush_dispatch()
 	end)
@@ -3623,7 +3758,7 @@ end
 --- @param complete function Receives success and, for an Export, its path.
 --- @return boolean accepted Whether this request owns its completion.
 function M.request_metrics_maintenance(kind, complete)
-	if not require("keystats.metrics_maintenance").KINDS[kind] or type(complete) ~= "function" then
+	if not require("metrics.engine.maintenance").KINDS[kind] or type(complete) ~= "function" then
 		Logger.error(LOG, "Metrics maintenance needs a known kind and a completion callback.")
 		return false
 	end
@@ -3706,7 +3841,7 @@ end
 --- @return integer
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_llm_events
-		+ #_pending_network_events + #Roi.pending
+		+ #_raw_pending.network + #_clipboard.pending + #Roi.pending + #_raw_pending.window_topo + #_raw_pending.av
 		+ #_pending_app_switch_events + #_pending_window_switch_events
 	for _, stream in pairs(_pending_typing_events) do
 		for _, pending in ipairs(stream.runs) do count = count + #pending.events end

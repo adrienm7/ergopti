@@ -4,14 +4,14 @@
 --- MODULE: LLM Menu Persistence Tests (Hammerspoon)
 --- DESCRIPTION:
 --- Ensures every LLM menu setting mapped in infra/preferences.lua is written
---- to config.toml and read back. Contract: _shared/modules/llm/menu_persistence_contract.json
+--- to config.toml and read back. Contract: _shared/ai/data/menu_persistence_contract.json
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local fixture = require("tests.support.preferences_roundtrip_fixture")
 
 local function contract_path()
-	return helpers.shared("modules/llm/menu_persistence_contract.json")
+	return helpers.shared("ai/data/menu_persistence_contract.json")
 end
 
 local function load_contract()
@@ -145,7 +145,7 @@ helpers.describe("LLM menu persistence — disk round-trip", function()
 				expected, expected_disk = nil, nil
 			end
 			fixture.with_roundtrip({ [hs.flat_key] = hs.sample }, function(flat, _, tmp)
-				local codec = helpers.load_with_stubs("infra.toml.codec")
+				local codec = helpers.load_with_stubs("core.text.engine.toml.codec")
 				local got = flat[hs.flat_key]
 				local flat_ok = values_equal(expected, got, hs)
 				helpers.assert_true(

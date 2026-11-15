@@ -228,7 +228,7 @@ FmtCount(N) {
 NoAction(*) {
 }
 ; Frames a translated title as a disabled menu section header. The frame is the
-; one format of _shared/modules/menu/section_header.json, which macOS and Linux
+; one format of _shared/menu/data/section_header.json, which macOS and Linux
 ; read through menu.labels too.
 MenuSectionTitle(Text) {
 		return MENU_SECTION_HEADER_PREFIX . Text . MENU_SECTION_HEADER_SUFFIX

@@ -39,13 +39,13 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 		}
 	}
 
-	/// static/ergopti_plus/_shared/data/locales, found from this file.
+	/// static/ergopti_plus/_shared/core/i18n/data/locales, found from this file.
 	private static let localesDirectory: String = {
 		var url = URL(fileURLWithPath: #filePath)
 		for _ in 0..<5 {
 			url.deleteLastPathComponent()
 		}
-		return url.appendingPathComponent("_shared/data/locales").path
+		return url.appendingPathComponent("_shared/core/i18n/data/locales").path
 	}()
 
 	private static func localization(_ code: String) throws -> LauncherLocalization {
@@ -250,12 +250,14 @@ final class CatalogUpdateUserDriverTests: XCTestCase {
 	private static func nativeCaption(_ label: String) throws -> String {
 		let manifestURL = URL(fileURLWithPath: localesDirectory)
 			.deletingLastPathComponent().deletingLastPathComponent()
+			.deletingLastPathComponent().deletingLastPathComponent()
 			.appendingPathComponent("ui/apps.manifest.json")
 		let data = try Data(contentsOf: manifestURL)
 		let manifest = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-		let policy = try XCTUnwrap(manifest["window_title"] as? [String: String])
-		let prefix = try XCTUnwrap(policy["prefix"])
-		let separator = try XCTUnwrap(policy["separator"])
+		// The policy also lists product_names, an array: read its two strings one by one.
+		let policy = try XCTUnwrap(manifest["window_title"] as? [String: Any])
+		let prefix = try XCTUnwrap(policy["prefix"] as? String)
+		let separator = try XCTUnwrap(policy["separator"] as? String)
 		return prefix.isEmpty ? label : prefix + separator + label
 	}
 

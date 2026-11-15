@@ -28,10 +28,10 @@
 local M = {}
 
 local hs     = hs
-local Logger = require("infra.logger")
-local FileSystem = require("adapters.file_system")
-local text_utils = require("infra.text_utils")
-local DeferredWork = require("infra.deferred_work")
+local Logger = require("core.logger.engine.logger")
+local FileSystem = require("core.fs.adapters.file_system")
+local text_utils = require("core.text.engine.utils")
+local DeferredWork = require("core.timing.engine.deferred_work")
 local LOG    = "personal_shortcuts"
 
 

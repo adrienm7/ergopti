@@ -11,7 +11,7 @@
 local helpers = require("tests.helpers")
 local Destination = require("tests.support.text_destination_receipt")
 local with_sender = require("tests.support.text_sender_fixture")
-require("logger")
+require("core.logger.engine")
 
 local function with_plain(callback)
 	helpers.with_stub_scope({
@@ -23,8 +23,8 @@ local function with_plain(callback)
 			local board = f.hs_overrides.pasteboard
 			board.getContents = function() return f.clipboard()["public.utf8-plain-text"] end
 			hs.pasteboard.getContents = board.getContents
-			package.loaded["infra.paths"] = { shared = function() return nil end }
-			package.loaded["infra.timings"] = { sec = function() return 0.01 end }
+			package.loaded["core.fs.engine.paths"] = { shared = function() return nil end }
+			package.loaded["core.timing.engine.timings"] = { sec = function() return 0.01 end }
 			Destination.install()
 			f.text = require("modules.shortcuts.actions.text")
 			function f.step()

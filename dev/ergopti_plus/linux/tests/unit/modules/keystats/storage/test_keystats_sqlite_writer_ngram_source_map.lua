@@ -104,8 +104,8 @@ helpers.describe("linux-sqlite-ngram-source-encoding", function()
 				-- SQL quotes are doubled after JSON encoding; restore only that outer layer.
 				source_json = source_json:gsub("''", "'")
 				local expected = { [case[2]] = 2 }
-				helpers.assert_eq(require("json").decode(source_json), expected)
-				helpers.assert_eq(source_json, require("json").encode(expected))
+				helpers.assert_eq(require("core.text.engine.json").decode(source_json), expected)
+				helpers.assert_eq(source_json, require("core.text.engine.json").encode(expected))
 			end)
 		end)
 	end
@@ -117,7 +117,7 @@ helpers.describe("linux-sqlite-ngram-source-encoding", function()
 			}))
 			local source_json = statements[1]:match(",2,0,0,0,'(.-)'%)")
 			helpers.assert_type(source_json, "string")
-			helpers.assert_eq(require("json").decode(source_json), { ["addon\n"] = 2, [""] = 0 })
+			helpers.assert_eq(require("core.text.engine.json").decode(source_json), { ["addon\n"] = 2, [""] = 0 })
 		end)
 	end)
 end)
@@ -267,13 +267,13 @@ end)
 
 helpers.describe("keystats-device-log-privacy", function()
 	helpers.it("keystats-device-log-privacy: native registration receipt keeps identity only in SQL", function()
-		local previous_logger, previous_writer = package.loaded["logger.shim"], package.loaded["modules.keystats.sqlite_writer"]
+		local previous_logger, previous_writer = package.loaded["core.logger.engine.shim"], package.loaded["modules.keystats.sqlite_writer"]
 		local messages, registration_requests = {}, 0
 		local logger = {}
 		for _, level in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 			logger[level] = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
 		end
-		package.loaded["logger.shim"] = logger
+		package.loaded["core.logger.engine.shim"] = logger
 		local ok, err = xpcall(function()
 			with_writer_read_receipts(function(command)
 				if command:find("INSERT INTO devices", 1, true) then
@@ -291,7 +291,7 @@ helpers.describe("keystats-device-log-privacy", function()
 				helpers.assert_nil(messages[1]:find("private-host-identity", 1, true))
 			end)
 		end, debug.traceback)
-		package.loaded["logger.shim"], package.loaded["modules.keystats.sqlite_writer"] = previous_logger, previous_writer
+		package.loaded["core.logger.engine.shim"], package.loaded["modules.keystats.sqlite_writer"] = previous_logger, previous_writer
 		if not ok then error(err, 0) end
 	end)
 end)
@@ -357,7 +357,7 @@ end)
 
 helpers.describe("SQLite flush native capability", function()
 	it("refuses absent luv before any reservation or native ownership", function()
-		local name = "infra.sqlite_batch_process"
+		local name = "core.fs.engine.sqlite_batch_process"
 		local previous = package.loaded[name]
 		package.loaded[name] = { is_available = function() return false end,
 			start = function() error("unavailable transport dispatched") end }
@@ -378,7 +378,7 @@ end)
 
 helpers.describe("SQLite terminal flush retry fence", function()
 	it("cannot acquire another child after committed cleanup dispatch is refused", function()
-		local name, calls = "infra.sqlite_batch_process", 0
+		local name, calls = "core.fs.engine.sqlite_batch_process", 0
 		local previous = package.loaded[name]
 		package.loaded[name] = { is_available = function() return true end,
 			start = function()

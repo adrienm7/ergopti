@@ -31,7 +31,7 @@ end
 
 helpers.describe("AI actions are unarmed with the AI off (ai-off-inert-macos)", function()
 	helpers.it("names the llm_ actions and only those, and follows the engine's switch", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.shortcuts.ai_actions"] = nil
 		local AiActions = require("modules.shortcuts.ai_actions")
 		helpers.assert_eq(AiActions.is_ai_action("llm_agent_command"), true)
@@ -46,7 +46,7 @@ helpers.describe("AI actions are unarmed with the AI off (ai-off-inert-macos)", 
 	end)
 
 	helpers.it("blocks an AI action when no engine is loaded", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.shortcuts.ai_actions"] = nil
 		local AiActions = require("modules.shortcuts.ai_actions")
 		local previous = package.loaded[ENGINE]
@@ -57,7 +57,7 @@ helpers.describe("AI actions are unarmed with the AI off (ai-off-inert-macos)", 
 	end)
 
 	helpers.it("notifies every layer, and one failing layer does not stop the others", function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["modules.shortcuts.ai_actions"] = nil
 		local AiActions = require("modules.shortcuts.ai_actions")
 		local seen = {}
@@ -85,7 +85,7 @@ end)
 --- Loads the real owner with an AI slot and a plain one over a recording registrar.
 local function load_keyboard()
 	local enabled, order = {}, {}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			local handle = "handle:" .. chord
 			enabled[handle] = true
@@ -95,16 +95,16 @@ local function load_keyboard()
 		unbind = function(handle) enabled[handle] = nil return true end,
 		setEnabled = function(handle, want) enabled[handle] = want == true return true end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"},{"id":"b","label":"B"}]}' end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return "catalogue.json" end }
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.fs.engine.paths"] = { shared = function() return "catalogue.json" end }
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["modules.gestures.actions"] = {
 		is_assignable = function(action_id) return type(action_id) == "string" end,
 		execute_single = function() end,
 	}
-	package.loaded["adapters.storage"] = nil
+	package.loaded["core.fs.adapters.storage"] = nil
 	package.loaded["modules.shortcuts.ai_actions"] = nil
 	package.loaded["modules.shortcuts.keyboard_shortcuts"] = nil
 	require("tests.support.keyboard_config_fixture").install(
@@ -149,9 +149,9 @@ end)
 helpers.describe("AI tap keys (ai-off-inert-macos)", function()
 	helpers.it("lets the key through while the AI is off, runs the action once on", function()
 		with_ai(function(state)
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
-			package.loaded["adapters.file_system"] = nil
-			package.loaded["infra.paths"] = nil
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
+			package.loaded["core.fs.adapters.file_system"] = nil
+			package.loaded["core.fs.engine.paths"] = nil
 			package.loaded["modules.shortcuts.ai_actions"] = nil
 			package.loaded["modules.shortcuts.tap_keys"] = nil
 			local TapKeys = require("modules.shortcuts.tap_keys")
@@ -190,7 +190,7 @@ end)
 helpers.describe("The action picker greys the agent's manual actions (ai-off-picker)", function()
 	helpers.it("greys them with the AI notice while the AI is off and offers them once on", function()
 		with_ai(function(state)
-			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["modules.shortcuts.ai_actions"] = nil
 			package.loaded["ui.menu.shortcut_utils"] = nil
 			local utils = require("ui.menu.shortcut_utils")
@@ -210,8 +210,8 @@ helpers.describe("The action picker greys the agent's manual actions (ai-off-pic
 				utils.picker_parameter_fields(gestures, items, nil)
 				return items
 			end
-			local notice = require("infra.i18n").get("dialog.action_picker.requires_ai")
-			helpers.assert_true(notice ~= require("infra.i18n").get("llm.manual_prediction.disabled"),
+			local notice = require("core.i18n.engine.i18n").get("dialog.action_picker.requires_ai")
+			helpers.assert_true(notice ~= require("core.i18n.engine.i18n").get("llm.manual_prediction.disabled"),
 				"the greyed row has its own AI-off hint, not the suggestions notice")
 			local off = rows()
 			for index = 1, 2 do

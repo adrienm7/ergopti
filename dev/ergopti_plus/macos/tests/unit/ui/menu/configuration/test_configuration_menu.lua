@@ -12,12 +12,8 @@
 --- Startup and Uninstall moved to Version / Updates
 --- (test_menu_about_uninstall.lua), with no separator left dangling here.
 ---
---- PAUSE GATING, carried over from the global actions: pause owns the bindings
---- axis for the whole pause window — pause_all() snapshots what was running and
---- resume_all() restores that snapshot — so a row that rewrites the
---- configuration mid-pause is either discarded on resume or breaks « pause =
---- tout éteint ». Those three rows are greyed AND stripped of their handler
---- while paused; the rows that only open a window stay live.
+--- PAUSE GATING: a pause stops typing, not configuration (EDD-1, maintainer
+--- decision 2026-11-12), so every Configuration row stays live while paused.
 ---
 --- Driven through Builder.generate, so the assertion is on what the menu offers.
 --- ==============================================================================
@@ -38,14 +34,15 @@ local EXPECTED = {
 }
 
 -- The rows that rewrite the configuration, and the action each one runs.
-local GATED = {
-	["common.restore_recommended"]   = "reset_defaults",
-	["common.clear_to_system"]       = "clear_to_system",
-	["menu.global.clean_unused_keys"] = "clean_unused_keys",
-}
+local GATED = {}
 
 -- Rows that do not modify the running keyboard, and the action each one runs.
+-- A pause stops typing, not configuration (EDD-1, maintainer decision
+-- 2026-11-12): the whole-configuration restore and clear stay live.
 local LIVE = {
+	["common.restore_recommended"] = "reset_defaults",
+	["common.clear_to_system"]     = "clear_to_system",
+	["menu.global.clean_unused_keys"] = "clean_unused_keys",
 	["menu.global.config_folder"] = "open_paths",
 	["menu.global.setup_wizard"]  = "show_setup_wizard",
 }
@@ -65,7 +62,7 @@ end
 --- @return table|nil rows
 local function configuration_rows(paused, fired)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
 	local ok, menu = pcall(builder.generate, { config = { log_level = 2 }, paused = paused }, {},
@@ -123,7 +120,7 @@ end)
 -- ================================
 
 helpers.describe("configuration submenu (macOS): a pause gates what rewrites the configuration", function()
-	helpers.it("greys the three rewriting rows and keeps independent actions live", function()
+	helpers.it("keeps every Configuration row live while paused (edd1-paused-writes)", function()
 		local fired = {}
 		local rows = configuration_rows(true, fired)
 		helpers.assert_true(type(rows) == "table", "the Configuration submenu stays reachable while paused")
@@ -139,8 +136,8 @@ helpers.describe("configuration submenu (macOS): a pause gates what rewrites the
 				helpers.assert_eq(type(row.fn), "function", row.title .. " must keep its handler")
 			end
 		end
-		helpers.assert_eq(gated, 3, "the three rewriting rows must be drawn")
-		helpers.assert_eq(live, 2, "all independent rows must be drawn")
+		helpers.assert_eq(gated, 0, "no Configuration row greys while paused")
+		helpers.assert_eq(live, 5, "all live rows must be drawn")
 		helpers.assert_eq(#fired, 0, "building the menu must not run any action")
 	end)
 end)
@@ -160,7 +157,7 @@ end)
 --- @return table|nil rows
 local function rows_with_karabiner(enabled, calls)
 	local builder = helpers.load_with_stubs("ui.menu.builder")
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	i18n.get = function(key) return key end
 	i18n.build_language_menu_items = function() return {} end
 	local karabiner = {
@@ -224,11 +221,11 @@ end)
 --- @param body function Independent source and finished-row assertions.
 local function configuration_parent_fixture(body)
 	local saved = {}
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
-	helpers.load_with_stubs("infra.paths")
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do saved[name] = package.loaded[name] end
+	helpers.load_with_stubs("core.fs.engine.paths")
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = nil end
 	local native = require("ui.menu.builder")
-	local renderer, locale = require("infra.manifest_menu"), require("infra.locale")
+	local renderer, locale = require("infra.manifest_menu"), require("core.i18n.engine.locale")
 	local language = locale.current_locale()
 	local callbacks, actions = {}, {}
 	local getter_observer = { calls = 0 }
@@ -245,12 +242,12 @@ local function configuration_parent_fixture(body)
 	local function build(paused) return native.generate({ paused = paused }, {}, published_actions) end
 	local ok, detail = xpcall(function() body(renderer, build, callbacks, locale, getter_observer) end, debug.traceback)
 	locale.set_locale(language)
-	for _, name in ipairs({ "ui.menu.builder", "infra.i18n", "infra.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
+	for _, name in ipairs({ "ui.menu.builder", "core.i18n.engine.i18n", "core.i18n.engine.locale", "infra.manifest_menu" }) do package.loaded[name] = saved[name] end
 	if not ok then error(detail, 0) end
 end
 
-local configuration_parent_file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
+local configuration_parent_file = assert(io.open(require("core.fs.engine.paths").shared("tests/corpus/menus/configuration_parent.json"), "rb"))
 local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
-require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
-	assert(require("adapters.json_codec").decode(configuration_parent_raw)), "hs")
+require("tests.lua.settings.configuration_parent_contract").register(helpers, configuration_parent_fixture,
+	assert(require("core.fs.adapters.json_codec").decode(configuration_parent_raw)), "hs")

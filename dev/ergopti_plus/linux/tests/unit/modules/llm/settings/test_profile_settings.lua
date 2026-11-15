@@ -9,7 +9,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local RegistryCodec = require("llm.profile_registry_codec")
+local RegistryCodec = require("ai.engine.settings.profile_registry_codec")
 
 
 --- Binds the actual idle live owner without replacing the profile/save collaborators.
@@ -83,7 +83,7 @@ helpers.describe("model profile recommendation: shared policy", function()
 		local catalogue = { 42, { families = 12 }, { families = { false, { models = 1 },
 			{ models = { 42, { name = "Valid", type = "completion" } } } } } }
 		local policy = { advanced_min_parameters_b = 2, batch_min_parameters_b = 4 }
-		local logger = require("logger.shim")
+		local logger = require("core.logger.engine.shim")
 		local original, warnings = logger.warn, {}
 		logger.warn = function(_, message) warnings[#warnings + 1] = message end
 		local ok, err = pcall(function()
@@ -302,7 +302,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			"the registered model-browser bridge needs a production menu caller")
 		helpers.assert_eq(browse.fn(), true)
 		helpers.assert_eq(opened_window, "model_browser")
-		local create = find(menu, require("infra.i18n").get("menu.profiles.create_profile"))
+		local create = find(menu, require("core.i18n.engine.i18n").get("menu.profiles.create_profile"))
 		helpers.assert_not_nil(create,
 			"the shared editor needs a production caller, not only a registered bridge")
 		helpers.assert_eq(type(create.fn), "function")
@@ -310,13 +310,11 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		helpers.assert_eq(opened.existing, nil)
 		helpers.assert_true(opened.opts.profile_id:match("^user_") ~= nil)
 		helpers.assert_eq(editor_calls, 1)
+		-- A pause stops typing, not configuration (EDD-1, maintainer decision
+		-- 2026-11-12): a retained Create callback opens the editor while paused.
 		paused = true
-		helpers.assert_eq(create.fn(), false,
-			"a retained Create callback must re-read the native pause owner")
-		helpers.assert_eq(editor_calls, 1, "the paused callback cannot reach the editor")
-		helpers.assert_eq(opened.on_save({ id = opened.opts.profile_id,
-			label = "Refused", system_single = "Refused", batch = false }), false,
-			"a retained editor save must not publish while paused")
+		helpers.assert_eq(create.fn(), true, "a retained Create callback runs while paused")
+		helpers.assert_eq(editor_calls, 2, "the paused callback reaches the editor")
 		helpers.assert_eq(#settings.list_user(), 0)
 		helpers.assert_eq(rebuilds, 0)
 		paused = false
@@ -339,7 +337,7 @@ helpers.describe("LLM user profiles: tray reachability", function()
 		menu = menu_builder.build(context)
 		local custom = find(menu, "Menu custom")
 		helpers.assert_not_nil(custom)
-		local edit = find(custom.menu, require("infra.i18n").get("menu.profiles.edit_profile"))
+		local edit = find(custom.menu, require("core.i18n.engine.i18n").get("menu.profiles.edit_profile"))
 		helpers.assert_not_nil(edit)
 		helpers.assert_eq(edit.fn(), true)
 		helpers.assert_eq(opened.existing.id, created_id)
@@ -350,22 +348,22 @@ helpers.describe("LLM user profiles: tray reachability", function()
 			batch = false,
 		}), true)
 		helpers.assert_eq(settings.list_user()[1].label, "Menu updated")
-		local Paths = require("infra.paths")
-		local Json = require("json")
-		local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
+		local Paths = require("core.fs.engine.paths")
+		local Json = require("core.text.engine.json")
+		local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
 		local document = Json.decode(file:read("*a"))
 		file:close()
 		document.llm_profile_commands[1].i18n = "button.cancel"
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = "linux",
-			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
 			json_decode = function() return document end,
-			i18n = require("infra.i18n"),
-			logger = require("logger.shim"),
+			i18n = require("core.i18n.engine.i18n"),
+			logger = require("core.logger.engine.shim"),
 		}))
 		replace("infra.manifest_menu", renderer)
 		menu_builder = helpers.load_module("ui.menu.builder")
-		local changed = find(menu_builder.build(context), require("infra.i18n").get("button.cancel"))
+		local changed = find(menu_builder.build(context), require("core.i18n.engine.i18n").get("button.cancel"))
 		helpers.assert_not_nil(changed, "the actual Create provider follows its changed declaration")
 		editor_accepted = false
 		helpers.assert_eq(changed.fn(), false)
@@ -393,7 +391,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 		for index, profile in ipairs(settings.list_built_in()) do ids[index] = profile.id end
 		helpers.assert_eq(table.concat(ids, ","),
 			"raw,basic,advanced,batch_advanced,rewrite,tone_familiar,tone_neutral,tone_formal,tone_very_formal,translate_en,translate_ja")
-		helpers.assert_true(require("llm.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
+		helpers.assert_true(require("ai.engine.prediction.rewrite").is_rewrite_profile(settings.resolve_id("rewrite")),
 			"the rewrite built-in is recognised by its prompt")
 		helpers.assert_true(settings.set("active", "rewrite", "small"), "and selectable like the others")
 		restore()
@@ -415,7 +413,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 
 	helpers.it("labels a profile as the menu lists it, filling only the placeholders it has", function()
 		local settings = load_settings()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local basic = settings.resolve_id("basic")
 		helpers.assert_eq(settings.menu_label(basic, 3), i18n.get("llm.profile.basic.label"),
 			"a label without {n} gets no count appended")
@@ -448,7 +446,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 						if nested then return nested end
 					end
 				end
-				local i18n = require("infra.i18n")
+				local i18n = require("core.i18n.engine.i18n")
 				local rewrite = find(menu, i18n.get("llm.profile.rewrite.label"))
 				helpers.assert_not_nil(rewrite, "the rewrite prompt has its row")
 				helpers.assert_not_nil(find(menu, i18n.get("llm.profile.basic.label")),
@@ -463,7 +461,7 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 end)
 
 helpers.describe("shared Clone Profile command", function()
-	helpers.it("shared Clone Profile preserves editor refusal, live pause and exact save acknowledgement", function()
+	helpers.it("shared Clone Profile preserves editor refusal, opens while paused and keeps the exact save acknowledgement", function()
 		local ok, err = xpcall(function()
 			local storage_options = {}
 			local storage = PreferencesFixture.new(storage_options)
@@ -501,7 +499,7 @@ helpers.describe("shared Clone Profile command", function()
 				end
 				return nil
 			end
-			local i18n = require("infra.i18n")
+			local i18n = require("core.i18n.engine.i18n")
 			local builder = helpers.load_module("ui.menu.builder")
 			local row = find(builder.build(context), i18n.get("menu.profiles.clone_builtin"))
 			helpers.assert_not_nil(row)
@@ -510,11 +508,11 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_not_nil(opened.existing)
 			helpers.assert_eq(opened.opts.as_new, true)
 			helpers.assert_eq(#settings.list_user(), 0, "opening the existing native clone draft does not publish it")
+			-- A pause stops typing, not configuration (EDD-1): the row opens while paused.
 			paused = true
-			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(row.fn(), true)
+			helpers.assert_eq(calls, 2)
 			local profile = { id = opened.opts.profile_id, label = "Cloned", system_single = "Clone {context}", batch = false }
-			helpers.assert_eq(opened.on_save(profile), false)
 			helpers.assert_eq(#settings.list_user(), 0)
 			helpers.assert_eq(refreshes, 0)
 			paused = false
@@ -529,29 +527,29 @@ helpers.describe("shared Clone Profile command", function()
 			helpers.assert_eq(refreshes, 1)
 			accepted = false
 			helpers.assert_eq(row.fn(), false)
-			helpers.assert_eq(calls, 1, "the already committed menu draft cannot open another editor")
+			helpers.assert_eq(calls, 2, "the already committed menu draft cannot open another editor")
 			helpers.assert_eq(refreshes, 1)
 			helpers.assert_eq(settings.set("active", "basic"), true,
 				"the conditional Clone row requires a real active built-in before rebuilding")
 			local fresh_clone = assert(find(builder.build(context), i18n.get("menu.profiles.clone_builtin")))
 			helpers.assert_eq(fresh_clone.fn(), false, "a fresh row still preserves native editor refusal")
-			helpers.assert_eq(calls, 2)
-			local Paths = require("infra.paths")
-			local file = assert(io.open(Paths.shared("modules/menu/menu_manifest.json"), "r"))
-			local manifest = require("json").decode(file:read("*a"))
+			helpers.assert_eq(calls, 3)
+			local Paths = require("core.fs.engine.paths")
+			local file = assert(io.open(Paths.shared("menu/data/menu_manifest.json"), "r"))
+			local manifest = require("core.text.engine.json").decode(file:read("*a"))
 			file:close()
 			for _, declaration in ipairs(manifest.llm_profile_commands) do
 				if declaration.id == "llm_profile_clone" then declaration.i18n = "button.cancel" end
 			end
-			replace("infra.manifest_menu", assert(require("menu.renderer").new({
-				platform = "linux", manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
-				json_decode = function() return manifest end, i18n = i18n, logger = require("logger.shim"),
+			replace("infra.manifest_menu", assert(require("menu.engine.renderer").new({
+				platform = "linux", manifest_path = function() return Paths.shared("menu/data/menu_manifest.json") end,
+				json_decode = function() return manifest end, i18n = i18n, logger = require("core.logger.engine.shim"),
 			})))
 			builder = helpers.load_module("ui.menu.builder")
 			local changed = find(builder.build(context), i18n.get("button.cancel"))
 			helpers.assert_not_nil(changed, "the real Clone provider must follow only the shared declaration")
 			helpers.assert_eq(changed.fn(), false)
-			helpers.assert_eq(calls, 3)
+			helpers.assert_eq(calls, 4)
 			helpers.assert_eq(refreshes, 1)
 		end, debug.traceback)
 		restore()
@@ -611,7 +609,7 @@ helpers.describe("Linux automatic profile toggle: actual menu owner", function()
 			replace("ui.menu.builder", nil)
 			local builder = helpers.load_module("ui.menu.builder")
 			local menu = builder.build(context)
-			local row = find(menu, require("infra.i18n").get("menu.profiles.auto_detect"))
+			local row = find(menu, require("core.i18n.engine.i18n").get("menu.profiles.auto_detect"))
 			helpers.assert_not_nil(row, "the actual profile provider exposes its checkbox")
 			helpers.assert_type(row.fn, "function")
 			body({
@@ -674,19 +672,18 @@ helpers.describe("Linux automatic profile toggle: actual menu owner", function()
 		end)
 	end)
 
-	helpers.it("autodetect-toggle: live pause refuses a held command before writing", function()
+	-- A pause stops typing, not configuration (EDD-1): the check commits while paused.
+	helpers.it("autodetect-toggle: a held command publishes while paused (edd1-paused-writes)", function()
 		with_menu({ initial = true }, function(fixture)
 			fixture.set_paused(true)
-			local accepted = fixture.row.fn()
-			helpers.assert_eq(accepted, false)
-			helpers.assert_eq(#fixture.writes, 0)
-			helpers.assert_eq(fixture.redraws(), 0)
-			helpers.assert_eq(fixture.settings.get("auto_profile_for_model"), true)
-			helpers.assert_eq(fixture.storage.get(KEY), true)
+			helpers.assert_eq(fixture.row.fn(), true)
+			helpers.assert_eq(#fixture.writes, 1)
+			helpers.assert_eq(fixture.settings.get("auto_profile_for_model"), false)
+			helpers.assert_eq(fixture.storage.get(KEY), false)
 		end)
 	end)
 
-	helpers.it("autodetect-toggle: pause reentry during the live read cannot reach publication", function()
+	helpers.it("autodetect-toggle: a pause beginning during the live read still publishes (edd1-paused-writes)", function()
 		with_menu({ initial = true }, function(fixture)
 			local get = fixture.settings.get
 			fixture.settings.get = function(name)
@@ -696,10 +693,8 @@ helpers.describe("Linux automatic profile toggle: actual menu owner", function()
 			end
 			local accepted = fixture.row.fn()
 			fixture.settings.get = get
-			helpers.assert_eq(accepted, false)
-			helpers.assert_eq(#fixture.writes, 0)
-			helpers.assert_eq(fixture.redraws(), 0)
-			helpers.assert_eq(fixture.settings.get("auto_profile_for_model"), true)
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(fixture.settings.get("auto_profile_for_model"), false)
 		end)
 	end)
 

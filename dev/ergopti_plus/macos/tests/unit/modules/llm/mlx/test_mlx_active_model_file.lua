@@ -10,17 +10,17 @@
 --- =============================================================================
 
 local helpers = require("tests.helpers")
-local AppDirs = require("app_dirs")
+local AppDirs = require("core.fs.engine.app_dirs")
 
 local MODULES = {
-	"adapters.file_system",
-	"adapters.http_client",
-	"adapters.json_codec",
-	"adapters.shell_runner",
-	"adapters.timer_scheduler",
+	"core.fs.adapters.file_system",
+	"core.network.adapters.http_client",
+	"core.fs.adapters.json_codec",
+	"core.process.adapters.shell_runner",
+	"core.events.timer_scheduler",
 	"infra.config_paths",
-	"infra.logger",
-	"infra.timings",
+	"core.logger.engine.logger",
+	"core.timing.engine.timings",
 	"modules.llm.api_common",
 	"modules.llm.api_mlx_discovery",
 }
@@ -41,7 +41,7 @@ local function with_fixture(run)
 	}
 	local effects = { raw_opens = {}, reads = 0, classifications = 0 }
 
-	package.loaded["infra.logger"] = {
+	package.loaded["core.logger.engine.logger"] = {
 		debug = function() end,
 		info = function() end,
 		warn = function() end,
@@ -53,7 +53,7 @@ local function with_fixture(run)
 			return secure_path
 		end,
 	}
-	package.loaded["adapters.file_system"] = {
+	package.loaded["core.fs.adapters.file_system"] = {
 		classify_no_follow = function(path)
 			effects.classifications = effects.classifications + 1
 			helpers.assert_eq(path, secure_path)
@@ -67,14 +67,14 @@ local function with_fixture(run)
 			return content, "ok"
 		end,
 	}
-	package.loaded["adapters.http_client"] = { new = function() return {} end }
-	package.loaded["adapters.json_codec"] = {
+	package.loaded["core.network.adapters.http_client"] = { new = function() return {} end }
+	package.loaded["core.fs.adapters.json_codec"] = {
 		encode = function() return "{}" end,
 		decode = function() return {} end,
 	}
-	package.loaded["adapters.shell_runner"] = {}
-	package.loaded["adapters.timer_scheduler"] = {}
-	package.loaded["infra.timings"] = { sec = function() return 1 end }
+	package.loaded["core.process.adapters.shell_runner"] = {}
+	package.loaded["core.events.timer_scheduler"] = {}
+	package.loaded["core.timing.engine.timings"] = { sec = function() return 1 end }
 	package.loaded["modules.llm.api_common"] = {
 		protected_call = function(callback, _, ...)
 			if type(callback) ~= "function" then return false end
@@ -108,7 +108,7 @@ local function with_fixture(run)
 
 	io.open = original_open
 	for _, name in ipairs(MODULES) do package.loaded[name] = saved[name] end
-	package.loaded["adapters.shell_runner"] = saved["adapters.shell_runner"]
+	package.loaded["core.process.adapters.shell_runner"] = saved["core.process.adapters.shell_runner"]
 	if not ok then error(detail, 0) end
 end
 

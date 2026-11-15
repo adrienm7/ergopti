@@ -151,7 +151,7 @@ helpers.describe("Tap-Hold settings edited while the switch is off", function()
 					"an edit with the switch off is a settings change, not a refused deploy")
 				helpers.assert_eq(result, true, "reason: " .. tostring(reason))
 				helpers.assert_eq(reason, "persisted-integration-off")
-				helpers.assert_true(calls.save >= 1, "the edit must reach config_karabiner.toml")
+				helpers.assert_true(calls.save >= 1, "the edit must reach tap_hold.toml")
 				helpers.assert_eq(calls.saved_enabled[#calls.saved_enabled], false,
 					"a settings edit must not decide the switch")
 				helpers.assert_eq(calls.build, 0,

@@ -30,7 +30,7 @@ helpers.describe("typing metrics cache reads", function()
 			local previous_open, previous_remove, previous_rename = io.open, os.remove, os.rename
 			local ok, err = xpcall(function()
 				Scope.run(function()
-					package.loaded["adapters.file_system"] = {
+					package.loaded["core.fs.adapters.file_system"] = {
 						read_with_status = function(path, report)
 							if mode == "dependency" then error("PRIVATE_CACHE_PATH") end
 							if mode == "unreported_error" then return nil, "error", "PRIVATE_CACHE_PATH" end
@@ -60,7 +60,7 @@ helpers.describe("typing metrics cache reads", function()
 						fresh_reads = fresh_reads + 1
 						return nil
 					end
-					package.loaded["infra.logger"].warn = function(_, message, ...)
+					package.loaded["core.logger.engine.logger"].warn = function(_, message, ...)
 						warnings[#warnings + 1] = string.format(message, ...)
 					end
 					os.remove = function() unlinks = unlinks + 1; return true end

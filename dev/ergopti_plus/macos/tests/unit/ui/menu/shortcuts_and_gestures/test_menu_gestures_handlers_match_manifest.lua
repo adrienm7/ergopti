@@ -92,7 +92,7 @@ helpers.describe("menu_gestures: every id-bearing row is rendered by the manifes
 	-- rows stood below the system rows until then.
 	helpers.it("ManifestMenu.build opens the menu with the switch, the restore and the clear", function()
 		local ManifestMenu = helpers.load_with_stubs("infra.manifest_menu")
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local fired = {}
 		local function record(name) return function() fired[#fired + 1] = name end end
 		local built = ManifestMenu.build("gestures_menu", "Gestures", make_dyn_handlers(), nil, {
@@ -117,31 +117,31 @@ end)
 -- Independent mode expectations predate this presentation migration. Drive the
 -- actual native menu owner and renderer; only the host/runtime ports are controlled.
 local mode_fixture_modules = {
-	"json", "menu.renderer", "infra.manifest_menu", "infra.i18n", "infra.logger",
-	"modules.gestures", "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-	"ui.menu.shortcut_utils", "infra.deferred_work", "ui.menu.menu_gestures",
+	"core.text.engine.json", "menu.engine.renderer", "infra.manifest_menu", "core.i18n.engine.i18n", "core.logger.engine.logger",
+	"modules.gestures", "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
+	"ui.menu.shortcut_utils", "core.timing.engine.deferred_work", "ui.menu.menu_gestures",
 }
 local function mode_json(path)
 	local file = assert(io.open(path, "rb"))
 	local bytes = file:read("*a")
 	file:close()
-	return require("json").decode(bytes)
+	return require("core.text.engine.json").decode(bytes)
 end
 local function with_mode_fixture(options, callback)
 	return helpers.with_fresh_modules(mode_fixture_modules, function()
 		options = options or {}
 		local corpus = mode_json(helpers.shared("tests/corpus/menus/gesture_slot_modes.json"))
 		local locale = options.locale or "en"
-		local strings = mode_json(helpers.shared("data/locales/" .. locale .. ".json"))
+		local strings = mode_json(helpers.shared("core/i18n/data/locales/" .. locale .. ".json"))
 		local i18n = {
 			get = function(key) return strings[key] or key end,
 			section = function(key) return strings[key] or key end,
 		}
 		local logger = helpers.make_logger_stub()
-		local renderer = assert(require("menu.renderer").new({
+		local renderer = assert(require("menu.engine.renderer").new({
 			platform = options.platform or "hs",
-			manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-			json_decode = require("json").decode, i18n = i18n, logger = logger,
+			manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+			json_decode = require("core.text.engine.json").decode, i18n = i18n, logger = logger,
 		}))
 		local root = renderer.get_root()
 		root.gesture_slots = { ["2"] = { "swipe_2_left" }, ["3"] = {}, ["4"] = {}, ["5"] = {} }
@@ -168,12 +168,12 @@ local function with_mode_fixture(options, callback)
 			end,
 		}
 		package.loaded["infra.manifest_menu"] = renderer
-		package.loaded["infra.i18n"] = i18n
-		package.loaded["infra.logger"] = logger
+		package.loaded["core.i18n.engine.i18n"] = i18n
+		package.loaded["core.logger.engine.logger"] = logger
 		package.loaded["modules.gestures"] = { DEFAULT_STATE = { gestures = true } }
-		for _, name in ipairs({ "ui.menu.menu_utils", "infra.dialog_util", "ui.action_picker",
-			"ui.menu.shortcut_utils", "infra.deferred_work" }) do package.loaded[name] = {} end
-		if options.dialog then package.loaded["infra.dialog_util"] = options.dialog end
+		for _, name in ipairs({ "ui.menu.menu_utils", "core.ui.engine.dialog_util", "ui.action_picker",
+			"ui.menu.shortcut_utils", "core.timing.engine.deferred_work" }) do package.loaded[name] = {} end
+		if options.dialog then package.loaded["core.ui.engine.dialog_util"] = options.dialog end
 		local owner = require("ui.menu.menu_gestures")
 		function fixture.build()
 			return owner.build({
@@ -415,8 +415,8 @@ local function with_gesture_controls(options, callback)
 	options = options or {}
 	return with_mode_fixture({ locale = options.locale, platform = options.platform, mode = "incremental" }, function(f)
 		local controls = mode_json(helpers.shared("tests/corpus/menus/gesture_slot_controls.json"))
-		local labels = require("menu.labels")
-		package.loaded["infra.i18n"].section = function(key)
+		local labels = require("menu.engine.labels")
+		package.loaded["core.i18n.engine.i18n"].section = function(key)
 			return labels.decorate_section(f.strings[key] or key)
 		end
 		f.control_state = { gestures = true }
@@ -437,14 +437,14 @@ local function with_gesture_controls(options, callback)
 			if options.rollback_no_effect and #f.control_writes == 2 then return false end
 			f.action = value
 			if options.rollback_throw and #f.control_writes == 2 then
-				package.loaded["infra.logger"].error = function() error("logger failure") end
+				package.loaded["core.logger.engine.logger"].error = function() error("logger failure") end
 				error("logger failure after restoration")
 			end
 			if options.setter and #f.control_writes == 1 then return options.setter() end
 			return true
 		end
 		f.gestures.on_action_changed = function() f.conflicts = f.conflicts + 1 end
-		package.loaded["infra.deferred_work"].after = function(delay, work, tag)
+		package.loaded["core.timing.engine.deferred_work"].after = function(delay, work, tag)
 			f.queue[#f.queue + 1] = { delay = delay, work = work, tag = tag }
 			return true
 		end
@@ -466,7 +466,7 @@ local function with_gesture_controls(options, callback)
 		function f.control_slot()
 			local item = f.control_build()
 			local slot = f.root.gesture_slots["2"][1]
-			local prefix = require("locale.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
+			local prefix = require("core.i18n.engine.label_value").compose(function(key) return f.strings[key] or key end, f.strings["gesture.slots." .. slot] or "gesture.slots." .. slot, "")
 			for _, row in ipairs(item.submenu) do
 				if type(row.title) == "string" and row.title:sub(1, #prefix) == prefix then return row end
 			end
@@ -517,24 +517,27 @@ helpers.describe("Gestures: declared sensitivity head and real action-choice own
 			helpers.assert_eq(f.conflicts, 0)
 		end)
 	end)
-	for _, refusal in ipairs({ "paused", "disabled" }) do
-		helpers.it("initial choice preserves the native disabled UI: " .. refusal, function()
-			with_gesture_controls({}, function(f)
-				if refusal == "paused" then f.control_paused = true else f.control_state.gestures = false end
-				local slot = assert(f.control_slot())
-				helpers.assert_true(slot.disabled)
-				if refusal == "disabled" then
-					-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
-					helpers.assert_nil(slot.menu)
-					helpers.assert_nil(slot.fn)
-				else
-					helpers.assert_true(slot.menu[1].disabled)
-					helpers.assert_eq(false, slot.menu[1].fn())
-				end
-				helpers.assert_eq(f.queue, {})
-			end)
+	helpers.it("initial choice preserves the native disabled UI: disabled", function()
+		with_gesture_controls({}, function(f)
+			f.control_state.gestures = false
+			local slot = assert(f.control_slot())
+			helpers.assert_true(slot.disabled)
+			-- Category-off rule: an off Gestures menu greys the slot and opens nothing.
+			helpers.assert_nil(slot.menu)
+			helpers.assert_nil(slot.fn)
+			helpers.assert_eq(f.queue, {})
 		end)
-	end
+	end)
+	-- A pause stops typing, not configuration (EDD-1): the slot's picker opens.
+	helpers.it("a paused slot reaches the picker (edd1-paused-writes)", function()
+		with_gesture_controls({}, function(f)
+			f.control_paused = true
+			local slot = assert(f.control_slot())
+			helpers.assert_true(not slot.disabled)
+			slot.menu[1].fn(); f.drain()
+			helpers.assert_eq(f.control_writes, { { "swipe_2_left", "copy" } })
+		end)
+	end)
 	for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		helpers.it("retains decorated heading, inert hint, numeric choices and action caption: " .. locale, function()

@@ -132,7 +132,7 @@ _LKAH_EveryVariantStandsDownOnTheLayer() {
 		. (Offenders.Length ? Offenders[1] : ""))
 	; AltGr is registered from the resolved layer instead of a static label.
 	Ctx := KeymapLayers_LoadContext(A_ScriptDir . "\..\..\_shared")
-	Resolved := KeymapLayers_Load("windows", Ctx, FileRead(A_ScriptDir . "\..\..\_shared\keymap\layers.recommended.toml", "UTF-8"))
+	Resolved := KeymapLayers_Load("windows", Ctx, FileRead(A_ScriptDir . "\..\..\_shared\layouts\data\layers.recommended.toml", "UTF-8"))
 	AssertTrue(Resolved["ok"], "the recommended layer must resolve")
 	AltGrLabels := Map()
 	for Row in NavLayer_BuildTable(Resolved["layers"]["nav"], Ctx) {

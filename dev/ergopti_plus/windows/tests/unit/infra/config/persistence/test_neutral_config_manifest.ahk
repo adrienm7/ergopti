@@ -209,7 +209,7 @@ Test("neutral-config: every clear writes the script chords off (script-chords-th
 
 _NeutralConfigMissingTapHold() {
 	global _SharedDir
-	Preset := _SharedDir . "\tap_hold\defaults.toml"
+	Preset := _SharedDir . "\tap_hold\data\defaults.toml"
 	Assert(FileExist(Preset), "exercise the actual shipped recommendations")
 	Loaded := LoadTapHoldToml(A_Temp . "\ergopti-no-neutral-config-" . A_TickCount . ".toml", Preset)
 	AssertEqual(Loaded["keys"].Count, 0, "absence must never import the recommendation")

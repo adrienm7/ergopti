@@ -102,10 +102,10 @@ _LRPN_LoadTables() {
 		Models[Entry["id"]] := Keylayout_Parse(FSReadStrict(Root . StrReplace(Entry["file"], "/", "\")))
 	}
 	_LRPN_Require(Models.Count == 2, "both real checked-in layouts must parse")
-	Keycodes := JsonParse(FSReadStrict(_SharedDir . "\modules\layouts\mac_keycodes.json"))
+	Keycodes := JsonParse(FSReadStrict(_SharedDir . "\layouts\data\mac_keycodes.json"))
 	ERGOPTI_SPEC := ErgoptiLayout_BuildSpec(Models["ergopti"], Models["ergopti_plus"],
 		KeylayoutEmulation_KeyCodes(Keycodes, Convention),
-		ErgoptiLayout_ReadWrapPairs(_SharedDir . "\modules\wrap_symbols\wrap_symbols.json"))
+		ErgoptiLayout_ReadWrapPairs(_SharedDir . "\keyboard\data\wrap_symbols\wrap_symbols.json"))
 	; A regression must not fall through into a native profile probe either.
 	Corpus := JsonParse(FSReadStrict(_SharedDir . "\tests\corpus\layouts\number_row_levels.json"))
 	Plain := Map(), Shift := Map()

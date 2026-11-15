@@ -3,17 +3,17 @@
 --- ==============================================================================
 --- MODULE: AI Agent Settings (Linux)
 --- DESCRIPTION:
---- Loads _shared/modules/llm/agent.json and owns the agent's four settings:
+--- Loads _shared/ai/data/agent.json and owns the agent's four settings:
 --- llm.agent_system1 and llm.agent_system2 (the backend of each system, "" when
 --- off), llm.agent_mode ("off", "action" or "auto") and llm.agent_disabled_apps
 --- (the applications the automatic mode never looks at). The logic itself is
---- the shared _shared/lua/llm/agent.lua; this module reads the file, the
+--- the shared _shared/ai/engine/agent/agent.lua; this module reads the file, the
 --- settings, and resolves where a system's request goes.
 ---
 --- FEATURES & RATIONALE:
 --- 1. A system's backend is written like the llm_vision parameter: "local" (the
 ---    local Ollama server) or a provider of api_providers.json, optionally
----    followed by |model. It is parsed by llm/vision.lua and its model resolved
+---    followed by |model. It is parsed by ai/engine/prediction/vision.lua and its model resolved
 ---    by agent.resolve_model: agent.json's default for the local server, the
 ---    provider's default_model of api_providers.json otherwise; a backend
 ---    without a default and without a model counts as not configured.
@@ -31,19 +31,19 @@
 
 local M = {}
 
-local Logger = require("logger.shim")
-local ConfigOutdated = require("config_outdated")
-local Json = require("json")
-local Vision = require("llm.vision")
-local Agent = require("llm.agent")
-local AppIdentity = require("llm.app_identity")
+local Logger = require("core.logger.engine.shim")
+local ConfigOutdated = require("settings.engine.migration.outdated")
+local Json = require("core.text.engine.json")
+local Vision = require("ai.engine.prediction.vision")
+local Agent = require("ai.engine.agent.agent")
+local AppIdentity = require("ai.engine.policy.app_identity")
 local Manifest = require("infra.manifest_reader")
-local ConfigKeys = require("config_keys")
+local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "modules.llm.agent_settings"
 
 -- The shared file this module reads, relative to _shared/
-local CONFIG_FILE = "modules/llm/agent.json"
+local CONFIG_FILE = "ai/data/agent.json"
 
 -- The setting of each system
 M.SYSTEM_PATHS = { system1 = ConfigKeys.KEY.LLM_AGENT_SYSTEM1, system2 = ConfigKeys.KEY.LLM_AGENT_SYSTEM2 }
@@ -162,9 +162,9 @@ end
 --- @return table|nil config
 function M.config()
 	if _config then return _config end
-	local path = require("infra.paths").shared(CONFIG_FILE)
+	local path = require("core.fs.engine.paths").shared(CONFIG_FILE)
 	local text, status
-	if path then text, status = require("toml_codec.writer").read_classified(path) end
+	if path then text, status = require("core.text.engine.toml_codec.writer").read_classified(path) end
 	if status ~= "ok" then text = nil end
 	local config, reason = M.parse_config(text)
 	if not config then
@@ -522,7 +522,7 @@ function M.timezone()
 	end
 	local line = first_line("/etc/timezone")
 	if line and line:match("^[%w_%+%-]+/[%w_%+%-/]+$") then return line end
-	local target = require("adapters.shell_runner").exec_line("readlink -f /etc/localtime 2>/dev/null")
+	local target = require("core.process.adapters.shell_runner").exec_line("readlink -f /etc/localtime 2>/dev/null")
 	local zone = type(target) == "string" and target:match(ZONEINFO_MARKER .. "(.+)$") or nil
 	if zone and zone ~= "" then return zone end
 	return nil

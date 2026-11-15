@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local M = {}
-local Logger = require("infra.logger")
+local Logger = require("core.logger.engine.logger")
 local LOG = "menu.script_action_transaction"
 
 --- Creates an assignment owner around the global writer and preference owners.
@@ -72,8 +72,10 @@ function M.new(options)
 	--- @return boolean committed
 	function owner.assign(slot, action)
 		if type(slot) ~= "string" or type(action) ~= "string" then return false end
+		-- A pause admits the assignment: script_control keeps it until the
+		-- resume settles (EDD-1). A pause that is not a boolean is refused.
 		return options.admission("Script chord action", function()
-			if options.paused() ~= false then return false end
+			if type(options.paused()) ~= "boolean" then return false end
 			if debt and not restore(true) then return false end
 			local facade = options.script_control
 			local setter = type(facade) == "table" and facade.set_shortcut_action or nil
@@ -89,7 +91,7 @@ function M.new(options)
 				or not rawequal(options.script_control, facade)
 				or facade.set_shortcut_action ~= setter or facade.get_shortcut_actions ~= getter
 				or not rawequal(options.state.script_control_shortcuts, state) or state[slot] ~= debt.state
-				or options.paused() ~= false then
+				or type(options.paused()) ~= "boolean" then
 				if not restore(true) then Logger.error(LOG, "Script action rollback remains pending.") end
 				return false
 			end

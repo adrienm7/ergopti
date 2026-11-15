@@ -1,7 +1,7 @@
 --- tests/unit/modules/updater/install/test_release_install_async.lua
 
 --- Independent literal admission/completion ordering against the shared caller.
-local ReleaseInstall = require("updater.release_install")
+local ReleaseInstall = require("updater.engine.release_install")
 local tests = {}
 local function test(name, body) tests[#tests + 1] = { name, body } end
 local function fixture(options)

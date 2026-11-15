@@ -21,8 +21,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local json = require("json")
-local Rewrite = require("llm.rewrite")
+local json = require("core.text.engine.json")
+local Rewrite = require("ai.engine.prediction.rewrite")
 local ApplyFixture = require("tests.support.apply_prediction_fixture")
 
 local ENTRY_ID = "e2e-cerebras"
@@ -33,7 +33,7 @@ local MENU_MIN_WORDS = 9
 --- Reads live.json the way a reviewer would, to compare the engine against it.
 --- @return table { debounce_sec, min_words }
 local function live_config()
-	local fh = assert(io.open(helpers.shared("modules/llm/live.json"), "r"))
+	local fh = assert(io.open(helpers.shared("ai/data/live.json"), "r"))
 	local decoded = json.decode(fh:read("*a"))
 	fh:close()
 	return { debounce_sec = decoded.debounce_ms / 1000, min_words = decoded.min_words }
@@ -74,8 +74,7 @@ local function build_world()
 	}
 
 	for name in pairs(package.loaded) do
-		if type(name) == "string" and (name:find("^modules%.") or name:find("^adapters%.")
-			or name:find("^infra%.") or name:find("^ui%.")) then
+		if type(name) == "string" and helpers.is_driver_module(name) then
 			package.loaded[name] = nil
 		end
 	end
@@ -90,10 +89,10 @@ local function build_world()
 		path = function() return "/Applications/E2E.app" end,
 		pid = function() return 7 end,
 	}
-	helpers.load_with_stubs("infra.logger", {
+	helpers.load_with_stubs("core.logger.engine.logger", {
 		application = { frontmostApplication = function() return front_app end },
 	})
-	package.loaded["infra.logger"] = helpers.make_logger_stub()
+	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	-- The native clock only feeds the backend's request floor: each request is
 	-- made far enough from the previous one, as a human types
 	_G.hs.timer.secondsSinceEpoch = function() return world.clock end
@@ -117,7 +116,7 @@ local function build_world()
 		log_llm_suggested = function() end,
 		log_llm_dismissed = function() end,
 	}
-	package.loaded["ui.tooltip"] = {
+	package.loaded["core.ui.ui.tooltip"] = {
 		set_navigate_callback = function() end,
 		set_enter_validates = function() end,
 		set_llm_timeout = function() end,
@@ -175,7 +174,7 @@ local function build_world()
 	local engine = require("modules.llm.prediction_engine")
 	world.engine = engine
 	-- The native timers are those of the stub the scheduler captured when it loaded
-	local scheduler_hs = get_upvalue(require("adapters.timer_scheduler").after, "hs")
+	local scheduler_hs = get_upvalue(require("core.events.timer_scheduler").after, "hs")
 	assert(type(scheduler_hs) == "table" and type(scheduler_hs.timer.__timers) == "table",
 		"the timer scheduler's native stub must be reachable")
 	world.timers = scheduler_hs.timer.__timers
@@ -250,7 +249,7 @@ end
 --- @return boolean
 local function notice_is(notice, key)
 	if type(notice) ~= "string" then return false end
-	local i18n = require("infra.i18n")
+	local i18n = require("core.i18n.engine.i18n")
 	local text = i18n.get(key):gsub("{1}.*$", "")
 	return notice:find(text, 1, true) == 1
 end
@@ -316,8 +315,8 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 
 		-- The harness's i18n stub echoes keys: point it at the real locale core so
 		-- the notice shows its {1} filled with the prompt's menu label
-		local i18n = package.loaded["infra.i18n"]
-		local Locale = require("infra.locale")
+		local i18n = package.loaded["core.i18n.engine.i18n"]
+		local Locale = require("core.i18n.engine.locale")
 		local saved_get, saved_format = i18n.get, i18n.format
 		i18n.get = function(key) return Locale.get(key) or key end
 		i18n.format = function(key, ...)
@@ -586,12 +585,12 @@ helpers.describe("retained live shortcut stop", function()
 
 	helpers.it("uses all actual stop notices and preserves refused action bridge state", function()
 		local world = build_world()
-		local i18n = require("infra.i18n")
+		local i18n = require("core.i18n.engine.i18n")
 		local saved_get, spec = i18n.get, corpus()
 		local keymap, calls = package.loaded["modules.keymap"], 0
 		local ok, err = xpcall(function()
 			for _, code in ipairs(spec.locales) do
-				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
+				local file = assert(io.open(helpers.shared("core/i18n/data/locales/" .. code .. ".json"), "r"))
 				local catalog = json.decode(file:read("*a")); file:close()
 				i18n.get = function(key) return catalog[key] or key end
 				helpers.assert_true(toggle(world, "translate_en"))
@@ -637,10 +636,10 @@ local function with_live_boundary_owner(scenario)
 	local world, native, owner, receipt, acquired
 	local ok, detail = xpcall(function()
 		world = build_world()
-		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+		for _, name in ipairs({ "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu",
 			"ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
-		native = require("infra.i18n")
-		local backend = require("infra.locale")
+		native = require("core.i18n.engine.i18n")
+		local backend = require("core.i18n.engine.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
 		native.init()
 		owner = { pending = function() return false end }
@@ -655,8 +654,8 @@ local function with_live_boundary_owner(scenario)
 	if receipt then forgotten = native.scope_forget(owner, receipt) == true end
 	local cleaned, cleanup_detail = pcall(function()
 		if world then world.engine.stop_live_prompt("boundary fixture cleanup", true) end
-		local scheduler = package.loaded["adapters.timer_scheduler"]
-		if scheduler and not rawequal(scheduler, previous["adapters.timer_scheduler"]) then
+		local scheduler = package.loaded["core.events.timer_scheduler"]
+		if scheduler and not rawequal(scheduler, previous["core.events.timer_scheduler"]) then
 			helpers.assert_eq(scheduler.cancelAll(), true); helpers.assert_eq(scheduler.activeCount(), 0)
 		end
 		local bridge = package.loaded["modules.keystats.kc_bridge"]
@@ -693,9 +692,9 @@ helpers.describe("llm-control-boundaries: actual live prompt owner", function()
 		with_live_boundary_owner(function(_, _, _, native)
 			local expected = control_boundary_corpus()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
-				local renderer = assert(require("menu.renderer").new({ platform = platform,
-					manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
-					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
+				local renderer = assert(require("menu.engine.renderer").new({ platform = platform,
+					manifest_path = function() return helpers.shared("menu/data/menu_manifest.json") end,
+					json_decode = require("core.fs.adapters.json_codec").decode, i18n = native, logger = require("core.logger.engine.logger") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
 				end

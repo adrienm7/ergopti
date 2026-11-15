@@ -9,11 +9,11 @@
 
 local M = {}
 local task_receipts = setmetatable({}, { __mode = "k" })
-local FileSystem = require("adapters.file_system")
-local FsDir = require("infra.fs_dir")
-local Json = require("json")
-local Receipt = require("core.llm.managed_ollama_pull_receipt")
-local Logger = require("infra.logger")
+local FileSystem = require("core.fs.adapters.file_system")
+local FsDir = require("core.fs.engine.dir")
+local Json = require("core.text.engine.json")
+local Receipt = require("core.lifecycle.engine.core.managed_ollama_pull_receipt")
+local Logger = require("core.logger.engine.logger")
 local hs = hs
 local LOG = "adapters.managed_ollama_pull"
 
@@ -39,7 +39,7 @@ end
 function M.handles(executable)
 	local home = os.getenv("HOME")
 	return type(home) == "string" and home:sub(1, 1) == "/"
-		and executable == home:gsub("/+$", "") .. "/" .. require("app_dirs").macos.support_relative .. "/ollama-native-http/ollama"
+		and executable == home:gsub("/+$", "") .. "/" .. require("core.fs.engine.app_dirs").macos.support_relative .. "/ollama-native-http/ollama"
 end
 
 local RECEIPT_STATES = { retired = true, pending = true }
@@ -79,7 +79,7 @@ function M.prepare(model, port, python_bin)
 	local policy = driver .. "/modules/llm/network-retry.sh"
 	local script = driver .. "/modules/llm/managed_ollama_pull.py"
 	if not FileSystem.exists(policy) or not FileSystem.exists(script) then return nil, false end
-	local policy_path = driver .. "/../_shared/modules/network/proxy_policy.json"
+	local policy_path = driver .. "/../_shared/core/network/data/proxy_policy.json"
 	local read_ok, bytes, read_status = pcall(FileSystem.read_with_status, policy_path, fixed_failure)
 	if not read_ok or read_status ~= "ok" then return nil, false end
 	local parsed, proxy_policy = pcall(Json.decode, bytes)
@@ -336,7 +336,7 @@ local function material_census(owner)
 end
 
 local function capture_material(anchor, uid)
-	local Crypto = require("adapters.crypto")
+	local Crypto = require("core.crypto.crypto")
 	local owner = { directory = { path = anchor.directory.path, device = anchor.directory.device,
 		inode = anchor.directory.inode, uid = uid }, directory_removed = false }
 	for _, name in ipairs({ "authority", "window" }) do
@@ -458,7 +458,7 @@ function M.prepare_owned(model, port, python_bin)
 				-- Only the original Python owner can retire an unsealed directory
 				-- before publishing its pre-submission retired receipt.
 			else
-				local CleanupReceipt = require("core.llm.managed_ollama_cleanup_receipt")
+				local CleanupReceipt = require("core.lifecycle.engine.core.managed_ollama_cleanup_receipt")
 				local parsed = CleanupReceipt.anchor(raw, Json.decode, context.nonce, proof.operation, anchor.path)
 				if not parsed then return false, "anchor_invalid" end
 				local material = capture_material(parsed, anchor.observed.uid)
@@ -494,8 +494,8 @@ function M.prepare_cleanup(original_task)
 	local context = owned_handles[original_task]
 	if not context or context.original_callback_status ~= 78
 		or task_receipts[original_task] == nil or context.cleanup_task ~= nil then return nil, false end
-	local CleanupReceipt = require("core.llm.managed_ollama_cleanup_receipt")
-	local Crypto = require("adapters.crypto")
+	local CleanupReceipt = require("core.lifecycle.engine.core.managed_ollama_cleanup_receipt")
+	local Crypto = require("core.crypto.crypto")
 	local original_raw, anchor_raw = read_reserved(context.original), read_reserved(context.anchor)
 	local proof = CleanupReceipt.original_pending(original_raw, Json.decode, context.nonce)
 	if not proof then return nil, false end

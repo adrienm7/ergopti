@@ -11,13 +11,13 @@ local SyntheticStack = require("tests.support.synthetic_input_stack")
 
 local OWNED = {
 	"modules.keymap", "modules.keymap.state", "modules.keymap.expander", "modules.keymap.llm_bridge",
-	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "ui.tooltip",
+	"modules.keystats", "modules.llm", "modules.llm.prediction_engine", "core.ui.ui.tooltip",
 	"modules.dynamic_hotstrings.user_code", "modules.dynamic_hotstrings.rules_engine",
 	"modules.dynamic_hotstrings", "modules.dynamic_hotstrings.personal_info",
-	"ui.menu.programmatic_hotstrings", "infra.dialog_util", "adapters.shell_runner",
+	"ui.menu.programmatic_hotstrings", "core.ui.engine.dialog_util", "core.process.adapters.shell_runner",
 	"infra.preferences",
-	"adapters.application_notifier", "adapters.file_system", "infra.config_paths", "infra.i18n",
-	"adapters.secure_field_detector",
+	"platform.focus.application_notifier", "core.fs.adapters.file_system", "infra.config_paths", "core.i18n.engine.i18n",
+	"platform.focus.secure_field_detector",
 	"modules.diagnostics.hid_diagnostic_mailbox",
 }
 
@@ -69,7 +69,7 @@ local function with_native(body)
 			init = function() return true end, get_llm_enabled = function() return false end,
 			reset = function() return true end, is_visible = function() return false end,
 		}, { __index = function() return function() end end })
-		package.loaded["ui.tooltip"] = setmetatable({
+		package.loaded["core.ui.ui.tooltip"] = setmetatable({
 			hide = function() return true end, hide_forced = function() return true end,
 			hide_forced_silent = function() return true end, is_visible = function() return false end,
 			is_hotstring_visible = function() return false end, tint = function() return {} end,
@@ -148,7 +148,7 @@ local function with_native(body)
 		end
 		helpers.assert_true(Keymap.start())
 		drain(hs_stub)
-		local FileSystem = require("adapters.file_system")
+		local FileSystem = require("core.fs.adapters.file_system")
 		FileSystem.read_with_status = function()
 			if fixture.read_hook then fixture.read_hook() end
 			if fixture.unreadable then return nil, "error", "fixture unreadable" end
@@ -156,7 +156,7 @@ local function with_native(body)
 			return fixture.content, "ok"
 		end
 		package.loaded["infra.config_paths"] = { get_config_dir = function() return "/owned" end }
-		package.loaded["adapters.application_notifier"] = { send = function() fixture.notified = true; return true end }
+		package.loaded["platform.focus.application_notifier"] = { send = function() fixture.notified = true; return true end }
 		fixture.content = [[return function()
 			__USER_HOTSTRING_FIXTURE.factory_calls = __USER_HOTSTRING_FIXTURE.factory_calls + 1
 			if __USER_HOTSTRING_FIXTURE.factory_mutate then __USER_HOTSTRING_FIXTURE.factory_mutate() end
@@ -242,7 +242,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	end)
 	helpers.it("retains the exact queued transaction when native settlement observation refuses", function()
 		with_native(function(f)
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			local original, seen = Scheduler.onSettled, {}
 			Scheduler.onSettled = function(handle, callback)
 				seen[handle] = (seen[handle] or 0) + 1
@@ -293,7 +293,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 				end
 			end
 		end
-		local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+		local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 		local restore_timers = {}
 		for _, timer in ipairs(f.hs.timer.__timers) do
 			if timer.running and timer.delay == restore_delay then restore_timers[#restore_timers + 1] = timer end
@@ -342,9 +342,9 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("retains the exact clipboard timer after restoration until native stop acknowledges", function()
 		with_native(function(f)
 			f.hs.pasteboard.setContents("original clipboard")
-			local Scheduler = require("adapters.timer_scheduler")
+			local Scheduler = require("core.events.timer_scheduler")
 			local original, timer_stop, owned_handle = Scheduler.after, nil, nil
-			local restore_delay = require("infra.timings").sec("debounce", "clipboard_restore_ms")
+			local restore_delay = require("core.timing.engine.timings").sec("debounce", "clipboard_restore_ms")
 			Scheduler.after = function(delay, callback)
 				local handle, committed = original(delay, callback)
 				if delay == restore_delay and handle.timer then
@@ -463,7 +463,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 			helpers.assert_eq(f.User.set_enabled(true), false); helpers.assert_eq(f.User.is_enabled(), false)
 			helpers.assert_nil(f.notified, "a missing source is a menu state, not a notification")
 			helpers.assert_eq(f.User.problem(), "missing")
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			FileSystem.write_if_unchanged = function(path, content, expected)
 				helpers.assert_eq(path, f.User.source_path()); helpers.assert_eq(expected.status, "absent")
 				f.content, f.absent = content, false; return true
@@ -480,14 +480,14 @@ helpers.describe("programmable native macOS hotstrings", function()
 		with_native(function(f)
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.Keymap)); helpers.assert_true(f.User.set_time_activation(0.5))
-			local Logger = require("infra.logger")
+			local Logger = require("core.logger.engine.logger")
 			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
 			Logger.warn = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then warned[#warned + 1] = message end
 				return warn(module, message, ...)
 			end
 			Logger.error = function(module, message, ...)
-				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				if module == "hotstrings.engine.dynamic.user_code_core" then errors[#errors + 1] = message end
 				return err(module, message, ...)
 			end
 			local ok, failure = pcall(function()
@@ -806,8 +806,8 @@ helpers.describe("programmable native macOS hotstrings", function()
 	for _, refusal in ipairs({ "time-port", "save-throw", "save-refuse" }) do
 		helpers.it("(user-menu-publication-inverse) restores exact native timing after " .. refusal, function()
 			with_native(function(f)
-				package.loaded["infra.dialog_util"] = {
-					text_prompt = function() return require("infra.i18n").get("common.ok"), "125" end,
+				package.loaded["core.ui.engine.dialog_util"] = {
+					text_prompt = function() return require("core.i18n.engine.i18n").get("common.ok"), "125" end,
 					block_alert = function() error("a refused publication opens no dialog") end,
 				}
 				local set_time = f.Keymap.set_user_hotstring_time_activation
@@ -845,10 +845,12 @@ helpers.describe("programmable native macOS hotstrings", function()
 			end)
 		end)
 	end
-	helpers.it("(user-menu-live-pause) fences retained controls after the real pause owner closes", function()
+	-- A pause stops typing, not configuration (EDD-1): a control rendered before
+	-- the pause still commits once the script is paused.
+	helpers.it("(edd1-paused-writes) retained controls commit after the script pauses", function()
 		with_native(function(f)
-			package.loaded["infra.dialog_util"] = {
-				block_alert = function() error("a refused control opens no dialog") end,
+			package.loaded["core.ui.engine.dialog_util"] = {
+				block_alert = function() error("a committed control opens no dialog") end,
 			}
 			local paused, saves, updates = false, 0, 0
 			local rows = require("ui.menu.programmatic_hotstrings").build({
@@ -858,16 +860,16 @@ helpers.describe("programmable native macOS hotstrings", function()
 				updateMenu = function() updates = updates + 1 end,
 				save_prefs = function() saves = saves + 1; return true end })
 			paused = true
-			helpers.assert_eq(rows[1].menu[1].fn(), false)
-			helpers.assert_true(f.User.is_enabled())
-			helpers.assert_eq(saves, 0)
-			helpers.assert_eq(updates, 1, "the refusal redraws the menu instead of opening a dialog")
+			helpers.assert_eq(rows[1].menu[1].fn(), true)
+			helpers.assert_eq(f.User.is_enabled(), false, "the switch reaches the native gate")
+			helpers.assert_eq(saves, 1)
+			helpers.assert_eq(updates, 1)
 		end)
 	end)
 	helpers.it("opens source through the actual menu adapter without loading or creating it", function()
 		with_native(function(f)
 			local admitted
-			package.loaded["adapters.shell_runner"] = { run = function(executable, argv)
+			package.loaded["core.process.adapters.shell_runner"] = { run = function(executable, argv)
 				admitted = { executable, argv }; return true
 			end }
 			local Menu = require("ui.menu.programmatic_hotstrings")
@@ -886,7 +888,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("saves declared preferences to disk then reloads them into actual native gate and timing", function()
 		with_native(function(f)
 			local path = os.tmpname()
-			local FileSystem = require("adapters.file_system")
+			local FileSystem = require("core.fs.adapters.file_system")
 			local original_read, original_write = FileSystem.read_with_status, FileSystem.write_if_unchanged
 			local function read_disk()
 				local handle = assert(io.open(path, "r"))
@@ -911,7 +913,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 				helpers.assert_eq(select(2, Preferences.load(path)), "ok")
 				helpers.assert_true(Preferences.save(path, { dynamichotstrings_user_code_enabled = true,
 					dynamichotstrings_user_code_time_activation_seconds = 0.125 }, {}, {}))
-				local decoded = require("toml_codec").decode(read_disk())
+				local decoded = require("core.text.engine.toml_codec").decode(read_disk())
 				helpers.assert_eq(decoded.other.untouched, "foreign")
 				helpers.assert_eq(decoded.hotstrings.dynamic.user_code.neighbor, "kept")
 				package.loaded["infra.preferences"] = nil

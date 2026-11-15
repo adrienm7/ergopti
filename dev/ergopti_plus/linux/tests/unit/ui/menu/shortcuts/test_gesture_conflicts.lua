@@ -14,27 +14,27 @@ local h = require("tests.helpers")
 --- @param body function Assertions against the real module and observed effects.
 --- @param strings table|nil Canonical translation input for the owned renderer.
 local function scenario(choice, body, strings)
-	local names = { "ui.gesture_conflicts", "infra.i18n", "adapters.storage", "adapters.shell_runner",
-		"logger.shim", "adapters.event_loop", "ui.modal", "infra.manifest_menu", "menu.renderer", "infra.paths", "json" }
+	local names = { "ui.gesture_conflicts", "core.i18n.engine.i18n", "core.fs.adapters.storage", "core.process.adapters.shell_runner",
+		"core.logger.engine.shim", "core.events.loop", "core.ui.ui.modal", "infra.manifest_menu", "menu.engine.renderer", "core.fs.engine.paths", "core.text.engine.json" }
 	local saved, store, queued = {}, {}, {}
 	local observed = { shells = 0, modals = 0, dialogs = 0 }
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-	package.loaded["infra.i18n"] = { get = function(key)
+	package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 		if strings then return strings[key] or key end
 		if key == "gestures.system.slot_unknown_caption" then return "%s — gestures.system.unknown" end
 		return key
 	end, section = function(key) return strings and strings[key] or key end }
-	package.loaded["adapters.storage"] = { get = function(key) return store[key] end,
+	package.loaded["core.fs.adapters.storage"] = { get = function(key) return store[key] end,
 		set = function(key, value) store[key] = value; return true end }
-	package.loaded["adapters.shell_runner"] = {
+	package.loaded["core.process.adapters.shell_runner"] = {
 		quote = function(value) return "'" .. value .. "'" end,
 		has_command = function() observed.shells = observed.shells + 1; return false end,
 		run = function() observed.shells = observed.shells + 1; return true end,
 		exec_checked = function() observed.dialogs = observed.dialogs + 1; return choice ~= "", choice end,
 	}
-	package.loaded["logger.shim"] = { warn = function() end, error = function() end }
-	package.loaded["adapters.event_loop"] = { defer = function(fn) queued[#queued + 1] = fn; return true end }
-	package.loaded["ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
+	package.loaded["core.logger.engine.shim"] = { warn = function() end, error = function() end }
+	package.loaded["core.events.loop"] = { defer = function(fn) queued[#queued + 1] = fn; return true end }
+	package.loaded["core.ui.ui.modal"] = { run = function(fn) observed.modals = observed.modals + 1; return fn() end }
 	local ok, err = xpcall(function() body(require("ui.gesture_conflicts"), observed, store, queued) end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
@@ -87,7 +87,7 @@ end)
 --- @return table
 local function status_json(relative)
 	local file = assert(io.open(h.driver_root() .. "/../_shared/" .. relative, "rb"))
-	local parsed = require("json").decode(file:read("*a"))
+	local parsed = require("core.text.engine.json").decode(file:read("*a"))
 	file:close()
 	return parsed
 end
@@ -104,7 +104,7 @@ h.describe("desktop gesture status uses genuine shared frames", function()
 	for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
 		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
 		h.it("keeps prior unknown posture and native reader captions: " .. locale, function()
-			local strings = status_json("data/locales/" .. locale .. ".json")
+			local strings = status_json("core/i18n/data/locales/" .. locale .. ".json")
 			local prior = status_json("tests/corpus/menus/gesture_system_status_captions.json").captions[locale]
 			scenario("", function(module, observed)
 				local native = cached_status_manager()

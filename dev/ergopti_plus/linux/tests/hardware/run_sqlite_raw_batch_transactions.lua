@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local uv = require("luv")
-require("compat.utf8").install()
+require("core.lifecycle.engine.compat.utf8").install()
 local root = assert(uv.fs_mkdtemp("/tmp/ergopti-raw-batches-XXXXXX"))
 for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 	assert(uv.os_setenv("XDG_" .. name .. "_HOME", root .. "/" .. name:lower()))
@@ -21,7 +21,7 @@ assert(config:write("[metrics]\nenabled = true\n") and config:close())
 
 local Keystats = require("modules.keystats.keystats")
 local Writer = require("modules.keystats.sqlite_writer")
-local Json = require("json")
+local Json = require("core.text.engine.json")
 local checks, failures = 0, 0
 
 local function check(name, test)
@@ -79,7 +79,7 @@ for index, fault in ipairs({
 	{ table_name = "agg_app_day_hourly", phase = "AFTER", refusal = "FAIL" },
 }) do
 	local app = "derived-atomic-" .. index
-	local now = math.floor(require("infra.monotonic").now_ms())
+	local now = math.floor(require("core.logger.engine.monotonic").now_ms())
 	assert(Writer.exec_sql("CREATE TABLE IF NOT EXISTS derived_side_effect(app TEXT);"))
 	assert(Writer.exec_sql("CREATE TRIGGER derived_refusal " .. fault.phase .. " INSERT ON " .. fault.table_name
 		.. " WHEN NEW.app='" .. app .. "' BEGIN INSERT INTO derived_side_effect VALUES (NEW.app);"

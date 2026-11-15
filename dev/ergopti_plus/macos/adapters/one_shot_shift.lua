@@ -10,10 +10,10 @@
 
 local M = {}
 local State = require("modules.keymap.one_shot_shift")
-local Keycodes = require("keycodes")
-local Timer = require("adapters.timer_scheduler")
-local SyntheticInput = require("adapters.synthetic_input")
-local KeystrokeIntegrity = require("infra.keystroke_integrity")
+local Keycodes = require("platform.input.keycodes.core")
+local Timer = require("core.events.timer_scheduler")
+local SyntheticInput = require("platform.input.synthetic_input")
+local KeystrokeIntegrity = require("core.logger.engine.keystroke_integrity")
 local CapsWordOutput = require("infra.capsword_output")
 local CONTROL = {
 	[Keycodes.BACKSPACE] = "backspace", [Keycodes.FORWARD_DELETE] = "delete",
@@ -27,9 +27,9 @@ local CONTROL = {
 function M.new(deps)
 	local data = deps.data
 	if data == nil then
-		local path = require("infra.paths").shared("tap_hold/one_shot_shift.json")
-		local raw = assert(require("adapters.file_system").read(path), "one-shot Shift results are unreadable")
-		data = assert(require("adapters.json_codec").decode(raw), "one-shot Shift results are malformed")
+		local path = require("core.fs.engine.paths").shared("tap_hold/data/one_shot_shift.json")
+		local raw = assert(require("core.fs.adapters.file_system").read(path), "one-shot Shift results are unreadable")
+		data = assert(require("core.fs.adapters.json_codec").decode(raw), "one-shot Shift results are malformed")
 	end
 	local owner = State.new(data)
 	local event_api = deps.event or hs.eventtap.event

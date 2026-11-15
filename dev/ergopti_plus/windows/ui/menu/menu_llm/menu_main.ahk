@@ -162,16 +162,21 @@ _LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn) {
 /**
  * Builds the IA submenu rows (toggle, warning, settings, about) into a new
  * detached Menu and returns it — no publish, no root rebuild, no tray touch.
- * initMenu builds IA inline at boot through this; LLM_Menu_Build uses it for
+ * initMenu publishes IA through this as a submenu built at its first open
+ * (MenuDeferOrBuild hands it the published child); LLM_Menu_Build uses it for
  * staged replacements. One row-construction site: the two must never drift.
  * Each native row retains this invocation's detached target. Nested builds
  * can publish a successor without redirecting the interrupted row or having
  * their published handle restored away by the older builder.
+ * @param {Menu} Target The empty child to fill; a new detached Menu when omitted.
  * @returns {Menu} Staged submenu with all rows.
  */
-LLM_Menu_BuildSubmenu() {
+LLM_Menu_BuildSubmenu(Target := 0) {
 	global _LLM_Menu
-	StagedHandle := Menu()
+	if Target is Menu
+		StagedHandle := Target
+	else
+		StagedHandle := Menu()
 	try {
 	_tStaged := A_TickCount
 
@@ -208,7 +213,7 @@ LLM_Menu_BuildSubmenu() {
 
 	; ── Settings rows ────────────────────────────────────────────────────────
 	; Row ORDER and the disabled-when-off POLICY come from the shared menu manifest
-	; (_shared/modules/menu/menu_manifest.json, key llm_menu), so the Windows and
+	; (_shared/menu/data/menu_manifest.json, key llm_menu), so the Windows and
 	; macOS IA menus can never drift again (a greying mismatch between them was the
 	; bug this prevents).
 	; The per-row native label + submenu builder are dispatched by id inside
@@ -238,7 +243,9 @@ LLM_Menu_BuildSubmenu() {
 		ListProviders, Commands, StateGetters, StagedHandle, GroupDisabled)
 	try LoggerInfo("LLM", "LLM_Menu_Build: settings rows emitted ({1} item(s) so far).", DllCall("GetMenuItemCount", "ptr", StagedHandle.Handle, "int"))
 	} catch as e {
-		try StagedHandle.Delete()
+		; A deferred child's owner restores its placeholder for the next open.
+		if !(Target is Menu)
+			try StagedHandle.Delete()
 		throw e
 	}
 	return StagedHandle
@@ -247,8 +254,12 @@ LLM_Menu_BuildSubmenu() {
 /** Captures readers; backend availability never grants configuration write readiness. */
 _LLM_Menu_StateGetters() {
 	global _LLM_Menu
+	; A pause stops typing, not configuration (EDD-1): the switch turns the AI
+	; off while paused, which only stops work. Turning it on waits for resume:
+	; it starts model warmups and may offer an install (decided by the agent on
+	; 2026-11-14, to review by the maintainer).
 	return Map("llm_enabled", () => _LLM_Menu["enabled"],
-		"llm_toggle_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
+		"llm_toggle_ready", () => (!A_IsSuspended || _LLM_Menu["enabled"]) && ConfigFullStateCanPersist(),
 		"llm_scope_ready", () => !A_IsSuspended && ConfigFullStateCanPersist(),
 		"config_newer_schema", () => ConfigNewerSchemaReadOnly(),
 		"config_older_schema", () => ConfigOlderSchemaReadOnly())
@@ -431,13 +442,13 @@ LLM_Menu_Build() {
 
 /**
  * Returns the ordered settings-row list for this platform from the shared menu
- * manifest (_shared/modules/menu/menu_manifest.json, key ``llm_menu``) — the
+ * manifest (_shared/menu/data/menu_manifest.json, key ``llm_menu``) — the
  * SINGLE SOURCE OF TRUTH shared with the macOS renderer so the two IA menus can
  * never drift in row order or greying policy. Cached after the first read (the
  * manifest is static for the session).
  *
  * The rows used to live in a SECOND shared file of their own
- * (_shared/modules/llm/menu_layout.json); one menu therefore had two shared
+ * (_shared/ai/data/menu_layout.json); one menu therefore had two shared
  * descriptions, and the manifest's ``llm_menu`` key described a menu only Linux
  * drew. Reading the manifest here is what collapses the two back into one.
  *

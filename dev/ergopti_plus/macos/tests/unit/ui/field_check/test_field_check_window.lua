@@ -13,15 +13,15 @@
 
 local helpers = require("tests.helpers")
 
-local MODULES = { "infra.logger", "infra.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
+local MODULES = { "core.logger.engine.logger", "core.i18n.engine.i18n", "infra.field_check", "infra.field_check_checks", "ui.field_check" }
 
 --- Loads the window over scripted services.
 --- @param body function(Window, services, world)
 local function with_window(body)
 	helpers.with_stub_scope(MODULES, function()
-		package.loaded["infra.logger"] = helpers.make_logger_stub()
+		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		-- The label-value join is the locale's own template (common.label_value).
-		package.loaded["infra.i18n"] = { get = function(key)
+		package.loaded["core.i18n.engine.i18n"] = { get = function(key)
 			if key == "common.label_value" then return "{1} : {2}" end
 			return "[" .. key .. "]"
 		end }
@@ -64,7 +64,7 @@ helpers.describe("field check menu rows", function()
 	end)
 
 	helpers.it("declares every Mac row once for macOS only, with a reason, and wires every row in the builder", function()
-		local file = assert(io.open(helpers.shared("modules/menu/menu_manifest.json"), "rb"))
+		local file = assert(io.open(helpers.shared("menu/data/menu_manifest.json"), "rb"))
 		local manifest = hs.json.decode(file:read("*a"))
 		file:close()
 		local rows = {}

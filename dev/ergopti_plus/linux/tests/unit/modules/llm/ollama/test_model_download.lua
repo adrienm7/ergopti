@@ -29,7 +29,7 @@ local function load_fixture()
 	-- The real bridge: a fake that accepted any operation hid that the real one
 	-- knew no "pull", so every download failed before reaching Ollama.
 	package.loaded["infra.llm_bridge"] = nil
-	replace("adapters.http_client", {
+	replace("core.network.adapters.http_client", {
 		postStream = function(url, headers, body, opts, on_chunk, on_done)
 			transport.starts[#transport.starts + 1] = {
 				url = url, headers = headers, body = body, opts = opts,
@@ -43,7 +43,7 @@ local function load_fixture()
 		end,
 	})
 	transport.owned_http = {}
-	require("tests.support.owned_http_fixture").attach(package.loaded["adapters.http_client"], transport.owned_http)
+	require("tests.support.owned_http_fixture").attach(package.loaded["core.network.adapters.http_client"], transport.owned_http)
 	replace("ui.download_window.bridge", {
 		-- The real window refuses a session without a known kind; a model pull
 		-- must name its own
@@ -266,7 +266,7 @@ end)
 
 helpers.describe("shared model catalogue projection", function()
 	helpers.it("derives Ollama runtime tags and keeps active/install identities coherent", function()
-		local Catalogue = require("llm.model_catalogue")
+		local Catalogue = require("ai.engine.local_servers.model_catalogue")
 		local source = { {
 			label = "Provider",
 			families = { {
@@ -362,7 +362,7 @@ helpers.describe("model pull retains exact creator and native settlement debt", 
 
 	helpers.it("model JSON creator retains cancellation until preparation unwinds", function()
 		local Download, transport, window = load_fixture()
-		local json = require("json")
+		local json = require("core.text.engine.json")
 		local encode = json.encode
 		json.encode = function(value)
 			transport.shutdown_during_encode = Download.shutdown()
@@ -405,7 +405,7 @@ helpers.describe("model source withdrawal and exact progress namespace", functio
 			transport.starts[1].on_done({ ok = true })
 			helpers.assert_eq(#window.completions, 1)
 			helpers.assert_eq(window.completions[1][2], false)
-			helpers.assert_eq(window.completions[1][3], require("infra.i18n").get("ollama.download_cancelled"))
+			helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get("ollama.download_cancelled"))
 			helpers.assert_eq(Download.is_active(), false)
 			helpers.assert_eq(window.retired_session, 11)
 			helpers.assert_true(Download.start("http://127.0.0.1:11434", "other:2b", "Other"))
@@ -480,7 +480,7 @@ end)
 helpers.describe("model preparation failure after source withdrawal", function()
 	helpers.it("withdrawn model consent with encode error retires known old UI without HTTP", function()
 		local Download, transport, window = load_fixture()
-		local json, allowed = require("json"), true
+		local json, allowed = require("core.text.engine.json"), true
 		local encode = json.encode
 		json.encode = function() allowed = false; error("controlled preparation error") end
 		local ok, err = xpcall(function()
@@ -489,7 +489,7 @@ helpers.describe("model preparation failure after source withdrawal", function()
 			helpers.assert_eq(#transport.starts, 0)
 			helpers.assert_eq(#window.completions, 1)
 			helpers.assert_eq(window.completions[1][2], false)
-			helpers.assert_eq(window.completions[1][3], require("infra.i18n").get("ollama.download_cancelled"))
+			helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get("ollama.download_cancelled"))
 			helpers.assert_eq(Download.is_active(), false)
 			helpers.assert_eq(window.retired_session, 11)
 			helpers.assert_true(Download.shutdown())
@@ -513,7 +513,7 @@ helpers.describe("model cancellation namespace publication", function()
 			window.complete_refused = false
 			helpers.assert_true(Download.shutdown())
 			helpers.assert_eq(window.completions[1][2], false)
-			helpers.assert_eq(window.completions[1][3], require("infra.i18n").get("ollama.download_cancelled"))
+			helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get("ollama.download_cancelled"))
 			helpers.assert_eq(window.retired_session, 11)
 		end, debug.traceback)
 		restore()
@@ -549,7 +549,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 		local env = setmetatable({
 			privacy_owners = {},
 			keystats = { stop = function() return true end },
-			ShutdownCoordinator = require("infra.shutdown_coordinator"), prediction_engine = prediction,
+			ShutdownCoordinator = require("core.lifecycle.engine.shutdown.coordinator"), prediction_engine = prediction,
 			webview_manager = webviews, dyn_hotstrings = false, updater = false, file_watchers = false,
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
 			tooltip_preview = false, gestures = false, input_capture_gate = false,
@@ -658,7 +658,7 @@ helpers.describe("model download: exact requester retirement continuation", func
 			Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen", function(done) finished = done end)
 			helpers.assert_eq(#transport.starts, 0, "the daemon is never asked to fetch")
 			helpers.assert_eq(window.completions[1][2], false)
-			helpers.assert_eq(window.completions[1][3], require("infra.i18n").get("network.relay.sign_in_rejected"))
+			helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get("network.relay.sign_in_rejected"))
 			helpers.assert_eq(finished, false)
 			helpers.assert_eq(Download.is_active(), false)
 			shown().on_retry()
@@ -692,9 +692,9 @@ helpers.describe("model download: exact requester retirement continuation", func
 	}) do
 		helpers.it("(pac-direct-fallback-pull) " .. case.name, function()
 			local State = require("modules.llm.ollama_install_state")
-			local saved_logger = package.loaded["logger.shim"]
+			local saved_logger = package.loaded["core.logger.engine.shim"]
 			local errors = {}
-			package.loaded["logger.shim"] = setmetatable({ error = function(_, message, ...)
+			package.loaded["core.logger.engine.shim"] = setmetatable({ error = function(_, message, ...)
 				errors[#errors + 1] = string.format(message, ...)
 			end }, { __index = function() return function() end end })
 			local ok, err = xpcall(function()
@@ -704,11 +704,11 @@ helpers.describe("model download: exact requester retirement continuation", func
 				local Download, transport, window = load_fixture()
 				helpers.assert_true(Download.start("http://127.0.0.1:11434", "qwen:2b", "Qwen"))
 				if case.remote then
-					transport.starts[1].on_chunk(require("json").encode({ error = case.remote }) .. "\n")
+					transport.starts[1].on_chunk(require("core.text.engine.json").encode({ error = case.remote }) .. "\n")
 				end
 				transport.starts[1].on_done({ ok = case.remote ~= nil })
 				helpers.assert_eq(window.completions[1][2], false)
-				helpers.assert_eq(window.completions[1][3], require("infra.i18n").get(case.key))
+				helpers.assert_eq(window.completions[1][3], require("core.i18n.engine.i18n").get(case.key))
 				local named = 0
 				for _, line in ipairs(errors) do
 					if line:find(case.stage or "\0", 1, true) and line:find("direct connection failed", 1, true) then
@@ -717,7 +717,7 @@ helpers.describe("model download: exact requester retirement continuation", func
 				end
 				helpers.assert_eq(named, case.logged, "the log names the lookup stage and the direct failure")
 			end, debug.traceback)
-			package.loaded["logger.shim"] = saved_logger
+			package.loaded["core.logger.engine.shim"] = saved_logger
 			require("modules.llm.ollama_install_state")._reset()
 			restore()
 			if not ok then error(err, 0) end

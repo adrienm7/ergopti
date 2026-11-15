@@ -127,7 +127,7 @@ _GR_PhysicalCaptions() {
 	Child := Menu()
 	try {
 		for Code in ["en", "fr"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Reads := Map("count", 0)
 			Getters := Map("agent_system_backend_current_caption", _GR_ReadCaption.Bind(Reads, "12% / 🦀"))
@@ -173,7 +173,7 @@ _GR_PhysicalCaptionPolicy() {
 	Child := Menu()
 	try {
 		for Language, Expected in Map("en", "⚡ System 1 (fast): 12% / 🦀", "fr", "⚡ Système 1 (rapide) : 12% / 🦀") {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Language . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Calls := Map("count", 0)
 			Getter := _MM_InertCaptionCount.Bind(Calls, "12% / 🦀")
@@ -216,7 +216,7 @@ _DA_WithPhysicalFrame(Body) {
 	try {
 		Root[Key] := Corpus["rows"]
 		for Language in ["en", "fr"] {
-			_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Language . ".json", "UTF-8"))
+			_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Language . ".json", "UTF-8"))
 			_I18nCacheLoaded := true
 			Body.Call(Key, Root, Corpus, Language)
 		}

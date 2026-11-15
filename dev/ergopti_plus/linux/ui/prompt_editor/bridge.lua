@@ -9,11 +9,11 @@
 --- ==============================================================================
 
 local M = {}
-local TextUtils = require("text_utils")
+local TextUtils = require("core.text.engine.utils_core")
 M.bridge_name = "prompt_bridge"
 
-local Json = require("json")
-local Logger = require("logger.shim")
+local Json = require("core.text.engine.json")
+local Logger = require("core.logger.engine.shim")
 
 local APP_NAME = "prompt_editor"
 local LOG = "bridge.prompt_editor"
@@ -28,7 +28,7 @@ local function dependency(state, field, module_name)
 end
 
 local function translated(key)
-	local ok, i18n = pcall(require, "infra.i18n")
+	local ok, i18n = pcall(require, "core.i18n.engine.i18n")
 	return ok and type(i18n.get) == "function" and i18n.get(key) or key
 end
 
@@ -55,7 +55,7 @@ local function close_session(session, state, context)
 	if type(context) == "table" and type(context.close_owned_window) == "function" then
 		closed = context.close_owned_window() == true
 	else
-		local manager = dependency(state, "webview_manager", "ui.webview_manager")
+		local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 		closed = manager and type(manager.hide) == "function"
 			and manager.hide(APP_NAME) == true
 	end
@@ -75,7 +75,7 @@ local function push_init(session, state, context)
 				and context.epoch ~= session.window_epoch) then
 		return false, nil
 	end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	if not manager or type(manager.eval_js) ~= "function" then return false, nil end
 	local ok_json, encoded = pcall(Json.encode, session.payload)
 	if not ok_json or type(encoded) ~= "string" then return false, nil end
@@ -91,7 +91,7 @@ end
 local function notify_save_refused(session, state)
 	if _active_session ~= session or session.settled or type(state) ~= "table"
 		or type(state.notify_error) ~= "function" then return false end
-	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local manager = dependency(state, "webview_manager", "core.ui.ui.webview_manager")
 	local current = manager and manager.page_current
 	local epoch, notify = session.window_epoch, state.notify_error
 	if type(current) ~= "function" or type(epoch) ~= "number" then return false end
@@ -164,7 +164,7 @@ function M.open(existing, on_save, opts)
 		Logger.error(LOG, "Prompt editor requires a save callback.")
 		return false
 	end
-	local manager = dependency(nil, nil, "ui.webview_manager")
+	local manager = dependency(nil, nil, "core.ui.ui.webview_manager")
 	if not manager or type(manager.show) ~= "function" or type(manager.hide) ~= "function" then
 		Logger.error(LOG, "Prompt editor cannot open: webview manager is unavailable.")
 		return false

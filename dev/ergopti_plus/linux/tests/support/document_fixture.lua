@@ -5,14 +5,14 @@
 --- route metadata. No privileged document owner is fabricated by the test.
 --- This is a pure fixture, not real LGI/WebKit/entropy or native close proof.
 local M = {}
-local Json = require("json")
+local Json = require("core.text.engine.json")
 function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
-	local names = {"lgi","infra.monotonic","infra.timings","infra.managed_http_deadline",
-		"adapters.event_loop","adapters.notifier","adapters.application_notifier","ui.webkit_host","ui.webview_manager"}
+	local names = {"lgi","core.logger.engine.monotonic","core.timing.engine.timings","core.network.engine.managed_http_deadline",
+		"core.events.loop","platform.system.notifier","platform.focus.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
-	local real_host = require("ui.webkit_host")
+	local real_host = require("core.ui.ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
 	local nonce_serial = 0
 	host.native_nonce = function() nonce_serial=nonce_serial+1;return string.rep("A",20)..string.format("%04d",nonce_serial) end
@@ -105,25 +105,25 @@ function M.new(app_name, handler, state)
 				ucm.connected[id]=false
 				ucm.on_script_message_received[ucm.signal_details[id]]=nil
 			end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
-		package.loaded["infra.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
-		package.loaded["infra.timings"]={ms=function(section,key)
+		package.loaded["core.logger.engine.monotonic"]={now_ms=function()return c.now end,has_hires=function()return true end}
+		package.loaded["core.timing.engine.timings"]={ms=function(section,key)
 			assert(section=="ui" and key=="document_initialization_ack_timeout_ms");return 5000 end}
-		package.loaded["infra.managed_http_deadline"]={start=function(deadline,expired)
+		package.loaded["core.network.engine.managed_http_deadline"]={start=function(deadline,expired)
 			local t={started=true,settled=false,listeners={},deadline=deadline,expired=expired}
 			function t:cancel()if c.on_cancel then c.on_cancel()end;return true end
 			function t:is_settled()return self.settled end
 			function t:on_settled(cb)self.listeners[#self.listeners+1]=cb;return true end
 			function t:ack_close()self.settled=true;local callbacks=self.listeners;self.listeners={};for _,cb in ipairs(callbacks)do cb()end end
 			c.timers[#c.timers+1]=t;return t end}
-		package.loaded["adapters.event_loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
-		package.loaded["adapters.notifier"]={send_owned=function(message,opts,admit)
+		package.loaded["core.events.loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
+		package.loaded["platform.system.notifier"]={send_owned=function(message,opts,admit)
 			if c.on_notice_probe then c.on_notice_probe() end
 			if not admit() then return false end
 			c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
-		package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
-		package.loaded["ui.webkit_host"]=host
-		package.loaded["ui.webview_manager"]=nil
-		Manager=require("ui.webview_manager");c.manager=Manager
+		package.loaded["platform.focus.application_notifier"]=package.loaded["platform.system.notifier"]
+		package.loaded["core.ui.ui.webkit_host"]=host
+		package.loaded["core.ui.ui.webview_manager"]=nil
+		Manager=require("core.ui.ui.webview_manager");c.manager=Manager
 		native_shutdown = Manager.shutdown
 		local owned_state={}
 		for key,value in pairs(state or {})do owned_state[key]=value end

@@ -51,11 +51,11 @@
 ---    (adapters/field_probe_ports.lua), so the portable suite drives each step.
 --- ==============================================================================
 
-local Identifiers = require("identifiers")
-local Json = require("json")
-local NativePath = require("native_path")
-local TableUtil = require("table_util")
-local TextUtils = require("text_utils")
+local Identifiers = require("core.text.engine.identifiers")
+local Json = require("core.text.engine.json")
+local NativePath = require("core.fs.engine.native_path")
+local TableUtil = require("core.text.engine.table_util")
+local TextUtils = require("core.text.engine.utils_core")
 
 local M = {}
 
@@ -204,7 +204,7 @@ end
 -- ======================================
 
 -- Timer probes the run-loop step takes, how long each asks, and the lateness
--- above which key events arrive late at the taps (infra/logger.lua's hold count).
+-- above which key events arrive late at the taps (core/logger/engine/logger.lua's hold count).
 M.RUNLOOP_PROBES = 5
 M.RUNLOOP_PROBE_SECONDS = 0.1
 M.RUNLOOP_LATE_MS = 250

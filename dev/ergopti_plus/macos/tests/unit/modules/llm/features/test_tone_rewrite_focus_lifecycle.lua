@@ -12,9 +12,9 @@
 local helpers = require("tests.helpers")
 local FIFO = require("tests.support.modules.llm.selection_translation_fifo")
 local Response = require("tests.support.modules.llm.selection_translation_fixture")
-local Tone = require("llm.tone")
+local Tone = require("ai.engine.prediction.tone")
 local RESULT = "A formal rewrite"
-local function seconds(key) return require("infra.timings").sec("debounce", key) end
+local function seconds(key) return require("core.timing.engine.timings").sec("debounce", key) end
 
 --- Owns the tone module in addition to the common real-pipeline fixture scope.
 --- @param scenario function Complete callback and timer scenario.
@@ -251,7 +251,7 @@ helpers.describe("tone rewrite retains its original native destination", functio
 	helpers.it("refuses a throwing final selection guard before HTTP (tone-focus-guard-error)", function()
 		with_world(function(world)
 			local checked, errors = false, {}
-			require("infra.logger").error = function(_, template, ...)
+			require("core.logger.engine.logger").error = function(_, template, ...)
 				errors[#errors + 1] = string.format(template, ...)
 			end
 			helpers.assert_eq(world.engine.request_selection_rewrite("tone_formal", "Hello", function()

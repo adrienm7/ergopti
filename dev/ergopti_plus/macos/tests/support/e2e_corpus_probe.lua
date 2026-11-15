@@ -10,9 +10,9 @@ local mode = assert(arg[1], "a probe mode is required")
 local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 local root = assert(source:match("^(.*)/tests/support/e2e_corpus_probe%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. package.path
+	.. root .. "/../_shared/?.lua;" .. package.path
 local corpus = assert(root:match("^(.*)/[^/]+$")) .. "/_shared/tests/corpus/hotstrings/vectors.json"
-local json = require("json")
+local json = require("core.text.engine.json")
 local vectors = json.decode(require("tests.support.source_file").read(corpus)).vectors
 local selected
 for _, vector in ipairs(vectors) do

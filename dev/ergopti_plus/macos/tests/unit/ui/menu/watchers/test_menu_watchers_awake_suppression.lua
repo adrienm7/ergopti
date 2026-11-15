@@ -13,66 +13,66 @@ local helpers = require("tests.helpers")
 
 local OWNED_MODULES = {
 	"_generated.logger_sub_files",
-	"adapters.application_notifier",
-	"adapters.boot_journal",
-	"adapters.file_system",
-	"adapters.hotkey_registrar",
-	"adapters.json_codec",
-	"adapters.log_transport",
+	"platform.focus.application_notifier",
+	"core.logger.adapters.boot_journal",
+	"core.fs.adapters.file_system",
+	"platform.input.hotkey_registrar",
+	"core.fs.adapters.json_codec",
+	"core.logger.adapters.log_transport",
 	"adapters.python_interpreter",
-	"adapters.running_application",
-	"adapters.shell_runner",
-	"adapters.storage",
-	"adapters.task_environment",
-	"adapters.timer_scheduler",
+	"platform.focus.running_application",
+	"core.process.adapters.shell_runner",
+	"core.fs.adapters.storage",
+	"core.process.adapters.task_environment",
+	"core.events.timer_scheduler",
 	"adapters.tray_menu",
 	"adapters.update_launcher",
-	"app_dirs",
-	"caps_word.auto_off",
-	"compat.utf8",
-	"config_binding_identity",
-	"config_binding_publication",
-	"config_defaults",
-	"config_migrate",
-	"diagnostics.operation_reporter",
-	"diagnostics.redact",
-	"diagnostics.runtime_log",
-	"diagnostics.snapshot",
-	"error_description",
-	"hotstrings.personal_files",
+	"core.fs.engine.app_dirs",
+	"keyboard.engine.caps_word_auto_off",
+	"core.lifecycle.engine.compat.utf8",
+	"settings.engine.publication.binding_identity",
+	"settings.engine.publication.binding_publication",
+	"settings.engine.publication.defaults",
+	"settings.engine.migration.migrate",
+	"diagnostics.engine.operation_reporter",
+	"diagnostics.engine.reports.redact",
+	"diagnostics.engine.runtime_log",
+	"diagnostics.engine.snapshot",
+	"diagnostics.engine.reports.error_description",
+	"hotstrings.engine.catalogue.personal_files",
 	"hs",
-	"infra.boot_profiler",
+	"core.logger.engine.boot_profiler",
 	"infra.capsword_auto_off",
 	"infra.config_paths",
-	"infra.deferred_work",
+	"core.timing.engine.deferred_work",
 	"infra.diagnostic_snapshot",
-	"infra.dialog_util",
+	"core.ui.engine.dialog_util",
 	"infra.factory_reset_journal",
-	"infra.fs_dir",
+	"core.fs.engine.dir",
 	"infra.git_status",
-	"infra.i18n",
-	"infra.launcher_environment",
-	"infra.log_folders",
-	"infra.logger",
+	"core.i18n.engine.i18n",
+	"core.lifecycle.engine.launcher_environment",
+	"core.logger.engine.log_folders",
+	"core.logger.engine.logger",
 	"infra.manifest_reader",
-	"infra.notifications",
-	"infra.paths",
+	"core.ui.engine.notifications",
+	"core.fs.engine.paths",
 	"infra.personal_shortcuts",
 	"infra.preferences",
-	"infra.reload_guard",
+	"core.lifecycle.engine.reload.guard",
 	"infra.script_chord_catalogue",
-	"infra.termination_coordinator",
-	"infra.text_utils",
-	"infra.toml.codec",
-	"infra.toml.reader",
+	"core.lifecycle.engine.shutdown.termination_coordinator",
+	"core.text.engine.utils",
+	"core.text.engine.toml.codec",
+	"core.text.engine.toml.reader",
 	"infra.ui_restore",
-	"json",
-	"keymap.terminators_catalogue",
-	"logger",
-	"menu.click_intent",
-	"menu.wrap_mutation",
-	"module_source_directory",
-	"module_source_identity",
+	"core.text.engine.json",
+	"layouts.engine.layers.terminators_catalogue",
+	"core.logger.engine",
+	"menu.engine.click_intent",
+	"menu.engine.wrap_mutation",
+	"core.fs.engine.module_source_directory",
+	"core.fs.engine.module_source_identity",
 	"modules.dynamic_hotstrings",
 	"modules.gestures",
 	"modules.keystats",
@@ -81,25 +81,25 @@ local OWNED_MODULES = {
 	"modules.shortcuts",
 	"modules.updater",
 	"modules.updater.channel",
-	"native_path",
-	"number_policy",
-	"reload_gate",
-	"script_chords",
-	"shortcuts.assignment",
-	"shortcuts.physical_slots",
-	"tap_hold.key_combinations",
+	"core.fs.engine.native_path",
+	"core.text.engine.number_policy",
+	"core.lifecycle.engine.reload.gate",
+	"keyboard.engine.layers.script_chords",
+	"shortcuts.engine.assignment",
+	"shortcuts.engine.physical_slots",
+	"tap_hold.engine.key_combinations",
 	"tests.stubs.hs",
 	"tests.support.menu_boot_fixture",
-	"toml_codec",
-	"toml_codec.basic_string",
-	"toml_codec.bom",
-	"toml_codec.codec",
-	"toml_codec.key_path",
-	"toml_codec.leaf_rows",
-	"toml_codec.record_scanner",
-	"toml_codec.reader",
-	"toml_codec.source_open",
-	"toml_codec.writer",
+	"core.text.engine.toml_codec",
+	"core.text.engine.toml_codec.basic_string",
+	"core.text.engine.toml_codec.bom",
+	"core.text.engine.toml_codec.codec",
+	"core.text.engine.toml_codec.key_path",
+	"core.text.engine.toml_codec.leaf_rows",
+	"core.text.engine.toml_codec.record_scanner",
+	"core.text.engine.toml_codec.reader",
+	"core.text.engine.toml_codec.source_open",
+	"core.text.engine.toml_codec.writer",
 	"ui.hotstring_editor",
 	"ui.log_openers",
 	"ui.menu.base_delay_transaction",
@@ -127,7 +127,7 @@ local OWNED_MODULES = {
 	"ui.menu.recoverable_file_moves",
 	"ui.menu.script_chords_transaction",
 	"ui.menu.session_demotions",
-	"window_titles",
+	"core.ui.engine.window_titles",
 }
 
 local EDIT_PATH = "/virtual/user-config/hotstrings_config.toml"
@@ -175,7 +175,7 @@ local function with_menu(body)
 							return native
 						end,
 					}
-					package.loaded["adapters.shell_runner"].open = function(path)
+					package.loaded["core.process.adapters.shell_runner"].open = function(path)
 						assert(path == "/virtual/init.lua" or path == "/virtual/config.toml",
 							"only the actual deferred file-open commands may cross this boundary")
 						world.opened[#world.opened + 1] = path
@@ -210,7 +210,7 @@ local function with_menu(body)
 						world.deferred_reload = callback
 						return true
 					end
-					package.loaded["infra.termination_coordinator"].request_reload = function(source)
+					package.loaded["core.lifecycle.engine.shutdown.termination_coordinator"].request_reload = function(source)
 						helpers.assert_eq(source, "watcher", "the real menu must identify its source request")
 						world.reloads = world.reloads + 1
 						return world.reload_accepts
@@ -223,7 +223,7 @@ local function with_menu(body)
 				end,
 			})
 			Menu = require("ui.menu.init")
-			Scheduler = require("adapters.timer_scheduler")
+			Scheduler = require("core.events.timer_scheduler")
 			helpers.assert_not_nil(fixture.menu, "the actual menu must boot")
 			helpers.assert_eq(#world.watchers, 1, "the real config watcher must own one native stream")
 			helpers.assert_eq(world.watchers[1].path, "/virtual/")
@@ -234,7 +234,7 @@ local function with_menu(body)
 			body(world)
 		end, debug.traceback)
 		Menu = Menu or package.loaded["ui.menu.init"]
-		Scheduler = Scheduler or package.loaded["adapters.timer_scheduler"]
+		Scheduler = Scheduler or package.loaded["core.events.timer_scheduler"]
 		if Menu then helpers.assert_eq(Menu.stop_watchers(), true, "the exact menu watcher owner must retire") end
 		if Scheduler then helpers.assert_eq(Scheduler.cancelAll(), true, "the menu's native timer owners must retire") end
 		for _, watcher in ipairs(world.watchers) do

@@ -154,8 +154,14 @@ _BRC_ByRefDefinitions(Src) {
 ; ===========================================
 ; ===========================================
 
+; Block comments hold prose that reads as calls (a doc comment's
+; ``Open(..., true)``), so they are masked, offsets kept, before the scan.
+_BRC_CodeOnly(Src) {
+	return _DriverMaskBlockComments(&Src)
+}
+
 _BRC_ByRefCallSitesPassAmpersand() {
-	Src := _DriverSourceNoComments()
+	Src := _BRC_CodeOnly(_DriverSourceNoComments())
 	Defs := _BRC_ByRefDefinitions(Src)
 	Assert(Defs.Count > 0,
 		"the ByRef scan must find at least one &-declared parameter, otherwise the guard is vacuous")
@@ -250,3 +256,14 @@ _BRC_TraversalDoesNotRestart() {
 }
 Test("meta byref: source traversal never restarts per symbol (byref-scan-source-once)",
 	_BRC_TraversalDoesNotRestart)
+
+; A ByRef method shares its name with calls written only in documentation: a
+; block comment is prose, while the same call in code is still an offender.
+_BRC_BlockCommentIsNotACallSite() {
+	Src := 'Open(&Reason := "") {`n}`n/**`n * Async ``Open(..., true)`` rejects binary bodies.`n */`nOpen(value)`n'
+	Violations := _BRC_FindViolations(_BRC_CodeOnly(Src), _BRC_ByRefDefinitions(Src))
+	AssertEqual(1, Violations.Length, "only the call in code is an offender")
+	AssertContains(Violations[1], "Open(value")
+}
+Test("meta byref: a block comment is not a call site (byref-block-comment)",
+	_BRC_BlockCommentIsNotACallSite)

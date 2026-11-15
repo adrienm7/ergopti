@@ -37,7 +37,10 @@ _CTWP_NativeReadCustodyTick(State) {
 			return
 		}
 	} catch as Err {
-		State.failure := Err.Message
+		; The caught state is the verdict: an Error with an empty message is
+		; still an observer failure, and the message alone read it as none.
+		State.failed := true
+		State.failure := Type(Err) . ": " . Err.Message
 		State.active := false
 	}
 }
@@ -49,7 +52,11 @@ _CTWP_NativeReadCustodyTick(State) {
 ; the gap between two interrupt checks on some attempt, and every byte of it costs
 ; far more in the commit and the rollback than in that read, so a small source with
 ; many attempts is both faster and tighter than a large one with few.
-global _CTWP_TEMPORAL_READ_ATTEMPTS := 512
+; A hit is a geometric draw: 57 hosted modes (7 runs, 2026-11-14) needed 71.5
+; attempts on average, up to 432, so 512 missed one mode in about 150 runs
+; (run 43611195865). 2048 leaves about 3e-12 per run; a run only pays them on
+; a miss. tools/test/test-windows-config-timer-custody-bound.cjs recomputes it.
+global _CTWP_TEMPORAL_READ_ATTEMPTS := 2048
 
 _CTWP_TemporalPaddedSource(Marker) {
 	static PaddingDoublings := 18
@@ -277,7 +284,7 @@ _CTWP_NativeReadTemporalCustody() {
 		for Mode in ["control", "hash", "port"] {
 			_TestPrint("# acquired-read timer custody mode " . Mode)
 			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode,
-				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failed: false, failure: "",
 				restoreErrors: []}
 			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
 				: ((*) => (State.observerCalls += 1, Digest))
@@ -299,7 +306,7 @@ _CTWP_NativeReadTemporalCustody() {
 				}
 			}
 			Restore()
-			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertFalse(State.failed, "actual timer observer failure is retained rather than swallowed: " . State.failure)
 			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
 			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
 			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")
@@ -363,7 +370,10 @@ _CTWP_GuardedReadCustodyTick(State) {
 			return
 		}
 	} catch as Err {
-		State.failure := Err.Message
+		; The caught state is the verdict: an Error with an empty message is
+		; still an observer failure, and the message alone read it as none.
+		State.failed := true
+		State.failure := Type(Err) . ": " . Err.Message
 		State.active := false
 	}
 }
@@ -432,7 +442,7 @@ _CTWP_GuardedReadTemporalCustody() {
 			default: TargetCallback := false
 			}
 			State := {path: Path, pathKey: FileReadActivityKey(Path), port: Native, mode: Mode, callback: TargetCallback,
-				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failure: "",
+				active: false, observed: false, readerHandle: -1, timerCritical: -1, observerCalls: 0, failed: false, failure: "",
 				restoreErrors: []}
 			State.observer := Mode == "port" ? ((*) => (State.observerCalls += 1, HashCallback))
 				: ((*) => (State.observerCalls += 1, Mode == "hash" ? Digest : 1))
@@ -468,7 +478,7 @@ _CTWP_GuardedReadTemporalCustody() {
 					AssertThrows(() => Captured.port["hash"].Call(NewSource))
 			}
 			Restore()
-			AssertEqual("", State.failure, "actual timer observer failure is retained rather than swallowed")
+			AssertFalse(State.failed, "actual timer observer failure is retained rather than swallowed: " . State.failure)
 			AssertTrue(State.observed, "an actual timer must run during the acquired native exact-read span")
 			Assert(State.readerHandle != -1, "the timer observed an actual retained Win32 read handle")
 			AssertEqual(0, State.timerCritical, "the original native read remains interruptible")

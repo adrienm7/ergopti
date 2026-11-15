@@ -411,11 +411,11 @@ _TBSF_WithLocale(Code, Body) {
 		_I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded, _I18nFallbacksWarmed]
 	try {
 		_I18nLocale := Code
-		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\" . Code . ".json", "UTF-8"))
 		_I18nCacheLoaded := true
-		_I18nCacheEn := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+		_I18nCacheEn := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\en.json", "UTF-8"))
 		_I18nCacheEnLoaded := true
-		_I18nCacheFr := JsonParse(FileRead(_SharedDir . "\data\locales\fr.json", "UTF-8"))
+		_I18nCacheFr := JsonParse(FileRead(_SharedDir . "\core\i18n\data\locales\fr.json", "UTF-8"))
 		_I18nCacheFrLoaded := true
 		_I18nFallbacksWarmed := true
 		return Body.Call()
@@ -502,13 +502,13 @@ _TBPI_UnavailableLiveSource() {
 _TBPI_UnavailableLiveSourceBody() {
 	global _SharedDir, _MM_MANIFEST_ROOT_CACHE
 	SavedDir := _SharedDir, SavedRoot := _MM_MANIFEST_ROOT_CACHE
-	CanonicalBytes := FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8")
+	CanonicalBytes := FileRead(_SharedDir . "\menu\data\menu_manifest.json", "UTF-8")
 	Private := A_Temp . "\ergopti-startup-authority-" . A_TickCount
-	DirCreate(Private . "\modules\menu")
+	DirCreate(Private . "\menu\data")
 	try {
 		_SharedDir := Private
 		for Kind in ["missing", "empty", "malformed", "read-locked"] {
-			FilePath := Private . "\modules\menu\menu_manifest.json"
+			FilePath := Private . "\menu\data\menu_manifest.json"
 			if FileExist(FilePath)
 				FileDelete(FilePath)
 			if Kind != "missing"
