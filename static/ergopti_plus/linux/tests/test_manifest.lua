@@ -685,6 +685,7 @@ return {
 	"tests.unit.modules.keystats.privacy.test_focus_guard_text_owner",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_expected_text_owner",
 	"tests.unit.modules.keystats.privacy.test_focus_guard_app_context",
+	"tests.unit.modules.keystats.privacy.test_paused_driver_records_no_keys",
 	"tests.unit.modules.keystats.privacy.test_resident_text_identity",
 	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_ngram_nine_families",
 	"tests.unit.modules.keystats.aggregation.test_aggregate_walker_streaks_layout_exists",

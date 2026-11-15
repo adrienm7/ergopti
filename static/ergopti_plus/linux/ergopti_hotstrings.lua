@@ -1954,6 +1954,8 @@ local function main()
 		physical_privacy_admission = { code = scancode, allowed = allowed }
 		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
+		-- A paused driver feeds neither the heatmap nor the live WPM (EDD-1).
+		if script_actions.is_paused() then return end
 		local app_id = _cached_app_id or "Unknown"
 		if keystats.is_unrecorded_app(app_id) then
 			keystats.suppress()
@@ -2179,7 +2181,9 @@ local function main()
 				edits_text = true
 			end
 			secure_focus_guard.blocks_text()
-			local chord = keyboard_shortcuts.chord_name(detail)
+			-- A paused driver records no typing metrics (EDD-1), as macOS and
+			-- Windows drop them while paused.
+			local chord = not script_actions.is_paused() and keyboard_shortcuts.chord_name(detail) or nil
 			if chord then
 				keystats.record_shortcut(_cached_app_id or "Unknown", chord,
 					math.floor(Monotonic.now_ms()))
@@ -2686,7 +2690,8 @@ local function main()
 			end,
 		})
 		if not consumed then return false end
-		local chord = keyboard_shortcuts.chord_name(detail)
+		-- A paused driver records no typing metrics (EDD-1).
+		local chord = not script_actions.is_paused() and keyboard_shortcuts.chord_name(detail) or nil
 		if chord then
 			keystats.record_shortcut(_cached_app_id or "Unknown", chord, math.floor(Monotonic.now_ms()))
 		end
