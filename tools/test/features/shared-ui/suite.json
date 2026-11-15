@@ -480,7 +480,7 @@
 		},
 		{
 			"id": "corpus-count-tables",
-			"ordinal": 674,
+			"ordinal": 675,
 			"name": "every published count table under static/corpus/frequency passes the strict reader and traces to its pinned archive and register entry, and the importer's Leipzig, Lexique and pruning rules give hand-computed counts",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-count-tables.cjs"],
