@@ -528,9 +528,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): layout checkboxes, 25 built-in corpora with their register, paste and file reading are
       done (f7b366f6ba, 07b19db438, bd5f162320; test-layout-comparer-page.cjs); PDF text is read in the page
       (2026-11-15, `claude/ergopti-todo-pdf-text`: pdf_text.js, no library; proof: test-pdf-text.cjs on the
-      repository's Chrome, Firefox and Google Docs exports, `comparer-reads-pdf` in layout-editor.playwright.cjs);
-      layouts made in
-      « Éditer » still do not appear in the comparison list (only « Compare with other layouts » adds the one edited).
+      repository's Chrome, Firefox and Google Docs exports, `comparer-reads-pdf` in layout-editor.playwright.cjs).
+      The layouts open in « Éditer » are in the comparison list, ticked and kept in step with the editor (2026-11-15,
+      `claude/ergopti-todo-workspace-in-comparer`; proof: `editor-layouts-in-comparer` in layout-editor.playwright.cjs
+      and site-structure.playwright.cjs).
 
 - [x] **Several personal layouts, never lost (maintainer, 2026-11-14).** « Éditer » holds several layouts in its own
       tabs; a « + » button opens a new one (blank, from a library layout, or from a file). Everything is saved

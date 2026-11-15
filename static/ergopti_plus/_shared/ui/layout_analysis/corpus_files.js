@@ -23,8 +23,9 @@
  *    promise resolved once window.LAYOUT_ANALYSIS_CORPORA[id] is set. Tables
  *    already loaded are used as they are.
  * 4. The Studio's shared state: the keyboard format its editor and Comparer
- *    share (stored once for both), and the layout the site's editor hands to
- *    the Comparer framed beside it (this tab's storage, taken once).
+ *    share (stored once for both), the layout the site's editor hands to the
+ *    Comparer framed beside it (this tab's storage, taken once), and the
+ *    layouts open in « Éditer », which the Comparer lists and follows.
  * ==============================================================================
  */
 
@@ -196,6 +197,10 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	// layouts » stores it here for this tab, then the framing page opens the
 	// Comparer, which takes it once.
 	const HANDOFF_KEY = 'ergopti.studio.compare_handoff.v1';
+	// The layouts open in « Éditer », for the Comparer's list (library shape): the
+	// same page hears the event, the site's other frame the storage key.
+	const EDITOR_LAYOUTS_KEY = 'ergopti.studio.editor_layouts.v1';
+	const EDITOR_LAYOUTS_EVENT = 'ergopti-studio:editor-layouts';
 	// The message the editor's frame posts to the site's Studio to open « Comparer ».
 	const OPEN_COMPARER_MESSAGE = 'ergopti-studio:open-comparer';
 
@@ -248,8 +253,45 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		return text === null ? null : JSON.parse(text);
 	}
 
+	/**
+	 * Tells the Comparer which layouts « Éditer » has open (library shape).
+	 * @param {object[]} layouts
+	 */
+	function publishEditorLayouts(layouts) {
+		try {
+			window.localStorage.setItem(EDITOR_LAYOUTS_KEY, JSON.stringify(layouts));
+		} catch (error) {
+			// The same page still hears the event; another frame keeps its last list.
+			console.warn(`layout studio: the editor's layouts are not stored (${error.name})`);
+		}
+		window.dispatchEvent(new CustomEvent(EDITOR_LAYOUTS_EVENT, { detail: layouts }));
+	}
+
+	/**
+	 * Calls back with the layouts « Éditer » has open: the stored list now, then
+	 * every change, from this page or another frame of the Studio.
+	 * @param {function(object[]): void} listener
+	 */
+	function onEditorLayouts(listener) {
+		const read = () => {
+			try {
+				const text = window.localStorage.getItem(EDITOR_LAYOUTS_KEY);
+				return text === null ? [] : JSON.parse(text);
+			} catch {
+				return [];
+			}
+		};
+		listener(read());
+		window.addEventListener(EDITOR_LAYOUTS_EVENT, (event) => listener(event.detail));
+		window.addEventListener('storage', (event) => {
+			if (event.key === EDITOR_LAYOUTS_KEY) listener(read());
+		});
+	}
+
 	return {
 		SETTINGS_KEY,
+		publishEditorLayouts,
+		onEditorLayouts,
 		OPEN_COMPARER_MESSAGE,
 		readText,
 		builtinTables,

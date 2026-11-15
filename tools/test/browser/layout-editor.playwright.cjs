@@ -808,6 +808,37 @@ async function exerciseManager(browser, origin) {
 	assert.equal(await page.inputValue('#la-format'), '65', "the Comparer takes the editor's format");
 	await page.click('#studio-tab-edit');
 	await page.selectOption('#le-board-format', 'tkl');
+	// (editor-layouts-in-comparer) The layouts open in « Éditer » are in the
+	// Comparer's list, ticked, and follow the editor: a rename shows there.
+	const listed = () =>
+		page.$$eval('#la-layout-list .la-layout', (labels) =>
+			labels.map((label) => [label.textContent.trim(), label.querySelector('input').checked])
+		);
+	await tool(page, 'details');
+	await page.fill('#le-name', 'Studio canary');
+	await page.dispatchEvent('#le-name', 'change');
+	await page.click('#studio-tab-compare');
+	await page.waitForFunction(() =>
+		[...document.querySelectorAll('#la-layout-list .la-layout')].some(
+			(label) => label.textContent.trim() === 'Studio canary'
+		)
+	);
+	assert.deepEqual(
+		(await listed()).filter(([name]) => name === 'Studio canary'),
+		[['Studio canary', true]],
+		"the editor's layout, once and ticked"
+	);
+	await page.click('#studio-tab-edit');
+	await page.fill('#le-name', 'Studio canary 2');
+	await page.dispatchEvent('#le-name', 'change');
+	await page.click('#studio-tab-compare');
+	await page.waitForFunction(() => {
+		const names = [...document.querySelectorAll('#la-layout-list .la-layout')].map((label) =>
+			label.textContent.trim()
+		);
+		return names.includes('Studio canary 2') && !names.includes('Studio canary');
+	});
+	await page.click('#studio-tab-edit');
 	// (layout-editor-no-null-text) A section that renders nothing (the « Start
 	// from » panel when no start is open) leaves no text node behind: the root
 	// once received null and showed « null » under the toolbar.

@@ -3787,6 +3787,50 @@ var LayoutEditorPage = (function () {
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc());
 			scheduleAutosave();
+			schedulePublish();
+		}
+
+		// The Comparer lists the layouts open here (its personal layouts): each
+		// tab's analysis layout, sent after the same delay as the autosave.
+		const comparerLayouts = new WeakMap();
+		let publishTimer = null;
+		let published = null;
+		function schedulePublish() {
+			if (!analysisPanel || !window.LAYOUT_ANALYSIS_FILES) return;
+			clearTimeout(publishTimer);
+			publishTimer = setTimeout(publishLayouts, LayoutEditorWorkspace.AUTOSAVE_DELAY_MS);
+		}
+
+		/** Sends the open tabs to the Comparer; a tab the analysis cannot read is left out. */
+		function publishLayouts() {
+			keepActive();
+			const ids = new Set();
+			const layouts = [];
+			state.tabs.forEach((tab, index) => {
+				const document = tabAt(index).history.current();
+				if (!comparerLayouts.has(document)) {
+					let layout = null;
+					try {
+						layout = window.LAYOUT_ANALYSIS_PANEL.layoutFromEditorDoc(document);
+					} catch (error) {
+						// Its own tab says why (the panel); the Comparer just lacks it.
+						console.warn(
+							`layout editor: tab ${index} is not analysed (${error.code || error.message})`
+						);
+					}
+					comparerLayouts.set(document, layout);
+				}
+				const layout = comparerLayouts.get(document);
+				if (!layout) return;
+				let id = `editor_${document.layout.id}`;
+				for (let n = 2; ids.has(id); n++) id = `editor_${document.layout.id}_${n}`;
+				ids.add(id);
+				layouts.push(Object.assign({}, layout, { id, name: document.layout.name }));
+			});
+			const text = JSON.stringify(layouts);
+			if (text === published) return;
+			published = text;
+			window.LAYOUT_ANALYSIS_FILES.publishEditorLayouts(layouts);
 		}
 
 		/**

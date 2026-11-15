@@ -509,6 +509,14 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 		'tkl',
 		'the editor takes the format chosen in the Comparer'
 	);
+	// (editor-layouts-in-comparer) The layout open in the editor frame is in the
+	// Comparer frame's list on a later visit, the handoff long taken.
+	await visit(page, origin, basePath, '/studio/comparer');
+	await page
+		.frameLocator('iframe.studio-frame')
+		.locator('#la-layout-list .la-layout', { hasText: 'Mon Ergopti' })
+		.first()
+		.waitFor();
 }
 
 /** The whole structure check, in one browser page. */

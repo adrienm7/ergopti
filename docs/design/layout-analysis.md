@@ -426,7 +426,11 @@ editor and the Comparer store that format once for both (`corpus_files.js`
 `saveFormat`), so the site's two framed pages share it too; on the site the
 editor's « Compare with other layouts » keeps the layout in the tab's storage
 (`handOff`), the Studio opens « Comparer », and the Comparer ranks it
-(`takeHandoff`).
+(`takeHandoff`). The layouts open in « Éditer » are listed as personal
+layouts (ids `editor_<layout id>`), ticked when they appear: the editor sends
+each tab's analysis layout after its autosave delay (`publishEditorLayouts`),
+and the Comparer follows (`onEditorLayouts`: the same page through an event, the
+site's other frame through localStorage and its `storage` event).
 Until the user ticks or unticks a layout, the ticked layouts follow the
 keyboard: the registry, reference and personal layouts, but of a family that
 ships one layout per board (registry `geometry`: Ergopti and Ergopti ANSI)

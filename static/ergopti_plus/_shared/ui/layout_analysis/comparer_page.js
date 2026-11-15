@@ -1330,6 +1330,39 @@
 			analyse();
 		}
 
+		// The layouts open in « Éditer » (ids editor_…), listed as personal layouts
+		// and replaced whenever the editor's tabs change.
+		const editorIds = new Set();
+		function useEditorLayouts(list) {
+			const next = new Map();
+			for (const value of Array.isArray(list) ? list : []) {
+				try {
+					const layout = E.layoutFromRows(Object.assign({}, value, { origin: 'user' }));
+					if (layout.id.startsWith('editor_')) next.set(layout.id, layout);
+				} catch (error) {
+					console.warn(`layout comparer: an editor layout is refused (${error.message})`);
+				}
+			}
+			for (const id of editorIds)
+				if (!next.has(id)) {
+					layouts.splice(layouts.indexOf(byId.get(id)), 1);
+					byId.delete(id);
+					state.selected.delete(id);
+					editorIds.delete(id);
+				}
+			for (const [id, layout] of next) {
+				if (byId.has(id)) layouts.splice(layouts.indexOf(byId.get(id)), 1, layout);
+				else {
+					layouts.push(layout);
+					state.selected.add(id);
+				}
+				byId.set(id, layout);
+				editorIds.add(id);
+			}
+			fillLayouts();
+			if (state.tables) analyse();
+		}
+
 		function addLayouts(list) {
 			for (const value of list) {
 				const layout = E.layoutFromRows(Object.assign({ origin: 'user' }, value));
@@ -1388,6 +1421,7 @@
 			fillShortcuts();
 			fillForms();
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
+			window.LAYOUT_ANALYSIS_FILES.onEditorLayouts(useEditorLayouts);
 			FINGERING.onChange(() => analyse());
 			bind();
 			analyse();
