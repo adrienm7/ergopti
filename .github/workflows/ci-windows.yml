@@ -1068,6 +1068,14 @@ jobs:
         run: python tools/build/build_static_bundle.py
         shell: bash
 
+      # The shipped Ergopti pack's suffixes, magic-key replacement, rolls and
+      # reductions are files its manifest binds; the driver refuses a pack with
+      # one missing, so the exe would boot without them. The same check as the
+      # macOS and Linux builds, on the archive the exe embeds.
+      - name: Verify the layout extension hotstring payload
+        run: python tools/build/check_layout_extension_payload.py static/layouts/registry "static/ergopti_plus/windows/build/static_bundle.zip::static/layouts/registry"
+        shell: bash
+
       - name: Stamp BUNDLE_VERSION, BUNDLE_RELEASE_URL, BUNDLE_CHANNEL
         shell: pwsh
         run: |

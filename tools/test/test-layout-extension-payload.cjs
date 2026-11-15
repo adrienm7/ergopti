@@ -12,7 +12,9 @@
  * tools/build/check_layout_extension_payload.py, which derives the bound files
  * from the source manifests. This test runs that checker on the real registry
  * and on packaged copies that lose, alter, alias or empty a bound file, and
- * proves both build scripts call it on the registry they package.
+ * proves both build scripts call it on the registry they package. The Windows
+ * packaging runs it on the static bundle ZIP the exe embeds
+ * (`<archive.zip>::<folder in it>`), proved the same way.
  * ==============================================================================
  */
 
@@ -158,6 +160,104 @@ check('the Linux build verifies its packaged registry before the missing-file ve
 		'the check must read the packaged Linux registry'
 	);
 });
+
+// The Windows static bundle is a ZIP: the registry is a folder inside it.
+const ARCHIVE_FOLDER = 'static/layouts/registry';
+
+/**
+ * Run the checker on a ZIP holding a copy of the real registry under
+ * ARCHIVE_FOLDER, as build_static_bundle.py writes it; `edit` names the
+ * members to drop (`drop`) or to write as symlinks (`links`).
+ */
+function runArchive(edit) {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-extension-archive-'));
+	try {
+		const archive = path.join(fixture, 'static_bundle.zip');
+		const writer = [
+			'import os, stat, sys, zipfile',
+			'root, archive, folder, drop, links = sys.argv[1:6]',
+			'drop, links = set(filter(None, drop.split(","))), set(filter(None, links.split(",")))',
+			'with zipfile.ZipFile(archive, "w") as zf:',
+			'    for base, _, files in os.walk(root):',
+			'        for name in sorted(files):',
+			'            full = os.path.join(base, name)',
+			'            rel = os.path.relpath(full, root).replace(os.sep, "/")',
+			'            if rel in drop: continue',
+			'            arc = folder + "/" + rel',
+			'            if rel in links:',
+			'                info = zipfile.ZipInfo(arc)',
+			'                info.external_attr = (stat.S_IFLNK | 0o777) << 16',
+			'                zf.writestr(info, "elsewhere")',
+			'            else:',
+			'                zf.write(full, arc)'
+		].join('\n');
+		const made = spawnSync(
+			PYTHON,
+			[
+				'-I',
+				'-c',
+				writer,
+				REGISTRY,
+				archive,
+				ARCHIVE_FOLDER,
+				(edit.drop || []).join(','),
+				(edit.links || []).join(',')
+			],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(made.status, 0, made.stderr);
+		return spawnSync(PYTHON, ['-I', CHECKER, REGISTRY, `${archive}::${ARCHIVE_FOLDER}`], {
+			encoding: 'utf8'
+		});
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
+check('the Windows bundle archive passes with every bound file inside it', () => {
+	const result = runArchive({});
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(
+		result.stdout,
+		/ergopti\/hotstrings\/magickeyreplace\.toml sha256=[0-9a-f]{64} sections=replace/
+	);
+	assert.match(result.stdout, /PASS bound=\d+/);
+});
+
+check('a Windows bundle archive without a bound file is refused', () => {
+	const result = runArchive({ drop: ['ergopti/hotstrings/suffixes_a.toml'] });
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /lacks the bound file ergopti\/hotstrings\/suffixes_a\.toml/);
+});
+
+check('a bound file stored as a symlink in the Windows bundle archive is refused', () => {
+	const result = runArchive({ links: ['ergopti/hotstrings/rolls.toml'] });
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /rolls\.toml is not a regular file/);
+});
+
+check(
+	'the Windows packaging verifies the bundle archive the exe embeds, right after building it',
+	() => {
+		const workflow = fs.readFileSync(
+			path.join(ROOT, '.github', 'workflows', 'ci-windows.yml'),
+			'utf8'
+		);
+		const build = workflow.indexOf('run: python tools/build/build_static_bundle.py\n');
+		const verify = workflow.indexOf(
+			'run: python tools/build/check_layout_extension_payload.py static/layouts/registry ' +
+				'"static/ergopti_plus/windows/build/static_bundle.zip::static/layouts/registry"'
+		);
+		assert.ok(build > 0, 'ci-windows.yml builds no static bundle');
+		assert.ok(verify > build, 'the payload check must run on the built bundle archive');
+		const between = workflow.slice(build, verify);
+		assert.equal(
+			(between.match(/\n {6}- name: /g) || []).length,
+			1,
+			'no step may run between them'
+		);
+	}
+);
 
 if (failures > 0) process.exit(1);
 console.log('All layout extension payload checks passed.');
