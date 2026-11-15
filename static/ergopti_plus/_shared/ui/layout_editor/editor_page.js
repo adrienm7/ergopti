@@ -320,7 +320,7 @@ var LayoutEditorPage = (function () {
 			autoCase: true,
 			caseOverwrite: false,
 			// Layouts a layer can be filled from (null until asked), and whether the
-			// host's registry list failed (the built-in references remain).
+			// host's registry list failed: its error, or null (the references remain).
 			fillSources: null,
 			fillUnavailable: null,
 			// « New » shows where a new layout starts from: blank or another layout.
@@ -401,9 +401,13 @@ var LayoutEditorPage = (function () {
 				focused.blur();
 		}
 
+		// How many documents replace() opened: the opening start keeps one the user opened.
+		let replacements = 0;
+
 		function replace(next, lost) {
 			// The edit belongs to the document being replaced: commit it there first.
 			commitFocused();
+			replacements += 1;
 			state.history.reset(next);
 			state.layer = (next.layers || []).some((l) => l.id === 'base') ? 'base' : null;
 			state.selected = null;
@@ -2150,7 +2154,8 @@ var LayoutEditorPage = (function () {
 				(error) => {
 					// The references still work; the panel says the registry list failed.
 					state.fillSources = LayoutSourceIO.fillSources([]);
-					state.fillUnavailable = problemText(error);
+					// Kept as the error: its text is made at render, in the locale loaded by then.
+					state.fillUnavailable = error;
 					render();
 				}
 			);
@@ -2211,7 +2216,7 @@ var LayoutEditorPage = (function () {
 					? el('p', { class: 'le-note', text: tl('start.loading') })
 					: null,
 				state.fillUnavailable
-					? el('p', { class: 'le-message error', text: state.fillUnavailable })
+					? el('p', { class: 'le-message error', text: problemText(state.fillUnavailable) })
 					: null,
 				el('div', { class: 'le-buttons' }, choices)
 			]);
@@ -2247,7 +2252,9 @@ var LayoutEditorPage = (function () {
 				{ id: 'le-fill-level' }
 			);
 			if (state.fillUnavailable)
-				parts.push(el('p', { class: 'le-message error', text: state.fillUnavailable }));
+				parts.push(
+					el('p', { class: 'le-message error', text: problemText(state.fillUnavailable) })
+				);
 			parts.push(
 				el('label', { class: 'le-field' }, [tl('fill.source'), source]),
 				el('label', { class: 'le-field' }, [tl('fill.level'), level]),
@@ -3155,32 +3162,48 @@ var LayoutEditorPage = (function () {
 		// The live analysis (layout_analysis/analysis_panel.js), when the page loads it.
 		if (analysisPanel) sideSlot.append(analysisPanel.node);
 
-		if (typeof host.initial === 'string') {
-			const parsed = LayoutSourceIO.parse(host.initial);
-			if (parsed.ok) replace(parsed.doc);
-			else state.message = { kind: 'error', text: problemText(parsed.error) };
-		} else if (typeof host.startFrom === 'string') {
-			// With nothing to open, a host may start on a copy of a start source (the
-			// app's Studio: Ergopti, maintainer 2026-11-15) instead of an empty
-			// keyboard, as « Start from » does, once the sources are known. Only the
-			// untouched first document is replaced; without that source it stays.
-			const untouched = doc();
-			loadFillSources().then(() => {
-				const entry = (state.fillSources || []).find((source) => source.id === host.startFrom);
-				if (!entry || doc() !== untouched || state.dirty) return;
-				try {
-					const started = LayoutSourceIO.startFrom(
-						entry,
-						`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
-						tl('start.copy_name', { name: entry.name })
-					);
-					replace(started.doc, started.lost.length ? started.lost : null);
-				} catch (error) {
-					state.message = { kind: 'error', text: problemText(error) };
-				}
-				render();
-			});
+		/**
+		 * Opens the first document: the host's initial text, else (with nothing to
+		 * open) a copy of the host's start source, the app's and site's Studio
+		 * starting on Ergopti (maintainer, 2026-11-15). The one place that decides
+		 * the initial document, so a host's restored draft can come first.
+		 */
+		// The start the page opened on, renamed when the locale arrives after it.
+		let openedStart = null;
+
+		function openInitial() {
+			if (typeof host.initial === 'string') {
+				const parsed = LayoutSourceIO.parse(host.initial);
+				if (parsed.ok) replace(parsed.doc);
+				else state.message = { kind: 'error', text: problemText(parsed.error) };
+			} else if (typeof host.startFrom === 'string') {
+				// With nothing to open, a host may start on a copy of a start source (the
+				// app's Studio: Ergopti, maintainer 2026-11-15) instead of an empty
+				// keyboard, as « Start from » does, once the sources are known. Only the
+				// untouched first document is replaced; without that source it stays. The
+				// locale's arrival renames that document without touching it (i18n:applied).
+				const opened = replacements;
+				loadFillSources().then(() => {
+					const entry = (state.fillSources || []).find((source) => source.id === host.startFrom);
+					const touched = replacements !== opened || state.dirty || state.history.canUndo();
+					if (!entry || touched) return;
+					try {
+						const started = LayoutSourceIO.startFrom(
+							entry,
+							`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
+							tl('start.copy_name', { name: entry.name })
+						);
+						replace(started.doc, started.lost.length ? started.lost : null);
+						openedStart = { doc: doc(), name: entry.name };
+					} catch (error) {
+						state.message = { kind: 'error', text: problemText(error) };
+					}
+					render();
+				});
+			}
 		}
+
+		openInitial();
 		render();
 		document.addEventListener('i18n:applied', () => {
 			// The first document is made before the locale arrives: give an untouched one its translated name.
@@ -3188,6 +3211,12 @@ var LayoutEditorPage = (function () {
 				!state.dirty && !state.history.canUndo() && !LayoutSourceIO.isPreserved(doc());
 			if (untouched && doc().layout.name === PREFIX + 'default_name')
 				state.history.reset(LayoutEditorModel.setLayout(doc(), { name: tl('default_name') }));
+			// The opening start's copy name, made before its locale arrived.
+			if (openedStart && doc() === openedStart.doc && !state.dirty && !state.history.canUndo()) {
+				const name = tl('start.copy_name', { name: openedStart.name });
+				state.history.reset(LayoutEditorModel.setLayout(doc(), { name }));
+				openedStart.doc = doc();
+			}
 			render();
 		});
 		return {

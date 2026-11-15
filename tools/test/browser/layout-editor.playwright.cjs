@@ -299,6 +299,50 @@ async function exerciseOpensOnErgopti(browser, origin) {
 }
 
 /**
+ * (site-opens-on-ergopti) The site's standalone editor opens on a copy of
+ * Ergopti too, from the registry it serves; without that registry (the main
+ * check's loopback server) it keeps the empty keyboard.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseSiteOpensOnErgopti(browser, origin) {
+	const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+	const keylayout = fs.readFileSync(KEYLAYOUT, 'utf8');
+	await context.route('**/layouts/registry/index.json', (route) =>
+		route.fulfill({
+			contentType: 'application/json',
+			body: JSON.stringify({
+				layouts: [
+					{ id: 'ergopti', name: 'Ergopti', file: 'ergopti.keylayout', keycode_convention: 'iso' }
+				]
+			})
+		})
+	);
+	await context.route('**/layouts/registry/ergopti.keylayout', (route) =>
+		route.fulfill({ contentType: 'text/plain', body: keylayout })
+	);
+	const page = await context.newPage();
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
+	await tool(page, 'details');
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	await page.waitForFunction(
+		(expected) => document.querySelector('#le-name').value === expected,
+		strings['layout_editor.start.copy_name'].replace('{name}', 'Ergopti')
+	);
+	assert.notEqual(
+		await page.textContent('#le-board [data-code="KeyQ"] .le-legend'),
+		'',
+		'the board shows Ergopti'
+	);
+	assert.deepEqual(errors, []);
+	await context.close();
+}
+
+/**
  * (layout-editor-download-error) A download whose converters cannot load says
  * why: in the macOS and Linux app windows the Lua VM of the XKB and KLC
  * builders can be missing, and its synchronous throw once escaped the click's
@@ -1318,7 +1362,7 @@ async function exercisePhoneWidth(browser, origin) {
 		// has no registry folder, so the panel says the catalogue list failed.
 		await page.click('[data-layer="base"]');
 		await tool(page, 'fill');
-		await page.click('#le-fill-load');
+		// The site's start on Ergopti already asked for the list when the page opened.
 		await page.waitForSelector('#le-fill-source');
 		assert.equal(await page.locator('#le-fill .le-message.error').count(), 1);
 		await page.selectOption('#le-fill-source', 'azerty');
@@ -1388,6 +1432,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exerciseDownloadWithoutLuaVm(browser, origin);
 		await exerciseOpensOnErgopti(browser, origin);
 		await exerciseCompareEdited(browser, origin);
+		await exerciseSiteOpensOnErgopti(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);

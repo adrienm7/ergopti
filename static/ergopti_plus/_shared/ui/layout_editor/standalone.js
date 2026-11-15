@@ -118,7 +118,9 @@
 		saveFile: download,
 		saveBinary: download,
 		loadSources: registrySources,
-		exportAssets: loadExportAssets
+		exportAssets: loadExportAssets,
+		// The site's Studio opens on a copy of Ergopti, as the app's does (maintainer, 2026-11-15).
+		startFrom: 'ergopti'
 	});
 
 	// The message the framing page (the site's /studio) listens for to size its frame.
