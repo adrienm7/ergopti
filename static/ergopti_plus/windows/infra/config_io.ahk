@@ -2335,7 +2335,6 @@ global ScriptShortcutPausedChords := 0
 ; Set by the boot's marker restore: the pause it replays takes its chords from
 ; the file the reload wrote, not from the configuration just loaded.
 global _ScriptShortcutPausedChordsFromReload := false
-global SCRIPT_SHORTCUT_PAUSED_CHORDS_FILENAME := "suspend_restore.chords"
 
 ; The chords a press is judged by: those of pause time while paused, the
 ; configured ones otherwise.
@@ -2394,13 +2393,14 @@ ScriptShortcutPausedChordsParse(Text) {
 		return Map("assignments", Assignments, "on", Values["chords_enabled"] == "1")
 }
 
-; The file that carries the chords of pause time across a reload.
+; The file that carries the chords of pause time across a reload, beside the
+; suspend marker (its only reader and writer are the functions below).
 ; @return {String} Empty before the paths locator is known.
 ScriptShortcutPausedChordsPath() {
-		global _PathsFile, SCRIPT_SHORTCUT_PAUSED_CHORDS_FILENAME
+		global _PathsFile
 		if !IsSet(_PathsFile) || (_PathsFile == "")
 				return ""
-		return SuspendHandoffMarkerPath(_PathsFile, SCRIPT_SHORTCUT_PAUSED_CHORDS_FILENAME)
+		return SuspendHandoffMarkerPath(_PathsFile, "suspend_restore.chords")
 }
 
 ; Takes the chords of pause time as the driver pauses. A pause a reload
@@ -2469,6 +2469,23 @@ ScriptShortcutPausedChordsPersist(Path, WriteFn, ReadFn) {
 				return false
 		}
 		return true
+}
+
+; The suspend reactors' entry: takes the chords of pause time as the driver
+; pauses, drops them on resume, on the real chords file.
+; @param Entering {Boolean} True as the driver pauses, false as it resumes.
+ScriptShortcutPausedChordsOnSuspend(Entering) {
+		Path := ScriptShortcutPausedChordsPath()
+		if Entering
+				ScriptShortcutPausedChordsBegin(Path, FSStrictExists, FSRead, FSDeleteStrict)
+		else
+				ScriptShortcutPausedChordsEnd(Path, FSStrictExists, FSDeleteStrict)
+}
+
+; The reload's entry: writes the chords of pause time to the real chords file.
+; @return {Boolean} False when they could not be written.
+ScriptShortcutPausedChordsCarry() {
+		return ScriptShortcutPausedChordsPersist(ScriptShortcutPausedChordsPath(), FSWriteDurable, FSRead)
 }
 
 ; Whether the chords of a script slot belong to the driver right now: the slot

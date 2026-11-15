@@ -338,10 +338,24 @@ for (const slot of manifestSlots) {
 // dropped on resume, and carried across a reload while paused before the
 // suspend marker is prepared.
 check(
-	functionBody('Ergopti_OnSuspendEnter').includes('ScriptShortcutPausedChordsBegin(') &&
-		functionBody('Ergopti_OnSuspendResume').includes('ScriptShortcutPausedChordsEnd(') &&
-		/ScriptShortcutPausedChordsPersist\(ScriptShortcutPausedChordsPath\(\),\s*FSWriteDurable, FSRead\) && _SuspendHandoffPrepareMarker\(MarkerPath, Intent\)/.test(
+	functionBody('Ergopti_OnSuspendEnter').includes('ScriptShortcutPausedChordsOnSuspend(true)') &&
+		functionBody('Ergopti_OnSuspendResume').includes(
+			'ScriptShortcutPausedChordsOnSuspend(false)'
+		) &&
+		functionBody('ScriptShortcutPausedChordsOnSuspend').includes(
+			'ScriptShortcutPausedChordsBegin('
+		) &&
+		functionBody('ScriptShortcutPausedChordsOnSuspend').includes(
+			'ScriptShortcutPausedChordsEnd('
+		) &&
+		/_SuspendHandoffCarryPausedChords\(\) && _SuspendHandoffPrepareMarker\(MarkerPath, Intent\)/.test(
 			SOURCE
+		) &&
+		functionBody('_SuspendHandoffCarryPausedChords').includes(
+			'ScriptShortcutPausedChordsCarry()'
+		) &&
+		functionBody('ScriptShortcutPausedChordsCarry').includes(
+			'ScriptShortcutPausedChordsPersist(ScriptShortcutPausedChordsPath(), FSWriteDurable, FSRead)'
 		) &&
 		functionBody('_SuspendRestoreFromMarker').includes('_ScriptShortcutPausedChordsFromReload :='),
 	'the chords of pause time must be taken at pause, dropped at resume and carried across a paused reload'

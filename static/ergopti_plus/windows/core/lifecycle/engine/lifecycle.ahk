@@ -272,8 +272,7 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		; The chords of pause time travel with the pause: the successor loads the
 		; new configuration, yet its restored pause keeps the chord that resumes.
 		Launched := SuspendHandoffReload(A_IsSuspended, Path,
-			(MarkerPath) => ScriptShortcutPausedChordsPersist(ScriptShortcutPausedChordsPath(),
-				FSWriteDurable, FSRead) && _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
+			(MarkerPath) => _SuspendHandoffCarryPausedChords() && _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
 				ReadyFn, ReportStage, _SuspendHandoffCancelMarker)
 		return Launched
 	} finally {
@@ -353,6 +352,14 @@ LifecycleRetireWorkers() {
 _SuspendHandoffBeforeReload(Path) {
 		if (Path != "")
 				try LoggerInfo("Lifecycle", "Reloading while suspended — inert pause intent prepared for '{1}'.", Path)
+}
+
+; Writes the script chords of pause time beside the marker (config_io.ahk owns
+; them; a lifecycle loaded without it, as an isolated fixture, carries none).
+_SuspendHandoffCarryPausedChords() {
+	if !IsSet(ScriptShortcutPausedChordsCarry)
+		return true
+	return ScriptShortcutPausedChordsCarry()
 }
 
 _SuspendHandoffPrepareMarker(Path, Intent := "1") {
@@ -534,8 +541,8 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(TakeNoteRevokePending)
 		TakeNoteRevokePending()
 	; The chords that resume stay those of pause time until the resume.
-	ScriptShortcutPausedChordsBegin(ScriptShortcutPausedChordsPath(),
-		FSStrictExists, FSRead, FSDeleteStrict)
+	if IsSet(ScriptShortcutPausedChordsOnSuspend)
+		ScriptShortcutPausedChordsOnSuspend(true)
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
@@ -730,7 +737,8 @@ Ergopti_OnSuspendEnter() {
 }
 Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
-		ScriptShortcutPausedChordsEnd(ScriptShortcutPausedChordsPath(), FSStrictExists, FSDeleteStrict)
+		if IsSet(ScriptShortcutPausedChordsOnSuspend)
+			ScriptShortcutPausedChordsOnSuspend(false)
 		if IsSet(ProgramActions_Stop)
 			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")

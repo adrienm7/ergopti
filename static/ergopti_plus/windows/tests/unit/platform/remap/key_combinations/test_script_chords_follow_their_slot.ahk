@@ -178,12 +178,16 @@ Test("script chords: released AltGr never admits assigned chords (altgr-physical
 ; a restore that moved the pause toggle left the paused driver without its way
 ; back (paused-chord-change).
 _SCFS_WithPausedChords(Body) {
-	global ScriptShortcutPausedChords, _ScriptShortcutPausedChordsFromReload
+	global ScriptShortcutPausedChords, _ScriptShortcutPausedChordsFromReload, SCRIPT_SHORTCUT_SLOTS
 	Saved := ScriptShortcutPausedChords, SavedFlag := _ScriptShortcutPausedChordsFromReload
+	SavedSlots := IsSet(SCRIPT_SHORTCUT_SLOTS) ? SCRIPT_SHORTCUT_SLOTS : unset
+	; The slots the boot reads from the manifest (feature_state.ahk).
+	SCRIPT_SHORTCUT_SLOTS := _SCFS_Slots()
 	try Body.Call()
 	finally {
 		ScriptShortcutPausedChords := Saved
 		_ScriptShortcutPausedChordsFromReload := SavedFlag
+		SCRIPT_SHORTCUT_SLOTS := IsSet(SavedSlots) ? SavedSlots : unset
 	}
 }
 
@@ -212,7 +216,9 @@ _SCFS_MovedAssignments() {
 global _SCFS_FAKE_CHORDS_PATH := "C:\fake\suspend_restore.chords"
 
 _SCFS_PausedChordsKeepTheResumeChord() {
+	global ScriptShortcutPausedChords
 	_SCFS_WithPausedChords(_SCFS_PausedChordsAcrossAReload)
+	AssertFalse(ScriptShortcutPausedChords is Map, "the case leaves no chords of pause time behind")
 }
 _SCFS_PausedChordsAcrossAReload() {
 	global _ScriptShortcutPausedChordsFromReload
@@ -250,7 +256,9 @@ Test("script chords: a reload while paused keeps the resume chord of pause time 
 ; A file no reload of this boot carried is stale: an ordinary pause takes the
 ; configured chords and removes it.
 _SCFS_StaleFileIsRemoved() {
+	global ScriptShortcutPausedChords
 	_SCFS_WithPausedChords(_SCFS_StaleFileBody)
+	AssertFalse(ScriptShortcutPausedChords is Map, "the case leaves no chords of pause time behind")
 }
 _SCFS_StaleFileBody() {
 	global _ScriptShortcutPausedChordsFromReload
@@ -274,6 +282,10 @@ _SCFS_ChordsText(Assignments) {
 }
 
 _SCFS_ParseRefusesMalformedChords() {
+	_SCFS_WithPausedChords(_SCFS_ParseBody)
+	AssertEqual(4, _SCFS_Slots().Length, "the manifest declares the four slots the text holds")
+}
+_SCFS_ParseBody() {
 	Good := _SCFS_ChordsText(_SCFS_PausedAssignments())
 	Parsed := ScriptShortcutPausedChordsParse(Good)
 	AssertEqual("script_pause_toggle", Parsed["assignments"]["script_altgr_enter"], "the text round-trips")
