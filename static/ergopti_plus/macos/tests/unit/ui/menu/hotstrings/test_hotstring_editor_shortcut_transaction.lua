@@ -49,8 +49,9 @@ end
 --- Runs one prompt result through the real menu callback.
 --- @param raw string Prompt text.
 --- @param outcome string Runtime setter outcome.
+--- @param paused boolean|nil Whether the menu is built and clicked while paused.
 --- @return table fixture Observed state, calls, and callback result.
-local function run_menu_action(raw, outcome)
+local function run_menu_action(raw, outcome, paused)
 	local saved_dialog = package.loaded["core.ui.engine.dialog_util"]
 	local saved_notifications = package.loaded["core.ui.engine.notifications"]
 	local saved_lifecycle = package.loaded["ui.menu.keymap_lifecycle"]
@@ -84,7 +85,7 @@ local function run_menu_action(raw, outcome)
 		helpers.assert_true(type(shortcut_prefix) == "string" and shortcut_prefix ~= "",
 			"the localized shortcut prefix must be available")
 		local ctx = {
-			paused = false,
+			paused = paused == true,
 			state = state,
 			hotfiles = { "personal.toml" },
 			get_group_name = function() return "personal" end,
@@ -232,6 +233,18 @@ helpers.describe("personal hotstring editor shortcut is transactional", function
 		helpers.assert_eq(fixture.calls.saves, 1)
 		helpers.assert_eq(fixture.calls.updates, 1)
 		helpers.assert_eq(fixture.calls.notices, 0)
+		helpers.assert_eq(fixture.state.custom_editor_shortcut,
+			{ mods = { "alt" }, key = "K" })
+	end)
+
+	-- EDD-1, the maintainer's decision of 2026-11-14: a paused change is saved
+	-- at once and the hotkey moves on resume (the menu's resume listener binds
+	-- it). Before, the row had no action while paused.
+	helpers.it("(paused-slot-change) saves a paused shortcut without binding it", function()
+		local fixture = run_menu_action("option+k", "true", true)
+		helpers.assert_eq(fixture.result, true)
+		helpers.assert_eq(fixture.calls.sets, 0, "the hotkey waits for the resume")
+		helpers.assert_eq(fixture.calls.saves, 1)
 		helpers.assert_eq(fixture.state.custom_editor_shortcut,
 			{ mods = { "alt" }, key = "K" })
 	end)

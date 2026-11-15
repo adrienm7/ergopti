@@ -954,6 +954,21 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 				if kbd_layout_mod and type(kbd_layout_mod.schedule_pause_layout_switch) == "function" then
 					pcall(kbd_layout_mod.schedule_pause_layout_switch, is_paused, state)
 				end
+				-- The editor shortcut row saves a paused change without binding it
+				-- (menu_hotstrings_custom); the resume binds the saved chord. An
+				-- unchanged chord is kept as it is.
+				if is_paused == false then
+					local sc = state.custom_editor_shortcut
+					local bound = true
+					if type(sc) == "table" and type(sc.mods) == "table" and type(sc.key) == "string" then
+						bound = hotstring_editor.set_shortcut(sc.mods, sc.key) == true
+					elseif sc == false then
+						bound = hotstring_editor.clear_shortcut() == true
+					end
+					if not bound then
+						Logger.error(LOG, "The editor shortcut saved while paused could not be bound on resume.")
+					end
+				end
 				-- updateMenu's first statement is pcall(update_icon), so a bare call
 				-- here rendered the icon twice per toggle — off disk, through an
 				-- off-screen canvas — from inside the script-control eventtap callback

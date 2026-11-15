@@ -402,18 +402,25 @@ function M.build_custom(ctx, counts)
 				or tostring(sc.key or "?"):upper()
 	end
 
+	--- Applies the editor shortcut. While paused it is saved at once and the
+	--- hotkey moves on resume (EDD-1, the maintainer's decision of 2026-11-14):
+	--- the menu's resume listener binds the saved chord.
 	local function apply_shortcut(mods, key)
 		local editor = ctx.hotstring_editor
-		local committed = KeymapLifecycle.commit_mutation(ctx,
-			"change personal hotstring editor shortcut", function()
-				if mods and key then
-					if not editor or type(editor.set_shortcut) ~= "function" then return false end
-					return editor.set_shortcut(mods, key)
-				end
-				if not editor or type(editor.clear_shortcut) ~= "function" then return false end
-				return editor.clear_shortcut()
-			end)
-		if not committed then return false end
+		local live_pause = type(ctx.is_paused) == "function" and ctx.is_paused() or paused
+		if type(live_pause) ~= "boolean" then return false end
+		if not live_pause then
+			local committed = KeymapLifecycle.commit_mutation(ctx,
+				"change personal hotstring editor shortcut", function()
+					if mods and key then
+						if not editor or type(editor.set_shortcut) ~= "function" then return false end
+						return editor.set_shortcut(mods, key)
+					end
+					if not editor or type(editor.clear_shortcut) ~= "function" then return false end
+					return editor.clear_shortcut()
+				end)
+			if not committed then return false end
+		end
 		state.custom_editor_shortcut = mods and key and { mods = mods, key = key } or false
 		if ctx.save_prefs() ~= true then return false end
 		ctx.updateMenu()
@@ -601,12 +608,9 @@ function M.build_custom(ctx, counts)
 	if state.custom_editor_shortcut ~= nil then
 		local declared_legacy = ManifestMenu.template_rows("hotstring_personal_legacy_shortcut",
 			{ personal_legacy_shortcut = sc_fn },
-			{ personal_shortcut_label = sc_label, personal_legacy_ready = function() return not paused end }, {})
+			{ personal_shortcut_label = sc_label, personal_legacy_ready = function() return true end }, {})
 		if type(declared_legacy) ~= "table" or #declared_legacy ~= 1 then return nil end
-		local legacy = declared_legacy[1]
-		-- Retain the old native posture: a menu built while paused has no action.
-		if paused then legacy.action = nil end
-		legacy_rows[1] = legacy
+		legacy_rows[1] = declared_legacy[1]
 	end
 	local default_parent = ManifestMenu.template_rows("hotstring_personal_default_parent", {},
 		{ personal_default_label = default_section_label },
