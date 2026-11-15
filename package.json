@@ -779,6 +779,7 @@
 		"test:browser:layout-editor": "node ./tools/test/browser/layout-editor.playwright.cjs",
 		"test:layout-source-emulation": "node ./tools/test/test-layout-source-emulation.cjs",
 		"test:layout-shortcut-keys": "node ./tools/test/test-layout-shortcut-keys.cjs",
+		"test:windows-lua-export-identity": "node ./tools/test/test-windows-lua-export-identity.cjs",
 		"test:macos-layout-bundle-plan": "node ./tools/test/test-macos-layout-bundle-plan.cjs",
 		"test:layout-extension-payload": "node ./tools/test/test-layout-extension-payload.cjs",
 		"test:layout-sources": "node ./tools/test/test-layout-sources.cjs",

@@ -946,6 +946,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-layout-shortcut-keys.cjs"],
 			"repro": "npm run test:layout-shortcut-keys"
+		},
+		{
+			"id": "windows-lua-export-identity",
+			"ordinal": 673,
+			"name": "the committed Windows Lua export host matches its pin, sources and identity, or neither is shipped",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-lua-export-identity.cjs"],
+			"repro": "npm run test:windows-lua-export-identity"
 		}
 	]
 }
