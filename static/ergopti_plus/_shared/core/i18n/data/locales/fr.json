@@ -4606,6 +4606,7 @@
 	"layout_analysis.fingering.save_failed": "Le doigté n’a pas pu être enregistré.",
 	"layout_analysis.fingering.load_failed": "Le doigté enregistré n’a pas pu être lu.",
 	"layout_analysis.error.not_json": "le fichier n’est pas du JSON",
+	"layout_analysis.error.studio_handoff_failed": "Le navigateur a refusé de garder la disposition pour « Comparer » (fenêtre privée ou stockage bloqué).",
 	"layout_analysis.error.fingering_not_object": "un doigté est un objet JSON",
 	"layout_analysis.error.fingering_unknown_base": "{base} n’est pas un doigté de base",
 	"layout_analysis.error.fingering_unknown_key": "{key} n’est pas une touche des claviers",

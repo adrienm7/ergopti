@@ -234,7 +234,13 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					);
 					return;
 				}
-				onCompare(layout);
+				try {
+					onCompare(layout);
+				} catch (error) {
+					// The site's handoff to its Comparer needs this tab's storage.
+					if (!error || error.code !== 'studio_handoff_failed') throw error;
+					showError(t('layout_analysis.error.studio_handoff_failed'));
+				}
 			});
 			controls.append(compareButton);
 		}

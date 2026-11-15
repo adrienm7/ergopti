@@ -296,7 +296,11 @@ var LayoutEditorPage = (function () {
 			selected: null,
 			// The keyboard format shown (analysis_model.json keyboard_formats, the
 			// Comparer's too): each hides the blocks it lacks.
-			format: LAYOUT_ANALYSIS.defaultKeyboardFormat(),
+			format: LAYOUT_ANALYSIS.keyboardFormats().some(
+				(f) => f.id === window.LAYOUT_ANALYSIS_FILES.savedFormat()
+			)
+				? window.LAYOUT_ANALYSIS_FILES.savedFormat()
+				: LAYOUT_ANALYSIS.defaultKeyboardFormat(),
 			deadKey: null,
 			paletteBlock: PALETTE_BLOCKS[0].id,
 			// Whether the palette is unfolded, so a render keeps it open.
@@ -1385,6 +1389,7 @@ var LayoutEditorPage = (function () {
 							state.format,
 							(value) => {
 								state.format = value;
+								window.LAYOUT_ANALYSIS_FILES.saveFormat(value);
 								render();
 							},
 							{ id: 'le-board-format' }

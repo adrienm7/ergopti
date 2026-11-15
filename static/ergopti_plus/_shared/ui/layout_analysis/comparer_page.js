@@ -314,7 +314,6 @@
 					JSON.stringify({
 						corpus: state.corpus,
 						keyboard: state.keyboard,
-						format: state.format,
 						selected: Array.from(state.selected),
 						selectionChosen: state.selectionChosen,
 						weights: state.weights,
@@ -374,11 +373,12 @@
 				linked.corpus ||
 				(corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id),
 			keyboard: linked.keyboard || (DATA.model.keyboards[saved.keyboard] ? saved.keyboard : 'iso'),
-			// The keyboard format (the editor's « Format » too): compact_fit measures on it.
+			// The keyboard format (the editor's « Format » too, one stored choice for the
+			// Studio's two tabs): compact_fit measures on it.
 			format:
 				linked.format ||
-				(E.keyboardFormats().some((f) => f.id === saved.format)
-					? saved.format
+				(E.keyboardFormats().some((f) => f.id === window.LAYOUT_ANALYSIS_FILES.savedFormat())
+					? window.LAYOUT_ANALYSIS_FILES.savedFormat()
 					: E.defaultKeyboardFormat()),
 			// Whether the user chose the ticked layouts; until then they follow the keyboard.
 			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
@@ -1149,7 +1149,7 @@
 			if (state.format === id) return;
 			state.format = id;
 			$('la-format').value = id;
-			save();
+			window.LAYOUT_ANALYSIS_FILES.saveFormat(id);
 			analyse();
 		}
 
@@ -1251,7 +1251,11 @@
 	/** The site's page: mount into its <main>, and size the framing page. */
 	function autostart() {
 		const root = document.getElementById(STANDALONE_ROOT_ID);
-		if (root) mount(root, { reportHeight: true });
+		if (!root) return;
+		mount(root, { reportHeight: true });
+		// The layout the site's editor handed over with « Compare with other layouts ».
+		const handed = window.LAYOUT_ANALYSIS_FILES.takeHandoff();
+		if (handed) instance().addLayouts([handed]);
 	}
 
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autostart);

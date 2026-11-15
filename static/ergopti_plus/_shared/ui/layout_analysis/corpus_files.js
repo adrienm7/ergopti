@@ -21,6 +21,9 @@
  *    base URL to load from) defines LAYOUT_ANALYSIS_HOST.loadCorpus(id): a
  *    promise resolved once window.LAYOUT_ANALYSIS_CORPORA[id] is set. Tables
  *    already loaded are used as they are.
+ * 4. The Studio's shared state: the keyboard format its editor and Comparer
+ *    share (stored once for both), and the layout the site's editor hands to
+ *    the Comparer framed beside it (this tab's storage, taken once).
  * ==============================================================================
  */
 
@@ -179,5 +182,78 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 		return tables;
 	}
 
-	return { SETTINGS_KEY, readText, builtinTables };
+	// ===================================
+	// ======= Studio shared state =======
+	// ===================================
+
+	// The keyboard format (100 %, TKL…) the Studio's editor and Comparer share: in
+	// the app they are one page, on the site two framed pages of one origin, so
+	// the choice is stored once for both (coordinator, 2026-11-15).
+	const FORMAT_KEY = 'ergopti.studio.keyboard_format.v1';
+	// The layout the site's editor hands to its Comparer: « Compare with other
+	// layouts » stores it here for this tab, then the framing page opens the
+	// Comparer, which takes it once.
+	const HANDOFF_KEY = 'ergopti.studio.compare_handoff.v1';
+	// The message the editor's frame posts to the site's Studio to open « Comparer ».
+	const OPEN_COMPARER_MESSAGE = 'ergopti-studio:open-comparer';
+
+	/**
+	 * The keyboard format chosen in the Studio, if storage keeps one.
+	 * @returns {string|null} A keyboard_formats id, unchecked: the caller validates it.
+	 */
+	function savedFormat() {
+		try {
+			return window.localStorage.getItem(FORMAT_KEY);
+		} catch {
+			// A private window or blocked storage: no shared choice, the default applies.
+			return null;
+		}
+	}
+
+	/** Stores the keyboard format chosen in either tab of the Studio. */
+	function saveFormat(id) {
+		try {
+			window.localStorage.setItem(FORMAT_KEY, id);
+		} catch {
+			// Unavailable storage keeps the choice for this page only.
+		}
+	}
+
+	/**
+	 * Hands a layout (library shape) to the Comparer of this tab.
+	 * @throws {Error} studio_handoff_failed when the tab's storage refuses it.
+	 */
+	function handOff(layout) {
+		try {
+			window.sessionStorage.setItem(HANDOFF_KEY, JSON.stringify(layout));
+		} catch {
+			throw failure('studio_handoff_failed');
+		}
+	}
+
+	/**
+	 * Takes the layout handed to the Comparer, once.
+	 * @returns {object|null} The layout, or null when none waits.
+	 */
+	function takeHandoff() {
+		let text = null;
+		try {
+			text = window.sessionStorage.getItem(HANDOFF_KEY);
+			window.sessionStorage.removeItem(HANDOFF_KEY);
+		} catch {
+			return null;
+		}
+		return text === null ? null : JSON.parse(text);
+	}
+
+	return {
+		SETTINGS_KEY,
+		OPEN_COMPARER_MESSAGE,
+		readText,
+		builtinTables,
+		savedFormat,
+		saveFormat,
+		handOff,
+		takeHandoff
+	};
 })();

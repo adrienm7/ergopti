@@ -477,11 +477,46 @@ async function exerciseDeadKeyLegends(page, origin, basePath) {
 	);
 }
 
+/**
+ * (studio-site-handoff) The site's two framed Studio pages share one keyboard
+ * format, and the editor's « Compare with other layouts » opens « Comparer »
+ * with the edited layout ranked, as the app's Studio window does.
+ */
+async function exerciseStudioHandoff(page, origin, basePath) {
+	await visit(page, origin, basePath, '/studio');
+	const editor = page.frameLocator('iframe.studio-frame');
+	await editor.locator('#le-board .le-legend.key-legend-dead').first().waitFor();
+	await editor.locator('#le-board-format').selectOption('65');
+	await editor.locator('#la-panel-compare').click();
+	await page.waitForURL(origin + basePath + '/studio/comparer');
+	const comparer = page.frameLocator('iframe.studio-frame');
+	await comparer.locator('#la-table tbody tr').first().waitFor();
+	assert.equal(
+		await comparer.locator('#la-format').inputValue(),
+		'65',
+		"the Comparer keeps the editor's format"
+	);
+	await comparer
+		.locator('#la-table tbody tr', { hasText: 'Mon Ergopti' })
+		.first()
+		.waitFor({ timeout: 20000 });
+	// The format chosen in the Comparer is the editor's next time.
+	await comparer.locator('#la-format').selectOption('tkl');
+	await visit(page, origin, basePath, '/studio');
+	await page.frameLocator('iframe.studio-frame').locator('#le-board').waitFor();
+	assert.equal(
+		await page.frameLocator('iframe.studio-frame').locator('#le-board-format').inputValue(),
+		'tkl',
+		'the editor takes the format chosen in the Comparer'
+	);
+}
+
 /** The whole structure check, in one browser page. */
 async function exerciseSiteStructure(page, origin, basePath) {
 	await exerciseHome(page, origin, basePath);
 	await exerciseSections(page, origin, basePath);
 	await exerciseDeadKeyLegends(page, origin, basePath);
+	await exerciseStudioHandoff(page, origin, basePath);
 	await exerciseRedirects(page, origin, basePath);
 	await exercisePhone(page, origin, basePath);
 }

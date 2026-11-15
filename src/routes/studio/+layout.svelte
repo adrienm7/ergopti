@@ -7,17 +7,36 @@ DESCRIPTION:
 Ergopti Studio is an app-like workspace: under the site header, a slim tab
 bar (« Éditer », « Comparer », from siteNavigation.js) and the framed tool,
 which takes the full width and the rest of the viewport height and scrolls
-inside itself. The site page around it does not scroll.
+inside itself. The site page around it does not scroll. The editor's
+« Compare with other layouts » opens the « Comparer » tab, which takes the
+layout the editor stored for this tab.
 ==============================================================================
 -->
 
 <script>
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import SubNav from '#lib/components/SubNav.svelte';
 	import { STUDIO_PAGES } from '#lib/js/siteNavigation.js';
 
 	let { children } = $props();
+
+	// The editor's « Compare with other layouts »: the framed editor stores the
+	// layout for this tab, then asks for the Comparer (the message type of
+	// layout_analysis/corpus_files.js OPEN_COMPARER_MESSAGE).
+	const OPEN_COMPARER_MESSAGE = 'ergopti-studio:open-comparer';
+
+	onMount(() => {
+		const open = (event) => {
+			if (event.origin !== location.origin) return;
+			if (!event.data || event.data.type !== OPEN_COMPARER_MESSAGE) return;
+			goto(resolve('/studio/comparer'));
+		};
+		window.addEventListener('message', open);
+		return () => window.removeEventListener('message', open);
+	});
 
 	let items = $derived(
 		STUDIO_PAGES.map((entry) => ({

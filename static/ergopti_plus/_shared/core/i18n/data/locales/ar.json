@@ -4606,6 +4606,7 @@
 	"layout_analysis.fingering.save_failed": "تعذر حفظ توزيع الأصابع.",
 	"layout_analysis.fingering.load_failed": "تعذرت قراءة توزيع الأصابع المحفوظ.",
 	"layout_analysis.error.not_json": "the file is not JSON",
+	"layout_analysis.error.studio_handoff_failed": "The browser refused to keep the layout for « Comparer » (private window or blocked storage).",
 	"layout_analysis.error.fingering_not_object": "a fingering is a JSON object",
 	"layout_analysis.error.fingering_unknown_base": "{base} is not a base fingering",
 	"layout_analysis.error.fingering_unknown_key": "{key} is not a key of the keyboards",

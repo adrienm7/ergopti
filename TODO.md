@@ -287,14 +287,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       above is out of date; proof: test_layout_manager_bridge.lua (Linux, macOS),
       test_keystats_reader_ngram_sources.ahk, tools/test/test-layout-manager-page.cjs. Real-machine checks: the
       `layout_editor_window` lines of the three TODO-tests files.
-- [ ] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
+- [x] **Corpus analysis.** Load a text corpus (file picker, local) and analyse the edited layout on it with the same
       metrics; keep the corpora the site already uses as built-in choices.
       [CODE] Left (2026-11-15): the Comparer reads a local file or pasted text (6e798c9afb, 1fb3330e32, be84e5ba93;
       test-layout-comparer-page.cjs), but the edited layout cannot be analysed on it: the editor's panel offers only the
       built-in corpora and « My typing ».
       In the app 2026-11-15 (`claude/ergopti-todo-edited-into-comparer`): « Compare with other layouts » in the
-      editor's panel puts the edited layout in « Comparer », where a pasted text or a file is the corpus. Left: the
-      same on the site, whose editor and Comparer are two framed pages.
+      editor's panel puts the edited layout in « Comparer », where a pasted text or a file is the corpus.
+      On the site 2026-11-15 (`claude/ergopti-todo-site-studio-handoff`): the framed editor keeps the layout in the
+      tab's storage and the Studio opens « Comparer », which ranks it; proof: `studio-site-handoff` in
+      site-structure.playwright.cjs.
 - [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
       (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
@@ -692,7 +694,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       of analysis_model.json (TKL by default, as the old unchecked box); the editor's « Format », the Comparer's,
       and `compact_fit`'s ISO and ANSI 60–100 % form factors measured on the chosen format (the metric vectors are
       unchanged: no layout types on those blocks); in the app window the editor's format goes to the Comparer;
-      the site's two framed pages each keep their own (decided by the agent, to review by the maintainer);
+      on the site the two framed pages share one stored choice (`claude/ergopti-todo-site-studio-handoff`, proof:
+      `studio-site-handoff` in site-structure.playwright.cjs);
       proof: test-layout-comparer-page.cjs (formats nested, refusal of an unknown one), `keyboard-format` in
       layout-editor.playwright.cjs (what each format shows, the hand-off to the Comparer).
       4 [x] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their

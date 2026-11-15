@@ -377,7 +377,12 @@ request; the user's own layouts) goes through
 `window.LAYOUT_ANALYSIS_COMPARER`: `setCorpus({id, title?, tables, default?})`
 adds or replaces a corpus, listed first and selected when `default` is true, and
 `addLayouts([layout, ...])` adds or replaces layouts, ticked, and `setFormat(id)`
-chooses the keyboard format (the app's Studio passes the editor's « Format »).
+chooses the keyboard format (the app's Studio passes the editor's « Format »). The
+editor and the Comparer store that format once for both (`corpus_files.js`
+`saveFormat`), so the site's two framed pages share it too; on the site the
+editor's « Compare with other layouts » keeps the layout in the tab's storage
+(`handOff`), the Studio opens « Comparer », and the Comparer ranks it
+(`takeHandoff`).
 Until the user ticks or unticks a layout, the ticked layouts follow the
 keyboard: the registry, reference and personal layouts, but of a family that
 ships one layout per board (registry `geometry`: Ergopti and Ergopti ANSI)

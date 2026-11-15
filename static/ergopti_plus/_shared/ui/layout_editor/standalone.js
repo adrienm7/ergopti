@@ -133,7 +133,19 @@
 		exportAssets: loadExportAssets,
 		// The site's Studio opens on a copy of Ergopti, as the app's does (maintainer, 2026-11-15).
 		startFrom: 'ergopti',
-		workspace
+		workspace,
+		// « Compare with other layouts »: the Comparer is the Studio's other framed
+		// page, so the layout waits in this tab's storage while the Studio opens it.
+		compare:
+			window.parent !== window
+				? (layout) => {
+						window.LAYOUT_ANALYSIS_FILES.handOff(layout);
+						window.parent.postMessage(
+							{ type: window.LAYOUT_ANALYSIS_FILES.OPEN_COMPARER_MESSAGE },
+							location.origin
+						);
+					}
+				: undefined
 	});
 
 	// The message the framing page (the site's /studio) listens for to size its frame.
