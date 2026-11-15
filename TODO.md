@@ -564,6 +564,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): only FrequencyWords word lists are imported (be84e5ba93) with the cross-word caveat; no
       char, bigram or trigram count-table format, and none of Norvig, Leipzig lists, Lexique or Wikipedia frequency
       data.
+      [CODE] Done (2026-11-15): the « ergopti-count-table » format, its strict reader and the pinned importer
+      tools/build/import-count-tables.cjs (b073da48), with the French Leipzig Wikipedia 2021 table and Lexique 4.10
+      offered as corpora (d7d8c4eb; test-corpus-count-tables.cjs). Left: the English Leipzig table is held until its
+      licence is confirmed, and Norvig's counts wait for norvig.com to be reachable from the build environment.
 
 - [x] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
       and app) the user sets, per physical key, the finger and hand that press it; then, for each finger, its home key
