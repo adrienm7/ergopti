@@ -50,6 +50,8 @@ static/layouts/registry/index.json
 
 # Third-party code kept byte-identical to its upstream release
 **/vendor/
+# Third-party layout files kept as their projects publish them (their README)
+tools/test/fixtures/layout-formats/third-party/
 
 # Promo video: public/ is a hard-link mirror of static/ (formatting it would
 # rewrite the originals through the links) and out/ holds renders.

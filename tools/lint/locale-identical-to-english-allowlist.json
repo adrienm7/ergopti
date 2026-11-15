@@ -1968,6 +1968,126 @@
 				"zh"
 			]
 		},
+		"layout_editor.export.kalamine": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.export.kla": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.status.imported_format": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.status.imported_partial": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_editor.status.saved_partial": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.fill.level.altgr": {
 			"reason": "keyboard-key-name",
 			"locales": [

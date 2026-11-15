@@ -875,10 +875,85 @@ var LayoutEditorPage = (function () {
 				}
 				return;
 			}
+			// An Ergopti source opens as it is; any other layout file (KLA JSON, Kalamine,
+			// XKB symbols, KLC, DOF, cmini, rows) goes through the Comparer's readers.
+			if (!/^\s*format\s*=\s*"ergopti-layout"/m.test(text)) return importForeign(name, text);
 			const parsed = LayoutSourceIO.parse(text);
 			if (!parsed.ok) return notify('error', problemText(parsed.error));
 			replace(parsed.doc);
 			notify('ok', tl('status.opened', { name }));
+		}
+
+		/**
+		 * Reads another tool's layout file into a new Ergopti source: the
+		 * Comparer's readers (layout_formats.js) give each key's characters and
+		 * dead keys, toSource the source; what they could not read is listed.
+		 */
+		function importForeign(name, text) {
+			let result;
+			let started;
+			try {
+				result = LAYOUT_FORMATS.read(name, text, {
+					parseToml: window.exports && window.exports.parse,
+					scancodes: LAYOUT_ANALYSIS_DATA.scancodes,
+					composer: LayoutComposer,
+					table: LAYOUT_COMPOSER_DATA,
+					analysis: LAYOUT_ANALYSIS,
+					convention: state.importConvention
+				});
+				const base = name.replace(/\.[^.]+$/, '');
+				started = LayoutSourceIO.startFromDocument(
+					LAYOUT_FORMATS.toSource(result.layout),
+					LayoutSourceIO.identifierFrom(result.layout.id || base, 'layout'),
+					result.layout.name || base
+				);
+			} catch (error) {
+				// The Comparer's words for a file its readers refuse.
+				notify(
+					'error',
+					t('layout_analysis.layouts.import_failed', {
+						reason: (error && (error.code || error.message)) || name
+					})
+				);
+				return;
+			}
+			replace(started.doc);
+			notify(
+				'ok',
+				result.unmapped.length === 0
+					? tl('status.imported_format', { name, format: result.format })
+					: tl('status.imported_partial', {
+							name,
+							format: result.format,
+							count: result.unmapped.length,
+							list: lossList(result.unmapped)
+						})
+			);
+		}
+
+		/** What a reader or writer could not carry, in a few words. */
+		function lossList(unmapped) {
+			const words = unmapped.map((entry) =>
+				typeof entry === 'string' ? entry : [entry.what, entry.detail].filter(Boolean).join(' ')
+			);
+			return words.length > 8 ? `${words.slice(0, 8).join(', ')}…` : words.join(', ');
+		}
+
+		/**
+		 * The KLA JSON of the edited layout and what KLA cannot hold (dead keys,
+		 * several characters on one key).
+		 */
+		function klaExport(layout) {
+			const unmapped = [];
+			for (const row of Object.values(layout.rows))
+				for (const cell of row) {
+					if (cell && typeof cell === 'object')
+						unmapped.push({ what: 'dead_key', detail: cell.dead });
+					else if (typeof cell === 'string' && Array.from(cell).length > 1)
+						unmapped.push({ what: 'multi_character', detail: cell });
+				}
+			const json = LAYOUT_FORMATS.toKla(layout, LAYOUT_ANALYSIS_DATA.model.fingerings.standard);
+			return { text: `${JSON.stringify(json, null, 2)}\n`, unmapped };
 		}
 
 		/** Opens a file through the host's native panel (macOS), where the webview shows none. */
@@ -974,7 +1049,7 @@ var LayoutEditorPage = (function () {
 			const fileInput = el('input', {
 				type: 'file',
 				id: 'le-open-file',
-				accept: '.toml,.keylayout',
+				accept: '.toml,.keylayout,.json,.klc,.dof,.txt,.yaml,.xkb',
 				hidden: true,
 				onchange: (event) => readFile(event.target, openText)
 			});
@@ -3459,6 +3534,44 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				);
+			// Interoperability (coordinator, 2026-11-14): the KLA JSON and Kalamine
+			// TOML of the layout, each saying what it cannot hold.
+			if (!LayoutSourceIO.isPreserved(doc()))
+				for (const [target, write, extension, mime] of [
+					['kla', klaExport, 'kla.json', 'application/json'],
+					['kalamine', LAYOUT_FORMATS.toKalamineToml, 'kalamine.toml', 'application/toml']
+				])
+					buttons.push(
+						el('button', {
+							type: 'button',
+							id: `le-export-${target}`,
+							text: tl(`export.${target}`),
+							onclick: () => {
+								let file;
+								try {
+									file = write(LAYOUT_ANALYSIS_PANEL.layoutFromEditorDoc(doc()));
+								} catch (error) {
+									notify('error', problemText(error));
+									return;
+								}
+								const filename = `${doc().layout.id}.${extension}`;
+								fromHost(() => host.saveFile(filename, file.text, mime)).then(
+									() =>
+										notify(
+											'ok',
+											file.unmapped.length === 0
+												? tl('status.saved', { name: filename })
+												: tl('status.saved_partial', {
+														name: filename,
+														count: file.unmapped.length,
+														list: lossList(file.unmapped)
+													})
+										),
+									(error) => notify('error', problemText(error))
+								);
+							}
+						})
+					);
 			// The two ways ErgoptiPlus uses a layout, each said in one line.
 			if (host.install) buttons.push(installButton(report));
 			if (host.emulate) buttons.push(emulateButton(report));

@@ -434,11 +434,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       sources and states the limits (not legal advice). So the library
       re-encodes each arrangement as our own TOML (what each key types), never copies another tool's files verbatim,
       and credits each layout's author and source.
-      [CODE] Left (2026-11-15): layout_formats.js reads KLA, Kalamine, XKB, KLC, DOF, cmini, rows and .keylayout and
-      reports what it drops (14ec36aded, 5eeae785ab; tools/test/test-layout-formats.cjs); import is wired only in the
-      Comparer, not « Éditer », the KLA JSON and Kalamine TOML writers have no UI, the library comes only from Oxeylyzer
-      and cmini, and no importer is tested on third-party files. [DECISION] confirm the KLA JSON and Kalamine TOML
-      exports.
+      Done 2026-11-15 (`claude/ergopti-todo-read-every-format`): « Open » in « Éditer » reads every format the
+      Comparer reads (KLA, Kalamine TOML and JSON, XKB, KLC, DOF, cmini, rows) into a new Ergopti source and lists
+      what it could not carry; « Download KLA JSON » and « Download Kalamine TOML » say what each format cannot hold;
+      the readers are tested on real files Ergo-L and Kalamine publish (tools/test/fixtures/layout-formats/third-party,
+      sources and licences in its README); proof: test-layout-formats.cjs, `editor-reads-every-format` in
+      layout-editor.playwright.cjs.
+      [CODE] Left (2026-11-15): the library comes only from Oxeylyzer and cmini; another source (genkey, GPL-3.0 like
+      cmini; KLA's built-in list) needs its layout list, which this session cannot list (no GitHub directory access);
+      no third-party KLA JSON, XKB symbols, KLC or DOF file under a licence that allows shipping it was found.
+      [DECISION] confirm the KLA JSON and Kalamine TOML exports.
 - [x] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
       two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
       (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such

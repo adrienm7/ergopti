@@ -400,6 +400,7 @@ async function exerciseSiteOpensOnErgopti(browser, origin) {
 		'',
 		'the board shows Ergopti'
 	);
+	await exerciseForeignFiles(page);
 	await exerciseStartAnyLayout(page);
 	assert.deepEqual(errors, []);
 	await context.close();
@@ -443,6 +444,44 @@ async function exerciseStartAnyLayout(page) {
 	);
 	await tool(page, 'details');
 	assert.equal(await page.inputValue('#le-name'), 'My Colemak-DH');
+}
+
+/**
+ * (editor-reads-every-format) « Open » reads another tool's layout file (here
+ * Ergo-L's published Kalamine JSON) into an Ergopti source, and the layout
+ * downloads as KLA JSON and Kalamine TOML, each saying what it cannot hold.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseForeignFiles(page) {
+	const dir = path.join(ROOT, 'tools', 'test', 'fixtures', 'layout-formats', 'third-party');
+	await page.setInputFiles('#le-open-file', path.join(dir, 'ergol.json'));
+	await page.waitForFunction(() =>
+		/ergol\.json/.test((document.getElementById('le-message') || {}).textContent || '')
+	);
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	assert.deepEqual(
+		[await legend('KeyQ'), await legend('KeyW'), await legend('KeyE')],
+		['q', 'c', 'o'],
+		"Ergo-L's letters on the board"
+	);
+	await tool(page, 'export');
+	const kla = await downloaded(page, () => page.click('#le-export-kla'));
+	assert.match(kla.name, /\.kla\.json$/);
+	const json = JSON.parse(kla.text);
+	assert.equal(json.keyboardType, 'european');
+	assert.ok(
+		json.keys.some((key) => key.primary === 'c'.codePointAt(0)),
+		'KLA keys carry the letters'
+	);
+	assert.match(
+		await page.textContent('#le-message'),
+		/dead_key/,
+		'KLA says it cannot hold dead keys'
+	);
+	const kalamine = await downloaded(page, () => page.click('#le-export-kalamine'));
+	assert.match(kalamine.name, /\.kalamine\.toml$/);
+	assert.match(kalamine.text, /^name = "Ergo-L"/);
+	assert.match(kalamine.text, /geometry = "ISO"/);
 }
 
 /**

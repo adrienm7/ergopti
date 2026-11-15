@@ -20,6 +20,11 @@
  * 3. Writers: every imported layout becomes an Ergopti source the source
  *    model validates; Kalamine TOML and KLA JSON read back to what was written.
  * 4. Plain rows, DOF and cmini blocks; unknown and malformed files refused.
+ * 5. Third-party files (tools/test/fixtures/layout-formats/third-party, their
+ *    sources and licences in its README): Ergo-L's own Kalamine TOML and the
+ *    JSON its project publishes give the same keys, the TOML reporting only
+ *    the dead keys whose rules Kalamine keeps built in; Kalamine's qwerty-prog
+ *    example reads on its ANSI board; each becomes a valid Ergopti source.
  * ==============================================================================
  */
 
@@ -280,11 +285,65 @@ check(
 	'an unknown KLA board is accepted'
 );
 
+// 5/ Third-party files, as their projects publish them.
+const THIRD_PARTY = path.join(
+	REPO_ROOT,
+	'tools',
+	'test',
+	'fixtures',
+	'layout-formats',
+	'third-party'
+);
+const thirdParty = (file) =>
+	F.read(file, fs.readFileSync(path.join(THIRD_PARTY, file), 'utf8'), {
+		parseToml,
+		scancodes: DATA.scancodes
+	});
+const ergolToml = thirdParty('ergol.toml');
+const ergolJson = thirdParty('ergol.json');
+const prog = thirdParty('kalamine-qwerty-prog.toml');
+check(
+	ergolToml.format === 'kalamine_toml' && ergolJson.format === 'kalamine_json',
+	'Ergo-L formats'
+);
+check(
+	same(ergolToml.layout.rows, ergolJson.layout.rows),
+	"Ergo-L: the TOML and the project's JSON give other keys"
+);
+check(
+	JSON.stringify(ergolToml.layout.rows.KeyQ) ===
+		JSON.stringify(['q', 'Q', '^', { dead: 'circumflex' }]) &&
+		JSON.stringify(ergolToml.layout.rows.KeyO[0]) === JSON.stringify({ dead: 'odk' }),
+	`Ergo-L: KeyQ ${JSON.stringify(ergolToml.layout.rows.KeyQ)}, its one dead key on KeyO`
+);
+check(ergolJson.unmapped.length === 0, `Ergo-L JSON: ${JSON.stringify(ergolJson.unmapped)}`);
+check(
+	JSON.stringify(ergolToml.unmapped.map((u) => u.what + ':' + u.detail).sort()) ===
+		JSON.stringify(['dead_key_rules:currency', 'dead_key_rules:greek', 'dead_key_rules:stroke']),
+	`Ergo-L TOML: only Kalamine's built-in dead keys go unread, got ${JSON.stringify(ergolToml.unmapped)}`
+);
+check(
+	prog.layout.name === 'qwerty-prog' &&
+		JSON.stringify(prog.layout.rows.KeyQ) === JSON.stringify(['q', 'Q', '=', null]) &&
+		prog.unmapped.length === 0,
+	`Kalamine qwerty-prog: ${JSON.stringify(prog.layout.rows.KeyQ)} ${JSON.stringify(prog.unmapped)}`
+);
+for (const [name, result] of [
+	['ergol.toml', ergolToml],
+	['ergol.json', ergolJson],
+	['kalamine-qwerty-prog.toml', prog]
+])
+	try {
+		Source.validate(F.toSource(result.layout));
+	} catch (error) {
+		check(false, `${name}: toSource is invalid (${error.code} ${error.path})`);
+	}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-formats: ${errors.length} problem(s)`);
 	process.exit(1);
 }
 console.log(
-	`test-layout-formats: OK (4 formats of one layout, 2 .keylayout, ${Object.keys(reference).length} characters, ${compared} KLA keys, writers round-trip)`
+	`test-layout-formats: OK (4 formats of one layout, 3 third-party files, 2 .keylayout, ${Object.keys(reference).length} characters, ${compared} KLA keys, writers round-trip)`
 );
