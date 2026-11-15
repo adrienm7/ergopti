@@ -687,12 +687,17 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       user ticks or unticks a layout, the ticks follow the keyboard (ISO for a split or ortholinear board, decided
       by the agent, to review by the maintainer); proof: `comparer-default-geometry` in
       layout-editor.playwright.cjs.
-      9 [ ] The start dialog keeps its quick picks and adds a searchable, sorted list of every library layout.
+      9 [x] The start dialog keeps its quick picks and adds a searchable, sorted list of every library layout.
+      Done 2026-11-15 (`claude/ergopti-todo-start-any-layout`): « New » lists the analysis data's every layout by
+      display name with a search field, on the site and in the app; a layout the host lists as a fill source
+      starts through its exact importer, any other from its library entry (base, Shift, AltGr and dead keys,
+      LAYOUT_FORMATS.toSource); proof: `start-any-layout` in layout-editor.playwright.cjs (site and app window:
+      sorted, searchable, Colemak-DH's letters on the board).
       1 [ ] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
       and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
       installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
       review by the maintainer.
-      [CODE] Left (2026-11-15): remarks 9 and 1.
+      [CODE] Left (2026-11-15): remark 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is

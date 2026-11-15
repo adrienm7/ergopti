@@ -2687,7 +2687,67 @@ var LayoutEditorPage = (function () {
 				state.fillUnavailable
 					? el('p', { class: 'le-message error', text: problemText(state.fillUnavailable) })
 					: null,
-				el('div', { class: 'le-buttons' }, choices)
+				el('div', { class: 'le-buttons' }, choices),
+				libraryStart(begin)
+			]);
+		}
+
+		/**
+		 * Every layout of the library, by display name (maintainer, 2026-11-15):
+		 * the analysis data's one list (LAYOUT_ANALYSIS.libraryLayouts), with a
+		 * search field. A layout the host also lists as a fill source starts
+		 * through its exact importer, any other from its library entry
+		 * (LAYOUT_FORMATS.toSource: its base, Shift, AltGr levels and dead keys).
+		 * @param {function(function(): {doc: object, lost: string[]}): void} begin
+		 * @returns {HTMLElement}
+		 */
+		function libraryStart(begin) {
+			const layouts = LAYOUT_ANALYSIS.libraryLayouts().sort((a, b) =>
+				a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+			);
+			const list = el('select', { id: 'le-start-layout', size: '8' });
+			const go = el('button', {
+				type: 'button',
+				id: 'le-start-library-go',
+				text: tl('start.from_library'),
+				onclick: () => {
+					const layout = layouts.find((entry) => entry.id === list.value);
+					if (!layout) return;
+					const id = `${LayoutSourceIO.identifierFrom(layout.id, 'layout')}_custom`;
+					const name = tl('start.copy_name', { name: layout.name });
+					const source = (state.fillSources || []).find((entry) => entry.id === layout.id);
+					begin(() =>
+						source
+							? LayoutSourceIO.startFrom(source, id, name)
+							: LayoutSourceIO.startFromDocument(LAYOUT_FORMATS.toSource(layout), id, name)
+					);
+				}
+			});
+			const fill = (query) => {
+				const wanted = query.trim().toLocaleLowerCase();
+				const shown = layouts.filter(
+					(layout) => !wanted || layout.name.toLocaleLowerCase().includes(wanted)
+				);
+				list.replaceChildren(
+					...shown.map((layout) => el('option', { value: layout.id }, layout.name))
+				);
+				if (shown.length) list.value = shown[0].id;
+				go.disabled = shown.length === 0;
+			};
+			list.addEventListener('dblclick', () => go.click());
+			const search = el('input', {
+				type: 'search',
+				id: 'le-start-search',
+				placeholder: tl('start.search'),
+				'aria-label': tl('start.search'),
+				oninput: (event) => fill(event.target.value)
+			});
+			fill('');
+			return el('div', { class: 'le-start-library' }, [
+				el('h3', { text: tl('start.library') }),
+				search,
+				list,
+				go
 			]);
 		}
 

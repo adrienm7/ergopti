@@ -624,6 +624,20 @@ var LayoutSourceIO = (function () {
 	}
 
 	/**
+	 * A new editable source that starts as a layout source document another
+	 * module wrote (the layout library's entries, LAYOUT_FORMATS.toSource).
+	 * @param {object} model - The source document, before TOML encoding.
+	 * @param {string} id - The new layout's identifier.
+	 * @param {string} name - Its displayed name.
+	 * @returns {{doc: object, lost: string[]}} The validated copy (nothing lost).
+	 * @throws {LayoutSource.SourceError} On a document the source model refuses.
+	 */
+	function startFromDocument(model, id, name) {
+		const doc = Object.assign({}, model, { layout: Object.assign({}, model.layout, { id, name }) });
+		return { doc: LayoutSource.validate(doc), lost: [] };
+	}
+
+	/**
 	 * The layouts a layer can be filled from: the built-in references (QWERTY,
 	 * AZERTY) and the registry layouts a host supplies as {id, name, convention, text}.
 	 * @param {object[]} supplied
@@ -817,6 +831,7 @@ var LayoutSourceIO = (function () {
 		approximateImport,
 		fillSources,
 		startFrom,
+		startFromDocument,
 		windowsDlls,
 		windowsDllArchive,
 		fillLayer,

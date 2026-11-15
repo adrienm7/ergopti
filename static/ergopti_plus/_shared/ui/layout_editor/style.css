@@ -853,6 +853,32 @@ body {
 	padding: 12px;
 }
 
+/* Every layout of the library: a search field over a sorted list. */
+.le-start-library {
+	display: grid;
+	gap: 8px;
+	margin-top: 12px;
+	max-width: 420px;
+}
+
+.le-start-library h3 {
+	font-size: 1em;
+	margin: 0;
+}
+
+.le-start-library select {
+	background: var(--le-surface);
+	border: 1px solid var(--le-border);
+	border-radius: 6px;
+	color: inherit;
+	font: inherit;
+	width: 100%;
+}
+
+.le-start-library button {
+	justify-self: start;
+}
+
 /* =============================== */
 /* =============================== */
 /* ======= 8/ Stickers =========== */

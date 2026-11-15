@@ -400,8 +400,49 @@ async function exerciseSiteOpensOnErgopti(browser, origin) {
 		'',
 		'the board shows Ergopti'
 	);
+	await exerciseStartAnyLayout(page);
 	assert.deepEqual(errors, []);
 	await context.close();
+}
+
+/**
+ * (start-any-layout) « New » lists every layout of the library, sorted by
+ * display name, with a search field; starting from one that is not a quick
+ * pick (Colemak-DH) puts its letters on the board.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseStartAnyLayout(page) {
+	await page.click('#le-new');
+	const names = await page.$$eval('#le-start-layout option', (options) =>
+		options.map((option) => option.textContent)
+	);
+	assert.ok(names.length > 100, `every library layout is listed (${names.length})`);
+	assert.deepEqual(
+		names,
+		[...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
+		'sorted by display name'
+	);
+	assert.ok(!names.some((name) => /_/.test(name)), 'display names, not ids');
+	await page.fill('#le-start-search', 'colemak-dh');
+	assert.deepEqual(
+		await page.$$eval('#le-start-layout option', (options) =>
+			options.map((option) => option.textContent)
+		),
+		['Colemak-DH', 'Colemak-DH Angle', 'Colemak-DHv'],
+		'the search narrows the list'
+	);
+	assert.equal(await page.inputValue('#le-start-layout'), 'colemak_dh');
+	await page.click('#le-start-library-go');
+	if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	const legend = (code) => page.textContent(`#le-board [data-code="${code}"] .le-legend`);
+	assert.deepEqual(
+		[await legend('KeyE'), await legend('KeyF'), await legend('KeyD'), await legend('KeyV')],
+		['f', 't', 's', 'd'],
+		"Colemak-DH's letters on the board"
+	);
+	await tool(page, 'details');
+	assert.equal(await page.inputValue('#le-name'), 'My Colemak-DH');
 }
 
 /**
@@ -783,6 +824,7 @@ async function exerciseManager(browser, origin) {
 	await page.click('#le-start [data-start="blank"]');
 	await page.waitForSelector('#le-start', { state: 'detached' });
 	assert.equal(await page.inputValue('#le-name'), strings['layout_editor.default_name']);
+	await exerciseStartAnyLayout(page);
 	// « Close » closes the editor's own window through the host.
 	await page.click('#le-close');
 	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'close'));
