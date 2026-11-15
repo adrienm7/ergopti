@@ -22,7 +22,7 @@ end
 
 local GNOME_SOURCES = "[('xkb', 'fr'), ('xkb', 'fr+ergopti'), ('ibus', 'mozc-jp')]\n"
 local GNOME_MRU = "[('xkb', 'fr+ergopti'), ('xkb', 'fr')]\n"
--- The call the Ergopti GNOME Shell extension answers (desktop_focus/gnome/extension.js).
+-- The call the Ergopti GNOME Shell extension answers (platform/desktop_focus/gnome/extension.js).
 local function activate(id)
 	return "gdbus call --session --dest org.gnome.Shell --object-path /org/ergopti/InputSource --method "
 		.. "org.ergopti.InputSource1.Activate '" .. id .. "'"

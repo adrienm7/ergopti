@@ -133,7 +133,7 @@ check('GNOME: an update refreshes the files and keeps a user-disabled extension 
 		const output = box.run(['install', DRIVER], 'GNOME');
 		assert.equal(
 			fs.readFileSync(path.join(box.gnome, 'extension.js'), 'utf8'),
-			fs.readFileSync(path.join(DRIVER, 'desktop_focus/gnome/extension.js'), 'utf8')
+			fs.readFileSync(path.join(DRIVER, 'platform/desktop_focus/gnome/extension.js'), 'utf8')
 		);
 		assert.equal(box.calls(), before, 'no enable on an update');
 		assert.match(output, /focus integration updated/);

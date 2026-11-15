@@ -22,7 +22,7 @@
 --- 2. GNOME Shell (checked on 46) reads `mru-sources` only when it starts and
 ---    ignores `current`: on a `sources` change it keeps its in-memory recent
 ---    list and activates its first entry. Switching therefore asks the Ergopti
----    GNOME Shell extension (desktop_focus/gnome, installed with the focus
+---    GNOME Shell extension (platform/desktop_focus/gnome, installed with the focus
 ---    reports) to activate the source as the Shell's own switcher does; the
 ---    user's `sources` list is never rewritten. Without the extension running
 ---    (Flatpak, turned off, or an update not yet loaded by a new login) the
@@ -54,7 +54,7 @@ M.KDE = "kde"
 M.X11 = "x11"
 
 local GNOME_SCHEMA = "org.gnome.desktop.input-sources"
--- Exported by desktop_focus/gnome/extension.js on GNOME Shell's own connection;
+-- Exported by platform/desktop_focus/gnome/extension.js on GNOME Shell's own connection;
 -- tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua pins both.
 local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
 M.GNOME_SWITCH_PATH = LinuxDesktop.gnome_switch_path

@@ -134,6 +134,7 @@ class GnomeLiveSelectTests(unittest.TestCase):
             Path(__file__).resolve().parents[4]
             / "ergopti_plus"
             / "linux"
+            / "platform"
             / "desktop_focus"
             / "gnome"
             / "extension.js"

@@ -1,4 +1,4 @@
-// linux/desktop_focus/gnome/extension.js
+// linux/platform/desktop_focus/gnome/extension.js
 
 /**
  * ==============================================================================

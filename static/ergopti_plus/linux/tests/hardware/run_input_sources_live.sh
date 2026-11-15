@@ -13,7 +13,7 @@
 #              runs on a private bus named as the system bus. A RemoteDesktop
 #              session adds the virtual keyboard XWayland needs to receive
 #              mutter's keymap. The Ergopti GNOME Shell extension
-#              (desktop_focus/gnome) is installed and enabled first: the
+#              (platform/desktop_focus/gnome) is installed and enabled first: the
 #              daemon switches GNOME's layout only through it.
 #   gnome-no-extension  The same session without the extension: every switch
 #              must be refused with the extension named.
@@ -183,7 +183,7 @@ gnome)
 	if [ "${GNOME_EXTENSION}" = on ]; then
 		# What install/compositor_focus.sh does for a user, before the login.
 		extension="${XDG_DATA_HOME:-${HOME}/.local/share}/gnome-shell/extensions/focus@ergopti.fr"
-		for file in desktop_focus/gnome/*; do install -D -m 644 -- "${file}" "${extension}/$(basename "${file}")"; done
+		for file in platform/desktop_focus/gnome/*; do install -D -m 644 -- "${file}" "${extension}/$(basename "${file}")"; done
 		gsettings set org.gnome.shell disable-user-extensions false
 		gsettings set org.gnome.shell enabled-extensions "['focus@ergopti.fr']"
 	fi

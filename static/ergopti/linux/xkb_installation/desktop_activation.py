@@ -1237,7 +1237,7 @@ def read_desktop_selection(desktop: str, slots: tuple[str, str]) -> DesktopSelec
 
 
 # The Ergopti GNOME Shell extension's layout switch
-# (static/ergopti_plus/linux/desktop_focus/gnome/extension.js, which
+# (static/ergopti_plus/linux/platform/desktop_focus/gnome/extension.js, which
 # tests/test_desktop_activation.py pins against these).
 GNOME_SWITCH_PATH = "/org/ergopti/InputSource"
 GNOME_SWITCH_INTERFACE = "org.ergopti.InputSource1"

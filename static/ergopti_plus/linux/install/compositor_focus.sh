@@ -5,7 +5,7 @@
 # MODULE: Desktop Focus Integration Installer
 # DESCRIPTION:
 # Installs, enables and removes the two desktop-side halves of the Wayland
-# focused-application identity (linux/desktop_focus/): the Ergopti GNOME Shell
+# focused-application identity (linux/platform/desktop_focus/): the Ergopti GNOME Shell
 # extension and the Ergopti KWin script. GNOME admits its Introspect interface
 # to allow-listed senders only and KWin answers only a loaded script, so code
 # inside the desktop is the only way to learn which window has focus there.
@@ -32,7 +32,7 @@ set -uo pipefail
 source "$(dirname -- "${BASH_SOURCE[0]}")/messages.sh"
 
 # Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
-# against desktop_focus/gnome/metadata.json and desktop_focus/kwin/metadata.json.
+# against platform/desktop_focus/gnome/metadata.json and platform/desktop_focus/kwin/metadata.json.
 GNOME_FOCUS_UUID="focus@ergopti.fr"
 KWIN_FOCUS_ID="ergopti-focus"
 
@@ -109,7 +109,7 @@ _kwin_scripting() {
 # ===================================
 
 _install_gnome() {
-	local source="$1/desktop_focus/gnome" first=false enabled label="GNOME Shell"
+	local source="$1/platform/desktop_focus/gnome" first=false enabled label="GNOME Shell"
 	[ -d "$GNOME_TARGET" ] || first=true
 	# Every daemon start runs this: an unchanged copy says nothing.
 	if ! "$first" && _same_tree "$source" "$GNOME_TARGET"; then return 0; fi
@@ -179,7 +179,7 @@ _remove_gnome() {
 # ===================================
 
 _install_kwin() {
-	local source="$1/desktop_focus/kwin" first=false writer label="KWin"
+	local source="$1/platform/desktop_focus/kwin" first=false writer label="KWin"
 	[ -d "$KWIN_TARGET" ] || first=true
 	if ! "$first" && _same_tree "$source" "$KWIN_TARGET"; then return 0; fi
 	if ! _publish_tree "$source" "$KWIN_TARGET"; then
@@ -223,7 +223,7 @@ _remove_kwin() {
 case "${1:-}" in
 	install)
 		driver_root="${2:-}"
-		[ -d "$driver_root/desktop_focus" ] || { printf '[compositor_focus] code=no-source\n' >&2; exit 2; }
+		[ -d "$driver_root/platform/desktop_focus" ] || { printf '[compositor_focus] code=no-source\n' >&2; exit 2; }
 		[[ "$DATA_HOME" == /* ]] || exit 0
 		[ -e /.flatpak-info ] && exit 0
 		if _desktop_is gnome; then _install_gnome "$driver_root"; fi
