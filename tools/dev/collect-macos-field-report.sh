@@ -425,6 +425,12 @@ step owned_runtime sh -c '
 # only a person typing ls could see it. It is listed again after the run.
 OWNED_RUNTIME_FILES='p="/Library/Application Support/ErgoptiPlus"; if [ -e "$p" ]; then ls -laeR "$p" 2>&1 | head -n 400; else echo "absent: $p"; fi'
 step owned_runtime_files sh -c "${OWNED_RUNTIME_FILES}"
+# The install journal says which service step an install stopped at (the helper
+# exits 75, install_cleanup_pending, and the field run names no step): it is
+# root-only (mode 600) and the run's reset removes it, so it is copied here
+# before the run and again after it (field report 2026-11-15).
+OWNED_RUNTIME_JOURNAL='j="/Library/Application Support/ErgoptiPlus/.runtime-install-journal"; if sudo /bin/test -e "$j"; then sudo /bin/cat "$j"; echo; sudo /bin/ls -le "$j"; else echo "absent: $j"; fi'
+step owned_runtime_journal sh -c "${OWNED_RUNTIME_JOURNAL}"
 
 # ===========================================
 # ======= 3/ Field run in the app ===========
@@ -810,6 +816,7 @@ field_run_status=${PIPESTATUS[0]}
 # (OwnedSuspendedImageGuardian); a file written into the bundle breaks it.
 step app_signature sh -c 'app="/Applications/$1"; verdict=$(codesign --verify --deep --strict "$app" 2>&1); status=$?; printf "%s\n" "$verdict" | sed "s#$HOME#~#g"; echo "codesign exit=$status"; n=$(find "$app/Contents" -name __pycache__ 2>/dev/null | wc -l | tr -d " "); echo "pycache_folders=$n"' sh "${ERGOPTI_APP_BUNDLE}"
 step owned_runtime_files_after sh -c "${OWNED_RUNTIME_FILES}"
+step owned_runtime_journal_after sh -c "${OWNED_RUNTIME_JOURNAL}"
 # What no command can do on its own, said once instead of faked.
 cat > "${out}/not_automated.txt" <<'NOTE'
 typing through the owned runtime: refused. Karabiner captures the keyboards at the HID level, below the event system;
