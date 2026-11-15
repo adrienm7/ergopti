@@ -166,6 +166,36 @@ function M.new(ports)
 		end
 		return true
 	end
+
+	-- Whether the inhibitor ran when the driver paused, and the pause it
+	-- belongs to: the resume gives it back (the maintainer's decision of
+	-- 2026-11-14, as on Windows and macOS).
+	local resume_after_pause, pause_generation, paused_now = false, 0, false
+
+	--- Follows the driver's pause: a pause stops the inhibitor and remembers
+	--- whether it ran, the resume starts it again once the old one settled.
+	--- @param paused boolean The driver's settled pause state.
+	--- @return boolean settled
+	function owner.set_paused(paused)
+		if type(paused) ~= "boolean" then
+			error("keep_awake.set_paused() needs a boolean pause state", 2)
+		end
+		pause_generation = pause_generation + 1
+		paused_now = paused
+		if paused then
+			resume_after_pause = resume_after_pause or owner.is_active()
+			return owner.stop()
+		end
+		if not resume_after_pause then return true end
+		resume_after_pause = false
+		local generation = pause_generation
+		return owner.when_settled(function()
+			if pause_generation ~= generation or paused_now or current then return end
+			if owner.toggle() ~= true then
+				Logger.error(LOG, "Keep-awake could not start again on resume.")
+			end
+		end)
+	end
 	return owner
 end
 
@@ -179,6 +209,16 @@ end
 --- Releases the daemon's inhibitor before its event loop stops.
 --- @return boolean settled
 function M.stop() return not _owner or _owner.stop() end
+
+--- Follows the driver's pause: the daemon's inhibitor stops with it and comes
+--- back on resume when it ran at the pause.
+--- @param paused boolean The driver's settled pause state.
+--- @return boolean settled
+function M.set_paused(paused)
+	if type(paused) ~= "boolean" then error("keep_awake.set_paused() needs a boolean pause state", 2) end
+	if not _owner then return true end
+	return _owner.set_paused(paused)
+end
 
 --- Waits for the inhibitor's native cleanup receipt.
 --- @param fn function Settlement callback.

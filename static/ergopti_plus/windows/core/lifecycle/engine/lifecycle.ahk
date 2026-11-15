@@ -537,6 +537,7 @@ _LifecycleStopUIAWorkerForSuspend() {
 }
 
 Ergopti_OnSuspendEnter() {
+	global _LifecycleKeepAwakeAtPause
 	; Retire RAM-only note continuations before any suspend step can yield.
 	if IsSet(TakeNoteRevokePending)
 		TakeNoteRevokePending()
@@ -697,6 +698,9 @@ Ergopti_OnSuspendEnter() {
 	if IsSet(KL_Mig_OnSuspend)
 		_LifecycleRunRequiredStep(Transition, "keystats-text-migration",
 			KL_Mig_OnSuspend)
+	; Keep-awake is restored on resume (the maintainer's decision of 2026-11-14,
+	; as on macOS and Linux): remember whether it ran before stopping it.
+	_LifecycleKeepAwakeAtPause := IsSet(ActivitySimulation) && ActivitySimulation ? true : false
 	_LifecycleRunRequiredStep(Transition, "keep-awake",
 		() => StopActivitySimulation(), true)
 		; AHK-12: A gesture left/right click-hold (SendEvent "{LButton Down}") that
@@ -845,10 +849,41 @@ Ergopti_OnSuspendResume() {
 			catch as Err
 				try LoggerError("Lifecycle", "Local AI server post-transition repair remains owned.")
 		}
+		_LifecycleRestoreKeepAwake()
 		LoggerSuccess("Lifecycle", "Resumed — suspend-bypassing subsystems restarted.")
 		if IsSet(NotifyPauseState)
 			NotifyPauseState(false)
 		return true
+}
+
+; Whether keep-awake ran when the driver paused; the resume starts it again.
+global _LifecycleKeepAwakeAtPause := false
+
+; Starts keep-awake again after a resume when it ran at the pause (the
+; maintainer's decision of 2026-11-14): a pause stops it, the resume gives it
+; back as it was, as on macOS and Linux.
+; @param StartFn {Func} Starts keep-awake; StartActivitySimulation by default.
+; @return {Boolean} False when it ran at the pause and could not start again.
+_LifecycleRestoreKeepAwake(StartFn := 0) {
+	global _LifecycleKeepAwakeAtPause
+	if !_LifecycleKeepAwakeAtPause
+		return true
+	_LifecycleKeepAwakeAtPause := false
+	if !HasMethod(StartFn, "Call") {
+		if !IsSet(StartActivitySimulation)
+			return true
+		StartFn := StartActivitySimulation
+	}
+	try Started := StartFn.Call()
+	catch as Err {
+		try LoggerError("Lifecycle", "Keep-awake could not start again on resume: {1}.", Err.Message)
+		return false
+	}
+	if Started != true {
+		try LoggerError("Lifecycle", "Keep-awake could not start again on resume.")
+		return false
+	}
+	return true
 }
 
 ; Runs the quit transition: one owner, the switch to the pause layout. Its

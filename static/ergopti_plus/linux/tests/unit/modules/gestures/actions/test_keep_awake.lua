@@ -68,6 +68,31 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		helpers.assert_true(f.owner.stop())
 	end)
 
+	-- The maintainer's decision of 2026-11-14: a pause stops keep-awake and the
+	-- resume gives it back as it was, as on Windows and macOS. Before, Linux
+	-- stopped it at pause and left it off (paused-keepawake-restore).
+	helpers.it("(paused-keepawake-restore) the resume restarts a keep-awake that ran at the pause", function()
+		local f = fixture()
+		helpers.assert_true(f.owner.toggle())
+		f.options.on_output("ERGOPTI_INHIBITED\n", "stdout")
+		helpers.assert_true(f.owner.is_active())
+		f.owner.set_paused(true)
+		helpers.assert_true(f.cancelled, "the pause stops the inhibitor")
+		f.finish()
+		helpers.assert_eq(f.owner.is_active(), false)
+		f.settled, f.running = false, true
+		helpers.assert_true(f.owner.set_paused(false))
+		helpers.assert_eq(f.launches, 2, "the resume starts the inhibitor again")
+		f.options.on_output("ERGOPTI_INHIBITED\n", "stdout")
+		helpers.assert_true(f.owner.is_active())
+		f.owner.toggle()
+		f.finish()
+		local off = fixture()
+		off.owner.set_paused(true)
+		helpers.assert_true(off.owner.set_paused(false))
+		helpers.assert_eq(off.launches, 0, "a keep-awake off at the pause stays off")
+	end)
+
 	-- KMD-3 (decided by the maintainer on 2026-11-11): a finished session is the
 	-- day's awake_ms, as on Windows and macOS; an unconfirmed one credits nothing.
 	helpers.it("linux-awake-definition: a released session credits its confirmed time", function()
@@ -181,6 +206,12 @@ helpers.describe("Linux idle inhibition (linux-keep-awake)", function()
 		local previous, stopped, listener = package.loaded["modules.keep_awake"], 0, nil
 		package.loaded["modules.keep_awake"] = {
 			stop = function() stopped = stopped + 1; return false end,
+			-- The pause releases it through its pause port, which stops it.
+			set_paused = function(paused)
+				helpers.assert_eq(paused, true)
+				stopped = stopped + 1
+				return false
+			end,
 			when_settled = function(fn) listener = fn; return true end,
 		}
 		local ok, err = pcall(function()

@@ -1683,7 +1683,10 @@ function M.set_program_paused(paused)
 	-- The hidden run_command children follow the same pause as user programs
 	local commands_settled = UserActions.set_paused(paused)
 	local inhibitor = package.loaded["modules.keep_awake"]
-	if paused == true and inhibitor and inhibitor.stop() ~= true then commands_settled = false end
+	-- Keep-awake stops with the pause and comes back on resume when it ran.
+	if type(paused) == "boolean" and inhibitor and inhibitor.set_paused(paused) ~= true then
+		commands_settled = false
+	end
 	if _program_owner == nil then return type(paused) == "boolean" and commands_settled end
 	return _program_owner.set_paused(paused) and commands_settled
 end
