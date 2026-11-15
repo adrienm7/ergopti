@@ -482,6 +482,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): Digit6, the space bar, the weights, the 6.5/11.5/15.5/16.5 % load and the « i » popovers
       are done (5d5f424542, 0c197c6ce8; test-layout-analysis-engine.cjs); index >= middle >= ring >= pinky is checked on
       the default only, not on a user-edited load. [LATER] the 19 other locales keep pending English.
+      Order on an edited load done 2026-11-15 (worker X, e363f74b): idealLoad refuses it as `ideal_load_order`; proof:
+      test-layout-analysis-engine.cjs (pinky and ring swapped on each hand). Left: the Comparer's ideal-load box shows
+      only a red sum, not the refusal's text (Comparer UI, owned by worker T).
 - [x] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
       for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
       (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
@@ -622,12 +625,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is
       published. Delete the pre-move fixtures with the legacy probes.
-- [ ] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
+- [x] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
       exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
       .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
-      [CODE] Left (2026-11-15): every format reports `shortcut_key` as omitted and the export note says so, which covers
-      Linux; the shortcut VK in the KLC and built DLL, and the .keylayout Command level, are not written. The real-OS
-      proofs are in the three TODO-tests files (2026-11-15).
+      Done 2026-11-15 (worker X, 4d265e75): the .keylayout writes the named key's row on every Command and Control
+      keyMap; Linux XKB carries it too, on ERGOPTI_SEVEN_LEVEL's Control/Alt/Super level (its preserve keeps those
+      modifiers), and the export's limitations say what that one level cannot tell apart; the KLC and DLL exchange
+      virtual keys with the named key (tools/lib/kbd-dll/shortcut-keys.cjs), a displaced or refused key reported.
+      Proof: tools/test/test-layout-shortcut-keys.cjs (goldens of shortcut_keys.toml). The real-OS proofs
+      stay in the three TODO-tests files.
 - [ ] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
       Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
       regression test that fails on the old behaviour.
