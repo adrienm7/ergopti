@@ -159,7 +159,8 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		const exportButton = el('button');
 		exportButton.type = 'button';
 		const importLabel = el('label', 'la-file');
-		const importText = el('span');
+		// The page's button: the native control's words stay hidden (style.css .la-file).
+		const importText = el('span', 'la-file-button');
 		const importInput = el('input');
 		importInput.type = 'file';
 		importInput.accept = '.json';

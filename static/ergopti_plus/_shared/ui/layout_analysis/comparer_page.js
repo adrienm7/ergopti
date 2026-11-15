@@ -108,12 +108,13 @@
 			data-i18n-placeholder="layout_analysis.corpus.paste_placeholder"
 		></textarea>
 		<label class="la-file">
-			<span data-i18n="layout_analysis.corpus.file"></span>
+			<span class="la-file-button" data-i18n="layout_analysis.corpus.file"></span>
 			<input
 				id="la-file"
 				type="file"
 				accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt"
 			/>
+			<span id="la-file-name" class="la-muted"></span>
 		</label>
 		<p id="la-file-error" class="la-error" hidden></p>
 	</div>
@@ -144,7 +145,7 @@
 		<button id="la-all" type="button" data-i18n="layout_analysis.layouts.all"></button>
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
 		<label class="la-file">
-			<span data-i18n="layout_analysis.layouts.import"></span>
+			<span class="la-file-button" data-i18n="layout_analysis.layouts.import"></span>
 			<input
 				id="la-import"
 				type="file"
@@ -943,6 +944,8 @@
 				const file = event.target.files && event.target.files[0];
 				const error = $('la-file-error');
 				error.hidden = true;
+				// The browser's own « no file chosen » text is hidden with its input.
+				$('la-file-name').textContent = file ? file.name : '';
 				if (!file) return;
 				try {
 					const text = await window.LAYOUT_ANALYSIS_FILES.readText(file);

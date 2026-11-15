@@ -252,6 +252,32 @@ async function exerciseStudioComparer(page) {
 		await page.evaluate(() => document.getElementById('la-status').textContent),
 		/^\d+ layouts compared on [\d,]+ characters/
 	);
+	// (studio-file-buttons) The file inputs never show the browser's own words
+	// (« Choose File », « No file chosen »): each is hidden inside a label whose
+	// button carries the page's translated text.
+	// The corpus file sits in the panel « custom text » opens: open it first.
+	await page.selectOption('#la-corpus', 'custom');
+	const inputs = await page.$$eval('#studio-comparer input[type="file"]', (nodes) =>
+		nodes.map((node) => {
+			const box = node.getBoundingClientRect();
+			const button = node.closest('label').querySelector('.la-file-button');
+			return {
+				id: node.id || node.accept,
+				hidden: box.width <= 1 && box.height <= 1,
+				label: button ? button.textContent.trim() : '',
+				shown: Boolean(button && button.getBoundingClientRect().width > 1)
+			};
+		})
+	);
+	assert.equal(inputs.length, 3, 'a corpus file, a layout file and a fingering profile');
+	for (const input of inputs) {
+		assert.ok(input.hidden, `${input.id}: the native file control is hidden`);
+		assert.ok(input.shown, `${input.id}: its labelled button is shown`);
+		assert.ok(
+			input.label.length > 0 && !input.label.startsWith('layout_analysis.'),
+			`${input.id}: the button is translated (${input.label})`
+		);
+	}
 	await page.click('#studio-tab-edit');
 	assert.equal(await page.isVisible('#studio-comparer'), false);
 }

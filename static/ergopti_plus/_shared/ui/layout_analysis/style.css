@@ -120,9 +120,43 @@ body:has(> main.layout-analysis) {
 	width: 100%;
 }
 
-.la-file input {
-	margin-left: 8px;
-	max-width: 100%;
+/* A file input shows the browser's own words (« Choose File », « No file
+   chosen ») in its language, not the page's: it is hidden, kept inside its
+   label so a click or a key opens the picker, and the label is the button. */
+.la-file {
+	align-items: center;
+	display: inline-flex;
+	gap: 8px;
+	position: relative;
+}
+
+.layout-analysis .la-file input {
+	border: 0;
+	clip-path: inset(50%);
+	height: 1px;
+	margin: -1px;
+	overflow: hidden;
+	padding: 0;
+	position: absolute;
+	white-space: nowrap;
+	width: 1px;
+}
+
+.la-file-button {
+	background: var(--la-surface);
+	border: 1px solid var(--la-border);
+	border-radius: 6px;
+	cursor: pointer;
+	padding: 5px 8px;
+}
+
+.la-file-button:hover {
+	background: var(--la-accent-soft);
+}
+
+.la-file:focus-within .la-file-button {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 1px;
 }
 
 .la-row {
