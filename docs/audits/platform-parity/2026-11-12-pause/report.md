@@ -241,6 +241,18 @@ gestures manager's pause, starts it again once the old inhibitor settled.
 Regressions: `test_keepawake_restored_on_resume.ahk`, Linux `test_keep_awake`
 and macOS `test_rebind_preserves_keep_awake` `(paused-keepawake-restore)`.
 
+## Seventh pass (2026-11-14, worker P): the number-row choice while paused
+
+The shared number-row policy (`number_row_policy.lua`, its Windows twin
+`number_row_policy.ahk`) refused every snapshot taken while paused, so the
+number-row rows refused on the three OS. A pause now admits the choice: it is
+saved at once and the resume reads the stored row. A snapshot whose `paused`
+field is not a boolean is still refused, and `paused` joins the fields an
+intent compares, so a pause or resume between the capture and the write
+retires the capture (as the magic key capture). Regressions: the shared
+contract `(paused-number-row)` and the Windows `test_number_row_symbols`
+corpus.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a

@@ -101,6 +101,9 @@ Traps met in (2): `tools/test/test-script-chords-three-os.cjs` pins the Linux
 `ScriptChords.runs` call; `test_hotstring_editor_shortcut_transaction` needs
 the whole `menu_input` group's stubs (`--only` alone fails on `hs.fs`).
 
+Block 5 (`claude/ergopti-todo-pause-parity-5`): the number-row policy admits
+a paused snapshot on the three OS; see the report's seventh pass.
+
 ## Traps met
 
 - Structural JS proofs pin exact source text:

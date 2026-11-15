@@ -124,12 +124,16 @@ function M.ready(snapshot, value)
 	for _, field in ipairs({ "master", "paused", "symbols", "blocked", "caps" }) do
 		if type(snapshot[field]) ~= "boolean" then return false end
 	end
-	return snapshot.master and not snapshot.paused and not snapshot.blocked and M.capable(snapshot.platform, value, snapshot.symbols)
+	-- A pause admits the choice (EDD-1): the paused driver types nothing, and the
+	-- resume reads the stored row. A pause that is not a boolean is refused above.
+	return snapshot.master and not snapshot.blocked and M.capable(snapshot.platform, value, snapshot.symbols)
 end
 
 function M.intent(expected, current, value)
 	if not M.ready(expected, value) or not M.ready(current, value) then return false end
-	for _, field in ipairs({ "owner", "source", "native_owner", "generation", "lifecycle", "hkl", "platform", "mode", "symbols", "caps" }) do
+	-- A pause or resume between the capture and the write retires the capture.
+	for _, field in ipairs({ "owner", "source", "native_owner", "generation", "lifecycle", "hkl", "platform", "mode",
+		"paused", "symbols", "caps" }) do
 		if expected[field] ~= current[field] then return false end
 	end
 	return true

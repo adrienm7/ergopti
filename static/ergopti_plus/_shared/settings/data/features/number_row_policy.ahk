@@ -159,14 +159,18 @@ NumberRowPolicyReady(Snapshot, Value) {
 		if !(Bool is Integer) || (Bool != true && Bool != false)
 			return false
 	}
-	return Snapshot["master"] && !Snapshot["paused"] && !Snapshot["blocked"]
+	; A pause admits the choice (EDD-1): the paused driver types nothing, and the
+	; resume reads the stored row. A pause that is not a boolean is refused above.
+	return Snapshot["master"] && !Snapshot["blocked"]
 		&& NumberRowPolicyCapable(Snapshot.Get("platform", ""), Value, Snapshot["symbols"])
 }
 
 NumberRowPolicyIntent(Expected, Current, Value) {
 	if !NumberRowPolicyReady(Expected, Value) || !NumberRowPolicyReady(Current, Value)
 		return false
-	for Field in ["owner", "source", "native_owner", "generation", "lifecycle", "hkl", "platform", "mode", "symbols", "caps"] {
+	; A pause or resume between the capture and the write retires the capture.
+	for Field in ["owner", "source", "native_owner", "generation", "lifecycle", "hkl", "platform", "mode", "paused",
+			"symbols", "caps"] {
 		Left := Expected[Field], Right := Current[Field]
 		if Type(Left) != Type(Right) || ((Left is String) ? StrCompare(Left, Right, true) != 0 : Left != Right)
 			return false

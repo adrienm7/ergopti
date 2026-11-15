@@ -63,6 +63,13 @@ _NRP_SharedPolicyCorpus() {
 			: Field == "symbols" ? false : Current[Field] + 1
 		AssertFalse(NumberRowPolicyIntent(Expected, Current, "native"), "a retained callback cannot borrow changed " . Field)
 	}
+	; EDD-1 (paused-number-row): a pause admits the choice, and a pause edge
+	; between the capture and the write retires the capture.
+	Paused := Expected.Clone()
+	Paused["paused"] := true
+	AssertTrue(NumberRowPolicyReady(Paused, "digits"), "(paused-number-row) a paused snapshot admits the choice")
+	AssertTrue(NumberRowPolicyIntent(Paused, Paused.Clone(), "digits"))
+	AssertFalse(NumberRowPolicyIntent(Expected, Paused, "digits"), "a retained callback cannot cross a pause edge")
 }
 Test("number row: shared typed source policy refuses unsupported and stale owners", _NRP_SharedPolicyCorpus)
 

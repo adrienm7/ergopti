@@ -45,10 +45,18 @@ function M.run(helpers, corpus_path)
 			for _, mode in ipairs({ "native", "digits", "symbols" }) do
 				helpers.assert_eq(Policy.intent(snapshot(), snapshot(), mode), true, "fresh mode")
 			end
+			-- EDD-1 (paused-number-row): a pause admits the choice; before, every
+			-- number-row row refused while the driver was paused.
+			local paused_expected, paused_current = snapshot(), snapshot()
+			paused_expected.paused, paused_current.paused = true, true
+			helpers.assert_eq(Policy.intent(paused_expected, paused_current, "digits"), true,
+				"(paused-number-row) a paused snapshot admits the choice")
+			helpers.assert_eq(Policy.intent(snapshot(), paused_current, "digits"), false,
+				"(paused-number-row) a pause between the capture and the write retires the capture")
 			local invalid = {
 				owner = { false, 0, "" }, source = { false, 0, "" }, native_owner = { false, 0, "" },
 				generation = { -1, 1.5, "2", 9007199254740992 }, lifecycle = { -1, 1.5, "3" },
-				hkl = { 0, 1.5, "4" }, master = { false, 0, "true" }, paused = { true, 0, "false" },
+				hkl = { 0, 1.5, "4" }, master = { false, 0, "true" }, paused = { 0, "false" },
 				blocked = { true, 0, "false" }, symbols = { 0, "true" }, caps = { 0, "false" },
 				mode = { true, "future", "Native" }
 			}
