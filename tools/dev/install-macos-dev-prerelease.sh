@@ -33,6 +33,8 @@ fail() { printf '[dev-prerelease] REFUSED: %s\n' "$*" >&2; exit 1; }
 log() { printf '[dev-prerelease] %s\n' "$*"; }
 
 [ "$(uname -s)" = Darwin ] || fail "a Mac is required."
+# /usr/bin/python3 below refuses to run while Xcode's license is pending.
+bash "$REPO_ROOT/tools/dev/macos-accept-xcode-license.sh" || fail "Xcode's license is not accepted."
 APP="/Applications/$ERGOPTI_APP_BUNDLE"
 # The repository comes from the updater defaults, the one source of every GitHub link.
 DEFAULTS="$REPO_ROOT/static/ergopti_plus/_shared/updater/data/defaults.json"

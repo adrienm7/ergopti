@@ -82,6 +82,10 @@ set -e
 . "$REPO_ROOT/tools/dev/macos-field-shell-checks.sh"
 # shellcheck source=field-report-git.sh
 . "$REPO_ROOT/tools/dev/field-report-git.sh"
+# A pending Xcode license blocks every /usr/bin shim (python3, swift, clang):
+# it is accepted first, before any of them runs (field report 2026-11-15).
+bash "$REPO_ROOT/tools/dev/macos-accept-xcode-license.sh" \
+	|| { printf '[field-report] ERROR: the Xcode license blocks python3 and swift (reason above).\n' >&2; exit 1; }
 set +e
 # The folders and file names come from their shared declarations, never from
 # a copy here (tools/dev/field-report-paths.py). The topical logs that help a
@@ -202,6 +206,8 @@ scrub_log() {
 finalize() {
 	"${finalized}" && return 0
 	finalized=true
+	# The clone's own field_run.json comes back before git touches the tree.
+	restore_field_run_spec
 	local start_day today d f subject
 	# Resolved again: the app's first boot can write LogsDirPath during the run,
 	# and the folders read at start then pointed at yesterday's logs (field
@@ -529,6 +535,40 @@ guided_poll() {
 	sleep "${FIELD_RUN_POLL_SECONDS}"
 }
 
+# The signed dev prerelease runs its own bundled Lua but reads field_run.json
+# from this clone: a clone newer than the prerelease declared a step kind the
+# prerelease's field_run.lua refused ("step guided_window_topology has an
+# unknown kind", field report 2026-11-15) and no step ran. The declaration of
+# the prerelease's own tag replaces the clone's for the run, and the clone's
+# copy is put back when the collector exits.
+FIELD_RUN_SPEC_BACKUP=""
+restore_field_run_spec() {
+	[ -n "${FIELD_RUN_SPEC_BACKUP}" ] && [ -f "${FIELD_RUN_SPEC_BACKUP}" ] || return 0
+	mv -f "${FIELD_RUN_SPEC_BACKUP}" "${REPO_ROOT}/${FIELD_RUN_SPEC}" && FIELD_RUN_SPEC_BACKUP=""
+}
+trap restore_field_run_spec EXIT
+align_field_run_spec_with_prerelease() {
+	local remote tag spec_path="${REPO_ROOT}/${FIELD_RUN_SPEC}" tagged
+	# Outside the report folder: only that folder is committed.
+	tagged="$(mktemp "${TMPDIR:-/tmp}/ergopti-field-run-tagged.XXXXXX")" || return 0
+	remote="$(git -C "${REPO_ROOT}" remote get-url origin 2>/dev/null)" || return 0
+	tag="$(git ls-remote --tags --refs "${remote}" 'v*-dev.*' 2>/dev/null \
+		| sed -n 's|.*refs/tags/\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*-dev\.[0-9][0-9]*\)$|\1|p' \
+		| awk -F'-dev[.]' '{ print $2, $0 }' | sort -n | tail -n 1 | cut -d' ' -f2)"
+	[ -n "${tag}" ] || { log "WARNING: no dev prerelease tag found; the clone's field_run.json is used as is."; return 0; }
+	if ! git -C "${REPO_ROOT}" rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+		git -C "${REPO_ROOT}" fetch -q --depth 1 origin tag "${tag}" 2>/dev/null \
+			|| { log "WARNING: tag ${tag} could not be fetched; the clone's field_run.json is used as is."; return 0; }
+	fi
+	git -C "${REPO_ROOT}" show "${tag}:${FIELD_RUN_SPEC}" > "${tagged}" 2>/dev/null \
+		|| { rm -f "${tagged}"; log "WARNING: ${tag} has no ${FIELD_RUN_SPEC}; the clone's copy is used as is."; return 0; }
+	if cmp -s "${tagged}" "${spec_path}"; then rm -f "${tagged}"; return 0; fi
+	FIELD_RUN_SPEC_BACKUP="${TMPDIR:-/tmp}/ergopti-field-run-clone.$$.json"
+	cp -f "${spec_path}" "${FIELD_RUN_SPEC_BACKUP}" && mv -f "${tagged}" "${spec_path}" \
+		|| { FIELD_RUN_SPEC_BACKUP=""; log "WARNING: the field run declaration could not be aligned with ${tag}."; return 0; }
+	log "The clone is newer than the prerelease ${tag}: the run uses ${tag}'s field_run.json (the clone's copy comes back at the end)."
+}
+
 # Opens the developer app, sends the request, waits for done and copies it.
 run_field_run() {
 	local request_name accepted_name done_name refused_name deadline_seconds guided_prompt_name guided_answer_name
@@ -561,6 +601,8 @@ run_field_run() {
 		# (field report 2026-11-09): its leftovers go first, finished installs stay.
 		bash "${REPO_ROOT}/tools/dev/reset-macos-owned-runtime.sh" \
 			|| { log "The leftovers of an unfinished owned runtime install could not be removed (reason above)."; return 1; }
+		# Before the app opens: its watcher reads the declaration at start.
+		align_field_run_spec_with_prerelease
 		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
 			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
 		log "Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog"
