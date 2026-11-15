@@ -221,6 +221,26 @@ helpers.describe("prediction triggers: hotstring preview ownership", function()
 		restore()
 	end)
 
+	helpers.it("asks after a word whose first keys showed a preview (ai-inline-preview-hold)", function()
+		-- « b » and « bo » show « b★ → bonjour »; from « bon » no trigger matches,
+		-- so the preview is gone and the pause after the word asks the API.
+		local showing = false
+		local engine, scheduler, fired = fixture({}, function() return showing end)
+		local word = "bonjour"
+		for index = 1, #word do
+			showing = index <= 2
+			engine.on_char(word:sub(index, index), word:sub(1, index), {
+				app_id = "editor",
+				hotstring_preview_visible = showing,
+			})
+		end
+		showing = false
+		helpers.assert_eq(scheduler.test.advance(1), 1, "the pause after the word armed one request")
+		helpers.assert_eq(#fired, 1)
+		helpers.assert_eq(fired[1].context, "bonjour")
+		restore()
+	end)
+
 	helpers.it("keeps an explicit trigger even while the preview shows", function()
 		local engine, scheduler, fired = fixture({}, function() return true end)
 		engine.on_char("/", "btw //", { app_id = "editor", hotstring_preview_visible = true })
