@@ -327,9 +327,15 @@ bar's place and the backup format were decided by the agent on 2026-11-15, to re
   strict content policy, without 'unsafe-eval', so fengari cannot run there (maintainer, 2026-11-15): their host
   offers `lua_export` in initData and runs the shared adapter's step with its own Lua (`lua_export {request, step,
 input}`, the registries' `source_export_step`, `_shared/layouts/engine/composer/export_step.lua`, answered by
-  `luaExportResult`), and the page builds the same files from that result. The Windows host has no Lua and its
-  WebView2 pages carry no content policy, so its page keeps fengari (decided by the agent, to review by the
-  maintainer); a host with neither shows « converters cannot run in this window ». The export test builds the
+  `luaExportResult`), and the page builds the same files from that result. The Windows host takes the
+  same path (maintainer, 2026-11-15): a restricted Lua 5.4 host executable, `windows/native/ergopti_lua_export.c`
+  (only the base, string, table, math and utf8 libraries; its own `require` reads text modules of `_shared` only),
+  built from the pinned lua.org archive (`ergopti_lua_export.pin.json`) by `tools/build/build_windows_lua_export.ps1`
+  and committed in `vendor/` with its identity (`ergopti_lua_export.json`). The AutoHotkey host offers `lua_export`
+  only when that executable's SHA-256 matches its identity, stages the input in a private file, runs the step for at
+  most `source.export_step_timeout_ms` of the layout defaults and answers `luaExportResult`; until the executable is
+  committed its page keeps fengari, which stays the site's runner. A host with neither shows « converters cannot run
+  in this window ». The export test builds the
   files through the hosts' path under Lua 5.4 and checks they are the site's bytes. It hands each file's bytes (base64) to
   the host with `source_export`; the host's store (`composer/source_store.lua` on macOS and Linux,
   `windows/ui/layout_manager/source_store.ahk`) writes them to the user's Downloads folder under the page's name,

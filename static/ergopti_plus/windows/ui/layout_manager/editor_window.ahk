@@ -55,6 +55,11 @@ global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"studio_profile_load", true, "studio_profile_save", true, "studio_workspace_load", true,
 	"studio_workspace_save", true, "lua_export", true)
 
+; The editor's export step host and its identity, in the vendor folder
+; (tools/build/build_windows_lua_export.ps1 builds both).
+global LAYOUT_EDITOR_LUA_EXPORT_EXE := "ergopti_lua_export.exe"
+global LAYOUT_EDITOR_LUA_EXPORT_IDENTITY := "ergopti_lua_export.json"
+
 
 
 
@@ -102,7 +107,8 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
 			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
 			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true),
-			"studio_store", LayMgrJsonBool_Of(true), "studio_workspace", LayMgrJsonBool_Of(true)))
+			"studio_store", LayMgrJsonBool_Of(true), "studio_workspace", LayMgrJsonBool_Of(true),
+			"lua_export", LayMgrJsonBool_Of(LayoutEditorWindow_LuaExportHost(Deps["vendor_dir"]) is Map)))
 		return LayoutManager_HandleEditorAction("source_open", Map("action", "source_open"), Deps)
 	}
 	if (Action == "close") {
@@ -119,14 +125,11 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 		return LayoutEditorWindow_StudioProfile(Action, Payload, Deps)
 	if (Action == "studio_workspace_load" || Action == "studio_workspace_save")
 		return LayoutEditorWindow_StudioWorkspace(Action, Payload, Deps)
-	; The macOS and Linux hosts run the downloads' export adapter with their own
-	; Lua (lua_export); this host has none and offers no lua_export in initData:
-	; its WebView2 pages carry no content policy that refuses the page's fengari
-	; VM, so the page builds XKB and KLC itself and never asks.
-	if (Action == "lua_export") {
-		LoggerWarn("LayoutEditorWindow", "Refused an export step: the Windows host runs no Lua; the page builds its downloads.")
-		return false
-	}
+	; The downloads' export adapter runs in the host's Lua, as on macOS and Linux:
+	; here the shipped export step executable. initData offers lua_export only
+	; when that executable matches its identity; until then the page keeps fengari.
+	if (Action == "lua_export")
+		return LayoutEditorWindow_LuaExport(Payload, Deps)
 	; The Studio's analysis panels open their « i » links in the system browser:
 	; an https URL only.
 	if (Action == "open_link") {
@@ -311,6 +314,152 @@ _LayEdWin_PushRefusal(Deps, Code) {
 	Deps["push_raw"].Call("keystatsNgrams", '{"ok":false,"code":' . JsonStringLiteral(Code) . "}")
 }
 
+/**
+ * The editor's export step host this build ships (windows/native/ergopti_lua_export.c,
+ * committed with its identity in vendor/ by the same path as the PAC evaluator),
+ * checked against that identity's SHA-256 before it is offered or run.
+ * @param {String} VendorDir - The driver's vendor folder.
+ * @returns {Map|String} Map("exe", Path), or why the host is not offered.
+ */
+LayoutEditorWindow_LuaExportHost(VendorDir) {
+	global LAYOUT_EDITOR_LUA_EXPORT_EXE, LAYOUT_EDITOR_LUA_EXPORT_IDENTITY
+	IdentityPath := VendorDir . "\" . LAYOUT_EDITOR_LUA_EXPORT_IDENTITY
+	; Until the Windows CI's executable is committed, this build has no host: the
+	; page then builds its downloads with fengari, as before.
+	if !FileExist(IdentityPath)
+		return "this build ships no export step host (" . LAYOUT_EDITOR_LUA_EXPORT_IDENTITY . " is absent)"
+	Text := FSRead(IdentityPath)
+	if !(Text is String)
+		return "the export step host identity cannot be read"
+	try Identity := JsonParse(Text)
+	catch as Err
+		return "the export step host identity is not JSON: " . Err.Message
+	Digest := Identity is Map ? Identity.Get("exe_sha256", "") : ""
+	if !(Digest is String) || !RegExMatch(Digest, "^[0-9a-f]{64}$")
+		return "the export step host identity names no executable digest"
+	ExePath := VendorDir . "\" . LAYOUT_EDITOR_LUA_EXPORT_EXE
+	if !FileExist(ExePath)
+		return "the export step host executable is missing"
+	try Actual := CryptoSha256Bytes(FSReadBytesStrict(ExePath))
+	catch as Err
+		return "the export step host executable cannot be read: " . Err.Message
+	if (Actual !== Digest)
+		return "the export step host executable does not match its identity"
+	return Map("exe", ExePath)
+}
+
+/**
+ * Runs one export step of the editor's XKB and KLC downloads in the host
+ * executable, as the macOS and Linux hosts run export_step.lua with their own
+ * Lua: the input is staged in a private file (the process runner has no stdin),
+ * the step runs for at most the layout defaults' export_step_timeout_ms, and
+ * luaExportResult answers { request, ok, output } or { request, ok, code, detail }.
+ * @param {Map} Payload - { request, step, input }.
+ * @param {Map} Deps - "push", "vendor_dir", "shared_dir", "export_settings"
+ *   () => Map(timeout_ms, failure), "write_input" (Text) => Path, "remove_input"
+ *   (Path), "spawn" (Exe, Args, OnDone) => handle and "after" (Ms, Fn).
+ * @returns {Boolean} Whether the step was started.
+ */
+LayoutEditorWindow_LuaExport(Payload, Deps) {
+	Request := Payload.Get("request", 0)
+	Step := Payload.Get("step", "")
+	Input := Payload.Get("input", 0)
+	if !(Request is Integer) || Request < 1 || !(Step is String) || !(Input is String) {
+		LoggerWarn("LayoutEditorWindow", "Refused an export step without its request number, step or input text.")
+		return false
+	}
+	HostExe := LayoutEditorWindow_LuaExportHost(Deps["vendor_dir"])
+	if !(HostExe is Map) {
+		LoggerWarn("LayoutEditorWindow", "Refused an export step: {1}.", HostExe)
+		return false
+	}
+	Settings := Deps["export_settings"].Call()
+	Failure := Settings["failure"]
+	Answer(Ok, Fields) {
+		Fields["request"] := Request
+		Fields["ok"] := LayMgrJsonBool_Of(Ok)
+		return Deps["push"].Call("luaExportResult", Fields)
+	}
+	try InputPath := Deps["write_input"].Call(Input)
+	catch as Err {
+		LoggerError("LayoutEditorWindow", "The export step input could not be staged: {1}.", Err.Message)
+		return Answer(false, Map("code", Failure, "detail", "the step's input cannot be staged"))
+	}
+	State := Map("done", false, "handle", 0)
+	Finish(ExitCode, Stdout, *) {
+		if State["done"]
+			return
+		State["done"] := true
+		Deps["remove_input"].Call(InputPath)
+		if (ExitCode == 0) {
+			LoggerInfo("LayoutEditorWindow", "Export step {1} ended.", Step)
+			return Answer(true, Map("output", Stdout))
+		}
+		; A refusal is one « code<TAB>detail » line on stdout.
+		Line := Trim(StrSplit(Stdout, "`n")[1], "`r ")
+		Parts := StrSplit(Line, "`t", , 2)
+		Code := (Parts.Length == 2 && RegExMatch(Parts[1], "^[a-z_]+$")) ? Parts[1] : Failure
+		Detail := Parts.Length == 2 ? Parts[2] : "the export step host exited " . ExitCode
+		LoggerWarn("LayoutEditorWindow", "Export step {1} refused ({2}): {3}.", Step, Code, Detail)
+		return Answer(false, Map("code", Code, "detail", Detail))
+	}
+	TimedOut(*) {
+		if State["done"]
+			return
+		State["done"] := true
+		if IsObject(State["handle"])
+			State["handle"].terminate()
+		Deps["remove_input"].Call(InputPath)
+		LoggerWarn("LayoutEditorWindow", "Export step {1} stopped after {2} ms.", Step, Settings["timeout_ms"])
+		return Answer(false, Map("code", Failure, "detail", "the export step did not end in time"))
+	}
+	LoggerInfo("LayoutEditorWindow", "Export step {1} started.", Step)
+	State["handle"] := Deps["spawn"].Call(HostExe["exe"], [Deps["shared_dir"], Step, InputPath], Finish)
+	if !State["handle"].start() {
+		State["done"] := true
+		Deps["remove_input"].Call(InputPath)
+		LoggerError("LayoutEditorWindow", "Export step {1} ended: the host could not be started.", Step)
+		return Answer(false, Map("code", Failure, "detail", "the export step host could not be started"))
+	}
+	Deps["after"].Call(Settings["timeout_ms"], TimedOut)
+	return true
+}
+
+/**
+ * The export step's bounds from the layout defaults (source.export_step_timeout_ms
+ * and source.failures.export), checked.
+ * @returns {Map} Map("timeout_ms", Integer, "failure", String).
+ */
+LayoutEditorWindow_ExportSettings() {
+	Source := _LayoutRegistryReadJson("layouts\data\defaults.json")["source"]
+	Timeout := Source.Get("export_step_timeout_ms", 0)
+	Failure := Source["failures"].Get("export", "")
+	if !(Timeout is Integer) || Timeout <= 0
+		throw ValueError("layouts defaults: source.export_step_timeout_ms is not a positive integer")
+	if !(Failure is String) || !RegExMatch(Failure, "^[a-z_]+$")
+		throw ValueError("layouts defaults: source.failures.export names no refusal code")
+	return Map("timeout_ms", Timeout, "failure", Failure)
+}
+
+; A private staging folder per step, removed with its file once the step ends.
+_LayEdWin_WriteExportInput(Text) {
+	return FSWritePrivateRetained(A_Temp, "ergopti_lua_export_" . A_TickCount . "_" . Random(1, 0x7FFFFFFF),
+		"input.json", Text)
+}
+
+_LayEdWin_RemoveExportInput(Path) {
+	SplitPath(Path, , &Folder)
+	if !FSDelete(Path) {
+		LoggerWarn("LayoutEditorWindow", "The export step input {1} could not be removed.", Path)
+		return
+	}
+	try {
+		DirDelete(Folder)
+	} catch as Err {
+		LoggerWarn("LayoutEditorWindow", "The export step folder {1} could not be removed: {2}.", Folder, Err.Message)
+	}
+}
+
 
 
 
@@ -339,7 +488,7 @@ LayoutEditorWindow_Open(*) {
 
 ; The ports of one window: pushes go to that exact host only.
 _LayEdWin_Deps(Host) {
-	global _ConfigDir, _SharedDir
+	global _ConfigDir, _SharedDir, _VendorDir
 	return Map(
 		"push", _LayEdWin_Push.Bind(Host),
 		"local_dir", LayoutRegistry_LocalDir(_ConfigDir),
@@ -352,7 +501,13 @@ _LayEdWin_Deps(Host) {
 		"open_url", (Url) => ExternalUrl_OpenHttp(Url),
 		"config_dir", _ConfigDir,
 		"shared_dir", _SharedDir,
-		"run_script", (Text) => Host.Eval(Text)
+		"run_script", (Text) => Host.Eval(Text),
+		"vendor_dir", _VendorDir,
+		"export_settings", LayoutEditorWindow_ExportSettings,
+		"write_input", _LayEdWin_WriteExportInput,
+		"remove_input", _LayEdWin_RemoveExportInput,
+		"spawn", (Exe, Args, OnDone) => ShellRunner_Spawn(Exe, Args, OnDone),
+		"after", (Ms, Fn) => SetTimer(Fn, -Ms)
 	)
 }
 

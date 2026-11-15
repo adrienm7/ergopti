@@ -529,13 +529,123 @@ _KLRSource_StudioWorkspaceMessages() {
 Test("Layout editor window: Ergopti Studio keeps the editor's tabs (studio-editor-workspace)",
 	_KLRSource_StudioWorkspaceMessages)
 
-; The Windows host runs no Lua: it offers no lua_export and refuses the message.
-_KLRSource_LuaExportRefused() {
-	Pushed := []
-	Deps := Map("push", (Name, Payload) => (Pushed.Push(Name), true))
-	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 1, "step", "xkb",
-		"input", "{}"), Deps), "the Windows host refuses lua_export")
-	AssertEqual(0, Pushed.Length, "nothing is pushed for a refused export step")
+; The export step host's ports, with every effect recorded: the staged input,
+; the spawned command, the timer and the pushed answers.
+_KLRSource_LuaExportDeps(VendorDir, Log) {
+	Log["pushed"] := [], Log["inputs"] := Map(), Log["removed"] := [], Log["spawned"] := 0, Log["timer"] := 0
+	Log["terminated"] := false, Log["start_ok"] := true
+	WriteInput(Text) {
+		Path := VendorDir . "\input_" . (Log["inputs"].Count + 1) . ".json"
+		Log["inputs"][Path] := Text
+		return Path
+	}
+	Spawn(Exe, Args, OnDone) {
+		Log["spawned"] := Map("exe", Exe, "args", Args, "done", OnDone)
+		Handle := {}
+		Handle.start := (*) => Log["start_ok"]
+		Handle.terminate := (*) => (Log["terminated"] := true)
+		return Handle
+	}
+	return Map(
+		"push", (Name, Payload) => (Log["pushed"].Push(Name . " " . _LayMgrWeb_Json(Payload)), true),
+		"vendor_dir", VendorDir,
+		"shared_dir", "C:\shared",
+		"export_settings", () => Map("timeout_ms", 30000, "failure", "target_export_refused"),
+		"write_input", WriteInput,
+		"remove_input", (Path) => Log["removed"].Push(Path),
+		"spawn", Spawn,
+		"after", (Ms, Fn) => (Log["timer"] := Map("ms", Ms, "fn", Fn)))
 }
-Test("Layout editor window: the Windows host builds downloads in the page, not with lua_export (lua-export-host)",
+
+; Writes a stand-in host executable and the identity naming its digest.
+_KLRSource_LuaExportVendor(Dir, Digest := "") {
+	FileAppend("MZ stand-in host", Dir . "\ergopti_lua_export.exe", "UTF-8-RAW")
+	if (Digest == "")
+		Digest := CryptoSha256Bytes(FSReadBytesStrict(Dir . "\ergopti_lua_export.exe"))
+	FileAppend('{"schema_version":1,"exe_sha256":"' . Digest . '"}', Dir . "\ergopti_lua_export.json", "UTF-8-RAW")
+}
+
+; Without its identity, or with an executable that does not match it, the
+; host is not offered and refuses lua_export without running anything.
+_KLRSource_LuaExportRefused() {
+	Dir := A_Temp . "\ergopti_lua_export_test_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Log := Map()
+		Deps := _KLRSource_LuaExportDeps(Dir, Log)
+		Message := Map("action", "lua_export", "request", 1, "step", "xkb", "input", "{}")
+		AssertFalse(LayoutEditorWindow_LuaExportHost(Dir) is Map, "no identity: no host")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Message, Deps), "no identity: lua_export is refused")
+		_KLRSource_LuaExportVendor(Dir, Format("{:064}", 0))
+		AssertContains(LayoutEditorWindow_LuaExportHost(Dir), "does not match its identity")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Message, Deps), "a mismatched executable is refused")
+		AssertEqual(0, Log["pushed"].Length, "nothing is pushed for a refused export step")
+		AssertEqual(0, Log["spawned"], "nothing is run for a refused export step")
+		AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "step", "xkb", "input", "{}"), Deps),
+			"a request number is required")
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: without a matching export step host, lua_export is refused (lua-export-host)",
 	_KLRSource_LuaExportRefused)
+
+; A matching host runs the step on a staged input and answers luaExportResult:
+; its output, its refusal line, a timeout, or a host that does not start.
+_KLRSource_LuaExportRuns() {
+	Dir := A_Temp . "\ergopti_lua_export_run_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		_KLRSource_LuaExportVendor(Dir)
+		AssertTrue(LayoutEditorWindow_LuaExportHost(Dir) is Map, "a matching executable is offered")
+		Log := Map()
+		Deps := _KLRSource_LuaExportDeps(Dir, Log)
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 7, "step", "xkb",
+			"input", '{"a":1}'), Deps))
+		Spawned := Log["spawned"]
+		AssertEqual(Dir . "\ergopti_lua_export.exe", Spawned["exe"])
+		AssertEqual("C:\shared", Spawned["args"][1])
+		AssertEqual("xkb", Spawned["args"][2])
+		AssertEqual('{"a":1}', Log["inputs"][Spawned["args"][3]], "the input is staged as given")
+		AssertEqual(30000, Log["timer"]["ms"], "the step is bounded by the defaults' timeout")
+		Spawned["done"].Call(0, '{"symbols":"x"}', "")
+		AssertEqual(1, Log["pushed"].Length)
+		AssertContains(Log["pushed"][1], 'luaExportResult {')
+		AssertContains(Log["pushed"][1], '"ok":true')
+		AssertContains(Log["pushed"][1], '"request":7')
+		AssertContains(Log["pushed"][1], '"output":"{\"symbols\":\"x\"}"')
+		AssertEqual(Spawned["args"][3], Log["removed"][1], "the staged input is removed")
+		Log["timer"]["fn"].Call()
+		AssertEqual(1, Log["pushed"].Length, "a step that ended answers once")
+
+		; The host's refusal line names its code and detail.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 8, "step", "read",
+			"input", "[1]"), Deps))
+		Log["spawned"]["done"].Call(1, "target_export_refused`tthe export step's input is not a JSON object`n", "")
+		AssertContains(Log["pushed"][2], '"ok":false')
+		AssertContains(Log["pushed"][2], '"code":"target_export_refused"')
+		AssertContains(Log["pushed"][2], "is not a JSON object")
+
+		; A step past its timeout is stopped and refused once.
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 9, "step", "xkb",
+			"input", "{}"), Deps))
+		Log["timer"]["fn"].Call()
+		AssertTrue(Log["terminated"], "the late host is stopped")
+		AssertContains(Log["pushed"][3], '"code":"target_export_refused"')
+		AssertContains(Log["pushed"][3], "did not end in time")
+		Log["spawned"]["done"].Call(0, "{}", "")
+		AssertEqual(3, Log["pushed"].Length, "a stopped step answers once")
+
+		; A host that does not start is refused at once, its input removed.
+		Log["start_ok"] := false
+		Removed := Log["removed"].Length
+		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "lua_export", "request", 10, "step", "xkb",
+			"input", "{}"), Deps))
+		AssertContains(Log["pushed"][4], "could not be started")
+		AssertEqual(Removed + 1, Log["removed"].Length)
+	} finally {
+		DirDelete(Dir, true)
+	}
+}
+Test("Layout editor window: a matching export step host runs lua_export, bounded (lua-export-run)",
+	_KLRSource_LuaExportRuns)

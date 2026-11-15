@@ -360,7 +360,8 @@ window.exportResult = function (result) {
  * What the XKB and KLC downloads run, built once from the data this page loads.
  * The macOS and Linux windows refuse the page's fengari VM (no 'unsafe-eval'):
  * their host runs the shared export adapter with its own Lua (lua_export,
- * answered by luaExportResult). Windows, whose pages allow it, keeps fengari.
+ * answered by luaExportResult), and so does Windows once its build ships the export
+ * step executable; a Windows build without it keeps fengari.
  */
 function hostExportAssets() {
 	if (_exportAssets) return _exportAssets;

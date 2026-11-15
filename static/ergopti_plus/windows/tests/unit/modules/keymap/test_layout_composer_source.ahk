@@ -359,11 +359,13 @@ _LCS_ManagerCase() {
 		Deps["editor_strings"] := () => Map("layout_editor.btn.install", "Install")
 		Deps["apply_nav"] := (Text) => (Log.Push(Map("call", "nav " . Text)),
 			Map("saved", true, "applied", false, "errors", []))
+		; A vendor folder without the export step host's identity: lua_export is not offered.
+		Deps["vendor_dir"] := Dir
 		; The editor window's ready answers with its flags, then with the last saved source.
 		AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "ready"), Deps))
 		Init := _LayMgrWeb_Json(_LCH_Pushed(Log, "initData"))
 		for Flag in ['"source_editor":true', '"emulate":true', '"nav_apply":true', '"source_pick":false',
-				'"source_export":true', '"layout_editor.title":']
+				'"source_export":true', '"lua_export":false', '"layout_editor.title":']
 			AssertContains(Init, Flag)
 		Opened := _LayMgrWeb_Json(_LCH_Pushed(Log, "sourceData"))
 		AssertContains(Opened, '"text":null')
