@@ -103,6 +103,20 @@ for (const m of fs
 	.readFileSync(path.join(PAGE_DIR, 'fingering_editor.js'), 'utf8')
 	.matchAll(/notifyError\('([a-z_.]+)'/g))
 	keys.add(m[1]);
+// Every engine refusal the pages show in words (info_popover.js refusal).
+const engineCodes = new Set(
+	Array.from(
+		fs
+			.readFileSync(path.join(PAGE_DIR, 'analysis_engine.js'), 'utf8')
+			.matchAll(/new AnalysisError\(\s*'([a-z_]+)'/g),
+		(m) => m[1]
+	)
+);
+check(
+	engineCodes.has('ideal_load_order') && engineCodes.has('fingering_unknown_key'),
+	'engine codes'
+);
+for (const code of [...engineCodes, 'not_json']) keys.add(`${PREFIX}error.${code}`);
 for (const id of Object.keys(DATA.sources.items)) keys.add(`${PREFIX}info.${id}`);
 // The other analysers' view shows each score-less analyser's headline parts.
 for (const entry of Object.values(DATA.analysers))
@@ -114,6 +128,50 @@ for (const file of locales) {
 	const strings = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, file), 'utf8'));
 	for (const key of keys)
 		check(typeof strings[key] === 'string' && strings[key] !== '', `${file}: ${key}`);
+}
+
+// A refusal reaches the reader in their language, its fingers by their labels,
+// never as the engine's English message (the fingering editor, the ideal load).
+{
+	const french = JSON.parse(fs.readFileSync(path.join(LOCALES_DIR, 'fr.json'), 'utf8'));
+	const reader = { window: { _i18n_strings: french } };
+	reader.window.window = reader.window;
+	vm.createContext(reader.window);
+	for (const file of ['_generated/analysis_data.js', 'analysis_engine.js', 'info_popover.js'])
+		vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, file), 'utf8'), reader.window);
+	const said = (run) => {
+		try {
+			run();
+		} catch (error) {
+			return vm.runInContext('LAYOUT_ANALYSIS_INFO', reader.window).refusal(error);
+		}
+		return null;
+	};
+	const engine = vm.runInContext('LAYOUT_ANALYSIS', reader.window);
+	const load = Object.assign({}, engine.defaultIdealLoad(), { lp: 11.5, lr: 6.5 });
+	check(
+		said(() => engine.idealLoad(load)) ===
+			'Annulaire gauche porte moins que Auriculaire gauche : chaque main garde index ≥ majeur ≥ annulaire ≥ auriculaire',
+		`refusal: ${said(() => engine.idealLoad(load))}`
+	);
+	check(
+		said(() => engine.keyboard('iso', { fingers: { NoKey: 'lp' } })) ===
+			'NoKey n’est pas une touche des claviers',
+		'refusal: an unknown key'
+	);
+	check(
+		said(() => JSON.parse('{')) === 'le fichier n’est pas du JSON',
+		'refusal: an import that is not JSON'
+	);
+	let rethrown = false;
+	try {
+		said(() => {
+			throw new TypeError('a programming error');
+		});
+	} catch {
+		rethrown = true;
+	}
+	check(rethrown, 'refusal: an error the engine did not raise stays an error');
 }
 
 // The site sizes its frame from this message (contract with src/routes/studio).

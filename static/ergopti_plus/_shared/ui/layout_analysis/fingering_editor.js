@@ -121,7 +121,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			use(next, true);
 			return true;
 		} catch (error) {
-			notifyError('layout_analysis.fingering.invalid', { reason: error.message });
+			notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 			return false;
 		}
 	}
@@ -277,7 +277,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			try {
 				use(JSON.parse(await file.text()), true);
 			} catch (error) {
-				notifyError('layout_analysis.fingering.invalid', { reason: error.message });
+				notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 			}
 		});
 		onChange(() => {
@@ -298,7 +298,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 					try {
 						use(saved || null, false);
 					} catch (error) {
-						notifyError('layout_analysis.fingering.invalid', { reason: error.message });
+						notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 					}
 				},
 				() => notifyError('layout_analysis.fingering.load_failed')

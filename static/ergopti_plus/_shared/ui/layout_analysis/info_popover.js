@@ -44,6 +44,38 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return text;
 	}
 
+	// The refusal values that name a finger or a keyboard, shown by their label
+	// when they name a known one (a refused unknown finger shows as typed).
+	const NAMED_VALUES = { finger: 'finger', below: 'finger', keyboard: 'keyboard' };
+	// Digits of a refused number (an edited load's sum).
+	const REFUSAL_DIGITS = 2;
+
+	/**
+	 * The text of an engine refusal (analysis_engine.js AnalysisError) in the
+	 * reader's language: layout_analysis.error.<code>, its fingers and keyboard
+	 * by their labels. A file that is not JSON is said as such.
+	 * @param {Error} error
+	 * @returns {string}
+	 * @throws {Error} The error itself when it is neither: a programming error
+	 *   stays visible instead of reaching the reader as English text.
+	 */
+	function refusal(error) {
+		if (error && error.name === 'SyntaxError') return t('layout_analysis.error.not_json');
+		if (!error || error.name !== 'AnalysisError' || typeof error.code !== 'string') throw error;
+		const strings = window._i18n_strings || {};
+		const values = {};
+		for (const [name, value] of Object.entries(error.values || {})) {
+			const label = Object.hasOwn(NAMED_VALUES, name)
+				? `layout_analysis.${NAMED_VALUES[name]}.${value}`
+				: null;
+			if (label !== null && typeof strings[label] === 'string') values[name] = strings[label];
+			else if (typeof value === 'number')
+				values[name] = String(Number(value.toFixed(REFUSAL_DIGITS)));
+			else values[name] = value;
+		}
+		return t(`layout_analysis.error.${error.code}`, values);
+	}
+
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
 		if (className) node.className = className;
@@ -206,5 +238,5 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		else start();
 	}
 
-	return { t, button, routeLink };
+	return { t, refusal, button, routeLink };
 })();

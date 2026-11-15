@@ -816,8 +816,10 @@
 							])
 						)
 					);
-				} catch {
+				} catch (error) {
+					// Why the load is refused (its sum, a share, the finger order), in words.
 					box.className = 'la-error';
+					box.textContent = t('layout_analysis.ideal.refused', { reason: INFO.refusal(error) });
 					for (const input of Object.values(inputs)) input.setAttribute('aria-invalid', 'true');
 					return;
 				}
