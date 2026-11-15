@@ -143,7 +143,8 @@ async function downloaded(page, click) {
 /**
  * (studio-comparer-tab) Ergopti Studio's « Comparer » tab in the app window:
  * the comparer mounts into the tab the first time it opens, lists the host's
- * stored layouts and ranks the layouts on a built-in corpus.
+ * stored layouts, asks the host for the chosen built-in corpus (studio_corpus)
+ * and ranks the layouts on it.
  * @param {import('playwright').Page} page The editor window, after initData.
  */
 async function exerciseStudioComparer(page) {
@@ -160,6 +161,22 @@ async function exerciseStudioComparer(page) {
 		const list = window.__posted.find((p) => p.action === 'studio_layouts');
 		window.studioLayouts({ request: list.request, ok: true, layouts: [] });
 	});
+	// The chosen built-in corpus comes from the host (LAYOUT_ANALYSIS_HOST.loadCorpus):
+	// like the macOS, Linux and Windows hosts, this one runs the generated file
+	// in the page, then answers every pending request.
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_corpus'));
+	const corpus = await page.evaluate(
+		() => window.__posted.find((p) => p.action === 'studio_corpus').id
+	);
+	assert.match(corpus, /^[a-z0-9_]+$/);
+	await page.addScriptTag({
+		path: shared('ui', 'layout_analysis', '_generated', 'corpus_' + corpus + '.js')
+	});
+	await page.evaluate((id) => {
+		for (const posted of window.__posted)
+			if (posted.action === 'studio_corpus' && posted.id === id)
+				window.studioCorpus({ request: posted.request, ok: true });
+	}, corpus);
 	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
 	// English strings: the comparer reports its analysis, not a failure.
 	assert.match(
