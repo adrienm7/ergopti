@@ -739,10 +739,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       virtual keys with the named key (tools/lib/kbd-dll/shortcut-keys.cjs), a displaced or refused key reported.
       Proof: tools/test/test-layout-shortcut-keys.cjs (goldens of shortcut_keys.toml). The real-OS proofs
       stay in the three TODO-tests files.
-- [ ] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
+- [x] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
       Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
       regression test that fails on the old behaviour.
-      [CODE] Left (2026-11-15): not started; json.lua still decodes `null` to `{}` and drops array holes.
+      Done 2026-11-15 (worker X, 39fd1087, 08ee9765): the audit of the 210 default-decode sites (both Lua suites on a
+      base and a patched tree) found the rules that need a present null. The default decode now drops a null
+      member, keeps array holes and gives nil for a null root; decode_lossless and AutoHotkey's JSON_NULL keep it.
+      The Linux multi-step provider answers check `"error": null` losslessly; the physical shortcuts page sends JSON
+      text that every host decodes keeping null, so a null `previous_slot` is refused on the three OS (maintainer
+      decision, through the coordinator). Proof: `_shared/tests/lua/core_text/json_null_contract.lua` (macOS and
+      Linux), the « original-null » contract case on the three drivers.
 - [ ] **Google Books Ngram letter tables, later (2026-11-14 night).** The 1-gram files are several GB per language:
       a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
       [LATER] Left (2026-11-15): not started.
