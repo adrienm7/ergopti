@@ -378,7 +378,7 @@ MenuPopulation_IsLeaf(Rows) {
 /** Completes an owned popup in the synchronous message sent before its paint. */
 MenuPopulation_OnInitPopup(Handle, *) {
 	; Native configuration navigation remains available while paused. This only
-	; prepares rows: feature commands remain fenced by root pause greying.
+	; prepares rows: each one reads the pause state while it is built (EDD-1).
 	global _MenuPopulationPublished
 	PerfCount("menu.initpopup")
 	try {

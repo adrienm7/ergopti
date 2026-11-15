@@ -1396,7 +1396,7 @@ const HOTSTRINGS_MENU_BUILD =
 
 /** Retains the completed native Hotstrings child through its declared parent receiver.
  * The finite publication helper checks the row's exact native child identity before
- * AddFeature, propagates the declared checked state and disposes a refused child.
+ * TrayMenuStage_Add, propagates the declared checked state and disposes a refused child.
  */
 function ahkDeclaredHotstringsTransport(stage, consumer) {
 	const capture = 'Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")';
@@ -1431,7 +1431,7 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 		return false;
 	const actual = owner(
 		consumer,
-		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {',
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
 		'.ahk'
 	);
 	const expected = `
@@ -1440,10 +1440,7 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 			Row := Receiver.Call(Child, Getters)
 			if !(Row is Map) || Row.Get("submenu", false) != Child
 				throw Error("The canonical feature parent changed during native construction.")
-			if Feature
-				TrayMenuStage_AddFeature(Row["label"], Child)
-			else
-				TrayMenuStage_Add(Row["label"], Child)
+			TrayMenuStage_Add(Row["label"], Child)
 			Published := true
 			if Row.Get("checked", false)
 				TrayMenuStage_Check(Row["label"])
@@ -1497,10 +1494,9 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 					'.ahk',
 					'HotstringsMenu',
 					HOTSTRINGS_MENU_BUILD,
-					'TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)',
+					'TrayMenuStage_Add(HotstringsMenuTitle, HotstringsMenu)',
 					0
-				) &&
-				route(stage, '.ahk', [['TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)']]);
+				) && route(stage, '.ahk', [['TrayMenuStage_Add(HotstringsMenuTitle, HotstringsMenu)']]);
 			if (!directTransport && !ahkDeclaredHotstringsTransport(stage, sources[consumerFile]))
 				return false;
 			// Bind the real assigned symbol, including the separately owned reserved-name repair.

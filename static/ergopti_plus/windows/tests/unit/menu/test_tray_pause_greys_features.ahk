@@ -1,21 +1,17 @@
 ﻿; tests/unit/menu/test_tray_pause_greys_features.ahk
 
 ; ==============================================================================
-; MODULE: Tray Pause Greys Feature Submenus
+; MODULE: Tray Pause Keeps Feature Submenus Live
 ; DESCRIPTION:
-; Regression guard for tray-pause-greys-features. While the driver is paused,
-; every FEATURE submenu of the tray (layout, hotstrings, IA, metrics, shortcuts,
-; tap-holds, gestures) must be greyed out, while the global rows (actions,
-; language, about, « Suspendre », reload, quit, debug) stay enabled so resume
-; still works.
+; A pause stops typing, not configuration (EDD-1, maintainer 2026-11-12): every
+; tray row stays live while the driver is paused, as on macOS and Linux, and the
+; rows that wait for the resume are greyed inside their own submenu, with why.
 ;
-; ROOT CAUSE ENCODED: UpdateTrayIcon only swapped the icon and the « Suspendre »
-; checkmark, and tray rebuilds are refused while paused, so nothing ever touched
-; the live feature rows. The fix records the feature head rows at their single
-; staging point (TrayMenuStage_AddFeature), and TrayMenu_ApplyPauseGreying
-; disables or re-enables exactly those rows on the live root, from UpdateTrayIcon
-; and right after every publication. The behaviour is read back through the Win32
-; GetMenuState of a real native menu, not through bookkeeping.
+; ROOT CAUSE ENCODED: the tray greyed every feature head on a pause
+; (tray-pause-greys-features), so the configuration a pause must keep was out of
+; reach. A root built before a pause or a resume would also show a stale state
+; once the heads stay live, so the watchdog rebuilds the published root once the
+; transition settled (pause-root-rebuild). The file keeps its historical name.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -28,130 +24,55 @@ _TPGF_IsGreyed(TargetMenu, Position) {
 	return (State & (MF_GRAYED | MF_DISABLED)) != 0
 }
 
-; Publishes the staged tree into a detached native menu, never the test's tray.
-_TPGF_ReplayInto(TargetMenu, Stage) {
-	for _, Entry in Stage {
-		if (Entry["kind"] == "submenu")
-			TargetMenu.Add(Entry["label"], Entry["target"])
-	}
-	return true
+; The greying owners are gone, and nothing on the pause path disables a head row.
+_TPGF_NoHeadGreying() {
+	for Name in ["TrayMenu_ApplyPauseGreying", "TrayMenuStage_AddFeature",
+			"TrayMenuStage_AddFeatureAction", "_TrayStageFeatureLabels"]
+		AssertEqual("", _DriverFuncBodyOrEmpty(Name), Name . " must stay deleted (EDD-1)")
+	Icon := _StripFullLineComments(_DriverFuncBody("UpdateTrayIcon"))
+	AssertEqual(0, InStr(Icon, ".Disable("), "a pause transition greys no tray row")
+	Publish := _StripFullLineComments(_DriverFuncBody("TrayMenuStage_Publish"))
+	AssertEqual(0, InStr(Publish, "A_IsSuspended"), "a publication reads no pause state: each row reads it while built")
 }
 
-_TPGF_PauseGreysOnlyFeatureRows() {
-	global _TrayMenuStage, _TrayFeatureHeadLabels
-	SavedStage := _TrayMenuStage
-	SavedLabels := _TrayFeatureHeadLabels
-	Root := Menu()
-	try {
-		_TrayMenuStage := false
-		TrayMenuStage_Begin()
-		TrayMenuStage_AddFeature("Layout", Menu())
-		TrayMenuStage_AddFeature("Hotstrings (12)", Menu())
-		TrayMenuStage_AddFeature("Gestures", Menu())
-		TrayMenuStage_Add("Global actions", Menu())
-		TrayMenuStage_Add("Language", Menu())
-		TrayMenuStage_Add("Pause", Menu())
-		TrayMenuStage_Add("Debug", Menu())
-		AssertTrue(TrayMenuStage_Publish(0, _TPGF_ReplayInto.Bind(Root)))
-		AssertEqual(3, _TrayFeatureHeadLabels.Length,
-			"publication must record exactly the staged feature head rows")
-
-		AssertEqual(3, TrayMenu_ApplyPauseGreying(true, Root))
-		Loop 3
-			AssertTrue(_TPGF_IsGreyed(Root, A_Index - 1),
-				"feature row " . A_Index . " must be greyed while paused")
-		Loop 4
-			AssertFalse(_TPGF_IsGreyed(Root, A_Index + 2),
-				"global row " . (A_Index + 3) . " must stay enabled while paused")
-
-		AssertEqual(3, TrayMenu_ApplyPauseGreying(false, Root))
-		Loop 7
-			AssertFalse(_TPGF_IsGreyed(Root, A_Index - 1),
-				"every row must be enabled again after resume (row " . A_Index . ")")
-	} finally {
-		_TrayMenuStage := SavedStage
-		_TrayFeatureHeadLabels := SavedLabels
-	}
-}
-
-; The live-root owners must actually call the greying: the pause transition
-; (UpdateTrayIcon) and the default publication path.
-_TPGF_OwnersApplyGreying() {
-	Icon := _DriverFuncBody("UpdateTrayIcon")
-	Assert(Icon != "", "UpdateTrayIcon must be readable")
-	Assert(InStr(Icon, "TrayMenu_ApplyPauseGreying(A_IsSuspended)") > 0,
-		"UpdateTrayIcon must grey or restore the feature rows on every pause transition")
-	Publish := _DriverFuncBody("TrayMenuStage_Publish")
-	Assert(Publish != "", "TrayMenuStage_Publish must be readable")
-	Assert(InStr(Publish, "TrayMenu_ApplyPauseGreying(A_IsSuspended)") > 0,
-		"a freshly published root must receive the current pause state")
-}
-
-; The top-level ids a pause switches off: the rows the manifest marks
-; `greyed_when_paused`, visible on this platform. Each one's root builder must
-; stage its row as a feature row so the pause greys it, and every other builder
-; must stage a plain row so « Suspendre », language, reload, quit and debug stay
-; live. Read from the manifest, which the macOS and Linux roots read too, so the
-; three trays grey the same rows.
-_TPGF_MarkedFeatureIds() {
-	Ids := []
-	for _, Entry in MenuManifest_LoadTopLevel() {
-		if (Entry is Map) && _MR_IsForAhk(Entry) && (Entry.Get("greyed_when_paused", false) == true)
-			Ids.Push(Entry["id"])
-	}
-	return Ids
-}
-
-; The marked rows that stay live while paused (EDD-1): their configuration rows
-; run then, and the rows that wait for the resume are greyed with why
-; (_LAY_GreyPausedRows). They stay marked, so the boot shell still leaves them
-; out until the features are ready.
-_TPGF_LiveWhilePausedIds() {
-	return Map("keyboard_layout", true)
-}
-
-_TPGF_EveryFeatureRowIsStagedAsAFeature() {
+; Each top-level builder stages a plain row: no entry carries a feature mark a
+; pause could grey (Ergopti Studio stands for the command rows).
+_TPGF_StudioRowStagedPlain() {
+	global _TrayMenuStage
 	Builders := _MI_TopLevelBuilders()
-	Features := Map()
-	Live := _TPGF_LiveWhilePausedIds()
-	Marked := _TPGF_MarkedFeatureIds()
-	Assert(Marked.Length >= 7, "the manifest must mark the feature rows a pause greys, got " . Marked.Length)
-	for _, Id in Marked {
-		Assert(Builders.Has(Id), "the tray root must have a builder for the feature row " . Id)
-		Features[Id] := true
+	Stage := TrayMenuStage_Begin()
+	try {
+		Builders["ergopti_studio"].Call()
+		AssertEqual(1, Stage.Length)
+		AssertEqual("action", Stage[1]["kind"])
+		AssertFalse(Stage[1].Has("feature"), "the row carries no pause mark")
+	} finally TrayMenuStage_Abort()
+	AssertFalse(IsObject(_TrayMenuStage), "the stage is released")
+}
+
+; The watchdog rebuilds the published root once a transition settled, and never
+; before a first root: the boot build reads the pause state itself.
+_TPGF_TransitionRebuildsThePublishedRoot() {
+	global _TrayRootRequestedGeneration, _TrayRootPublishedGeneration, _TrayRootBootDetailsPending
+	Watchdog := _StripFullLineComments(_DriverFuncBody("_SuspendStateWatchdog"))
+	BusyPos := InStr(Watchdog, "_TransitionBusy := false", false,
+		InStr(Watchdog, "_TransitionBusy := true"))
+	RebuildPos := InStr(Watchdog, "TrayMenu_RebuildForPauseState()", false, BusyPos)
+	Assert(BusyPos > 0 && RebuildPos > BusyPos,
+		"the watchdog must rebuild the root after the transition released its owner")
+	Body := _StripFullLineComments(_DriverFuncBody("TrayMenu_RebuildForPauseState"))
+	Assert(InStr(Body, "return RebuildTrayMenu()") > 0, "a settled transition requests one ordinary root rebuild")
+	Saved := [_TrayRootRequestedGeneration, _TrayRootPublishedGeneration, _TrayRootBootDetailsPending]
+	try {
+		_TrayRootRequestedGeneration := 0, _TrayRootPublishedGeneration := 0, _TrayRootBootDetailsPending := false
+		AssertFalse(TrayMenu_RebuildForPauseState(), "no root is published yet")
+		_TrayRootRequestedGeneration := 2, _TrayRootPublishedGeneration := 1, _TrayRootBootDetailsPending := true
+		AssertFalse(TrayMenu_RebuildForPauseState(), "the boot build is still publishing its details")
+	} finally {
+		_TrayRootRequestedGeneration := Saved[1]
+		_TrayRootPublishedGeneration := Saved[2]
+		_TrayRootBootDetailsPending := Saved[3]
 	}
-	DeclaredFeatureBody := _StripFullLineComments(_DriverFuncBody("_MI_StageDeclaredFeature"))
-	Assert(DeclaredFeatureBody != "", "the shared feature staging owner must be readable")
-	Assert(RegExMatch(DeclaredFeatureBody, 's)if Feature\s+TrayMenuStage_AddFeature\(Row\["label"\], Child\)\s+else\s+TrayMenuStage_Add\(Row\["label"\], Child\)'),
-		"the declared parent stages a feature unless its caller keeps it live while paused")
-	Checked := 0
-	for Id, Builder in Builders {
-		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
-		Assert(Body != "", "the actual tray root builder " . Builder.Name . " must be readable")
-		; Only a genuine direct call reaches this shared feature staging owner.
-		; A call may run over several lines (hotstrings): its arguments end at the
-		; first line that closes it.
-		Declared := RegExMatch(Body, "ms)^[ \t]*_MI_StageDeclaredFeature\((.*?)\)[ \t]*$", &Call)
-		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
-		if (Id == "llm")
-			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
-		KeptLive := Declared && RegExMatch(Call[1], ", true, false$")
-		if Features.Has(Id) && Live.Has(Id) {
-			Assert(KeptLive, "the " . Id . " row stays live while paused (EDD-1)")
-		} else if Features.Has(Id) {
-			Assert(!KeptLive, "the " . Id . " row must be greyed by a pause")
-			Assert(Declared || InStr(Body, "TrayMenuStage_AddFeature(") > 0 || InStr(Body, "TrayMenuStage_AddFeatureAction(") > 0,
-				"the " . Id . " row must be staged as a feature row so a pause greys it")
-			AssertEqual(0, InStr(Body, "TrayMenuStage_Add("),
-				"the " . Id . " row staged with the plain TrayMenuStage_Add would stay live while paused")
-		} else {
-			AssertFalse(Declared, "the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
-			AssertEqual(0, InStr(Body, "TrayMenuStage_AddFeature(") + InStr(Body, "TrayMenuStage_AddFeatureAction("),
-				"the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
-		}
-		Checked += 1
-	}
-	Assert(Checked >= 12, "the tray root must dispatch at least twelve builders, read " . Checked)
 }
 
 ; The Layout rows that wait for the resume are greyed with why while paused, and
@@ -205,12 +126,12 @@ _TPGF_RearmRebuildsAtNextOpen() {
 		"a pause and a resume arm the Layout submenu again")
 }
 
-Test("tray pause: feature submenus greyed, global rows live, restored on resume (tray-pause-greys-features)",
-	_TPGF_PauseGreysOnlyFeatureRows)
-Test("tray pause: UpdateTrayIcon and publication apply the greying (tray-pause-greys-features)",
-	_TPGF_OwnersApplyGreying)
-Test("tray pause: every feature row of the root is staged as a feature row (tray-pause-greys-features)",
-	_TPGF_EveryFeatureRowIsStagedAsAFeature)
+Test("tray pause: no head row is greyed by a pause or a publication (pause-keeps-features-live)",
+	_TPGF_NoHeadGreying)
+Test("tray pause: a root builder stages a plain row without a pause mark (pause-keeps-features-live)",
+	_TPGF_StudioRowStagedPlain)
+Test("tray pause: a settled transition rebuilds the published root, never the boot one (pause-root-rebuild)",
+	_TPGF_TransitionRebuildsThePublishedRoot)
 Test("tray pause: the Layout rows that wait for the resume are greyed with why, the others live (paused-layout-live)",
 	_TPGF_LayoutRowsWaitOnlyWhereNeeded)
 Test("tray pause: a pause or a resume builds the live Layout submenu again (paused-layout-live)",

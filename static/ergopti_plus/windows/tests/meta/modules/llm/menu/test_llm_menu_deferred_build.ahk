@@ -71,8 +71,8 @@ _MetaCheckLlmTrayDeferredBuild() {
 	Assert(InitBody != "", "LLM_Menu_Init must be readable")
 
 	; LLM_Menu_Init must place the (empty) entry itself. A root rebuild records
-	; this insertion in TrayMenuStage_AddFeature and publishes it atomically afterwards.
-	Assert(InStr(InitBody, 'TrayMenuStage_AddFeature(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)') > 0,
+	; this insertion in TrayMenuStage_Add and publishes it atomically afterwards.
+	Assert(InStr(InitBody, 'TrayMenuStage_Add(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)') > 0,
 		"LLM_Menu_Init must stage the (empty) IA submenu in its canonical tray position")
 
 	; … but must NOT build the menu synchronously — that is what blocked initMenu.

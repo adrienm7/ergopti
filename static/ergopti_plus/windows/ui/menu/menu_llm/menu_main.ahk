@@ -144,7 +144,6 @@ _LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn) {
 		TrayMenuRebindSubmenu(A_TrayMenu, Label, Submenu)
 		MenuPopulation_Publish(A_TrayMenu)
 		MenuDispatcher_PruneMenu(A_TrayMenu)
-		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
 		try LoggerDebug("LLM", "IA submenu swapped in the published root.")
 		return 1
 	} finally Critical(PreviousCritical)

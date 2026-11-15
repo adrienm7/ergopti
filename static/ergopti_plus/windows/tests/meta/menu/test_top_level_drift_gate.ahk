@@ -108,12 +108,11 @@ _DG_CaptureStage(Captured, DisabledTitles, Stage) {
 ; Stages a top_level array through the production dispatcher with stub builders
 ; for every id the real table knows, and returns what was staged.
 _DG_StageWithStubs(TopLevel) {
-	global _TrayMenuStage, _TrayFeatureHeadLabels
+	global _TrayMenuStage
 	Stubs := Map()
 	for Id in _MI_TopLevelBuilders()
 		Stubs[Id] := _DG_StageStub.Bind(Id)
 	SavedStage := _TrayMenuStage
-	SavedLabels := _TrayFeatureHeadLabels
 	Captured := []
 	DisabledTitles := Map()
 	for _, Entry in TopLevel {
@@ -129,7 +128,6 @@ _DG_StageWithStubs(TopLevel) {
 		AssertTrue(TrayMenuStage_Publish(0, _DG_CaptureStage.Bind(Captured, DisabledTitles)))
 	} finally {
 		_TrayMenuStage := SavedStage
-		_TrayFeatureHeadLabels := SavedLabels
 	}
 	return Captured
 }
@@ -259,14 +257,14 @@ Test("menu drift gate (AHK): every root builder stages the row its id names",
 	_DG_EveryBuilderStagesItsOwnRow)
 
 ; The real dispatcher must skip the unfinished builder and stage an inert,
-; localized header. It is not a feature head that resume may re-enable.
+; localized header, and its neighbor stays available.
 _DG_RecordNeighbor(Calls, Id) {
 	Calls.Push(Id)
-	TrayMenuStage_AddFeature(Id, 0)
+	TrayMenuStage_Add(Id, 0)
 }
 
 _DG_AgentUnreadyDoesNotDisableNeighbors() {
-	global _TrayMenuStage, _TrayFeatureHeadLabels
+	global _TrayMenuStage
 	Agent := false
 	for _, Entry in _DG_ManifestTopLevel() {
 		if Entry["id"] == "agent"
@@ -275,7 +273,6 @@ _DG_AgentUnreadyDoesNotDisableNeighbors() {
 	Assert(Agent is Map, "the canonical Agent declaration must exist")
 	AssertEqual(true, Agent.Get("disabled", false))
 	SavedStage := _TrayMenuStage
-	SavedLabels := _TrayFeatureHeadLabels
 	Calls := []
 	try {
 		_TrayMenuStage := false
@@ -298,11 +295,16 @@ _DG_AgentUnreadyDoesNotDisableNeighbors() {
 				FoundDisable := true
 		}
 		Assert(FoundAction && FoundDisable, "Agent must retain its exact localized disabled header")
-		AssertEqual("llm", _DG_Join(_TrayStageFeatureLabels(_TrayMenuStage)),
-			"pause/resume may only re-enable the neighboring AI feature header")
+		Neighbor := 0
+		for _, Row in _TrayMenuStage {
+			if Row["label"] == "llm" && Row["kind"] == "submenu"
+				Neighbor += 1
+			AssertFalse(Row["kind"] == "disable" && Row["label"] == "llm",
+				"the neighboring AI header stays available")
+		}
+		AssertEqual(1, Neighbor, "the neighboring AI header is staged once")
 	} finally {
 		_TrayMenuStage := SavedStage
-		_TrayFeatureHeadLabels := SavedLabels
 	}
 }
 
@@ -330,15 +332,12 @@ _DG_SourceJoin(Lines) {
 }
 _DG_DeclaredStageExpected() {
 	return _DG_SourceJoin([
-		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {',
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
 		'Published := false',
 		'try {',
 		'Row := Receiver.Call(Child, Getters)',
 		'if !(Row is Map) || Row.Get("submenu", false) != Child',
 		'throw Error("The canonical feature parent changed during native construction.")',
-		'if Feature',
-		'TrayMenuStage_AddFeature(Row["label"], Child)',
-		'else',
 		'TrayMenuStage_Add(Row["label"], Child)',
 		'Published := true',
 		'if Row.Get("checked", false)',
@@ -378,7 +377,7 @@ _DG_DeclaredBuilderExpected(Id) {
 			'"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))',
 			'LayoutBuild := (Target) => _LAY_BuildLayoutMenu(Target, LayoutGroupBuilders, LayoutListProviders)',
 			'LayoutMenu  := MenuDeferOrBuild(LayoutBuild, "layout_menu")',
-			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true, false)',
+			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)',
 			'_MI_LayoutDeferred := Map("menu", LayoutMenu, "build", LayoutBuild)',
 			'BootProfile_Mark("MENU/initMenu: layout built+added")',
 			'}'])
@@ -479,7 +478,7 @@ _DG_DeclaredSourceCounterfactuals() {
 		['Row := Receiver.Call(Child, Getters)', 'Alias := Child`nAlias.Delete()`nRow := Receiver.Call(Child, Getters)'],
 		['DisposeOnRefusal := false', 'DisposeOnRefusal := true'],
 		['Row.Get("submenu", false) != Child', 'Row.Get("submenu", false) != false'],
-		['TrayMenuStage_AddFeature(Row["label"], Child)', 'TrayMenuStage_AddFeature("Foreign parent", Child)']]
+		['TrayMenuStage_Add(Row["label"], Child)', 'TrayMenuStage_Add("Foreign parent", Child)']]
 	Count := 0
 	for Vector in Mutations {
 		Changed := StrReplace(Stage, Vector[1], Vector[2])
@@ -545,7 +544,7 @@ _DG_StageCountReceipt(Reads, Kind, Value) {
 	return Value
 }
 _DG_CheckDeclaredStageLocale(Expected, Corpus) {
-	global _TrayMenuStage, _TrayFeatureHeadLabels, _MenuDispatchCallbacks
+	global _TrayMenuStage, _MenuDispatchCallbacks
 	Categories := Map("keyboard_layout", "", "hotstrings", "", "shortcuts", "Shortcuts", "tap_holds", "TapHolds", "gestures", "Gestures")
 	States := Map("keyboard_layout", "layout_enabled", "hotstrings", "hotstrings_enabled", "shortcuts", "shortcuts_enabled", "tap_holds", "tapholds_enabled", "gestures", "gestures_enabled")
 	Child := Menu(), Calls := Map("callback", 0)
@@ -557,7 +556,7 @@ _DG_CheckDeclaredStageLocale(Expected, Corpus) {
 	AssertTrue(DllCall("GetMenuState", "ptr", Child.Handle, "uint", 0, "uint", 0x400, "uint") & 0x8)
 	AssertTrue(DllCall("GetMenuState", "ptr", Child.Handle, "uint", 2, "uint", 0x400, "uint") & 0x3)
 	Image := _DG_ChildImage(Child), Registry := _MenuDispatchCallbacks, Callbacks := Registry.Clone()
-	SavedStage := _TrayMenuStage, SavedLabels := _TrayFeatureHeadLabels
+	SavedStage := _TrayMenuStage
 	try {
 		for Id, Category in Categories {
 			OriginalTitle := Category != "" ? GetCategoryTitle(Category) : t(Id == "keyboard_layout" ? "menu.layout.title" : "menu.hotstrings.title")
@@ -590,7 +589,7 @@ _DG_CheckDeclaredStageLocale(Expected, Corpus) {
 						AssertEqual(Value ? 2 : 1, _TrayMenuStage.Length)
 						Row := _TrayMenuStage[1]
 						AssertEqual("submenu", Row["kind"]), AssertEqual(ExpectedLabel, Row["label"])
-						AssertTrue(Row["target"] == Child), AssertTrue(Row["feature"])
+						AssertTrue(Row["target"] == Child), AssertFalse(Row.Has("feature"))
 						if Value {
 							AssertEqual("check", _TrayMenuStage[2]["kind"])
 							AssertEqual(ExpectedLabel, _TrayMenuStage[2]["label"])
@@ -626,7 +625,7 @@ _DG_CheckDeclaredStageLocale(Expected, Corpus) {
 			}
 		}
 	} finally {
-		_TrayMenuStage := SavedStage, _TrayFeatureHeadLabels := SavedLabels
+		_TrayMenuStage := SavedStage
 		try Child.Delete()
 		finally MenuDispatcher_PruneMenu(Child)
 	}

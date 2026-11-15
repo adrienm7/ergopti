@@ -364,7 +364,7 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 			_IaSub := MenuDeferOrBuild(LLM_Menu_BuildSubmenu, "llm_menu")
 			_LLM_Menu_Handle := _IaSub
 			_IaTitle := LLM_Menu_TrayTitle()
-			TrayMenuStage_AddFeature(_IaTitle, _IaSub)
+			TrayMenuStage_Add(_IaTitle, _IaSub)
 			MenuDispatcher_PruneMenu(_IaSub)
 			if _LLM_Menu["enabled"]
 				TrayMenuStage_Check(_IaTitle)
@@ -374,13 +374,13 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 			try LoggerError("LLM",
 				"Inline IA submenu build failed, deferred population will recover: {1}.",
 				_IaErr.Message)
-			TrayMenuStage_AddFeature(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)
+			TrayMenuStage_Add(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)
 		}
 	} else if IsObject(_TrayMenuStage) {
 		; A full root replacement removed the previous IA parent entry. The
 		; persistent submenu remains valid, but it must be attached to this new
 		; staged root even though it was already in the retired tray.
-		TrayMenuStage_AddFeature(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)
+		TrayMenuStage_Add(LLM_Menu_TrayTitle(), _LLM_Menu_Handle)
 	}
 
 	; Bootstrap the selected backend silently on reload when the feature was enabled.

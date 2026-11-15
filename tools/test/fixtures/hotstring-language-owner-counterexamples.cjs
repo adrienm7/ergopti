@@ -225,10 +225,7 @@ module.exports = function verifyHotstringLanguageOwners(base, manifest) {
 					'Row := Map("submenu", Child, "label", "foreign")'
 				],
 				['Row.Get("submenu", false) != Child', 'false'],
-				[
-					'TrayMenuStage_AddFeature(Row["label"], Child)',
-					'TrayMenuStage_AddFeature(Row["label"], Menu())'
-				],
+				['TrayMenuStage_Add(Row["label"], Child)', 'TrayMenuStage_Add(Row["label"], Menu())'],
 				['if Row.Get("checked", false)', 'if false'],
 				['finally MenuDispatcher_PruneMenu(Child)', 'finally ForeignPrune(Child)']
 			];

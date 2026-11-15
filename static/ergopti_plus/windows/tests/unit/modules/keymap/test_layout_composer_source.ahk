@@ -448,8 +448,7 @@ _LCS_StudioRowCase() {
 		AssertEqual("action", Entry["kind"], "the row is a command, registered with the startup admission")
 		AssertEqual(t("menu.studio.title"), Entry["label"])
 		AssertTrue(HasMethod(Entry["target"], "Call"), "the row runs a command")
-		AssertTrue(Entry.Get("feature", false), "a pause greys the row with the feature rows")
-		AssertEqual(1, _TrayStageFeatureLabels(Stage).Length)
+		AssertFalse(Entry.Has("feature"), "the row stays live while paused, as every top-level row (EDD-1)")
 	} finally {
 		TrayMenuStage_Abort()
 	}

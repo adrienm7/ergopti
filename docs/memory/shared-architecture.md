@@ -553,8 +553,8 @@ the user can consult the past), and its window must open with the category off.
 The layout has an enable row on Windows only, since macOS and Linux have no off
 state for it. Action: a new top-level category declares its enable row, a new
 reader is a maintainer decision; `test-menu-category-off-rule.cjs` and the
-built-menu test of each driver hold the rule. Pause greying (`greyed_when_paused`)
-is a separate rule and does grey the parents.
+built-menu test of each driver hold the rule. A pause greys no parent on any
+driver (EDD-1): the rows that wait for the resume are greyed inside their submenu.
 
 ### project-a-local-version-greys-its-update-rows
 
@@ -605,10 +605,10 @@ Each of the three drivers builds its tray root with one loop over the manifest
 `_MI_TopLevelBuilders`/`_MI_StageTopLevel`, Linux `M.build`. To reorder the root,
 edit `manifest.toml`, not a driver. `test-menu-top-level-parity.cjs` pins the
 approved order and checks both directions of each table. The macOS and AHK drift
-gates also render a shuffled top level. The rows a pause greys carry
-`greyed_when_paused` in the manifest: macOS and Linux grey what it marks, the AHK
-pause test holds each Windows builder's `TrayMenuStage_AddFeature` to it, and a
-new feature row needs the mark, never a driver-side id list.
+gates also render a shuffled top level. No tray greys a top-level row under a
+pause any more (EDD-1, Windows since 2026-11-15). `greyed_when_paused` is read by
+the Windows boot shell alone, which leaves the marked feature rows out of its
+first, global-only root; a new feature row still needs the mark there.
 
 ### project-tap-hold-key-catalogue
 

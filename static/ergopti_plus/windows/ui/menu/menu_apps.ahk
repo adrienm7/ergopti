@@ -131,8 +131,7 @@ _MI_BuildAppsMenu() {
 	return MenuRenderer_Build("apps_menu", "Applications", "", "", Map("apps_installed", (*) => BundledApps_Rows()))
 }
 
-; The manifest marks the row greyed_when_paused, as the macOS and Linux trays
-; grey it: a feature row is the one a pause greys and a resume re-enables.
+; The row stays live while paused, as on macOS and Linux (EDD-1).
 _MI_StageApps() {
-	TrayMenuStage_AddFeature(t("menu.apps.title"), _MI_BuildAppsMenu())
+	TrayMenuStage_Add(t("menu.apps.title"), _MI_BuildAppsMenu())
 }

@@ -132,7 +132,6 @@ MenuRenderer_StageDisabledTopLevel(Args*) => 0
 MenuDispatcher_PruneMenu(Args*) => 0
 MenuDispatcher_BeginReplacement(Args*) => 0
 MenuPopulation_Publish(Args*) => 0
-TrayMenu_ApplyPauseGreying(Args*) => 0
 InitSubMenus() {
  global _LMCC
  _LMCC["full_rebuilds"] += 1
@@ -145,11 +144,11 @@ TrayMenuStage_Abort() {
  global _TrayMenuStage
  _TrayMenuStage := false
 }
-TrayMenuStage_Add() => 0
 TrayMenuStage_Check(Args*) => 0
-TrayMenuStage_AddFeature(Label, Target) {
+TrayMenuStage_Add(Label := "", Target := "") {
  global _TrayMenuStage
- _TrayMenuStage.Push(Map("label", Label, "target", Target))
+ if (Label != "")
+  _TrayMenuStage.Push(Map("label", Label, "target", Target))
 }
 TrayMenuStage_Publish(AuthorizeFn) {
  global _TrayMenuStage, _LMCC
@@ -181,7 +180,7 @@ _MI_StageReload() => 0
 _MI_StageQuit() => 0
 _MI_StageErgoptiStudio() => 0
 _MI_StageDebug() => 0
-_MI_StageMetrics() => TrayMenuStage_AddFeature("metrics", Menu())
+_MI_StageMetrics() => TrayMenuStage_Add("metrics", Menu())
 ; A root build publishes the IA child deferred, built at its first open; this
 ; harness opens it at once, so the recording builder sees the published child.
 MenuDeferred_Create(BuildFn, ListId) {

@@ -98,9 +98,7 @@ _MSG_InitMenuOnlyReadsSubMenus() {
 			if !InStr(Line, "SubMenus[")
 				continue
 			Reads += 1
-			; TrayMenuStage_AddFeature is the head-row form of the same staging call
-			; (it only records the row as a feature for pause greying).
-			DirectStage := RegExMatch(Line, "^\s*TrayMenuStage_Add(Feature)?\(")
+			DirectStage := RegExMatch(Line, "^\s*TrayMenuStage_Add\(")
 			DeclaredStage := false
 			if RegExMatch(Line, "^\s*_MI_StageDeclaredFeature\(Receiver, SubMenus\[")
 				DeclaredStage := _DG_DeclaredBuilderSourceValid(Id, BuilderBody, _DriverFuncBody("_MI_StageDeclaredFeature"))
@@ -167,10 +165,10 @@ Test("menu: the keyboard-shortcut groups come from the manifest, not a splice (m
 ; directly to their coordinator. Every updater-style replay keeps the existing
 ; SubMenus object and its native child generation unchanged.
 _MSG_ActualBuildersKeepBorrowedChildren() {
-	global SubMenus, CategoryEnabled, _TrayMenuStage, _TrayFeatureHeadLabels
+	global SubMenus, CategoryEnabled, _TrayMenuStage
 	HadSubMenus := IsSet(SubMenus), SavedSubMenus := HadSubMenus ? SubMenus : false
 	HadCategories := IsSet(CategoryEnabled), SavedCategories := HadCategories ? CategoryEnabled : false
-	SavedStage := _TrayMenuStage, SavedLabels := _TrayFeatureHeadLabels
+	SavedStage := _TrayMenuStage
 	Shortcuts := Menu(), TapHolds := Menu(), Calls := Map("callback", 0)
 	RegisterMenuItem(Shortcuts, "Shortcut sentinel", (*) => Calls["callback"] += 1)
 	RegisterMenuItem(TapHolds, "Tap-hold sentinel", (*) => Calls["callback"] += 1)
@@ -194,7 +192,7 @@ _MSG_ActualBuildersKeepBorrowedChildren() {
 				AssertEqual(GetCategoryTitle("Shortcuts"), First["label"])
 				AssertEqual(GetCategoryTitle("TapHolds"), Second["label"])
 				AssertTrue(First["target"] == Shortcuts), AssertTrue(Second["target"] == TapHolds)
-				AssertTrue(First["feature"] && Second["feature"])
+				AssertFalse(First.Has("feature") || Second.Has("feature"), "a pause greys no head row (EDD-1)")
 				if Value {
 					AssertEqual("check", _TrayMenuStage[2]["kind"]), AssertEqual(First["label"], _TrayMenuStage[2]["label"])
 					AssertEqual("check", _TrayMenuStage[4]["kind"]), AssertEqual(Second["label"], _TrayMenuStage[4]["label"])
@@ -213,7 +211,7 @@ _MSG_ActualBuildersKeepBorrowedChildren() {
 			CategoryEnabled := SavedCategories
 		else
 			CategoryEnabled := unset
-		_TrayMenuStage := SavedStage, _TrayFeatureHeadLabels := SavedLabels
+		_TrayMenuStage := SavedStage
 		try Shortcuts.Delete()
 		finally MenuDispatcher_PruneMenu(Shortcuts)
 		try TapHolds.Delete()
@@ -234,18 +232,13 @@ _MSG_ExecutableSpacing(Source) {
 
 ; A retained child may join only the reviewed non-disposing feature adapter.
 _MSG_RetainedFeatureAdapter(Body) {
-	; Feature := false stages a head that stays live while paused (EDD-1); the
-	; retained Shortcuts and TapHolds parents omit it and stay feature rows.
-	Expected := '_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {`n'
+	Expected := '_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {`n'
 		. '	Published := false`n'
 		. '	try {`n'
 		. '		Row := Receiver.Call(Child, Getters)`n'
 		. '		if !(Row is Map) || Row.Get("submenu", false) != Child`n'
 		. '			throw Error("The canonical feature parent changed during native construction.")`n'
-		. '		if Feature`n'
-		. '			TrayMenuStage_AddFeature(Row["label"], Child)`n'
-		. '		else`n'
-		. '			TrayMenuStage_Add(Row["label"], Child)`n'
+		. '		TrayMenuStage_Add(Row["label"], Child)`n'
 		. '		Published := true`n'
 		. '		if Row.Get("checked", false)`n'
 		. '			TrayMenuStage_Check(Row["label"])`n'
@@ -264,7 +257,7 @@ _MSG_RetainedFeatureAdapter(Body) {
 _MSG_RetainedSubmenuRead(Line, Adapter) {
 	Code := _MSG_ExecutableSpacing(Line)
 	; The legacy direct form also passes the original child as its only child use.
-	if RegExMatch(Code, '^TrayMenuStage_Add(?:Feature)?\((?:[A-Za-z_][A-Za-z0-9_]*|t\("[^"\r\n]+"\)),SubMenus\["(?:Shortcuts|TapHolds)"\]\)$')
+	if RegExMatch(Code, '^TrayMenuStage_Add\((?:[A-Za-z_][A-Za-z0-9_]*|t\("[^"\r\n]+"\)),SubMenus\["(?:Shortcuts|TapHolds)"\]\)$')
 		return true
 	if !_MSG_RetainedFeatureAdapter(Adapter)
 		return false
@@ -297,7 +290,7 @@ _MSG_RetainedFeatureRejectsMutation() {
 	}
 	for Mutant in [StrReplace(Adapter, "DisposeOnRefusal := false", "DisposeOnRefusal := true"),
 		StrReplace(Adapter, "if DisposeOnRefusal && !Published", "if !Published"),
-		StrReplace(Adapter, "TrayMenuStage_AddFeature(Row", 'Child.Insert("anchor")' . "`nTrayMenuStage_AddFeature(Row"),
+		StrReplace(Adapter, "TrayMenuStage_Add(Row", 'Child.Insert("anchor")' . "`nTrayMenuStage_Add(Row"),
 		StrReplace(Adapter, 'Row.Get("submenu", false) != Child', 'Row.Get("submenu", false) != 0'),
 		StrReplace(Adapter, 'Row.Get("submenu", false) != Child', 'Row.Get("sub menu", false) != Child'),
 		StrReplace(Adapter, 'Row["label"], Child', 'Row["label"], Menu()')] {

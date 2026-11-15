@@ -235,10 +235,9 @@ _MI_StageLayout() {
 		"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))
 	LayoutBuild := (Target) => _LAY_BuildLayoutMenu(Target, LayoutGroupBuilders, LayoutListProviders)
 	LayoutMenu  := MenuDeferOrBuild(LayoutBuild, "layout_menu")
-	; The Layout head stays live while paused (EDD-1): its configuration rows
-	; run then, and the rows that wait for the resume are greyed with why. A
-	; pause or resume builds its rows again (_MI_LayoutRearmForPause).
-	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true, false)
+	; Its rows that wait for the resume are greyed with why while paused, and a
+	; pause or resume builds them again (_MI_LayoutRearmForPause).
+	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	_MI_LayoutDeferred := Map("menu", LayoutMenu, "build", LayoutBuild)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
 }
@@ -303,14 +302,14 @@ _MI_LayoutRearmForPause() {
 ; ── Ergopti Studio 🎨 — one top-level command opening the layout editor window
 ; (ui/layout_manager/editor_window.ahk), the same window as the layout submenu's
 ; « Create or edit a layout… » row. A click made before input readiness waits in
-; the startup admission like the other command rows, and a pause greys it with
-; the feature rows (greyed_when_paused).
+; the startup admission like the other command rows, and it stays live while
+; paused (EDD-1).
 _MI_StageErgoptiStudio() {
 	Row := MenuRenderer_CommandRow("top_level", MenuCommand.ERGOPTI_STUDIO,
 		Map(MenuCommand.ERGOPTI_STUDIO, LayoutManager_OpenEditor))
 	if !(Row is Map) || !Row.Has("action")
 		throw Error("The declared Ergopti Studio row was refused before native construction.")
-	TrayMenuStage_AddFeatureAction(Row["label"], Row["action"])
+	TrayMenuStage_AddAction(Row["label"], Row["action"])
 	if Row.Get("disabled", false)
 		TrayMenuStage_Disable(Row["label"])
 }
@@ -431,7 +430,7 @@ _MI_StagePrebuiltLlm(Submenu) {
 	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !(_LLM_Menu is Map)
 		throw Error("The caller-owned AI submenu was withdrawn before root staging.")
 	Title := LLM_Menu_TrayTitle()
-	TrayMenuStage_AddFeature(Title, Submenu)
+	TrayMenuStage_Add(Title, Submenu)
 	if _LLM_Menu["enabled"]
 		TrayMenuStage_Check(Title)
 	BootProfile_Mark("MENU/initMenu: caller-owned LLM tray projection")
@@ -441,7 +440,7 @@ _MI_StagePrebuiltLlm(Submenu) {
 ; ticked while the agent is not off.
 _MI_StageAgent() {
 	AgentTitle := t("menu.agent.title")
-	TrayMenuStage_AddFeature(AgentTitle, LLM_Agent_MenuBuild())
+	TrayMenuStage_Add(AgentTitle, LLM_Agent_MenuBuild())
 	if (LLM_Agent_Setting(ConfigLeaf.AGENT_MODE) != "off")
 		TrayMenuStage_Check(AgentTitle)
 	BootProfile_Mark("MENU/initMenu: agent menu")
@@ -450,7 +449,7 @@ _MI_StageAgent() {
 
 _MI_StageMetrics() {
 	MetricsMenu := BuildMetricsMenu()
-	TrayMenuStage_AddFeature(t("menu.metrics.title"), MetricsMenu)
+	TrayMenuStage_Add(t("menu.metrics.title"), MetricsMenu)
 	if MetricsShortcuts.enabled {
 		TrayMenuStage_Check(t("menu.metrics.title"))
 	}
@@ -503,17 +502,13 @@ _MI_StageGestures() {
 
 
 ; Publication consumes only the declared parent and its captured genuine native child.
-; Feature is false for a head row that stays live while paused (EDD-1).
-_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {
+_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {
 	Published := false
 	try {
 		Row := Receiver.Call(Child, Getters)
 		if !(Row is Map) || Row.Get("submenu", false) != Child
 			throw Error("The canonical feature parent changed during native construction.")
-		if Feature
-			TrayMenuStage_AddFeature(Row["label"], Child)
-		else
-			TrayMenuStage_Add(Row["label"], Child)
+		TrayMenuStage_Add(Row["label"], Child)
 		Published := true
 		if Row.Get("checked", false)
 			TrayMenuStage_Check(Row["label"])

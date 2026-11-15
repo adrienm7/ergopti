@@ -928,6 +928,11 @@ _SuspendStateWatchdog() {
 		} finally {
 				_TransitionBusy := false
 		}
+		; The feature rows stay live under a pause (EDD-1): one root rebuild
+		; once the transition settled lets every submenu show what waits for the
+		; resume, and lifts it again on resume (pause-root-rebuild).
+		if IsSet(TrayMenu_RebuildForPauseState)
+				TrayMenu_RebuildForPauseState()
 }
 ; Single global shutdown handler wired to OnExit (see the auto-execute section
 ; after the keystats is started). AHK v2 Reload() and ExitApp() tear the process
@@ -1791,10 +1796,6 @@ UpdateTrayIcon() {
 				if FileExist(IconPath)
 						TraySetIcon(IconPath)
 		}
-		; Grey every feature submenu of the live root on pause and restore them on
-		; resume; a root rebuilt meanwhile gets the same state at publication.
-		; The global rows, « Suspendre » included, are not feature rows.
-		TrayMenu_ApplyPauseGreying(A_IsSuspended)
 		MenuPopulation_Resume()
 }
 ; The tray menu's own « Recharger » item — the single most obviously

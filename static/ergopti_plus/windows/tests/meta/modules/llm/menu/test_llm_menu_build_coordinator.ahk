@@ -389,7 +389,6 @@ _LMPC_RowPublication(*) {
 }
 MenuDispatcher_BeginReplacement(Args*) => _LMPC_RowPublication()
 MenuPopulation_Publish(Args*) => _LMPC_RowPublication()
-TrayMenu_ApplyPauseGreying(Args*) => _LMPC_RowPublication()
 TrayMenuStage_Begin() {
  global _TrayMenuStage
  _TrayMenuStage := []
@@ -398,10 +397,10 @@ TrayMenuStage_Abort() {
  global _TrayMenuStage
  _TrayMenuStage := false
 }
-TrayMenuStage_Add() => 0
-TrayMenuStage_AddFeature(Label, Target) {
+TrayMenuStage_Add(Label := "", Target := "") {
  global _TrayMenuStage
- _TrayMenuStage.Push(Map("label", Label, "target", Target))
+ if (Label != "")
+  _TrayMenuStage.Push(Map("label", Label, "target", Target))
 }
 TrayMenuStage_Check(Args*) => 0
 MenuManifest_LoadTopLevel() => [Map("id", "metrics"), Map("id", "llm")]
@@ -428,7 +427,7 @@ _MI_StageDebug() => 0
 _MI_StageMetrics() {
  global _LMPC_State
  _LMPC_State["siblings"] += 1
- TrayMenuStage_AddFeature("metrics", _LMPC_State["sibling"])
+ TrayMenuStage_Add("metrics", _LMPC_State["sibling"])
 }
 ; A root build publishes the IA child deferred, built at its first open; this
 ; harness opens it at once, so the recording builder sees the published child.
@@ -502,7 +501,7 @@ _LMPC_Case(Mode) {
   AssertTrue(Accepted)
   AssertEqual(0, _LMPC_State["published"], "a settled root swaps the AI row instead of re-staging every row")
   AssertEqual(0, _LMPC_State["siblings"], "no sibling row is rebuilt for an AI repaint")
-  AssertEqual(3, _LMPC_State["row_steps"], "the swap retires the old child like a root publication")
+  AssertEqual(2, _LMPC_State["row_steps"], "the swap retires the old child like a root publication")
   AssertEqual(1, Owner.PublishedGeneration)
   AssertEqual(1, _LMPC_State["ticket_calls"])
   AssertEqual(2, TrayMenuItemCount(A_TrayMenu))
