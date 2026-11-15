@@ -24,14 +24,14 @@ return function(helpers, Json, shared_path, load_host, platform)
 		backend=load_host()
 		local s=scope()
 		eq(backend.open({scope=s,is_paused=function()return false end}),true,'Linux actual host opens')
-		eq(backend.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual epoch initializes shared protocol')
+		eq(backend.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual epoch initializes shared protocol')
 		eq(lastjs:find('"entries":[]',1,true)~=nil,true,'Linux empty inventory remains JSON array')
-		eq(backend.on_message({action='choose',request={code='KeyJ',mods={},request_id=1}},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual host invokes existing picker')
+		eq(backend.on_message(Json.encode({action='choose',request={code='KeyJ',mods={},request_id=1}}),{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual host invokes existing picker')
 		eq(picker('send_text',{},'★'),true,'Linux native picker returns draft only');eq(s.count(),0,'Linux choose never persists')
-		eq(backend.on_message({action='save',token=1},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual host returns joint commit');eq(s.count(),1,'Linux only Save publishes')
-		local old=epoch;eq(backend.on_message({action='close'},{},{app_name='physical_shortcuts',epoch=old}),true,'Linux exact epoch closes')
+		eq(backend.on_message(Json.encode({action='save',token=1}),{},{app_name='physical_shortcuts',epoch=epoch}),true,'Linux actual host returns joint commit');eq(s.count(),1,'Linux only Save publishes')
+		local old=epoch;eq(backend.on_message(Json.encode({action='close'}),{},{app_name='physical_shortcuts',epoch=old}),true,'Linux exact epoch closes')
 		eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'Linux successor opens after native close')
-		backend.on_window_closed(old);eq(backend.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Old native close cannot clear successor')
+		backend.on_window_closed(old);eq(backend.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=epoch}),true,'Old native close cannot clear successor')
 		old=epoch;epoch=0;backend.on_window_closed(old);eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
 	else
 		-- Macro host controlled ports. These are tables, not native userdata qualification.
@@ -47,10 +47,10 @@ return function(helpers, Json, shared_path, load_host, platform)
 		 local v=setmetatable({},{__native_owned=true})
 		 function v:evaluateJavaScript(js)lastjs=js end
 		 function v:delete()if delete_refuse then error('private path should stay out of diagnostic')end;if delete_false then return false end;options.on_close();setmetatable(self,nil);return nil end
-		 view=v;options.on_webview_created(v);if early_ready then callback({body={action='ready'}})end;if early_close then options.on_close()end;return v end}
+		 view=v;options.on_webview_created(v);if early_ready then callback({body=Json.encode({action='ready'})})end;if early_close then options.on_close()end;return v end}
 		backend=load_host()
-		local s=scope();eq(backend.open({scope=s,gestures=catalogue}),true,'Mac actual host opens');callback({body={action='ready'}});eq(lastjs:find('"entries":[]',1,true)~=nil,true,'Mac empty JSON array preserved')
-		callback({body={action='choose',request={code='KeyJ',mods={},request_id=1}}});eq(picker('send_text','★'),true,'Mac native picker returns owned Unicode draft');eq(s.count(),0,'Mac selection never writes');callback({body={action='save',token=1}});eq(s.count(),1,'Mac source receipt reaches joint publication')
+		local s=scope();eq(backend.open({scope=s,gestures=catalogue}),true,'Mac actual host opens');callback({body=Json.encode({action='ready'})});eq(lastjs:find('"entries":[]',1,true)~=nil,true,'Mac empty JSON array preserved')
+		callback({body=Json.encode({action='choose',request={code='KeyJ',mods={},request_id=1}})});eq(picker('send_text','★'),true,'Mac native picker returns owned Unicode draft');eq(s.count(),0,'Mac selection never writes');callback({body=Json.encode({action='save',token=1})});eq(s.count(),1,'Mac source receipt reaches joint publication')
 		-- A failed public delete can already own a native fade. Observe its distinct
 		-- SDK retirement before testing bridge debt; never infer no effect and retry.
 		delete_refuse=true;eq(backend.close(),false,'Refused native delete retains exact owner');eq(backend.open({scope=scope(),gestures=catalogue}),false,'Refused delete blocks successor');delete_refuse=false;setmetatable(view,nil);clear_refuse=true;eq(backend.close(),false,'Refused bridge detach retains debt');clear_refuse=false;eq(backend.close(),true,'Bridge debt retries without resurrecting deleted native view')

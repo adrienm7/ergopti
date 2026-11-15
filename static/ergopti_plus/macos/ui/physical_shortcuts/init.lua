@@ -285,9 +285,16 @@ function M.open(options)
 	end
 	candidate.bridge = bridge
 	local bound, accepted = pcall(function() return bridge:setCallback(function(message)
-		if not current() or type(message) ~= "table" or type(message.body) ~= "table" then return end
-		if candidate.constructing and message.body.action == "ready" then candidate.pending_ready = true; return end
-		local called = pcall(candidate.window.receive,message.body)
+		-- The page sends JSON text (hs.webview would turn a JS null into nil): decoded
+		-- keeping null, an explicit null is refused, never read as absence.
+		if not current() or type(message) ~= "table" or type(message.body) ~= "string" then return end
+		local body = Json.decode_lossless(message.body)
+		if type(body) ~= "table" then
+			Logger.error("ui.physical_shortcuts", "Physical shortcut page message is not a JSON object.")
+			return
+		end
+		if candidate.constructing and body.action == "ready" then candidate.pending_ready = true; return end
+		local called = pcall(candidate.window.receive,body)
 		if not called then Logger.error("ui.physical_shortcuts", "Physical shortcut page request refused.") end
 	end) end)
 	if not bound or accepted ~= bridge then candidate.constructing = false; close(candidate); return false end

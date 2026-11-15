@@ -2,6 +2,10 @@
 
 --- Checks the actual native host through controlled constructor and cleanup ports.
 local helpers = require("tests.helpers")
+-- The page sends its messages as JSON text (physical_shortcuts/script.js); a
+-- value that is not a table is sent as is, to be refused.
+local Json = require("core.text.engine.json")
+local function wire(message) return type(message) == "table" and Json.encode(message) or message end
 local Json = require("core.text.engine.json")
 helpers.describe("Physical shortcut native host ownership", function()
 	helpers.it("(physical-editor-ui) refuses stale pages and retains failed native cleanup", function()
@@ -50,7 +54,7 @@ helpers.describe("Physical editor position capture host epoch composition", func
 			package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 			host = helpers.load_module("ui.physical_shortcuts.bridge")
 			helpers.assert_true(host.open({ scope = scope, is_paused = function() return false end }))
-			local function send(message, exact) return host.on_message(message, {}, { app_name = "physical_shortcuts", epoch = exact or epoch }) end
+			local function send(message, exact) return host.on_message(wire(message), {}, { app_name = "physical_shortcuts", epoch = exact or epoch }) end
 			helpers.assert_true(send({ action = "ready" }))
 			helpers.assert_true(send({ action = "capture_position", request = { request_id = 1 } }))
 			helpers.assert_true(guard(), "actual shared/native host retains its Manager epoch and canonical receipt")
@@ -148,7 +152,7 @@ helpers.describe("Physical editor exact native-closed debt retry", function()
 
 			helpers.assert_true(host.open(options))
 			local closed = epoch
-			local function send(message) return host.on_message(message, {}, { app_name = "physical_shortcuts", epoch = closed }) end
+			local function send(message) return host.on_message(wire(message), {}, { app_name = "physical_shortcuts", epoch = closed }) end
 			helpers.assert_true(send({ action = "ready" }))
 			-- EDD-1 (maintainer, 2026-11-12): a capture keeps working after a pause.
 			paused_now = true
@@ -217,7 +221,7 @@ helpers.describe("Physical editor premature close notice refusal", function()
 			local options = { scope = scope, is_paused = function() return false end }
 			helpers.assert_true(host.open(options))
 			local original = epoch
-			local function send(message) return host.on_message(message, {}, { app_name = "physical_shortcuts", epoch = original }) end
+			local function send(message) return host.on_message(wire(message), {}, { app_name = "physical_shortcuts", epoch = original }) end
 			helpers.assert_true(send({ action = "ready" }))
 			helpers.assert_true(send({ action = "capture_position", request = { request_id = 1 } }))
 			cancel_refused = true

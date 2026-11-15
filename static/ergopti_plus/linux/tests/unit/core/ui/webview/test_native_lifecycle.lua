@@ -1,6 +1,8 @@
 --- tests/unit/core/ui/webview/test_native_lifecycle.lua
 
 local helpers = require("tests.helpers")
+-- The page sends its messages as JSON text (physical_shortcuts/script.js).
+local Json = require("core.text.engine.json")
 
 -- Independent actual manager resource identity/retirement assertions.
 local run_contract = function(helpers,load_manager,load_host)
@@ -601,12 +603,12 @@ local run_contract = function(helpers,load_manager,load_host)
       if mode=='destroy'then c.destroy='false'else c.release=false end
       helpers.assert_eq(host.open(options),false);local epoch=m.current_epoch('physical_shortcuts')
       helpers.assert_true(type(epoch)=='number',table.concat(c.logs,' | '));helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.constructor_calls,1)
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),false);helpers.assert_eq(received,0)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=epoch}),false);helpers.assert_eq(received,0)
       c.present=nil;c.destroy=nil;c.release=true
       helpers.assert_eq(host.close(),true);helpers.assert_eq(m.current_epoch('physical_shortcuts'),nil)
       helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.constructor_calls,2)
       host.on_window_closed(epoch)
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
       helpers.assert_eq(received,1);helpers.assert_eq(host.close(),true)
      end)
     end)
@@ -621,7 +623,7 @@ local run_contract = function(helpers,load_manager,load_host)
      local host=load_host();package.loaded['ui.physical_shortcuts.bridge']=host
      local options={scope={capture_editor_inventory=function()end,editor_source_current=function()end,edit=function()end,physical_delivery_available=function()return true end},is_paused=function()return false end}
      c.present=function()
-      helpers.assert_eq(host.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
+      helpers.assert_eq(host.on_message(Json.encode({action='ready'}),{},{app_name='physical_shortcuts',epoch=m.current_epoch('physical_shortcuts')}),true)
       helpers.assert_eq(received,0,'Provisional native page does not initialize editor')
      end
      helpers.assert_eq(host.open(options),true);helpers.assert_eq(received,1);helpers.assert_eq(host.close(),true)

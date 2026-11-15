@@ -780,6 +780,8 @@ return function(helpers, Editor, Window, Model)
 		end)
 	end)
 	helpers.describe("Physical editor serialized optional old identity", function()
+		-- Wire messages are decoded as the hosts decode the page's JSON text: keeping
+		-- null (decode_lossless), so a null previous_slot stays present and refused.
 		local Json = require("core.text.engine.json")
 		-- These literals are fixed independently of the browser implementation.
 		-- The browser controls require its actual serialized packets to match them.
@@ -822,7 +824,7 @@ return function(helpers, Editor, Window, Model)
 			return state
 		end
 		helpers.it("(physical-editor-wire) Add omission survives actual JSON decode and exact publication", function()
-			local state = fixture(); local message = Json.decode(add_wire)
+			local state = fixture(); local message = Json.decode_lossless(add_wire)
 			eq(message.request.previous_slot, nil, "omission is actual absence after unchanged native JSON decode")
 			eq(state.window.receive(message), true, "actual intake and Editor admit serialized Add")
 			eq(state.picks, 1); eq(state.binding, "keyboard__physical_ctrl_KeyJ"); eq(state.writes, 0)
@@ -834,7 +836,7 @@ return function(helpers, Editor, Window, Model)
 			eq(state.window.close(), true)
 		end)
 		helpers.it("(physical-editor-wire) Edit retains exact prior identity through actual JSON and Editor", function()
-			local state = fixture(true); local message = Json.decode(edit_wire)
+			local state = fixture(true); local message = Json.decode_lossless(edit_wire)
 			eq(message.request.previous_slot, "physical_ctrl_KeyK")
 			eq(state.window.receive(message), true); eq(state.picks, 1)
 			eq(state.binding, "keyboard__physical_ctrl_KeyK"); eq(state.action, "none"); eq(state.writes, 0)
@@ -855,7 +857,7 @@ return function(helpers, Editor, Window, Model)
 		}
 		for _, refusal in ipairs(refusals) do
 			helpers.it("(physical-editor-wire) serialized " .. refusal[1] .. " remains refused without picker or write", function()
-				local state = fixture(); local message = Json.decode(refusal[2])
+				local state = fixture(); local message = Json.decode_lossless(refusal[2])
 				if refusal[1] == "original-null" or refusal[1] == "empty-object" then
 					eq(type(message.request.previous_slot), "table", "legacy null cannot be authenticated as absence")
 				end
@@ -865,7 +867,7 @@ return function(helpers, Editor, Window, Model)
 			end)
 		end
 		helpers.it("(physical-editor-wire) inherited request fields remain refused without picker or write", function()
-			local state = fixture(); local message = Json.decode(add_wire)
+			local state = fixture(); local message = Json.decode_lossless(add_wire)
 			setmetatable(message.request, { __index = { source = "foreign" } })
 			eq(state.window.receive(message), false); eq(state.picks, 0); eq(state.writes, 0)
 			eq(state.window.close(), true)

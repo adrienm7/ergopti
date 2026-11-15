@@ -232,7 +232,11 @@ function M.on_message(payload,state,context)
 	if context.epoch == nil or context.epoch ~= candidate.current_epoch(APP) then return false end
 	if candidate.epoch == nil and candidate.constructing then candidate.epoch = context.epoch end
 	if candidate.epoch ~= context.epoch then return false end
-	local message = type(payload) == "string" and Json.decode(payload) or payload
+	-- The page sends JSON text: decoded keeping null, an explicit null is refused,
+	-- never read as absence (physical_editor_contract.lua).
+	if type(payload) ~= "string" then return false end
+	local message = Json.decode_lossless(payload)
+	if type(message) ~= "table" then return false end
 	if candidate.constructing then
 		if type(message) == "table" and message.action == "ready" then candidate.pending_ready = true; return true end
 		return false

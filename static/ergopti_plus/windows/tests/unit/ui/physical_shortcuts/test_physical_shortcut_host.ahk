@@ -182,6 +182,24 @@ Test("physical shortcuts: the init packet names keys and carries no id (physical
 	AssertFalse(Window.Receive(Map("action", "save", "token", 1, "extra", 1)), "an open field set is refused")
 ))
 
+; The page's JSON text, parsed as the host parses it: JsonParse keeps a null as
+; JSON_NULL, so a null previous_slot is present and refused, never read as an
+; omitted one (the shared physical_editor_contract.lua case « original-null »).
+_PSH_NullPreviousSlotRefused() {
+	Wire := '{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},'
+	Sent := []
+	Window := _PSH_Window(Sent, Map("physical_ctrl_KeyA", "copy"))
+	AssertTrue(Window.Receive(Map("action", "ready")))
+	AssertTrue(Window.Receive(JsonParse(Wire . '"request_id":3}}')), "the same request without previous_slot opens the picker")
+	Sent := []
+	Window := _PSH_Window(Sent, Map("physical_ctrl_KeyA", "copy"))
+	AssertTrue(Window.Receive(Map("action", "ready")))
+	AssertFalse(Window.Receive(JsonParse(Wire . '"previous_slot":null,"request_id":3}}')),
+		"a null previous_slot cannot be authenticated as absence")
+	AssertContains(Sent[Sent.Length], "refused(")
+}
+Test("physical shortcuts: a serialized null previous_slot is refused (physical-editor-wire)", _PSH_NullPreviousSlotRefused)
+
 Test("physical shortcuts: a captured scan code fills the draft with its position (physical-editor-windows)", () => (
 	Sent := [],
 	Window := _PSH_Window(Sent, Map()),

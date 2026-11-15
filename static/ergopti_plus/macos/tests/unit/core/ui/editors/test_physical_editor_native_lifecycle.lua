@@ -1,6 +1,8 @@
 --- tests/unit/core/ui/editors/test_physical_editor_native_lifecycle.lua
 
 local helpers = require("tests.helpers")
+-- The page sends its messages as JSON text (physical_shortcuts/script.js).
+local Json = require("core.text.engine.json")
 
 -- Actual Builder early acquisition and public SDK release semantics, controlled natives.
 local run_contract = function(helpers, load_host, load_builder)
@@ -17,7 +19,7 @@ local run_contract = function(helpers, load_host, load_builder)
   package.loaded['core.events.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.
   package.loaded['core.fs.adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
   package.loaded['core.ui.engine.window_titles']={compose=function(k)return k end}
-  package.loaded['core.text.engine.json']={encode=function()return '{}'end}
+  package.loaded['core.text.engine.json']={encode=function()return '{}'end,decode_lossless=Json.decode_lossless}
   package.loaded['core.fs.adapters.file_system']={read=function()return c.catalogue or '{}'end}
   package.loaded['shortcuts.engine.physical_slots']={new=function(model)c.decoded_model=model;return{candidates=function()return{}end}end}
   package.loaded['shortcuts.engine.physical_editor_window']={new=function(options)
@@ -156,7 +158,7 @@ local run_contract = function(helpers, load_host, load_builder)
     fixture(function(host,c,options)
      helpers.assert_eq(host.open(options),true,table.concat(c.diagnostics,' | '));c.delete=mode
      helpers.assert_eq(host.close(),false);helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
-     c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0,'Closing debt cannot publish or admit page callbacks')
+     c.bridges[1].callback({body=Json.encode({action='ready'})});helpers.assert_eq(c.received,0,'Closing debt cannot publish or admit page callbacks')
      helpers.assert_eq(c.delete_calls,1,'No retry while the original native deletion remains uncertain')
      -- Public delete may already own a fade despite its wrapper refusing.
      -- Independent SDK retirement, not another delete attempt, acknowledges it.
@@ -172,7 +174,7 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_eq(host.close(),false);helpers.assert_eq(getmetatable(c.views[1]),nil)
      local deletes=c.delete_calls
      helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1);helpers.assert_eq(c.delete_calls,deletes,'Retired view is not recreated or deleted twice')
-     c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0)
+     c.bridges[1].callback({body=Json.encode({action='ready'})});helpers.assert_eq(c.received,0)
      c.detach=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(c.bridges[1].callback,nil)
     end)
    end)
@@ -203,7 +205,7 @@ local run_contract = function(helpers, load_host, load_builder)
    fixture(function(host,c,options)
     helpers.assert_eq(host.open(options),true);c.delete='pending';helpers.assert_eq(host.close(),false)
     setmetatable(c.views[1],nil);local deletes=c.delete_calls
-    c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0)
+    c.bridges[1].callback({body=Json.encode({action='ready'})});helpers.assert_eq(c.received,0)
     c.drain();helpers.assert_eq(host.close(),true);helpers.assert_eq(c.delete_calls,deletes,'Terminal SDK readback acknowledges already deleted view')
    end)
   end)
@@ -211,7 +213,7 @@ local run_contract = function(helpers, load_host, load_builder)
    fixture(function(host,c,options)
     helpers.assert_eq(host.open(options),true);local old=c.views[1].closing;helpers.assert_eq(host.close(),true)
     helpers.assert_eq(host.open(options),true);old('closing');helpers.assert_true(getmetatable(c.views[2])~=nil)
-    c.bridges[2].callback({body={action='ready'}});helpers.assert_eq(c.received,1);helpers.assert_eq(host.close(),true)
+    c.bridges[2].callback({body=Json.encode({action='ready'})});helpers.assert_eq(c.received,1);helpers.assert_eq(host.close(),true)
    end)
   end)
   helpers.it('(physical-editor-lifecycle) foreground restoration receives the exact native window acknowledgement',function()
@@ -230,7 +232,7 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_eq(c.detach_calls,0,'No bridge release without editor acknowledgement')
      helpers.assert_true(getmetatable(c.views[1])~=nil,'Original native page remains retained')
      helpers.assert_eq(host.open(options),false,'Debt prevents successor allocation')
-     helpers.assert_eq(c.created,1);c.bridges[1].callback({body={action='ready'}})
+     helpers.assert_eq(c.created,1);c.bridges[1].callback({body=Json.encode({action='ready'})})
      helpers.assert_eq(c.received,0,'Refused retirement cannot admit the old page')
      c.retire=nil;helpers.assert_eq(host.close(),true,'Same editor acknowledges retry')
      helpers.assert_eq(c.delete_calls,1);helpers.assert_eq(c.detach_calls,1)
@@ -296,7 +298,7 @@ local run_contract = function(helpers, load_host, load_builder)
     helpers.assert_eq(c.created,0,'Builder has not acquired a native view')
     helpers.assert_eq(#c.bridges,1,'Exact acquired bridge remains retained')
     helpers.assert_eq(c.detach_calls,0,'Editor debt blocks bridge release')
-    c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0,'Refused constructor leaves page callbacks inert')
+    c.bridges[1].callback({body=Json.encode({action='ready'})});helpers.assert_eq(c.received,0,'Refused constructor leaves page callbacks inert')
     builder.get_centered_frame=original_frame
     helpers.assert_eq(host.open(options),false,'Healthy frame provider cannot bypass original editor debt')
     helpers.assert_eq(c.retired,2,'Same editor receives the retry')
@@ -393,11 +395,11 @@ local function with_observer(body)
     end
     return self
    end
-   c.bridges[#c.bridges].callback({body={action='ready'}})
+   c.bridges[#c.bridges].callback({body=Json.encode({action='ready'})})
   end
   c.request=function()
    c.request_id=c.request_id+1
-   c.bridges[#c.bridges].callback({body={action='capture_position',request={request_id=c.request_id}}})
+   c.bridges[#c.bridges].callback({body=Json.encode({action='capture_position',request={request_id=c.request_id}})})
   end
   c.dispatch=function(facts)
    c.in_frame=true;local called,accepted=pcall(c.receive,facts);c.in_frame=false
@@ -427,7 +429,7 @@ helpers.describe('Mac optional observational position composition',function()
     setmetatable({native_code=38,mods={}},{})})do
     c.request();helpers.assert_eq(c.enrollments,c.request_id)
     helpers.assert_eq(c.dispatch(facts),false);helpers.assert_eq(#c.packets,0)
-    c.bridges[#c.bridges].callback({body={action='cancel_position'}})
+    c.bridges[#c.bridges].callback({body=Json.encode({action='cancel_position'})})
     helpers.assert_eq(c.pending,false)
    end
    helpers.assert_true(host.close());helpers.assert_eq(c.stops,0)
@@ -491,8 +493,8 @@ helpers.describe('Mac optional observational position composition',function()
     package.loaded['ui.physical_shortcuts']=nil;c.host=require('ui.physical_shortcuts')
     host=c.host
     helpers.assert_true(host.open(options))
-    c.bridges[#c.bridges].callback({body={action='ready'}})
-    c.bridges[#c.bridges].callback({body={action='capture_position',request={request_id=1}}})
+    c.bridges[#c.bridges].callback({body=Json.encode({action='ready'})})
+    c.bridges[#c.bridges].callback({body=Json.encode({action='capture_position',request={request_id=1}})})
     helpers.assert_eq(c.enrollments,0);helpers.assert_eq(required,0);helpers.assert_true(host.close())
    end)
    package.preload['modules.keystats.physical_capture']=saved

@@ -28,10 +28,18 @@ const assert = (condition, label) => {
 			const errors = [];
 			page.on('pageerror', (error) => errors.push(error.message));
 			await page.evaluate(() => {
+				// The page sends JSON text on every OS; a non-string packet is kept
+				// as is, so the string check below fails on it.
 				window.requests = [];
+				window.raw = [];
 				window.webkit = {
 					messageHandlers: {
-						physical_shortcuts_bridge: { postMessage: (packet) => window.requests.push(packet) }
+						physical_shortcuts_bridge: {
+							postMessage: (packet) => {
+								window.raw.push(packet);
+								window.requests.push(typeof packet === 'string' ? JSON.parse(packet) : packet);
+							}
+						}
 					}
 				};
 			});
@@ -125,7 +133,11 @@ const assert = (condition, label) => {
 				'Page has no canonical source authority'
 			);
 			assert(
-				JSON.stringify(chosen) ===
+				await page.evaluate(() => window.raw.every((packet) => typeof packet === 'string')),
+				'Every page message crosses as JSON text, so a host can keep its nulls'
+			);
+			assert(
+				(await page.evaluate(() => window.raw.at(-1))) ===
 					'{"action":"choose","request":{"code":"KeyJ","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"request_id":3}}',
 				'Add omits the optional old identity in the exact serialized native request'
 			);
@@ -211,7 +223,7 @@ const assert = (condition, label) => {
 				'Edit retains only its exact displayed old identity and no source authority'
 			);
 			assert(
-				JSON.stringify(editChoice) ===
+				(await page.evaluate(() => window.raw.at(-1))) ===
 					'{"action":"choose","request":{"code":"KeyK","mods":{"ctrl":true,"alt":false,"shift":false,"super":false},"previous_slot":"physical_ctrl_KeyK","request_id":8}}',
 				'Edit retains the old identity in the exact serialized native request'
 			);
@@ -256,10 +268,14 @@ const assert = (condition, label) => {
 			try {
 				await capturePage.evaluate(() => {
 					window.requests = [];
+					window.raw = [];
 					window.webkit = {
 						messageHandlers: {
 							physical_shortcuts_bridge: {
-								postMessage: (value) => window.requests.push(value)
+								postMessage: (value) => {
+									window.raw.push(value);
+									window.requests.push(typeof value === 'string' ? JSON.parse(value) : value);
+								}
 							}
 						}
 					};

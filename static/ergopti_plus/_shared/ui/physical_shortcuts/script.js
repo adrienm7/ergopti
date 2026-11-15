@@ -4,7 +4,11 @@
  * The native session retains source ownership and action parameters. This page
  * selects registry positions manually; browser key events are never capture proof.
  */
-const post = makeHostBridge('physical_shortcuts_bridge');
+const bridge = makeHostBridge('physical_shortcuts_bridge');
+// Every message crosses as JSON text, on the three OS: each host decodes it
+// keeping null (the shared lossless decoder, AutoHotkey's JSON_NULL), so an
+// explicit null is never read as an absent field (physical_editor_contract.lua).
+const post = (message) => bridge(JSON.stringify(message));
 let strings = {};
 // The host names each modifier and position from the shared key name table.
 let names = { modifiers: {}, positions: {} };
