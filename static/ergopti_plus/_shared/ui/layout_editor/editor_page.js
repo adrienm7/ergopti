@@ -366,6 +366,18 @@ var LayoutEditorPage = (function () {
 		}
 
 		/**
+		 * Calls the host as a promise. A host call that throws at once (the Lua VM
+		 * of the downloads missing from the page) rejects it instead, so every
+		 * caller's error branch shows the reason; Promise.resolve(host.x()) ran
+		 * the call before any promise existed and the click failed in silence.
+		 * @param {function(): *} call - The host call.
+		 * @returns {Promise<*>}
+		 */
+		function fromHost(call) {
+			return new Promise((resolve) => resolve(call()));
+		}
+
+		/**
 		 * Commits the edit of the focused field, if any: a field commits on blur, and its
 		 * change must apply to the document it was typed in, before that document is
 		 * replaced or its node leaves the page.
@@ -418,7 +430,7 @@ var LayoutEditorPage = (function () {
 
 		/** Opens a file through the host's native panel (macOS), where the webview shows none. */
 		function pickWithHost() {
-			Promise.resolve(host.pickFile()).then(
+			fromHost(() => host.pickFile()).then(
 				(picked) => {
 					if (picked && typeof picked.text === 'string') openText(picked.filename, picked.text);
 				},
@@ -437,7 +449,7 @@ var LayoutEditorPage = (function () {
 		}
 
 		function save(filename, text, mime) {
-			Promise.resolve(host.saveFile(filename, text, mime)).then(
+			fromHost(() => host.saveFile(filename, text, mime)).then(
 				() => {
 					if (/\.toml$/.test(filename) && filename !== 'layers.toml') state.dirty = false;
 					notify('ok', tl(host.savedStatus || 'status.saved', { name: filename }));
@@ -2674,7 +2686,7 @@ var LayoutEditorPage = (function () {
 							notify('error', problemText(error));
 							return;
 						}
-						Promise.resolve(host.install(payload)).then(
+						fromHost(() => host.install(payload)).then(
 							(result) =>
 								notify(
 									'ok',
@@ -2703,7 +2715,7 @@ var LayoutEditorPage = (function () {
 							notify('error', problemText(error));
 							return;
 						}
-						Promise.resolve(host.emulate(payload)).then(
+						fromHost(() => host.emulate(payload)).then(
 							() => notify('ok', tl('status.emulated')),
 							(error) => notify('error', problemText(error))
 						);
@@ -2792,7 +2804,7 @@ var LayoutEditorPage = (function () {
 						text: tl(macFormat === 'bundle' ? 'export.bundle' : `export.keylayout_${macFormat}`),
 						onclick: () => {
 							if (macos.text !== undefined) return save(macos.filename, macos.text, macos.mime);
-							Promise.resolve(host.saveBinary(macos.filename, macos.bytes, macos.mime)).then(
+							fromHost(() => host.saveBinary(macos.filename, macos.bytes, macos.mime)).then(
 								() => notify('ok', tl('status.saved', { name: macos.filename })),
 								(error) => notify('error', problemText(error))
 							);
@@ -2811,10 +2823,10 @@ var LayoutEditorPage = (function () {
 							text: tl(`export.${target}`),
 							onclick: () => {
 								// The host loads the converters on the first click; the build runs on the current source.
-								Promise.resolve(host.exportAssets())
+								fromHost(() => host.exportAssets())
 									.then((assets) => {
 										const file = build(doc(), assets);
-										return Promise.resolve(host.saveBinary(file.filename, file.bytes, mime)).then(
+										return fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
 											() => file.filename
 										);
 									})
@@ -2840,7 +2852,7 @@ var LayoutEditorPage = (function () {
 								notify('error', problemText(error));
 								return;
 							}
-							Promise.resolve(host.saveBinary(file.filename, file.bytes, 'application/zip')).then(
+							fromHost(() => host.saveBinary(file.filename, file.bytes, 'application/zip')).then(
 								() => notify('ok', tl('status.saved', { name: file.filename })),
 								(error) => notify('error', problemText(error))
 							);
@@ -2865,7 +2877,7 @@ var LayoutEditorPage = (function () {
 								notify('error', problemText(error));
 								return;
 							}
-							Promise.resolve(host.applyNav(text)).then(
+							fromHost(() => host.applyNav(text)).then(
 								(result) =>
 									notify(
 										result && result.applied ? 'ok' : 'error',

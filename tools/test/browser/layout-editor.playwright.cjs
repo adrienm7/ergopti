@@ -141,6 +141,71 @@ async function downloaded(page, click) {
 }
 
 /**
+ * (layout-editor-download-error) A download whose converters cannot load says
+ * why: in the macOS and Linux app windows the Lua VM of the XKB and KLC
+ * builders can be missing, and its synchronous throw once escaped the click's
+ * promise, so the click showed nothing and wrote nothing.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseDownloadWithoutLuaVm(browser, origin) {
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript(() => {
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	});
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.evaluate(() =>
+		window.initData({
+			strings: {},
+			state: { platform: 'linux' },
+			source_editor: true,
+			source_export: true
+		})
+	);
+	await page.evaluate(
+		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
+		fs.readFileSync(SOURCE_FIXTURE, 'utf8')
+	);
+	await page.waitForSelector('#le-tools');
+	// The page as the inlining hosts leave it: the VM's script never ran.
+	await page.evaluate(() => {
+		window.LayoutLuaRunner.assets = () => {
+			throw new Error('lua vm not loaded: vendor/fengari-web.js');
+		};
+	});
+	await tool(page, 'export');
+	for (const target of ['xkb', 'klc']) {
+		await page.click(`#le-export-${target}`);
+		await page.waitForFunction(
+			() => /\berror\b/.test((document.getElementById('le-message') || {}).className || ''),
+			null,
+			{ timeout: 5000 }
+		);
+		assert.ok(
+			(await page.textContent('#le-message')).trim().length > 0,
+			`${target}: the reason is shown`
+		);
+		assert.equal(
+			await page.evaluate(() => window.__posted.some((p) => p.action === 'source_export')),
+			false,
+			`${target}: nothing is written`
+		);
+		await page.evaluate(() => {
+			document.getElementById('le-message').className = '';
+		});
+	}
+	assert.deepEqual(errors, [], 'the failure is reported, not thrown');
+	await page.close();
+}
+
+/**
  * (studio-comparer-tab) Ergopti Studio's « Comparer » tab in the app window:
  * the comparer mounts into the tab the first time it opens, lists the host's
  * stored layouts, asks the host for the chosen built-in corpus (studio_corpus)
@@ -1097,6 +1162,7 @@ async function exercisePhoneWidth(browser, origin) {
 
 		// Inside the layout manager window, the same editor saves through the host.
 		await exerciseManager(browser, origin);
+		await exerciseDownloadWithoutLuaVm(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);
