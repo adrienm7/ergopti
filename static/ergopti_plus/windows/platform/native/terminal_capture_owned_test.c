@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/terminal_capture_owned_test.c
+// static/ergopti_plus/windows/platform/native/terminal_capture_owned_test.c
 /**
  * @file terminal_capture_owned_test.c
  * @brief Exercises capture intervals and processed frontiers without native input.

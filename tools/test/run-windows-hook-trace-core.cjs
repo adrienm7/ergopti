@@ -19,7 +19,7 @@ const { spawnSync } = require('node:child_process');
 const { compilePortable } = require('./lib/portable-c-compiler.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
-const SOURCE = path.join(ROOT, 'static/ergopti_plus/windows/native/nav_event_owner');
+const SOURCE = path.join(ROOT, 'static/ergopti_plus/windows/platform/native');
 
 /**
  * Runs a raw child and preserves its exit status and diagnostics.

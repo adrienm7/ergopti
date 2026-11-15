@@ -38,15 +38,7 @@ const collectionContract = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'diagnostics', 'data', 'collection.json'), 'utf8')
 );
 const nativeHeader = fs.readFileSync(
-	path.join(
-		ROOT,
-		'static',
-		'ergopti_plus',
-		'windows',
-		'native',
-		'nav_event_owner',
-		'nav_event_owner.h'
-	),
+	path.join(ROOT, 'static', 'ergopti_plus', 'windows', 'platform', 'native', 'nav_event_owner.h'),
 	'utf8'
 );
 for (const [key, name] of [

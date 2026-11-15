@@ -684,7 +684,7 @@ function Assert-TrackedManifest {
 # =================================
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
-$sourceDir = Join-Path $repoRoot "static\ergopti_plus\windows\native\nav_event_owner"
+$sourceDir = Join-Path $repoRoot "static\ergopti_plus\windows\platform\native"
 $buildDir = Join-Path $repoRoot "static\ergopti_plus\windows\build\native\nav_event_owner"
 $vendorDir = Join-Path $repoRoot "static\ergopti_plus\windows\vendor"
 $sourcePath = Join-Path $sourceDir "nav_event_owner.c"

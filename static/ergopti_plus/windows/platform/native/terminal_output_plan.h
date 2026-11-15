@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan.h
+// static/ergopti_plus/windows/platform/native/terminal_output_plan.h
 /**
  * @file terminal_output_plan.h
  * @brief Portable, guarded output planning and exact accepted-prefix accounting.

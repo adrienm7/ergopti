@@ -18,7 +18,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
-const SOURCE = path.join(ROOT, 'static/ergopti_plus/windows/native/nav_event_owner');
+const SOURCE = path.join(ROOT, 'static/ergopti_plus/windows/platform/native');
 const SUPPORT = path.join(__dirname, 'support/nav_event_owner_portable');
 const NATIVE_ONLY = 'native editor receiver matrix';
 

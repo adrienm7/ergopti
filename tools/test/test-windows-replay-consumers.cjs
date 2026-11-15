@@ -32,7 +32,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../..');
 const WINDOWS = path.join(ROOT, 'static', 'ergopti_plus', 'windows');
-const NATIVE = path.join(WINDOWS, 'native', 'nav_event_owner');
+const NATIVE = path.join(WINDOWS, 'platform', 'native');
 const PROBE = path.join(WINDOWS, 'tests', 'hardware', 'replay_marker_consumers.ahk');
 const DOC = path.join(ROOT, 'docs', 'design', 'windows-input-hooks.md');
 const AHK = process.env.ERGOPTI_AHK_EXE || 'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey64.exe';

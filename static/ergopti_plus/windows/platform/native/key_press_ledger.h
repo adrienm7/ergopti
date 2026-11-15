@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/key_press_ledger.h
+// static/ergopti_plus/windows/platform/native/key_press_ledger.h
 /**
  * @file key_press_ledger.h
  * @brief Keys held right now, as only the native hook can know them.

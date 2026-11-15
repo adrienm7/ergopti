@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h
+// static/ergopti_plus/windows/platform/native/nav_event_owner.h
 /**
  * @file nav_event_owner.h
  * @brief Stable x64 C ABI for the Windows LLM navigation event owner.

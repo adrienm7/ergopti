@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/editor_replace.c
+// static/ergopti_plus/windows/platform/native/editor_replace.c
 /**
  * @file editor_replace.c
  * @brief Owns editor messages outside AutoHotkey's cooperative keyboard thread.

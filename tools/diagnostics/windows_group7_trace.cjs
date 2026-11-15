@@ -35,10 +35,7 @@ function keys(row, fields) {
 /** @returns {string} Marker derived from the production native declaration. */
 function expectedMarker() {
 	const header = fs.readFileSync(
-		path.resolve(
-			__dirname,
-			'../../static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.h'
-		),
+		path.resolve(__dirname, '../../static/ergopti_plus/windows/platform/native/nav_event_owner.h'),
 		'utf8'
 	);
 	const match = header.match(/^#define ERGOPTI_NAV_AHK_SEND_LEVEL_BASE (0x[0-9A-Fa-f]+)u$/m);

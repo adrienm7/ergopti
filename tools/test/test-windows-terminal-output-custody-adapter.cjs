@@ -472,7 +472,7 @@ function validatePackets(source, tests, headers, loader) {
 	assert.match(tests, /"unknown-string", "unknown-float"/);
 }
 const markerHeaders = ['nav_event_owner.h', 'terminal_output_plan.h']
-	.map((name) => fs.readFileSync(path.join(DRIVER, 'native/nav_event_owner', name), 'utf8'))
+	.map((name) => fs.readFileSync(path.join(DRIVER, 'platform/native', name), 'utf8'))
 	.join('\n');
 const packetLoader = fs.readFileSync(path.join(DRIVER, 'adapters/llm_nav_event_owner.ahk'), 'utf8');
 validatePackets(source, tests, markerHeaders, packetLoader);

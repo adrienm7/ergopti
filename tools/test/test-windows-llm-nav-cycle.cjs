@@ -343,10 +343,7 @@ check(
 );
 
 // 3. The parking follows the DLL contract.
-const native = fs.readFileSync(
-	path.join(WIN, 'native', 'nav_event_owner', 'nav_event_owner.c'),
-	'utf8'
-);
+const native = fs.readFileSync(path.join(WIN, 'platform', 'native', 'nav_event_owner.c'), 'utf8');
 check(
 	/binding->pass_through != 1 \|\| binding->target != 0/.test(native) &&
 		/return cycle_up_count == 1\s*&& cycle_down_count == 1/.test(native),

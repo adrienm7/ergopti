@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/terminal_output_plan_test.c
+// static/ergopti_plus/windows/platform/native/terminal_output_plan_test.c
 /**
  * @file terminal_output_plan_test.c
  * @brief Independent literal output/ACK vectors, authored before implementation.

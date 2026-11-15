@@ -1,4 +1,4 @@
-// static/ergopti_plus/windows/native/nav_event_owner/editor_replace.h
+// static/ergopti_plus/windows/platform/native/editor_replace.h
 /**
  * @file editor_replace.h
  * @brief Asynchronous, verified literal replacement in a focused Windows editor.
