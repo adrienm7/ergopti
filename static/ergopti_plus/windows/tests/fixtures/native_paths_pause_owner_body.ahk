@@ -25,6 +25,13 @@ _NPPA_Write(Path) {
 	_NPPA.Writes.Push({Path: Path, Paused: A_IsSuspended})
 	return false
 }
+; The paused notice is a presentation port: the child records each one, as the
+; user would see it, instead of showing a balloon (paused-refusal-notice).
+NotifyPausedRefusal(What, *) {
+	global _NPPA
+	_NPPA.Notices.Push(What)
+	return true
+}
 _NPPA_OnError(Failure, *) {
 	global _NPPA
 	if !IsObject(_NPPA.Failure)
@@ -76,10 +83,12 @@ _NPPA_Exercise() {
 		_NPPA_Click(Button, 1)
 		_NPPA_Require(_NPPA.Writes.Length == 0 && DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int")
 			&& PathEdit.Value == Candidate, "A paused OK callback must not enter the writer or retire its exact native editor.")
+		_NPPA_Require(_NPPA.Notices.Length == 1, "A paused OK click must tell the user that it waits for the resume.")
 	} finally Suspend(false)
 	_NPPA_Observe()
 	_NPPA_Require(_NPPA.Writes.Length == 0 && _NPPA.Returned == 1, "Resume alone must not replay a refused folder change.")
 	_NPPA_Click(Button, 2)
+	_NPPA_Require(_NPPA.Notices.Length == 1, "An unpaused OK click tells no pause.")
 	_NPPA_Require(_NPPA.Writes.Length == 1 && _NPPA.Writes[1].Path == Candidate && !_NPPA.Writes[1].Paused,
 		"A fresh unpaused OK click must reach the writer admission once with the exact normalized candidate.")
 	_NPPA_Require(DllCall("IsWindowVisible", "Ptr", _NPPA.Windows[1].Hwnd, "Int"),
@@ -89,7 +98,7 @@ _NPPA_Main() {
 	global _NPPA, _VendorDir, _SharedDir, _ConfigDir, _DefaultConfigDir, _PathsFile
 	if A_Args.Length != 2
 		ExitApp(2)
-	_NPPA := {Windows: [], Entered: 0, Returned: 0, Pulses: 0, Writes: [], Failure: 0}
+	_NPPA := {Windows: [], Entered: 0, Returned: 0, Pulses: 0, Writes: [], Notices: [], Failure: 0}
 	_VendorDir := A_Args[2], _SharedDir := A_Args[2] . "\shared"
 	_ConfigDir := A_Args[2] . "\original\", _DefaultConfigDir := _ConfigDir, _PathsFile := A_Args[2] . "\paths.toml"
 	Primary := 0

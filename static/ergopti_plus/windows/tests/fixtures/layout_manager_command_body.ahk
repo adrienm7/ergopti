@@ -19,6 +19,14 @@ _LMCS_Require(Condition, Message) {
 t(Key) => Key
 WindowTitle(Label := "") => Label
 
+; The paused notice is a presentation port: the child records each one instead
+; of showing a balloon (paused-refusal-notice).
+NotifyPausedRefusal(What, *) {
+	global _LMCS
+	_LMCS.Notices += 1
+	return true
+}
+
 Gui_Create(Options := "", Title := "") {
 	global _LMCS
 	Window := Gui(Options, Title)
@@ -278,7 +286,7 @@ _LMCS_Report(Command) {
 	Snapshot := _LMCS_Snapshot()
 	FileAppend("RECEIPT layout-manager-command mode=" . _LMCS.Mode . " delivery=" . Command.Calls
 		. " settled=" . Command.Settled . " paused=" . Command.Paused . " cancel=" . Command.Cancels
-		. " ready_while_paused=" . _LMCS.ReadyWhilePaused
+		. " ready_while_paused=" . _LMCS.ReadyWhilePaused . " paused_notices=" . _LMCS.Notices
 		. " before_resume_exists=" . (HasProp(_LMCS, "BeforeResume") ? _LMCS.BeforeResume.Exists : -1)
 		. " before_resume_installed=" . (HasProp(_LMCS, "BeforeResume") ? _LMCS.BeforeResume.Installed : -1)
 		. " arms=" . Command.Arms . " resumes=" . _LMCS.Resumes . " file_exists=" . Snapshot.Exists
@@ -298,7 +306,7 @@ _LMCS_Main() {
 		ExitApp(2)
 	Persistent(true)
 	_LMCS := {Mode: A_Args[1], Windows: [], Controllers: [], Records: [], Timers: Map(), Phase: "setup",
-		Failure: 0, Environments: 0, Resumes: 0, ReadyWhilePaused: false, Id: "ergol"}
+		Failure: 0, Environments: 0, Resumes: 0, ReadyWhilePaused: false, Notices: 0, Id: "ergol"}
 	OnError(_FeatureStateSmokeFatal, 0)
 	OnError(_LMCS_OnError)
 	LoggerSetTestSink(_LMCS_Log)
