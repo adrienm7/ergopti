@@ -24,6 +24,9 @@
 --- 4. A missing key is the slot's preset (the maintainer's decision of
 ---    2026-09-30), so a clear writes "none" explicitly; the Shortcuts scope
 ---    owns restore and clear through the configuration_* ports below.
+--- 5. A change made while paused is saved at once and runs from the resume:
+---    the chords live at pause time keep answering until then, so the chord
+---    that resumes cannot move away under a paused daemon.
 --- ==============================================================================
 
 local M = {}
@@ -73,6 +76,12 @@ local _pause_epoch = nil
 
 local _configuration_owner = nil
 local _dispatch_generation = 0
+
+-- The chords live when the pause began, kept while the menu changes them during
+-- that pause (the maintainer's decision of 2026-11-14): a change is saved at
+-- once and takes effect on resume, so the chord that resumes stays the one
+-- active at pause time. { epoch, assignments, chords_on }, or nil.
+local _paused_live = nil
 
 --- Exclusively owns mutations and cancels previously queued actions.
 --- @param owner table Exact token retained through runtime compensation.
@@ -267,6 +276,37 @@ function M.chords_enabled()
 	return _chords_on
 end
 
+--- The pause lifetime a snapshot belongs to, nil without an epoch reader.
+--- @return any epoch
+local function current_pause_epoch()
+	if not _pause_epoch then return nil end
+	local called, value = pcall(_pause_epoch)
+	return called and value or nil
+end
+
+--- Keeps the chords live at pause time before a paused change replaces them.
+local function keep_live_chords_for_pause()
+	if not _is_paused() then return end
+	local epoch = current_pause_epoch()
+	if _paused_live and _paused_live.epoch == epoch then return end
+	local copy = {}
+	for id, action in pairs(_assignments) do copy[id] = action end
+	_paused_live = { epoch = epoch, assignments = copy, chords_on = _chords_on }
+end
+
+--- The chords a press runs now: those live at pause time while that pause
+--- lasts, the configured ones otherwise.
+--- @return table assignments, boolean chords_on
+local function live_chords()
+	if _paused_live then
+		if _is_paused() and _paused_live.epoch == current_pause_epoch() then
+			return _paused_live.assignments, _paused_live.chords_on
+		end
+		_paused_live = nil
+	end
+	return _assignments, _chords_on
+end
+
 --- Persists one row, deleting it when it equals the manifest default.
 --- @param key string Slot id or the switch.
 --- @param value any
@@ -317,6 +357,7 @@ function M.set_action(slot_id, action_id)
 		return false
 	end
 	if not persist(slot_id, action_id) then return false end
+	keep_live_chords_for_pause()
 	_assignments[slot_id] = action_id
 	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Script chord '%s' → '%s'.", slot_id, action_id)
@@ -335,6 +376,7 @@ function M.set_chords_enabled(on)
 	end
 	load_assignments()
 	if not persist(SWITCH_KEY, on) then return false end
+	keep_live_chords_for_pause()
 	_chords_on = on
 	_dispatch_generation = _dispatch_generation + 1
 	Logger.info(LOG, "Script chords switched %s.", on and "on" or "off")
@@ -348,7 +390,8 @@ end
 function M.slot_runs(slot_id, paused)
 	load_assignments()
 	if paused == nil then paused = _is_paused() end
-	return ScriptChords.runs(M.catalogue(), _assignments[slot_id], _chords_on, paused)
+	local assignments, chords_on = live_chords()
+	return ScriptChords.runs(M.catalogue(), assignments[slot_id], chords_on, paused)
 end
 
 
@@ -403,7 +446,7 @@ function M.on_key(detail)
 		return false
 	end
 	local generation, paused, runs, epoch_reader = _dispatch_generation, _is_paused, M.slot_runs, _pause_epoch
-	local action = _assignments[slot_id]
+	local action = (live_chords())[slot_id]
 	local script_action = require("modules.shortcuts.script_actions").runs_while_paused(action)
 	local epoch
 	if epoch_reader and not script_action then
@@ -454,6 +497,7 @@ function M._reset()
 	_binding_catalogue = nil
 	_assignments = nil
 	_chords_on = nil
+	_paused_live = nil
 	_is_paused = NEVER_PAUSED
 	_defer = nil
 	_pause_epoch = nil
@@ -519,6 +563,8 @@ function M.apply_configuration(owner, state)
 		slots[slot.id], copy[slot.id] = true, action
 	end
 	for id in pairs(state.assignments) do if not slots[id] then return false end end
+	load_assignments()
+	keep_live_chords_for_pause()
 	_assignments, _chords_on = copy, state.chords_on
 	_dispatch_generation = _dispatch_generation + 1
 	return true

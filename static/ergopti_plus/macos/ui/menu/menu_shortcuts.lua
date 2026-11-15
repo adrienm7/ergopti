@@ -740,10 +740,12 @@ function M.build(ctx)
 				for _, slot in ipairs(script_control.script_chord_slots()) do
 					local current = state.script_control_shortcuts[slot.id] or "none"
 					local slot_label = i18n.get(SCRIPT_CHORD_LABELS[slot.id])
+					-- A setting: it runs while paused and takes effect on resume, so the
+					-- chord that resumes stays the one active at pause time (EDD-1, the
+					-- maintainer's decision of 2026-11-14; script_control defers it).
 					rows[#rows + 1] = {
 						label    = string.format("%s → %s", slot_label, get_label(current, slot.id)),
-						disabled = paused or nil,
-						action   = (not paused) and function() choose_script_action(slot.id, slot_label) end or nil,
+						action   = function() choose_script_action(slot.id, slot_label) end,
 					}
 				end
 				return rows

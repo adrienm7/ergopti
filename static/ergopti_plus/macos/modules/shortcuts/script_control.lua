@@ -129,6 +129,15 @@ local _tap_generation  = 0
 -- (set_shortcut_action, set_chords_enabled). The switch off keeps every
 -- slot's action.
 local _key_actions, _chords_on = nil, nil
+-- What the menu chose while the driver was paused or between pause states
+-- (the maintainer's decision of 2026-11-14): saved at once, applied when the
+-- resume settles, so the chord that resumes stays the one active when the
+-- pause started. `_deferred_actions` maps a slot to its chosen action; a nil
+-- `_deferred_chords_on` means the switch was not touched.
+local _deferred_actions, _deferred_chords_on = nil, nil
+-- Defined with the chord state below; the pause transaction settles first.
+local apply_deferred_chords
+local sync_karabiner_chords
 -- The key of the last plan Karabiner read (M.karabiner_chords), and whether a
 -- regeneration for a newer one is already queued.
 local _karabiner_plan_key = nil
@@ -1057,6 +1066,7 @@ local function complete_pause_transition(transaction, ok, reason)
 	if queued ~= nil and (queued ~= _is_paused or queued_repause_debt) then
 		request_pause_transition(queued)
 	end
+	apply_deferred_chords()
 end
 
 --- Restores native PAUSED after a local Hammerspoon resume step failed. The
@@ -1357,6 +1367,7 @@ request_pause_transition = function(target_paused, input_drained, admission_fenc
 			_pause_admission_fence = admission_fence
 		end
 		finish_physical_pause(physical_ticket, true)
+		apply_deferred_chords()
 		return true
 	end
 
@@ -1407,6 +1418,26 @@ end
 local function chord_state()
 	if _key_actions == nil then _key_actions, _chords_on = ChordCatalogue.defaults() end
 	return _key_actions, _chords_on
+end
+
+--- Whether a chord change must wait for the resume: the driver is paused, or a
+--- pause or resume is still settling, so the chord that resumes must not move.
+--- @return boolean
+local function chord_change_deferred()
+	return _is_paused or M.is_pause_transition_pending()
+end
+
+--- Applies the chord changes chosen while paused, once the resume has settled.
+--- Karabiner is asked for the new plan, as for a change made while active.
+apply_deferred_chords = function()
+	if _deferred_actions == nil and _deferred_chords_on == nil then return end
+	if chord_change_deferred() then return end
+	local actions = chord_state()
+	for slot_id, action in pairs(_deferred_actions or {}) do actions[slot_id] = action end
+	if _deferred_chords_on ~= nil then _chords_on = _deferred_chords_on end
+	_deferred_actions, _deferred_chords_on = nil, nil
+	Logger.info(LOG, "Script chord changes made while paused applied on resume.")
+	sync_karabiner_chords()
 end
 
 --- Captures the genuine script chord assignment and tap lifecycle without IO.
@@ -1824,6 +1855,7 @@ end
 function M.get_shortcut_actions()
 	local actions = {}
 	for key, value in pairs((chord_state())) do actions[key] = value end
+	for key, value in pairs(_deferred_actions or {}) do actions[key] = value end
 	return actions
 end
 
@@ -1943,7 +1975,7 @@ end
 --- the system, and one that started must get its sentinel. The remap refuses a
 --- regeneration while paused or switched off, and its next one reads the plan;
 --- before its first build nothing is asked, since that build reads the plan.
-local function sync_karabiner_chords()
+sync_karabiner_chords = function()
 	if _karabiner_sync_queued or _karabiner_plan_key == nil
 		or type(_karabiner) ~= "table" or type(_karabiner.regenerate) ~= "function" then
 		return
@@ -1984,6 +2016,12 @@ function M.set_shortcut_action(slot_id, action)
 		Logger.error(LOG, "set_shortcut_action(): '%s' is not a script chord slot.", slot_id)
 		return false
 	end
+	if chord_change_deferred() then
+		_deferred_actions = _deferred_actions or {}
+		_deferred_actions[slot_id] = action
+		Logger.debug(LOG, "Script chord slot '%s' → '%s', applied on resume.", slot_id, action)
+		return true
+	end
 	chord_state()[slot_id] = action
 	Logger.debug(LOG, "Script chord slot '%s' → '%s'.", slot_id, action)
 	sync_karabiner_chords()
@@ -2000,6 +2038,11 @@ function M.set_chords_enabled(on)
 		return false
 	end
 	chord_state()
+	if chord_change_deferred() then
+		_deferred_chords_on = on
+		Logger.debug(LOG, "Script chords switched %s, applied on resume.", on and "on" or "off")
+		return true
+	end
 	_chords_on = on
 	Logger.debug(LOG, "Script chords switched %s.", on and "on" or "off")
 	sync_karabiner_chords()
@@ -2010,6 +2053,7 @@ end
 --- @return boolean
 function M.chords_enabled()
 	local _, chords_on = chord_state()
+	if _deferred_chords_on ~= nil then return _deferred_chords_on end
 	return chords_on
 end
 

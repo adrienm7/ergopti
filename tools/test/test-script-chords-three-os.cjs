@@ -263,9 +263,9 @@ check(
 );
 const linuxChords = read('linux', 'modules', 'shortcuts', 'script_chords.lua');
 check(
-	/ScriptChords\.runs\(M\.catalogue\(\), _assignments\[slot_id\], _chords_on, paused\)/.test(
+	/ScriptChords\.runs\(M\.catalogue\(\), assignments\[slot_id\], chords_on, paused\)/.test(
 		linuxChords
-	),
+	) && /local assignments, chords_on = live_chords\(\)/.test(linuxChords),
 	'Linux script chords must judge each chord with the shared rule'
 );
 check(

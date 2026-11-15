@@ -26,9 +26,12 @@ function M.new(options)
 		if called and type(value) == "boolean" then return value end
 		return nil
 	end
+	-- A pause admits the switch: script_control keeps it until the resume
+	-- settles, so the resume chord stays live (EDD-1). A pause that is not a
+	-- boolean is refused.
 	local function ready()
 		local called, paused = pcall(options.paused)
-		return called and paused == false
+		return called and type(paused) == "boolean"
 	end
 	local function apply(setter, getter, value)
 		local called, accepted = pcall(setter, value)

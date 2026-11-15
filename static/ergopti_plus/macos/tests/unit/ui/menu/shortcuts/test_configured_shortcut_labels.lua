@@ -192,8 +192,10 @@ helpers.describe("real script-action catalogue projection", function()
 				helpers.assert_eq(#captured, #control.script_chord_slots())
 				for _, slot in ipairs(captured) do
 					helpers.assert_nil(slot.items, "a slot row must not inline the action catalogue")
-					helpers.assert_eq(slot.disabled == true, paused)
-					helpers.assert_eq(type(slot.action), paused and "nil" or "function")
+					-- A slot row runs while paused: script_control keeps the change
+					-- until the resume settles (paused-chord-change).
+					helpers.assert_eq(slot.disabled == true, false)
+					helpers.assert_eq(type(slot.action), "function")
 				end
 			end
 			context.paused = false; owner.build(context)
