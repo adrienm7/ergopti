@@ -102,38 +102,48 @@ _TPGF_MarkedFeatureIds() {
 	return Ids
 }
 
+; The marked rows that stay live while paused (EDD-1): their configuration rows
+; run then, and the rows that wait for the resume are greyed with why
+; (_LAY_GreyPausedRows). They stay marked, so the boot shell still leaves them
+; out until the features are ready.
+_TPGF_LiveWhilePausedIds() {
+	return Map("keyboard_layout", true)
+}
+
 _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 	Builders := _MI_TopLevelBuilders()
 	Features := Map()
+	Live := _TPGF_LiveWhilePausedIds()
 	Marked := _TPGF_MarkedFeatureIds()
 	Assert(Marked.Length >= 7, "the manifest must mark the feature rows a pause greys, got " . Marked.Length)
 	for _, Id in Marked {
 		Assert(Builders.Has(Id), "the tray root must have a builder for the feature row " . Id)
 		Features[Id] := true
 	}
+	DeclaredFeatureBody := _StripFullLineComments(_DriverFuncBody("_MI_StageDeclaredFeature"))
+	Assert(DeclaredFeatureBody != "", "the shared feature staging owner must be readable")
+	Assert(RegExMatch(DeclaredFeatureBody, 's)if Feature\s+TrayMenuStage_AddFeature\(Row\["label"\], Child\)\s+else\s+TrayMenuStage_Add\(Row\["label"\], Child\)'),
+		"the declared parent stages a feature unless its caller keeps it live while paused")
 	Checked := 0
 	for Id, Builder in Builders {
 		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
 		Assert(Body != "", "the actual tray root builder " . Builder.Name . " must be readable")
 		; Only a genuine direct call reaches this shared feature staging owner.
-		if RegExMatch(Body, "m)^[ \t]*_MI_StageDeclaredFeature\(") {
-			DeclaredFeatureBody := _StripFullLineComments(_DriverFuncBody("_MI_StageDeclaredFeature"))
-			Assert(DeclaredFeatureBody != "", "the reached shared feature staging owner must be readable")
-			Assert(InStr(DeclaredFeatureBody, "TrayMenuStage_AddFeature(") > 0,
-				"the reached declared parent must stage its actual child as a feature")
-			AssertEqual(0, InStr(DeclaredFeatureBody, "TrayMenuStage_Add("),
-				"the reached declared feature owner must not stage a plain row")
-			Body .= DeclaredFeatureBody
-		}
+		Declared := RegExMatch(Body, "m)^[ \t]*_MI_StageDeclaredFeature\((.*)\)\s*$", &Call)
 		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
-		if Features.Has(Id) {
-			Assert(InStr(Body, "TrayMenuStage_AddFeature(") > 0 || InStr(Body, "TrayMenuStage_AddFeatureAction(") > 0,
+		KeptLive := Declared && RegExMatch(Call[1], ", true, false$")
+		if Features.Has(Id) && Live.Has(Id) {
+			Assert(KeptLive, "the " . Id . " row stays live while paused (EDD-1)")
+		} else if Features.Has(Id) {
+			Assert(!KeptLive, "the " . Id . " row must be greyed by a pause")
+			Assert(Declared || InStr(Body, "TrayMenuStage_AddFeature(") > 0 || InStr(Body, "TrayMenuStage_AddFeatureAction(") > 0,
 				"the " . Id . " row must be staged as a feature row so a pause greys it")
 			AssertEqual(0, InStr(Body, "TrayMenuStage_Add("),
 				"the " . Id . " row staged with the plain TrayMenuStage_Add would stay live while paused")
 		} else {
+			AssertFalse(Declared, "the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
 			AssertEqual(0, InStr(Body, "TrayMenuStage_AddFeature(") + InStr(Body, "TrayMenuStage_AddFeatureAction("),
 				"the " . Id . " row is no feature: greyed by a pause, it could not be used to resume or leave")
 		}
@@ -142,9 +152,64 @@ _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 	Assert(Checked >= 12, "the tray root must dispatch at least twelve builders, read " . Checked)
 }
 
+; The Layout rows that wait for the resume are greyed with why while paused, and
+; the others, the magic key capture among them, stay live (paused-layout-live).
+_TPGF_LayoutRowsWaitOnlyWhereNeeded() {
+	Target := Menu()
+	Noop := (*) => 0
+	Keys := _LAY_PausedRowKeys()
+	AssertEqual(2, Keys.Length, "the layout manager and the layout editor wait for the resume")
+	for Key in Keys
+		Target.Add(t(Key), Noop)
+	Capture := t("menu.layout.magic_key_source.capture")
+	Target.Add(Capture, Noop)
+	AssertEqual(0, _LAY_GreyPausedRows(Target, false), "an active driver greys no Layout row")
+	Loop 3
+		AssertFalse(_TPGF_IsGreyed(Target, A_Index - 1), "row " . A_Index . " is live while active")
+	AssertEqual(2, _LAY_GreyPausedRows(Target, true))
+	Reason := _MR_ReasonHead(t("menu.shortcuts.keyboard.magic_editor_reason.paused"))
+	for Index, Key in Keys {
+		AssertTrue(_TPGF_IsGreyed(Target, Index - 1), Key . " waits for the resume")
+		AssertEqual(t(Key) . " — " . Reason, _TPGF_Label(Target, Index - 1), Key . " says why")
+	}
+	AssertFalse(_TPGF_IsGreyed(Target, 2), "the magic key capture runs while paused")
+	AssertEqual(Capture, _TPGF_Label(Target, 2))
+}
+
+_TPGF_Label(TargetMenu, Position) {
+	static MF_BYPOSITION := 0x400
+	Buf := Buffer(1024, 0)
+	DllCall("GetMenuStringW", "ptr", TargetMenu.Handle, "uint", Position, "ptr", Buf, "int", 512,
+		"uint", MF_BYPOSITION, "int")
+	return StrGet(Buf, "UTF-16")
+}
+
+; A pause or a resume builds the live Layout submenu again at its next open, so
+; it shows what waits; a submenu still waiting for its build is left as it is.
+_TPGF_RearmRebuildsAtNextOpen() {
+	global _MenuDeferredChildren
+	Count := Map("built", 0)
+	Build := (Target) => (Count["built"] += 1, Target.Add("row", (*) => 0))
+	Child := Menu()
+	Build.Call(Child)
+	AssertTrue(MenuDeferred_Rearm(Child, Build, "layout_menu"), "a built submenu is armed again")
+	AssertTrue(_MenuDeferredChildren.Has(Child.Handle), "its next open builds it")
+	AssertFalse(MenuDeferred_Rearm(Child, Build, "layout_menu"), "a pending submenu is left as it is")
+	AssertTrue(MenuDeferred_Build(Child.Handle, "test"))
+	AssertEqual(2, Count["built"], "the next open builds it from the state of that moment")
+	AssertFalse(_MenuDeferredChildren.Has(Child.Handle))
+	Enter := _DriverFuncBody("Ergopti_OnSuspendEnter"), Resume := _DriverFuncBody("Ergopti_OnSuspendResume")
+	Assert(InStr(Enter, "_MI_LayoutRearmForPause()") > 0 && InStr(Resume, "_MI_LayoutRearmForPause()") > 0,
+		"a pause and a resume arm the Layout submenu again")
+}
+
 Test("tray pause: feature submenus greyed, global rows live, restored on resume (tray-pause-greys-features)",
 	_TPGF_PauseGreysOnlyFeatureRows)
 Test("tray pause: UpdateTrayIcon and publication apply the greying (tray-pause-greys-features)",
 	_TPGF_OwnersApplyGreying)
 Test("tray pause: every feature row of the root is staged as a feature row (tray-pause-greys-features)",
 	_TPGF_EveryFeatureRowIsStagedAsAFeature)
+Test("tray pause: the Layout rows that wait for the resume are greyed with why, the others live (paused-layout-live)",
+	_TPGF_LayoutRowsWaitOnlyWhereNeeded)
+Test("tray pause: a pause or a resume builds the live Layout submenu again (paused-layout-live)",
+	_TPGF_RearmRebuildsAtNextOpen)

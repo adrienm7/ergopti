@@ -213,6 +213,7 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 ; ``active_layouts`` lists the layouts installed for the user (_LAY_ActiveLayoutRows);
 ; ``layout_system_install`` installs the Ergopti system layout (SystemLayout_MenuRows).
 _MI_StageLayout() {
+	global _MI_LayoutDeferred
 	Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")
 	if !Receiver
 		throw Error("The declared keyboard_layout feature parent was refused before native construction.")
@@ -232,11 +233,70 @@ _MI_StageLayout() {
 	; The emulated-row switches are the manifest's layout_emulated_rows_group.
 	LayoutGroupBuilders := Map("layout_emulated_rows", () => MenuRenderer_Build("layout_emulated_rows_group", "Layout",
 		"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))
-	LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", LayoutGroupBuilders,
-		LayoutListProviders, _LAY_ScopeCommands(),
-		Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")
-	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
+	LayoutBuild := (Target) => _LAY_BuildLayoutMenu(Target, LayoutGroupBuilders, LayoutListProviders)
+	LayoutMenu  := MenuDeferOrBuild(LayoutBuild, "layout_menu")
+	; The Layout head stays live while paused (EDD-1): its configuration rows
+	; run then, and the rows that wait for the resume are greyed with why. A
+	; pause or resume builds its rows again (_MI_LayoutRearmForPause).
+	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true, false)
+	_MI_LayoutDeferred := Map("menu", LayoutMenu, "build", LayoutBuild)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
+}
+
+; The Layout submenu of the live tray and its builder, for the pause re-arm.
+global _MI_LayoutDeferred := 0
+
+; Builds the Layout submenu's rows, then greys the rows that wait for the
+; resume while paused.
+; @param Target {Menu} The empty submenu.
+; @param GroupBuilders {Map} Its group builders.
+; @param ListProviders {Map} Its list providers.
+_LAY_BuildLayoutMenu(Target, GroupBuilders, ListProviders) {
+	MenuRenderer_Build("layout_menu", "Layout", "", GroupBuilders,
+		ListProviders, _LAY_ScopeCommands(),
+		Map("layout_enabled", () => IsCategoryGated("Layout")), Target)
+	_LAY_GreyPausedRows(Target)
+}
+
+; The Layout rows that wait for the resume: the layout manager and the layout
+; editor, whose pages refuse every command under Suspend. Each is greyed and
+; says why, as a row with a disabled_reason_key reads.
+; @return {Array} The i18n keys of their labels.
+_LAY_PausedRowKeys() {
+	return ["menu.layout.manage", "menu.layout.edit"]
+}
+
+; Greys the Layout rows that wait for the resume, while paused.
+; @param Target {Menu} The built Layout submenu.
+; @param Paused {Boolean} The pause state to judge by.
+; @return {Integer} How many rows were greyed.
+_LAY_GreyPausedRows(Target, Paused := A_IsSuspended) {
+	if !Paused
+		return 0
+	Reason := _MR_ReasonHead(t("menu.shortcuts.keyboard.magic_editor_reason.paused"))
+	Greyed := 0
+	for Key in _LAY_PausedRowKeys() {
+		Label := t(Key)
+		Waiting := Label . " — " . Reason
+		try {
+			Target.Rename(Label, Waiting)
+			Target.Disable(Waiting)
+			Greyed += 1
+		} catch as Err {
+			LoggerError("Menu", "The Layout row '{1}' could not be greyed while paused: {2}.", Label, Err.Message)
+		}
+	}
+	return Greyed
+}
+
+; Builds the live Layout submenu again at a pause or a resume, so its rows show
+; what waits for the resume: the tray root is not rebuilt under a pause.
+; @return {Boolean} True when the submenu will build at its next open.
+_MI_LayoutRearmForPause() {
+	global _MI_LayoutDeferred
+	if !(_MI_LayoutDeferred is Map)
+		return false
+	return MenuDeferred_Rearm(_MI_LayoutDeferred["menu"], _MI_LayoutDeferred["build"], "layout_menu")
 }
 
 
@@ -443,13 +503,17 @@ _MI_StageGestures() {
 
 
 ; Publication consumes only the declared parent and its captured genuine native child.
-_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {
+; Feature is false for a head row that stays live while paused (EDD-1).
+_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {
 	Published := false
 	try {
 		Row := Receiver.Call(Child, Getters)
 		if !(Row is Map) || Row.Get("submenu", false) != Child
 			throw Error("The canonical feature parent changed during native construction.")
-		TrayMenuStage_AddFeature(Row["label"], Child)
+		if Feature
+			TrayMenuStage_AddFeature(Row["label"], Child)
+		else
+			TrayMenuStage_Add(Row["label"], Child)
 		Published := true
 		if Row.Get("checked", false)
 			TrayMenuStage_Check(Row["label"])

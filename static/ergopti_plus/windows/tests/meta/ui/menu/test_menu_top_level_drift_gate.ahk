@@ -330,13 +330,16 @@ _DG_SourceJoin(Lines) {
 }
 _DG_DeclaredStageExpected() {
 	return _DG_SourceJoin([
-		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {',
 		'Published := false',
 		'try {',
 		'Row := Receiver.Call(Child, Getters)',
 		'if !(Row is Map) || Row.Get("submenu", false) != Child',
 		'throw Error("The canonical feature parent changed during native construction.")',
+		'if Feature',
 		'TrayMenuStage_AddFeature(Row["label"], Child)',
+		'else',
+		'TrayMenuStage_Add(Row["label"], Child)',
 		'Published := true',
 		'if Row.Get("checked", false)',
 		'TrayMenuStage_Check(Row["label"])',
@@ -356,6 +359,7 @@ _DG_DeclaredBuilderExpected(Id) {
 	if Id == "keyboard_layout"
 		return _DG_SourceJoin([
 			'_MI_StageLayout() {',
+			'global _MI_LayoutDeferred',
 			'Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
 			'if !Receiver',
 			'throw Error("The declared keyboard_layout feature parent was refused before native construction.")',
@@ -372,10 +376,10 @@ _DG_DeclaredBuilderExpected(Id) {
 			')',
 			'LayoutGroupBuilders := Map("layout_emulated_rows", () => MenuRenderer_Build("layout_emulated_rows_group", "Layout",',
 			'"", "", "", _LAY_ScopeCommands(), Map("layout_enabled", () => IsCategoryGated("Layout"))))',
-			'LayoutMenu  := MenuDeferOrBuild((Target) => MenuRenderer_Build("layout_menu", "Layout", "", LayoutGroupBuilders,',
-			'LayoutListProviders, _LAY_ScopeCommands(),',
-			'Map("layout_enabled", () => IsCategoryGated("Layout")), Target), "layout_menu")',
-			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)',
+			'LayoutBuild := (Target) => _LAY_BuildLayoutMenu(Target, LayoutGroupBuilders, LayoutListProviders)',
+			'LayoutMenu  := MenuDeferOrBuild(LayoutBuild, "layout_menu")',
+			'_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true, false)',
+			'_MI_LayoutDeferred := Map("menu", LayoutMenu, "build", LayoutBuild)',
 			'BootProfile_Mark("MENU/initMenu: layout built+added")',
 			'}'])
 	if Id == "hotstrings"

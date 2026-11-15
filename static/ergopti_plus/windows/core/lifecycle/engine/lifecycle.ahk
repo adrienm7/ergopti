@@ -543,6 +543,11 @@ Ergopti_OnSuspendEnter() {
 	; The chords that resume stay those of pause time until the resume.
 	if IsSet(ScriptShortcutPausedChordsOnSuspend)
 		ScriptShortcutPausedChordsOnSuspend(true)
+	; The Layout submenu stays live while paused: its rows show what waits.
+	if IsSet(_MI_LayoutRearmForPause)
+		try _MI_LayoutRearmForPause()
+		catch as Err
+			LoggerError("Lifecycle", "The Layout submenu could not be rebuilt for the pause: {1}.", Err.Message)
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
@@ -739,6 +744,10 @@ Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
 		if IsSet(ScriptShortcutPausedChordsOnSuspend)
 			ScriptShortcutPausedChordsOnSuspend(false)
+		if IsSet(_MI_LayoutRearmForPause)
+			try _MI_LayoutRearmForPause()
+			catch as Err
+				LoggerError("Lifecycle", "The Layout submenu could not be rebuilt for the resume: {1}.", Err.Message)
 		; A magic key capture opened while paused never crosses the resume.
 		global _MagicKeyEditorInputHook
 		if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)

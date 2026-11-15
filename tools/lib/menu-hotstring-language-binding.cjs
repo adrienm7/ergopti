@@ -1427,7 +1427,7 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 		return false;
 	const actual = owner(
 		consumer,
-		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false, Feature := true) {',
 		'.ahk'
 	);
 	const expected = `
@@ -1436,7 +1436,10 @@ function ahkDeclaredHotstringsTransport(stage, consumer) {
 			Row := Receiver.Call(Child, Getters)
 			if !(Row is Map) || Row.Get("submenu", false) != Child
 				throw Error("The canonical feature parent changed during native construction.")
-			TrayMenuStage_AddFeature(Row["label"], Child)
+			if Feature
+				TrayMenuStage_AddFeature(Row["label"], Child)
+			else
+				TrayMenuStage_Add(Row["label"], Child)
 			Published := true
 			if Row.Get("checked", false)
 				TrayMenuStage_Check(Row["label"])
