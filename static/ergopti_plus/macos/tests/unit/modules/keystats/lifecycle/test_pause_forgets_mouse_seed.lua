@@ -1,4 +1,4 @@
---- tests/unit/modules/keystats/watchers/test_pause_forgets_mouse_seed.lua
+--- tests/unit/modules/keystats/lifecycle/test_pause_forgets_mouse_seed.lua
 
 --- ==============================================================================
 --- MODULE: A Pause Forgets The Mouse Distance Seed (macOS)
