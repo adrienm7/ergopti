@@ -10,6 +10,68 @@ This file lists features and fixes. The checks only real hardware can answer are
 [TODO-tests-macos.md](TODO-tests-macos.md), [TODO-tests-windows.md](TODO-tests-windows.md) and
 [TODO-tests-linux.md](TODO-tests-linux.md).
 
+## Resume here (2026-11-15, 14:30 Paris, read first)
+
+The coordinator session hit its usage limit. A new coordinator resumes from this section.
+
+- **Role.** Coordinate the worker containers, land their branches on `dev`, report to the maintainer in French
+  with Paris times, ask questions as multiple choice with the recommended option first, and record every
+  maintainer request in this file.
+- **Hard rules.**
+  - No merge commits on dev: `git fetch origin dev && git rebase origin/dev`, then
+    `git push origin HEAD:refs/heads/dev`. Never force-push, and never push main, tags or releases.
+  - Every commit is authored and committed as « Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com> »,
+    with no AI trailer; `tools/lint/check-commit-identity.cjs` enforces it. The global git config of a cloud
+    container resets to « Claude » on restart, so set the repository's local `user.name` and `user.email`
+    first.
+  - Gates before each push: `node tools/lint/format.cjs --check` and
+    `node tools/lint/lint-conventions.js --fail-on-violations`, plus the tests of the change.
+- **Landing a worker branch** (workers cannot push dev):
+  - check out the branch, then
+    `git rebase origin/dev --exec 'git commit --amend --no-edit --reset-author --no-verify -q'`;
+  - then `node tools/dev/coordinator/renumber-suite-ordinals.cjs`, `node tools/test/test-js-feature-inventory.cjs`,
+    `node tools/lint/check-commit-identity.cjs --range origin/dev..HEAD`, format and lint;
+  - push. On a conflict, ask the worker to rebase and push a new branch name.
+- **CI.** Each push cancels the previous dev run. Space the pushes so that one full run completes, read its reds
+  by name, and route each red to the worker of its area.
+- **Site deploy.** Once a dev run is complete with its 5 site jobs green, run
+  `gh workflow run deploy-site.yml --repo adrienm7/ergopti --ref dev -f run_id=<id>`. The last deploy was
+  38e6cfb50a (10:31 Paris); everything after it waits for a green run.
+- **Windows Lua export exe.** Once a dev run builds « Windows / Build », download its artifact
+  `windows-lua-export-*` and commit the exe and its JSON into `windows/vendor`, with the `required` entries in
+  `tools/build/windows_bundle_manifest.json`. The identity test then turns on.
+- **Active workers** (cloud sessions; message them with send_message). Each was told to push its branch often.
+  - T (`session_01Xt8dDwwe4sUNNVXsz1nfNH`): rebasing onto dev editable-tables, pdf-text and
+    workspace-in-comparer plus compare-reuses-editor (new `-2` names); then retiring the navigation layer editor
+    in 3 steps. Step 1 is on `claude/ergopti-todo-retire-layer-editor`. The step 2 design is approved: the Studio
+    opens on « nav » and imports layers.toml, which becomes compiled output with a documented generated-from
+    header.
+  - W (`session_01Xt8dDuPL4iepfyANYxdFMc`): Windows pause slices. Slice 2a (no greyed rows,
+    `claude/ergopti-pause-c2-drop-greyed`) is HELD until no handler that can be reached while paused refuses
+    silently. 2b renames greyed_when_paused to boot_deferred. Also the Windows wrap_selection clipboard red
+    (test_wrap_selection_action.ahk:475), and MLC-005 (`claude/ergopti-todo-mlc005-rows`), which waits for a
+    green macOS build row.
+  - X (`session_01Xt8dDti7Ph8qRbgEgSGURC`): text corpora in other languages (de, es, it; public domain), then the
+    CI keyboard-source fixture investigation.
+  - Y (`session_01Xt8dDw17eucqsrvamXCVnf`): structure phase 2. S18 to S20 are on dev; S21 (ai) is next, in pushes
+    of 2 or 3 steps; also the linux-feature-parity re-pin of ergopti_hotstrings.lua.
+- **Maintainer decisions of 2026-11-15:**
+  - Studio: XKB and KLC built by the host on the 3 OS (Windows through a pinned, restricted Lua 5.4 exe); no
+    footer on /studio; a « Format » dropdown; Comparer ticks follow the keyboard; display names; centred legends
+    and bare dead-key accents; an « Essayer » input bar; every library layout as a start; an installable Windows
+    zip (generic NSIS stub pinned to makensis v3.10-2).
+  - Data: the Ergo-L PDFs and the KLAnext screenshots are deleted, and benchmarks show the live Comparer. The
+    corpora frequences_lettres and Johnix prog are deleted; Leipzig ships as CC BY 4.0.
+  - Process: structure phase 2 launched; real-machine checks live in the TODO-tests-<os>.md files only.
+- **Open for the maintainer:**
+  - the history rewrite removing every mention of Claude (later, once the workers are done; see « Commit
+    identity »);
+  - the identity gate's false positive on every PDF's root trailer key in containers whose home is the root
+    account's (left unchanged);
+  - the casing of BEO, INTS, UCIEA, AHEI, MTGAP-T and CTGAP 3;
+  - the dead-key marker style;
+  - ISO ticks for split and ortholinear boards.
+
 ## Resume here (2026-11-13 evening, read first)
 
 Any agent can continue from this section alone: the maintainer answered every open question on 2026-11-13 and
