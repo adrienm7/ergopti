@@ -401,6 +401,7 @@ async function exerciseSiteOpensOnErgopti(browser, origin) {
 		'the board shows Ergopti'
 	);
 	await exerciseForeignFiles(page);
+	await exerciseFingeringPerKeyboard(page);
 	await exerciseStartAnyLayout(page);
 	assert.deepEqual(errors, []);
 	await context.close();
@@ -482,6 +483,52 @@ async function exerciseForeignFiles(page) {
 	assert.match(kalamine.name, /\.kalamine\.toml$/);
 	assert.match(kalamine.text, /^name = "Ergo-L"/);
 	assert.match(kalamine.text, /geometry = "ISO"/);
+}
+
+/**
+ * (fingering-in-editor, fingering-per-keyboard) The editor's analysis panel
+ * holds the fingering editor too, and each keyboard keeps its own profile: a
+ * finger changed on ISO is ISO's alone, ANSI keeps its defaults.
+ * @param {import('playwright').Page} page
+ */
+async function exerciseFingeringPerKeyboard(page) {
+	const fingerOf = (code) =>
+		page.$eval(
+			`.la-panel-fingering .la-fingering-key[title^="${code} "]`,
+			(node) => node.dataset.finger
+		);
+	const waitFinger = (code, finger) =>
+		page.waitForFunction(
+			([c, f]) => {
+				const node = document.querySelector(
+					`.la-panel-fingering .la-fingering-key[title^="${c} "]`
+				);
+				return node && node.dataset.finger === f;
+			},
+			[code, finger]
+		);
+	await waitFinger('KeyQ', 'lp');
+	assert.ok(
+		(await page.locator('.la-panel-fingering .la-fingering-key').count()) > 40,
+		'the panel shows the key map'
+	);
+	await page.click('.la-panel-fingering .la-fingering-key[title^="KeyQ "]');
+	await page.selectOption('.la-panel-fingering div.la-fingering-row select', 'lr');
+	await waitFinger('KeyQ', 'lr');
+	const stored = await page.evaluate(() =>
+		JSON.parse(window.localStorage.getItem('ergopti.layout_analysis.profiles.v2'))
+	);
+	assert.equal(stored.version, 2);
+	assert.equal(stored.profiles.iso.fingers.KeyQ, 'lr', 'stored as the ISO profile');
+	assert.equal(stored.profiles.ansi, undefined, 'ANSI keeps its defaults');
+	await page.selectOption('#la-panel-keyboard', 'ansi');
+	await waitFinger('KeyQ', 'lp');
+	await page.selectOption('#la-panel-keyboard', 'iso');
+	await waitFinger('KeyQ', 'lr');
+	assert.equal(await fingerOf('KeyQ'), 'lr');
+	// « Reset » gives ISO its defaults back.
+	await page.click('.la-panel-fingering .la-row button');
+	await waitFinger('KeyQ', 'lp');
 }
 
 /**

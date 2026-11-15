@@ -64,7 +64,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 	 * @param {HTMLElement} container - Where the view goes (the owner places it).
 	 * @param {{comparer?: object}} [options] - The mounted Comparer (default
 	 *   window.LAYOUT_ANALYSIS_COMPARER). The user's finger model is
-	 *   LAYOUT_ANALYSIS_FINGERING.current(); a change re-scores.
+	 *   LAYOUT_ANALYSIS_FINGERING.current(keyboard); a change re-scores.
 	 * @throws {Error} On a missing container or Comparer.
 	 */
 	function attach(container, options) {
@@ -195,7 +195,7 @@ var LAYOUT_ANALYSER_TAB = (function () {
 					result.layout.id,
 					S.scoreAll(layout, state.tables, {
 						keyboard: state.keyboard,
-						profile: FINGERING.current() || undefined
+						profile: FINGERING.current(state.keyboard) || undefined
 					})
 				);
 				render();

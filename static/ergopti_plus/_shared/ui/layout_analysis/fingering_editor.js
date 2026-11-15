@@ -8,18 +8,25 @@
  * each physical key, the home key of each finger (a column stagger, the angle
  * mod, an ergonomic board) and the base fingering. The Comparer shows the
  * editor; the Comparer, the editor's analysis panel and the other analysers'
- * scores all analyse with the same profile.
+ * scores all analyse a keyboard with that keyboard's profile.
  *
  * FEATURES & RATIONALE:
- * 1. One current profile per viewer: LAYOUT_ANALYSIS_FINGERING.current() is
- *    what every analysis passes as `profile`; null means the defaults.
+ * 1. One profile per keyboard model (ISO, ANSI, ortholinear, each split
+ *    board), since each geometry has its own keys and home row (maintainer,
+ *    2026-11-14 night): LAYOUT_ANALYSIS_FINGERING.current(keyboard) is what
+ *    every analysis on that keyboard passes as `profile`; null means the
+ *    defaults. Stored as {version: 2, profiles: {<keyboard>: profile}}; the
+ *    single profile of version 1 is not carried over (decided by the agent,
+ *    to review by the maintainer: it served every board at once).
  * 2. Kept by the host when it can (LAYOUT_ANALYSIS_HOST.store.loadProfile /
  *    saveProfile: the app's data folder, the site's IndexedDB), else in
  *    localStorage; another page of the same site follows through the
  *    'storage' event.
  * 3. Checked by the engine (fingeringProfile, keyboard) before it is kept: an
  *    invalid change is refused with its reason, never half applied.
- * 4. Reset, export and import as JSON.
+ * 4. Reset, export and import as JSON, for the keyboard shown.
+ * 5. Mounted where the user analyses: the Comparer and the editor's analysis
+ *    panel (both in the app's Studio window); every mount shows the refusals.
  * ==============================================================================
  */
 
@@ -32,7 +39,8 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	const DATA = window.LAYOUT_ANALYSIS_DATA;
 	const INFO = window.LAYOUT_ANALYSIS_INFO;
 	const t = INFO.t;
-	const STORAGE_KEY = 'ergopti.layout_analysis.profile.v1';
+	const STORAGE_KEY = 'ergopti.layout_analysis.profiles.v2';
+	const STORED_VERSION = 2;
 	const PROFILE_ID = 'custom';
 	// Size of one key unit of the key map, in pixels.
 	const KEY_UNIT_PX = 40;
@@ -40,7 +48,8 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	const MAP_KEYBOARD = 'iso';
 	const BASES = ['standard', 'angle'];
 
-	let profile = null;
+	// keyboard id → its checked profile; a keyboard absent here uses the defaults.
+	let profiles = {};
 	const listeners = [];
 
 	function el(tag, className, text) {
@@ -52,11 +61,35 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 
 	const host = () => (window.LAYOUT_ANALYSIS_HOST && window.LAYOUT_ANALYSIS_HOST.store) || null;
 
-	/** A profile the engine accepts on every board, or an error. */
-	function checked(candidate) {
+	/** A profile the engine accepts on its keyboard, or an error. */
+	function checked(keyboardId, candidate) {
+		if (!DATA.model.keyboards[keyboardId])
+			throw new Error(`layout_analysis: unknown keyboard ${keyboardId}`);
 		const clean = E.fingeringProfile(candidate);
-		for (const id of Object.keys(DATA.model.keyboards)) E.keyboard(id, clean);
+		E.keyboard(keyboardId, clean);
 		return clean;
+	}
+
+	/** Every keyboard's profile from what was stored, checked; null is none. */
+	function checkedSet(stored) {
+		if (stored === null || stored === undefined) return {};
+		if (
+			typeof stored !== 'object' ||
+			stored.version !== STORED_VERSION ||
+			!stored.profiles ||
+			typeof stored.profiles !== 'object'
+		)
+			// The engine's own refusal of what is not a profile (fingering_not_object).
+			E.fingeringProfile(null);
+		const out = {};
+		for (const [keyboardId, candidate] of Object.entries(stored.profiles))
+			out[keyboardId] = checked(keyboardId, candidate);
+		return out;
+	}
+
+	/** What is stored: every keyboard's profile, or null when all use the defaults. */
+	function stored() {
+		return Object.keys(profiles).length ? { version: STORED_VERSION, profiles } : null;
 	}
 
 	function readLocal() {
@@ -77,31 +110,45 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		}
 	}
 
-	/** Makes `next` (or the defaults, for null) the current profile and tells everyone. */
-	function use(next, persist) {
-		profile = next ? checked(next) : null;
+	/** Keeps the profiles, if asked, and tells everyone which keyboard changed. */
+	function commit(next, persist, keyboardId) {
+		profiles = next;
 		if (persist) {
 			const store = host();
 			if (store && typeof store.saveProfile === 'function')
 				store
-					.saveProfile(profile)
+					.saveProfile(stored())
 					.catch(() => notifyError('layout_analysis.fingering.save_failed'));
-			else writeLocal(profile);
+			else writeLocal(stored());
 		}
-		for (const listener of listeners) listener(profile);
+		for (const listener of listeners) listener(keyboardId);
 	}
 
-	let errorSink = null;
+	/** Makes `next` (or the defaults, for null) the profile of one keyboard. */
+	function use(keyboardId, next, persist) {
+		const copy = Object.assign({}, profiles);
+		if (next) copy[keyboardId] = checked(keyboardId, next);
+		else delete copy[keyboardId];
+		commit(copy, persist, keyboardId);
+	}
+
+	// Each mount's status line: a refusal is shown wherever the editor is.
+	const errorSinks = [];
 	function notifyError(key, values) {
-		if (errorSink) errorSink(t(key, values));
+		for (const sink of errorSinks) sink(t(key, values));
 	}
 
-	/** The current profile, or null for the defaults. */
-	function current() {
-		return profile;
+	/**
+	 * The profile of one keyboard, or null for its defaults.
+	 * @param {string} keyboardId A model keyboard id.
+	 */
+	function current(keyboardId) {
+		if (typeof keyboardId !== 'string' || !DATA.model.keyboards[keyboardId])
+			throw new Error(`layout_analysis: current() needs a keyboard, got ${keyboardId}`);
+		return profiles[keyboardId] || null;
 	}
 
-	/** Calls a listener with the new profile after every change. */
+	/** Calls a listener with the keyboard whose profile changed (null: all of them). */
 	function onChange(listener) {
 		if (typeof listener !== 'function')
 			throw new Error('layout_analysis: onChange needs a function');
@@ -112,13 +159,13 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 	 * Applies an edit to a copy of the current profile; refused edits keep the
 	 * current one and report why.
 	 */
-	function edit(change) {
+	function edit(keyboardId, change) {
 		const next = JSON.parse(
-			JSON.stringify(profile || { id: PROFILE_ID, name: '', fingers: {}, home: {} })
+			JSON.stringify(profiles[keyboardId] || { id: PROFILE_ID, name: '', fingers: {}, home: {} })
 		);
 		change(next);
 		try {
-			use(next, true);
+			use(keyboardId, next, true);
 			return true;
 		} catch (error) {
 			notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
@@ -169,10 +216,11 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 		const status = el('p', 'la-muted');
 		status.setAttribute('role', 'status');
 		root.append(head, help, baseLabel, map, keyLine, actions, status);
-		errorSink = (text) => {
+		errorSinks.push((text) => {
 			status.textContent = text;
 			status.className = 'la-error';
-		};
+		});
+		const profile = () => profiles[keyboardId()] || null;
 
 		function draw() {
 			title.textContent = t('layout_analysis.fingering.title');
@@ -185,13 +233,13 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 					return option;
 				})
 			);
-			baseSelect.value = (profile && profile.base) || 'standard';
+			baseSelect.value = (profile() && profile().base) || 'standard';
 			// A split, ortholinear or column-staggered board has its own fingering.
 			baseLabel.hidden = Boolean(DATA.model.keyboards[keyboardId()].board);
 			reset.textContent = t('layout_analysis.fingering.reset');
 			exportButton.textContent = t('layout_analysis.fingering.export');
 			importText.textContent = t('layout_analysis.fingering.import');
-			const board = E.keyboard(keyboardId(), profile || undefined);
+			const board = E.keyboard(keyboardId(), profile() || undefined);
 			map.replaceChildren();
 			let width = 0;
 			let height = 0;
@@ -235,37 +283,34 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 				homeButton.disabled = board.homeOf[board.finger[k]] === k;
 			}
 			if (status.className !== 'la-error')
-				status.textContent = profile ? t('layout_analysis.fingering.custom') : '';
+				status.textContent = profile() ? t('layout_analysis.fingering.custom') : '';
 		}
 
 		baseSelect.addEventListener('change', () =>
-			edit((next) => {
+			edit(keyboardId(), (next) => {
 				next.base = baseSelect.value;
 			})
 		);
 		fingerSelect.addEventListener('change', () =>
-			edit((next) => {
+			edit(keyboardId(), (next) => {
 				next.fingers[selected] = fingerSelect.value;
 			})
 		);
 		homeButton.addEventListener('click', () =>
-			edit((next) => {
+			edit(keyboardId(), (next) => {
 				next.home[fingerSelect.value] = selected;
 			})
 		);
-		reset.addEventListener('click', () => {
-			const store = host();
-			if (store && typeof store.saveProfile === 'function') use(null, true);
-			else {
-				writeLocal(null);
-				use(null, false);
-			}
-		});
+		reset.addEventListener('click', () => use(keyboardId(), null, true));
 		exportButton.addEventListener('click', () => {
-			const text = JSON.stringify(profile || { id: PROFILE_ID, fingers: {}, home: {} }, null, '\t');
+			const text = JSON.stringify(
+				profile() || { id: PROFILE_ID, fingers: {}, home: {} },
+				null,
+				'\t'
+			);
 			const link = el('a');
 			link.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-			link.download = 'ergopti-fingering.json';
+			link.download = `ergopti-fingering-${keyboardId()}.json`;
 			document.body.append(link);
 			link.click();
 			link.remove();
@@ -275,7 +320,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			importInput.value = '';
 			if (!file) return;
 			try {
-				use(JSON.parse(await file.text()), true);
+				use(keyboardId(), JSON.parse(await file.text()), true);
 			} catch (error) {
 				notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 			}
@@ -296,7 +341,7 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			store.loadProfile().then(
 				(saved) => {
 					try {
-						use(saved || null, false);
+						commit(checkedSet(saved || null), false, null);
 					} catch (error) {
 						notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 					}
@@ -306,17 +351,17 @@ var LAYOUT_ANALYSIS_FINGERING = (function () {
 			return;
 		}
 		try {
-			use(readLocal(), false);
-		} catch {
-			// A saved profile the engine no longer accepts: the defaults.
-			writeLocal(null);
+			commit(checkedSet(readLocal()), false, null);
+		} catch (error) {
+			// A saved set the engine no longer accepts: said, and the defaults.
+			notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 		}
 		window.addEventListener('storage', (event) => {
 			if (event.key !== STORAGE_KEY) return;
 			try {
-				use(readLocal(), false);
-			} catch {
-				use(null, false);
+				commit(checkedSet(readLocal()), false, null);
+			} catch (error) {
+				notifyError('layout_analysis.fingering.invalid', { reason: INFO.refusal(error) });
 			}
 		});
 	}

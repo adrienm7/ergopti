@@ -139,8 +139,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		}
 	}
 
-	/** The Comparer's weights and ideal finger load, each checked by the engine. */
-	function comparerSettings() {
+	/**
+	 * The Comparer's weights and ideal finger load, each checked by the engine,
+	 * and the user's fingering profile of one keyboard.
+	 * @param {string} keyboardId The keyboard analysed.
+	 */
+	function comparerSettings(keyboardId) {
 		const saved = readStorage(FILES.SETTINGS_KEY);
 		const settings = {};
 		try {
@@ -155,8 +159,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		} catch {
 			settings.idealLoad = undefined;
 		}
-		// The user's fingering profile, shared with the Comparer.
-		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current() || undefined;
+		// The user's fingering profile of this keyboard, shared with the Comparer.
+		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current(keyboardId) || undefined;
 		return settings;
 	}
 
@@ -253,6 +257,9 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const analysersTitle = el('h3');
 		const analysers = el('table', 'la-panel-metrics la-panel-analysers');
 		const extra = el('div', 'la-panel-extra');
+		// Who presses each key on the keyboard analysed, editable here as in the
+		// Comparer (one profile per keyboard, shared with it).
+		const fingering = el('div', 'la-panel-fingering');
 		node.append(
 			summary,
 			controls,
@@ -263,8 +270,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			fingers,
 			analysersTitle,
 			analysers,
-			extra
+			extra,
+			fingering
 		);
+		const fingeringView = window.LAYOUT_ANALYSIS_FINGERING.mount(fingering, {
+			keyboard: () => state.keyboard
+		});
 
 		function persist() {
 			try {
@@ -375,7 +386,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				return;
 			}
 			if (mine !== state.generation) return;
-			const settings = comparerSettings();
+			const settings = comparerSettings(state.keyboard);
 			const result = E.analyse(layout, prepared, {
 				keyboard: state.keyboard,
 				format: keyboardFormat(),
@@ -445,7 +456,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 
 		function drawFingers(result) {
 			fingers.replaceChildren();
-			const ideal = comparerSettings().idealLoad || E.defaultIdealLoad();
+			const ideal = comparerSettings(state.keyboard).idealLoad || E.defaultIdealLoad();
 			for (const id of DATA.model.fingers) {
 				const row = el('div', 'la-panel-finger');
 				const share = result.fingers[id];
@@ -604,6 +615,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		});
 		keyboardSelect.addEventListener('change', () => {
 			state.keyboard = keyboardSelect.value;
+			fingeringView.draw();
 			state.previous = null;
 			persist();
 			schedule();

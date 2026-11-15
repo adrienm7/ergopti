@@ -1,0 +1,74 @@
+/* _shared/ui/layout_analysis/fingering_editor.css */
+
+/*
+ * ==============================================================================
+ * MODULE: Fingering Editor Style
+ * DESCRIPTION:
+ * The look of the fingering editor (fingering_editor.js) wherever it is
+ * mounted: the Comparer and the layout editor's analysis panel, on the site
+ * and in the app's Studio window. Theme tokens only (theme.css), so it needs
+ * no page's own variables; the key rules sit under the map, so a page's own
+ * button rules never repaint the fingers.
+ * ==============================================================================
+ */
+
+.la-fingering-row {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+.la-fingering-map {
+	margin: 8px 0;
+	max-width: 100%;
+	overflow-x: auto;
+	position: relative;
+}
+
+.la-fingering-map .la-fingering-key {
+	align-items: center;
+	border: 1px solid var(--theme-separator);
+	border-radius: 6px;
+	color: var(--theme-text);
+	cursor: pointer;
+	display: flex;
+	font-size: 0.75em;
+	font-weight: 600;
+	height: 36px;
+	justify-content: center;
+	padding: 0;
+	position: absolute;
+	width: 36px;
+}
+
+/* One hue per finger, the same on both hands; thumbs neutral. */
+.la-fingering-map .la-fingering-key[data-finger='lp'],
+.la-fingering-map .la-fingering-key[data-finger='rp'] {
+	background: color-mix(in srgb, var(--theme-red) 30%, var(--theme-surface));
+}
+
+.la-fingering-map .la-fingering-key[data-finger='lr'],
+.la-fingering-map .la-fingering-key[data-finger='rr'] {
+	background: color-mix(in srgb, var(--theme-orange) 30%, var(--theme-surface));
+}
+
+.la-fingering-map .la-fingering-key[data-finger='lm'],
+.la-fingering-map .la-fingering-key[data-finger='rm'] {
+	background: color-mix(in srgb, var(--theme-green) 30%, var(--theme-surface));
+}
+
+.la-fingering-map .la-fingering-key[data-finger='li'],
+.la-fingering-map .la-fingering-key[data-finger='ri'] {
+	background: color-mix(in srgb, var(--theme-blue) 30%, var(--theme-surface));
+}
+
+.la-fingering-map .la-fingering-home {
+	box-shadow: inset 0 -4px 0 var(--theme-text);
+	font-weight: 700;
+}
+
+.la-fingering-map .la-fingering-key.la-selected {
+	outline: 2px solid var(--theme-accent);
+}

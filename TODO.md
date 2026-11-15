@@ -565,7 +565,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       char, bigram or trigram count-table format, and none of Norvig, Leipzig lists, Lexique or Wikipedia frequency
       data.
 
-- [ ] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
+- [x] **Maximum keyboard-model customisation (maintainer, 2026-11-14 night).** In Studio (Comparer and Éditer, site
       and app) the user sets, per physical key, the finger and hand that press it; then, for each finger, its home key
       anywhere inside the zone of keys assigned to that finger (e.g. the right pinky covers 3 columns × 4 rows and its
       home key can be any of those 12 keys); no global home-row setting, metrics use each finger's own home key. Defaults stay the
@@ -575,10 +575,13 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       ANSI, ortholinear/matrix, column-staggered ergonomic splits (Ergodox, Corne, Moonlander, Kinesis-like thumb
       clusters), with real key positions and thumb keys, a default fingering and home keys per geometry; keys a
       geometry lacks are reported per layout, never dropped silently.
-      [CODE] Left (2026-11-15): per-key fingers and home keys, nine QMK geometries, missing keys reported, profile
+      Checked 2026-11-15: per-key fingers and home keys, nine QMK geometries, missing keys reported, profile
       saved, exported and reset are done (b53b32b712, c4a9ecf295, 0275c9fc9a, f50a9aafbe, b200e583eb;
-      test-layout-analysis-engine.cjs); the fingering is editable only in the Comparer, one profile serves every
-      geometry, and a home key is not checked to lie in its finger's zone.
+      test-layout-analysis-engine.cjs). Done 2026-11-15 (`claude/ergopti-todo-keyboard-model`): the fingering editor
+      is also in the editor's analysis panel (« Éditer », site and app); each keyboard model keeps its own profile
+      (stored as version 2; the version 1 single profile is not carried over, decided by the agent, to review by
+      the maintainer); a home key outside its finger's keys is refused (`home_key_other_finger`, already in
+      test-layout-analysis-engine.cjs); proof: `fingering-per-keyboard` in layout-editor.playwright.cjs.
 - [x] **The editor lives under /studio (maintainer, 2026-11-14 night).** « Éditer » at /studio, « Comparer » at
       /studio/comparer; /editeur redirects to /studio; menus, links and docs point to /studio.
       Checked 2026-11-15: done on dev (ceac641ab5, fc0239c80e): src/routes/editeur redirects to /studio, the site

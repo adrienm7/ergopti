@@ -409,18 +409,24 @@ onResults}`. A second mount throws.
   scripts and mounts the Comparer into its « Comparer » tab.
 - Keystats tables sent before the mount are kept and applied when it happens.
 
-« Doigté » (`fingering_editor.js`, global `LAYOUT_ANALYSIS_FINGERING`) edits
-the fingering profile under the weights. It draws a key map coloured by
+« Doigté » (`fingering_editor.js`, global `LAYOUT_ANALYSIS_FINGERING`, styled
+by `fingering_editor.css`) edits the fingering profile under the Comparer's
+weights and in the layout editor's analysis panel. It draws a key map coloured by
 finger, with the home keys marked; the user clicks a key, then picks its
 finger or makes it that finger's home key. It also has a base fingering
 (standard or angle mod), reset, and JSON export and import.
 
-- `current()` is the profile every analysis passes: the Comparer, the
-  editor's panel and the other analysers' scores. `onChange(listener)`
-  tells them when it changes.
+- Each keyboard model (ISO, ANSI, ortholinear, each split board) has its own
+  profile: `current(keyboard)` is the one every analysis on that keyboard
+  passes (the Comparer, the editor's panel and the other analysers' scores),
+  null for the keyboard's defaults; reset, export and import act on the
+  keyboard shown. `onChange(listener)` tells them which keyboard changed.
+- What is stored is `{version: 2, profiles: {<keyboard>: profile}}`; the single
+  profile of version 1 is not carried over (decided by the agent, to review by
+  the maintainer).
 - An edit the engine refuses is not applied, and the page shows the reason.
 - The profile is kept by the host when it offers `store.loadProfile()` and
-  `store.saveProfile(profile)` (promises). Otherwise it goes to
+  `store.saveProfile(stored)` (promises). Otherwise it goes to
   localStorage, and another page of the same site follows it through the
   `storage` event.
 

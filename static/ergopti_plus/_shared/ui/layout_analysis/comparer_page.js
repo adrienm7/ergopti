@@ -515,7 +515,7 @@
 				format: state.format,
 				weights: state.weights,
 				idealLoad: state.idealLoad,
-				profile: FINGERING.current() || undefined
+				profile: FINGERING.current(state.keyboard) || undefined
 			});
 			const ms = Math.round(performance.now() - start);
 			// The compared layouts themselves (rows, dead keys…), for extra scorers.
