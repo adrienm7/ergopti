@@ -161,6 +161,26 @@ greying is lifted (EDD-1 on AHK).
 | Linux   | `magic_key_source.can_capture` needs the grab only; the pause listener cancels a capture on either edge   | `test_magic_key_source_config_toml_leaf` `(paused-magic-capture)` |
 | Windows | `MagicKeySourceCapture` follows the pause state it started in; the resume reactor stops a capture as well | `test_magic_key_capture_settlement.ahk` `source paused-live`      |
 
+## Typing-inertness audit (2026-11-14, worker P)
+
+A census of every typing feature's pause gate on the three drivers (hotstrings
+of every kind, the physical magic key, layout emulation, tap-holds, layers,
+chords, one-shot modifiers, CapsWord, keyboard slots, tap keys, wrap, text and
+accented shortcuts, gestures, AI predictions, metrics, WPM, the preview, dead
+keys). Each is gated on Windows (native Suspend plus the explicit `A_IsSuspended`
+gates; the only Suspend-exempt hotkeys are the script chords) and on macOS (the
+keymap's `processing_paused`, Karabiner's paused graph, the pause inventory).
+
+Fixed on Linux: Main fed every physical key-down to the heatmap and the live
+WPM, and counted every modifier chord, while paused (`handle_physical`,
+`handle_control`, `consume_bound_chord`); macOS and Windows drop them. Regression:
+`test_paused_driver_records_no_keys` `(paused-records-no-keys)`.
+
+Open, macOS: nothing explicitly ends CapsWord at pause, where Windows and Linux
+do. Karabiner's paused graph holds no CapsWord rule, so its auto-off cannot
+answer; whether the system CapsLock it raised stays on through the pause can
+only be seen on a Mac.
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -170,11 +190,7 @@ source proofs reworked first:
 - AI menus: turning the AI on (it starts model warmups and may offer an
   install), and on Windows the model and API entry rows, the whole-scope
   restore and clear, and the tray's greying of the AI submenu.
-- The audit that every typing feature is inert while paused, and that a
-  setting changed while paused applies on resume. Layout emulation is done:
-  both Lua drivers gate it on the live pause (`is_active` from
-  `CoreState.processing_paused` on macOS, `script_actions.is_paused` on Linux),
-  pinned by `test_layout_emulation` on each driver.
+- macOS CapsWord at pause, to see on a Mac (see the typing-inertness audit).
 - Windows: every `A_IsSuspended` gate is listed in
   [the Windows inventory](windows-inventory.md); the fourth pass removed the
   personal editor, word expander, terminator, extension scope and AI settings
