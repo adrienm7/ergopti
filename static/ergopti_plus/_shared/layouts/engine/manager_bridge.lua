@@ -43,8 +43,9 @@
 ---    deps.read_keystats answers with the character, bigram and trigram counts
 ---    of the local keystats store (_shared/metrics/engine/view/studio_ngrams.lua),
 ---    read only and pushed to this page alone (keystatsNgrams {ok, ngrams} or
----    {ok = false, code}). Only the editor window offers it, and only when the
----    user asks: the page posts it from its « Analyse my typing » button.
+---    {ok = false, code}). Only the editor window offers it: the page posts it
+---    once when the window opens (« My typing » is the app's default corpus) and
+---    from its « Analyse my typing » button.
 --- 9. The Studio's analysis panels open their « i » links in the system browser
 ---    (open_link {url}): only an https URL, and only from the editor window.
 --- 10. Ergopti Studio keeps the user's personal layouts for its comparison

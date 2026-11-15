@@ -223,8 +223,10 @@ user really types. The contract (schema, families, refusal codes) is `_shared/me
 
 - Read only and local: macOS opens `db.sqlite` read only, Linux runs `sqlite3 -readonly`, Windows projects the
   journals in a keystats worker (`KLPF_RequestStudio`, mode `studio`) that writes one private stage. Nothing is
-  written to the store and nothing leaves the machine; the counts go to the Studio window alone, and only after the
-  user clicks.
+  written to the store and nothing leaves the machine; the counts go to the Studio window alone. The window reads
+  them once when it opens, so « My typing » is the default corpus of the editor's panel and of « Comparer »
+  (maintainer, 2026-11-14), and again on « Analyse my typing »; no store yet keeps the built-in corpus and says so
+  calmly, an unreadable one is an error.
 - Physical keystrokes: hotstring expansions, AI completions and other synthetic sources are subtracted
   (`_shared/metrics/engine/view/studio_ngrams.lua`, `KLR_BuildStudioNgramsJson`).
 - Fail fast: an absent store answers `keystats_absent`, a refused or partial read `keystats_unreadable`; the page

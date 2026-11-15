@@ -15,7 +15,8 @@
 // Ergopti Studio reads the user's own typing with keystats_ngrams: the host
 // answers keystatsNgrams with the counts of the local keystats store
 // (_shared/metrics/engine/view/studio_ngrams.lua), read only and never sent
-// anywhere; the page asks only when the user clicks « Analyse my typing ».
+// anywhere; the page reads it once when the window opens (« My typing » is the
+// app's default corpus) and again on « Analyse my typing ».
 // The downloads the site offers (Linux XKB, Windows KLC and DLL images, macOS
 // bundle) are built here, offline, with the export data the app ships
 // (layout_editor/_generated/export_assets.js); source_export hands their bytes
@@ -144,6 +145,13 @@ window.initData = function (data) {
 	_hostExports = data.source_export === true;
 	_hostLuaExport = data.lua_export === true;
 	showKeystatsSource(data.keystats === true);
+	// « My typing » is the app's default corpus (maintainer, 2026-11-14): the
+	// window reads the local store once when it opens, as the button does; the
+	// counts stay in this window, as the bar's privacy line says.
+	if (data.keystats === true && !_keystatsOpened) {
+		_keystatsOpened = true;
+		loadKeystats(true);
+	}
 	settleStudioStore(data.studio_store === true);
 	window.updateState(data.state);
 };
@@ -461,6 +469,10 @@ window.sourceResult = function (result) {
 // trigrams, total}); the Studio analysis reads them from here.
 let _keystatsNgrams = null;
 let _keystatsPending = false;
+// Whether the pending read is the one the window makes when it opens.
+let _keystatsAutomatic = false;
+// Whether that read was made: initData may come again (a reload).
+let _keystatsOpened = false;
 
 // The message of each refusal code the hosts send (metrics/engine/view/studio_ngrams.lua
 // CODES); an unknown code reads as unreadable, never as an empty success.
@@ -503,10 +515,14 @@ function setKeystatsStatus(text, error) {
 	status.classList.toggle('error', error === true);
 }
 
-/** Asks the host for the user's n-grams, once at a time. */
-function loadKeystats() {
+/**
+ * Asks the host for the user's n-grams, once at a time.
+ * @param {boolean} [automatic] - The read the window makes when it opens.
+ */
+function loadKeystats(automatic) {
 	if (_keystatsPending) return;
 	_keystatsPending = true;
+	_keystatsAutomatic = automatic === true;
 	document.getElementById('studio-keystats-load').disabled = true;
 	setKeystatsStatus(tr('layout_editor.studio.keystats.loading'));
 	send('keystats_ngrams');
@@ -526,7 +542,9 @@ window.keystatsNgrams = function (result) {
 		const key = Object.prototype.hasOwnProperty.call(KEYSTATS_REFUSALS, code)
 			? KEYSTATS_REFUSALS[code]
 			: KEYSTATS_REFUSALS.keystats_unreadable;
-		setKeystatsStatus(tr(key), true);
+		// No store yet is not a failure of the read the window makes by itself:
+		// the built-in corpus stays chosen, and the bar says why.
+		setKeystatsStatus(tr(key), !(_keystatsAutomatic && code === 'keystats_absent'));
 		return;
 	}
 	_keystatsNgrams = ngrams;
@@ -536,7 +554,9 @@ window.keystatsNgrams = function (result) {
 	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
 };
 
-document.getElementById('studio-keystats-load').addEventListener('click', loadKeystats);
+document.getElementById('studio-keystats-load').addEventListener('click', function () {
+	loadKeystats(false);
+});
 
 // The analysis panels (_shared/ui/layout_analysis) open their « i » links
 // through the host, in the system browser, instead of a WebView tab. The
