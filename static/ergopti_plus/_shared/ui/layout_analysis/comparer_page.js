@@ -623,8 +623,16 @@
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
 				const row = layout.rows[code];
-				const base = row && typeof row[0] === 'string' ? row[0] : row && row[0] ? '◌' : '';
+				// A dead key shows its bare accent (what it types alone), marked as dead.
+				const dead = row && row[0] && typeof row[0] === 'object' ? row[0].dead : null;
+				const base =
+					dead !== null
+						? KEY_LEGEND.deadKeyText(((layout.dead || {})[dead] || {})[' '] || '') || dead
+						: row && typeof row[0] === 'string'
+							? row[0]
+							: '';
 				const key = el('span', 'la-key', code === 'Space' ? '␣' : base);
+				if (dead !== null) key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
 				const share = values[k] / max;
 				key.style.left = `${(board.x[k] - 0.5 - minX) * HEAT_UNIT_PX}px`;
 				key.style.top = `${(board.y[k] - 1) * HEAT_UNIT_PX}px`;

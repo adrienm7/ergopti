@@ -41,6 +41,8 @@ const PREFIX = 'layout_analysis.';
 const SCRIPTS = [
 	'../i18n.js',
 	'../host_bridge.js',
+	// The shared key legend formatter (dead keys as their bare accent).
+	'../_generated/key_legend.js',
 	'_generated/analysis_data.js',
 	'analysis_engine.js',
 	'analyser_scores.js',

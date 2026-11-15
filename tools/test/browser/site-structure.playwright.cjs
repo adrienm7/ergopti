@@ -407,10 +407,39 @@ async function exercisePhone(page, origin, basePath) {
 	}
 }
 
+/**
+ * (dead-key-legend) The site's keyboard shows a dead key as its bare accent
+ * with the shared marker class (src/lib/keyboard/keyLegend.js), never as a
+ * combining mark on a dotted circle; its data-content keeps the data's
+ * spelling, which the emulation reads.
+ */
+async function exerciseDeadKeyLegends(page, origin, basePath) {
+	await visit(page, origin, basePath, '/ergopti');
+	const dead = page.locator("keyboard-key[data-style='deadkey']");
+	await dead.first().waitFor({ state: 'attached' });
+	const keys = await dead.evaluateAll((nodes) =>
+		nodes.map((node) => ({
+			content: node.dataset.content,
+			text: node.querySelector('div').textContent,
+			marked: node.querySelector('div').classList.contains('key-legend-dead')
+		}))
+	);
+	assert.ok(keys.length > 0, 'The Ergopti keyboard shows dead keys');
+	for (const key of keys) {
+		assert.ok(key.marked, `Dead key ${key.content} carries the marker class`);
+		assert.ok(!key.text.includes('\u25cc'), `Dead key ${key.content} without a dotted circle`);
+	}
+	assert.ok(
+		keys.some((key) => key.text === '^'),
+		'The circumflex dead key reads as « ^ »'
+	);
+}
+
 /** The whole structure check, in one browser page. */
 async function exerciseSiteStructure(page, origin, basePath) {
 	await exerciseHome(page, origin, basePath);
 	await exerciseSections(page, origin, basePath);
+	await exerciseDeadKeyLegends(page, origin, basePath);
 	await exerciseRedirects(page, origin, basePath);
 	await exercisePhone(page, origin, basePath);
 }

@@ -341,6 +341,17 @@ body:has(> main.layout-analysis) {
 	position: absolute;
 }
 
+/* A dead key shows its bare accent with a corner mark, as on the editor's board. */
+.la-key.key-legend-dead::before {
+	border-color: currentColor currentColor transparent transparent;
+	border-style: solid;
+	border-width: 4px;
+	content: '';
+	position: absolute;
+	right: 3px;
+	top: 3px;
+}
+
 .la-weight-list {
 	display: grid;
 	gap: 6px 16px;

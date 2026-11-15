@@ -194,17 +194,12 @@ var LayoutEditorPage = (function () {
 		]);
 	}
 
-	function visible(text) {
-		if (text === '') return '∅';
-		if (text === ' ') return '␣';
-		return Array.from(text)
-			.map((c) => {
-				const code = c.codePointAt(0);
-				if (code < 0x20) return String.fromCodePoint(0x2400 + code);
-				if (code >= 0x300 && code <= 0x36f) return '◌' + c;
-				return c;
-			})
-			.join('');
+	// The shared legend formatter (_generated/key_legend.js, from the site's keyLegend.js).
+	const visible = KEY_LEGEND.visibleText;
+
+	/** Whether a mapping is a dead key, which every board marks (KEY_LEGEND.DEAD_KEY_CLASS). */
+	function isDeadKey(mapping) {
+		return Boolean(mapping) && LayoutEditorModel.kindOf(mapping) === 'dead_key';
 	}
 
 	/** A short legend for a mapping on the board. */
@@ -213,8 +208,10 @@ var LayoutEditorPage = (function () {
 		const kind = LayoutEditorModel.kindOf(mapping);
 		if (kind === 'text') return visible(mapping.text);
 		if (kind === 'dead_key') {
+			// The bare accent; a dead key typing nothing alone shows its name.
 			const dead = (doc.dead_keys || []).find((entry) => entry.id === mapping.dead_key);
-			return '◌' + (dead && dead.terminator ? visible(dead.terminator) : '');
+			const accent = dead && dead.terminator ? KEY_LEGEND.deadKeyText(dead.terminator) : '';
+			return accent || (dead && dead.name) || mapping.dead_key;
 		}
 		if (kind === 'action') return actionLabel(mapping.action);
 		if (kind === 'key') return (mapping.modifiers || []).concat([keyName(mapping.key)]).join('+');
@@ -294,6 +291,8 @@ var LayoutEditorPage = (function () {
 			nameSearch: { query: '', limit: UnicodeNames.DEFAULT_LIMIT, answer: null, failed: false },
 			// The text the character magnifier shows ('' shows its hint).
 			magnified: '',
+			// Whether the magnified text is a dead key's: its bare accent, marked.
+			magnifiedDead: false,
 			presses: [],
 			locked: new Set(),
 			heldCustom: new Set(),
@@ -1231,6 +1230,7 @@ var LayoutEditorPage = (function () {
 						: '';
 				const classes = ['le-key'];
 				if (found) classes.push(found.scope === 'all' ? 'mapped' : 'platform');
+				if (!state.shortcutView && isDeadKey(found && found.mapping)) classes.push('dead');
 				if (state.shortcutView) classes.push(overrides.length || actsAs ? 'overridden' : 'same');
 				if (state.pickingShortcutKey && key.code !== state.pickingShortcutKey)
 					classes.push('pickable');
@@ -1264,7 +1264,10 @@ var LayoutEditorPage = (function () {
 								render();
 							},
 							onkeydown: (event) => clipboardKey(event, key.code),
-							...magnifyOn(magnifiedText(found && found.mapping)),
+							...magnifyOn(
+								magnifiedText(found && found.mapping),
+								!state.shortcutView && isDeadKey(found && found.mapping)
+							),
 							ondragstart: (event) => event.dataTransfer.setData('text/plain', key.code),
 							ondragover: (event) => event.preventDefault(),
 							// KbdEdit's drop: a plain drop swaps the two keys, Ctrl (or Alt) copies.
@@ -1299,7 +1302,13 @@ var LayoutEditorPage = (function () {
 							}
 						},
 						[
-							el('span', { class: 'le-legend', text: label }),
+							el('span', {
+								class:
+									!state.shortcutView && isDeadKey(found && found.mapping)
+										? `le-legend ${KEY_LEGEND.DEAD_KEY_CLASS}`
+										: 'le-legend',
+								text: label
+							}),
 							// Only a key with a printed name (Tab, Shift, Esc) shows it: a character
 							// key shows the selected layer's value alone, never the base character
 							// or its raw code; the tooltip still names it.
@@ -1574,8 +1583,8 @@ var LayoutEditorPage = (function () {
 		// ===================================
 
 		/** Listeners that show a text in the character magnifier while it is hovered or focused. */
-		function magnifyOn(text) {
-			const show = () => magnify(text);
+		function magnifyOn(text, dead) {
+			const show = () => magnify(text, dead);
 			return { onmouseenter: show, onfocus: show };
 		}
 
@@ -1601,8 +1610,9 @@ var LayoutEditorPage = (function () {
 		}
 
 		/** Shows a text in the magnifier, updating it in place (no full render on hover). */
-		function magnify(text) {
+		function magnify(text, dead) {
 			state.magnified = text || '';
+			state.magnifiedDead = Boolean(dead);
 			const node = root.querySelector('#le-magnifier');
 			if (!node) return;
 			if (state.magnified && !UnicodeNames.available() && !state.nameSearch.failed)
@@ -1657,7 +1667,13 @@ var LayoutEditorPage = (function () {
 			});
 			return el('aside', { class: 'le-magnifier', id: 'le-magnifier' }, [
 				el('h3', { text: tl('magnifier.title') }),
-				el('div', { class: 'le-magnifier-glyph', id: 'le-magnifier-glyph', text: visible(text) }),
+				el('div', {
+					class: state.magnifiedDead
+						? `le-magnifier-glyph ${KEY_LEGEND.DEAD_KEY_CLASS}`
+						: 'le-magnifier-glyph',
+					id: 'le-magnifier-glyph',
+					text: state.magnifiedDead ? KEY_LEGEND.deadKeyText(text) : visible(text)
+				}),
 				el('ul', { class: 'le-list', id: 'le-magnifier-rows' }, rows),
 				el('button', {
 					type: 'button',

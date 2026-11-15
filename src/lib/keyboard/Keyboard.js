@@ -1,5 +1,6 @@
 import * as stores_infos from '#lib/stores_infos.js';
 import { get } from 'svelte/store';
+import { applyLegend, deadKeyText } from '#lib/keyboard/keyLegend.js';
 
 import characterFrequencies from '#lib/keyboard/data/characterFrequencies.json'; // Data coming from https://github.com/Nuclear-Squid/ergol/blob/main/corpus/en%2Bfr.json
 // Create the "max" and "min" keys containing the maximum value among the frequencies (the frequency of E) and the minimum value
@@ -212,6 +213,13 @@ export class Keyboard {
 			} else if (keyContent[get(stores_infos[this.id])['layer'] + '-style'] !== undefined) {
 				key.dataset['style'] = keyContent[get(stores_infos[this.id])['layer'] + '-style'];
 			}
+		}
+
+		// A dead key shows its bare accent, marked, through the shared formatter; its
+		// data-content keeps the data's spelling (« ◌̂ »), which the emulation reads.
+		if (key.dataset['style'] === 'deadkey') {
+			const legend = key.querySelector('div');
+			applyLegend(legend, deadKeyText(legend.textContent), true);
 		}
 
 		key.style.setProperty('--size', keyIdentifier['size']);

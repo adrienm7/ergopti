@@ -437,12 +437,12 @@ body {
 }
 
 .le-key {
-	align-items: flex-start;
+	align-items: stretch;
 	border-radius: 6px;
 	display: flex;
 	flex-direction: column;
 	height: calc(var(--le-unit) * var(--h) - 4px);
-	justify-content: space-between;
+	justify-content: flex-start;
 	left: calc(var(--le-unit) * var(--x));
 	min-height: 0;
 	overflow: hidden;
@@ -508,13 +508,37 @@ body {
 	border: 2px solid var(--le-accent);
 }
 
+/*
+ * The legend is centred in the key, both ways (maintainer, 2026-11-15): its
+ * automatic margins centre it in the space the key-name label leaves below it,
+ * which is the whole key on a character key, whose label is empty.
+ */
 .le-legend {
 	display: block;
+	flex: none;
 	font-size: calc(var(--le-unit) * 0.38);
 	line-height: 1.15;
+	margin: auto 0;
 	overflow: hidden;
+	text-align: center;
 	white-space: nowrap;
 	width: 100%;
+}
+
+/* A dead key: its bare accent in the accent colour, and a corner mark on the key. */
+.le-legend.key-legend-dead,
+.le-magnifier-glyph.key-legend-dead {
+	color: var(--le-accent);
+}
+
+.le-key.dead::before {
+	border-color: var(--le-accent) var(--le-accent) transparent transparent;
+	border-style: solid;
+	border-width: 4px;
+	content: '';
+	position: absolute;
+	right: 2px;
+	top: 2px;
 }
 
 /* A label too long even at the smallest size (editor_page.js, fitLegends). */
@@ -524,6 +548,7 @@ body {
 
 .le-code {
 	color: var(--le-sub);
+	flex: none;
 	font-size: max(8px, calc(var(--le-unit) * 0.2));
 	max-width: 100%;
 	overflow: hidden;

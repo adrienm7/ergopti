@@ -325,6 +325,45 @@ async function exerciseSiteOpensOnErgopti(browser, origin) {
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.goto(`${origin}/ui/layout_editor/index.html?lang=en`);
+	await page.waitForSelector('#le-board .le-legend.key-legend-dead');
+	// (centred-legend) A character key's legend is centred in its key, both ways.
+	const offsets = await page.evaluate(() =>
+		['KeyA', 'KeyQ', 'Digit5'].map((code) => {
+			const key = document.querySelector(`#le-board [data-code="${code}"]`);
+			const range = document.createRange();
+			range.selectNodeContents(key.querySelector('.le-legend'));
+			const text = range.getBoundingClientRect();
+			const box = key.getBoundingClientRect();
+			return {
+				code,
+				x: text.left + text.width / 2 - (box.left + box.width / 2),
+				y: text.top + text.height / 2 - (box.top + box.height / 2)
+			};
+		})
+	);
+	for (const offset of offsets)
+		assert.ok(
+			Math.abs(offset.x) <= 2 && Math.abs(offset.y) <= 2,
+			`${offset.code}: legend centred (${offset.x.toFixed(1)}, ${offset.y.toFixed(1)} px)`
+		);
+	// (dead-key-legend) A dead key is its bare accent with the shared marker
+	// class, on the board and in the magnifier; no dotted circle anywhere.
+	const dead = await page.$$eval('#le-board .le-legend.key-legend-dead', (nodes) =>
+		nodes.map((node) => node.textContent)
+	);
+	assert.deepEqual(dead.sort(), ['^', '¨'].sort(), "Ergopti's base dead keys as bare accents");
+	assert.ok(
+		!(await page.textContent('#le-board')).includes('\u25cc'),
+		'no dotted circle on the board'
+	);
+	await page.hover('#le-board .le-key.dead');
+	// The magnifier shows once the character names are loaded.
+	await page.waitForSelector('#le-magnifier-glyph');
+	const glyph = await page.$eval('#le-magnifier-glyph', (node) => ({
+		text: node.textContent,
+		dead: node.classList.contains('key-legend-dead')
+	}));
+	assert.ok(glyph.dead && ['^', '¨'].includes(glyph.text), `magnifier: ${JSON.stringify(glyph)}`);
 	await tool(page, 'details');
 	const strings = JSON.parse(
 		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
@@ -453,6 +492,25 @@ async function exerciseStudioComparer(page) {
 	assert.match(
 		await page.evaluate(() => document.getElementById('la-status').textContent),
 		/^\d+ layouts compared on [\d,]+ characters/
+	);
+	// (dead-key-legend) Ergopti's heatmap shows its dead keys as bare accents, marked.
+	await page.evaluate(() =>
+		[...document.querySelectorAll('#la-table tbody tr')]
+			.find((row) => [...row.cells].some((cell) => cell.textContent.trim() === 'Ergopti'))
+			.click()
+	);
+	const heat = await page.$$eval('#la-heatmap .la-key', (keys) =>
+		keys.map((key) => ({ text: key.textContent, dead: key.classList.contains('key-legend-dead') }))
+	);
+	assert.ok(heat.length > 30, 'the heatmap shows the board');
+	assert.ok(!heat.some((key) => key.text.includes('\u25cc')), 'no dotted circle on the heatmap');
+	assert.deepEqual(
+		heat
+			.filter((key) => key.dead)
+			.map((key) => key.text)
+			.sort(),
+		['^', '¨'].sort(),
+		"Ergopti's base dead keys as bare accents"
 	);
 	// (studio-file-buttons) The file inputs never show the browser's own words
 	// (« Choose File », « No file chosen »): each is hidden inside a label whose

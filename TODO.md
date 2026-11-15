@@ -633,9 +633,16 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       tab bar continues the header's dark band, its tabs are text links, the current one in the purple gradient
       and underlined. Done 2026-11-15 (`claude/ergopti-todo-studio-tabs`); proof: `expectStudioWorkspace` in
       site-structure.playwright.cjs (header colour, no gap above or below, full width, no pills).
-      6 [ ] Each key's legend centred horizontally and vertically, clear of the small key-name label.
-      7 [ ] Dead keys as the bare accent, centred, with a marker class or badge (no combining mark on U+25CC),
-      through one shared legend formatter: editor board, magnifier, Comparer previews, site keyboard.
+      6 [x] Each key's legend centred horizontally and vertically, clear of the small key-name label: centred in
+      the space the label leaves, the whole key on a character key. Done 2026-11-15
+      (`claude/ergopti-todo-key-legends`); proof: `centred-legend` in layout-editor.playwright.cjs (within 2 px).
+      7 [x] Dead keys as the bare accent, centred, with a marker class or badge (no combining mark on U+25CC),
+      through one shared legend formatter: editor board, magnifier, Comparer previews, site keyboard. Done
+      2026-11-15 (`claude/ergopti-todo-key-legends`): src/lib/keyboard/keyLegend.js, generated for the app pages
+      as `_shared/ui/_generated/key_legend.js`; marker class `key-legend-dead`, the accent colour and a corner
+      mark on the editor's and Comparer's keys (look decided by the agent, to review by the maintainer); proof:
+      test-key-legend.cjs, `dead-key-legend` in layout-editor.playwright.cjs (board, magnifier, Comparer
+      heatmap) and site-structure.playwright.cjs (the /ergopti keyboard).
       8 [ ] « Essayer » as one input bar in the site's style with the clear button inside the field, the same
       component on the site and in the app, light and dark.
       5 [ ] Proper display names for every library layout, from the library's single data source; ids stay keys.
@@ -648,7 +655,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
       installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
       review by the maintainer.
-      [CODE] Left (2026-11-15): remarks 6, 7, 8, 5, 3, 4, 9 and 1.
+      [CODE] Left (2026-11-15): remarks 8, 5, 3, 4, 9 and 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is

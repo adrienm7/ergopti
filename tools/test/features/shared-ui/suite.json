@@ -469,6 +469,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-analyser-scores.cjs"],
 			"repro": "npm run test:analyser-scores"
+		},
+		{
+			"id": "key-legend",
+			"ordinal": 672,
+			"name": "the one key legend formatter shows a dead key as its bare accent, never on a dotted circle, and the app pages' generated copy of it is current",
+			"cmd": "node",
+			"args": ["tools/test/test-key-legend.cjs"],
+			"repro": "npm run test:key-legend"
 		}
 	]
 }
