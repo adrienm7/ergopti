@@ -485,6 +485,18 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
       Ctrl+A → Ctrl+B), listed and editable. Stored in the Ergopti TOML shortcut model; each export target says
       honestly what it cannot carry, Ergopti+ emulation keeps it. Playwright checks through save and reload.
+- [ ] **XKB and KLC downloads in the app Studio window (maintainer decision, 2026-11-15).** The app windows'
+      CSP has no 'unsafe-eval', so fengari-web.js cannot load and the editor's XKB/KLC downloads cannot run there
+      (seen on Linux under WebKitGTK; macOS uses the same inlining host and CSP builder; Windows WebView2 unchecked).
+      Decision: keep the CSP strict and have the host build these files with the native Lua engine through the
+      host bridge on Windows, macOS and Linux; fengari stays for the site only. Until then the app shows the
+      localized « converters cannot run in this window » notice that points to ergopti.fr.
+- [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
+      an app; the footer made every Studio page 80 px taller than the screen.
+- [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
+      published release predates the move, the live E2E requires the installer's exact ownership refusal and the
+      old build to stay installed; it becomes a full install and restart proof again once a post-move release is
+      published. Delete the pre-move fixtures with the legacy probes.
 - [ ] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
       exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
       .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
