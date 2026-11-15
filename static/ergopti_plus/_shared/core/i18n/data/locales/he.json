@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "שרת ה-MLX אינו מגיב. בדוק שהמודל טעון ושהשרת פועל ביציאה 8080.",
 	"notify.llm_mlx_failures_title": "ניבויי LLM — כשלים חוזרים",
 	"notify.llm_suggestions": "הצעות AI",
+	"notify.paused_refused": "ErgoptiPlus מושהה: פעולה זו ממתינה לחידוש.",
 	"notify.personal_info": "מידע אישי",
 	"notify.quit_refused": "לא ניתן לצאת כעת, פעולה אחרת עדיין מתבצעת. נסו שוב בעוד רגע.",
 	"notify.tap_hold.copy_failed": "דבר לא הועתק: ההעתקה לא הגיעה ללוח גם בניסיון השני. סמנו את הטקסט והעתיקו שוב.",

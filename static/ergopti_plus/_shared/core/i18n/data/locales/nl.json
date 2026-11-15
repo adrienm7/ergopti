@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "De MLX-server reageert niet. Controleer of het model geladen is en de server actief is op poort 8080.",
 	"notify.llm_mlx_failures_title": "LLM-voorspellingen — Herhaalde fouten",
 	"notify.llm_suggestions": "KI-suggesties",
+	"notify.paused_refused": "ErgoptiPlus is gepauzeerd: deze actie wacht op het hervatten.",
 	"notify.personal_info": "Persoonlijke gegevens",
 	"notify.quit_refused": "Afsluiten is nu niet mogelijk, er loopt nog een andere bewerking. Probeer het zo opnieuw.",
 	"notify.tap_hold.copy_failed": "Er is niets gekopieerd: de kopie is ook bij de tweede poging niet op het klembord aangekomen. Selecteer de tekst en kopieer opnieuw.",

@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "Der MLX-Server antwortet nicht. Überprüfen Sie, ob das Modell geladen und der Server auf Port 8080 aktiv ist.",
 	"notify.llm_mlx_failures_title": "LLM-Vorhersagen — Wiederholte Fehler",
 	"notify.llm_suggestions": "KI-Vorschläge",
+	"notify.paused_refused": "ErgoptiPlus ist pausiert: Diese Aktion wartet auf die Fortsetzung.",
 	"notify.personal_info": "Persönliche Informationen",
 	"notify.quit_refused": "Beenden ist gerade nicht möglich, ein anderer Vorgang läuft noch. Versuchen Sie es gleich erneut.",
 	"notify.tap_hold.copy_failed": "Nichts wurde kopiert: Die Kopie ist auch beim zweiten Versuch nicht in der Zwischenablage angekommen. Markieren Sie den Text und kopieren Sie erneut.",

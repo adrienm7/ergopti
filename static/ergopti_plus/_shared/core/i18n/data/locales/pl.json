@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "Serwer MLX nie odpowiada. Sprawdź, czy model jest załadowany i serwer działa na porcie 8080.",
 	"notify.llm_mlx_failures_title": "Predykcje LLM — Powtarzające się błędy",
 	"notify.llm_suggestions": "Sugestie SI",
+	"notify.paused_refused": "ErgoptiPlus jest wstrzymany: ta czynność czeka na wznowienie.",
 	"notify.personal_info": "Dane osobowe",
 	"notify.quit_refused": "Nie można teraz zakończyć, inna operacja jest wciąż w toku. Spróbuj ponownie za chwilę.",
 	"notify.tap_hold.copy_failed": "Nic nie zostało skopiowane: kopia nie trafiła do schowka, nawet przy drugiej próbie. Zaznacz tekst i skopiuj ponownie.",

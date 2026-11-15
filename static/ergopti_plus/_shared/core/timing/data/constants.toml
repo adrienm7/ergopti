@@ -823,6 +823,11 @@ model_browser_filter_debounce_ms = 120
 onboarding_poll_ms = 100
 onboarding_gesture_done_ms = 100
 
+# Windows: the same action refused while paused is told once in this window, as
+# a page can send several refused messages for one click.
+# AHK: platform/system/notifier.ahk.
+paused_refusal_repeat_ms = 3000
+
 # Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
 desktop_open_timeout_ms = 30000
 

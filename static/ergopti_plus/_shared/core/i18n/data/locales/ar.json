@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "خادم MLX لا يستجيب. تحقق من تحميل النموذج وتشغيل الخادم على المنفذ 8080.",
 	"notify.llm_mlx_failures_title": "تنبؤات LLM — فشل متكرر",
 	"notify.llm_suggestions": "اقتراحات الذكاء الاصطناعي",
+	"notify.paused_refused": "ErgoptiPlus متوقف مؤقتًا: هذا الإجراء ينتظر الاستئناف.",
 	"notify.personal_info": "معلومات شخصية",
 	"notify.quit_refused": "تعذّر الإنهاء الآن، لا تزال عملية أخرى قيد التنفيذ. حاول مرة أخرى بعد لحظة.",
 	"notify.tap_hold.copy_failed": "لم يُنسخ شيء: لم يصل النسخ إلى الحافظة حتى في المحاولة الثانية. حدّد النص وانسخه مرة أخرى.",

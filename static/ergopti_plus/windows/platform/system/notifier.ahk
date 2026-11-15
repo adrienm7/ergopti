@@ -126,6 +126,24 @@ NotifyQuitRefused(SendFn := 0) {
 	_NotifierDeliver(t("notify.quit_refused"), "error", "Quit refusal", SendFn)
 }
 
+; Tells the user that a click made while paused waits for the resume. Every
+; tray row stays live under a pause (EDD-1), and the actions not yet made to
+; run paused refuse; a refusal that reached only the log made the click look
+; dead. The same action is told once per window (ui.paused_refusal_repeat_ms):
+; a page can send several refused messages for one click.
+; @param What {String} English name of the refused action, for the log.
+; @param SendFn {Func|Integer} Replaces NotifierSend (tests only).
+; @returns {Boolean} Whether the notice was delivered now, not folded into the last one.
+NotifyPausedRefusal(What, SendFn := 0) {
+	static LastShown := Map()
+	try LoggerWarn("Notifier", "{1} was refused while paused.", What)
+	if LastShown.Has(What) && TickElapsed(LastShown[What]) < TimingsGet("ui", "paused_refusal_repeat_ms")
+		return false
+	LastShown[What] := A_TickCount
+	_NotifierDeliver(t("notify.paused_refused"), "warning", "Paused refusal", SendFn)
+	return true
+}
+
 ; Tells a committed pause or resume, as macOS publish_pause_state and Linux
 ; script_actions PAUSE_NOTICES do: the pause at the warning level, the resume at
 ; the success level. Windows' balloon keeps the system's own display time.

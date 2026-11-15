@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "MLX 서버가 응답하지 않습니다. 모델이 로드되고 서버가 포트 8080에서 실행 중인지 확인하세요.",
 	"notify.llm_mlx_failures_title": "LLM 예측 — 반복 실패",
 	"notify.llm_suggestions": "AI 제안",
+	"notify.paused_refused": "ErgoptiPlus가 일시 중지되었습니다. 이 작업은 재개를 기다립니다.",
 	"notify.personal_info": "개인 정보",
 	"notify.quit_refused": "지금은 종료할 수 없습니다. 다른 작업이 아직 진행 중입니다. 잠시 후 다시 시도하세요.",
 	"notify.tap_hold.copy_failed": "아무것도 복사되지 않았습니다. 두 번째 시도에서도 복사 내용이 클립보드에 도달하지 않았습니다. 텍스트를 선택한 후 다시 복사하세요.",

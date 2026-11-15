@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "MLX-serveren svarer ikke. Kontroller, at modellen er indlæst, og serveren kører på port 8080.",
 	"notify.llm_mlx_failures_title": "LLM-forudsigelser — Gentagne fejl",
 	"notify.llm_suggestions": "AI-forslag",
+	"notify.paused_refused": "ErgoptiPlus er sat på pause: denne handling venter på genoptagelsen.",
 	"notify.personal_info": "Personlige oplysninger",
 	"notify.quit_refused": "Kan ikke afslutte lige nu, en anden handling er stadig i gang. Prøv igen om et øjeblik.",
 	"notify.tap_hold.copy_failed": "Intet blev kopieret: kopien nåede ikke udklipsholderen, heller ikke ved andet forsøg. Markér teksten, og kopiér igen.",

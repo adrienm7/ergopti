@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "MLX-serveren svarer ikke. Kontroller at modellen er lastet og serveren kjører på port 8080.",
 	"notify.llm_mlx_failures_title": "LLM-spådommer — Gjentatte feil",
 	"notify.llm_suggestions": "AI-forslag",
+	"notify.paused_refused": "ErgoptiPlus er satt på pause: denne handlingen venter på at den gjenopptas.",
 	"notify.personal_info": "Personlig informasjon",
 	"notify.quit_refused": "Kan ikke avslutte akkurat nå, en annen operasjon pågår fortsatt. Prøv igjen om et øyeblikk.",
 	"notify.tap_hold.copy_failed": "Ingenting ble kopiert: kopien kom ikke frem til utklippstavlen, heller ikke ved andre forsøk. Merk teksten og kopier på nytt.",

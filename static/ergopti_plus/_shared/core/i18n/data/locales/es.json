@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "El servidor MLX no responde. Compruebe que el modelo está cargado y el servidor está ejecutándose en el puerto 8080.",
 	"notify.llm_mlx_failures_title": "Predicciones LLM — Fallos repetidos",
 	"notify.llm_suggestions": "Sugerencias IA",
+	"notify.paused_refused": "ErgoptiPlus está en pausa: esta acción espera a que se reanude.",
 	"notify.personal_info": "Información personal",
 	"notify.quit_refused": "No se puede salir ahora, otra operación sigue en curso. Inténtalo de nuevo en un momento.",
 	"notify.tap_hold.copy_failed": "No se ha copiado nada: la copia no llegó al portapapeles, ni siquiera en el segundo intento. Seleccione el texto y vuelva a copiar.",

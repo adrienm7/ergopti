@@ -2667,6 +2667,7 @@
 	"notify.llm_mlx_failures_body": "MLXサーバーが応答していません。モデルがロードされ、ポート8080でサーバーが実行中であることを確認してください。",
 	"notify.llm_mlx_failures_title": "LLM予測 — 繰り返し失敗",
 	"notify.llm_suggestions": "AI提案",
+	"notify.paused_refused": "ErgoptiPlus は一時停止中です。この操作は再開を待っています。",
 	"notify.personal_info": "個人情報",
 	"notify.quit_refused": "現在は終了できません。別の処理がまだ実行中です。しばらくしてからもう一度お試しください。",
 	"notify.tap_hold.copy_failed": "何もコピーされませんでした。2 回目の試行でもコピーがクリップボードに届きませんでした。テキストを選択して、もう一度コピーしてください。",
