@@ -203,7 +203,7 @@ the active application.
 | Behaviour                                                        | Windows | macOS              | Linux         |
 | ---------------------------------------------------------------- | ------- | ------------------ | ------------- |
 | Keystroke metrics                                                | stops   | stops              | stops (fixed) |
-| Application time, app switches, window titles                    | stops   | stops (open edge)  | stops (fixed) |
+| Application time, app switches, window titles                    | stops   | stops (fixed)      | stops (fixed) |
 | Pointer clicks, scroll, distance, tap-to-click                   | stops   | stops (fixed edge) | stops (fixed) |
 | Window topology, capture presence, network and VPN rows          | stops   | stops              | stops (fixed) |
 | System day counters (lock, sleep, mute, Wi-Fi, battery, desktop) | stops   | stops              | stops (fixed) |
@@ -225,12 +225,17 @@ pause's travel at the resume. Regressions: Linux `test_paused_driver_records_no_
 `test_window_titles` and `test_excluded_span_boundary` (`driver-paused`);
 macOS `test_pause_forgets_mouse_seed`.
 
-Open, macOS: the pause leaves the foreground interval open, so the resume drops
-the time before the pause and a reload while paused credits none of it
-(nothing is credited while paused). Closing it from the pause inventory wrote an
-app-switch row that kept the physical-history rebuild of
-`test_physical_history_persistence` from running; reverted, to be traced with
-that rebuild.
+Fixed, macOS (eighth pass): the pause inventory closes the foreground interval
+(`keystats.close_app_interval_for_pause`), so the time before the pause is
+credited and the resume opens a new interval. The first attempt was reverted
+because `test_physical_history_persistence` then failed its rebuild. The cause
+was the test's SQLite bridge, not the rebuild: SQL NULL crosses it as JSON
+null, and the shared decoder's default mode turns null into a truthy empty
+table (`(val == NULL) and nil or val` always yields `val`), so the closed
+interval's NULL `next_app` reached the walker as a table. lsqlite3 returns nil
+in production. The bridge now maps NULL to nil, as the cold-rollover bridge
+does; the decoder itself is a separate question to the coordinator.
+Regression: `test_pause_closes_app_interval`.
 
 Keep-awake across a pause (decided by the maintainer on 2026-11-14): a pause
 stops it and the resume restores it when it ran at the pause, on the three OS.

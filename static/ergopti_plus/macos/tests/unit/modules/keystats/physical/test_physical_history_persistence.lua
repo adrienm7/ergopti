@@ -34,6 +34,12 @@ function sqlite.open(path)
 	function database:close() return call("close") end
 	function database:nrows(sql)
 		local rows = assert(call("rows", sql), detail)
+		-- SQL NULL crosses the bridge as JSON null, which the legacy decoder turns
+		-- into a table; lsqlite3 returns nil, so the bridge does too (as the cold
+		-- rollover bridge does). A NULL next_app is how a closed interval persists.
+		for _, row in ipairs(rows) do
+			for key, value in pairs(row) do if type(value) == "table" then row[key] = nil end end
+		end
 		local index = 0
 		return function() index = index + 1; return rows[index] end
 	end
@@ -381,6 +387,12 @@ function sqlite.open(path)
 	function database:close() return call("close") end
 	function database:nrows(sql)
 		local rows = assert(call("rows", sql), detail)
+		-- SQL NULL crosses the bridge as JSON null, which the legacy decoder turns
+		-- into a table; lsqlite3 returns nil, so the bridge does too (as the cold
+		-- rollover bridge does). A NULL next_app is how a closed interval persists.
+		for _, row in ipairs(rows) do
+			for key, value in pairs(row) do if type(value) == "table" then row[key] = nil end end
+		end
 		local index = 0
 		return function() index = index + 1; return rows[index] end
 	end
