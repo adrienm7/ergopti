@@ -529,6 +529,15 @@ body {
 	cursor: crosshair;
 }
 
+/* The analysis panel's key colours: --le-heat runs from 0 (green, costs nothing)
+   to 1 (red, the key that costs the most), laid over the key's own background. */
+.le-key.le-heat {
+	background-image: linear-gradient(
+		hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45),
+		hsl(calc(120 - 120 * var(--le-heat)) 75% 50% / 0.45)
+	);
+}
+
 .le-act-as {
 	border-bottom: 1px solid var(--le-border);
 	margin-bottom: 8px;

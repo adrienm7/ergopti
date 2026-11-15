@@ -448,7 +448,7 @@ the browser allows it; nothing is sent anywhere.
 
 `_shared/ui/layout_analysis/analysis_panel.js` (global `LAYOUT_ANALYSIS_PANEL`)
 is the live analysis beside the « Éditer » board. `create()` returns
-`{node, update(doc), addSection(draw)}`. The editor page appends `node` to its
+`{node, update(doc), onHeat(listener), addSection(draw)}`. The editor page appends `node` to its
 board row on every render and calls `update(doc())` afterwards. A page that
 does not load the panel's scripts gets no panel.
 
@@ -476,6 +476,19 @@ does not load the panel's scripts gets no panel.
   Node for the 11 analysers.
 - `addSection(draw)` adds a view drawn after each analysis with
   `(container, {layout, tables, keyboard, result})`.
+- « Key colours » (`#la-panel-heat`, saved with the corpus and keyboard): the
+  global score (the default, `keyScoreCost` with the Comparer's weights), the
+  presses, or one metric of `KEY_COST_METRICS`. The edited layout is analysed
+  with `keyGroups: true`, and `onHeat(listener)` receives after each analysis
+  `{metric, values: {code: value}, max, titles: {code: text}}`, or `null` when
+  the colours are « None », the panel is folded or the layout cannot be
+  analysed. The editor colours its board's keys from green (0) to red (the
+  key that costs the most) and adds the title to each key's tooltip: the
+  key's part of the metric and its worst pairs or trigrams, written with the
+  characters on those keys, or for the global score the points it loses and
+  the three metrics that cost the most. Every edit re-analyses and recolours
+  (150 ms after the last change), on the site and in the app, which load the
+  same panel.
 
 The built-in corpus scripts load through `LAYOUT_ANALYSIS_FILES.builtinTables`,
 relative to `corpus_files.js`, from any page folder. The « i » popovers

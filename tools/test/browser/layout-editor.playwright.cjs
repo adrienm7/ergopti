@@ -1432,6 +1432,68 @@ async function exerciseAppWorkspace(browser, origin) {
 	await page.close();
 }
 
+/**
+ * (studio-key-heatmap) « Key colours » of the analysis panel colours the
+ * editor's own keys live: QWERTY's « e » and « d » share a finger, so with the
+ * SFB metric they are red with each other named as their worst pair; moving a
+ * character away recolours them at once; the global score names the points a
+ * key loses; « None » clears every colour.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseHeatmap(browser, origin) {
+	const { page, errors } = await open(browser, origin, 'en');
+	await page.click('#le-new');
+	await page.click('#le-start [data-start="qwerty"]');
+	await page.waitForSelector('#le-start', { state: 'detached' });
+	await page.waitForSelector('#la-panel-heat');
+	const heatOf = (code) =>
+		page.evaluate((code) => {
+			const key = document.querySelector(`#le-board [data-code="${code}"]`);
+			return key.classList.contains('le-heat')
+				? { heat: Number(key.style.getPropertyValue('--le-heat')), title: key.title }
+				: null;
+		}, code);
+	const settle = (code, test) =>
+		page.waitForFunction(
+			({ code, test }) => {
+				const key = document.querySelector(`#le-board [data-code="${code}"]`);
+				const heat = key.classList.contains('le-heat')
+					? Number(key.style.getPropertyValue('--le-heat'))
+					: null;
+				return new Function('heat', `return ${test}`)(heat);
+			},
+			{ code, test },
+			{ timeout: 15000 }
+		);
+	// The default is the global score: every key says the points it loses.
+	await settle('KeyE', 'heat !== null');
+	assert.match((await heatOf('KeyE')).title, /points lost/);
+	await page.selectOption('#la-panel-heat', 'sfb');
+	await page.waitForFunction(() =>
+		/worst: e d/.test(document.querySelector('#le-board [data-code="KeyE"]').title)
+	);
+	const before = await heatOf('KeyE');
+	assert.ok(before.heat > 0.3, `KeyE is among the worst SFB keys (${before.heat})`);
+	assert.match(before.title, /Same-finger bigrams|SFB/i);
+	assert.equal(
+		(await heatOf('Space')) && (await heatOf('Space')).heat,
+		0,
+		'a key without SFB is green'
+	);
+	// Moving « e » onto another finger's key recolours KeyE at once.
+	await page.click('#le-board [data-code="KeyE"]');
+	await page.selectOption('#le-kind', 'text');
+	await page.fill('#le-text', 'ẑ');
+	await page.click('#le-apply');
+	await settle('KeyE', `heat !== null && heat < ${before.heat / 2}`);
+	// The colours follow every render and leave with « None ».
+	await page.selectOption('#la-panel-heat', 'off');
+	await page.waitForFunction(() => document.querySelectorAll('#le-board .le-heat').length === 0);
+	assert.deepEqual(errors, [], 'heatmap: page errors');
+	await page.context().close();
+}
+
 async function exercisePhoneWidth(browser, origin) {
 	const backgrounds = [];
 	for (const colorScheme of ['light', 'dark']) {
@@ -1892,6 +1954,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exerciseShortcuts(browser, origin);
 		await exerciseWorkspace(browser, origin);
 		await exerciseAppWorkspace(browser, origin);
+		await exerciseHeatmap(browser, origin);
 
 		// Every locale names every visible string.
 		for (const lang of LOCALES) {

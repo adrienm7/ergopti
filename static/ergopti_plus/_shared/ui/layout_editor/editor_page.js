@@ -35,6 +35,9 @@
  *    unsaved edits saved as the user types and restored on the next mount
  *    (LayoutEditorWorkspace); « Export all » and « Import » back them up as one
  *    ZIP of Ergopti sources.
+ * 7. Live key heatmap: the analysis panel's « Key colours » (onHeat) colours
+ *    the board's own keys from green to red by what each costs, the tooltip
+ *    naming its worst pairs; every edit re-analyses and recolours.
  * ==============================================================================
  */
 
@@ -364,7 +367,9 @@ var LayoutEditorPage = (function () {
 			// when the stored workspace did not read, so nothing is saved over it.
 			// error is the refusal itself, translated when shown (the locale can arrive later).
 			workspace: { status: host.workspace ? 'loading' : 'none', blocked: false, error: null },
-			persisted: null
+			persisted: null,
+			// The analysis panel's key colours ({values, max, titles}), null when off.
+			heat: null
 		};
 		state.tabs.push({ history: state.history, dirty: false });
 		const doc = () => state.history.current();
@@ -3587,6 +3592,7 @@ var LayoutEditorPage = (function () {
 			// A section a state hides is null: it must not reach the page as text.
 			root.replaceChildren(...parts.filter(Boolean));
 			fitLegends();
+			applyHeat();
 			root.dispatchEvent(new CustomEvent('layout-editor:rendered', { detail: { doc: doc() } }));
 			if (analysisPanel) analysisPanel.update(doc());
 			scheduleAutosave();
@@ -3616,6 +3622,27 @@ var LayoutEditorPage = (function () {
 			});
 		}
 
+		/**
+		 * Colours each key of the board from green (costs nothing) to red (costs
+		 * the most of this layout) and adds what it costs to its tooltip; the
+		 * shortcut view shows no colours. Runs after each render and each analysis.
+		 */
+		function applyHeat() {
+			const heat = state.shortcutView ? null : state.heat;
+			for (const node of root.querySelectorAll('#le-board .le-key[data-code]')) {
+				if (node.dataset.title === undefined) node.dataset.title = node.title;
+				const value = heat ? heat.values[node.dataset.code] : undefined;
+				node.classList.toggle('le-heat', value !== undefined);
+				if (value === undefined) {
+					node.style.removeProperty('--le-heat');
+					node.title = node.dataset.title;
+					continue;
+				}
+				node.style.setProperty('--le-heat', String(heat.max > 0 ? value / heat.max : 0));
+				node.title = `${node.dataset.title}\n${heat.titles[node.dataset.code]}`;
+			}
+		}
+
 		// The board's key unit follows the editor's width: refit the labels when it changes.
 		if (typeof ResizeObserver === 'function') {
 			let lastWidth = -1;
@@ -3631,7 +3658,13 @@ var LayoutEditorPage = (function () {
 		// re-inserted by every render, so what the host appends there survives.
 		const sideSlot = el('div', { class: 'le-side-slot', id: 'le-side-slot' });
 		// The live analysis (layout_analysis/analysis_panel.js), when the page loads it.
-		if (analysisPanel) sideSlot.append(analysisPanel.node);
+		if (analysisPanel) {
+			sideSlot.append(analysisPanel.node);
+			analysisPanel.onHeat((heat) => {
+				state.heat = heat;
+				applyHeat();
+			});
+		}
 
 		/**
 		 * Opens the first document: the host's initial text, else (with nothing to

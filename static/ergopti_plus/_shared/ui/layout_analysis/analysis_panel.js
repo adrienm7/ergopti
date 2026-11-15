@@ -31,6 +31,11 @@
  *    app's Studio, whose « Comparer » tab ranks it against the chosen
  *    layouts on any corpus, a pasted text or a file included), one click
  *    hands over the edited layout in the library shape.
+ * 8. Live key heatmap: « Key colours » picks the global score or one metric;
+ *    after each analysis the panel tells its onHeat listeners what each key
+ *    costs (the engine's exact per-key parts, keyReport cost and keyScoreCost)
+ *    with a tooltip naming its worst pairs or trigrams, and the editor colours
+ *    its own keys from green to red.
  * ==============================================================================
  */
 
@@ -76,6 +81,16 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	const PART_DIGITS = 1;
 	// Shown in a score's cell until it is computed.
 	const PENDING_TEXT = '…';
+	// What « Key colours » can show: nothing, the global score, the presses, or
+	// one metric the keys share exactly (analysis_engine.js KEY_COST_METRICS).
+	const HEAT_OFF = 'off';
+	const HEAT_SCORE = 'score';
+	const HEAT_PRESSES = 'presses';
+	const HEAT_CHOICES = [HEAT_OFF, HEAT_SCORE, HEAT_PRESSES].concat(E.KEY_COST_METRICS);
+	// Digits of a key's share in its tooltip, and of the points it costs.
+	const HEAT_DIGITS = 2;
+	// How many metrics a key's global-score tooltip names, worst first.
+	const HEAT_SCORE_PARTS = 3;
 
 	function el(tag, className, text) {
 		const node = document.createElement(tag);
@@ -149,6 +164,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 * Creates a panel. The page appends `node` where it wants it, every render
 	 * (the same node), and calls update(doc) after each render.
 	 * @returns {{node: HTMLElement, update: function(object): void,
+	 *   onHeat: function(function(object|null): void): void,
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
 	/**
@@ -162,6 +178,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		const state = {
 			corpus: corpora.some((c) => c.id === saved.corpus) ? saved.corpus : corpora[0].id,
 			keyboard: KEYBOARDS.includes(saved.keyboard) ? saved.keyboard : SOURCE_BOARD,
+			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_SCORE,
 			doc: null,
 			previous: null,
 			library: null,
@@ -170,6 +187,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			generation: 0
 		};
 		const sections = [];
+		const heatListeners = [];
 
 		const node = el('details', 'la-panel');
 		node.open = saved.open !== false;
@@ -182,8 +200,19 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		corpusLabel.htmlFor = corpusSelect.id;
 		const keyboardLabel = el('label');
 		keyboardLabel.htmlFor = keyboardSelect.id;
+		const heatSelect = el('select');
+		heatSelect.id = 'la-panel-heat';
+		const heatLabel = el('label');
+		heatLabel.htmlFor = heatSelect.id;
 		const controls = el('div', 'la-panel-controls');
-		controls.append(corpusLabel, corpusSelect, keyboardLabel, keyboardSelect);
+		controls.append(
+			corpusLabel,
+			corpusSelect,
+			keyboardLabel,
+			keyboardSelect,
+			heatLabel,
+			heatSelect
+		);
 		const compareButton = onCompare ? el('button', 'la-panel-compare') : null;
 		if (compareButton) {
 			compareButton.type = 'button';
@@ -231,7 +260,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			try {
 				window.localStorage.setItem(
 					STORAGE_KEY,
-					JSON.stringify({ corpus: state.corpus, keyboard: state.keyboard, open: node.open })
+					JSON.stringify({
+						corpus: state.corpus,
+						keyboard: state.keyboard,
+						heat: state.heat,
+						open: node.open
+					})
 				);
 			} catch {
 				// A private window or a full quota: the panel keeps working unsaved.
@@ -266,6 +300,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				})
 			);
 			keyboardSelect.value = state.keyboard;
+			heatLabel.textContent = t('layout_analysis.panel.heat.label');
+			heatSelect.replaceChildren(
+				...HEAT_CHOICES.map((id) => {
+					const option = el('option', '', heatName(id));
+					option.value = id;
+					return option;
+				})
+			);
+			heatSelect.value = state.heat;
 		}
 
 		async function tables() {
@@ -290,6 +333,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		}
 
 		function showError(text) {
+			tellHeat(null);
 			headline.textContent = text;
 			headline.className = 'la-panel-score la-panel-error';
 			metrics.replaceChildren();
@@ -325,8 +369,11 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				keyboard: state.keyboard,
 				weights: settings.weights,
 				idealLoad: settings.idealLoad,
-				profile: settings.profile
+				profile: settings.profile,
+				// One layout: every key's worst pairs, for the heatmap's tooltips.
+				keyGroups: true
 			});
+			tellHeat(heatOf(result, layout, settings));
 			note.textContent = settings.profile
 				? `${t('layout_analysis.panel.weights_note')} ${t('layout_analysis.fingering.custom')}`
 				: t('layout_analysis.panel.weights_note');
@@ -460,6 +507,75 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			}, 0);
 		}
 
+		function tellHeat(heat) {
+			for (const listener of heatListeners) listener(heat);
+		}
+
+		/**
+		 * What « Key colours » shows for an analysis: each key's value (points
+		 * lost, % of the presses, or its part of the metric), the largest, and
+		 * each key's tooltip line.
+		 * @returns {{metric: string, values: object, max: number, titles: object}|null}
+		 *   null when the colours are off.
+		 */
+		function heatOf(result, layout, settings) {
+			if (state.heat === HEAT_OFF) return null;
+			const points = state.heat === HEAT_SCORE ? E.keyScoreCost(result, settings.weights) : null;
+			const used = Object.assign(E.defaultWeights(), settings.weights || {});
+			const typed = (code) => {
+				const row = layout.rows[code];
+				const first = row && row.find((cell) => typeof cell === 'string' && cell !== '');
+				return first === undefined ? code : first;
+			};
+			const groups = (code, event) =>
+				result.keys[code].worst[event]
+					.map(
+						([others, share]) =>
+							`${[code].concat(others).map(typed).join(' ')} ${format(share, HEAT_DIGITS)} %`
+					)
+					.join(', ');
+			const values = {};
+			const titles = {};
+			for (const [code, key] of Object.entries(result.keys)) {
+				let value;
+				let title;
+				if (points) {
+					value = points[code];
+					const parts = E.KEY_COST_METRICS.map((id) => [id, (used[id] || 0) * key.cost[id]])
+						.filter(([, part]) => part > 0)
+						.sort((a, b) => b[1] - a[1])
+						.slice(0, HEAT_SCORE_PARTS)
+						.map(
+							([id, part]) => `${t(`layout_analysis.metric.${id}`)} ${format(part, HEAT_DIGITS)}`
+						);
+					title = t('layout_analysis.panel.heat.points', { points: format(value, HEAT_DIGITS) });
+					if (parts.length) title += ` (${parts.join(' · ')})`;
+				} else if (state.heat === HEAT_PRESSES) {
+					value = key.presses;
+					title = `${heatName(HEAT_PRESSES)}: ${format(value, HEAT_DIGITS)} %`;
+				} else {
+					value = key.cost[state.heat];
+					title = `${heatName(state.heat)}: ${format(value, HEAT_DIGITS)} ${unitText(state.heat)}`;
+					const worst = key.worst[state.heat] ? groups(code, state.heat) : '';
+					if (worst) title += ` — ${t('layout_analysis.panel.heat.worst', { groups: worst })}`;
+				}
+				values[code] = value;
+				titles[code] = title;
+			}
+			return {
+				metric: state.heat,
+				values,
+				max: Math.max(0, ...Object.values(values)),
+				titles
+			};
+		}
+
+		function heatName(id) {
+			if (id === HEAT_OFF || id === HEAT_SCORE) return t(`layout_analysis.panel.heat.${id}`);
+			if (id === HEAT_PRESSES) return t('layout_analysis.heat.presses');
+			return t(`layout_analysis.metric.${id}`);
+		}
+
 		function schedule() {
 			clearTimeout(state.timer);
 			state.timer = setTimeout(run, UPDATE_DEBOUNCE_MS);
@@ -477,9 +593,17 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			persist();
 			schedule();
 		});
+		heatSelect.addEventListener('change', () => {
+			state.heat = heatSelect.value;
+			persist();
+			if (state.heat === HEAT_OFF) tellHeat(null);
+			schedule();
+		});
 		node.addEventListener('toggle', () => {
 			persist();
 			if (node.open) schedule();
+			// A folded panel analyses nothing: its colours would go stale.
+			else tellHeat(null);
 		});
 		document.addEventListener('i18n:applied', () => {
 			fillControls();
@@ -509,6 +633,15 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			update(doc) {
 				state.doc = doc;
 				schedule();
+			},
+			/**
+			 * Listens to the key colours: listener(heat) after each analysis, with
+			 * heatOf()'s value, or null when they are off or nothing was analysed.
+			 */
+			onHeat(listener) {
+				if (typeof listener !== 'function')
+					throw new Error('layout_analysis: a heat listener is a function');
+				heatListeners.push(listener);
 			},
 			addSection(draw) {
 				if (typeof draw !== 'function') throw new Error('layout_analysis: a section draws itself');
