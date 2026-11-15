@@ -270,7 +270,8 @@ var LayoutEditorPage = (function () {
 	 *   without installing it;
 	 *   savedStatus names the message shown after a save; onClose leaves the editor;
 	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
-	 *   on a host that can fetch them.
+	 *   on a host that can fetch them; startFrom names the start source (a
+	 *   loadSources or built-in id) the editor copies when it has no initial text.
 	 * @returns {{open: function(string, string): void, current: function(): object}}
 	 */
 	function mount(root, host) {
@@ -2124,12 +2125,20 @@ var LayoutEditorPage = (function () {
 		// ======= 10/ Modifiers, dead keys ==
 		// ==================================
 
-		/** Lists the fill sources once: the built-in references, then the host's registry layouts. */
+		// The one load of the fill sources: the opening start and the panels share it,
+		// so the host is asked once (a second request while one is pending is refused).
+		let fillLoad = null;
+
+		/**
+		 * Lists the fill sources once: the built-in references, then the host's registry layouts.
+		 * @returns {Promise<void>} Settled once state.fillSources is set.
+		 */
 		function loadFillSources() {
+			if (fillLoad) return fillLoad;
 			const loaded = host.loadSources
 				? Promise.resolve().then(() => host.loadSources())
 				: Promise.resolve([]);
-			loaded.then(
+			fillLoad = loaded.then(
 				(supplied) => {
 					state.fillSources = LayoutSourceIO.fillSources(supplied);
 					render();
@@ -2141,6 +2150,7 @@ var LayoutEditorPage = (function () {
 					render();
 				}
 			);
+			return fillLoad;
 		}
 
 		/** « Start from »: a blank layout, or a copy of a built-in or registry layout. */
@@ -3145,6 +3155,27 @@ var LayoutEditorPage = (function () {
 			const parsed = LayoutSourceIO.parse(host.initial);
 			if (parsed.ok) replace(parsed.doc);
 			else state.message = { kind: 'error', text: problemText(parsed.error) };
+		} else if (typeof host.startFrom === 'string') {
+			// With nothing to open, a host may start on a copy of a start source (the
+			// app's Studio: Ergopti, maintainer 2026-11-15) instead of an empty
+			// keyboard, as « Start from » does, once the sources are known. Only the
+			// untouched first document is replaced; without that source it stays.
+			const untouched = doc();
+			loadFillSources().then(() => {
+				const entry = (state.fillSources || []).find((source) => source.id === host.startFrom);
+				if (!entry || doc() !== untouched || state.dirty) return;
+				try {
+					const started = LayoutSourceIO.startFrom(
+						entry,
+						`${LayoutSourceIO.identifierFrom(entry.id, 'layout')}_custom`,
+						tl('start.copy_name', { name: entry.name })
+					);
+					replace(started.doc, started.lost.length ? started.lost : null);
+				} catch (error) {
+					state.message = { kind: 'error', text: problemText(error) };
+				}
+				render();
+			});
 		}
 		render();
 		document.addEventListener('i18n:applied', () => {

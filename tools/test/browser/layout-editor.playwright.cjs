@@ -141,6 +141,71 @@ async function downloaded(page, click) {
 }
 
 /**
+ * (studio-opens-on-ergopti) With no saved source, the Studio window opens on a
+ * copy of Ergopti, not an empty keyboard, once the host lists its sources; a
+ * file the user opened in the meantime is kept.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseOpensOnErgopti(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const keylayout = fs.readFileSync(KEYLAYOUT, 'utf8');
+	const openWindow = async () => {
+		const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+		const errors = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		await page.addInitScript((strings) => {
+			window._i18n_strings = strings;
+			window.__posted = [];
+			window.webkit = {
+				messageHandlers: {
+					layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+				}
+			};
+		}, strings);
+		await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+		await page.evaluate(() => window.initData({ strings: {}, state: { platform: 'linux' } }));
+		await page.evaluate(() => window.sourceData({ text: null, folder: 'layout_sources/' }));
+		await page.waitForSelector('#layout-editor #le-board');
+		await page.waitForFunction(() => window.__posted.some((p) => p.action === 'composer_open'));
+		return { page, errors };
+	};
+	const answer = (page) =>
+		page.evaluate(
+			(text) =>
+				window.composerData({
+					sources: [{ id: 'ergopti', name: 'Ergopti', convention: 'iso', text }]
+				}),
+			keylayout
+		);
+	const name = (page) => page.inputValue('#le-name');
+
+	const { page, errors } = await openWindow();
+	await answer(page);
+	await tool(page, 'details');
+	await page.waitForFunction(
+		(expected) => document.querySelector('#le-name').value === expected,
+		strings['layout_editor.start.copy_name'].replace('{name}', 'Ergopti')
+	);
+	assert.deepEqual(errors, []);
+	await page.close();
+
+	const kept = await openWindow();
+	await kept.page.setInputFiles('#le-open-file', SOURCE_FIXTURE);
+	await tool(kept.page, 'details');
+	await kept.page.waitForFunction(
+		() => document.querySelector('#le-name').value === 'Source Fixture'
+	);
+	// composerData settles the sources and the opening start in the same task.
+	await answer(kept.page);
+	assert.equal(await name(kept.page), 'Source Fixture', 'a file opened first is kept');
+	assert.deepEqual(kept.errors, []);
+	await kept.page.close();
+}
+
+/**
  * (layout-editor-download-error) A download whose converters cannot load says
  * why: in the macOS and Linux app windows the Lua VM of the XKB and KLC
  * builders can be missing, and its synchronous throw once escaped the click's
@@ -1228,6 +1293,7 @@ async function exercisePhoneWidth(browser, origin) {
 		// Inside the layout manager window, the same editor saves through the host.
 		await exerciseManager(browser, origin);
 		await exerciseDownloadWithoutLuaVm(browser, origin);
+		await exerciseOpensOnErgopti(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);

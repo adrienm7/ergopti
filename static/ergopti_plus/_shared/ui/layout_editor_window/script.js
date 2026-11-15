@@ -55,6 +55,9 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 // Locale strings: the catalogue macOS and Linux seed as window._i18n_strings,
 // overlaid by the strings the host pushes with initData.
 let _strings = {};
+// The start source the editor copies when the host has no saved source (the
+// registry id of Ergopti, from the host's composer sources).
+const ERGOPTI_START = 'ergopti';
 // Last state pushed by the host (the editor reads its platform).
 let _state = null;
 
@@ -436,6 +439,10 @@ window.sourceData = function (data) {
 		platform: _state && _state.platform,
 		savedStatus: 'status.saved_in_app',
 		initial: initial,
+		// No saved source yet: the Studio opens on a copy of Ergopti rather than an
+		// empty keyboard (maintainer, 2026-11-15); the user's own layout, once saved,
+		// is what the host sends next time.
+		startFrom: initial === null ? ERGOPTI_START : null,
 		// The editor is the whole window: leaving it closes the window.
 		onClose: function () {
 			send('close');
