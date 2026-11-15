@@ -1,0 +1,70 @@
+# .github/workflows/probe-macos-tis-cache.yml
+
+# Manual probe for the « [CI] Native keyboard-source fixture » refusals (TODO.md):
+# in runs 43277967473 and 43276494558 the system applied a restore from French to
+# US while the test process's TISCopyCurrentKeyboardInputSource stayed French.
+# tools/diagnostics/macos_tis_cache_probe.swift runs each run-loop mode in its own
+# long-lived process on each hosted macOS image and says, step by step, whether
+# that process saw the change, what a fresh process read, and whether a stale
+# cache caught up. It never runs on push: dispatch it by hand, then read the
+# SUMMARY lines in the job summary and the JSON lines in the artifact.
+
+name: Probe macOS TIS current-source cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      cycles:
+        description: Select-and-restore cycles per run-loop mode (1 to 200)
+        required: false
+        default: '30'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: TIS cache on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the probe
+        run: swiftc -O -o "$RUNNER_TEMP/tis-cache-probe" tools/diagnostics/macos_tis_cache_probe.swift
+
+      - name: Run each run-loop mode in its own long-lived process
+        env:
+          CYCLES: ${{ inputs.cycles }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/tis-cache-evidence"
+          mkdir -p "$evidence"
+          sw_vers > "$evidence/sw_vers.txt"
+          uname -m >> "$evidence/sw_vers.txt"
+          bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" before
+          for variant in "default" "default --body" "tracking" "nsapp" "none"; do
+              read -r -a extra <<< "$variant"
+              name="${variant// --/-}"
+              "$RUNNER_TEMP/tis-cache-probe" --mode "${extra[@]}" --cycles "$CYCLES" | tee "$evidence/$name.jsonl"
+          done
+          bash tools/diagnostics/macos_text_input_agents.sh "$evidence/text-input-agents.txt" after
+          {
+              echo "### TIS cache on ${{ matrix.runner }} ($(sw_vers -productVersion), $(uname -m))"
+              echo '```'
+              grep -h '^SUMMARY ' "$evidence"/*.jsonl
+              echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the probe evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tis-cache-probe-${{ matrix.runner }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/tis-cache-evidence
+          if-no-files-found: error
