@@ -6,7 +6,8 @@
 # DESCRIPTION:
 # Sorts a finished field report folder into subfolders so the synthesis reads
 # first: the 2026-11-15 macOS report held some sixty files side by side and
-# the maintainer could not tell which one was the summary.
+# the maintainer could not tell which one was the summary. Shared by the
+# macOS, Linux and Windows collectors.
 #
 #   0_main/      the synthesis: analysis.md, todo_summary.md, steps.txt, the
 #                field run's terminal output, and their JSON twins
@@ -34,7 +35,7 @@ SYSTEM = "3_system"
 # The synthesis, in reading order (README lists them so).
 MAIN_FILES = [
     ("analysis.md", "What to fix first, check verdicts, errors and warnings: start here."),
-    ("todo_summary.md", "One verdict per TODO point to confirm on the Mac."),
+    ("todo_summary.md", "One verdict per TODO point to confirm on this OS."),
     ("steps.txt", "Every collector step with its exit status."),
     ("field_run.txt", "The field run's terminal output, one verdict per step."),
     ("not_automated.txt", "What the run cannot automate, and why."),

@@ -58,6 +58,15 @@ const code = source
 	.join('\n');
 const names = JSON.parse(fs.readFileSync(path.join(ROOT, IDENTIFIERS), 'utf8')).field_report;
 const appDirs = fs.readFileSync(path.join(ROOT, APP_DIRS), 'utf8');
+/** A report file wherever field-report-tidy.py sorted it (0_main, 1_logs, 2_digests, 3_system), else at the root. */
+function reportFile(folder, name) {
+	for (const sub of ['', '0_main', '1_logs', '2_digests', '3_system']) {
+		const candidate = path.join(folder, sub, name);
+		if (fs.existsSync(candidate)) return candidate;
+	}
+	return path.join(folder, name);
+}
+
 const tomlValue = (key) => appDirs.match(new RegExp(`^${key} = "([^"]+)"`, 'm'))[1];
 const LOG = {
 	main: tomlValue('unified_prefix'),
@@ -461,10 +470,10 @@ try {
 			assert.match(path.basename(folders[0]), /^win-\d{4}-\d{2}-\d{2}_\d{6}$/);
 			const head = git(paths.clone, 'rev-parse', '--short', 'HEAD~1');
 			assert.equal(
-				fs.readFileSync(path.join(folders[0], 'base.txt'), 'utf8'),
+				fs.readFileSync(reportFile(folders[0], 'base.txt'), 'utf8'),
 				`field_branch: ${expected}\nbase: dev\ncommit: ${head}\n`
 			);
-			const steps = fs.readFileSync(path.join(folders[0], 'steps.txt'), 'utf8');
+			const steps = fs.readFileSync(reportFile(folders[0], 'steps.txt'), 'utf8');
 			for (const name of ['versions', 'toolchain', 'processes', 'proxy'])
 				assert.match(steps, new RegExp(`^${name}\\s+exit=\\d+$`, 'm'));
 			const dayLog = `${LOG.main}${today()}${LOG.extension}`;
@@ -472,31 +481,31 @@ try {
 			assert.match(steps, /^hotstring_collisions\s+exit=0$/m);
 			assert.match(steps, /^proxy_winhttp\s+exit=0$/m);
 			assert.match(
-				fs.readFileSync(path.join(folders[0], 'proxy_winhttp.txt'), 'utf8'),
+				fs.readFileSync(reportFile(folders[0], 'proxy_winhttp.txt'), 'utf8'),
 				/^WinHTTP: (direct|set)\s*$/
 			);
 			assert.match(
-				fs.readFileSync(path.join(folders[0], 'hotstring_collisions.txt'), 'utf8'),
+				fs.readFileSync(reportFile(folders[0], 'hotstring_collisions.txt'), 'utf8'),
 				/no personal hotstrings file at personal_hotstrings\.toml/,
 				'the fixture profile holds no personal file'
 			);
-			const dayLogCopy = fs.readFileSync(path.join(folders[0], dayLog), 'utf8');
+			const dayLogCopy = fs.readFileSync(reportFile(folders[0], dayLog), 'utf8');
 			assert.doesNotMatch(dayLogCopy, /TYPEDCANARY/, 'the pushed day log keeps no typed text');
 			assert.match(dayLogCopy, /keystroke <text withheld> typed while/);
 			for (const file of fs.readdirSync(folders[0]))
 				assert.doesNotMatch(
-					fs.readFileSync(path.join(folders[0], file), 'utf8'),
+					fs.readFileSync(reportFile(folders[0], file), 'utf8'),
 					/TYPEDCANARY/,
 					`${file} holds no typed text`
 				);
 			assert.match(
-				fs.readFileSync(path.join(folders[0], 'digest_field_checks.txt'), 'utf8'),
+				fs.readFileSync(reportFile(folders[0], 'digest_field_checks.txt'), 'utf8'),
 				/check=composer verdict=fail/
 			);
 			// The analysis marks the tray check of the day and the collector's own.
 			assert.match(steps, /^collector_checks\s+exit=\d+$/m);
 			assert.match(steps, /^analysis\s+exit=0$/m);
-			const analysis = JSON.parse(fs.readFileSync(path.join(folders[0], 'analysis.json'), 'utf8'));
+			const analysis = JSON.parse(fs.readFileSync(reportFile(folders[0], 'analysis.json'), 'utf8'));
 			assert.equal(
 				analysis.field_checks.items.find((item) => item.id === 'composer').verdict,
 				'fail'
@@ -505,10 +514,10 @@ try {
 			assert.match(result.stdout, /Check verdicts summary: /);
 			// No developer driver runs in the fixture: the field run is a skip, not a wait.
 			assert.equal(
-				fs.readFileSync(path.join(folders[0], 'field_run_checks.txt'), 'utf8'),
+				fs.readFileSync(reportFile(folders[0], 'field_run_checks.txt'), 'utf8'),
 				'check=field_run verdict=skip codes=no_ready_driver\n'
 			);
-			assert.doesNotMatch(fs.readFileSync(path.join(folders[0], 'steps.txt'), 'utf8'), /\r/);
+			assert.doesNotMatch(fs.readFileSync(reportFile(folders[0], 'steps.txt'), 'utf8'), /\r/);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD').split('\n');
 			assert(
 				committed.every((file) => file.startsWith(`${names.folder}/`)),
@@ -550,19 +559,19 @@ try {
 		const folders = reportFolders(paths);
 		assert.equal(folders.length, 2);
 		assert.match(
-			fs.readFileSync(path.join(folders[1], 'base.txt'), 'utf8'),
+			fs.readFileSync(reportFile(folders[1], 'base.txt'), 'utf8'),
 			new RegExp(`^field_branch: ${expected}\nbase: feature/x\n`)
 		);
 	});
 
-	check('tracked changes are refused before any branch is switched', () => {
+	check('tracked changes are stashed and the clone reset before the run', () => {
 		const paths = fixture('dirty');
 		fs.appendFileSync(path.join(paths.clone, '.gitignore'), '# edit\n');
 		const result = runCollector(paths);
-		assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
-		assert.match(result.stderr, /Commit or discard the tracked changes first/);
-		assert.equal(git(paths.clone, 'branch', '--show-current'), 'dev');
-		assert.deepEqual(reportFolders(paths), []);
+		assert.doesNotMatch(result.stderr, /could not be stashed/);
+		assert.match(result.stdout, /Tracked changes found/);
+		assert.match(git(paths.clone, 'stash', 'list'), /field-report auto-stash/);
+		assert.doesNotMatch(fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'), /# edit\n$/);
 	});
 } finally {
 	fs.rmSync(scratch, { recursive: true, force: true });

@@ -258,8 +258,17 @@ function reportFolders(paths) {
 }
 
 /** Reads one report file. */
+/** A report file wherever field-report-tidy.py sorted it (0_main, 1_logs, 2_digests, 3_system), else at the root. */
+function reportFile(folder, name) {
+	for (const sub of ['', '0_main', '1_logs', '2_digests', '3_system']) {
+		const candidate = path.join(folder, sub, name);
+		if (fs.existsSync(candidate)) return candidate;
+	}
+	return path.join(folder, name);
+}
+
 function read(folder, name) {
-	return fs.readFileSync(path.join(folder, name), 'utf8');
+	return fs.readFileSync(reportFile(folder, name), 'utf8');
 }
 
 (async () => {
@@ -415,9 +424,9 @@ function read(folder, name) {
 				);
 				assert.match(read(folder, dayLog), /Cannot deliver <text withheld> before erasing/);
 				assert.match(read(folder, dayLog), /inject\(\): bc=3 text=<text withheld>$/m);
-				assert(fs.existsSync(path.join(folder, LOG_FILES.bootstrap)));
+				assert(fs.existsSync(reportFile(folder, LOG_FILES.bootstrap)));
 				assert(
-					!fs.existsSync(path.join(folder, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`))
+					!fs.existsSync(reportFile(folder, `${LOG_FILES.main}2000-01-01${LOG_FILES.extension}`))
 				);
 				assert.match(read(folder, 'digest_field_checks.txt'), /check=network verdict=pass/);
 				// The macOS marks, the verdict word kept after each, and one summary.
@@ -570,21 +579,21 @@ function read(folder, name) {
 			const folders = reportFolders(paths);
 			assert.equal(folders.length, 1);
 			assert.match(read(folders[0], 'steps.txt'), /^collector\s+interrupted$/m);
-			assert(fs.existsSync(path.join(folders[0], 'base.txt')));
+			assert(fs.existsSync(reportFile(folders[0], 'base.txt')));
 			assert.match(git(paths.clone, 'log', '-1', '--format=%s'), /\(interrupted\)$/);
 			const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
 			assert.match(committed, new RegExp(`${LOG_FILES.main}\\d{4}-\\d{2}-\\d{2}\\.log`));
 			assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');
 		});
 
-		await check('tracked changes are refused before any branch is switched', async () => {
+		await check('tracked changes are stashed and the clone reset before the run', async () => {
 			const paths = fixture('dirty');
 			fs.appendFileSync(path.join(paths.clone, '.gitignore'), '# edit\n');
 			const result = await runCollector(paths);
-			assert.equal(result.status, 1);
-			assert.match(result.stderr, /Commit or discard the tracked changes first/);
-			assert.equal(git(paths.clone, 'branch', '--show-current'), 'dev');
-			assert.deepEqual(reportFolders(paths), []);
+			assert.doesNotMatch(result.stderr, /could not be stashed/);
+			assert.match(result.stdout, /Tracked changes found/);
+			assert.match(git(paths.clone, 'stash', 'list'), /field-report auto-stash/);
+			assert.doesNotMatch(fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'), /# edit\n$/);
 		});
 	} finally {
 		fs.rmSync(scratch, { recursive: true, force: true });

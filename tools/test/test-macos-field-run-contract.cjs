@@ -391,6 +391,15 @@ function addProbe(paths, withMarker) {
 	return log;
 }
 
+/** A report file wherever field-report-tidy.py sorted it (0_main, 1_logs, 2_digests, 3_system), else at the root. */
+function reportFile(folder, name) {
+	for (const sub of ['', '0_main', '1_logs', '2_digests', '3_system']) {
+		const candidate = path.join(folder, sub, name);
+		if (fs.existsSync(candidate)) return candidate;
+	}
+	return path.join(folder, name);
+}
+
 /** The single report folder a collector run committed. */
 function reportFolder(paths) {
 	const reports = path.join(paths.clone, 'docs/field-reports');
@@ -822,7 +831,7 @@ function reportFolder(paths) {
 				assert.match(refused.stdout, /^scpt_failed:Stale App\.app\/main\.scpt:osacompile_exit_3$/m);
 				assert.match(refused.stdout, /^scpt_recompiled:0$/m);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'main.scpt'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'main.scpt'), 'utf8'),
 					/metrics/,
 					'a source that does not compile never replaces the script'
 				);
@@ -840,7 +849,7 @@ function reportFolder(paths) {
 					/lonely/,
 					'a source without a compiled script is not compiled'
 				);
-				assert.match(fs.readFileSync(path.join(folder, 'main.scpt'), 'utf8'), /keystats/);
+				assert.match(fs.readFileSync(reportFile(folder, 'main.scpt'), 'utf8'), /keystats/);
 				assert.deepEqual(
 					fs.readdirSync(folder).sort(),
 					['main.applescript', 'main.scpt'],
@@ -980,12 +989,12 @@ function reportFolder(paths) {
 					assert.match(request.request_id, new RegExp(spec.request_id_pattern));
 					const folder = reportFolder(paths);
 					const done = JSON.parse(
-						fs.readFileSync(path.join(folder, 'field_run', spec.files.done), 'utf8')
+						fs.readFileSync(reportFile(folder, 'field_run', spec.files.done), 'utf8')
 					);
 					assert.equal(done.request_id, request.request_id);
-					assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+					assert(fs.existsSync(reportFile(folder, 'field_run/01_field_lease.json')));
 					assert.match(
-						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 						/^field_run\s+exit=0$/m
 					);
 					// The maintainer scans the output for the marks, not the words.
@@ -995,7 +1004,7 @@ function reportFolder(paths) {
 					assert.match(result.stdout, /Check verdicts summary: ✅ \d+ pass, ❌ \d+ fail, /);
 					assert.match(result.stdout, /Log analysis: \d+ error group\(s\)/);
 					assert.match(
-						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 						/^analysis\s+exit=0$/m
 					);
 					const committed = git(paths.clone, 'show', '--name-only', '--format=', 'HEAD');
@@ -1027,11 +1036,11 @@ function reportFolder(paths) {
 					assert(!fs.existsSync(path.join(paths.clone, spec.folder, spec.guided.answer)));
 					const folder = reportFolder(paths);
 					assert.match(
-						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 						/^todo_summary\s+exit=0$/m
 					);
 					const summary = JSON.parse(
-						fs.readFileSync(path.join(folder, 'todo_summary.json'), 'utf8')
+						fs.readFileSync(reportFile(folder, 'todo_summary.json'), 'utf8')
 					);
 					const coverage = JSON.parse(fs.readFileSync(path.join(ROOT, TODO_COVERAGE), 'utf8'));
 					assert.deepEqual(
@@ -1100,11 +1109,11 @@ function reportFolder(paths) {
 					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 					const folder = reportFolder(paths);
 					assert.match(
-						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 						/^field_run\s+exit=1$/m
 					);
 					assert.match(
-						fs.readFileSync(path.join(folder, 'field_run.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'field_run.txt'), 'utf8'),
 						/request withdrawn/
 					);
 					assert.equal(
@@ -1132,12 +1141,12 @@ function reportFolder(paths) {
 					assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 					const folder = reportFolder(paths);
 					assert.match(
-						fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 						/^field_run\s+exit=0$/m
 					);
-					const text = fs.readFileSync(path.join(folder, 'field_run.txt'), 'utf8');
+					const text = fs.readFileSync(reportFile(folder, 'field_run.txt'), 'utf8');
 					assert.match(text, /published its readiness again/);
-					assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
+					assert(fs.existsSync(reportFile(folder, 'field_run/01_field_lease.json')));
 				} finally {
 					driver.child.kill();
 				}
@@ -1169,9 +1178,9 @@ function reportFolder(paths) {
 						'dev'
 					);
 					const folder = reportFolder(paths);
-					assert(fs.existsSync(path.join(folder, 'field_run', spec.files.done)));
+					assert(fs.existsSync(reportFile(folder, 'field_run', spec.files.done)));
 					assert.match(
-						fs.readFileSync(path.join(folder, 'base.txt'), 'utf8'),
+						fs.readFileSync(reportFile(folder, 'base.txt'), 'utf8'),
 						/^field_branch: field\/mac-.*-dev\nbase: dev\ncommit: \w+\n$/
 					);
 				} finally {
@@ -1189,14 +1198,14 @@ function reportFolder(paths) {
 				assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 				const folder = reportFolder(paths);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 					/^field_run\s+exit=1$/m
 				);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'field_run_refused.json'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'field_run_refused.json'), 'utf8'),
 					/"reason":"busy"/
 				);
-				assert.match(fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'), /^versions\s+exit=/m);
+				assert.match(fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'), /^versions\s+exit=/m);
 			} finally {
 				driver.child.kill();
 			}
@@ -1267,23 +1276,23 @@ function reportFolder(paths) {
 				});
 				assert.equal(result.status, 130, `${result.stdout}\n${result.stderr}`);
 				const folder = reportFolder(paths);
-				assert(fs.existsSync(path.join(folder, 'field_run', '01_field_lease.json')));
-				const copied = fs.readFileSync(path.join(folder, `ErgoptiPlus_${day}.log`), 'utf8');
+				assert(fs.existsSync(reportFile(folder, 'field_run/01_field_lease.json')));
+				const copied = fs.readFileSync(reportFile(folder, `ErgoptiPlus_${day}.log`), 'utf8');
 				assert.match(copied, /fixture day log/);
 				assert.doesNotMatch(copied, /rue privée|'adr'/, 'the pushed log must carry no typed text');
 				// The analysis reads the scrubbed copy, even after Ctrl-C.
-				const analysis = JSON.parse(fs.readFileSync(path.join(folder, 'analysis.json'), 'utf8'));
+				const analysis = JSON.parse(fs.readFileSync(reportFile(folder, 'analysis.json'), 'utf8'));
 				assert.equal(analysis.errors.find((group) => group.module === 'menu').count, 1);
 				assert.equal(
 					analysis.performance.find((row) => row.metric === 'preferences.save').verdict,
 					'over'
 				);
 				assert.doesNotMatch(
-					fs.readFileSync(path.join(folder, 'analysis.md'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'analysis.md'), 'utf8'),
 					/rue privée|'adr'/,
 					'the analysis quotes no typed text'
 				);
-				const collisions = fs.readFileSync(path.join(folder, 'hotstring_collisions.txt'), 'utf8');
+				const collisions = fs.readFileSync(reportFile(folder, 'hotstring_collisions.txt'), 'utf8');
 				assert.match(collisions, /^'sru' personal is_word=True priority=100$/m);
 				assert.doesNotMatch(
 					collisions,
@@ -1291,7 +1300,7 @@ function reportFolder(paths) {
 					'no personal text or section travels'
 				);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 					/^collector\s+interrupted$/m
 				);
 				assert.match(git(paths.clone, 'log', '-1', '--format=%s'), /\(interrupted\)$/);
@@ -1299,18 +1308,18 @@ function reportFolder(paths) {
 				assert.match(committed, /field_run\/01_field_lease\.json/);
 				assert.match(committed, /ErgoptiPlus_\d{4}-\d{2}-\d{2}\.log/);
 				assert.equal(
-					fs.readFileSync(path.join(folder, 'reload_breadcrumb.txt'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'reload_breadcrumb.txt'), 'utf8'),
 					'accepted 5000.000\nlease_fence_requested 5001.250\nboot 9000.000\n',
 					'the reload trail travels as written'
 				);
 				assert.match(committed, /reload_breadcrumb\.txt/);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'launcher.log'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'launcher.log'), 'utf8'),
 					/embedded Hammerspoon exited with status 70/,
 					'launcher.log is read from the default folder, not the moved one'
 				);
 				assert.match(
-					fs.readFileSync(path.join(folder, 'steps.txt'), 'utf8'),
+					fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
 					/^hammerspoon-fatal\.txt\s+missing$/m
 				);
 				assert.equal(git(paths.clone, 'status', '--porcelain', '--untracked-files=no'), '');

@@ -288,6 +288,12 @@ finalize() {
 	fi
 	# Last: it also reads the check verdicts the steps above wrote.
 	field_report_analyse ${day_logs[@]+"${day_logs[@]}"}
+	# After every step that reads the flat names: the synthesis goes to 0_main,
+	# the rest to numbered subfolders (field-report-tidy.py). Nothing writes
+	# ${steps} after this point.
+	python3 "${REPO_ROOT}/tools/dev/field-report-tidy.py" "${out}" \
+		&& log "Read first: ${out#"${REPO_ROOT}/"}/0_main/analysis.md (index in 0_main/README.md)." \
+		|| log "WARNING: the report folder could not be sorted into subfolders; it stays flat."
 
 	subject="docs(field): Linux field report ${stamp} on ${base}"
 	"${interrupted}" && subject="${subject} (interrupted)"

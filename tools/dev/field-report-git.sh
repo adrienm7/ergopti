@@ -43,8 +43,16 @@
 # Sets: branch (the field branch), base (the branch it is updated from).
 field_report_enter_branch() {
 	local tag="$1"
-	[ -z "$(git status --porcelain --untracked-files=no)" ] \
-		|| fail "Commit or discard the tracked changes first: the collector commits only its own folder."
+	# A run cut short (window closed, kill) can leave tracked changes, and the
+	# next run refused to start (macOS field report 2026-11-15). A tester's
+	# clone holds no work of its own: the changes are stashed (git stash list
+	# keeps them) and the tree is reset, so the collector always starts.
+	if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+		log "Tracked changes found (a previous run cut short?): stashed (git stash list) and the clone reset."
+		git stash push -q -m "field-report auto-stash $(date +%Y-%m-%d_%H%M%S)" \
+			|| fail "Tracked changes could not be stashed; commit or discard them first."
+		git reset -q --hard || fail "git reset --hard failed."
+	fi
 	branch="$(git branch --show-current)"
 	case "${branch}" in
 		"${ERGOPTI_FIELD_REPORT_BRANCH_PREFIX}"*)

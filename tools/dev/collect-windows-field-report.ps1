@@ -228,7 +228,17 @@ $null = Get-Git rev-parse '--git-dir'
 if ($script:GitStatus -ne 0) { Fail 'Not inside the Ergopti clone.' }
 $Tracked = Get-Git status '--porcelain' '--untracked-files=no'
 if ($script:GitStatus -ne 0) { Fail 'git status failed.' }
-if ($Tracked) { Fail 'Commit or discard the tracked changes first: the collector commits only its own folder.' }
+# A run cut short (window closed, kill) can leave tracked changes, and the next
+# run refused to start (macOS field report 2026-11-15). A tester's clone holds
+# no work of its own: the changes are stashed (git stash list keeps them) and
+# the tree is reset, so the collector always starts.
+if ($Tracked) {
+	Log 'Tracked changes found (a previous run cut short?): stashed (git stash list) and the clone reset.'
+	if (-not (Invoke-Git stash push '-q' '-m' "field-report auto-stash $(Get-Date -Format 'yyyy-MM-dd_HHmmss')")) {
+		Fail 'Tracked changes could not be stashed; commit or discard them first.'
+	}
+	if (-not (Invoke-Git reset '-q' '--hard')) { Fail 'git reset --hard failed.' }
+}
 
 # The base is the branch the field branch derives from and is updated from on
 # every run; git config remembers it so later runs on the field branch keep it.
@@ -556,6 +566,16 @@ function Complete-Report {
 		if ($LASTEXITCODE -ne 0) { Log "step 'analysis' exited $LASTEXITCODE" }
 	} else {
 		Add-Step ('{0,-28} skipped (no Python interpreter runs on this PC)' -f 'analysis')
+	}
+
+	# After every step that reads the flat names: the synthesis goes to 0_main,
+	# the rest to numbered subfolders (field-report-tidy.py). Nothing writes
+	# steps.txt after this point.
+	if ($script:Python) {
+		$ErrorActionPreference = 'Continue'
+		& $script:Python (Join-Path $DevTools 'field-report-tidy.py') $script:Out
+		if ($LASTEXITCODE -eq 0) { Log "Read first: $OutRelative/0_main/analysis.md (index in 0_main/README.md)." }
+		else { Log 'WARNING: the report folder could not be sorted into subfolders; it stays flat.' }
 	}
 
 	$Subject = "docs(field): Windows field report $Stamp on $Base"
