@@ -387,14 +387,21 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       form factors and their weights cannot be edited in the Studio, and 80/75/65/60 % are one combined entry
       ([DECISION] only if they must be scored apart).
 
-- [ ] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
+- [x] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
       time from green to red by how much the character placed on it costs (its share of SFBs, same-finger skipgrams,
       redirects, finger overload, distance…), with a selectable metric (or the global score) and a tooltip naming the
       worst pairs it causes; moving or swapping a key updates the colours and the score at once. Same view in the
       app's Studio and on the site.
-      [CODE] Left (2026-11-15): a heatmap exists only in the Comparer's layout details, with SFB partners in its tooltip
-      (test-layout-comparer-page.cjs); the editor's own keys are not coloured live, and there is no metric or
-      global-score selector nor worst pairs for the other metrics.
+      Done 2026-11-15 (`claude/ergopti-todo-studio-w-heat`; b40ca10d, 2430dd55, 3273078f): the analysis panel's « Key colours »
+      (global score by default, presses, or any of sfb, sfs, lsb, scissors, half scissors, redirects, bad redirects,
+      distance, finger imbalance, pinky load, outer column) colours the editor's own keys from green to red after each
+      edit, on the site and in the app (same panel and editor); each tooltip gives the key's exact part of the metric
+      and its three worst pairs or trigrams, or the points it loses and the metrics behind them. One engine:
+      keyReport's per-key parts add up to each metric, keyScoreCost to the score (docs/design/layout-analysis.md).
+      Proof: test-layout-analysis-engine.cjs (« Per-key costs »), layout-editor.playwright.cjs (exerciseHeatmap).
+      Selector placement and the green-to-red scale decided by the agent, to review by the maintainer. The
+      Comparer's own heatmap still names SFB partners only, now read from the engine's `worst.sfb`; its other metrics
+      can name their worst groups by analysing the shown layout with `keyGroups`.
 
 - [ ] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
       « Éditer » (the editor, with a right-hand side panel showing the current layout's metrics, its global score and
