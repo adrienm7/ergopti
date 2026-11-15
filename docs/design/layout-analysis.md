@@ -370,7 +370,13 @@ Data that arrives after load (the app's keystats tables, fetched on the user's
 request; the user's own layouts) goes through
 `window.LAYOUT_ANALYSIS_COMPARER`: `setCorpus({id, title?, tables, default?})`
 adds or replaces a corpus, listed first and selected when `default` is true, and
-`addLayouts([layout, ...])` adds or replaces layouts, ticked. The page also
+`addLayouts([layout, ...])` adds or replaces layouts, ticked, and `setFormat(id)`
+chooses the keyboard format (the app's Studio passes the editor's « Format »).
+Until the user ticks or unticks a layout, the ticked layouts follow the
+keyboard: the registry, reference and personal layouts, but of a family that
+ships one layout per board (registry `geometry`: Ergopti and Ergopti ANSI)
+only the one of the keyboard's geometry, ISO for a split or ortholinear board;
+the other stays listed, unticked. The page also
 listens for the app's `studio-ngrams` DOM event (`detail` = the keystats tables)
 and turns it into the « My typing » corpus (`my_typing`), the default in the
 app. A host that inlines its pages defines `loadCorpus(id)` (a promise resolved

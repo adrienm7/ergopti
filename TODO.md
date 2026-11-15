@@ -680,14 +680,19 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       the site's two framed pages each keep their own (decided by the agent, to review by the maintainer);
       proof: test-layout-comparer-page.cjs (formats nested, refusal of an unknown one), `keyboard-format` in
       layout-editor.playwright.cjs (what each format shows, the hand-off to the Comparer).
-      4 [ ] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their
-      ANSI versions, the other geometry stays listed and unchecked.
+      4 [x] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their
+      ANSI versions, the other geometry stays listed and unchecked. Done 2026-11-15
+      (`claude/ergopti-todo-comparer-geometry`): an optional `geometry` in the registry's meta.toml (Ergopti and
+      Ergopti+ iso, their ANSI versions ansi, bépo iso), carried by index.json and the analysis data; until the
+      user ticks or unticks a layout, the ticks follow the keyboard (ISO for a split or ortholinear board, decided
+      by the agent, to review by the maintainer); proof: `comparer-default-geometry` in
+      layout-editor.playwright.cjs.
       9 [ ] The start dialog keeps its quick picks and adds a searchable, sorted list of every library layout.
       1 [ ] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
       and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
       installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
       review by the maintainer.
-      [CODE] Left (2026-11-15): remarks 4, 9 and 1.
+      [CODE] Left (2026-11-15): remarks 9 and 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is

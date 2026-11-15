@@ -378,7 +378,11 @@ var LAYOUT_ANALYSIS = (function () {
 			fingering: layout.fingering || 'standard',
 			rows: layout.rows,
 			command: layout.command || {},
-			dead: layout.dead || {}
+			dead: layout.dead || {},
+			// A registry layout's family and board (iso or ansi), when its family
+			// ships one layout per board: the Comparer's default selection.
+			family: layout.family || '',
+			geometry: layout.geometry || ''
 		};
 	}
 

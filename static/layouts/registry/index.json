@@ -51,6 +51,7 @@
 					}
 				]
 			},
+			"geometry": "iso",
 			"source_sha256": "1ae285b4d523e3969474eab01084fdf09145f00cdb4daae1245ac2d52e30b6ba",
 			"licence_file": "LICENSE"
 		},
@@ -193,6 +194,7 @@
 					}
 				]
 			},
+			"geometry": "iso",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -310,6 +312,7 @@
 					}
 				]
 			},
+			"geometry": "ansi",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -427,6 +430,7 @@
 					}
 				]
 			},
+			"geometry": "iso",
 			"xkb": {
 				"keysym_overrides": [
 					[
@@ -544,6 +548,7 @@
 					}
 				]
 			},
+			"geometry": "ansi",
 			"xkb": {
 				"keysym_overrides": [
 					[

@@ -516,6 +516,30 @@ async function exerciseStudioComparer(page) {
 		await page.evaluate(() => document.getElementById('la-status').textContent),
 		/^\d+ layouts compared on [\d,]+ characters/
 	);
+	// (comparer-default-geometry) Until the user chooses, the ticked layouts
+	// follow the keyboard: ISO ticks Ergopti and Ergopti+, ANSI their ANSI
+	// versions; the other board's variants stay listed, unticked.
+	const ticks = () =>
+		page.$$eval('#la-layout-list .la-layout', (labels) =>
+			Object.fromEntries(
+				labels
+					.map((label) => [label.textContent.trim(), label.querySelector('input').checked])
+					.filter(([name]) => /^Ergopti\+?( ANSI)?$/.test(name))
+			)
+		);
+	assert.deepEqual(
+		await ticks(),
+		{ Ergopti: true, 'Ergopti+': true, 'Ergopti ANSI': false, 'Ergopti+ ANSI': false },
+		'ISO ticks Ergopti and Ergopti+'
+	);
+	await page.selectOption('#la-keyboard', 'ansi');
+	assert.deepEqual(
+		await ticks(),
+		{ Ergopti: false, 'Ergopti+': false, 'Ergopti ANSI': true, 'Ergopti+ ANSI': true },
+		'ANSI ticks their ANSI versions'
+	);
+	await page.selectOption('#la-keyboard', 'iso');
+	await page.waitForFunction(() => document.querySelectorAll('#la-table tbody tr').length > 0);
 	// (dead-key-legend) Ergopti's heatmap shows its dead keys as bare accents, marked.
 	await page.evaluate(() =>
 		[...document.querySelectorAll('#la-table tbody tr')]

@@ -289,8 +289,20 @@ function buildLibrary(model) {
 	const codes = engine.typingCodes(model);
 	const composer = loadComposer();
 	const out = [];
-	for (const entry of composer.INDEX.layouts)
-		out.push(fromComposer(engine, composer.SOURCES[entry.id], REGISTRY_ORIGIN, codes, entry.name));
+	for (const entry of composer.INDEX.layouts) {
+		const layout = fromComposer(
+			engine,
+			composer.SOURCES[entry.id],
+			REGISTRY_ORIGIN,
+			codes,
+			entry.name
+		);
+		// The board a registry layout is made for, and its family: the Comparer
+		// ticks by default the variant of the chosen keyboard's geometry.
+		layout.family = entry.family;
+		if (entry.geometry) layout.geometry = entry.geometry;
+		out.push(layout);
+	}
 	for (const id of Object.keys(composer.REFERENCE)) {
 		const layout = fromComposer(
 			engine,

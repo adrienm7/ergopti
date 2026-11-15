@@ -312,6 +312,7 @@
 						keyboard: state.keyboard,
 						format: state.format,
 						selected: Array.from(state.selected),
+						selectionChosen: state.selectionChosen,
 						weights: state.weights,
 						idealLoad: state.idealLoad,
 						custom: state.custom,
@@ -334,6 +335,29 @@
 			.concat((HOST.layouts || []).map(E.layoutFromRows))
 			.concat(imported.map(E.layoutFromRows));
 		const byId = new Map(layouts.map((layout) => [layout.id, layout]));
+
+		/**
+		 * The layouts ticked until the user chooses (maintainer, 2026-11-15): the
+		 * registry, reference and personal layouts, but of a family that ships
+		 * one layout per board (Ergopti and Ergopti ANSI) only the one of the
+		 * chosen keyboard's geometry; the other stays listed, unticked. A board
+		 * with no row-staggered geometry (split, ortholinear) takes ISO's.
+		 * @param {string} keyboard A model keyboard id.
+		 * @returns {Set<string>} The ids to tick.
+		 */
+		function defaultSelection(keyboard) {
+			const geometry = DATA.model.keyboards[keyboard].geometry || 'iso';
+			const otherBoard = (layout) =>
+				layout.geometry !== '' &&
+				layout.geometry !== geometry &&
+				layouts.some((other) => other.family === layout.family && other.geometry === geometry);
+			return new Set(
+				layouts
+					.filter((l) => DEFAULT_ORIGINS.includes(l.origin) || l.origin === 'user')
+					.filter((l) => !otherBoard(l))
+					.map((l) => l.id)
+			);
+		}
 		const corpora = (HOST.corpora || [])
 			.map((corpus) => ({ id: corpus.id, title: corpus.title, host: corpus }))
 			.concat(
@@ -347,13 +371,9 @@
 			format: E.keyboardFormats().some((f) => f.id === saved.format)
 				? saved.format
 				: E.defaultKeyboardFormat(),
-			selected: new Set(
-				Array.isArray(saved.selected)
-					? saved.selected.filter((id) => byId.has(id))
-					: layouts
-							.filter((l) => DEFAULT_ORIGINS.includes(l.origin) || l.origin === 'user')
-							.map((l) => l.id)
-			),
+			// Whether the user chose the ticked layouts; until then they follow the keyboard.
+			selectionChosen: saved.selectionChosen === true && Array.isArray(saved.selected),
+			selected: null,
 			weights: Object.assign(E.defaultWeights(), validWeights(saved.weights)),
 			idealLoad: validIdealLoad(saved.idealLoad),
 			custom: saved.custom && saved.custom.tables ? saved.custom : null,
@@ -363,6 +383,9 @@
 			heat: 'presses',
 			details: null
 		};
+		state.selected = state.selectionChosen
+			? new Set(saved.selected.filter((id) => byId.has(id)))
+			: defaultSelection(state.keyboard);
 		if (HOST.corpora && HOST.corpora.length > 0 && saved.corpus === undefined)
 			state.corpus = HOST.corpora[0].id;
 
@@ -782,6 +805,7 @@
 				box.addEventListener('change', () => {
 					if (box.checked) state.selected.add(layout.id);
 					else state.selected.delete(layout.id);
+					state.selectionChosen = true;
 					save();
 					analyse();
 				});
@@ -953,6 +977,10 @@
 			$('la-keyboard').value = state.keyboard;
 			$('la-keyboard').addEventListener('change', (event) => {
 				state.keyboard = event.target.value;
+				if (!state.selectionChosen) {
+					state.selected = defaultSelection(state.keyboard);
+					fillLayouts();
+				}
 				fingeringView.draw();
 				save();
 				analyse();
@@ -1002,12 +1030,14 @@
 			});
 			$('la-all').addEventListener('click', () => {
 				for (const id of visibleLayoutIds()) state.selected.add(id);
+				state.selectionChosen = true;
 				save();
 				fillLayouts();
 				analyse();
 			});
 			$('la-none').addEventListener('click', () => {
 				for (const id of visibleLayoutIds()) state.selected.delete(id);
+				state.selectionChosen = true;
 				save();
 				fillLayouts();
 				analyse();

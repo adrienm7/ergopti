@@ -7,6 +7,8 @@
 name = "Ergopti ANSI"
 # Catalogue family metadata; geometry hotstrings remain an independent
 # opt-in choice on every layout.
+# The physical board this layout is made for (iso or ansi).
+geometry = "ansi"
 family = "ergopti"
 extension_source = "ergopti"
 version = "2.2.2"

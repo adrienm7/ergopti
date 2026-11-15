@@ -85,7 +85,11 @@ const REQUIRED_KEYS = [
 	'platforms',
 	'keycode_convention'
 ];
-const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source'];
+// geometry: the physical board a layout is made for, when its family ships one
+// layout per board (Ergopti and Ergopti ANSI); the Comparer ticks the variant of
+// the chosen keyboard's geometry by default.
+const OPTIONAL_KEYS = ['licence_file', 'source_sha256', 'xkb', 'extension_source', 'geometry'];
+const GEOMETRIES = ['iso', 'ansi'];
 const XKB_KEYS = ['keysym_overrides', 'base_level_only'];
 
 // The rules the extension scanners apply to a manifest's historical hotstring
@@ -208,6 +212,9 @@ function validateMeta(id, meta, fileExists) {
 			(v) => PLATFORMS.includes(v),
 			false
 		);
+	}
+	if ('geometry' in meta && !GEOMETRIES.includes(meta.geometry)) {
+		errors.push(`${id}: geometry must be one of ${GEOMETRIES.join(', ')}`);
 	}
 	if ('keycode_convention' in meta && !KEYCODE_CONVENTIONS.includes(meta.keycode_convention)) {
 		errors.push(`${id}: keycode_convention must be one of ${KEYCODE_CONVENTIONS.join(', ')}`);
@@ -584,6 +591,7 @@ function buildIndex(registryDir) {
 			source_url: meta.source_url,
 			extension: extensions.get(id)
 		};
+		if (meta.geometry) entry.geometry = meta.geometry;
 		if (meta.source_sha256) entry.source_sha256 = meta.source_sha256;
 		if (meta.licence_file) entry.licence_file = meta.licence_file;
 		if (meta.xkb) {
