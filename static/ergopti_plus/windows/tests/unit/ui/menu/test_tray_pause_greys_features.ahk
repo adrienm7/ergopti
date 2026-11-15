@@ -129,7 +129,9 @@ _TPGF_EveryFeatureRowIsStagedAsAFeature() {
 		Body := _StripFullLineComments(_DriverFuncBody(Builder.Name))
 		Assert(Body != "", "the actual tray root builder " . Builder.Name . " must be readable")
 		; Only a genuine direct call reaches this shared feature staging owner.
-		Declared := RegExMatch(Body, "m)^[ \t]*_MI_StageDeclaredFeature\((.*)\)\s*$", &Call)
+		; A call may run over several lines (hotstrings): its arguments end at the
+		; first line that closes it.
+		Declared := RegExMatch(Body, "ms)^[ \t]*_MI_StageDeclaredFeature\((.*?)\)[ \t]*$", &Call)
 		; The IA row is staged by LLM_Menu_Init, which owns its persistent submenu.
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
