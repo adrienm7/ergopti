@@ -307,8 +307,12 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): the library (115 layouts, fea99ea2ab), the Comparer tables and charts and the app tabs
       are done (f0854d0f46, b200e583eb; test-layout-analysis-engine.cjs, test-layout-comparer-page.cjs); the layout
       being edited is not in the Comparer's tables, only ranked in the editor panel (done in the app 2026-11-15:
-      « Compare with other layouts », ranked against the layouts ticked there). [DECISION] the ergopti/benchmarks
-      pages do not read layout_library.json: rebuild them on the shared library, or drop that requirement.
+      « Compare with other layouts », ranked against the layouts ticked there). The benchmark page is rebuilt on the
+      shared library and engine (maintainer decision, 2026-11-15; `claude/ergopti-todo-studio-w-bench-2`, 225367b4,
+      a10f7a21): /ergopti/benchmarks frames the Studio's Comparer opened on `fr_nemolivier` and ISO through its new
+      `?corpus=`?corpus=&keyboard=` link, its KLAnextkeyboard=`?corpus=&keyboard=` link, its KLAnextformat=` link, its KLAnext screenshots are gone, its Ergo-L PDF reports too (maintainer decision, 2026-11-15: one source of
+      truth, the live Comparer), and /benchmarks still redirects there; proof:
+      site-structure.playwright.cjs (exerciseBenchmarks), layout-editor.playwright.cjs (exerciseComparerLink).
 
 - [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
       comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine
