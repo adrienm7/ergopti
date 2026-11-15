@@ -146,10 +146,8 @@ module.exports.push(
 module.exports = module.exports.concat([
 	{
 		path: 'macos/menu/ui/builder/builder.lua',
-		before:
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
-		after:
-			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }',
+		before: 'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true }',
+		after: 'local projected = { id = "foreign", boot_deferred = entry.boot_deferred == true }',
 		reason: 'current projected top-level identity replaced',
 		expected: false
 	},
@@ -163,9 +161,9 @@ module.exports = module.exports.concat([
 	{
 		path: 'macos/menu/ui/builder/builder.lua',
 		before:
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true }\n\t\tif entry.disabled == true then',
 		after:
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then',
+			'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true }\n\t\tif false then',
 		reason: 'current projected disabled declaration ignored',
 		expected: false
 	},

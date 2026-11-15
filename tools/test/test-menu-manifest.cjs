@@ -9293,7 +9293,7 @@ console.log(
 				i18n: 'menu.metrics.title',
 				rows: [],
 				checked_when: ['keystats_enabled'],
-				greyed_when_paused: true
+				boot_deferred: true
 			}
 		]
 	);

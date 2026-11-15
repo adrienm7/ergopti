@@ -372,7 +372,7 @@ function nativeTopLevelProjection(unit, lex) {
 			end
 			if not for_hs then goto continue end
 		end
-		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
@@ -383,12 +383,12 @@ function nativeTopLevelProjection(unit, lex) {
 	_top_level_cache = result
 	return _top_level_cache`;
 	const historical = current.replace(
-		`		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		`		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`,
-		`		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`
+		`		table.insert(result, { id = entry.id, boot_deferred = entry.boot_deferred == true })`
 	);
 	const declared = `
 	if not separator_facade_current() then return {} end
@@ -413,7 +413,7 @@ function nativeTopLevelProjection(unit, lex) {
 			end
 			if not for_hs then goto continue end
 		end
-		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
@@ -427,12 +427,12 @@ function nativeTopLevelProjection(unit, lex) {
 	// Retain the prior direct append obligation on this captured declaration,
 	// including the exact canonical record needed by the separator receiver.
 	const declaredHistorical = declared.replace(
-		`		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+		`		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`,
-		`		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`
+		`		table.insert(result, { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry })`
 	);
 	const shape = (value) => value.tokens.map((token) => [token.kind, token.value]);
 	return [historical, current, declared, declaredHistorical].some((text) => {
@@ -2709,7 +2709,7 @@ function nativeMacLayoutTopLevelPublication(builderSource, layoutSource, manifes
 				i18n: 'menu.layout.title',
 				rows: [],
 				checked_when: ['layout_enabled'],
-				greyed_when_paused: true
+				boot_deferred: true
 			}
 		])
 	)

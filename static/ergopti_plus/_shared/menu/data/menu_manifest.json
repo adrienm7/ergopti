@@ -248,7 +248,7 @@
 			"checked_when": [
 				"tapholds_enabled"
 			],
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"type": "group",
@@ -258,7 +258,7 @@
 			"checked_when": [
 				"shortcuts_enabled"
 			],
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"type": "group",
@@ -268,7 +268,7 @@
 			"checked_when": [
 				"gestures_enabled"
 			],
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"id": "---"
@@ -281,13 +281,13 @@
 			"checked_when": [
 				"layout_enabled"
 			],
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"type": "command",
 			"id": "ergopti_studio",
 			"i18n": "menu.studio.title",
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"type": "group",
@@ -297,7 +297,7 @@
 			"checked_when": [
 				"hotstrings_enabled"
 			],
-			"greyed_when_paused": true,
+			"boot_deferred": true,
 			"caption_count_policy": {
 				"value_getter": "hotstrings_parent_total",
 				"present_getter": "hotstrings_parent_count_present",
@@ -323,14 +323,14 @@
 			"checked_when": [
 				"keystats_enabled"
 			],
-			"greyed_when_paused": true
+			"boot_deferred": true
 		},
 		{
 			"id": "---"
 		},
 		{
 			"id": "llm",
-			"greyed_when_paused": true,
+			"boot_deferred": true,
 			"health_dot": {
 				"ready": "🟢",
 				"warming": "🟡",
@@ -339,7 +339,7 @@
 		},
 		{
 			"id": "agent",
-			"greyed_when_paused": true,
+			"boot_deferred": true,
 			"disabled": true,
 			"i18n": "menu.agent.title",
 			"reason_key": "menu.agent.not_ready"
@@ -352,7 +352,7 @@
 			"id": "apps",
 			"i18n": "menu.apps.title",
 			"rows": [],
-			"greyed_when_paused": true,
+			"boot_deferred": true,
 			"platforms": [
 				"ahk",
 				"hs",

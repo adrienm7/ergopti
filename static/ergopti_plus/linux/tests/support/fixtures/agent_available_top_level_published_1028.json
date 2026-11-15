@@ -1,4 +1,4 @@
 {
 	"id": "agent",
-	"greyed_when_paused": true
+	"boot_deferred": true
 }

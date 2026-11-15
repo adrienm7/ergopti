@@ -189,10 +189,10 @@ local function with_agent_declaration(component, body)
 			local available = require("core.text.engine.json").decode(contents)
 			helpers.assert_type(available, "table", "the published declaration must decode")
 			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
-			helpers.assert_eq(available.greyed_when_paused, true, "the published pause policy is retained")
+			helpers.assert_eq(available.boot_deferred, true, "the published boot shell mark is retained")
 			local fields = 0
 			for key in pairs(available) do
-				helpers.assert_true(key == "id" or key == "greyed_when_paused",
+				helpers.assert_true(key == "id" or key == "boot_deferred",
 					"the fixture cannot introduce readiness or owner fields")
 				fields = fields + 1
 			end

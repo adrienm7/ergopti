@@ -381,18 +381,18 @@ helpers.describe("menu drift gate (macOS): the tray root is the manifest's top l
 
 	helpers.it("a paused tray greys no row the manifest marks (edd1-paused-writes)", function()
 		-- A pause stops typing, not configuration (EDD-1, maintainer decision
-		-- 2026-11-12): `greyed_when_paused` is the AHK tray's alone. Moving the
-		-- mark onto Language must grey nothing either.
+		-- 2026-11-12): `boot_deferred` is the Windows boot shell's alone.
+		-- Moving the mark onto Language must grey nothing either.
 		local marked = 0
 		local moved = {}
 		for index, row in ipairs(top_level) do
 			local copy = {}
 			for key, value in pairs(row) do copy[key] = value end
-			if copy.greyed_when_paused == true then marked = marked + 1 end
-			if copy.id == "language" then copy.greyed_when_paused = true end
+			if copy.boot_deferred == true then marked = marked + 1 end
+			if copy.id == "language" then copy.boot_deferred = true end
 			moved[index] = copy
 		end
-		helpers.assert_true(marked >= 7, "the manifest still carries the AHK tray's mark, got " .. marked)
+		helpers.assert_true(marked >= 7, "the manifest still carries the boot shell's mark, got " .. marked)
 		local function greyed(paused)
 			local ids = {}
 			for _, row in ipairs(render_root(with_top_level(raw, moved), paused)) do

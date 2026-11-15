@@ -460,45 +460,43 @@ if (!appsRow || JSON.stringify(appsRow.platforms) !== JSON.stringify(APPS_DRIVER
 	);
 }
 
-// The manifest marks the feature rows once. Only the AHK tray still greys them
-// under Suspend: a pause stops typing, not configuration (EDD-1, 2026-11-12),
-// so the macOS and Linux roots keep them live, and the Windows agent deletes
-// the mark together with its A_IsSuspended gates. Until then the AHK pause test
-// holds the Windows builders to it. The approved
+// The manifest marks the feature rows once: the Windows boot shell leaves them
+// out of its first, global-only root (boot_deferred). No tray greys them under
+// a pause (EDD-1, 2026-11-12). The approved
 // order puts every feature before the tail, which Versions (the About row)
 // opens, so the mark must cover exactly the rows above it.
-const PAUSE_MARK = 'greyed_when_paused';
+const BOOT_DEFER_MARK = 'boot_deferred';
 const tailAt = (topLevel || []).findIndex((row) => row.id === 'about');
 let pauseMarked = 0;
 (topLevel || []).forEach((row, index) => {
-	const mark = row[PAUSE_MARK];
+	const mark = row[BOOT_DEFER_MARK];
 	if (mark !== undefined && mark !== true) {
 		errors.push(
-			`top_level "${row.id}": ${PAUSE_MARK} is ${JSON.stringify(mark)}; only true is a mark.`
+			`top_level "${row.id}": ${BOOT_DEFER_MARK} is ${JSON.stringify(mark)}; only true is a mark.`
 		);
 	}
 	if (row.id === SEPARATOR) {
 		if (mark !== undefined)
-			errors.push(`a top_level separator carries ${PAUSE_MARK}; it has no row to grey.`);
+			errors.push(`a top_level separator carries ${BOOT_DEFER_MARK}; it has no row to defer.`);
 		return;
 	}
 	if (mark === true) pauseMarked += 1;
 	const isFeature = tailAt >= 0 && index < tailAt;
 	if (isFeature && mark !== true) {
 		errors.push(
-			`the feature row "${row.id}" lacks ${PAUSE_MARK} = true: a pause would leave it live.`
+			`the feature row "${row.id}" lacks ${BOOT_DEFER_MARK} = true: the boot shell would build it before the features are ready.`
 		);
 	}
 	if (!isFeature && mark === true) {
 		errors.push(
-			`the tail row "${row.id}" carries ${PAUSE_MARK}: a pause would grey a row the user resumes or leaves with.`
+			`the tail row "${row.id}" carries ${BOOT_DEFER_MARK}: the boot shell would leave out a row the user resumes or leaves with.`
 		);
 	}
 });
 if (tailAt < 0 || pauseMarked < 7) {
 	errors.push(
-		`read ${pauseMarked} row(s) marked ${PAUSE_MARK} (floor 7) and ${tailAt < 0 ? 'no' : 'a'} Configuration ` +
-			'row — the pause-mark check compared nothing'
+		`read ${pauseMarked} row(s) marked ${BOOT_DEFER_MARK} (floor 7) and ${tailAt < 0 ? 'no' : 'a'} Configuration ` +
+			'row — the boot-shell mark check compared nothing'
 	);
 }
 

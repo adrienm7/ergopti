@@ -222,8 +222,8 @@ end
 --- tray in its old order — and a missing anchor emptied the tail, taking
 --- Reload, Quit and Debug with it.
 ---
---- Each entry keeps the manifest's `greyed_when_paused` mark, which only the
---- AHK tray still honours (EDD-1).
+--- Each entry keeps the manifest's `boot_deferred` mark, which only the
+--- Windows boot shell reads.
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
 --- @return table Array of projected entries retaining their exact canonical source records.
 local function load_top_level()
@@ -249,7 +249,7 @@ local function load_top_level()
 			end
 			if not for_hs then goto continue end
 		end
-		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
@@ -868,8 +868,8 @@ function M.generate(ctx, menu_mods, actions)
 			for _, row in ipairs(children) do
 				-- A pause stops typing, not configuration (EDD-1, maintainer
 				-- decision 2026-11-12): the feature rows stay live while paused.
-				-- The manifest's `greyed_when_paused` is read by the AHK tray alone
-				-- until its Suspend gates go.
+				-- The manifest's `boot_deferred` is the Windows boot shell's
+				-- alone.
 				table.insert(items, row)
 			end
 		end

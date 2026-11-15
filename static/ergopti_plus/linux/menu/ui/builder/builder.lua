@@ -392,8 +392,8 @@ function M.build(ctx)
 				else
 					-- A pause stops typing, not configuration (EDD-1, maintainer
 					-- decision 2026-11-12): the feature rows stay live while paused.
-					-- The manifest's `greyed_when_paused` is read by the AHK tray
-					-- alone until its Suspend gates go.
+					-- The manifest's `boot_deferred` is the Windows boot shell's
+					-- alone.
 					rows[#rows + 1] = build(ctx)
 				end
 			end

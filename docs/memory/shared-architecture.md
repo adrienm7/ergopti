@@ -606,9 +606,10 @@ Each of the three drivers builds its tray root with one loop over the manifest
 edit `manifest.toml`, not a driver. `test-menu-top-level-parity.cjs` pins the
 approved order and checks both directions of each table. The macOS and AHK drift
 gates also render a shuffled top level. No tray greys a top-level row under a
-pause any more (EDD-1, Windows since 2026-11-15). `greyed_when_paused` is read by
-the Windows boot shell alone, which leaves the marked feature rows out of its
-first, global-only root; a new feature row still needs the mark there.
+pause any more (EDD-1, Windows since 2026-11-15). `boot_deferred` (named
+`greyed_when_paused` until 2026-11-15) is read by the Windows boot shell alone,
+which leaves the marked feature rows out of its first, global-only root; a new
+feature row still needs the mark there.
 
 ### project-tap-hold-key-catalogue
 

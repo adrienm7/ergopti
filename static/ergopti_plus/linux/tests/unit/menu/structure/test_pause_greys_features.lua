@@ -5,7 +5,7 @@
 --- DESCRIPTION:
 --- A pause stops typing, not configuration (EDD-1, maintainer decision
 --- 2026-11-12): every feature row stays live while paused, whatever the
---- manifest's `greyed_when_paused` mark (now read by the AHK tray alone), and
+--- manifest's `boot_deferred` mark (the Windows boot shell's alone), and
 --- the title row resumes the script, as on macOS.
 --- ==============================================================================
 
@@ -119,22 +119,22 @@ helpers.describe("tray (linux): a pause keeps every feature row live", function(
 	end)
 
 	helpers.it("greys no row the manifest marks (edd1-paused-writes)", function()
-		-- The mark is the AHK tray's alone: moving it onto Language must grey
+		-- The mark is the Windows boot shell's alone: moving it onto Language must grey
 		-- nothing here either.
 		local ManifestMenu = require("menu.engine.manifest_menu")
 		local shipped = ManifestMenu.get_array("top_level")
 		local marked = 0
 		local moved = {}
 		for index, row in ipairs(shipped) do
-			moved[index] = { row = row, greyed_when_paused = row.greyed_when_paused }
-			if row.greyed_when_paused == true then marked = marked + 1 end
+			moved[index] = { row = row, boot_deferred = row.boot_deferred }
+			if row.boot_deferred == true then marked = marked + 1 end
 		end
-		helpers.assert_true(marked >= 7, "the manifest still carries the AHK tray's mark, got " .. marked)
+		helpers.assert_true(marked >= 7, "the manifest still carries the boot shell's mark, got " .. marked)
 		for _, entry in ipairs(moved) do
-			if entry.row.id == "language" then entry.row.greyed_when_paused = true end
+			if entry.row.id == "language" then entry.row.boot_deferred = true end
 		end
 		local ok, items = pcall(build, true)
-		for _, entry in ipairs(moved) do entry.row.greyed_when_paused = entry.greyed_when_paused end
+		for _, entry in ipairs(moved) do entry.row.boot_deferred = entry.boot_deferred end
 		helpers.assert_true(ok, "the tray must build: " .. tostring(items))
 		local metrics = row_for(items, "menu.metrics.title")
 		local language = row_for(items, "menu.global.language")

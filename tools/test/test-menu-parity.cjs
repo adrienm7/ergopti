@@ -1982,13 +1982,13 @@ const {
 	];
 	callerControls.push(
 		[
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }',
-			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }'
+			'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }',
+			'local projected = { id = "foreign", boot_deferred = entry.boot_deferred == true, declared_entry = entry }'
 		],
 		['table.insert(result, projected)', 'table.insert(result, {})'],
 		[
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }\n\t\tif entry.disabled == true then',
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }\n\t\tif false then'
+			'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }\n\t\tif false then'
 		],
 		[
 			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
@@ -2056,12 +2056,12 @@ const {
 	);
 	// The upstream disabled-row projection preserves the actual binding; the
 	// prior direct append remains a supported, independently recorded source form.
-	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+	const projection = `		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`;
-	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry })`;
 	assert.equal(builder.split(projection).length - 1, 1, 'exact current projected-row preimage');
 	assert.equal(
 		credits(source, builder.replace(projection, historicalProjection)),
@@ -2074,11 +2074,7 @@ const {
 			projection.replace('id = entry.id', 'id = "foreign"'),
 			'foreign projected identity'
 		],
-		[
-			projection,
-			projection.replace('entry.greyed_when_paused == true', 'false'),
-			'lost pause metadata'
-		],
+		[projection, projection.replace('entry.boot_deferred == true', 'false'), 'lost pause metadata'],
 		[
 			projection,
 			projection.replace('if entry.disabled == true then', 'if false then'),
@@ -3138,12 +3134,12 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	const builder = sources['macos/menu/ui/builder/builder.lua'];
 	const withBuilder = (candidate) =>
 		admits({ ...sources, 'macos/menu/ui/builder/builder.lua': candidate });
-	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
+	const projection = `		local projected = { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`;
-	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, boot_deferred = entry.boot_deferred == true, declared_entry = entry })`;
 	assert.equal(
 		builder.split(projection).length - 1,
 		1,
@@ -3160,11 +3156,7 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 			projection.replace('id = entry.id', 'id = "foreign"'),
 			'foreign projected identity'
 		],
-		[
-			projection,
-			projection.replace('entry.greyed_when_paused == true', 'false'),
-			'lost pause metadata'
-		],
+		[projection, projection.replace('entry.boot_deferred == true', 'false'), 'lost pause metadata'],
 		[
 			projection,
 			projection.replace('if entry.disabled == true then', 'if false then'),
@@ -3242,8 +3234,8 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 				)
 				.replaceAll('ManifestMenu.render_rows', 'separator_render')
 				.replaceAll(
-					'greyed_when_paused = entry.greyed_when_paused == true }',
-					'greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }'
+					'boot_deferred = entry.boot_deferred == true }',
+					'boot_deferred = entry.boot_deferred == true, declared_entry = entry }'
 				);
 		return { ...control, before: forward(control.before), after: forward(control.after) };
 	};
@@ -7050,7 +7042,7 @@ function languageParentSource(source, driver) {
 				i18n: 'menu.metrics.title',
 				rows: [],
 				checked_when: ['keystats_enabled'],
-				greyed_when_paused: true
+				boot_deferred: true
 			}
 		]
 	);
