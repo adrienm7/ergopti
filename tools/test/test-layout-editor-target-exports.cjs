@@ -146,6 +146,46 @@ function hostStep(step, input) {
 	return JSON.parse(result.stdout);
 }
 
+// The Windows driver's export step (windows/native/ergopti_lua_export.c): the
+// committed executable on Windows once its identity is committed beside it, or a
+// local build named by ERGOPTI_LUA_EXPORT_HOST (tools/build/build-lua-export-host.cjs).
+const WINDOWS_VENDOR = path.join(REPO_ROOT, 'static', 'ergopti_plus', 'windows', 'vendor');
+const WINDOWS_HOST_IDENTITY = path.join(WINDOWS_VENDOR, 'ergopti_lua_export.json');
+function windowsHostExecutable() {
+	if (process.env.ERGOPTI_LUA_EXPORT_HOST) return process.env.ERGOPTI_LUA_EXPORT_HOST;
+	if (process.platform === 'win32' && fs.existsSync(WINDOWS_HOST_IDENTITY))
+		return path.join(WINDOWS_VENDOR, 'ergopti_lua_export.exe');
+	return null;
+}
+
+/**
+ * One export step through the Windows driver's host executable, as the
+ * AutoHotkey host runs it: the shared folder, the step and a file holding the
+ * input in argv (its process runner has no stdin), the result's JSON on stdout.
+ * @param {string} executable
+ * @param {'read'|'xkb'} step
+ * @param {object} input
+ * @returns {object}
+ */
+function windowsHostStep(executable, step, input) {
+	const folder = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'ergopti-lua-export-'));
+	try {
+		const inputFile = path.join(folder, 'input.json');
+		fs.writeFileSync(inputFile, JSON.stringify(input));
+		const result = spawnSync(executable, [shared(), step, inputFile], {
+			encoding: 'utf8',
+			timeout: 30000,
+			maxBuffer: 32 * 1024 * 1024
+		});
+		if (result.error) throw new Error(`Windows export host: ${result.error.message}`);
+		// A refusal is one « code<TAB>detail » line on stdout with a non-zero exit code.
+		if (result.status !== 0) throw new Error(`Windows export host: ${result.stdout.trim()}`);
+		return JSON.parse(result.stdout);
+	} finally {
+		fs.rmSync(folder, { recursive: true, force: true });
+	}
+}
+
 async function main() {
 	// The generated KLC generator is the tool's module, wrapped verbatim.
 	assert.equal(fs.readFileSync(klcCodegen.OUT_PATH, 'utf8'), klcCodegen.buildSource());
@@ -199,20 +239,42 @@ async function main() {
 			...assets,
 			lua: { call: (step, input) => Promise.resolve(hostStep(step, input)) }
 		};
+		const executable = windowsHostExecutable();
+		const hosts = [['host', viaHost]];
+		if (executable !== null)
+			hosts.push([
+				'Windows host',
+				{
+					...assets,
+					lua: {
+						call: (step, input) => Promise.resolve(windowsHostStep(executable, step, input))
+					}
+				}
+			]);
+		const shortcutKeys = Source.read(
+			fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'shortcut_keys.toml'), 'utf8')
+		);
 		for (const [document, label] of [
 			[preserved, 'ergopti preserved'],
-			[structured, 'ergopti structured']
+			[structured, 'ergopti structured'],
+			[shortcutKeys, 'shortcut keys']
 		]) {
 			const site = await page.IO.xkbArchive(pageDoc(document), assets);
-			const host = await page.IO.xkbArchive(pageDoc(document), viaHost);
-			assert(Buffer.from(host.bytes).equals(Buffer.from(site.bytes)), `${label}: host XKB bytes`);
 			const siteKlc = await page.IO.klcFile(pageDoc(document), assets);
-			const hostKlc = await page.IO.klcFile(pageDoc(document), viaHost);
-			assert(
-				Buffer.from(hostKlc.bytes).equals(Buffer.from(siteKlc.bytes)),
-				`${label}: host KLC bytes`
-			);
+			for (const [kind, via] of hosts) {
+				const host = await page.IO.xkbArchive(pageDoc(document), via);
+				assert(
+					Buffer.from(host.bytes).equals(Buffer.from(site.bytes)),
+					`${label}: ${kind} XKB bytes`
+				);
+				const hostKlc = await page.IO.klcFile(pageDoc(document), via);
+				assert(
+					Buffer.from(hostKlc.bytes).equals(Buffer.from(siteKlc.bytes)),
+					`${label}: ${kind} KLC bytes`
+				);
+			}
 		}
+		if (executable !== null) console.log(`  Windows export host checked: ${executable}`);
 		checks++;
 	}
 

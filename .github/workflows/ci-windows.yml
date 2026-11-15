@@ -1020,6 +1020,23 @@ jobs:
         shell: pwsh
         run: ./tools/build/build_windows_network_pac.ps1 -Publish
 
+      # The layout editor window's export step host (windows/native/ergopti_lua_export.c)
+      # built from the pinned Lua archive and self-tested; not published into the
+      # bundle: its executable and identity are retained for review and committed
+      # through the same path as the PAC evaluator's.
+      - name: Build and self-test the Lua export host
+        shell: pwsh
+        run: ./tools/build/build_windows_lua_export.ps1
+
+      - name: Retain the Lua export host and its source identity
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-lua-export-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/build/native/lua_export/ergopti_lua_export.exe
+            static/ergopti_plus/windows/build/native/lua_export/ergopti_lua_export.json
+
       # The committed relay must be exactly what its sources build under the pin.
       - name: Read the pinned Go toolchain
         id: go-pin

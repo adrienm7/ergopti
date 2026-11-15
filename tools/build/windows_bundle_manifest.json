@@ -277,6 +277,10 @@
 			"dest": "vendor/ergopti_network_pac.LICENSE.txt"
 		},
 		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_lua_export.LICENSE.txt",
+			"dest": "vendor/ergopti_lua_export.LICENSE.txt"
+		},
+		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti-proxy-relay.exe",
 			"dest": "vendor/ergopti-proxy-relay.exe"
 		},
