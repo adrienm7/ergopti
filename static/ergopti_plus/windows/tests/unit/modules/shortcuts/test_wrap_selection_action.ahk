@@ -476,6 +476,10 @@ _GTTL_Case(Mode) {
 		AssertEqual(0, State.Code, "The native wrap render focus probe failed: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText)
 		AssertContains(State.Output, "PASS gesture-title-transform-target " . Mode)
+		; The 330000-unit selection is built in linear time: the quadratic
+		; build left under a second of the 12 s budget (gesture-title-build-quadratic).
+		AssertTrue(RegExMatch(State.Output, " build_ms=(\d+) ", &Build), "The child reports its selection build time.")
+		Assert(Integer(Build[1]) < 2000, "The child selection build took " . Build[1] . " ms.")
 	} catch as Err {
 		Primary := Err
 	}
