@@ -230,9 +230,10 @@ Account and tester actions (maintainer, from the PC):
 - [ ] EDD-1 on AHK, a pause stops typing, not configuration (moved 2026-11-15 from TODO.md « EDD-1 on AHK »; 392ae998,
       [pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md)): once the suspend
       gates of prompt_editor, paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker,
-      model_browser, menu_llm and `greyed_when_paused` are removed, a PC run confirms: a save while suspended writes
-      the file, the configuration and install rows stay live, and nothing that acts on typing stays active under
-      Suspend.
+      model_browser and menu_llm are removed (the tray greying went on 2026-11-15, `greyed_when_paused` is now
+      `boot_deferred`), a PC run confirms: a save while suspended writes the file, the configuration and install rows
+      stay live, a click that still waits for the resume shows the paused notice once, the tray rebuilds after a
+      pause and a resume, and nothing that acts on typing stays active under Suspend.
 - [ ] Immediate-Backspace restoration after Notepad-paste and terminal expansions (moved 2026-11-15 from TODO.md
       « Remaining code work »; c448c6d1ff): once the Notepad and terminal owners keep an undo record, a PC run in
       Notepad and in a terminal qualifies that the undo burst goes through the same owned output as the expansion (the

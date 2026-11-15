@@ -1306,6 +1306,12 @@ between workers) green alone. All live checks pass, typed by the harness.
       paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker, model_browser, menu_llm and
       `greyed_when_paused` remain, each classified against windows-inventory.md; the PC run that confirms them is in
       TODO-tests-windows.md (2026-11-15).
+      [CODE] Progress (2026-11-15, branch `claude/ergopti-pause-c2-drop-greyed`): the tray root rebuilds under a pause
+      (61488e32e5 on dev); the tray greys no feature row any more and the watchdog rebuilds the root once a pause or
+      resume settled (c3f678a972, test_tray_pause_greys_features.ahk); every click-reached handler that still refuses
+      while paused shows `notify.paused_refused` (667663b685, 72fb9945e5, test_bridge_suspend_guard.ahk
+      paused-refusal-notice); the key is now `boot_deferred`, the Windows boot shell's alone (ca4af9d52d). Left: the A
+      and B gates themselves (a paused save writes), the AI menus' deferred work, then the PC run.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
