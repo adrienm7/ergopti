@@ -366,11 +366,13 @@ function M.init(deps)
 	Logger.success(LOG, "Initialized (physical magic key %s).", M.get())
 end
 
---- Whether a key can be captured now: the daemon owns the keyboard and is not
---- paused, as macOS greys the row while paused — a paused driver takes no key.
+--- Whether a key can be captured now: the daemon owns the keyboard. A pause
+--- admits it (EDD-1, decided by the coordinator on 2026-11-14): the chosen key
+--- is saved at once and stays inert until resume, since on_key types nothing
+--- while paused; a pause or resume during the capture cancels it.
 --- @return boolean
 function M.can_capture()
-	return _deps ~= nil and _deps.can_capture() == true and _deps.is_active() == true
+	return _deps ~= nil and _deps.can_capture() == true
 end
 
 --- Fences pending and deferred captured choices at a committed pause boundary.

@@ -1345,7 +1345,8 @@ local function main()
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
-			if paused then MagicKeySource.cancel_capture() end
+			-- A capture never crosses a pause boundary, either way.
+			MagicKeySource.cancel_capture()
 			-- A dead key pending in the emulation must not compose after the resume.
 			if paused then require("modules.keymap.layout_emulation").drop_pending_dead_key() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end

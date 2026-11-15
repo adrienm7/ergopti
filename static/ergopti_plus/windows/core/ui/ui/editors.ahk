@@ -255,7 +255,10 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 ; The physical magic key captured by pressing it: the next key pressed while this
 ; dialog shows becomes [hotstrings] magic_key_source. Escape, closing the dialog
 ; or the shared capture timeout changes nothing. It shares the magic-key editor's
-; owner (one suppressive capture at a time, stopped by Suspend and by Close).
+; owner (one suppressive capture at a time, stopped by Close and by a pause or a
+; resume). It runs while paused (EDD-1, decided by the coordinator on
+; 2026-11-14): the key is saved at once and stays inert until resume, since the
+; suspended driver remaps nothing.
 ;
 ; The key is read from the keyboard hook's PHYSICAL key state, never from the
 ; scan code the InputHook reports: a remap hotkey suppresses the key it fires on,
@@ -268,8 +271,8 @@ ModifyMagicKey(gui, NewValue, WriterFn := 0, NotifyFn := 0, ReloadFn := 0) {
 ; installed, which it always is in this driver.
 MagicKeySourceCapture(*) {
 		global _MagicKeyEditorInputHook, _MagicKeyEditorStopDebt, _MagicKeyEditorGui
-		if A_IsSuspended
-				return
+		; The pause state the capture belongs to: a pause or resume ends it.
+		StartedSuspended := A_IsSuspended
 		if IsObject(_MagicKeyEditorInputHook) {
 				; A live capture keeps its owner and comes back to the front: its
 				; hook swallows the next key typed anywhere.
@@ -296,16 +299,16 @@ MagicKeySourceCapture(*) {
 				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
-						if A_IsSuspended or IsObject(_MagicKeyEditorInputHook)
+						if A_IsSuspended != StartedSuspended or IsObject(_MagicKeyEditorInputHook)
 								return
 						_MagicKeyEditorInputHook := IH
 						_MagicKeyEditorGui := GuiToShow
 						_MagicKeyEditorStopDebt := false
 						IH.Start()
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 						GuiToShow.Show("Center")
-						if A_IsSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
+						if A_IsSuspended != StartedSuspended || _MagicKeyEditorInputHook != IH || _MagicKeyEditorGui != GuiToShow
 								return
 				} finally {
 						Critical("Off")
@@ -334,7 +337,7 @@ MagicKeySourceCapture(*) {
 
 		; A completed candidate can outlive external Close or pause/resume. Its
 		; retained Scan/Stopped result is valid only for the terminal owner.
-		if !CaptureSettled || A_IsSuspended
+		if !CaptureSettled || A_IsSuspended != StartedSuspended
 				return
 		; Escape, Close and the timeout all end without an answer.
 		if (IH.EndReason != "Stopped")

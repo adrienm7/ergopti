@@ -167,7 +167,7 @@ helpers.describe("magic key source menu: choosing a key", function()
 		end)
 	end)
 
-	helpers.it("(magic-key-source) the rows label keys by the input source and grey capture while paused", function()
+	helpers.it("(paused-magic-capture) the rows label keys by the input source and keep capture while paused", function()
 		with_menu(function(Menu)
 			local rows = Menu.rows(context(true))
 			local items = rows[1].items
@@ -179,7 +179,9 @@ helpers.describe("magic key source menu: choosing a key", function()
 			helpers.assert_true(found, "KeyJ is labelled by what the input source types on it")
 			local paused = context(true)
 			paused.paused = true
-			helpers.assert_true(Menu.rows(paused)[1].items[1].disabled, "no capture while Ergopti is paused")
+			-- EDD-1: the capture runs while paused (decided on 2026-11-14).
+			helpers.assert_eq(Menu.rows(paused)[1].items[1].disabled == true, false, "the capture runs while paused")
+			helpers.assert_type(Menu.rows(paused)[1].items[1].action, "function", "the paused capture row presses a key")
 		end)
 	end)
 end)
@@ -529,7 +531,23 @@ helpers.describe("magic key source menu: retained event provenance fences", func
 end)
 
 helpers.describe("magic key source menu: live pause admission", function()
-	for _, invalid in ipairs({ "missing", "paused", "pending", "unknown", "negative", "fractional", "throw" }) do
+	-- A settled pause admits the capture: the key is saved at once and stays
+	-- inert until resume, since the paused keymap remaps nothing. Before, a
+	-- paused driver refused it (paused-magic-capture).
+	helpers.it("(paused-magic-capture) a settled pause captures and saves the key", function()
+		with_menu(function(Menu, world)
+			local ctx = context(true)
+			world.pause.paused = true
+			helpers.assert_true(Menu.capture(ctx), "a paused driver captures")
+			helpers.assert_true(world.taps[1].callback(key_down(KEYCODE_J)))
+			run_deferred(world)
+			helpers.assert_eq(ctx.saves, 1, "the paused choice is saved at once")
+			helpers.assert_eq(ctx.state.magic_key_source, "KeyJ")
+			helpers.assert_eq(Menu.capturing(), false)
+		end)
+	end)
+
+	for _, invalid in ipairs({ "missing", "pending", "unknown", "negative", "fractional", "throw" }) do
 		helpers.it("refuses capture with " .. invalid .. " live pause state before acquisition", function()
 			with_menu(function(Menu, world)
 				local ctx = context(true)

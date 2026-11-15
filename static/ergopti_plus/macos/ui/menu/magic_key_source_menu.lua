@@ -146,8 +146,12 @@ local function stop_capture(live)
 end
 
 --- Reads only the already-loaded script-control owner, never a menu snapshot.
+--- A settled pause admits the capture (EDD-1, decided by the coordinator on
+--- 2026-11-14): the chosen key is saved at once and stays inert until resume,
+--- since the paused keymap remaps nothing. A transition still refuses it.
 --- @return table|nil owner Exact pause-state provider.
---- @return integer|nil epoch Settled active generation.
+--- @return integer|nil epoch Settled pause generation.
+--- @return boolean|nil paused Settled pause state.
 local function capture_pause_source()
 	local owner = package.loaded["modules.shortcuts.script_control"]
 	if type(owner) ~= "table" or type(owner.is_paused) ~= "function"
@@ -157,17 +161,19 @@ local function capture_pause_source()
 	local observed, paused, pending, epoch = pcall(function()
 		return owner.is_paused(), owner.is_pause_transition_pending(), owner.get_pause_epoch()
 	end)
-	if not observed or paused ~= false or pending ~= false or type(epoch) ~= "number"
+	if not observed or type(paused) ~= "boolean" or pending ~= false or type(epoch) ~= "number"
 		or epoch < 0 or epoch % 1 ~= 0 then return nil end
-	return owner, epoch
+	return owner, epoch, paused
 end
 
---- Whether the original active generation still owns this captured choice.
+--- Whether the original pause generation still owns this captured choice: a
+--- pause or a resume during the capture cancels it.
 --- @param live table Capture owner.
 --- @return boolean current
 local function capture_pause_current(live)
-	local owner, epoch = capture_pause_source()
+	local owner, epoch, paused = capture_pause_source()
 	return owner ~= nil and owner == live.pause_owner and epoch == live.pause_epoch
+		and paused == live.pause_paused
 end
 
 --- Captures the next physical key pressed as the physical magic key.
@@ -180,13 +186,14 @@ function M.capture(ctx)
 			return false
 		end
 	end
-	local pause_owner, pause_epoch = capture_pause_source()
+	local pause_owner, pause_epoch, pause_paused = capture_pause_source()
 	if pause_owner == nil then
-		Logger.error(LOG, "Physical magic key capture refused without a settled active script state.")
+		Logger.error(LOG, "Physical magic key capture refused without a settled script state.")
 		return false
 	end
 	Source.resolver() -- Warm the registry before the event callback.
-	local live = { answered = false, active = false, pause_owner = pause_owner, pause_epoch = pause_epoch }
+	local live = { answered = false, active = false, pause_owner = pause_owner, pause_epoch = pause_epoch,
+		pause_paused = pause_paused }
 	_capture = live -- Own every candidate before construction or activation.
 	local function settle(keycode, keyboard_type)
 		local current = capture_pause_current(live)
@@ -292,7 +299,7 @@ end
 -- ============================
 
 --- The `magic_key_source` list rows.
---- @param ctx table { state, save_prefs, keymap, update_menu, paused }
+--- @param ctx table { state, save_prefs, keymap, update_menu }
 --- @return table rows
 function M.rows(ctx)
 	local started = PhaseStats.now()
@@ -311,7 +318,7 @@ function M.rows(ctx)
 			return key_text(native)
 		end,
 		choose = function(value) M.choose(ctx, value) end,
-		capture = ctx.paused ~= true and function() M.capture(ctx) end or nil,
+		capture = function() M.capture(ctx) end,
 	})
 	PhaseStats.stop("menu_keyboard_layout.magic_key", started)
 	return rows

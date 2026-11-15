@@ -8,7 +8,7 @@ if A_Args.Length != 7 || !Map("character", true, "source", true).Has(A_Args[1])
 	ExitApp(2)
 _MESC_Modes := Map("live", true, "cancel", true, "completed-close", true, "completed-paused-resumed", true,
 	"completed-close-successor", true, "stop-refusal", true, "stop-reentrant", true,
-	"scalar-pair", true, "invalid-high-BMP", true, "invalid-low", true, "invalid-max", true)
+	"scalar-pair", true, "invalid-high-BMP", true, "invalid-low", true, "invalid-max", true, "paused-live", true)
 if !_MESC_Modes.Has(A_Args[2])
 	ExitApp(2)
 global _MagicKeyEditorInputHook := "", _MagicKeyEditorStopDebt := false, _MagicKeyEditorGui := ""
@@ -278,11 +278,14 @@ _MESC_Exit(Reason, Code) {
 }
 
 try {
+	; A capture opened while paused completes and persists (paused-magic-capture).
+	if _MESC.Mode == "paused-live"
+		Suspend(true)
 	_MESC_Open()
 	if IsObject(_MESC.Failure)
 		throw _MESC.Failure
 	_MESC_Original := _MESC.Hooks[1]
-	_MESC_Expected := _MESC.Mode == "live" || _MESC.Mode == "scalar-pair" ? 1 : 0
+	_MESC_Expected := _MESC.Mode == "live" || _MESC.Mode == "scalar-pair" || _MESC.Mode == "paused-live" ? 1 : 0
 	FileAppend("RECEIPT editor=" . _MESC.Editor . " mode=" . _MESC.Mode . " publish_calls=" . _MESC.Calls
 		. " expected=" . _MESC_Expected . " stops=" . _MESC_Original.Stops . " reason=" . _MESC_Original.EndReason . "`n", "*")
 	_MESC_Require(_MESC_Original.Starts == 1 && _MESC.Calls == _MESC_Expected,

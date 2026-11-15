@@ -236,14 +236,27 @@ helpers.describe("magic key source: choosing a key", function()
 		end)
 	end)
 
-	helpers.it("(magic-key-source) no capture while the driver is paused, as on macOS", function()
+	-- EDD-1, decided by the coordinator on 2026-11-14: the capture runs while
+	-- paused, the key is saved at once and stays inert until resume. Before,
+	-- a paused driver refused the capture (paused-magic-capture).
+	helpers.it("(paused-magic-capture) a paused capture saves the key, inert until resume", function()
 		with_source(nil, function(Source)
 			local state = { active = false, replace = true, typed_ok = true }
-			wire(Source, state)
-			helpers.assert_eq(Source.can_capture(), false, "the menu greys the row")
-			helpers.assert_eq(Source.capture({ on_chosen = function() end, on_refused = function() end }), false)
+			local calls = wire(Source, state)
+			local chosen = {}
+			helpers.assert_true(Source.can_capture(), "a paused driver captures")
+			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end,
+				on_refused = function() end }))
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }), "the captured key reaches no application")
+			run_due(calls)
+			helpers.assert_eq(chosen, { "KeyJ" }, "the paused choice is saved at once")
+			helpers.assert_eq(Source.on_key({ code = KEY_J, mods = {} }), false, "the paused driver types nothing")
+			helpers.assert_eq(#calls.typed, 0)
 			state.active = true
-			helpers.assert_true(Source.can_capture(), "resumed, it captures again")
+			helpers.assert_true(Source.on_key({ code = KEY_J, mods = {} }), "resumed, the chosen key types the magic key")
+			helpers.assert_true(Source.capture({ on_chosen = function() end, on_refused = function() end }))
+			Source.cancel_capture()
+			helpers.assert_eq(Source.on_key({ code = KEY_C, mods = {} }), false, "a pause boundary cancels the capture")
 			Source._reset_for_test()
 		end)
 	end)

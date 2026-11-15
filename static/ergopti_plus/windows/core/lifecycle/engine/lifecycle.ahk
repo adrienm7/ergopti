@@ -739,6 +739,11 @@ Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
 		if IsSet(ScriptShortcutPausedChordsOnSuspend)
 			ScriptShortcutPausedChordsOnSuspend(false)
+		; A magic key capture opened while paused never crosses the resume.
+		global _MagicKeyEditorInputHook
+		if IsSet(_MagicKeyEditorInputHook) and IsObject(_MagicKeyEditorInputHook)
+			_LifecycleRunRequiredStep(Transition, "magic-key-editor-input-hook",
+				() => _MagicKeyEditorStopOwned(_MagicKeyEditorInputHook), true)
 		if IsSet(ProgramActions_Stop)
 			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")

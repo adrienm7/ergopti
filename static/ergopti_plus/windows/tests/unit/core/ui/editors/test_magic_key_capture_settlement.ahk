@@ -100,6 +100,12 @@ for _MESC_Editor in ["character", "source"]
 		Test("Magic Key capture settlement: " . _MESC_Editor . " " . _MESC_Mode . " (magic-key-capture-settlement)",
 			_MESC_Case.Bind(_MESC_Editor, _MESC_Mode))
 
+; EDD-1, decided by the coordinator on 2026-11-14: the physical magic key
+; capture runs while paused and saves the key at once; it stays inert until
+; resume. Before, a paused driver refused it (paused-magic-capture).
+Test("Magic Key capture settlement: source paused-live persists the key captured while paused (paused-magic-capture)",
+	_MESC_Case.Bind("source", "paused-live"))
+
 for _MESC_ScalarMode in ["scalar-pair", "invalid-high-BMP", "invalid-low", "invalid-max"]
 	Test("Magic Key scalar settlement: " . _MESC_ScalarMode . " never persists partial units (magic-key-scalar-settlement)",
 		_MESC_Case.Bind("character", _MESC_ScalarMode))
