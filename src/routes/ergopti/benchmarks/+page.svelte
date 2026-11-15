@@ -34,9 +34,6 @@
 	let comparerFrame;
 	let comparerHeight = 900;
 
-	let ergol = 'en_fr';
-	let version_1dfh = '_1dk';
-
 	onMount(() => {
 		const resize = (event) => {
 			if (!comparerFrame || event.source !== comparerFrame.contentWindow) return;
@@ -47,10 +44,6 @@
 		window.addEventListener('message', resize);
 		return () => window.removeEventListener('message', resize);
 	});
-
-	function getErgolPdf() {
-		return asset(`benchmarks/ergol/v2.1/analyse_ergol_ergopti${version_1dfh}_v2.1_${ergol}.pdf`);
-	}
 </script>
 
 <svelte:head>
@@ -121,35 +114,6 @@
 			height={comparerHeight}
 			bind:frame={comparerFrame}
 		/>
-
-		<h3>Analyse Ergo‑L</h3>
-		<p>
-			Réalisée à l’aide de l’analyseur disponible ici : <a
-				class="link"
-				href="https://github.com/Nuclear-Squid/ergol"
-				target="_blank">https://github.com/Nuclear-Squid/ergol</a
-			>.
-		</p>
-		<div style="display:flex; align-items:center; justify-content:left; flex-wrap: wrap;">
-			<select bind:value={ergol} style="height: 2.5rem; display:block; margin-right: 15px">
-				<option value="en_fr">Français + Anglais</option>
-				<option value="fr">Français</option>
-				<option value="en">Anglais</option>
-				<option value="panache">Panaché (Pyjam)</option>
-				<option value="essais">Essais (Pyjam)</option>
-			</select>
-			<select bind:value={version_1dfh} style="height: 2.5rem; display:block;">
-				<option value="_1dk">1DFH avec touche 1DK</option>
-				<option value="">Standard</option>
-			</select>
-		</div>
-		{#if true}
-			<a href={getErgolPdf()}
-				><button style="height: 2.5rem; margin-top:15px">Télécharger l’analyse Ergo‑L</button></a
-			>
-			<tiny-space></tiny-space>
-			<embed src={getErgolPdf()} type="application/pdf" width="100%" height="600px" />
-		{/if}
 
 		<AnalyseErgoptiPlus></AnalyseErgoptiPlus>
 		<ComparateursDispositions></ComparateursDispositions>

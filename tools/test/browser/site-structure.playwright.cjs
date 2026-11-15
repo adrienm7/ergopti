@@ -207,8 +207,8 @@ async function expectSingleFrameLoads(
 /**
  * (benchmarks-shared-engine) The benchmark page's results are the Studio's own
  * Comparer, framed: the shared library ranked by the shared engine on a shared
- * corpus, opened on French text on an ISO keyboard, with no screenshot or list
- * of its own; the frame grows to the Comparer's height.
+ * corpus, opened on French text on an ISO keyboard, with no screenshot, PDF
+ * report or list of its own; the frame grows to the Comparer's height.
  * @param {import('playwright').Page} page - On /ergopti/benchmarks.
  */
 async function exerciseBenchmarks(page) {
@@ -237,6 +237,11 @@ async function exerciseBenchmarks(page) {
 		await page.locator('img[alt^="Screenshot de benchmark sur le clavier"]').count(),
 		0,
 		'No result screenshot beside the live comparison'
+	);
+	assert.equal(
+		await page.locator('embed[src*="benchmarks/ergol"], a[href*="benchmarks/ergol"]').count(),
+		0,
+		'No archived Ergo-L report beside the live comparison (maintainer, 2026-11-15)'
 	);
 }
 
