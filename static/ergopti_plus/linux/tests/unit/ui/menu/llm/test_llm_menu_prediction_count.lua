@@ -137,7 +137,7 @@ local function with_numeric_menu(options, exercise)
 		package.loaded["infra.manifest_menu"] = renderer
 		local log = { prompts = {}, changed = 0, notices = 0, notice_texts = {}, reports = 0 }
 		if options.case_twin then writer.set_case_twin_reporter(function() log.reports = log.reports + 1 end) end
-		package.loaded["adapters.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
+		package.loaded["platform.system.notifier"] = { send = function(text) log.notices = log.notices + 1; log.notice_texts[#log.notice_texts + 1] = text; return true end }
 		package.loaded["core.ui.ui.numeric_prompt"] = { ask = function(spec, webview)
 			log.prompts[#log.prompts + 1] = { spec = spec, webview = webview }
 		end }

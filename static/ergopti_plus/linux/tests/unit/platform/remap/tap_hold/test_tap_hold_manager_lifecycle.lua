@@ -92,7 +92,7 @@ os.remove(user_path)
 	end)
 
 	helpers.it("keeps a delayed copy retry out of a newly focused field", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "adapters.notifier" }
+		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, field = nil, "first"
 		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
@@ -100,7 +100,7 @@ os.remove(user_path)
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.notifier"] = { send = function() return true end }
+		package.loaded["platform.system.notifier"] = { send = function() return true end }
 		local Manager, path
 		local ok, err = xpcall(function()
 			local hook, actions
@@ -135,7 +135,7 @@ os.remove(user_path)
 	end)
 
 	helpers.it("reports an explicit refusal of the delayed copy retry", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "adapters.notifier" }
+		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local callback, warnings, calls = nil, 0, 0
 		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
@@ -143,7 +143,7 @@ os.remove(user_path)
 			after = function(_, fn) callback = fn; return { armed = true } end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.notifier"] = { send = function() warnings = warnings + 1; return true end }
+		package.loaded["platform.system.notifier"] = { send = function() warnings = warnings + 1; return true end }
 		local Manager, path
 		local ok, err = xpcall(function()
 			local hook, actions
@@ -769,7 +769,7 @@ helpers.describe("native OneShot Manager route", function()
 		s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 220)
 	end
 	helpers.it("permits a copy retry after a configured pair key is released", function()
-		local names = { "adapters.clipboard", "core.events.timer_scheduler", "adapters.notifier" }
+		local names = { "adapters.clipboard", "core.events.timer_scheduler", "platform.system.notifier" }
 		local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 		local timer
 		package.loaded["adapters.clipboard"] = { change_counter = function() return 100 end }
@@ -777,7 +777,7 @@ helpers.describe("native OneShot Manager route", function()
 			after = function(_, callback) timer = callback; return { armed = true } end,
 			cancel = function() return true end,
 		}
-		package.loaded["adapters.notifier"] = { send = function() return true end }
+		package.loaded["platform.system.notifier"] = { send = function() return true end }
 		local ok, err = xpcall(function()
 			Fixture.with_manager_session({ before_manager = function(s)
 				s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'

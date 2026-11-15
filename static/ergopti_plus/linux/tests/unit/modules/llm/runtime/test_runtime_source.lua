@@ -388,7 +388,7 @@ for _, stale in ipairs({ false, true }) do
 		diagnostic_origin(v,'original');v.reads=0
 		if stale then v.on_read=function(count)if count==2 then v.bytes=v.bytes..'# external source edit\n'end end end
 		local notices, logs=0,0
-		package.loaded['adapters.notifier']={send=function(_,options)
+		package.loaded['platform.system.notifier']={send=function(_,options)
 			notices=notices+1;eq(options.level,'error');return true
 		end}
 		v.on_log=function(template)

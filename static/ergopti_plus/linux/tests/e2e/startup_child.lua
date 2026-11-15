@@ -129,8 +129,8 @@ io.popen = function(command, ...) watch_command(command); return real_popen(comm
 -- A feature switched off is announced at the error level on purpose
 -- (_shared/menu/engine/feature_notice.lua); the delimiter steps name the one they cause.
 local expected_off_notice = nil
-package.preload["adapters.notifier"] = function()
-	local notifier = dofile("adapters/notifier.lua")
+package.preload["platform.system.notifier"] = function()
+	local notifier = dofile("platform/system/notifier.lua")
 	local send = notifier.send
 	notifier.send = function(message, opts)
 		if type(opts) == "table" and opts.level == "error" then

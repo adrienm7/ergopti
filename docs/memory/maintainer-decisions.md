@@ -302,7 +302,7 @@ gesture modes and step sizes of macOS and Linux (`gestures.modes`,
 sections and the shared swipe-slot template), through a raw HID digitizer
 reader the driver owns: `RegisterRawInputDevices` for usage page 0x0D, usage
 0x05 (`modules/gestures/raw_touchpad.ahk`, natives in
-`adapters/raw_input.ahk`), contact X/Y and contact count read with `HidP_*`
+`platform/system/raw_input.ahk`), contact X/Y and contact count read with `HidP_*`
 from the preparsed descriptor, travel turned into millimetres with the
 descriptor's logical-to-physical scale, and the shared step and reversal rule
 ported to AutoHotkey and pinned by `_shared/tests/corpus/gestures/incremental_steps.json`.

@@ -65,7 +65,7 @@ correct in isolation while the flush called neither.
 ### Writing a table nobody reads is the same blank panel as not writing it
 
 Both halves land in the same change, or the second half looks like the first
-half not working. The same rule applies to adapters: `adapters/notifier.lua` was
+half not working. The same rule applies to adapters: `platform/system/notifier.lua` was
 deleted once under ADR-008 for having no callers — the file made the port matrix
 answer "does Linux notify?" affirmatively by inspection while the practical
 answer was no.

@@ -18,7 +18,7 @@ local BUNDLE = "/Applications/ErgoptiPlus.app/Contents/Resources/static/ergopti_
 --- @param body function Receives (H).
 local function with_collectors(body)
 	helpers.with_stub_scope({
-		"core.logger.engine.logger", "ui.healthcheck.helpers", "modules.updater", "adapters.system_info",
+		"core.logger.engine.logger", "ui.healthcheck.helpers", "modules.updater", "platform.system.info",
 	}, function()
 		helpers.load_with_stubs("core.logger.engine.logger", { configdir = BUNDLE })
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -26,7 +26,7 @@ local function with_collectors(body)
 			current_version = function() return LAUNCHER_VERSION end,
 			installed_channel = function() return "main" end,
 		}
-		package.loaded["adapters.system_info"] = {
+		package.loaded["platform.system.info"] = {
 			runtime_version = function() return "1.1.1" end,
 		}
 		package.loaded["ui.healthcheck.helpers"] = nil

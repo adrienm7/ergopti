@@ -48,7 +48,7 @@ local DEFAULT_DEPS = {
 	end,
 	--- Tells the user, once, why curl is refused.
 	notify = function(title, body)
-		return require("adapters.notifier").send(title, { body = body, kind = "error" })
+		return require("platform.system.notifier").send(title, { body = body, kind = "error" })
 	end,
 }
 

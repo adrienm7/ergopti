@@ -20,7 +20,7 @@ local SETTINGS_URL =
 local SUBJECT_MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.fs.adapters.file_system",
-	"adapters.screen_capture",
+	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
 	"core.ui.engine.notifications",
 	"core.logger.engine.logger",

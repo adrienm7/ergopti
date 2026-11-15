@@ -60,7 +60,7 @@ local _permission_reset_pending = false
 -- ===================================
 -- ===================================
 
-local function capture_adapter() return require("adapters.screen_capture") end
+local function capture_adapter() return require("platform.system.screen_capture") end
 local function file_system() return require("core.fs.adapters.file_system") end
 local function logger() return require("core.logger.engine.logger") end
 

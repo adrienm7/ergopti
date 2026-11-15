@@ -827,7 +827,7 @@ Hammerspoon never applies; macOS lists the runtime as "Hammerspoon" and applies
 a new grant only after a restart. Without it the selector still appears, then
 the capture fails or omits every window. Every capture entry point goes
 through `modules/shortcuts/actions/screen_capture_flow.lua`: check
-`adapters/screen_capture.lua` before launch, capture into an owned file (never
+`platform/system/screen_capture.lua` before launch, capture into an owned file (never
 `-c`, which leaves nothing to verify), then read the image back from the
 pasteboard before announcing success. screencapture's own help says Control
 held during an interactive capture sends it to the clipboard; Ctrl+H is still
@@ -1441,7 +1441,7 @@ the field run of 2026-11-01 interrupted it after 10315 slices and started over
 returns `false, ROLLOVER_WAITS_FOR_RECOVERY` without draining, the watcher says
 so once at INFO and completes the rotation on the first tick after the recovery;
 a real stall stays a WARNING. `_recovery_pause_sec` now scales the pause to
-0.5 % of a core on battery (`adapters/power_source.lua`) and keeps full speed on
+0.5 % of a core on battery (`platform/system/power_source.lua`) and keeps full speed on
 the mains. Reconstruction now uses a backup of the exact admitted writer handle
 and builds derived tables privately. Only a complete partition replaces its old
 rows, in the same transaction as its publication metadata; the global cache

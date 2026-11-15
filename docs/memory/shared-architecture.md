@@ -320,7 +320,7 @@ refuses only an action that reads the active window
 (`GESTURE_ACTIONS_ON_ACTIVE_WINDOW`), Linux reads it (`TARGETS`) before the
 question. Windows
 native calls of system actions go through
-`adapters/system_control.ahk`: the modules/infra/platform OS-call ratchet has
+`platform/system/control.ahk`: the modules/infra/platform OS-call ratchet has
 almost no headroom left.
 
 ### project-text-case-is-one-rule

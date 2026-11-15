@@ -28,7 +28,7 @@ local function with_permissions(states, body)
 			is_trusted = function() return table.unpack(states.accessibility, 1, 2) end,
 			request_prompt = function() prompts[#prompts + 1] = "accessibility" return true end,
 		}
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function() return table.unpack(states.screen_recording, 1, 2) end,
 			request_permission = function() prompts[#prompts + 1] = "screen" return true end,
 		}

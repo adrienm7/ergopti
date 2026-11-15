@@ -25,7 +25,7 @@ local M = {}
 --- @return boolean admitted Exact native command admission result.
 function M.send(message, opts)
 	local notifier = require("platform.focus.application_notifier_core").new(
-		require("adapters.notifier")._send_application, require("core.ui.engine.window_titles").compose)
+		require("platform.system.notifier")._send_application, require("core.ui.engine.window_titles").compose)
 	return notifier.send(message, opts)
 end
 
@@ -37,7 +37,7 @@ end
 function M.send_owned(message, opts, native_admit)
 	if type(native_admit) ~= "function" then return false end
 	local notifier = require("platform.focus.application_notifier_core").new(
-		require("adapters.notifier")._send_application_owned, require("core.ui.engine.window_titles").compose)
+		require("platform.system.notifier")._send_application_owned, require("core.ui.engine.window_titles").compose)
 	return notifier.send(message, opts, native_admit)
 end
 

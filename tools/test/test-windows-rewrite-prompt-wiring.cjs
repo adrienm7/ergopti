@@ -370,7 +370,7 @@ check(
 );
 const screenshots = read('modules/gestures/screenshots.ahk');
 // The GDI and GDI+ calls live at the native boundary, beside the owner.
-const screenCapture = read('adapters/screen_capture.ahk');
+const screenCapture = read('platform/system/screen_capture.ahk');
 check(
 	bodyOf(screenCapture, '_GestureScreenshotCaptureScreenGdip').includes(
 		'_GestureScreenshotGdipWrite(&Image, Stage, Encoder, MaxEdge)'

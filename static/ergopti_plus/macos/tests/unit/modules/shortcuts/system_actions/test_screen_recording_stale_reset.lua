@@ -15,7 +15,7 @@ local helpers = require("tests.helpers")
 local BUNDLE_ID = "com.ergoptiplus.app.hammerspoon"
 
 local SUBJECT_MODULES = {
-	"adapters.screen_capture",
+	"platform.system.screen_capture",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -31,7 +31,7 @@ local function with_gate(options, scenario)
 		local f = { events = {}, notifications = {}, resets = {}, logs = { error = {}, warn = {} } }
 		local function event(name) f.events[#f.events + 1] = name end
 
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function()
 				if opts.granted == nil and opts.query_fails then return nil, "tcc down" end
 				return opts.granted == true

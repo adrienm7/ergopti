@@ -6,7 +6,7 @@
 --- Proves the sentinel that keeps the suite from showing real notifications is
 --- first on PATH, so no test can reach the real program, and answers a spawn
 --- with a record and a failure. It fails when children would resolve the real
---- notify-send, when a case's require("adapters.notifier") is not the recording
+--- notify-send, when a case's require("platform.system.notifier") is not the recording
 --- seam, or when a notice that reaches the real notifier would not fail the run
 --- with its test case named.
 --- ==============================================================================
@@ -60,7 +60,7 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 	end)
 
 	helpers.it("resolves every case's notifier to the recording seam", function()
-		local notifier = require("adapters.notifier")
+		local notifier = require("platform.system.notifier")
 		helpers.assert_true(notifier == NoticeRecorder.notifier(), "a case's notifier is the recorder")
 		helpers.assert_eq(notifier.send("probe body", { title = "probe", level = "warning" }), true,
 			"the recorder admits the notice as the real adapter would")
@@ -79,7 +79,7 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 		os.remove(record)
 		-- The real adapter, loaded past the recorder: what a fixture that loads
 		-- adapters.notifier itself, without the shell seams, would send through.
-		local Notifier = helpers.fresh_module("adapters.notifier")
+		local Notifier = helpers.fresh_module("platform.system.notifier")
 		helpers.assert_true(Notifier ~= NoticeRecorder.notifier(), "the fixture holds the real adapter")
 		redirect_record(record)
 		local sent_ok, sent = pcall(Notifier.send, "escaped body", { title = "escaped" })
@@ -110,20 +110,20 @@ helpers.describe("notify-send spawn guard (nui-003-spawn-guard)", function()
 	-- value outside the cases must never become that double.
 	local fixture_double = { send = function() return true end }
 	local saved_recorder, restored = nil, false
-	local before_fixture = package.loaded["adapters.notifier"]
+	local before_fixture = package.loaded["platform.system.notifier"]
 	helpers.it("keeps a fixture's notifier double installed across cases", function()
-		saved_recorder = package.loaded["adapters.notifier"]
-		package.loaded["adapters.notifier"] = fixture_double
+		saved_recorder = package.loaded["platform.system.notifier"]
+		package.loaded["platform.system.notifier"] = fixture_double
 	end)
 	helpers.it("lets the fixture restore the recorder it saved", function()
 		if saved_recorder == nil then return end
-		helpers.assert_true(package.loaded["adapters.notifier"] == fixture_double, "the fixture still owns the notifier")
-		package.loaded["adapters.notifier"] = saved_recorder
+		helpers.assert_true(package.loaded["platform.system.notifier"] == fixture_double, "the fixture still owns the notifier")
+		package.loaded["platform.system.notifier"] = saved_recorder
 		restored = true
 	end)
-	local outside = package.loaded["adapters.notifier"]
+	local outside = package.loaded["platform.system.notifier"]
 	-- A filtered run that skipped the fixture's restore still ends clean.
-	if outside == fixture_double then package.loaded["adapters.notifier"] = before_fixture end
+	if outside == fixture_double then package.loaded["platform.system.notifier"] = before_fixture end
 	helpers.it("puts back the notifier found outside the cases after the fixture restores", function()
 		if not restored then return end
 		helpers.assert_true(outside ~= fixture_double, "the fixture's double did not leak out of its cases")

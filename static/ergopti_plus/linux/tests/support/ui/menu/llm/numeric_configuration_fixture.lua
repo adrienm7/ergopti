@@ -81,7 +81,7 @@ function M.with_configuration(body)
 			return true
 		end
 		package.loaded["core.ui.ui.webview_manager"] = host
-		package.loaded["adapters.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
+		package.loaded["platform.system.notifier"] = { send = function(message) notifications[#notifications + 1] = message; return true end }
 		local i18n = require("core.i18n.engine.i18n"); i18n.init()
 		local prompt = require("core.ui.ui.numeric_prompt")
 		local builder = require("ui.menu.builder")

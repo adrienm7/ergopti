@@ -122,7 +122,7 @@ global GESTURE_SHORTCUT_LABELS := GestureShortcutLabels()
 #Include incremental.ahk
 #Include incremental_tracker.ahk
 #Include touchpad_hid.ahk
-#Include %A_LineFile%\..\..\..\adapters\raw_input.ahk
+#Include %A_LineFile%\..\..\..\platform\system\raw_input.ahk
 #Include raw_touchpad.ahk
 
 

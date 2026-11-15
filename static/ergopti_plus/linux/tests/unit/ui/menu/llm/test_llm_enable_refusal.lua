@@ -17,7 +17,7 @@ file:close()
 
 local function with_notice(tool, body)
 	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "platform.input.keyboard_hook",
-		"adapters.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
+		"platform.system.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local world = { order = {}, commands = {}, notifications = {}, captions = {}, release_ok = true, restore_ok = true }
@@ -52,7 +52,7 @@ local function with_notice(tool, body)
 		-- Production returns the dialog choice even when native restoration refuses.
 		return result, answer
 	end }
-	package.loaded["adapters.notifier"] = { send = function(message, options)
+	package.loaded["platform.system.notifier"] = { send = function(message, options)
 		world.notifications[#world.notifications + 1] = { message, options }; return true
 	end }
 	package.loaded["ui.llm_enable_refusal"] = nil

@@ -65,7 +65,7 @@ EXPECTED="$(luajit -e 'require("core.lifecycle.engine.compat.utf8").install(); l
 "${PYTHON}" -c 'import json,sys; n=json.loads(open(sys.argv[1]).readline()); sys.exit(0 if n["body"]==sys.argv[2] and "✖" in n["summary"] else 1)' \
 	"${NOTICES}" "${EXPECTED}"
 # Error notices are marked in the title, at normal urgency: a critical one never
-# times out on most desktops (adapters/notifier.lua).
+# times out on most desktops (platform/system/notifier.lua).
 check $? "it is the specific refusal, titled as an error: « ${EXPECTED} »"
 [ ! -e "${NOTE}" ]
 check $? "no note file was created"

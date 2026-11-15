@@ -190,7 +190,7 @@ end
 local function _notify(saved, path)
 	pcall(function()
 		local i18n = require("core.i18n.engine.i18n")
-		local Notifier = require("adapters.notifier")
+		local Notifier = require("platform.system.notifier")
 		if saved then
 			Notifier.send(path, { title = i18n.get("crash.report.saved_title"), level = "info" })
 		else

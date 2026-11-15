@@ -249,8 +249,8 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 
 	helpers.it("(reload-refusal-notice) tells the user when a reload request is refused", function()
 		with_lifecycle_declarations(function(builder)
-			local original, sent = package.loaded["adapters.notifier"], {}
-			package.loaded["adapters.notifier"] = { send = function(text, opts)
+			local original, sent = package.loaded["platform.system.notifier"], {}
+			package.loaded["platform.system.notifier"] = { send = function(text, opts)
 				sent[#sent + 1] = { text = text, title = opts.title, level = opts.level }; return true
 			end }
 			local ok, err = pcall(function()
@@ -268,15 +268,15 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 					title = require("core.i18n.engine.i18n").get("init.reload_refused_title"), level = "error" }
 				helpers.assert_eq(sent, { expected, expected })
 			end)
-			package.loaded["adapters.notifier"] = original
+			package.loaded["platform.system.notifier"] = original
 			if not ok then error(err, 0) end
 		end)
 	end)
 
 	helpers.it("tells the user when the daemon refuses Quit because a shutdown already runs (quit-refused)", function()
 		with_lifecycle_declarations(function(builder)
-			local original, sent = package.loaded["adapters.notifier"], {}
-			package.loaded["adapters.notifier"] = { send = function(text, opts)
+			local original, sent = package.loaded["platform.system.notifier"], {}
+			package.loaded["platform.system.notifier"] = { send = function(text, opts)
 				sent[#sent + 1] = { text = text, level = opts and opts.level }
 				return true
 			end }
@@ -290,7 +290,7 @@ helpers.describe("shared lifecycle commands (Linux)", function()
 				quit.fn(); quit.fn()
 				helpers.assert_eq(#sent, 1, "an accepted or unanswered quit shows no refusal")
 			end)
-			package.loaded["adapters.notifier"] = original
+			package.loaded["platform.system.notifier"] = original
 			if not ok then error(err, 0) end
 		end)
 	end)

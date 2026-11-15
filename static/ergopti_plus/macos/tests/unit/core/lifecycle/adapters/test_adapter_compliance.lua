@@ -63,7 +63,7 @@ local ADAPTERS_UNDER_TEST = {
 	{ module = "core.ui.adapters.tooltip_renderer", port = "TooltipRenderer" },
 	{ module = "core.network.adapters.http_client", port = "HttpClient" },
 	{ module = "core.events.timer_scheduler", port = "TimerScheduler" },
-	{ module = "adapters.notifier", port = "Notifier" },
+	{ module = "platform.system.notifier", port = "Notifier" },
 	{ module = "platform.input.hotkey_registrar", port = "HotkeyRegistrar" },
 	{ module = "adapters.tray_menu", port = "TrayMenu" },
 	{ module = "core.fs.adapters.file_system", port = "FileSystem" },

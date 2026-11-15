@@ -20,7 +20,7 @@ local helpers = require("tests.helpers")
 local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
-	"adapters.screen_capture",
+	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",

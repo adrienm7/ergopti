@@ -604,7 +604,7 @@ end
 --- @return string|nil encoded Base64 PNG.
 --- @return string|nil detail Why the image cannot be encoded.
 local function encode_capture(data)
-	local encoded, encode_error = require("adapters.screen_capture").encode_base64(data)
+	local encoded, encode_error = require("platform.system.screen_capture").encode_base64(data)
 	if not encoded then return nil, "the capture could not be encoded: " .. tostring(encode_error) end
 	return encoded
 end

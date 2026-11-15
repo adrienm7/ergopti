@@ -19,7 +19,7 @@ local LOG = "ui.menu.feature_notice"
 -- so a daemon without notify-send only logs, and the logger lines carry this
 -- module's tag.
 local PORTS = {
-	send = function(text, level) return require("adapters.notifier").send(text, { level = level }) end,
+	send = function(text, level) return require("platform.system.notifier").send(text, { level = level }) end,
 	info = function(fmt, ...) Logger.info(LOG, fmt, ...) end,
 	warn = function(fmt, ...) Logger.warn(LOG, fmt, ...) end,
 }

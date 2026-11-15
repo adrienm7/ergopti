@@ -154,7 +154,7 @@ The keyboard hook forwards every touch report of a pointer source as a
 runs `modules/gestures/tap_detector.lua` (libinput's 180 ms timer from the
 last landing, 1.3 mm, at most three fingers, no landing after a lift, no
 button press) and counts a left or right tap as a click only while
-`adapters/tap_to_click_setting.lua` reads the desktop's setting as on. That
+`platform/system/tap_to_click_setting.lua` reads the desktop's setting as on. That
 reader answers unknown, never off, when the desktop does not say; the Metrics
 menu then names « Touchpad taps » as not measured. Palm, thumb and
 disable-while-typing rejection are not reproduced: a change that needs them

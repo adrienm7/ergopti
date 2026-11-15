@@ -26,7 +26,7 @@ local M = {}
 --- @param expected table Independent { default, named, decorated } captions.
 --- @param bypass boolean|nil Causal control routes through the original generic port.
 function M.run(assert_eq, driver, compose, expected, bypass)
-	local names = { "platform.focus.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+	local names = { "platform.focus.application_notifier", "platform.system.notifier", "platform.focus.application_notifier_core",
 		"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.logger.engine.shim" }
 	local previous, previous_hs = {}, _G.hs
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -69,9 +69,9 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 		return note
 	end } }
 	package.loaded["platform.focus.application_notifier"] = nil
-	package.loaded["adapters.notifier"] = nil
+	package.loaded["platform.system.notifier"] = nil
 	local ok, detail = xpcall(function()
-		local generic = require("adapters.notifier")
+		local generic = require("platform.system.notifier")
 		local application = require("platform.focus.application_notifier")
 		if bypass then application = generic end
 		if driver == "macos" then
@@ -118,7 +118,7 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 			local count = #commands
 			assert_eq(application.send("", options), false)
 			assert_eq(#commands, count)
-			package.loaded["adapters.notifier"] = nil
+			package.loaded["platform.system.notifier"] = nil
 			native_mode = "unavailable"
 			assert_eq(application.send("Native body", options), false)
 			assert_eq(#commands, count)

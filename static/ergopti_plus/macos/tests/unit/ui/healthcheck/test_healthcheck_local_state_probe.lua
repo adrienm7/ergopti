@@ -29,7 +29,7 @@ local function with_core(body)
 	local saved_usb = hs.usb
 	local ok, err = pcall(helpers.with_stub_scope, {
 		"core.logger.engine.logger", "core.network.adapters.info", "ui.healthcheck.core", "ui.healthcheck.helpers",
-		"adapters.accessibility_permission", "adapters.screen_capture",
+		"adapters.accessibility_permission", "platform.system.screen_capture",
 	}, function()
 		helpers.load_with_stubs("core.logger.engine.logger")
 		local world = { signal_reads = 0, tcc_reads = {} }
@@ -39,7 +39,7 @@ local function with_core(body)
 				return true
 			end,
 		}
-		package.loaded["adapters.screen_capture"] = {
+		package.loaded["platform.system.screen_capture"] = {
 			permission_state = function()
 				world.tcc_reads[#world.tcc_reads + 1] = "screen_recording"
 				return false

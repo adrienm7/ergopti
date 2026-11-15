@@ -27,7 +27,7 @@
 
 
 
-#Include ../../../adapters/system_locale.ahk
+#Include ../../../platform/system/locale.ahk
 #Include ../../../_generated/identifiers.ahk
 
 

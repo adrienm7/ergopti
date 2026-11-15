@@ -9,6 +9,6 @@
 	},
 	"inputs": {
 		"path": "../ci/windows-key-combination-cohort-original-inputs.json",
-		"sha256": "2c01cf8768e11e0d42abab540896c4acb5a6e048472c8e8f192f6af4b6185bea"
+		"sha256": "deceb9e2292fd1ee4df958b23ea9d9dbf0a9d039af08bd95e44798cb1ceccdf2"
 	}
 }

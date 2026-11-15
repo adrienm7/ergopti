@@ -80,7 +80,8 @@ const PURITY_TEST_PATH = path.join(
 	'windows',
 	'tests',
 	'meta',
-	'adapters',
+	'platform',
+	'system',
 	'test_port_adapter_coverage.ahk'
 );
 const CORPUS_OUT_DIR = shared('ui', 'layout_analysis', '_generated');

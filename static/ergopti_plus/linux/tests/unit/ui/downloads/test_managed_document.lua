@@ -183,17 +183,17 @@ end)
 
 helpers.describe("actual owned native notification effect boundary",function()
 	helpers.it("capability probe reentry cannot admit old notify-send command",function()
-		local old_shell,old_notifier=package.loaded["core.process.adapters.shell_runner"],package.loaded["adapters.notifier"]
+		local old_shell,old_notifier=package.loaded["core.process.adapters.shell_runner"],package.loaded["platform.system.notifier"]
 		local live,invoked=true,0
 		package.loaded["core.process.adapters.shell_runner"]={has_command=function()live=false;return true end,
 			quote=function(value)return value end,run=function()invoked=invoked+1;return true end}
-		package.loaded["adapters.notifier"]=nil
+		package.loaded["platform.system.notifier"]=nil
 		local ok,err=pcall(function()
-			local Notifier=require("adapters.notifier")
+			local Notifier=require("platform.system.notifier")
 			helpers.assert_eq(Notifier.send_owned("Generic error",{level="error"},function()return live end),false)
 			helpers.assert_eq(invoked,0)
 		end)
-		package.loaded["core.process.adapters.shell_runner"],package.loaded["adapters.notifier"]=old_shell,old_notifier
+		package.loaded["core.process.adapters.shell_runner"],package.loaded["platform.system.notifier"]=old_shell,old_notifier
 		if not ok then error(err)end
 	end)
 end)

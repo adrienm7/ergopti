@@ -82,7 +82,7 @@ helpers.describe("Adapter contract vectors: Notifier", function()
 		},
 	}
 
-	adapter = helpers.load_with_stubs("adapters.notifier", hs_overrides)
+	adapter = helpers.load_with_stubs("platform.system.notifier", hs_overrides)
 
 	helpers.it("localizes warning and error subtitles through core.i18n.engine.i18n", function()
 		local I18n = require("core.i18n.engine.i18n")

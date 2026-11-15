@@ -10,7 +10,7 @@ function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","core.logger.engine.monotonic","core.timing.engine.timings","core.network.engine.managed_http_deadline",
-		"core.events.loop","adapters.notifier","platform.focus.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
+		"core.events.loop","platform.system.notifier","platform.focus.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local real_host = require("core.ui.ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
@@ -116,11 +116,11 @@ function M.new(app_name, handler, state)
 			function t:ack_close()self.settled=true;local callbacks=self.listeners;self.listeners={};for _,cb in ipairs(callbacks)do cb()end end
 			c.timers[#c.timers+1]=t;return t end}
 		package.loaded["core.events.loop"]={add_idle_handler=function(fn)c.idles[#c.idles+1]=fn end}
-		package.loaded["adapters.notifier"]={send_owned=function(message,opts,admit)
+		package.loaded["platform.system.notifier"]={send_owned=function(message,opts,admit)
 			if c.on_notice_probe then c.on_notice_probe() end
 			if not admit() then return false end
 			c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
-		package.loaded["platform.focus.application_notifier"]=package.loaded["adapters.notifier"]
+		package.loaded["platform.focus.application_notifier"]=package.loaded["platform.system.notifier"]
 		package.loaded["core.ui.ui.webkit_host"]=host
 		package.loaded["core.ui.ui.webview_manager"]=nil
 		Manager=require("core.ui.ui.webview_manager");c.manager=Manager

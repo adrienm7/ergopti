@@ -24,7 +24,7 @@ local M = {}
 --- @return boolean accepted Exact generic native dispatch result.
 function M.send(label, opts)
 	local notifier = require("platform.focus.application_notifier_core").new(function(caption, title, options)
-		return require("adapters.notifier").send(caption(title), options)
+		return require("platform.system.notifier").send(caption(title), options)
 	end, require("core.ui.engine.window_titles").compose)
 	return notifier.send(label, opts)
 end

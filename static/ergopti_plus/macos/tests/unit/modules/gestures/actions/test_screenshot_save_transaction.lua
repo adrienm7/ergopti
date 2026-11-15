@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local SUBJECT_MODULES = {
 	"core.fs.adapters.file_system",
 	"adapters.mouse_control",
-	"adapters.screen_capture",
+	"platform.system.screen_capture",
 	"core.process.adapters.shell_runner",
 	"modules.shortcuts.actions.screen_capture_flow",
 	"core.i18n.engine.i18n",
@@ -52,7 +52,7 @@ local function with_subject(options, scenario)
 	}
 	-- A whole-screen save names one file per display; this desk has one.
 	package.loaded["adapters.mouse_control"] = { getMonitorCount = function() return 1 end }
-	package.loaded["adapters.screen_capture"] = {
+	package.loaded["platform.system.screen_capture"] = {
 		permission_state = function() return true end,
 		request_permission = function() return true end,
 		open_permission_settings = function() return true end,

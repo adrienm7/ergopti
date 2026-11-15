@@ -8,7 +8,7 @@
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
-#Include ../adapters/system_control.ahk
+#Include ../platform/system/control.ahk
 #Include ../core/fs/adapters/file_system.ahk
 #Include ../core/logger/engine/tick_count.ahk
 
