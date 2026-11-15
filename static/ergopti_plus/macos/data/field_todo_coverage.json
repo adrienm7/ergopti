@@ -772,6 +772,15 @@
 			]
 		},
 		{
+			"id": "pause_ends_capsword",
+			"title": "A pause ends a running CapsWord and switches its CapsLock off",
+			"checks": [
+				{
+					"step": "guided_input_policies"
+				}
+			]
+		},
+		{
 			"id": "developer_app_login_item",
 			"title": "Start at login from the developer app (ad hoc signed)",
 			"checks": [],

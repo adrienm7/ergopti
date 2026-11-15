@@ -736,6 +736,32 @@ function M.deactivate_capsword_by_action()
 	return true
 end
 
+--- Ends a running CapsWord as the driver pauses, as Windows and Linux do. The
+--- paused Karabiner graph holds no CapsWord rule, so its auto-off could not
+--- answer, and the CapsLock it raised stayed on through the whole pause. A
+--- CapsLock the user set themselves, with no CapsWord known active, is kept.
+--- @return boolean settled Always true: a refused clear is logged, never a
+---   reason to keep the driver from pausing.
+function M.end_capsword_for_pause()
+	if KeVariables.capsword_known_active() ~= true then return true end
+	if _capsword_listener_owned then
+		deactivate_capsword(_capsword_watcher_gen, "script paused", true)
+	else
+		local called, superseded = Logger.pcall(LOG, KeVariables.supersede_capsword_activation)
+		if not called or superseded ~= true then
+			Logger.error(LOG, "CapsWord could not be cleared in Karabiner at pause.")
+		end
+	end
+	cancel_capsword_idle_timer()
+	local called, cleared = Logger.pcall(LOG, KeyState.set_capslock, false)
+	if not called or cleared ~= true then
+		Logger.error(LOG, "CapsLock could not be switched off as CapsWord ended at pause.")
+	else
+		Logger.info(LOG, "CapsWord ended: script paused.")
+	end
+	return true
+end
+
 --- Stops every CapsWord pointer resource owned by this remap generation.
 --- @param watcher table|nil Eventtap returned by start_gesture_watcher().
 function M.stop_gesture_watcher(watcher)

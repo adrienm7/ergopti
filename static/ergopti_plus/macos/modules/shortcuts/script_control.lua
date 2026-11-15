@@ -709,6 +709,20 @@ local function pause_all()
 	)
 	if not ok_step then return false, step_reason end
 
+	-- A running CapsWord ends at pause, as on Windows and Linux: the paused
+	-- Karabiner graph holds no CapsWord rule, so its CapsLock would stay on.
+	-- Read only once the remap loaded it; without the remap no CapsWord runs.
+	local remap_watchers = package.loaded["platform.remap.watchers"]
+	if type(remap_watchers) == "table" and type(remap_watchers.end_capsword_for_pause) == "function" then
+		ok_step, step_reason = add_required_step(
+			"watchers.end_capsword_for_pause",
+			remap_watchers.end_capsword_for_pause,
+			nil,
+			"an ended CapsWord is not restored on resume, as on Windows and Linux"
+		)
+		if not ok_step then return false, step_reason end
+	end
+
 	local tt, tt_reason = require_pause_module("core.ui.ui.tooltip")
 	if tt_reason then return false, tt_reason end
 	if tt then

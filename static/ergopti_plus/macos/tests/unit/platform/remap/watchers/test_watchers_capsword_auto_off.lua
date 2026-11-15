@@ -541,3 +541,34 @@ helpers.describe("CapsWord watcher: text the driver types ends CapsWord on a del
 		helpers.assert_eq(h.supersede_calls, 0, "a stopped watcher receives nothing")
 	end)
 end)
+
+
+
+
+-- ======================================
+-- ======================================
+-- ======= 7/ The Pause ==================
+-- ======================================
+-- ======================================
+
+-- Windows and Linux end CapsWord when the driver pauses; macOS kept its
+-- CapsLock on through the pause, the paused Karabiner graph holding no
+-- CapsWord rule (paused-ends-capsword).
+helpers.describe("CapsWord watcher: a pause ends CapsWord", function()
+	helpers.it("(paused-ends-capsword) a pause ends a running CapsWord and its CapsLock", function()
+		local h = fresh_harness()
+		activate(h)
+		helpers.assert_true(h.watchers.end_capsword_for_pause(), "the pause step settles")
+		helpers.assert_eq(#h.writers, 1, "the Karabiner CapsWord is cleared")
+		helpers.assert_eq(h.active, false)
+		helpers.assert_eq(h.capslock[#h.capslock], false, "CapsLock is switched off")
+		assert_logged(h, "script paused")
+	end)
+
+	helpers.it("(paused-ends-capsword) a pause keeps a CapsLock the user set themselves", function()
+		local h = fresh_harness()
+		helpers.assert_true(h.watchers.end_capsword_for_pause())
+		helpers.assert_eq(h.supersede_calls, 0, "no CapsWord, no write")
+		helpers.assert_eq(h.capslock, {}, "the user's CapsLock is untouched")
+	end)
+end)
