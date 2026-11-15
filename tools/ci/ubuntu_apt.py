@@ -16,6 +16,9 @@ from urllib.parse import unquote, urlsplit
 
 
 SOURCE = Path("/etc/apt/sources.list.d/ubuntu.sources")
+# Only listed in a refusal's diagnostic, never read as an origin.
+SOURCES_DIR = Path("/etc/apt/sources.list.d")
+SOURCES_LIST = Path("/etc/apt/sources.list")
 KEYRING_NAME = "/usr/share/keyrings/ubuntu-archive-keyring.gpg"
 KEYRING = Path(KEYRING_NAME)
 MIRRORS = Path("/etc/apt/apt-mirrors.txt")
@@ -105,7 +108,11 @@ def read_owned_origin(path, role):
         require_owned(before, role)
         identity = origin_identity(before)
         if not 0 < before.st_size <= ORIGIN_MAX_BYTES:
-            raise ValueError("Ubuntu archive origin size refused: " + role)
+            raise ValueError(
+                "Ubuntu archive origin size refused: "
+                + role
+                + f" ({before.st_size} bytes, admitted 1..{ORIGIN_MAX_BYTES})"
+            )
         chunks, length = [], 0
         while length <= ORIGIN_MAX_BYTES:
             requested = ORIGIN_MAX_BYTES + 1 - length
@@ -578,11 +585,35 @@ def acquire(
                 primary.add_note("Ubuntu private authority cleanup reporting unavailable")
 
 
+def apt_source_layout(directory=SOURCES_DIR, listing=SOURCES_LIST):
+    """Name every APT source file and its size, never a body, for a refusal note.
+
+    A runner image that moves its archive origin out of ubuntu.sources (an
+    AWS-hosted ubuntu-26.04 runner refused an empty one in CI run
+    43687747663) is then recorded by the refusal itself.
+    """
+    rows = []
+    for path in (listing, *sorted(directory.iterdir() if directory.is_dir() else ())):
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            rows.append(f"{path}: absent")
+            continue
+        kind = "regular" if stat.S_ISREG(metadata.st_mode) else "other"
+        rows.append(f"{path}: {kind}, {metadata.st_size} bytes")
+    return "APT source layout: " + "; ".join(rows)
+
+
 def main(arguments):
     """Require owned origins; supply the independently authenticated private anchor."""
     if sys.platform != "linux" or os.geteuid() != 0:
         raise RuntimeError("Ubuntu CI acquisition requires its privileged Linux owner")
-    raw = read_owned_origin(SOURCE, "source")
+    try:
+        raw = read_owned_origin(SOURCE, "source")
+    except ValueError as refusal:
+        # The refusal stands; the note records the shape this runner has.
+        refusal.add_note(apt_source_layout())
+        raise
     mirrors = None
     if source_uses_mirrors(raw):
         mirrors = read_owned_origin(MIRRORS, "mirrors")

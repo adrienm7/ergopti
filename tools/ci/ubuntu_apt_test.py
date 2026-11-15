@@ -4,6 +4,7 @@
 from pathlib import Path
 from contextlib import contextmanager
 import errno
+import tempfile
 import subprocess
 import stat
 import hashlib
@@ -582,6 +583,34 @@ class OriginDescriptorControls(unittest.TestCase):
                     self.assertEqual(model.reads, [])
                     self.assertEqual(model.closes, model.stats)
                     self.assertEqual(model.fd_rows, {})
+
+    def test_size_refusal_names_the_declared_size_and_the_admitted_range(self):
+        # An AWS-hosted runner refused its source without saying it was empty
+        # or oversized (CI run 43687747663).
+        for size in (0, 65537):
+            with self.subTest(size=size):
+                model = OriginDescriptorModel()
+                model.metadata["source"]["st_size"] = size
+                with (
+                    origin_ports(model),
+                    self.assertRaisesRegex(
+                        ValueError, rf"source \({size} bytes, admitted 1\.\.65536\)$"
+                    ),
+                ):
+                    owner.read_owned_origin(owner.SOURCE, "source")
+
+    def test_source_layout_names_files_and_sizes_without_bodies(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            directory = root / "sources.list.d"
+            directory.mkdir()
+            (directory / "ubuntu.sources").write_bytes(b"")
+            (directory / "aws.sources").write_bytes(b"Types: deb secret-body\n")
+            note = owner.apt_source_layout(directory, root / "sources.list")
+        self.assertIn("sources.list: absent", note)
+        self.assertIn("aws.sources: regular, 23 bytes", note)
+        self.assertIn("ubuntu.sources: regular, 0 bytes", note)
+        self.assertNotIn("secret-body", note)
 
     def test_growing_stream_is_cut_at_independent_maximum_plus_one_before_admission(self):
         for role in ("source", "mirrors"):
