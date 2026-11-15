@@ -696,6 +696,30 @@ async function exerciseStudioComparer(page) {
 		),
 		'the Comparer heatmap names SFB partners'
 	);
+	// (editable-tables) The shortcut letters, their keys' ease and the compact
+	// form factors' weights are edited, refused when out of range, saved and reset.
+	assert.equal(await page.locator('#la-shortcut-letters input').count(), 26, 'every letter');
+	assert.equal(await page.locator('#la-form-list input').count(), 4, 'every form factor');
+	const letterZ = '#la-shortcut-letters input[data-id="z"]';
+	await page.fill(letterZ, '11');
+	await page.waitForFunction(
+		() => document.getElementById('la-shortcuts-status').className === 'la-error'
+	);
+	assert.equal(await page.getAttribute(letterZ, 'aria-invalid'), 'true');
+	await page.fill(letterZ, '4');
+	await page.waitForFunction(() => {
+		const saved = JSON.parse(window.localStorage.getItem('ergopti.layout_analysis.v1') || '{}');
+		return saved.shortcuts && saved.shortcuts.letters.z === 4;
+	});
+	await page.fill('#la-form-list input[data-id="40"]', '3');
+	await page.waitForFunction(() => {
+		const saved = JSON.parse(window.localStorage.getItem('ergopti.layout_analysis.v1') || '{}');
+		return saved.formWeights && saved.formWeights['40'] === 3;
+	});
+	await page.click('#la-shortcuts-restore');
+	await page.click('#la-forms-restore');
+	assert.equal(await page.inputValue(letterZ), '10', 'the default table is back');
+	assert.equal(await page.inputValue('#la-form-list input[data-id="40"]'), '1');
 	// (studio-file-buttons) The file inputs never show the browser's own words
 	// (« Choose File », « No file chosen »): each is hidden inside a label whose
 	// button carries the page's translated text.

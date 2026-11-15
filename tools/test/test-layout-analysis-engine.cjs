@@ -400,6 +400,80 @@ for (const [bad, code, values] of [
 	);
 }
 
+// The user's shortcut table and compact form factor weights (maintainer,
+// 2026-11-14: editable in the Studio): absent, the model's; edited, the
+// metrics follow; out of range, refused with a stable code.
+const qwerty = byId.get('qwerty');
+const defaultShortcuts = E.defaultShortcuts();
+check(
+	E.analyse(qwerty, ngrams, { shortcuts: defaultShortcuts }).metrics.shortcut_left ===
+		E.analyse(qwerty, ngrams, {}).metrics.shortcut_left,
+	'shortcuts: the default table is the model'
+);
+const onlyZ = {
+	letters: Object.fromEntries(
+		Object.keys(defaultShortcuts.letters).map((l) => [l, l === 'z' ? 10 : 0])
+	),
+	ease: defaultShortcuts.ease
+};
+check(
+	near(
+		E.analyse(qwerty, ngrams, { shortcuts: onlyZ }).metrics.shortcut_left,
+		100 * defaultShortcuts.ease.KeyZ
+	),
+	'shortcuts: with Z alone, shortcut_left is the ease of its key'
+);
+const only40 = Object.fromEntries(
+	Object.keys(E.defaultFormFactorWeights()).map((f) => [f, f === '40' ? 1 : 0])
+);
+check(
+	E.analyse(qwerty, E.ngramsFromText('a1'), { formWeights: only40 }).metrics.compact_fit === 50,
+	'form factors: on the 40 % alone, a digit is lost'
+);
+for (const [call, code, values] of [
+	[
+		() =>
+			E.shortcuts({ letters: { ...defaultShortcuts.letters, z: 11 }, ease: defaultShortcuts.ease }),
+		'shortcut_letter_value',
+		{ letter: 'z', max: 10 }
+	],
+	[
+		() =>
+			E.shortcuts({
+				letters: { ...defaultShortcuts.letters, '!': 1 },
+				ease: defaultShortcuts.ease
+			}),
+		'shortcut_letter_unknown',
+		{ letter: '!' }
+	],
+	[
+		() =>
+			E.shortcuts({
+				letters: defaultShortcuts.letters,
+				ease: { ...defaultShortcuts.ease, KeyA: 2 }
+			}),
+		'shortcut_key_value',
+		{ key: 'KeyA', max: 1 }
+	],
+	[() => E.shortcuts({ letters: defaultShortcuts.letters }), 'shortcuts_not_object', {}],
+	[() => E.formFactorWeights({ ...only40, 40: -1 }), 'form_factor_weight', { form: '40' }],
+	[() => E.formFactorWeights({ ...only40, 50: 1 }), 'form_factor_unknown', { form: '50' }],
+	[() => E.formFactorWeights({ ...only40, 40: 0 }), 'form_weights_zero', {}]
+]) {
+	let refusal = null;
+	try {
+		call();
+	} catch (error) {
+		refusal = error;
+	}
+	check(
+		refusal instanceof E.AnalysisError &&
+			refusal.code === code &&
+			JSON.stringify(refusal.values) === JSON.stringify(values),
+		`tables: refused as ${code} ${JSON.stringify(values)}, got ${refusal && refusal.code}`
+	);
+}
+
 // Split, ortholinear and column-staggered boards: their own positions, fingers
 // and homes; keys they lack are reported, not dropped silently.
 for (const id of ['corne', 'planck', 'ergodox', 'moonlander', 'kinesis_advantage']) {

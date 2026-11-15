@@ -63,8 +63,19 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   `model.ideal_finger_load_hands` gives); a refusal is an `AnalysisError` with
   a stable `code` (`ideal_load_fingers`, `ideal_load_share`, `ideal_load_sum`,
   `ideal_load_order`) and the `values` its message names.
-- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?, profile?, keyGroups?})` → one
-  result (`idealLoad` replaces the default target of `finger_imbalance`;
+- `defaultShortcuts()` → a copy of `{letters: shortcut_letters, ease:
+shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
+  letters and keys, no others; usefulness 0 to 10, ease 0 to 1), refused as
+  `shortcuts_not_object`, `shortcut_letter_unknown`, `shortcut_letter_value`,
+  `shortcut_key_unknown` or `shortcut_key_value`.
+- `defaultFormFactorWeights()` → each `form_factors` weight;
+  `formFactorWeights(weights)` → `weights` checked (every form factor, no
+  other, each ≥ 0, not all zero), refused as `form_weights_not_object`,
+  `form_factor_unknown`, `form_factor_weight` or `form_weights_zero`.
+- `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?, shortcuts?, formWeights?, profile?, keyGroups?})` → one
+  result (`idealLoad` replaces the default target of `finger_imbalance`,
+  `shortcuts` the table of `shortcut_left`, `formWeights` the weights of
+  `compact_fit`;
   `keyGroups: true` counts every key's worst groups for every event, below):
 
   ```js
@@ -496,7 +507,12 @@ The codegen refuses a default that breaks the maintainer's rule (each hand at
 the order, which the engine enforces, while its hand shares and pinkies are the
 user's choice.
 
-Weights, ideal finger load, selection, corpus and keyboard are remembered in `localStorage` when
+The shortcut table (each letter's usefulness and each key's ease) and the
+compact form factors' weights are editable below it the same way: every change
+is checked by the engine as a whole, a refused one marks the inputs and says
+why, and each has « restore the defaults ».
+
+Weights, ideal finger load, shortcut table, form factor weights, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.
 
 ## Editor analysis panel
@@ -516,7 +532,8 @@ does not load the panel's scripts gets no panel.
   conversion takes about 0.3 ms and the analysis about 5 ms.
 - The library is ranked once per corpus, keyboard, weights and ideal finger
   load. The rank is « N of library + 1 ».
-- The panel reads the weights and ideal finger load the Comparer saved (key
+- The panel reads the weights, ideal finger load, shortcut table and form
+  factor weights the Comparer saved (key
   `LAYOUT_ANALYSIS_FILES.SETTINGS_KEY`), so both pages score alike.
 - Corpus and keyboard are its own choices. « Ma frappe » arrives through the
   app's `studio-ngrams` event and becomes the default corpus.

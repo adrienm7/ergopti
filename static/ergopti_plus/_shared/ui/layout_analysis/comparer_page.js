@@ -241,6 +241,49 @@
 	<p id="la-ideal-sum" class="la-muted" role="status"></p>
 </section>
 
+<section class="la-weights" aria-labelledby="la-shortcuts-label">
+	<div class="la-heading">
+		<h2 id="la-shortcuts-label" data-i18n="layout_analysis.shortcuts.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="shortcut_letters"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.shortcuts.help"></p>
+	<button
+		id="la-shortcuts-restore"
+		type="button"
+		data-i18n="layout_analysis.shortcuts.restore"
+	></button>
+	<h3 data-i18n="layout_analysis.shortcuts.letters"></h3>
+	<div id="la-shortcut-letters" class="la-weight-list"></div>
+	<h3 data-i18n="layout_analysis.shortcuts.ease"></h3>
+	<div id="la-shortcut-ease" class="la-weight-list"></div>
+	<p id="la-shortcuts-status" class="la-muted" role="status"></p>
+</section>
+
+<section class="la-weights" aria-labelledby="la-forms-label">
+	<div class="la-heading">
+		<h2 id="la-forms-label" data-i18n="layout_analysis.forms.title"></h2>
+		<button
+			class="la-info"
+			type="button"
+			data-info="compact_fit"
+			data-i18n-title="layout_analysis.info.button"
+		>
+			i
+		</button>
+	</div>
+	<p class="la-muted" data-i18n="layout_analysis.forms.help"></p>
+	<button id="la-forms-restore" type="button" data-i18n="layout_analysis.forms.restore"></button>
+	<div id="la-form-list" class="la-weight-list"></div>
+	<p id="la-forms-status" class="la-muted" role="status"></p>
+</section>
+
 <section id="la-fingering" class="la-weights la-fingering"></section>`;
 
 	let mounted = null;
@@ -318,6 +361,8 @@
 						selectionChosen: state.selectionChosen,
 						weights: state.weights,
 						idealLoad: state.idealLoad,
+						shortcuts: state.shortcuts,
+						formWeights: state.formWeights,
 						custom: state.custom,
 						imported
 					})
@@ -385,6 +430,10 @@
 			selected: null,
 			weights: Object.assign(E.defaultWeights(), validWeights(saved.weights)),
 			idealLoad: validIdealLoad(saved.idealLoad),
+			// The shortcut table of shortcut_left and the form factor weights of
+			// compact_fit, the model's until the user edits them.
+			shortcuts: validOr(E.shortcuts, saved.shortcuts, E.defaultShortcuts),
+			formWeights: validOr(E.formFactorWeights, saved.formWeights, E.defaultFormFactorWeights),
 			custom: saved.custom && saved.custom.tables ? saved.custom : null,
 			tables: null,
 			results: [],
@@ -432,6 +481,19 @@
 				return true;
 			} catch {
 				return false;
+			}
+		}
+
+		/** A saved table the engine still accepts (check), else its default. */
+		function validOr(check, value, fallback) {
+			if (value === undefined) return fallback();
+			try {
+				return check(value);
+			} catch (error) {
+				console.warn(
+					`layout comparer: a saved table is refused (${error.code}); the default applies`
+				);
+				return fallback();
 			}
 		}
 
@@ -515,6 +577,8 @@
 				format: state.format,
 				weights: state.weights,
 				idealLoad: state.idealLoad,
+				shortcuts: state.shortcuts,
+				formWeights: state.formWeights,
 				profile: FINGERING.current(state.keyboard) || undefined
 			});
 			const ms = Math.round(performance.now() - start);
@@ -931,6 +995,99 @@
 			});
 		}
 
+		/**
+		 * One editable table of numbers (the shortcut letters, the key ease, the
+		 * form factor weights): every change is checked by the engine as a whole;
+		 * a refused one marks the inputs and says why, an accepted one is kept.
+		 * @param {Array<{list: string, values: object, label: function(string): string, max?: number}>} parts
+		 * @param {string} statusId The status line.
+		 * @param {function(Array<object>): object} accept Builds and checks the whole value; throws on a refusal.
+		 */
+		function fillTable(parts, statusId, accept) {
+			const inputs = parts.map(() => ({}));
+			const changed = () => {
+				const status = $(statusId);
+				const read = inputs.map((group) =>
+					Object.fromEntries(
+						Object.entries(group).map(([id, input]) => [
+							id,
+							input.value === '' ? NaN : Number(input.value)
+						])
+					)
+				);
+				try {
+					accept(read);
+				} catch (error) {
+					status.className = 'la-error';
+					status.textContent = t('layout_analysis.table.refused', { reason: INFO.refusal(error) });
+					for (const group of inputs)
+						for (const input of Object.values(group)) input.setAttribute('aria-invalid', 'true');
+					return;
+				}
+				status.className = 'la-muted';
+				status.textContent = '';
+				for (const group of inputs)
+					for (const input of Object.values(group)) input.removeAttribute('aria-invalid');
+				save();
+				analyse();
+			};
+			parts.forEach((part, index) => {
+				const list = $(part.list);
+				list.replaceChildren();
+				for (const [id, value] of Object.entries(part.values)) {
+					const label = el('label', 'la-weight');
+					label.append(el('span', '', part.label(id)));
+					const input = el('input');
+					input.type = 'number';
+					input.min = '0';
+					if (part.max !== undefined) input.max = String(part.max);
+					input.step = 'any';
+					input.dataset.id = id;
+					input.value = String(value);
+					input.addEventListener('input', changed);
+					inputs[index][id] = input;
+					label.append(input);
+					list.append(label);
+				}
+			});
+		}
+
+		/** The shortcut letters' usefulness and their keys' ease (shortcut_left). */
+		function fillShortcuts() {
+			fillTable(
+				[
+					{
+						list: 'la-shortcut-letters',
+						values: state.shortcuts.letters,
+						label: (letter) => letter.toUpperCase(),
+						max: 10
+					},
+					{ list: 'la-shortcut-ease', values: state.shortcuts.ease, label: (code) => code, max: 1 }
+				],
+				'la-shortcuts-status',
+				([letters, ease]) => {
+					state.shortcuts = E.shortcuts({ letters, ease });
+				}
+			);
+		}
+
+		/** The compact form factors' weights (compact_fit). */
+		function fillForms() {
+			fillTable(
+				[
+					{
+						list: 'la-form-list',
+						values: state.formWeights,
+						label: (id) => t(`layout_analysis.forms.${id}`)
+					}
+				],
+				'la-forms-status',
+				([weights]) => {
+					state.formWeights = E.formFactorWeights(weights);
+				}
+			);
+		}
+
 		/** Decodes a picked layout file: UTF-16 with its byte-order mark (KLC) or UTF-8. */
 		async function fileText(file) {
 			const bytes = new Uint8Array(await file.arrayBuffer());
@@ -1078,6 +1235,20 @@
 				fillLayouts();
 				analyse();
 			});
+			$('la-shortcuts-restore').addEventListener('click', () => {
+				state.shortcuts = E.defaultShortcuts();
+				fillShortcuts();
+				$('la-shortcuts-status').textContent = '';
+				save();
+				analyse();
+			});
+			$('la-forms-restore').addEventListener('click', () => {
+				state.formWeights = E.defaultFormFactorWeights();
+				fillForms();
+				$('la-forms-status').textContent = '';
+				save();
+				analyse();
+			});
 			$('la-ideal-restore').addEventListener('click', () => {
 				state.idealLoad = E.defaultIdealLoad();
 				fillIdealLoad();
@@ -1095,6 +1266,8 @@
 				fillCorpora();
 				fillWeights();
 				fillIdealLoad();
+				fillShortcuts();
+				fillForms();
 				render();
 				analyse();
 			});
@@ -1208,6 +1381,8 @@
 			fillLayouts();
 			fillWeights();
 			fillIdealLoad();
+			fillShortcuts();
+			fillForms();
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			FINGERING.onChange(() => analyse());
 			bind();

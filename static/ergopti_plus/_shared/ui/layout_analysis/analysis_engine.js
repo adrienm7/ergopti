@@ -640,7 +640,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {object} layoutInput - Library shape (see layoutFromRows).
 	 * @param {object} ngrams - Counts or prepareNgrams() output.
 	 * @param {{keyboard?: string, format?: string, weights?: object, idealLoad?: object,
-	 *   profile?: object, keyGroups?: boolean}} [options] - Board, keyboard format
+	 *   profile?: object, keyGroups?: boolean, shortcuts?: object, formWeights?: object}} [options]
+	 *   - The user's shortcut table (shortcuts(): letter usefulness and key ease of
+	 *   shortcut_left) and compact form factor weights (formFactorWeights(): of
+	 *   compact_fit), the model's when absent; board, keyboard format
 	 *   (keyboard_formats id: compact_fit measures the per-format form factors on
 	 *   it alone), weights, the ideal finger load of finger_imbalance (finger → %
 	 *   of the non-thumb presses; the model's ideal_finger_load when absent), the
@@ -870,10 +873,10 @@ var LAYOUT_ANALYSIS = (function () {
 			dead_key_usage: pct(c.dead, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
-			compact_fit: compactFit(layout, board, table, opts.format),
+			compact_fit: compactFit(layout, board, table, opts.format, opts.formWeights),
 			char_coverage: charCoverage(best),
 			direct_digits: directDigits(layout, board),
-			shortcut_left: shortcutLeft(layout, board)
+			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts))
 		};
 		const result = {
 			layout: {
@@ -1225,18 +1228,19 @@ var LAYOUT_ANALYSIS = (function () {
 	 * @param {string|undefined} format The chosen keyboard format, if any.
 	 * @returns {Array<{weight: number, missing: string[]}>} The form factors.
 	 */
-	function compactForms(format) {
+	function compactForms(format, weights) {
 		const formats =
 			format === undefined ? keyboardFormats() : [{ hidden: formatHiddenKeys(format) }];
+		const chosen = formFactorWeights(weights);
 		const forms = [];
-		for (const form of Object.values(data().model.form_factors)) {
+		for (const [id, form] of Object.entries(data().model.form_factors)) {
 			if (!form.per_keyboard_format) {
-				forms.push(form);
+				forms.push({ weight: chosen[id], missing: form.missing });
 				continue;
 			}
 			for (const entry of formats)
 				forms.push({
-					weight: form.weight / formats.length,
+					weight: chosen[id] / formats.length,
 					missing: form.missing.concat([...entry.hidden])
 				});
 		}
@@ -1247,10 +1251,10 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Frequency-weighted share of the characters still typed on each compact
 	 * form factor, averaged with the form factors' weights.
 	 */
-	function compactFit(layout, board, table, format) {
+	function compactFit(layout, board, table, format, formWeights) {
 		let sum = 0;
 		let weights = 0;
-		for (const form of compactForms(format)) {
+		for (const form of compactForms(format, formWeights)) {
 			const reachable = compileLayout(layout, board, new Set(form.missing));
 			let kept = 0;
 			let all = 0;
@@ -1279,6 +1283,88 @@ var LAYOUT_ANALYSIS = (function () {
 			if (typeof row[0] === 'string' && /^[0-9]$/.test(row[0])) digits.add(row[0]);
 		}
 		return digits.size * 10;
+	}
+
+	/** A copy of the model's shortcut table: each letter's usefulness, each key's ease. */
+	function defaultShortcuts() {
+		const { model } = data();
+		return {
+			letters: Object.assign({}, model.shortcut_letters),
+			ease: Object.assign({}, model.shortcut_key_ease)
+		};
+	}
+
+	/**
+	 * The shortcut table shortcut_left measures with (maintainer, 2026-11-14:
+	 * editable in the Studio like the weights).
+	 * @param {object} [table] - {letters: letter → usefulness 0–10, ease: key →
+	 *   ease 0–1}, the same letters and keys as the model's; the model's when absent.
+	 * @returns {object} The table, checked.
+	 * @throws {AnalysisError} On another shape, a letter or key the model lacks
+	 *   or misses, or a value out of its range.
+	 */
+	function shortcuts(table) {
+		const defaults = defaultShortcuts();
+		if (table === undefined) return defaults;
+		if (!table || typeof table !== 'object' || !table.letters || !table.ease)
+			throw new AnalysisError('shortcuts_not_object', {}, 'a shortcut table has letters and ease');
+		const checkPart = (part, max, unknownCode, valueCode, field) => {
+			for (const id of Object.keys(table[part]))
+				if (!(id in defaults[part]))
+					throw new AnalysisError(unknownCode, { [field]: id }, `unknown shortcut ${field} ${id}`);
+			for (const id of Object.keys(defaults[part])) {
+				const value = table[part][id];
+				if (!Number.isFinite(value) || value < 0 || value > max)
+					throw new AnalysisError(
+						valueCode,
+						{ [field]: id, max },
+						`shortcut ${field} ${id} must be a number from 0 to ${max}`
+					);
+			}
+		};
+		checkPart('letters', 10, 'shortcut_letter_unknown', 'shortcut_letter_value', 'letter');
+		checkPart('ease', 1, 'shortcut_key_unknown', 'shortcut_key_value', 'key');
+		return { letters: Object.assign({}, table.letters), ease: Object.assign({}, table.ease) };
+	}
+
+	/** A copy of the compact form factors' weights (analysis_model.json form_factors). */
+	function defaultFormFactorWeights() {
+		return Object.fromEntries(
+			Object.entries(data().model.form_factors).map(([id, form]) => [id, form.weight])
+		);
+	}
+
+	/**
+	 * The weights compact_fit gives each compact form factor (maintainer,
+	 * 2026-11-14: editable).
+	 * @param {object} [weights] - form factor id → weight ≥ 0, every model form
+	 *   factor and no other, not all zero; the model's when absent.
+	 * @returns {object} The weights, checked.
+	 * @throws {AnalysisError} On an unknown or missing form factor, a negative or
+	 *   non-finite weight, or weights that are all zero.
+	 */
+	function formFactorWeights(weights) {
+		const defaults = defaultFormFactorWeights();
+		if (weights === undefined) return defaults;
+		if (!weights || typeof weights !== 'object')
+			throw new AnalysisError('form_weights_not_object', {}, 'form factor weights are an object');
+		for (const id of Object.keys(weights))
+			if (!(id in defaults))
+				throw new AnalysisError('form_factor_unknown', { form: id }, `unknown form factor ${id}`);
+		let sum = 0;
+		for (const id of Object.keys(defaults)) {
+			const value = weights[id];
+			if (!Number.isFinite(value) || value < 0)
+				throw new AnalysisError(
+					'form_factor_weight',
+					{ form: id },
+					`form factor ${id} needs a weight >= 0`
+				);
+			sum += value;
+		}
+		if (sum <= 0)
+			throw new AnalysisError('form_weights_zero', {}, 'at least one form factor needs a weight');
+		return Object.assign({}, weights);
 	}
 
 	/** A copy of the default ideal finger load (analysis_model.json). */
@@ -1335,8 +1421,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 * Usefulness-weighted share of the shortcut letters on easy left-hand keys:
 	 * a letter counts its weight times the ease of its key (0 on the right hand).
 	 */
-	function shortcutLeft(layout, board) {
-		const { shortcut_letters: letters, shortcut_key_ease: ease } = data().model;
+	function shortcutLeft(layout, board, table) {
+		const { letters, ease } = table;
 		const where = {};
 		for (const [code, row] of Object.entries(layout.rows)) {
 			const letter = layout.command[code] !== undefined ? layout.command[code] : row[0];
@@ -1448,6 +1534,10 @@ var LAYOUT_ANALYSIS = (function () {
 		defaultWeights,
 		defaultIdealLoad,
 		idealLoad,
+		defaultShortcuts,
+		shortcuts,
+		defaultFormFactorWeights,
+		formFactorWeights,
 		compare,
 		rescore
 	};

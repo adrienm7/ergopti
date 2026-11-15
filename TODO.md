@@ -412,7 +412,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       restore, live rescore and per-metric contributions; proof: tools/test/test-layout-analysis-engine.cjs (total
       equals the sum of contributions, rescore). The default weights still await the maintainer's review.
 
-- [ ] **Shortcut placement metric (maintainer, 2026-11-14), worth about 5-10 % of the global score.** Rewards a
+- [x] **Shortcut placement metric (maintainer, 2026-11-14), worth about 5-10 % of the global score.** Rewards a
       layout whose useful Ctrl/Cmd shortcut letters sit on the left hand (the right hand stays on the mouse). One
       shared, documented table of letters with a usefulness weight: highest for Z (undo), X, C, V (cut, copy, paste),
       A (select all), S (save); then F (find), W (close), T (new tab), N, O, R, P, Y, Q (quit on macOS, lower);
@@ -420,9 +420,10 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       better on easy keys (home and lower row, near the index) than on hard ones. The table and the metric weight are
       editable in the Studio like the other weights. Goal of the whole analyser (maintainer): do better than every
       existing tool, Kalamine included.
-      [CODE] Left (2026-11-15): `shortcut_left` and its editable weight are done (fea99ea2ab, 5d5f424542;
-      metric_vectors.json); the letter usefulness table and key ease cannot be edited, saved or reset in the Studio yet
-      (only an « i » popover).
+      Done 2026-11-15: `shortcut_left` and its editable weight (fea99ea2ab, 5d5f424542;
+      metric_vectors.json). Done 2026-11-15 (`claude/ergopti-todo-editable-tables`): the letter usefulness table and
+      the key ease are edited in the Comparer, checked by the engine (`shortcuts()`), saved, reset and read by the
+      editor's panel; proof: test-layout-analysis-engine.cjs, `editable-tables` in layout-editor.playwright.cjs.
 
 - [x] **Instant analysis (maintainer, 2026-11-14, very important).** Analysing and comparing layouts must feel
       instant, unlike KLAnext, which re-processes the corpus for every selected layout. Pre-process each corpus once
@@ -447,13 +448,15 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       normal column) is penalised twice: in finger travel distance, and through a compact-keyboard criterion below.
       Checked 2026-11-15: done on dev (fea99ea2ab): `outer_column`, the travel in `distance` and the 40 % and 3×10 form
       factors of `compact_fit`; proof: metric_vectors.json through tools/test/test-layout-analysis-engine.cjs.
-- [ ] **Compact-keyboard fitness bonus (maintainer, 2026-11-14).** The more of a layout works on a compact keyboard
+- [x] **Compact-keyboard fitness bonus (maintainer, 2026-11-14).** The more of a layout works on a compact keyboard
       (80 %, 75 %, 65 %, 60 %, 40 %…), the better: score each layout by the share of its characters (weighted by
       frequency) still reachable on each form factor without extra keys, and fold it into the global score. Weights
       and form factors editable.
-      [CODE] Left (2026-11-15): `compact_fit` is done with an editable weight (fea99ea2ab; metric_vectors.json); the
-      form factors and their weights cannot be edited in the Studio, and 80/75/65/60 % are one combined entry
-      ([DECISION] only if they must be scored apart).
+      Done 2026-11-15: `compact_fit` with an editable weight (fea99ea2ab; metric_vectors.json); the 100 %, TKL, 75 %,
+      65 % and 60 % formats scored apart through the chosen keyboard format (`claude/ergopti-todo-keyboard-format`);
+      each form factor's weight edited in the Comparer, checked (`formFactorWeights()`), saved, reset and read by the
+      editor's panel (`claude/ergopti-todo-editable-tables`); proof: test-layout-analysis-engine.cjs, `editable-tables`
+      in layout-editor.playwright.cjs.
 
 - [x] **Live key heatmap in the Studio (maintainer, 2026-11-14).** While editing, each key is coloured in real
       time from green to red by how much the character placed on it costs (its share of SFBs, same-finger skipgrams,

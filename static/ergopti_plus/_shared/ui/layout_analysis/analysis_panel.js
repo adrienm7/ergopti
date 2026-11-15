@@ -159,6 +159,17 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		} catch {
 			settings.idealLoad = undefined;
 		}
+		// The Comparer's shortcut table and form factor weights, so both score alike.
+		try {
+			settings.shortcuts = saved.shortcuts ? E.shortcuts(saved.shortcuts) : undefined;
+		} catch {
+			settings.shortcuts = undefined;
+		}
+		try {
+			settings.formWeights = saved.formWeights ? E.formFactorWeights(saved.formWeights) : undefined;
+		} catch {
+			settings.formWeights = undefined;
+		}
 		// The user's fingering profile of this keyboard, shared with the Comparer.
 		settings.profile = window.LAYOUT_ANALYSIS_FINGERING.current(keyboardId) || undefined;
 		return settings;
@@ -347,6 +358,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 					format: keyboardFormat(),
 					weights: settings.weights,
 					idealLoad: settings.idealLoad,
+					shortcuts: settings.shortcuts,
+					formWeights: settings.formWeights,
 					profile: settings.profile
 				}).map((r) => r.score.total);
 				state.libraryKey = key;
@@ -392,6 +405,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 				format: keyboardFormat(),
 				weights: settings.weights,
 				idealLoad: settings.idealLoad,
+				shortcuts: settings.shortcuts,
+				formWeights: settings.formWeights,
 				profile: settings.profile,
 				// One layout: every key's worst pairs, for the heatmap's tooltips.
 				keyGroups: true
