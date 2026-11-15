@@ -500,6 +500,13 @@ async function exerciseStudioHandoff(page, origin, basePath) {
 		.locator('#la-table tbody tr', { hasText: 'Mon Ergopti' })
 		.first()
 		.waitFor({ timeout: 20000 });
+	// (compare-reuses-editor-entry) The handed layout is the editor_… entry the
+	// Comparer lists from the editor frame: one row, not a copy beside it.
+	assert.equal(
+		await comparer.locator('#la-layout-list .la-layout', { hasText: 'Mon Ergopti' }).count(),
+		1,
+		'the edited layout is listed once'
+	);
 	// The format chosen in the Comparer is the editor's next time.
 	await comparer.locator('#la-format').selectOption('tkl');
 	await visit(page, origin, basePath, '/studio');

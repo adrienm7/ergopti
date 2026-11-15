@@ -222,6 +222,17 @@ async function exerciseCompareEdited(browser, origin) {
 		true,
 		'the edited layout is ticked in the list'
 	);
+	// (compare-reuses-editor-entry) The click ticks the editor_… entry the
+	// Comparer already lists: the edited layout once, never also as a copy.
+	assert.deepEqual(
+		await page.$$eval('#la-layout-list .la-layout', (labels) =>
+			labels
+				.filter((label) => label.textContent.includes('Source Fixture'))
+				.map((label) => label.querySelector('input').checked)
+		),
+		[true],
+		'the edited layout is listed once, ticked'
+	);
 	assert.equal(
 		await page.evaluate(
 			() => window.__posted.filter((p) => p.action === 'studio_layout_save').length

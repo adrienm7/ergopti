@@ -383,7 +383,8 @@ var LayoutEditorPage = (function () {
 		const analysisPanel =
 			typeof window.LAYOUT_ANALYSIS_PANEL === 'object'
 				? window.LAYOUT_ANALYSIS_PANEL.create({
-						onCompare: typeof host.compare === 'function' ? host.compare : null,
+						onCompare:
+							typeof host.compare === 'function' ? (layout) => compareActive(layout) : null,
 						format: () => state.format
 					})
 				: null;
@@ -3795,6 +3796,8 @@ var LayoutEditorPage = (function () {
 		const comparerLayouts = new WeakMap();
 		let publishTimer = null;
 		let published = null;
+		// The entry each tab was last published under (null: not analysed).
+		let publishedEntries = [];
 		function schedulePublish() {
 			if (!analysisPanel || !window.LAYOUT_ANALYSIS_FILES) return;
 			clearTimeout(publishTimer);
@@ -3806,6 +3809,7 @@ var LayoutEditorPage = (function () {
 			keepActive();
 			const ids = new Set();
 			const layouts = [];
+			publishedEntries = state.tabs.map(() => null);
 			state.tabs.forEach((tab, index) => {
 				const document = tabAt(index).history.current();
 				if (!comparerLayouts.has(document)) {
@@ -3825,12 +3829,33 @@ var LayoutEditorPage = (function () {
 				let id = `editor_${document.layout.id}`;
 				for (let n = 2; ids.has(id); n++) id = `editor_${document.layout.id}_${n}`;
 				ids.add(id);
-				layouts.push(Object.assign({}, layout, { id, name: document.layout.name }));
+				publishedEntries[index] = Object.assign({}, layout, { id, name: document.layout.name });
+				layouts.push(publishedEntries[index]);
 			});
 			const text = JSON.stringify(layouts);
 			if (text === published) return;
 			published = text;
 			window.LAYOUT_ANALYSIS_FILES.publishEditorLayouts(layouts);
+		}
+
+		/**
+		 * « Compare with other layouts »: the host receives the shown tab under the
+		 * editor_… id the Comparer already lists it by, so it is ticked there and
+		 * never listed twice. Only a tab that could not be published (no Comparer
+		 * file helpers on the page) goes as the panel's own copy, and the console
+		 * says why.
+		 * @param {object} layout - The analysis panel's layout (library shape).
+		 */
+		function compareActive(layout) {
+			clearTimeout(publishTimer);
+			publishTimer = null;
+			if (window.LAYOUT_ANALYSIS_FILES) publishLayouts();
+			const entry = publishedEntries[state.active] || null;
+			if (!entry)
+				console.warn(
+					'layout editor: the shown tab is not published to the Comparer, so it is compared as a copy'
+				);
+			host.compare(entry || layout);
 		}
 
 		/**
