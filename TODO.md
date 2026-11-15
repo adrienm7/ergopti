@@ -482,9 +482,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): Digit6, the space bar, the weights, the 6.5/11.5/15.5/16.5 % load and the « i » popovers
       are done (5d5f424542, 0c197c6ce8; test-layout-analysis-engine.cjs); index >= middle >= ring >= pinky is checked on
       the default only, not on a user-edited load. [LATER] the 19 other locales keep pending English.
-      Order on an edited load done 2026-11-15 (worker X, e363f74b): idealLoad refuses it as `ideal_load_order`; proof:
+      Order on an edited load done 2026-11-15 (worker X, 6e776b0a): idealLoad refuses it as `ideal_load_order`; proof:
       test-layout-analysis-engine.cjs (pinky and ring swapped on each hand); the ideal-load box says the refusal
-      (2e8148c0).
+      (fd6a2ae7).
 - [x] **Shortcut table covers A-Z (maintainer, 2026-11-14 evening).** Every letter gets a usefulness score, very low
       for rarely used shortcut letters; add the text-editing shortcuts Ctrl+B (bold), Ctrl+I (italic), Ctrl+U
       (underline), Ctrl+K (link / command palette), Ctrl+Y (redo) and other very common ones; the maintainer would
@@ -573,7 +573,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): Studio labels go through i18n with English and French (145df235e1, b9117767e7;
       test-locale-catalogue-complete.cjs); the fingering refusal embeds the engine's raw English error
       (analysis_engine.js), and no label-improvement pass has been made.
-      Fingering refusal done 2026-11-15 (worker X, 7b3f9e7c, 2e8148c0): engine refusals carry codes and the fingering
+      Fingering refusal done 2026-11-15 (worker X, ae0ab093, fd6a2ae7): engine refusals carry codes and the fingering
       editor and the ideal-load box say them as layout_analysis.error.<code> (en, fr; others pending); proof:
       test-layout-comparer-page.cjs. Left: the label-improvement pass; the 19 other locales.
 
@@ -631,7 +631,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
 - [x] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
       exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
       .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
-      Done 2026-11-15 (worker X, 4d265e75): the .keylayout writes the named key's row on every Command and Control
+      Done 2026-11-15 (worker X, 70291dac): the .keylayout writes the named key's row on every Command and Control
       keyMap; Linux XKB carries it too, on ERGOPTI_SEVEN_LEVEL's Control/Alt/Super level (its preserve keeps those
       modifiers), and the export's limitations say what that one level cannot tell apart; the KLC and DLL exchange
       virtual keys with the named key (tools/lib/kbd-dll/shortcut-keys.cjs), a displaced or refused key reported.
