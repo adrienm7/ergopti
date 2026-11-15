@@ -2848,13 +2848,15 @@ var LayoutEditorPage = (function () {
 							text: tl(`export.${target}`),
 							onclick: () => {
 								// The host loads the converters on the first click; the build runs on the current source.
+								const source = doc();
 								fromHost(() => host.exportAssets())
-									.then((assets) => {
-										const file = build(doc(), assets);
-										return fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
+									// The build may wait for the host's converters (lua_export).
+									.then((assets) => build(source, assets))
+									.then((file) =>
+										fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
 											() => file.filename
-										);
-									})
+										)
+									)
 									.then(
 										(name) => notify('ok', tl('status.saved', { name })),
 										(error) => notify('error', problemText(error))

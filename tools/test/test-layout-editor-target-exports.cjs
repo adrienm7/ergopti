@@ -12,7 +12,9 @@
  * and a registry layout, refusals included. The app's layout editor window
  * loads the same scripts with the generated export data
  * (_generated/export_assets.js) in place of the site's fetches; its downloads
- * are checked to be the same bytes.
+ * are checked to be the same bytes. The macOS and Linux windows run the
+ * export adapter with the host's own Lua (lua_export, export_step.lua); the
+ * files built through that path are checked to be the site's bytes too.
  * ==============================================================================
  */
 
@@ -22,6 +24,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { spawnSync } = require('node:child_process');
 const { REPO_ROOT, shared } = require('../lib/paths.cjs');
 const { loadLayoutSource } = require('../lib/layout-source.cjs');
 const { exportXkb } = require('../lib/layout-source-xkb.cjs');
@@ -93,9 +96,9 @@ const pageDoc = (document) => {
 let checks = 0;
 
 /** The page's XKB archive holds the tool's files, byte for byte, under one folder. */
-function sameXkb(document, label) {
+async function sameXkb(document, label) {
 	const tool = exportXkb(document);
-	const archive = page.IO.xkbArchive(pageDoc(document), assets);
+	const archive = await page.IO.xkbArchive(pageDoc(document), assets);
 	assert.deepEqual(
 		clone(archive.files.map((file) => file.path)),
 		[...tool.files.keys()],
@@ -111,10 +114,10 @@ function sameXkb(document, label) {
 }
 
 /** The page's .klc bytes are the tool's. */
-function sameKlc(document, label) {
+async function sameKlc(document, label) {
 	const tool = exportKlc(document);
 	const name = `${document.exports.windows.dll_name}.klc`;
-	const file = page.IO.klcFile(pageDoc(document), assets);
+	const file = await page.IO.klcFile(pageDoc(document), assets);
 	assert.equal(file.filename, name);
 	assert(Buffer.from(file.bytes).equals(Buffer.from(tool.files.get(name))), `${label}: KLC bytes`);
 	assert.deepEqual(
@@ -125,110 +128,163 @@ function sameKlc(document, label) {
 	checks++;
 }
 
-// The generated KLC generator is the tool's module, wrapped verbatim.
-assert.equal(fs.readFileSync(klcCodegen.OUT_PATH, 'utf8'), klcCodegen.buildSource());
-assert.deepEqual(
-	Object.keys(page.generator),
-	Object.keys(require('../codegen/lib/windows-keyboard-layout.cjs'))
-);
-checks++;
+/**
+ * One export step through the app hosts' path: the shared bridge's lua_export
+ * and export_step.lua, under the Lua the tool runs (as Hammerspoon's 5.4).
+ * @param {'read'|'xkb'} step
+ * @param {object} input
+ * @returns {object}
+ */
+function hostStep(step, input) {
+	const result = spawnSync(
+		'lua',
+		[path.join(REPO_ROOT, 'tools', 'lib', 'layout_export_host_step.lua'), shared(), step],
+		{ encoding: 'utf8', input: JSON.stringify(input), timeout: 30000, maxBuffer: 32 * 1024 * 1024 }
+	);
+	if (result.error) throw new Error(`host export step: ${result.error.message}`);
+	if (result.status !== 0) throw new Error(`host export step: ${result.stderr.trim()}`);
+	return JSON.parse(result.stdout);
+}
 
-// The corpus fixture: XKB equal; KLC refused by both with the same reason.
-sameXkb(fixture, 'fixture');
-{
-	let toolReason = null;
-	try {
-		exportKlc(fixture);
-	} catch (error) {
-		toolReason = error.message;
+async function main() {
+	// The generated KLC generator is the tool's module, wrapped verbatim.
+	assert.equal(fs.readFileSync(klcCodegen.OUT_PATH, 'utf8'), klcCodegen.buildSource());
+	assert.deepEqual(
+		Object.keys(page.generator),
+		Object.keys(require('../codegen/lib/windows-keyboard-layout.cjs'))
+	);
+	checks++;
+
+	// The corpus fixture: XKB equal; KLC refused by both with the same reason.
+	await sameXkb(fixture, 'fixture');
+	{
+		let toolReason = null;
+		try {
+			exportKlc(fixture);
+		} catch (error) {
+			toolReason = error.message;
+		}
+		assert(toolReason, 'the tool refuses the fixture KLC');
+		await assert.rejects(
+			() => page.IO.klcFile(pageDoc(fixture), assets),
+			(error) => error.code === 'target_export_refused' && error.path === toolReason
+		);
+		checks++;
 	}
-	assert(toolReason, 'the tool refuses the fixture KLC');
-	assert.throws(
-		() => page.IO.klcFile(pageDoc(fixture), assets),
-		(error) => error.code === 'target_export_refused' && error.path === toolReason
+
+	// A registry layout, preserved and structured, both targets.
+	{
+		const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };
+		const preserved = Source.importKeylayout(registryXml('ergopti'), 'ergopti', 'iso');
+		preserved.exports = { windows };
+		const structured = clone(Source.importStructured(registryXml('ergopti'), 'ergopti', 'iso'));
+		structured.exports.windows = windows;
+		await sameXkb(preserved, 'ergopti preserved');
+		await sameXkb(structured, 'ergopti structured');
+		await sameKlc(preserved, 'ergopti preserved');
+		await sameKlc(structured, 'ergopti structured');
+
+		// The macOS and Linux windows: the host's Lua builds the site's bytes, the
+		// preserved import's KLC included (its .keylayout is read by the host).
+		const viaHost = {
+			...assets,
+			lua: { call: (step, input) => Promise.resolve(hostStep(step, input)) }
+		};
+		for (const [document, label] of [
+			[preserved, 'ergopti preserved'],
+			[structured, 'ergopti structured']
+		]) {
+			const site = await page.IO.xkbArchive(pageDoc(document), assets);
+			const host = await page.IO.xkbArchive(pageDoc(document), viaHost);
+			assert(Buffer.from(host.bytes).equals(Buffer.from(site.bytes)), `${label}: host XKB bytes`);
+			const siteKlc = await page.IO.klcFile(pageDoc(document), assets);
+			const hostKlc = await page.IO.klcFile(pageDoc(document), viaHost);
+			assert(
+				Buffer.from(hostKlc.bytes).equals(Buffer.from(siteKlc.bytes)),
+				`${label}: host KLC bytes`
+			);
+		}
+		checks++;
+	}
+
+	// The direct compilers' extra levels: XKB's fifth level, KLC's Kana and Roya bits.
+	{
+		const direct = Source.read(
+			fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'direct_levels.toml'), 'utf8')
+		);
+		await sameXkb(direct, 'direct levels');
+		await sameKlc(direct, 'direct levels');
+	}
+
+	// The app's editor window: every script it needs is a static tag, and the shipped
+	// export data builds what the site's fetched files build, byte for byte.
+	{
+		assert.equal(fs.readFileSync(assetsCodegen.OUT_PATH, 'utf8'), assetsCodegen.buildSource());
+		const html = fs.readFileSync(path.join(UI, 'layout_editor_window', 'index.html'), 'utf8');
+		const tags = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) =>
+			path.relative(UI, path.resolve(path.join(UI, 'layout_editor_window'), m[1]))
+		);
+		for (const needed of [
+			'layout_composer/target_export.js',
+			'layout_editor/lua_runner.js',
+			...ON_DEMAND,
+			'layout_editor/_generated/export_assets.js'
+		])
+			assert(tags.includes(needed), `the editor window loads ${needed}`);
+		const context = vm.createContext({ TextEncoder });
+		context.window = context;
+		for (const file of [
+			'layout_editor/lua_runner.js',
+			...ON_DEMAND,
+			'layout_editor/_generated/export_assets.js'
+		])
+			vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), context, { filename: file });
+		const shipped = vm.runInContext(
+			'LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator)',
+			context
+		);
+		assert.deepEqual(clone(shipped.keysyms), clone(assets.keysyms));
+		assert.equal(shipped.template, assets.template);
+		assert.equal(shipped.types, assets.types);
+		const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };
+		const structured = clone(Source.importStructured(registryXml('ergopti'), 'ergopti', 'iso'));
+		structured.exports.windows = windows;
+		const mixed = { ...shipped, generator: page.generator };
+		const viaSite = await page.IO.xkbArchive(pageDoc(structured), assets);
+		const viaApp = await page.IO.xkbArchive(pageDoc(structured), mixed);
+		assert(
+			Buffer.from(viaApp.bytes).equals(Buffer.from(viaSite.bytes)),
+			'the app builds the site XKB archive'
+		);
+		const klcSite = await page.IO.klcFile(pageDoc(structured), assets);
+		const klcApp = await page.IO.klcFile(pageDoc(structured), mixed);
+		assert(
+			Buffer.from(klcApp.bytes).equals(Buffer.from(klcSite.bytes)),
+			'the app builds the site KLC'
+		);
+		checks++;
+	}
+
+	// A Lua refusal reaches the page as the tool's reason.
+	{
+		const read = assets.lua.call('read', { xml: '<keyboard/>' });
+		assert.equal(read.ok, false);
+		assert.equal(typeof read.reason, 'string');
+		// The host passes the adapter's refusal on as it is.
+		assert.deepEqual(
+			hostStep('read', { xml: '<keyboard/>' }),
+			clone(read),
+			'the host refuses as the page'
+		);
+		checks++;
+	}
+
+	console.log(
+		`[OK] layout editor target exports: ${checks} checks (XKB and KLC byte equality with the tool and through the host's Lua, refusals)`
 	);
-	checks++;
 }
 
-// A registry layout, preserved and structured, both targets.
-{
-	const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };
-	const preserved = Source.importKeylayout(registryXml('ergopti'), 'ergopti', 'iso');
-	preserved.exports = { windows };
-	const structured = clone(Source.importStructured(registryXml('ergopti'), 'ergopti', 'iso'));
-	structured.exports.windows = windows;
-	sameXkb(preserved, 'ergopti preserved');
-	sameXkb(structured, 'ergopti structured');
-	sameKlc(preserved, 'ergopti preserved');
-	sameKlc(structured, 'ergopti structured');
-}
-
-// The direct compilers' extra levels: XKB's fifth level, KLC's Kana and Roya bits.
-{
-	const direct = Source.read(
-		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'direct_levels.toml'), 'utf8')
-	);
-	sameXkb(direct, 'direct levels');
-	sameKlc(direct, 'direct levels');
-}
-
-// The app's editor window: every script it needs is a static tag, and the shipped
-// export data builds what the site's fetched files build, byte for byte.
-{
-	assert.equal(fs.readFileSync(assetsCodegen.OUT_PATH, 'utf8'), assetsCodegen.buildSource());
-	const html = fs.readFileSync(path.join(UI, 'layout_editor_window', 'index.html'), 'utf8');
-	const tags = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) =>
-		path.relative(UI, path.resolve(path.join(UI, 'layout_editor_window'), m[1]))
-	);
-	for (const needed of [
-		'layout_composer/target_export.js',
-		'layout_editor/lua_runner.js',
-		...ON_DEMAND,
-		'layout_editor/_generated/export_assets.js'
-	])
-		assert(tags.includes(needed), `the editor window loads ${needed}`);
-	const context = vm.createContext({ TextEncoder });
-	context.window = context;
-	for (const file of [
-		'layout_editor/lua_runner.js',
-		...ON_DEMAND,
-		'layout_editor/_generated/export_assets.js'
-	])
-		vm.runInContext(fs.readFileSync(path.join(UI, file), 'utf8'), context, { filename: file });
-	const shipped = vm.runInContext(
-		'LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator)',
-		context
-	);
-	assert.deepEqual(clone(shipped.keysyms), clone(assets.keysyms));
-	assert.equal(shipped.template, assets.template);
-	assert.equal(shipped.types, assets.types);
-	const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };
-	const structured = clone(Source.importStructured(registryXml('ergopti'), 'ergopti', 'iso'));
-	structured.exports.windows = windows;
-	const mixed = { ...shipped, generator: page.generator };
-	const viaSite = page.IO.xkbArchive(pageDoc(structured), assets);
-	const viaApp = page.IO.xkbArchive(pageDoc(structured), mixed);
-	assert(
-		Buffer.from(viaApp.bytes).equals(Buffer.from(viaSite.bytes)),
-		'the app builds the site XKB archive'
-	);
-	const klcSite = page.IO.klcFile(pageDoc(structured), assets);
-	const klcApp = page.IO.klcFile(pageDoc(structured), mixed);
-	assert(
-		Buffer.from(klcApp.bytes).equals(Buffer.from(klcSite.bytes)),
-		'the app builds the site KLC'
-	);
-	checks++;
-}
-
-// A Lua refusal reaches the page as the tool's reason.
-{
-	const read = assets.lua.call('read', { xml: '<keyboard/>' });
-	assert.equal(read.ok, false);
-	assert.equal(typeof read.reason, 'string');
-	checks++;
-}
-
-console.log(
-	`[OK] layout editor target exports: ${checks} checks (XKB and KLC byte equality with the tool, refusals)`
-);
+main().catch((error) => {
+	console.error(error);
+	process.exit(1);
+});

@@ -259,10 +259,12 @@ var LayoutSourceIO = (function () {
 	 * runs (`export-xkb`), so the files are byte for byte the tool's.
 	 * @param {object} doc
 	 * @param {{lua: {call: function}, keysyms: object, template: string, types: string}} assets
-	 *   A LayoutLuaRunner and key_sym.json, xkb_symbols.txt, xkb_types.txt.
-	 * @returns {{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}}
+	 *   A Lua runner (LayoutLuaRunner on the site, the app host's lua_export in
+	 *   its windows; its call may answer at once or as a promise) and
+	 *   key_sym.json, xkb_symbols.txt, xkb_types.txt.
+	 * @returns {Promise<{filename: string, bytes: Uint8Array, files: {path: string, text: string}[], report: object}>}
 	 */
-	function xkbArchive(doc, assets) {
+	async function xkbArchive(doc, assets) {
 		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'linux'));
 		const request = targetStep(() =>
 			LayoutTargetExport.xkbRequest(doc, target, {
@@ -272,7 +274,7 @@ var LayoutSourceIO = (function () {
 				types: assets.types
 			})
 		);
-		const output = assets.lua.call('xkb', request.input);
+		const output = await assets.lua.call('xkb', request.input);
 		const { report, files } = targetStep(() =>
 			LayoutTargetExport.xkbFiles(target, request, output)
 		);
@@ -293,17 +295,17 @@ var LayoutSourceIO = (function () {
 	 * (`export-klc`), so the bytes are the tool's.
 	 * @param {object} doc
 	 * @param {{lua: {call: function}, generator: object}} assets
-	 *   A LayoutLuaRunner and LayoutKlcGenerator.
-	 * @returns {{filename: string, bytes: Uint8Array, report: object}}
+	 *   A Lua runner (as xkbArchive) and LayoutKlcGenerator.
+	 * @returns {Promise<{filename: string, bytes: Uint8Array, report: object}>}
 	 */
-	function klcFile(doc, assets) {
+	async function klcFile(doc, assets) {
 		const target = targetStep(() => LayoutTargetCompiler.target(doc, tables(), 'windows'));
 		const metadata = targetStep(() => LayoutTargetExport.klcMetadata(doc));
 		// A structured source compiles straight to the canonical form; a preserved
 		// import's XML is read by the shared Lua reader.
 		let canonical = target.canonical;
 		if (!canonical) {
-			const read = assets.lua.call('read', { xml: target.text });
+			const read = await assets.lua.call('read', { xml: target.text });
 			if (!read.ok) throw new SourceIOError('target_export_refused', read.reason);
 			canonical = read.canonical;
 		}

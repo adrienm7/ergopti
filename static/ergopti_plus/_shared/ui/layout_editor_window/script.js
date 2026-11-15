@@ -47,7 +47,8 @@ const LAYOUT_EDITOR_WINDOW_ACTIONS = Object.freeze([
 	'studio_layout_remove',
 	'studio_corpus',
 	'studio_profile_load',
-	'studio_profile_save'
+	'studio_profile_save',
+	'lua_export'
 ]);
 
 // Locale strings: the catalogue macOS and Linux seed as window._i18n_strings,
@@ -118,6 +119,8 @@ let _hostAppliesNav = false;
 let _hostPicks = false;
 // Whether the host emulates a source without installing it (composer_emulate), from initData.
 let _hostEmulates = false;
+// Whether the host runs the downloads' export adapter with its own Lua (lua_export), from initData.
+let _hostLuaExport = false;
 // Whether the host writes the editor's downloads to the Downloads folder (source_export), from initData.
 let _hostExports = false;
 
@@ -139,6 +142,7 @@ window.initData = function (data) {
 	_hostAppliesNav = data.nav_apply === true;
 	_hostEmulates = data.emulate === true;
 	_hostExports = data.source_export === true;
+	_hostLuaExport = data.lua_export === true;
 	showKeystatsSource(data.keystats === true);
 	settleStudioStore(data.studio_store === true);
 	window.updateState(data.state);
@@ -336,11 +340,40 @@ window.exportResult = function (result) {
 		});
 };
 
-/** What the XKB and KLC downloads run, built once from the data this page loads. */
+/**
+ * What the XKB and KLC downloads run, built once from the data this page loads.
+ * The macOS and Linux windows refuse the page's fengari VM (no 'unsafe-eval'):
+ * their host runs the shared export adapter with its own Lua (lua_export,
+ * answered by luaExportResult). Windows, whose pages allow it, keeps fengari.
+ */
 function hostExportAssets() {
-	_exportAssets =
-		_exportAssets || LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator);
+	if (_exportAssets) return _exportAssets;
+	_exportAssets = _hostLuaExport
+		? {
+				lua: { call: hostLuaStep },
+				keysyms: LayoutExportAssetData.keysyms,
+				template: LayoutExportAssetData.template,
+				types: LayoutExportAssetData.types,
+				generator: LayoutKlcGenerator
+			}
+		: LayoutLuaRunner.assets(window, LayoutExportAssetData, LayoutKlcGenerator);
 	return _exportAssets;
+}
+
+/**
+ * Runs one step of the export adapter in the host, as LayoutLuaRunner's call
+ * does in the page: the input crosses as JSON text, the result comes back as
+ * the shared json module's encoding.
+ * @param {'read'|'xkb'} step
+ * @param {object} input
+ * @returns {Promise<object>}
+ */
+function hostLuaStep(step, input) {
+	return studioRequest('lua_export', { step: step, input: JSON.stringify(input) }).then(
+		function (result) {
+			return JSON.parse(result.output);
+		}
+	);
 }
 
 /** Opens a file in the host's native panel; settles on sourcePicked. */
@@ -558,6 +591,8 @@ window.studioLayouts = settleStudio;
 window.studioLayoutResult = settleStudio;
 /** Called by the host once a built-in corpus's tables ran in the page: { request, ok, code, detail }. */
 window.studioCorpus = settleStudio;
+/** Called by the host with one export step's result: { request, ok, output | code, detail }. */
+window.luaExportResult = settleStudio;
 /** Called by the host with the fingering profile: { request, ok, profile: json text | absent }. */
 window.studioProfile = settleStudio;
 /** Called by the host once the fingering profile is saved or reset: { request, ok, code, detail }. */

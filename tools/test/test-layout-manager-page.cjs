@@ -1034,6 +1034,50 @@ check(
 );
 
 check(
+	'the macOS and Linux windows build the downloads with the host Lua (lua_export)',
+	async () => {
+		const { context, window, messages } = loadEditorPage();
+		context.LayoutExportAssetData = { keysyms: { a: 1 }, template: 'symbols', types: 'types' };
+		context.LayoutKlcGenerator = { id: 'klc' };
+		window.initData({
+			strings: {},
+			state: { platform: 'linux' },
+			source_export: true,
+			lua_export: true
+		});
+		const assets = vm.runInContext('hostExportAssets()', context);
+		assert.equal(assets.template, 'symbols');
+		assert.ok(assets.generator === context.LayoutKlcGenerator);
+		const running = assets.lua.call('xkb', { name: 'mine' });
+		const step = messages[messages.length - 1];
+		assert.deepEqual(plain(step), {
+			action: 'lua_export',
+			request: step.request,
+			step: 'xkb',
+			input: '{"name":"mine"}'
+		});
+		window.luaExportResult({ request: step.request, ok: true, output: '{"ok":true,"files":[]}' });
+		assert.deepEqual(plain(await running), { ok: true, files: [] }, 'the result is the host JSON');
+		const refused = assets.lua.call('read', { xml: '<keyboard/>' });
+		window.luaExportResult({
+			request: messages[messages.length - 1].request,
+			ok: false,
+			code: 'target_export_refused',
+			detail: 'the export step is not read or xkb'
+		});
+		await assert.rejects(refused, (error) => error.code === 'target_export_refused');
+
+		// A host without lua_export (Windows) builds them with the page's fengari VM.
+		const windows = loadEditorPage();
+		windows.context.LayoutExportAssetData = { keysyms: {}, template: '', types: '' };
+		windows.context.LayoutKlcGenerator = {};
+		windows.context.LayoutLuaRunner = { assets: () => ({ via: 'fengari' }) };
+		windows.window.initData({ strings: {}, state: { platform: 'windows' }, source_export: true });
+		assert.equal(vm.runInContext('hostExportAssets()', windows.context).via, 'fengari');
+	}
+);
+
+check(
 	'the editor window mounts the editor on sourceData and closes its window on « Close »',
 	() => {
 		const { context, window, messages } = loadEditorPage();

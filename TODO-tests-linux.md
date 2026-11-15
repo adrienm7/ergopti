@@ -92,7 +92,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       right after « Keyboard layout », opens the same window, titled exactly « Ergopti Studio ».
       Studio tabs (2026-11-14, `claude/ergopti-todo-studio-app`): « Comparer » shows the layout ranking for a
       built-in corpus within a second, an imported layout is still listed after closing and reopening the window,
-      and « Analyse my typing » then selects « My typing » in « Comparer ».
+      and « Analyse my typing » then selects « My typing » in « Comparer ». XKB and KLC downloads (2026-11-15, `claude/ergopti-todo-native-export`): in the layout editor window's « Export » tab, « XKB » and « KLC » write `<id>_xkb.zip` and `<dll>.klc` to the Downloads folder, built by the host’s Lua (lua_export); proven under xvfb in the container.
       Downloads (2026-11-14, `layout_editor_downloads`): the window's XKB, KLC, DLL and macOS bundle downloads land in the Downloads folder, a second download of the same file is named « name (2).ext », and the XKB archive installs with the user layout installer.
 - [ ] <!-- field-point: direct_xkb_levels --> Direct XKB compiler (2026-11-13, `claude/ergopti-todo-compilers`): the XKB export of
       `_shared/tests/corpus/layouts/source/direct_levels.toml` installed with the user layout installer types a,

@@ -485,12 +485,19 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
       Ctrl+A → Ctrl+B), listed and editable. Stored in the Ergopti TOML shortcut model; each export target says
       honestly what it cannot carry, Ergopti+ emulation keeps it. Playwright checks through save and reload.
-- [ ] **XKB and KLC downloads in the app Studio window (maintainer decision, 2026-11-15).** The app windows'
+- [x] **XKB and KLC downloads in the app Studio window (maintainer decision, 2026-11-15).** The app windows'
       CSP has no 'unsafe-eval', so fengari-web.js cannot load and the editor's XKB/KLC downloads cannot run there
       (seen on Linux under WebKitGTK; macOS uses the same inlining host and CSP builder; Windows WebView2 unchecked).
       Decision: keep the CSP strict and have the host build these files with the native Lua engine through the
-      host bridge on Windows, macOS and Linux; fengari stays for the site only. Until then the app shows the
-      localized « converters cannot run in this window » notice that points to ergopti.fr.
+      host bridge on Windows, macOS and Linux; fengari stays for the site only.
+      Done 2026-11-15 (`claude/ergopti-todo-native-export`): the macOS and Linux hosts answer `lua_export` with
+      the shared `composer/export_step.lua` through the shared bridge; the export test checks the files built that
+      way are the site's bytes (Lua 5.4; LuaJIT checked locally), and under xvfb the Linux window wrote
+      `ergopti_xkb.zip` and `kbdergop.klc` with the same SHA-256 as the site's. Windows has no Lua engine and its
+      WebView2 pages carry no content policy, so its page keeps fengari (decided by the agent, to review by the
+      maintainer: a Lua runtime for the AutoHotkey driver would be a new dependency). A host with neither keeps
+      the « converters cannot run in this window » notice. Real-machine checks: the XKB and KLC downloads of the
+      layout editor window on macOS and Windows (TODO-tests files).
 - [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
       an app; the footer made every Studio page 80 px taller than the screen.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
