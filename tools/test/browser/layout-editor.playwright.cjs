@@ -670,17 +670,47 @@ async function exerciseShortcuts(browser, origin) {
 	assert.equal(parsedKeys.KeyE.shortcut_key, 'KeyR');
 	const reopened = path.join(require('node:os').tmpdir(), `layout-shortcuts-${process.pid}.toml`);
 	fs.writeFileSync(reopened, saved.text);
+	const english = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	// The file is read asynchronously: wait until the editor says it opened it.
+	const openReopened = async () => {
+		await page.setInputFiles('#le-open-file', reopened);
+		await page.waitForFunction(
+			(opened) => (document.getElementById('le-message') || {}).textContent === opened,
+			english['layout_editor.status.opened'].replace('{name}', path.basename(reopened))
+		);
+	};
 	try {
 		await page.click('#le-new');
 		await page.click('#le-start [data-start="blank"]');
 		if (await page.locator('#le-confirm-yes').count()) await page.click('#le-confirm-yes');
-		await page.setInputFiles('#le-open-file', reopened);
+		await openReopened();
+		await page.click('#le-shortcut-view');
+		assert.ok((await key('KeyW')).overridden, 'the reopened TOML overrides Ctrl+é');
+		assert.ok((await key('KeyQ')).overridden, 'the reopened TOML overrides Ctrl+A');
+		// An « Edit » under way belongs to the document it was started in: opening
+		// a file from the « Shortcuts » view ends it.
+		await page.click('#le-board [data-code="KeyQ"]');
+		await page.click('#le-shortcuts .le-shortcut-edit');
+		assert.equal(
+			await page.locator('#le-shortcut-cancel').count(),
+			1,
+			'the override is being edited'
+		);
+		await page.evaluate(() => {
+			document.getElementById('le-message').textContent = '';
+		});
+		await openReopened();
+		await page.click('#le-board [data-code="KeyQ"]');
+		assert.equal(
+			await page.locator('#le-shortcut-cancel').count(),
+			0,
+			'opening a file ends the « Edit » begun in the previous document'
+		);
 	} finally {
 		fs.rmSync(reopened);
 	}
-	await page.click('#le-shortcut-view');
-	assert.ok((await key('KeyW')).overridden);
-	assert.ok((await key('KeyQ')).overridden);
 	await page.click('#le-board [data-code="KeyW"]');
 	assert.match(await page.textContent('#le-shortcuts li'), /→ .*C/);
 	assert.equal(await page.inputValue('#le-shortcut-key'), 'KeyC');
@@ -933,7 +963,8 @@ async function exercisePhoneWidth(browser, origin) {
 		await page.hover('#le-board [data-code="KeyE"]');
 		assert.equal(await page.textContent('#le-magnifier-glyph'), 'É');
 		await page.click('#le-magnifier-copy');
-		assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'É');
+		// The clipboard write is asynchronous: wait until it holds the glyph.
+		await page.waitForFunction(async () => (await navigator.clipboard.readText()) === 'É');
 		await page.click('#le-undo');
 		await page.click('#le-undo');
 

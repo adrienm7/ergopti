@@ -407,6 +407,11 @@ var LayoutEditorPage = (function () {
 			state.dirty = false;
 			state.deadKey = null;
 			state.approximate = false;
+			// A shortcut being edited or chosen belongs to the document replaced: an
+			// « Edit » kept across an open once applied to the new file's override.
+			state.shortcutDraft = null;
+			state.shortcutForm = null;
+			state.pickingShortcutKey = null;
 		}
 
 		// ============================
