@@ -638,6 +638,17 @@ run_field_run() {
 		align_field_run_spec_with_prerelease
 		bash "${REPO_ROOT}/tools/dev/install-macos-dev-prerelease.sh" \
 			|| { log "The signed dev prerelease could not be installed and opened (reason above)."; return 1; }
+		# Read again from the declaration the prerelease runs with: the clone's
+		# newer default deadline (21310 s) passed the prerelease's max (10300 s)
+		# and the app refused the request as bad_deadline (field report 2026-11-15).
+		guided_prompt_name="$(spec_value guided.prompt 2>/dev/null || true)"
+		guided_answer_name="$(spec_value guided.answer 2>/dev/null || true)"
+		ready_file="${run_folder}/$(spec_value files.ready)"
+		request_name="$(spec_value files.request)"
+		refused_name="$(spec_value files.refused)"
+		accepted_name="$(spec_value files.accepted)"
+		done_name="$(spec_value files.done)"
+		deadline_seconds="$(spec_value deadline_seconds.default)"
 		log "Three steps may need you: if System Settings opens Accessibility, switch on the entry Ergopti's dialog"
 		log "names (never add one with +); type your password if macOS asks for it (Ergopti installs its own"
 		log "Karabiner runtime); and if System Settings opens Login Items & Extensions, switch on the Karabiner driver."
