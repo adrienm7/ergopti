@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "Wczytaj plik:",
 	"layout_analysis.corpus.file_unsupported": "Tego typu pliku nie można tu odczytać: skopiuj tekst i wklej go powyżej.",
 	"layout_analysis.corpus.file_unreadable": "Nie udało się odczytać tego pliku.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} znaków · {licence} · {source}",
 	"layout_analysis.corpus.private": "Twoje własne pisanie, odczytywane tylko na tym urządzeniu.",
 	"layout_analysis.corpus.local": "Twój tekst jest analizowany na tym urządzeniu i nigdzie nie jest wysyłany.",

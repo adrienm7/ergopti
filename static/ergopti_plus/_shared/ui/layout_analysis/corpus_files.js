@@ -14,7 +14,8 @@
  * 1. No library: .docx and .odt are ZIP archives, read with a central
  *    directory walk and the browser's DecompressionStream for deflate.
  * 2. Fail fast: a format the page cannot read rejects with a stable code the
- *    page turns into a localized message (PDF: copy its text and paste it).
+ *    page turns into a localized message. A PDF's text is read by
+ *    pdf_text.js; a locked or scanned PDF is refused with its own code.
  * 3. A built-in corpus's script path is relative to this folder; it resolves
  *    against this script's own URL, so a page in another folder loads it too.
  *    A host that inlines its pages (the macOS and Linux app windows have no
@@ -125,7 +126,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 	 * Reads a picked file as plain text.
 	 * @param {File} file - The file.
 	 * @returns {Promise<string>} Its text.
-	 * @throws {Error} With code file_unsupported or file_unreadable.
+	 * @throws {Error} With code file_unsupported, file_unreadable, pdf_encrypted or pdf_no_text.
 	 */
 	async function readText(file) {
 		const extension = (file.name.split('.').pop() || '').toLowerCase();
@@ -134,6 +135,7 @@ var LAYOUT_ANALYSIS_FILES = (function () {
 			const doc = new DOMParser().parseFromString(await file.text(), 'text/html');
 			return doc.body ? doc.body.innerText || doc.body.textContent : '';
 		}
+		if (extension === 'pdf') return window.LAYOUT_ANALYSIS_PDF.read(await file.arrayBuffer());
 		const office = OFFICE[extension];
 		if (!office) throw failure('file_unsupported');
 		const bytes = await zipEntry(await file.arrayBuffer(), office.part);

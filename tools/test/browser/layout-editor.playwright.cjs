@@ -725,6 +725,14 @@ async function exerciseStudioComparer(page) {
 	// button carries the page's translated text.
 	// The corpus file sits in the panel « custom text » opens: open it first.
 	await page.selectOption('#la-corpus', 'custom');
+	// (comparer-reads-pdf) A PDF's text becomes the corpus, read in the page.
+	await page.setInputFiles(
+		'#la-file',
+		path.join(ROOT, 'static', 'documents', 'archives', 'Layout_Optim7.pdf')
+	);
+	await page.waitForFunction(() =>
+		document.getElementById('la-text').value.includes('Exposants en AltGr E, Indices en AltGr I')
+	);
 	const inputs = await page.$$eval('#studio-comparer input[type="file"]', (nodes) =>
 		nodes.map((node) => {
 			const box = node.getBoundingClientRect();

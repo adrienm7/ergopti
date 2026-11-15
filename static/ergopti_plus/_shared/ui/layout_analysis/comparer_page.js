@@ -116,7 +116,7 @@
 			<input
 				id="la-file"
 				type="file"
-				accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt"
+				accept=".txt,.md,.csv,.tsv,.html,.htm,.json,.tex,.docx,.odt,.pdf"
 			/>
 			<span id="la-file-name" class="la-muted"></span>
 		</label>
@@ -1204,10 +1204,14 @@
 					$('la-text').value = text;
 					useText(text);
 				} catch (failure) {
-					error.textContent =
-						failure.code === 'file_unsupported'
-							? t('layout_analysis.corpus.file_unsupported')
-							: t('layout_analysis.corpus.file_unreadable');
+					// Each refusal in words: an unknown type, a PDF that is locked or holds no
+					// text (a scan), or a file that could not be read.
+					const known = {
+						file_unsupported: 'layout_analysis.corpus.file_unsupported',
+						pdf_encrypted: 'layout_analysis.corpus.pdf_encrypted',
+						pdf_no_text: 'layout_analysis.corpus.pdf_no_text'
+					};
+					error.textContent = t(known[failure.code] || 'layout_analysis.corpus.file_unreadable');
 					error.hidden = false;
 				}
 			});

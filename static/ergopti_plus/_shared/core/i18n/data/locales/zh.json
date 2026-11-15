@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "载入文件：",
 	"layout_analysis.corpus.file_unsupported": "此处无法读取这种文件：请复制其文本并粘贴到上方。",
 	"layout_analysis.corpus.file_unreadable": "无法读取此文件。",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} 个字符 · {licence} · {source}",
 	"layout_analysis.corpus.private": "你自己的输入，仅在本设备上读取。",
 	"layout_analysis.corpus.local": "你的文本在本设备上分析，不会发送到任何地方。",

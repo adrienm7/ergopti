@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "טעינת קובץ:",
 	"layout_analysis.corpus.file_unsupported": "אי אפשר לקרוא כאן סוג קובץ זה: העתיקו את הטקסט שלו והדביקו אותו למעלה.",
 	"layout_analysis.corpus.file_unreadable": "לא ניתן היה לקרוא את הקובץ.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} תווים · {licence} · {source}",
 	"layout_analysis.corpus.private": "ההקלדה שלך, נקראת במכשיר הזה בלבד.",
 	"layout_analysis.corpus.local": "הטקסט שלך מנותח במכשיר הזה ואינו נשלח לשום מקום.",

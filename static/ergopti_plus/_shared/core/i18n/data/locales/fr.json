@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "Charger un fichier :",
 	"layout_analysis.corpus.file_unsupported": "Ce type de fichier ne peut pas être lu ici : copiez son texte et collez-le ci-dessus.",
 	"layout_analysis.corpus.file_unreadable": "Ce fichier n’a pas pu être lu.",
+	"layout_analysis.corpus.pdf_encrypted": "Ce PDF est verrouillé : son texte ne peut pas être lu ici.",
+	"layout_analysis.corpus.pdf_no_text": "Ce PDF ne contient pas de texte (un scan ou des images) : copiez son texte et collez-le ci-dessus.",
 	"layout_analysis.corpus.info": "{chars} caractères · {licence} · {source}",
 	"layout_analysis.corpus.private": "Votre propre frappe, lue sur cet appareil uniquement.",
 	"layout_analysis.corpus.local": "Votre texte est analysé sur cet appareil et n’est envoyé nulle part.",

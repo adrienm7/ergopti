@@ -493,6 +493,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-text-sources.cjs"],
 			"repro": "npm run test:corpus-text-sources"
+		},
+		{
+			"id": "pdf-text",
+			"ordinal": 677,
+			"name": "the Comparer reads the text of a PDF in the page: whole words and lines for Chrome, Firefox and Google Docs exports, and refuses a locked or text-less PDF",
+			"cmd": "node",
+			"args": ["tools/test/test-pdf-text.cjs"],
+			"repro": "npm run test:pdf-text"
 		}
 	]
 }

@@ -396,7 +396,7 @@ report.
 ## Comparer page
 
 `_shared/ui/layout_analysis/index.html` is the « Comparer » tab: corpus
-(built-in, pasted text, or a .txt, .md, .csv, .html, .docx or .odt file read in
+(built-in, pasted text, or a .txt, .md, .csv, .html, .docx, .odt or .pdf file (`pdf_text.js`: its text, no library; a locked or scanned PDF refused) read in
 the page), keyboard, layout selection, the global score chart, the sortable
 ranking, each layout's contributions, finger load and metrics, and the weights
 editor with « restore the defaults ». The site embeds it like the editor

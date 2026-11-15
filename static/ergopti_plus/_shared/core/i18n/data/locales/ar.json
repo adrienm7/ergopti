@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "تحميل ملف:",
 	"layout_analysis.corpus.file_unsupported": "لا يمكن قراءة هذا النوع من الملفات هنا: انسخ نصه والصقه أعلاه.",
 	"layout_analysis.corpus.file_unreadable": "تعذّرت قراءة هذا الملف.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} حرفًا · {licence} · {source}",
 	"layout_analysis.corpus.private": "كتابتك الخاصة، تُقرأ على هذا الجهاز فقط.",
 	"layout_analysis.corpus.local": "يُحلَّل نصك على هذا الجهاز ولا يُرسَل إلى أي مكان.",

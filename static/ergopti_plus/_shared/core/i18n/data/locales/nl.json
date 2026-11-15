@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "Bestand laden:",
 	"layout_analysis.corpus.file_unsupported": "Dit bestandstype kan hier niet worden gelezen: kopieer de tekst en plak hem hierboven.",
 	"layout_analysis.corpus.file_unreadable": "Dit bestand kon niet worden gelezen.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} tekens · {licence} · {source}",
 	"layout_analysis.corpus.private": "Uw eigen typen, alleen op dit apparaat gelezen.",
 	"layout_analysis.corpus.local": "Uw tekst wordt op dit apparaat geanalyseerd en nergens naartoe gestuurd.",

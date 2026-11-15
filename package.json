@@ -63,6 +63,7 @@
 		"test:corpus-text-sources": "node ./tools/test/test-corpus-text-sources.cjs",
 		"test:analyser-scores": "node ./tools/test/test-analyser-scores.cjs",
 		"test:layout-comparer-page": "node ./tools/test/test-layout-comparer-page.cjs",
+		"test:pdf-text": "node ./tools/test/test-pdf-text.cjs",
 		"test:key-legend": "node ./tools/test/test-key-legend.cjs",
 		"test:layout-formats": "node ./tools/test/test-layout-formats.cjs",
 		"test:nav-layer-recommended-golden": "node ./tools/test/test-nav-layer-recommended-golden.cjs",

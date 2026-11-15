@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "फ़ाइल लोड करें:",
 	"layout_analysis.corpus.file_unsupported": "इस प्रकार की फ़ाइल यहाँ नहीं पढ़ी जा सकती: उसका पाठ कॉपी करके ऊपर चिपकाएँ।",
 	"layout_analysis.corpus.file_unreadable": "यह फ़ाइल पढ़ी नहीं जा सकी।",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} अक्षर · {licence} · {source}",
 	"layout_analysis.corpus.private": "आपकी अपनी टाइपिंग, केवल इसी डिवाइस पर पढ़ी जाती है।",
 	"layout_analysis.corpus.local": "आपके पाठ का विश्लेषण इसी डिवाइस पर होता है और वह कहीं नहीं भेजा जाता।",

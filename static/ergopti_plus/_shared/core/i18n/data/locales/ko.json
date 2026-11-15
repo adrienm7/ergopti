@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "파일 불러오기:",
 	"layout_analysis.corpus.file_unsupported": "이 파일 형식은 여기서 읽을 수 없습니다. 텍스트를 복사해 위에 붙여 넣으세요.",
 	"layout_analysis.corpus.file_unreadable": "이 파일을 읽을 수 없습니다.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars}자 · {licence} · {source}",
 	"layout_analysis.corpus.private": "내 타이핑 기록, 이 기기에서만 읽습니다.",
 	"layout_analysis.corpus.local": "텍스트는 이 기기에서 분석되며 어디로도 전송되지 않습니다.",

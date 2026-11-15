@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "Carregar um ficheiro:",
 	"layout_analysis.corpus.file_unsupported": "Este tipo de ficheiro não pode ser lido aqui: copie o texto e cole-o acima.",
 	"layout_analysis.corpus.file_unreadable": "Não foi possível ler este ficheiro.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} caracteres · {licence} · {source}",
 	"layout_analysis.corpus.private": "A sua própria digitação, lida apenas neste dispositivo.",
 	"layout_analysis.corpus.local": "O seu texto é analisado neste dispositivo e não é enviado para lado nenhum.",

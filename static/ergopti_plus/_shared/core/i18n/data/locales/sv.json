@@ -4453,6 +4453,8 @@
 	"layout_analysis.corpus.file": "Läs in en fil:",
 	"layout_analysis.corpus.file_unsupported": "Den här filtypen kan inte läsas här: kopiera texten och klistra in den ovan.",
 	"layout_analysis.corpus.file_unreadable": "Filen kunde inte läsas.",
+	"layout_analysis.corpus.pdf_encrypted": "This PDF is locked: its text cannot be read here.",
+	"layout_analysis.corpus.pdf_no_text": "This PDF holds no text (a scan or images only): copy its text and paste it above.",
 	"layout_analysis.corpus.info": "{chars} tecken · {licence} · {source}",
 	"layout_analysis.corpus.private": "Ditt eget skrivande, läst bara på den här enheten.",
 	"layout_analysis.corpus.local": "Din text analyseras på den här enheten och skickas ingenstans.",

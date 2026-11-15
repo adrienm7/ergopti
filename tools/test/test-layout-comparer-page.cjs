@@ -56,6 +56,8 @@ const SCRIPTS = [
 	'../layout_editor/toml_prelude.js',
 	'../vendor/smol-toml.js',
 	'layout_formats.js',
+	// The PDF text reader corpus_files.js calls.
+	'pdf_text.js',
 	'corpus_files.js',
 	'comparer_page.js'
 ];
