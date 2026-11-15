@@ -59,7 +59,10 @@ All functions are on `LAYOUT_ANALYSIS`. Every invalid input throws.
   compiled `.keylayout`).
 - `defaultIdealLoad()` → a copy of `ideal_finger_load`; `idealLoad(load)` →
   `load` checked (the eight fingers, finite shares ≥ 0, summing to 100 within
-  0.05).
+  0.05, each hand keeping index ≥ middle ≥ ring ≥ pinky in the order
+  `model.ideal_finger_load_hands` gives); a refusal is an `AnalysisError` with
+  a stable `code` (`ideal_load_fingers`, `ideal_load_share`, `ideal_load_sum`,
+  `ideal_load_order`) and the `values` its message names.
 - `analyse(layout, ngrams, {keyboard?, weights?, idealLoad?})` → one result
   (`idealLoad` replaces the default target of `finger_imbalance`):
 
@@ -413,7 +416,9 @@ open in a new tab.
 The ideal finger load is editable under the weights: eight targets, their
 total shown, analysed again once they sum to 100 %, « restore the defaults ».
 The codegen refuses a default that breaks the maintainer's rule (each hand at
-50 %, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %).
+50 %, index ≥ middle ≥ ring ≥ pinky, pinkies under 8 %); an edited load keeps
+the order, which the engine enforces, while its hand shares and pinkies are the
+user's choice.
 
 Weights, ideal finger load, selection, corpus and keyboard are remembered in `localStorage` when
 the browser allows it; nothing is sent anywhere.

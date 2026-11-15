@@ -55,6 +55,19 @@ var LAYOUT_ANALYSIS = (function () {
 	const DEFAULT_KEYBOARD = 'iso';
 	// An edited ideal finger load may miss 100 % by this much (rounding of inputs).
 	const LOAD_SUM_TOLERANCE = 0.05;
+	/**
+	 * A refusal with a stable code and the values its message names, so a page
+	 * shows it in the reader's language (layout_analysis.error.<code>).
+	 */
+	class AnalysisError extends Error {
+		constructor(code, values, message) {
+			super(`layout_analysis: ${message}`);
+			this.name = 'AnalysisError';
+			this.code = code;
+			this.values = values;
+		}
+	}
+
 	// A dead-key rule typed by another dead key: « dead:<state> » names the dead
 	// key that enters <state> (Ergo-L's 1dk pressed twice gives the diaeresis).
 	const DEAD_TYPED = 'dead:';
@@ -1079,23 +1092,44 @@ var LAYOUT_ANALYSIS = (function () {
 	 * The ideal finger load an analysis measures finger_imbalance against.
 	 * @param {object} [load] - finger → %; the default when absent.
 	 * @returns {object} The load, checked.
-	 * @throws {Error} On a finger the default lacks or misses, a negative or
-	 *   non-finite share, or shares that do not sum to 100.
+	 * @throws {AnalysisError} On a finger the default lacks or misses, a negative
+	 *   or non-finite share, shares that do not sum to 100, or a hand whose
+	 *   shares break index ≥ middle ≥ ring ≥ pinky (the maintainer's order, which
+	 *   the default keeps: model.ideal_finger_load_hands).
 	 */
 	function idealLoad(load) {
-		if (load === undefined) return data().model.ideal_finger_load;
-		const fingers = Object.keys(data().model.ideal_finger_load);
+		const { model } = data();
+		if (load === undefined) return model.ideal_finger_load;
+		const fingers = Object.keys(model.ideal_finger_load);
 		const given = Object.keys(load);
 		if (given.length !== fingers.length || !fingers.every((f) => given.includes(f)))
-			throw new Error(`layout_analysis: idealLoad needs exactly ${fingers.join(', ')}`);
+			throw new AnalysisError(
+				'ideal_load_fingers',
+				{},
+				`idealLoad needs exactly ${fingers.join(', ')}`
+			);
 		let sum = 0;
 		for (const f of fingers) {
 			if (!Number.isFinite(load[f]) || load[f] < 0)
-				throw new Error(`layout_analysis: idealLoad.${f} must be a finite number >= 0`);
+				throw new AnalysisError(
+					'ideal_load_share',
+					{ finger: f },
+					`idealLoad.${f} must be a finite number >= 0`
+				);
 			sum += load[f];
 		}
 		if (Math.abs(sum - 100) > LOAD_SUM_TOLERANCE)
-			throw new Error(`layout_analysis: idealLoad sums to ${sum}, not 100`);
+			throw new AnalysisError('ideal_load_sum', { sum }, `idealLoad sums to ${sum}, not 100`);
+		// Each hand from the pinky to the index: a finger never carries less than
+		// the one before it.
+		for (const hand of model.ideal_finger_load_hands)
+			for (let i = 1; i < hand.length; i++)
+				if (load[hand[i]] < load[hand[i - 1]])
+					throw new AnalysisError(
+						'ideal_load_order',
+						{ finger: hand[i], below: hand[i - 1] },
+						`idealLoad.${hand[i]} is below idealLoad.${hand[i - 1]}`
+					);
 		return load;
 	}
 
@@ -1193,6 +1227,7 @@ var LAYOUT_ANALYSIS = (function () {
 	return {
 		METRICS,
 		LAYER_IDS,
+		AnalysisError,
 		hashText,
 		keyboard,
 		fingeringProfile,

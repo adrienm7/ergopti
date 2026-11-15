@@ -277,6 +277,32 @@ for (const bad of [
 	}
 	check(threw, `ideal load: ${JSON.stringify(bad)} must throw`);
 }
+// An edited load keeps the order too: a pinky above its ring finger, on either
+// hand, is refused with its code, even when the shares sum to 100.
+for (const [hand, pinky, ring] of [
+	['left', 'lp', 'lr'],
+	['right', 'rp', 'rr']
+]) {
+	const swapped = Object.assign({}, ideal, { [pinky]: ideal[ring], [ring]: ideal[pinky] });
+	let refusal = null;
+	try {
+		E.idealLoad(swapped);
+	} catch (error) {
+		refusal = error;
+	}
+	check(
+		refusal && refusal.code === 'ideal_load_order',
+		`ideal load: the ${hand} hand's swapped pinky and ring are refused`
+	);
+	check(
+		refusal && refusal.values.finger === ring && refusal.values.below === pinky,
+		`ideal load: the ${hand} refusal names ${ring} below ${pinky}`
+	);
+}
+check(
+	E.idealLoad(Object.assign({}, ideal)).li === ideal.li,
+	'ideal load: the default order passes'
+);
 
 // Fingering profiles. The default board derives the lateral keys this list
 // once named by hand (index inner column, pinky outer keys).

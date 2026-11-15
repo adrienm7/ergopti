@@ -746,6 +746,8 @@ function buildData() {
 	const engine = loadEngine();
 	const corpora = buildCorpora(engine);
 	checkIdealLoad(model.ideal_finger_load);
+	// The engine keeps an edited load in the same order (analysis_engine.js idealLoad).
+	model.ideal_finger_load_hands = HAND_FINGERS;
 	delete model._description;
 	return {
 		schema_version: 1,
