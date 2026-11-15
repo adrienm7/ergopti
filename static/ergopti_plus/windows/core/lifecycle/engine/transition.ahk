@@ -23,7 +23,7 @@ global LIFECYCLE_REQUIRED_OWNERS := Map(
 		"prefix-index", "llm-pointer-watch",
 		"metrics-focus-refresh", "keystats-webview", "webview-readiness",
 		"keystats-text-migration", "llm-menu", "updater",
-		"uia-selection-worker", "keyboard-layout"
+		"uia-selection-worker", "keyboard-layout", "magic-key-editor-input-hook"
 	],
 	; A user quit has one owner: the switch to the pause layout.
 	"quit", [
