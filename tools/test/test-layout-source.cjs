@@ -785,7 +785,9 @@ try {
 	);
 	assert.deepEqual(nativeKlc.report.system_keys, [], 'no system mappings is an array');
 	assert.equal(nativeKlc.report.virtual_keys.find((key) => key.key === 'KeyA').virtual_key, 'A');
-	// A key's shortcut_key is reported by the KLC, never dropped: the driver emulates it.
+	// A key's shortcut_key is carried by the KLC as the named key's virtual key; the
+	// named key's own shortcuts move to the freed one, which the report says
+	// (the goldens: test-layout-shortcut-keys.cjs).
 	const structured = Source.read(
 		fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'direct_levels.toml'), 'utf8')
 	);
@@ -794,12 +796,12 @@ try {
 		keys: { ...(structured.keys || {}), KeyA: { shortcut_key: 'KeyB' } },
 		exports: { ...(structured.exports || {}), windows: clone(windowsMetadata) }
 	});
-	assert.ok(
-		shortcutKlc.report.omitted.some(
-			(entry) =>
-				entry.path === 'keys.KeyA.shortcut_key' && entry.reason === 'shortcut_output_not_in_klc'
-		),
-		JSON.stringify(shortcutKlc.report.omitted)
+	const vkOfKey = (key) =>
+		shortcutKlc.report.virtual_keys.find((entry) => entry.key === key).virtual_key;
+	assert.deepEqual([vkOfKey('KeyA'), vkOfKey('KeyB')], ['B', 'A']);
+	assert.deepEqual(
+		clone(shortcutKlc.report.omitted.filter((entry) => entry.path === 'keys.KeyA.shortcut_key')),
+		[{ path: 'keys.KeyA.shortcut_key', reason: 'shortcut_key_displaces_virtual_key_in_klc' }]
 	);
 	assert.throws(
 		() =>

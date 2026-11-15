@@ -6,7 +6,7 @@
  * DESCRIPTION:
  * Generates `_shared/ui/layout_editor/_generated/kbd_dll_writer.js`, the
  * repository tool's Windows keyboard layout DLL writer (tools/lib/kbd-dll:
- * constants, model, emit-c, source and pe-writer) as a classic script defining
+ * constants, model, emit-c, shortcut-keys, source and pe-writer) as a classic script defining
  * `LayoutKbdDll`, so the layout editor page builds the same four DLL images the
  * tool writes with `--writer pe`, with no compiler.
  *
@@ -31,7 +31,11 @@ const MODULES = Object.freeze([
 	{ file: 'constants.cjs', requires: [] },
 	{ file: 'model.cjs', requires: ['./constants.cjs'] },
 	{ file: 'emit-c.cjs', requires: ['./constants.cjs', './model.cjs'] },
-	{ file: 'source.cjs', requires: ['./constants.cjs', './model.cjs', 'node:fs', '../paths.cjs'] },
+	{ file: 'shortcut-keys.cjs', requires: [] },
+	{
+		file: 'source.cjs',
+		requires: ['./constants.cjs', './model.cjs', './shortcut-keys.cjs', 'node:fs', '../paths.cjs']
+	},
 	{ file: 'pe-writer.cjs', requires: ['./constants.cjs', './model.cjs', './emit-c.cjs'] }
 ]);
 // Required only to read the repository; the page passes physicalKeys instead.

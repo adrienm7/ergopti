@@ -1,0 +1,68 @@
+partial alphanumeric_keys
+xkb_symbols "shortcut_keys" {
+
+	name[Group1] = "Shortcut Keys";
+
+	include "latin"
+
+        // Space bar
+        key <SPCE> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+
+        // Digits
+        key <TLDE> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AE12> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+
+        // Letters — Row 1/3
+        key <AD01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [a, a, A, A, q, a, a] }; // a a A A q a a
+        key <AD02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [z, z, Z, Z, z, z, z] }; // z z Z Z z z z
+        key <AD03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AD12> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+
+        // Letters — Row 2/3
+        key <AC01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [q, q, Q, Q, a, q, q] }; // q q Q Q a q q
+        key <AC02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AC11> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <BKSL> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+
+        // Letters — Row 3/3
+        key <LSGT> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB01> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [w, w, W, W, c, w, w] }; // w w W W c w w
+        key <AB02> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [x, x, X, X, c, x, x] }; // x x X X c x x
+        key <AB03> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [c, c, C, C, c, c, c] }; // c c C C c c c
+        key <AB04> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB05> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [b, b, B, B, NoSymbol, b, b] }; // b b B B  b b
+        key <AB06> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB07> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB08> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB09> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+        key <AB10> { type[group1] = "ERGOPTI_SEVEN_LEVEL", [NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol, NoSymbol] }; //       
+
+	include "level3(ralt_switch)"
+};

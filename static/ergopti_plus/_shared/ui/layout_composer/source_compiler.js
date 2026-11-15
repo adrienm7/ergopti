@@ -88,11 +88,28 @@ var LayoutSourceCompiler = (function () {
 	// What each compilation target can carry. macOS reads the keylayout itself, with
 	// every sided token and an unused cell for a disabled key; Linux and Windows reach
 	// it through the XKB and KLC converters, which have neither and place no key at
-	// an unnamed macOS key code.
+	// an unnamed macOS key code. shortcutLevel: the target reads a key's shortcut_key
+	// from the Command keyMap (macOS, the XKB Control/Alt/Super level); the KLC
+	// carries it as a virtual key instead (tools/lib/kbd-dll/shortcut-keys.cjs).
 	const TARGETS = {
-		macos: { tokens: TOKENS, disabledCharacterCell: true, unnamedMacCodes: true },
-		linux: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false },
-		windows: { tokens: CONVERTER_TOKENS, disabledCharacterCell: false, unnamedMacCodes: false }
+		macos: {
+			tokens: TOKENS,
+			disabledCharacterCell: true,
+			unnamedMacCodes: true,
+			shortcutLevel: true
+		},
+		linux: {
+			tokens: CONVERTER_TOKENS,
+			disabledCharacterCell: false,
+			unnamedMacCodes: false,
+			shortcutLevel: true
+		},
+		windows: {
+			tokens: CONVERTER_TOKENS,
+			disabledCharacterCell: false,
+			unnamedMacCodes: false,
+			shortcutLevel: false
+		}
 	};
 	const VARIANTS = ['iso', 'ansi'];
 	const MACOS_FORMATS = ['bundle', 'iso', 'ansi'];
@@ -355,14 +372,106 @@ var LayoutSourceCompiler = (function () {
 		])
 			(source[field] || []).forEach((entry) => note(`${field}.${entry.key}`, reason));
 		if (source.windows) note('windows', 'windows_only_flags');
+		// A key's shortcut_key is carried by compileModel's shortcut level (and by
+		// the Windows virtual key); what it cannot carry is reported there.
 		for (const [key, entry] of Object.entries(source.keys || {}))
 			for (const field of Object.keys(entry))
-				if (field === 'shortcut_key')
-					// The shortcut level of a native layout follows the typed character; the
-					// driver's emulation table performs a key's shortcut_key instead.
-					note(`keys.${key}.${field}`, `shortcut_output_not_in_${format}`);
-				else if (field !== 'name') note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
+				if (field !== 'name' && field !== 'shortcut_key')
+					note(`keys.${key}.${field}`, 'layer_selection_owns_caps_lock');
 		return omitted;
+	}
+
+	// The modifiers whose combinations select a native shortcut level.
+	const SHORTCUT_LEVEL_IDS = ['control', 'meta'];
+
+	/**
+	 * True when a selector holds for exactly the modifier ids `pressed` (Caps Lock
+	 * off). A combination names either side of a modifier: a sided id (Right Ctrl)
+	 * does not answer it.
+	 */
+	function selects(selector, pressed) {
+		const allowed = new Set([...selector.required, ...selector.optional]);
+		return (
+			selector.required.every((id) => pressed.includes(id)) &&
+			pressed.every((id) => allowed.has(id))
+		);
+	}
+
+	/**
+	 * Carries each key's shortcut_key on the native shortcut level: in every keyMap
+	 * a shortcut combination selects (LayoutSource.shortcutKeyCombinations), the key
+	 * types what the key it names types there, as the driver's emulation sends that
+	 * key. macOS matches Command and Control shortcuts on that keyMap's character, and
+	 * the XKB converter writes it on its Control/Alt/Super level. A combination no
+	 * layer selects falls to the default keyMap: one more keyMap, based on it, takes
+	 * those combinations. A combination a text layer answers cannot hold it, which
+	 * the omissions say.
+	 * @param {object} source - The validated source.
+	 * @param {object[]} layers - compileModel's compiled layers, in keyMap order.
+	 * @param {Map[]} keyMaps - compileModel's rows, one Map per layer (changed in place).
+	 * @param {object} context - { table, tokens, platform, format, omitted }.
+	 * @returns {object|null} The added layer { selectors, base } or null.
+	 */
+	function shortcutLevels(source, layers, keyMaps, context) {
+		const { table, tokens, platform, format, omitted } = context;
+		const pairs = Object.entries(source.keys || {}).filter(([, entry]) =>
+			own(entry, 'shortcut_key')
+		);
+		if (!pairs.length) return null;
+		const shortcutLayer = (layer) =>
+			[layer, ...(layer.alternatives || [])].every((selector) =>
+				selector.required.some((id) => SHORTCUT_LEVEL_IDS.includes(id))
+			);
+		const patched = new Set();
+		const free = [];
+		let shadowed = false;
+		for (const combination of LayoutSource.shortcutKeyCombinations()) {
+			const index = layers.findIndex(({ layer }) =>
+				[layer, ...(layer.alternatives || [])].some((selector) => selects(selector, combination))
+			);
+			if (index === -1) free.push(combination);
+			else if (shortcutLayer(layers[index].layer)) patched.add(index);
+			else shadowed = true;
+		}
+		const rows = new Map();
+		// Every key reads the rows as the layers wrote them: two keys naming each
+		// other exchange their rows.
+		const written = new Map([...patched].map((index) => [index, new Map(keyMaps[index])]));
+		const nativeCode = (name, path) => {
+			const mac = table.code(name);
+			if (mac === undefined || MODIFIER_KEYS.has(name)) {
+				omitted.push({ path, reason: `physical_key_not_in_${format}` });
+				return undefined;
+			}
+			if (!TARGETS[platform].unnamedMacCodes && !table.byName.has(name)) {
+				omitted.push({ path, reason: `mac_only_key_code_not_in_${platform}` });
+				return undefined;
+			}
+			return mac;
+		};
+		for (const [key, entry] of pairs) {
+			const path = `keys.${key}.shortcut_key`;
+			const from = nativeCode(key, path);
+			const to = from === undefined ? undefined : nativeCode(entry.shortcut_key, path);
+			if (to === undefined) continue;
+			if (shadowed) omitted.push({ path, reason: `shortcut_level_types_text_in_${format}` });
+			for (const index of patched) {
+				const original = written.get(index);
+				if (original.has(to)) keyMaps[index].set(from, original.get(to));
+				else keyMaps[index].delete(from);
+			}
+			if (!free.length) continue;
+			// The added keyMap inherits the default one: the named key's row there.
+			if (keyMaps[0].has(to)) rows.set(from, keyMaps[0].get(to));
+			else omitted.push({ path, reason: `shortcut_key_types_nothing_in_${format}` });
+		}
+		if (!free.length || !rows.size) return null;
+		const caps = tokens.caps_lock ? ['caps_lock'] : [];
+		const selectors = free.map((required) => selectorKeys({ required, optional: caps }, tokens));
+		if (selectors.includes(null)) fail('source_shortcut_level_tokens', 'keys');
+		layers.push({ layer: null, selectors, keys: {}, base: 0 });
+		keyMaps.push(rows);
+		return layers[layers.length - 1];
 	}
 
 	/**
@@ -466,6 +575,8 @@ var LayoutSourceCompiler = (function () {
 			for (const [mac, output] of defaults) if (!rows.has(mac)) rows.set(mac, ['output', output]);
 			return rows;
 		});
+		if (TARGETS[platform].shortcutLevel)
+			shortcutLevels(source, layers, keyMaps, { table, tokens, platform, format, omitted });
 		// A rule input no key types keeps its action, as an imported file had it; a
 		// dead key only reached through a chain needs none.
 		for (const input of ruleInputs) if (!actions.has(input)) textAction(input, input, 'dead_keys');
@@ -530,7 +641,12 @@ var LayoutSourceCompiler = (function () {
 		});
 		lines.push('\t</modifierMap>', '\t<keyMapSet id="layout">');
 		keyMaps.forEach((rows, index) => {
-			lines.push(`\t\t<keyMap index="${index}">`);
+			const base = layers[index].base;
+			lines.push(
+				base === undefined
+					? `\t\t<keyMap index="${index}">`
+					: `\t\t<keyMap index="${index}" baseMapSet="layout" baseIndex="${base}">`
+			);
 			for (const mac of [...rows.keys()].sort((a, b) => a - b)) {
 				const [kind, value] = rows.get(mac);
 				lines.push(`\t\t\t<key code="${mac}" ${kind}="${esc(value)}"/>`);
@@ -638,6 +754,9 @@ var LayoutSourceCompiler = (function () {
 						id: 'layout',
 						key_maps: model.keyMaps.map((rows, index) => ({
 							index,
+							...(model.layers[index].base === undefined
+								? {}
+								: { base: { set: 'layout', index: model.layers[index].base } }),
 							keys: [...rows.keys()]
 								.sort((a, b) => a - b)
 								.map((code) => {

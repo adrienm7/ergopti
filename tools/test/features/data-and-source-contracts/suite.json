@@ -938,6 +938,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-structure-platform-markers.cjs"],
 			"repro": "npm run test:structure-platform-markers"
+		},
+		{
+			"id": "layout-shortcut-keys",
+			"ordinal": 671,
+			"name": "a key's shortcut key is carried by the .keylayout, XKB, KLC and DLL goldens",
+			"cmd": "node",
+			"args": ["tools/test/test-layout-shortcut-keys.cjs"],
+			"repro": "npm run test:layout-shortcut-keys"
 		}
 	]
 }

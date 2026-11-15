@@ -29,6 +29,7 @@
 
 const C = require('./constants.cjs');
 const Model = require('./model.cjs');
+const ShortcutKeys = require('./shortcut-keys.cjs');
 
 // The modifier ids of a column's bits; AltGr (Ctrl+Alt) is the right Alt key.
 const COLUMN_IDS = [
@@ -349,15 +350,49 @@ function fromSource(source, options = {}) {
 	const keys = [];
 	const scancodes = [];
 	const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-	for (const code of [...byCode.keys()].filter((c) => codes.has(c))) {
+	const placedCodes = [...byCode.keys()].filter((c) => codes.has(c));
+	// An E0 key (keypad divide, keypad Enter…) keeps its standard virtual key.
+	const e0Of = (sc) =>
+		sc >= 0x100 ? C.DEFAULT_E0.find(([low]) => low === (sc & 0xff)) : undefined;
+	const ownVk = new Map();
+	for (const code of placedCodes) {
 		const sc = byCode.get(code);
 		const fields = keyFields[code] || {};
-		// An E0 key (keypad divide, keypad Enter…) keeps its standard virtual key.
-		const e0 = sc >= 0x100 ? C.DEFAULT_E0.find(([low]) => low === (sc & 0xff)) : undefined;
+		const e0 = e0Of(sc);
 		if (sc >= 0x100 && (e0 === undefined || own(fields, 'virtual_key')))
 			fail('source_extended_character_key', code);
 		const vk = e0 ? e0[1] & 0xff : own(fields, 'virtual_key') ? fields.virtual_key : defaultVk(sc);
 		if (!vk) fail('source_key_without_vk', code);
+		ownVk.set(code, vk);
+	}
+	// A key's shortcut_key: it takes the named key's virtual key, which Windows
+	// matches its shortcuts on (shortcut-keys.cjs). Only a plain, non-keypad key
+	// with its own row can move; two keys of one virtual key share one row.
+	const movable = placedCodes.filter((code) => {
+		const sc = byCode.get(code);
+		return sc < 0x100 && !keypad(sc);
+	});
+	const firstOfVk = new Map();
+	for (const code of movable)
+		if (!firstOfVk.has(ownVk.get(code))) firstOfVk.set(ownVk.get(code), code);
+	const exchange = ShortcutKeys.exchangeVirtualKeys(
+		movable
+			.filter((code) => firstOfVk.get(ownVk.get(code)) === code)
+			.map((code) => ({ code, vk: ownVk.get(code) })),
+		ShortcutKeys.shortcutPairs(source)
+	);
+	for (const entry of exchange.refused)
+		omitted.push({ path: `keys.${entry.key}.shortcut_key`, reason: entry.reason });
+	for (const entry of exchange.displaced)
+		omitted.push({
+			path: `keys.${entry.by}.shortcut_key`,
+			reason: 'shortcut_key_displaces_virtual_key'
+		});
+	for (const code of placedCodes) {
+		const sc = byCode.get(code);
+		const e0 = e0Of(sc);
+		const fields = keyFields[code] || {};
+		const vk = exchange.vks.has(code) ? exchange.vks.get(code) : ownVk.get(code);
 		if (!e0 && vk !== defaultVk(sc)) {
 			if (keypad(sc)) fail('source_keypad_virtual_key', `keys.${code}`);
 			scancodes.push({ sc, vk });

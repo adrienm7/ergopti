@@ -22,6 +22,8 @@ const EMULATED_REASONS = new Set([
 	'custom_modifier_not_in_keylayout',
 	'modifier_not_in_keylayout',
 	'shortcut_output_not_in_keylayout',
+	'shortcut_key_types_nothing_in_keylayout',
+	'shortcut_level_types_text_in_keylayout',
 	'tap_hold_not_in_keylayout',
 	'system_or_modifier_key_remap',
 	'key_chord_not_in_keylayout',

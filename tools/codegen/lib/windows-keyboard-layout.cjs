@@ -24,7 +24,10 @@
  * 3. A virtual key follows the character a key types:
  *    Ctrl+C is on the key that types c. Windows keys its character tables by
  *    virtual key, so two keys cannot share one; the macOS Command keyMap's
- *    left-hand shortcuts cannot be expressed and are not read.
+ *    left-hand shortcuts cannot be expressed and are not read. A source's
+ *    `shortcut_key` is carried instead: the key exchanges virtual keys with
+ *    the key it names (tools/lib/kbd-dll/shortcut-keys.cjs, shared with the
+ *    DLL tables).
  * 4. Fail fast on what a keyboard DLL cannot say and the layout needs (a
  *    Caps Lock that is neither "none" nor "like Shift", two dead keys with one
  *    dead character, a chained dead key loop); a dead-key result Windows cannot
@@ -34,6 +37,8 @@
  */
 
 'use strict';
+
+const ShortcutKeys = require('../../lib/kbd-dll/shortcut-keys.cjs');
 
 // The Windows columns of the generated character table, in table order, and
 // the macOS modifiers whose keyMap gives each one. The two Ctrl columns stay
@@ -364,9 +369,12 @@ function deadKeyName(state) {
  * @param {object} canonical - Schema-1 canonical keylayout.
  * @param {object} keycodeTable - Decoded mac_keycodes.json.
  * @param {string} convention - The layout's keycode convention.
- * @returns {object} { keys, deadKeys, ligatures, omitted }.
+ * @param {object[]} [columns] - The character columns (columnsWith).
+ * @param {{key: string, shortcut_key: string}[]} [shortcutKeys] - The source's
+ *   shortcut keys: each key takes the virtual key of the key it names.
+ * @returns {object} { keys, deadKeys, ligatures, omitted, shortcutKeys }.
  */
-function buildModel(canonical, keycodeTable, convention, columns = COLUMNS) {
+function buildModel(canonical, keycodeTable, convention, columns = COLUMNS, shortcutKeys = []) {
 	const layout = indexLayout(canonical);
 	for (const modifier of [['option'], ['option', 'shift']]) {
 		if (keyMapIndex(layout, [...modifier, 'caps']) !== keyMapIndex(layout, modifier))
@@ -392,6 +400,11 @@ function buildModel(canonical, keycodeTable, convention, columns = COLUMNS) {
 		keys.push(key);
 	}
 	assignVirtualKeys(keys);
+	const exchange = ShortcutKeys.exchangeVirtualKeys(
+		keys.map((key) => ({ code: key.code, vk: key.vk })),
+		shortcutKeys
+	);
+	for (const key of keys) key.vk = exchange.vks.get(key.code);
 
 	// Dead characters: a state's terminator, one UTF-16 unit, distinct per state.
 	const deadChars = new Map();
@@ -510,7 +523,12 @@ function buildModel(canonical, keycodeTable, convention, columns = COLUMNS) {
 		keys,
 		deadKeys: stateOrder.map((state) => deadKeys.get(state)),
 		ligatures,
-		omitted
+		omitted,
+		shortcutKeys: {
+			carried: exchange.carried,
+			displaced: exchange.displaced,
+			refused: exchange.refused
+		}
 	};
 }
 
@@ -1006,9 +1024,10 @@ function renderKlc(model, context) {
 /**
  * Every generated source of one layout.
  * @param {object} canonical - Canonical keylayout.
- * @param {object} context - { meta, spec, keycodes, sourceRel, modifierBits? }. modifierBits:
- *   the Kana, Roya and Loya bits of layout_composer/target_compiler.js klcPlan, each with
- *   its key; the KLC then has their columns, and no C sources are written.
+ * @param {object} context - { meta, spec, keycodes, sourceRel, modifierBits?, shortcutKeys? }.
+ *   modifierBits: the Kana, Roya and Loya bits of layout_composer/target_compiler.js klcPlan,
+ *   each with its key; the KLC then has their columns, and no C sources are written.
+ *   shortcutKeys: the source's {key, shortcut_key} pairs (klcPlan), carried as virtual keys.
  * @returns {{model: object, files: Map<string, string>, klc: string}}
  */
 function generate(canonical, context) {
@@ -1023,7 +1042,8 @@ function generate(canonical, context) {
 		canonical,
 		context.keycodes,
 		context.meta.keycode_convention,
-		columnsWith(bits)
+		columnsWith(bits),
+		context.shortcutKeys || []
 	);
 	const name = context.spec.dll_name;
 	const files = new Map();

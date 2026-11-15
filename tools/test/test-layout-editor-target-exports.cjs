@@ -172,6 +172,15 @@ async function main() {
 		checks++;
 	}
 
+	// A key's shortcut_key: the page carries it as the tool does, on both targets.
+	{
+		const shortcutKeys = Source.read(
+			fs.readFileSync(shared('tests', 'corpus', 'layouts', 'source', 'shortcut_keys.toml'), 'utf8')
+		);
+		await sameXkb(shortcutKeys, 'shortcut keys');
+		await sameKlc(shortcutKeys, 'shortcut keys');
+	}
+
 	// A registry layout, preserved and structured, both targets.
 	{
 		const windows = { locale: 'fr-FR', layout_id: '0000040c', dll_name: 'kbdergo' };

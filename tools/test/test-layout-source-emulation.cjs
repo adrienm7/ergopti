@@ -219,17 +219,20 @@ for (const [label, mutate, message] of [
 				entry.path === 'keys.KeyW.shortcut_key' && entry.reason === 'physical_key_not_emulated'
 		)
 	);
-	// The native targets name it as a shortcut they cannot hold; the drivers emulate it.
+	// The native targets carry it on their shortcut level (the goldens:
+	// test-layout-shortcut-keys.cjs; the Windows KLC report is checked in
+	// test-layout-source.cjs, with its metadata): this fixture's KeyC types nothing,
+	// so the native files say only that; the drivers emulate it as well.
 	const reports = targetReport(source);
-	// (The Windows KLC report is checked in test-layout-source.cjs, with its metadata.)
-	for (const target of ['macos', 'linux']) {
+	for (const [target, format] of [
+		['macos', 'keylayout'],
+		['linux', 'xkb']
+	]) {
 		const report = reports.find((entry) => entry.target === target);
-		assert.ok(
-			report.omitted.some(
-				(entry) =>
-					entry.path === 'keys.KeyW.shortcut_key' && /^shortcut_output_not_in_/.test(entry.reason)
-			),
-			`${target}: shortcut_key is reported`
+		assert.deepEqual(
+			clone(report.omitted.filter((entry) => entry.path === 'keys.KeyW.shortcut_key')),
+			[{ path: 'keys.KeyW.shortcut_key', reason: `shortcut_key_types_nothing_in_${format}` }],
+			`${target}: shortcut_key is carried natively`
 		);
 	}
 	for (const target of ['driver_macos', 'driver_linux']) {

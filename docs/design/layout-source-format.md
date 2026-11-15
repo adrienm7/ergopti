@@ -555,8 +555,34 @@ Validation refuses a malformed key code and a key naming itself
 The emulation table expands it into one ordinary shortcut per combination, each
 sending its own modifiers on the chosen key, so the drivers' existing shortcut
 engines perform it on Windows, macOS and Linux (the shared vector « a key's
-shortcut*key acts as another key… » in `emulation_vectors.json`). The native
-`.keylayout`, XKB and KLC compilers report it as
-`shortcut_output_not_in*<format>`at`keys.<physical>.shortcut_key`: their
-shortcut level follows the typed character. Carrying it natively (the Windows
-virtual key, the `.keylayout` Command level) is not done yet.
+`shortcut_key` acts as another key… » in `emulation_vectors.json`).
+
+The native exports carry it too (`tools/test/test-layout-shortcut-keys.cjs`
+pins the goldens of `_shared/tests/corpus/layouts/source/shortcut_keys.toml`):
+
+- macOS `.keylayout`: in every keyMap a shortcut combination selects, the key
+  types what the named key types there, which is what macOS matches Command and
+  Control shortcuts on. A layer requiring `meta` or `control` is changed in
+  place; the combinations no layer selects get one more keyMap, after the
+  others, with `baseMapSet`/`baseIndex` on the default keyMap and only these
+  keys' rows (`source_compiler.js` `shortcutLevels`).
+- Linux XKB: the same keyMap becomes the Control/Alt/Super level of
+  `ERGOPTI_SEVEN_LEVEL`, whose `preserve` entries leave those modifiers to the
+  application's shortcut match. XKB has that one level per key, so every
+  Shift, Control, Alt and Super combination acts as the named key, Ctrl+Alt
+  included (the emulation leaves Ctrl+Alt to AltGr); an application matching
+  shortcuts by key code does not see it. The export's `limitations` say so.
+- Windows KLC and DLL: Windows matches shortcuts on the virtual key, and kbd.h
+  keys every character table by virtual key, so the key exchanges virtual keys
+  with the key it names (`tools/lib/kbd-dll/shortcut-keys.cjs`, one rule for the
+  KLC generator and the DLL tables). Two keys naming each other exchange exactly;
+  otherwise the named key takes the virtual key the claimer freed and its own
+  shortcuts move, reported as `shortcut_key_displaces_virtual_key` with the
+  report's `shortcut_keys.displaced`. A second key naming the same key
+  (`shortcut_key_virtual_key_taken`) and a key or named key without a character
+  row (`shortcut_key_not_a_character_key`) are refused; the KLC reasons end in
+  `_in_klc`.
+
+A named key that types nothing on that level is reported as
+`shortcut_key_types_nothing_in_<format>`, and a combination a text layer answers
+as `shortcut_level_types_text_in_<format>`; the driver's emulation performs both.
