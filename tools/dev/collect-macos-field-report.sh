@@ -140,6 +140,15 @@ git rev-parse --git-dir >/dev/null 2>&1 || fail "Not inside the Ergopti clone."
 # From dev, main or any other branch (or a detached commit) the report goes to
 # a field branch derived from it (tools/dev/field-report-git.sh), so a
 # maintainer only has to run this script.
+# A run cut short (window closed, kill) can leave tracked changes, such as the
+# prerelease's field_run.json swapped in, and the next run refused to start
+# (field report 2026-11-15). A tester's clone holds no work of its own: the
+# changes are stashed (recoverable with git stash list) and the tree is reset.
+if [ -n "$(git -C "${REPO_ROOT}" status --porcelain --untracked-files=no)" ]; then
+	log "Tracked changes found (a previous run cut short?): stashing them and resetting the clone."
+	git -C "${REPO_ROOT}" stash push -q -m "field-report auto-stash ${stamp:-$(date +%Y-%m-%d_%H%M%S)}" || true
+	git -C "${REPO_ROOT}" reset -q --hard || fail "git reset --hard failed."
+fi
 field_report_enter_branch mac
 
 # ===========================================
