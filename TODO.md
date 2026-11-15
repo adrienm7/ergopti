@@ -877,7 +877,7 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       [DECISION] Left (2026-11-15): not started; physical_keys.json has none of those keys; measure their Windows boot
       parse cost, then decide.
 
-- [ ] **Retire the composer and the navigation layer editor.** The Windows host takes a source since 2026-11-12: delete
+- [x] **Retire the composer and the navigation layer editor.** The Windows host takes a source since 2026-11-12: delete
       the composer section (`layout_composer/composer_page.js` and its markup), then retire `_shared/ui/layer_editor` and
       its three hosts once every driver reads the source's `nav` layer.
       Composer part done 2026-11-14 (worker C): the manager page lost its composer view, its three composer messages
@@ -897,8 +897,12 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       Step 2 done (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the « Navigation layer » menu row, gesture and
       shortcut (`open_layer_editor`, id kept for users' bindings) open the Studio on its `nav` layer, importing the
       user's layers.toml (else the preset) held by the current layer key; proof: `studio-nav-entry` in
-      layout-editor.playwright.cjs, test_layout_manager_bridge.lua and test_layer_editor_host.lua (macOS). Left:
-      step 3, deleting the page, its three hosts, their tests and strings.
+      layout-editor.playwright.cjs, test_layout_manager_bridge.lua and test_layer_editor_host.lua (macOS).
+      Step 3 done (2026-11-15): 3a `claude/ergopti-todo-retire-layer-editor-hosts` deleted the Linux and macOS
+      hosts; 3b `claude/ergopti-todo-retire-layer-editor-window` deleted the Windows host, the page (index.html,
+      script.js, style.css), its manifest entry, its Playwright and page gates, the CI step and 38 page-only
+      strings. layer_model.js and \_generated/layer_data.js stay: the layout editor reads them. The save's cases
+      live in the nav_layer_save suites of each driver; test-nav-layer-keys.cjs replaces the legends gate.
 
 ## Parity audit pause and resumption
 

@@ -936,7 +936,7 @@ function checkCore(
 	assert.equal(pipeline.field(browser, 'if'), null);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
-		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
+		['Test shared hotstring editor rendering', 'npm run test:browser:hotstring-editor'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
 		['Test shared layout editor page', 'npm run test:browser:layout-editor']
 	]) {
@@ -1019,7 +1019,7 @@ for (const [from, to] of [
 	assert.throws(() => checkCore(coreCaller, core, changed, coreBrowser));
 }
 for (const [from, to] of [
-	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
+	['run: npm run test:browser:hotstring-editor', 'run: echo skipped browser gate'],
 	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
 	[
 		'run: npm run test:browser:changelog-install',
@@ -1027,8 +1027,8 @@ for (const [from, to] of [
 	],
 	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
 	[
-		'run: npm run test:browser:layer-editor',
-		"if: matrix.suite == 'never'\n        run: npm run test:browser:layer-editor"
+		'run: npm run test:browser:hotstring-editor',
+		"if: matrix.suite == 'never'\n        run: npm run test:browser:hotstring-editor"
 	]
 ]) {
 	const changed = coreBrowser.replace(from, to);

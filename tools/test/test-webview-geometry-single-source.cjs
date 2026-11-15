@@ -281,10 +281,7 @@ const MACOS_EXCLUSIONS = {
 		'sizes itself to the screen (sf.w - 100), by design — the manifest value is honoured only by Linux',
 	numeric_prompt:
 		'no macOS host — hs.dialog asks for a number natively, so there is no window ' +
-		'to size. Linux has no native numeric dialog and needs a webview to ask at all',
-	layer_editor:
-		'no macOS host since 2026-11-15 — the navigation layer is edited in Ergopti Studio; ' +
-		'the entry leaves the manifest with the Windows host'
+		'to size. Linux has no native numeric dialog and needs a webview to ask at all'
 };
 
 // ── Windows: geometry literals that must equal the manifest value ────────────
@@ -406,17 +403,8 @@ const WINDOWS_APPS = {
 	layout_editor_window: {
 		file: 'ui/layout_manager/editor_window.ahk',
 		// The layout editor's own window, opened through WebViewHost.TryOpen under
-		// its manifest id, as the layer editor is.
+		// its manifest id.
 		checks: () => [/WebViewHost\.TryOpen\(\s*"layout_editor_window"/]
-	},
-	layer_editor: {
-		file: 'ui/layer_editor/init.ahk',
-		// Opened through WebViewHost.TryOpen, which reads the size from the manifest
-		// itself: the check is that the host goes through it under its manifest id.
-		checks: () => [
-			/WebViewHost\.TryOpen\(\s*LAYER_EDITOR_APP_ID\b/,
-			/LAYER_EDITOR_APP_ID := "layer_editor"/
-		]
 	},
 	update_check: {
 		file: 'ui/update_check/init.ahk',

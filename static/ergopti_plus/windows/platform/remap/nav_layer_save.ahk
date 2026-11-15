@@ -19,9 +19,6 @@
 ;    differently.
 ; 3. Atomic write: the text is staged beside layers.toml, flushed, then moved
 ;    over it in one write-through rename; a refused save leaves it untouched.
-; 4. A caller that read the file first (an opening source) passes it with the
-;    callbacks that say whether it is still current; the file is then
-;    replaced only while it still holds the bytes that caller read.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -32,12 +29,11 @@
 ; The error codes this save adds to the loader's.
 global NAV_LAYER_SAVE_INVALID_PAYLOAD := "invalid_payload"
 global NAV_LAYER_SAVE_WRITE_FAILED := "write_failed"
-global NAV_LAYER_SAVE_FILE_UNREADABLE := "file_unreadable"
 
 ; Tap-hold key id (the ahk column of [tap_hold.catalog]) -> the registry code of
 ; that physical key. The Windows remap files name their keys by literal scan
 ; codes, so this is the one table that ties the two vocabularies;
-; tools/test/test-layer-editor-legends.cjs holds it to the catalogue and, through
+; tools/test/test-nav-layer-keys.cjs holds it to the catalogue and, through
 ; the Linux engine's evdev codes, to the registry.
 global NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES := Map(
 	"escape", "Escape", "tab", "Tab", "caps_lock", "CapsLock", "left_shift", "ShiftLeft",
@@ -99,16 +95,13 @@ NavLayerSave_Validate(Text, Ctx) {
  * @param {Any} Text - The payload's text.
  * @param {Map} Ctx - The loader context.
  * @param {string} ConfigDir - The configuration folder.
- * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
- * @param {Func|Integer} OpeningCurrent - Says whether Opening still owns its page, or zero.
  * @returns {Map} saved (Boolean), path, errors (Array).
  */
-NavLayerSave_Save(Text, Ctx, ConfigDir, Opening := 0, OpeningCurrent := 0) {
-	global FS_STATUS_OK, FS_STATUS_ABSENT
+NavLayerSave_Save(Text, Ctx, ConfigDir) {
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return NavLayerSave_Save(Text, Ctx, ConfigDir, Opening, OpeningCurrent)
+		try return NavLayerSave_Save(Text, Ctx, ConfigDir)
 		finally Critical(InheritedCritical)
 	}
 	Path := KeymapLayers_UserFilePath(Ctx, ConfigDir)
@@ -120,30 +113,12 @@ NavLayerSave_Save(Text, Ctx, ConfigDir, Opening := 0, OpeningCurrent := 0) {
 	; This native guard closes admission even when pause arrives during loading,
 	; validation or staging. Only the final rename uses a short Critical span.
 	Admission := () => !A_IsSuspended && _ConfigWriteLeaseOwns(Owner, Path)
-		&& (!(Opening is Object) || (OpeningCurrent.Call()
-			&& _ConfigWriteLeaseKey(Path) == Opening.TargetKey
-			&& _ConfigWriteLeaseKey(Opening.Path) == Opening.TargetKey))
 	try {
 		Errors := NavLayerSave_Validate(Text, Ctx)
 		if (Errors.Length > 0)
 			return Map("saved", false, "path", Path, "errors", Errors)
 		if !Admission.Call()
 			return _NavLayerSave_Refused(Path, "the configuration write is no longer admitted")
-		if Opening is Object {
-			Expected := Opening.Source
-			if !Opening.Offered || (Expected["status"] != FS_STATUS_OK && Expected["status"] != FS_STATUS_ABSENT)
-				return _NavLayerSave_Refused(Path, "the save has no admitted opening source")
-			SourceAdmission := () => Admission.Call() && Opening.Source == Expected
-			Result := FSWriteIfUnchangedAdmitted(Path, Text, Expected, 0, SourceAdmission)
-			if !Result["committed"]
-				return _NavLayerSave_Refused(Path, Result["detail"])
-			PreviousCritical := Critical("On")
-			try {
-				if OpeningCurrent.Call() && Opening.Source == Expected
-					Opening.Source := Map("status", FS_STATUS_OK, "content", Text, "detail", "")
-			} finally Critical(PreviousCritical)
-			return Map("saved", true, "path", Path, "errors", [])
-		}
 		Stage := Path . ".tmp"
 		if !FSWriteDurable(Stage, Text) {
 			try FSDeleteStrict(Stage)
@@ -180,19 +155,14 @@ _NavLayerSave_Refused(Path, Detail) {
  * @param {string} SharedDir - The _shared folder.
  * @param {string} ConfigDir - The configuration folder.
  * @param {Func} ApplyFn - Applies the saved layer; returns false when refused.
- * @param {Object|Integer} Opening - The retained GUI source, or zero for an explicit write.
- * @param {Func|Integer} OpeningCurrent - Says whether Opening still owns its page, or zero.
- * @param {Func|Integer} SavedCurrent - SavedCurrent(Path, Text) says whether Opening
- *   still holds the saved text, or zero.
  * @returns {Map} saved, path, errors and, once saved, applied.
  */
-NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, OpeningCurrent := 0, SavedCurrent := 0) {
+NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn) {
 	global NAV_LAYER_SAVE_WRITE_FAILED
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
-		try return NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening, OpeningCurrent,
-			SavedCurrent)
+		try return NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn)
 		finally Critical(InheritedCritical)
 	}
 	if A_IsSuspended
@@ -208,7 +178,7 @@ NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, Ope
 		LoggerError("NavLayerSave", "The navigation layer was not saved: {1}.", Err.Message)
 		return Map("saved", false, "errors", [NavLayerSave_Error(NAV_LAYER_SAVE_WRITE_FAILED, Err.Message)])
 	}
-	Result := NavLayerSave_Save(Text, Ctx, ConfigDir, Opening, OpeningCurrent)
+	Result := NavLayerSave_Save(Text, Ctx, ConfigDir)
 	if !Result["saved"] {
 		for Err in Result["errors"]
 			LoggerWarn("NavLayerSave", "Refused: {1} ({2}.{3}.{4}) — {5}.", Err["code"], Err["layer"],
@@ -221,12 +191,8 @@ NavLayerSave_SaveAndApply(Text, SharedDir, ConfigDir, ApplyFn, Opening := 0, Ope
 	; its own log and leaves the saved file for the next start.
 	; The writer released its lease before Reload can acquire the terminal
 	; barrier. A pause during the completion log keeps the durable save but
-	; cannot authorize a fresh apply request. The exact GUI source also remains
-	; necessary after a completion log retires its page or changes folders.
-	; Never report that durable save as undone.
-	Result["applied"] := !A_IsSuspended
-		&& (!(Opening is Object) || SavedCurrent.Call(Result["path"], Text))
-		&& ApplyFn.Call() ? true : false
+	; cannot authorize a fresh apply request. Never report that durable save as undone.
+	Result["applied"] := !A_IsSuspended && ApplyFn.Call() ? true : false
 	if !Result["applied"]
 		LoggerError("NavLayerSave", "The saved navigation layer is not applied: the reload was refused.")
 	return Result

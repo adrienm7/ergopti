@@ -604,7 +604,7 @@
 		},
 		{
 			"id": "js-field-run-protocol",
-			"ordinal": 542,
+			"ordinal": 541,
 			"name": "every driver and collector shares one field run request and result protocol, and the macOS field run keeps its keys",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-run-protocol.cjs"],
@@ -612,7 +612,7 @@
 		},
 		{
 			"id": "js-managed-pyobjc",
-			"ordinal": 557,
+			"ordinal": 556,
 			"name": "the App Cloner's PyObjC wheels are pinned, verified, installed offline into the managed Python and imported",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-managed-pyobjc.cjs"],
@@ -620,7 +620,7 @@
 		},
 		{
 			"id": "js-app-cloner-managed-python",
-			"ordinal": 558,
+			"ordinal": 557,
 			"name": "App Cloner refuses to start without the managed Python, never executes /usr/bin/python3, and its clones exec the versionless link",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-app-cloner-managed-python.cjs"],
@@ -628,7 +628,7 @@
 		},
 		{
 			"id": "js-windows-builder-boundaries",
-			"ordinal": 560,
+			"ordinal": 559,
 			"name": "Windows native builders enter literal paths and refuse a mistyped manifest schema",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-builder-boundaries.cjs"],
@@ -636,7 +636,7 @@
 		},
 		{
 			"id": "js-macos-owned-runtime-code-hash-rule",
-			"ordinal": 594,
+			"ordinal": 593,
 			"name": "macOS owned runtime install and report paths admit the helper's code hashes through one rule",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-owned-runtime-code-hash-rule.cjs"],
@@ -644,7 +644,7 @@
 		},
 		{
 			"id": "js-macos-build-scripts-bash32",
-			"ordinal": 602,
+			"ordinal": 601,
 			"name": "the macOS app build and the scripts it starts use only Bash 3.2 cd options",
 			"cmd": "node",
 			"args": ["tools/test/test-macos-build-scripts-bash32.cjs"],
@@ -652,7 +652,7 @@
 		},
 		{
 			"id": "js-field-report-redact",
-			"ordinal": 605,
+			"ordinal": 604,
 			"name": "a field report names neither the user nor the machine: every collector redacts its folder before the commit and the pre-commit hook refuses an added line naming this machine",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-report-redact.cjs"],
@@ -660,7 +660,7 @@
 		},
 		{
 			"id": "linux-compositor-focus-install",
-			"ordinal": 607,
+			"ordinal": 606,
 			"name": "Linux installs, enables once and removes the GNOME Shell extension and KWin script that report the focused window",
 			"cmd": "node",
 			"args": ["tools/test/test-linux-compositor-focus-install.cjs"],
@@ -669,7 +669,7 @@
 		},
 		{
 			"id": "js-field-todo-summary",
-			"ordinal": 611,
+			"ordinal": 610,
 			"name": "one macOS field report gives every TODO « To confirm on the Mac » point its verdict, and says why a point cannot be tested",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-todo-summary.cjs"],
@@ -677,7 +677,7 @@
 		},
 		{
 			"id": "js-field-guided",
-			"ordinal": 612,
+			"ordinal": 611,
 			"name": "a field report's collector-side probes and guided steps observe counts, name what they could not read and never pass without a gesture",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-field-guided.cjs"],

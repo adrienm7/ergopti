@@ -133,14 +133,6 @@
 			"min_height": 520,
 			"vhost": "ergopti.hotstrings"
 		},
-		"layer_editor": {
-			"title_key": "layer_editor.window_title",
-			"width": 1120,
-			"height": 800,
-			"min_width": 900,
-			"min_height": 620,
-			"vhost": "ergopti.layereditor"
-		},
 		"layout_editor_window": {
 			"title_key": "layout_editor.title",
 			"width": 1180,

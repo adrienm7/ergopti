@@ -191,21 +191,18 @@ editor's keys, actions and picker) has nothing to read until the locale fetch
 lands. Draw again on the `i18n:applied` DOM event i18n.js fires after every
 apply; a page drawn once at `init()` keeps raw keys on screen.
 
-### project-layer-editor-legends-are-the-hosts
+### project-nav-layer-key-is-one-table
 
-The layer editor never spells a key's character itself: a registry key sent
-by scan code (`ahk_send: null`, the generated data's `character`) shows the
-legend its host read from the layout the user types with, and its registry
-code when the host had none. Windows reads the layout emulation first (digit
-row, registry layout, Ergopti base from its `.keylayout`), then ToUnicodeEx
-with flag 0x4 on `KS_ResolveKeyboardLayout`; macOS `hs.keycodes.map` in the
-ISO form of `platform/remap/nav_layer.lua`; Linux the daemon's loaded keymap
-(`keyboard_layout.base_symbol`). Only Windows emulates a layout. The shared
-Lua reads `ahk_send` as `type ~= "string"` because json.lua decodes a null to
-a sentinel table. Action: change the contract with
-`_shared/tests/corpus/layer_editor/legends.json` and
-`test-layer-editor-legends.cjs`, which also pins the Windows tap-hold id to
-registry code table the layer-key mark needs.
+Ergopti Studio's « Navigation layer » entries import the user's layers.toml
+as the source's `nav` layer, held by the key whose hold enters the layer
+today. Each driver finds it in its own vocabulary in its window-free
+nav_layer_save owner: Windows maps a tap-hold id to a registry code
+(`NAV_LAYER_SAVE_TAP_HOLD_KEY_CODES`), macOS matches the Karabiner key code
+in the ISO form of `platform/remap/nav_layer.lua`, Linux the tap-hold
+engine's evdev code. Action: change the contract with
+`_shared/tests/corpus/layer_editor/layer_keys.json` and
+`test-nav-layer-keys.cjs`. The navigation layer editor window and its
+per-key legends were retired on 2026-11-15.
 
 ### project-inline-webviews-cannot-fetch-their-locale
 

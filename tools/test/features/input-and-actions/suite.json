@@ -564,24 +564,16 @@
 			"repro": "npm run test:layer-editor-model"
 		},
 		{
-			"id": "js-0392",
-			"ordinal": 521,
-			"name": "layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol",
-			"cmd": "node",
-			"args": ["tools/test/test-layer-editor-page.cjs"],
-			"repro": "npm run test:layer-editor-page"
-		},
-		{
 			"id": "js-0393",
-			"ordinal": 522,
-			"name": "layer editor legends: the hosts send the current layout and the layer key by one contract",
+			"ordinal": 521,
+			"name": "navigation layer keys: the three drivers find the layer key by one contract",
 			"cmd": "node",
-			"args": ["tools/test/test-layer-editor-legends.cjs"],
-			"repro": "npm run test:layer-editor-legends"
+			"args": ["tools/test/test-nav-layer-keys.cjs"],
+			"repro": "npm run test:nav-layer-keys"
 		},
 		{
 			"id": "js-0394",
-			"ordinal": 523,
+			"ordinal": 522,
 			"name": "recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS",
 			"cmd": "node",
 			"args": ["tools/test/test-nav-layer-recommended-golden.cjs"],
@@ -589,7 +581,7 @@
 		},
 		{
 			"id": "js-0395",
-			"ordinal": 524,
+			"ordinal": 523,
 			"name": "layer-file schema corpus replays through the JS loader (every error code, OS and binding form)",
 			"cmd": "node",
 			"args": ["tools/test/test-keymap-layers-corpus.cjs"],
@@ -597,7 +589,7 @@
 		},
 		{
 			"id": "js-0401",
-			"ordinal": 525,
+			"ordinal": 524,
 			"name": "gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)",
 			"cmd": "node",
 			"args": ["tools/test/test-gesture-slots-single-source.cjs"],
@@ -605,7 +597,7 @@
 		},
 		{
 			"id": "js-0402",
-			"ordinal": 526,
+			"ordinal": 525,
 			"name": "gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)",
 			"cmd": "node",
 			"args": ["tools/test/test-gesture-defaults-single-source.cjs"],
@@ -613,7 +605,7 @@
 		},
 		{
 			"id": "js-0410",
-			"ordinal": 527,
+			"ordinal": 526,
 			"name": "no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)",
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-c-ahk-scan-code-precedence.cjs"],
@@ -621,7 +613,7 @@
 		},
 		{
 			"id": "js-0447",
-			"ordinal": 528,
+			"ordinal": 527,
 			"name": "CapsWord auto-off settings are one declaration: delay presets, delimiter catalogue and pointer kinds",
 			"cmd": "node",
 			"args": ["tools/test/test-caps-word-auto-off-single-source.cjs"],
@@ -629,7 +621,7 @@
 		},
 		{
 			"id": "js-0452",
-			"ordinal": 529,
+			"ordinal": 528,
 			"name": "the copy_selected_path open-target rule is one shared corpus every driver suite replays",
 			"cmd": "node",
 			"args": ["tools/test/test-open-target-vectors-shared.cjs"],
@@ -637,7 +629,7 @@
 		},
 		{
 			"id": "js-0457",
-			"ordinal": 530,
+			"ordinal": 529,
 			"name": "a fresh installation enables no layout emulation, system layout change or number-row inversion on any driver",
 			"cmd": "node",
 			"args": ["tools/test/test-neutral-installation.cjs"],
@@ -645,7 +637,7 @@
 		},
 		{
 			"id": "js-0458",
-			"ordinal": 531,
+			"ordinal": 530,
 			"name": "the owned Karabiner runtime pin is all-or-nothing and its driver pin equals the build tooling's",
 			"cmd": "node",
 			"args": ["tools/test/test-remap-runtime-manifest.cjs"],
@@ -653,7 +645,7 @@
 		},
 		{
 			"id": "action-catalogue-shared-projection",
-			"ordinal": 532,
+			"ordinal": 531,
 			"name": "the shared Lua action catalogue loads exactly each Lua driver's own catalogue",
 			"cmd": "node",
 			"args": ["tools/test/test-action-catalogue-shared-projection.cjs"],
@@ -661,7 +653,7 @@
 		},
 		{
 			"id": "recommended-defaults-rule",
-			"ordinal": 533,
+			"ordinal": 532,
 			"name": "recommended defaults avoid system conflicts (Linux swipes, macOS tap), one trigger debounce, MLX reason shown",
 			"cmd": "node",
 			"args": ["tools/test/test-recommended-defaults-rule.cjs"],
@@ -669,7 +661,7 @@
 		},
 		{
 			"id": "cascade-arrow-bounds",
-			"ordinal": 534,
+			"ordinal": 533,
 			"name": "the cascade arrow count has one range across the manifest, schema, both engines and the v14 migration",
 			"cmd": "node",
 			"args": ["tools/test/test-cascade-arrow-bounds.cjs"],
@@ -677,7 +669,7 @@
 		},
 		{
 			"id": "lua-features-manifest-projection",
-			"ordinal": 535,
+			"ordinal": 534,
 			"name": "the shared Lua features manifest loads exactly each Lua driver's own manifest",
 			"cmd": "node",
 			"args": ["tools/test/test-lua-features-manifest-projection.cjs"],
@@ -685,7 +677,7 @@
 		},
 		{
 			"id": "tap-hold-migrations",
-			"ordinal": 536,
+			"ordinal": 535,
 			"name": "the versioned tap_hold.toml registry, its corpus and the retired explicit_delays marker",
 			"cmd": "node",
 			"args": ["tools/test/test-tap-hold-migrations.cjs"],
@@ -693,7 +685,7 @@
 		},
 		{
 			"id": "keylayout-canonical-parity",
-			"ordinal": 537,
+			"ordinal": 536,
 			"name": "keylayout canonical form: the shared Lua parser and the converter's Python parser read every shipped layout the same, and the converter writes the same XKB from it",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-canonical-parity.cjs"],
@@ -701,7 +693,7 @@
 		},
 		{
 			"id": "xkb-row-options",
-			"ordinal": 538,
+			"ordinal": 537,
 			"name": "the number-row options: the Linux converter and the web composer type the same layout, and both match the hand-written Windows outcomes",
 			"cmd": "node",
 			"args": ["tools/test/test-xkb-row-options.cjs"],
@@ -709,7 +701,7 @@
 		},
 		{
 			"id": "keylayout-row-options",
-			"ordinal": 541,
+			"ordinal": 540,
 			"name": "the number-row options: the .keylayout macOS installs types what the Linux converter makes of the same options, Ctrl and Cmd keeping the layout's cells",
 			"cmd": "node",
 			"args": ["tools/test/test-keylayout-row-options.cjs"],
@@ -717,7 +709,7 @@
 		},
 		{
 			"id": "js-user-action-vectors",
-			"ordinal": 555,
+			"ordinal": 554,
 			"name": "the run_command, open_path and run_apple_shortcut parameter rule is one shared corpus both Lua suites replay",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-user-action-vectors-shared.cjs"],
@@ -725,7 +717,7 @@
 		},
 		{
 			"id": "js-keystats-token-encoding",
-			"ordinal": 562,
+			"ordinal": 561,
 			"name": "n-gram keys read the same on the dashboard, and every driver emits the shared marker list",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-keystats-token-encoding.cjs"],
@@ -733,7 +725,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-preference-update",
-			"ordinal": 574,
+			"ordinal": 573,
 			"name": "hotstring editor preference updates preserve unsaved drafts",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-preference-update.cjs"],
@@ -741,7 +733,7 @@
 		},
 		{
 			"id": "js-personal-editor-initialization",
-			"ordinal": 575,
+			"ordinal": 574,
 			"name": "personal information editor preserves edits across delayed initialization",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-editor-initialization.cjs"],
@@ -749,7 +741,7 @@
 		},
 		{
 			"id": "js-token-prompt-focus",
-			"ordinal": 577,
+			"ordinal": 576,
 			"name": "token prompt focus retries preserve typing and user focus",
 			"cmd": "node",
 			"args": ["tools/test/test-token-prompt-focus.cjs"],
@@ -757,7 +749,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-trailing-enter",
-			"ordinal": 578,
+			"ordinal": 577,
 			"name": "hotstring editor preserves trailing Enter commands when saving",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-trailing-enter.cjs"],
@@ -765,7 +757,7 @@
 		},
 		{
 			"id": "js-hotstring-editor-token-literals",
-			"ordinal": 579,
+			"ordinal": 578,
 			"name": "hotstring editor preserves literal brace groups and prototype names",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstring-editor-token-literals.cjs"],
@@ -773,7 +765,7 @@
 		},
 		{
 			"id": "js-editors-ime-keyboard",
-			"ordinal": 580,
+			"ordinal": 579,
 			"name": "editor keyboard shortcuts preserve input method composition",
 			"cmd": "node",
 			"args": ["tools/test/test-editors-ime-keyboard.cjs"],
@@ -781,7 +773,7 @@
 		},
 		{
 			"id": "js-hotstrings-config-zero-delay",
-			"ordinal": 581,
+			"ordinal": 580,
 			"name": "hotstring settings display zero unlimited delay after saving",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-zero-delay.cjs"],
@@ -789,7 +781,7 @@
 		},
 		{
 			"id": "js-hotstrings-config-number-input",
-			"ordinal": 582,
+			"ordinal": 581,
 			"name": "hotstring numeric settings retain the entered numeric value",
 			"cmd": "node",
 			"args": ["tools/test/test-hotstrings-config-number-input.cjs"],
@@ -797,7 +789,7 @@
 		},
 		{
 			"id": "js-personal-editor-multiline",
-			"ordinal": 584,
+			"ordinal": 583,
 			"name": "personal information editor preserves multiline fields",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-editor-multiline.cjs"],
@@ -805,7 +797,7 @@
 		},
 		{
 			"id": "capsword-fixed-exits-single-source",
-			"ordinal": 596,
+			"ordinal": 595,
 			"name": "CapsWord fixed exits are one list: the shared policy, the macOS Karabiner anchor, Windows virtual keys and Linux hook names",
 			"cmd": "node",
 			"args": ["tools/test/test-capsword-fixed-exits-single-source.cjs"],
@@ -813,7 +805,7 @@
 		},
 		{
 			"id": "personal-info-tags-single-source",
-			"ordinal": 637,
+			"ordinal": 636,
 			"name": "personal-info named tags are one table: the shared Lua tags and the Windows map and order",
 			"cmd": "node",
 			"args": ["tools/test/test-personal-info-tags-single-source.cjs"],

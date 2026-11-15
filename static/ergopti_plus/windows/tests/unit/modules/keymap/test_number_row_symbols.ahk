@@ -320,7 +320,6 @@ _NRP_AssertQwertySymbolsFirst(Hkl) {
 	AssertEqual("1", NumberRowSymbolsFirstText(0x02, true, Hkl, false), "and its digit with Shift")
 	AssertEqual(")", NumberRowSymbolsFirstText(0x0B, false, Hkl, false), "the 0 key types its Shift symbol")
 	AssertEqual("0", NumberRowSymbolsFirstText(0x0B, true, Hkl, false))
-	AssertEqual("!", LayerEditor_CurrentEmulation()["character"].Call("SC002"), "the layer editor shows the swapped level")
 	Rows := _LAY_NumberRowRows((*) => false, (*) => 0, (*) => true)
 	Items := Rows[1]["items"]
 	AssertTrue(Items[3]["checked"], "the stored symbols-first choice is ticked")
@@ -930,9 +929,6 @@ _NRP_RegisteredSymbols() {
 		_SendHook := _HOOK_RecordSend
 		CapsBefore := GetKeyState("CapsLock", "T")
 		for Index, Sc in Corpus["scancodes"] {
-			Legend := LayerEditor_CurrentEmulation()["character"].Call(Sc)
-			AssertEqual(Corpus["emulated"]["shift"][Index], Legend,
-				"the actual layer-editor legend follows the same unshifted symbols source")
 			for Shift in [false, true] {
 				Row := Capture.Rows[Shift ? "+" . Sc : Sc]
 				AssertTrue(Row.Criterion.Call(), "the original KLE owner admits its actual key")

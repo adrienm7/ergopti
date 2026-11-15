@@ -1427,7 +1427,6 @@ BootProfile_Mark("Metrics/keystats started")
 #Include ui/field_check/network_check.ahk
 #Include core/network/proxy_override.ahk
 #Include ui/personal_info_editor/init.ahk
-#Include ui/layer_editor/init.ahk
 #Include ui/physical_shortcuts/init.ahk
 
 #Include infra/suppressive_inputhook_ownership.ahk

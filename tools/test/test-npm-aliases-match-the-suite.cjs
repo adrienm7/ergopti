@@ -97,9 +97,6 @@ const NOT_SUITE_ENTRIES = new Set([
 	// test-changelog-release-install.cjs runs the same page scripts against
 	// a recording DOM inside the suite.
 	'tools/test/browser/changelog-release-install.playwright.cjs',
-	// Real Chromium and WebKit rendering is required separately by Core / js;
-	// test-desktop-ci-evidence.cjs rejects a missing or forgiven browser step.
-	'tools/test/browser/layer-editor.playwright.cjs',
 	// Real rendering checks literal newlines in the hotstring editor.
 	'tools/test/browser/hotstring-editor-whitespace.playwright.cjs',
 	// Real rendering checks model drafts during download progress updates.

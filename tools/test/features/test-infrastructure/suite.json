@@ -518,7 +518,7 @@
 		},
 		{
 			"id": "js-no-pinned-source-reads-linux",
-			"ordinal": 544,
+			"ordinal": 543,
 			"name": "no new location-pinned source reads in Linux tests (ratchet)",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-no-pinned-source-reads-linux.cjs"],
@@ -526,7 +526,7 @@
 		},
 		{
 			"id": "js-ahk-parallel-runner",
-			"ordinal": 556,
+			"ordinal": 555,
 			"name": "parallel AHK runner reads results by exact test name",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-ahk-parallel.cjs"],
@@ -534,7 +534,7 @@
 		},
 		{
 			"id": "js-git-paths",
-			"ordinal": 590,
+			"ordinal": 589,
 			"name": "Git path inventories retain every record beyond the default capture ceiling",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-git-paths.cjs"],
@@ -542,7 +542,7 @@
 		},
 		{
 			"id": "js-0540",
-			"ordinal": 668,
+			"ordinal": 667,
 			"name": "commit identity gate refuses AI assistant identities and attribution trailers",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-commit-identity.cjs"],

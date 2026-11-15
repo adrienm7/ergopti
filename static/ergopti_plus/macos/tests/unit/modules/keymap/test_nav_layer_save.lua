@@ -24,7 +24,7 @@ local Json      = require("core.text.engine.json")
 local TomlCodec = require("core.text.engine.toml_codec")
 
 local FIXTURE = helpers.shared("tests/corpus/layer_editor/edited_layers.toml")
-local LEGENDS = helpers.shared("tests/corpus/layer_editor/legends.json")
+local LAYER_KEYS = helpers.shared("tests/corpus/layer_editor/layer_keys.json")
 
 
 
@@ -200,7 +200,7 @@ helpers.describe("macOS navigation layer save", function()
 	end)
 
 	helpers.it("gives Ergopti Studio the user's layer file, else the preset, and the layer key (studio-nav-entry)", function()
-		local corpus = Json.decode(read_file(LEGENDS))
+		local corpus = Json.decode(read_file(LAYER_KEYS))
 		with_save(function(save, world)
 			local preset = read_file(helpers.shared("layouts/data/layers.recommended.toml"))
 			local nav = save.studio_nav({ karabiner = world.karabiner })

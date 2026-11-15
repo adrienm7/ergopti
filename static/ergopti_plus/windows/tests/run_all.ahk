@@ -241,9 +241,6 @@ global _DefaultLogsDir := _LogsDir
 ; The navigation layer's hotkey table, built from layer files; registration is
 ; injectable, so unit/platform/remap/layers/test_nav_layer_table.ahk drives it without a live hook.
 #Include ../platform/remap/nav_layer_table.ahk
-; The layer editor host: validation, the atomic save and the page's messages,
-; driven by unit/modules/keymap/test_layer_editor_host.ahk without a WebView.
-#Include ../ui/layer_editor/init.ahk
 #Include ../ui/physical_shortcuts/init.ahk
 #Include ../ui/menu/menu_taphold.ahk
 ; The hotstring gate and « all sections » rows, built over the live Features.
@@ -638,7 +635,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/personal/test_personal_info_persistence_transaction.ahk
 #Include unit/platform/remap/layers/test_nav_layer_helpers.ahk
 #Include unit/platform/remap/layers/test_nav_layer_table.ahk
-#Include unit/modules/keymap/test_layer_editor_host.ahk
+#Include unit/modules/keymap/test_nav_layer_save.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_buffer_effects.ahk
 #Include unit/modules/hotstrings/prefix/test_prefix_finalizer_generation.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_sends_declare_buffer_effect.ahk

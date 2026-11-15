@@ -1139,10 +1139,6 @@
 			"reason": "keyboard-key-name",
 			"locales": "*"
 		},
-		"layer_editor.pane.mouse": {
-			"reason": "loanword-or-cognate",
-			"locales": ["it", "pt"]
-		},
 		"layout_analysis.corpus.label": {
 			"reason": "loanword-or-cognate",
 			"locales": ["es", "fr", "it", "nl", "pt"]

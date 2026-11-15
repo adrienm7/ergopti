@@ -1,0 +1,8 @@
+{
+	"description": "The key whose hold enters the navigation layer on each driver, from its shipped tap-hold defaults: Ergopti Studio's « Navigation layer » entries import the user's layers.toml held by that key (the nav_layer_save owners). tools/test/test-nav-layer-keys.cjs holds it to the shipped files; the macOS and Windows nav_layer_save suites read it.",
+	"recommended_layer_keys": {
+		"windows": ["AltLeft"],
+		"macos": ["MetaLeft"],
+		"linux": ["AltLeft"]
+	}
+}

@@ -412,7 +412,7 @@
 		},
 		{
 			"id": "legacy-folder-names",
-			"ordinal": 573,
+			"ordinal": 572,
 			"name": "legacy folder names (only the one-time migration spells a data folder of the builds before the single folder name)",
 			"cmd": "node",
 			"args": ["tools/test/test-legacy-folder-names.cjs"],
@@ -420,7 +420,7 @@
 		},
 		{
 			"id": "js-metrics-app-unicode-search",
-			"ordinal": 576,
+			"ordinal": 575,
 			"name": "application filter matches canonically equivalent Unicode names",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-unicode-search.cjs"],
@@ -428,7 +428,7 @@
 		},
 		{
 			"id": "js-metrics-app-fallback-icon-unicode",
-			"ordinal": 583,
+			"ordinal": 582,
 			"name": "typing metrics fallback badges preserve Unicode initials",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-app-fallback-icon-unicode.cjs"],
@@ -436,7 +436,7 @@
 		},
 		{
 			"id": "typing-metrics-partial-live",
-			"ordinal": 588,
+			"ordinal": 587,
 			"name": "typing metrics partial live slots preserve calendar and selected-range ownership",
 			"cmd": "node",
 			"args": ["tools/test/test-typing-metrics-partial-live.cjs"],
@@ -444,7 +444,7 @@
 		},
 		{
 			"id": "js-crash-worker-partial-write",
-			"ordinal": 591,
+			"ordinal": 590,
 			"name": "Windows crash workers publish only complete reports after a refused write",
 			"cmd": "node",
 			"args": ["tools/test/test-crash-worker-partial-write.cjs"],
@@ -452,7 +452,7 @@
 		},
 		{
 			"id": "js-metrics-key-names",
-			"ordinal": 593,
+			"ordinal": 592,
 			"name": "metrics heatmap names its special keys from the key name table in every locale",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-key-names.cjs"],
@@ -460,7 +460,7 @@
 		},
 		{
 			"id": "js-metrics-maintenance",
-			"ordinal": 600,
+			"ordinal": 599,
 			"name": "dashboard export and purge: a tombstone purges every device in any replay order and the page answers only its own request",
 			"cmd": "node",
 			"args": ["tools/test/test-metrics-maintenance.cjs"],
@@ -468,7 +468,7 @@
 		},
 		{
 			"id": "keystats-roi-case-profile",
-			"ordinal": 604,
+			"ordinal": 603,
 			"name": "trigger ROI lowercase projection replays its qualified native Windows profile and rejects changed receipts",
 			"cmd": "node",
 			"args": ["tools/test/test-keystats-roi-case.cjs"],
@@ -476,7 +476,7 @@
 		},
 		{
 			"id": "js-windows-diagnostic-progress-reader",
-			"ordinal": 623,
+			"ordinal": 622,
 			"name": "Windows diagnostic worker commits its archive while the host reads its progress",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-windows-diagnostic-progress-reader.cjs"],

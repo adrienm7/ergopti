@@ -330,9 +330,6 @@ jobs:
           path: /var/cache/ergopti-ubuntu-apt-debs/used
           key: ${{ steps.ubuntu-apt-used.outputs.key }}
 
-      - name: Test shared layer editor rendering
-        run: npm run test:browser:layer-editor
-
       - name: Test shared hotstring editor rendering
         run: npm run test:browser:hotstring-editor
 

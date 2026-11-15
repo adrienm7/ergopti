@@ -3226,7 +3226,7 @@ function commonProblems(files) {
 	}
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
-		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
+		['Test shared hotstring editor rendering', 'npm run test:browser:hotstring-editor'],
 		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install'],
 		['Test shared layout editor page', 'npm run test:browser:layout-editor']
@@ -7879,7 +7879,7 @@ const PHYSICAL_BROWSER_ALIAS = 'test:browser:physical-shortcuts';
 const PHYSICAL_BROWSER_COMMAND = 'node ./tools/test/browser/physical-shortcuts.playwright.cjs';
 const PHYSICAL_BROWSER_SCRIPTS = require('../../package.json').scripts;
 
-/** Requires the recorded-bridge browser gate immediately after layer rendering. */
+/** Requires the recorded-bridge browser gate after the hotstring editor's rendering. */
 function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const problems = [];
 	const entry = files.find((file) => file.rel === COMMON_BOX);
@@ -7888,7 +7888,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const steps = core ? pipeline.steps(core.body) : [];
 	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
 	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
-	const layerAt = steps.findIndex((step) => step.name === 'Test shared layer editor rendering');
+	const layerAt = steps.findIndex((step) => step.name === 'Test shared hotstring editor rendering');
 	const installAt = steps.findIndex((step) => step.name === 'Install shared UI browsers');
 	// Only other unconditional shared rendering gates may sit between the two.
 	const interposed = at > layerAt && layerAt >= 0 ? steps.slice(layerAt + 1, at) : [];
@@ -7908,7 +7908,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 		installAt >= layerAt
 	) {
 		problems.push(
-			'physical shortcut renderer needs one gate after layer rendering and browser installation, with only shared rendering gates between'
+			'physical shortcut renderer needs one gate after hotstring editor rendering and browser installation, with only shared rendering gates between'
 		);
 	} else if (
 		pipeline.stepField(physical[0].body, 'if') !== null ||
@@ -7949,7 +7949,7 @@ for (const [what, changed] of [
 		'wrong physical browser command',
 		physicalBrowserBody.replace(
 			`npm run ${PHYSICAL_BROWSER_ALIAS}`,
-			'npm run test:browser:layer-editor'
+			'npm run test:browser:hotstring-editor'
 		)
 	]
 ]) {
@@ -7957,7 +7957,7 @@ for (const [what, changed] of [
 }
 const layerBrowserBody = pipeline.step(
 	pipeline.job('common-e2e'),
-	'Test shared layer editor rendering'
+	'Test shared hotstring editor rendering'
 );
 const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
 	entry.rel === COMMON_BOX
@@ -7971,9 +7971,12 @@ const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
 );
 assert.ok(
 	physicalBrowserProblems(misplacedPhysicalBrowser).length > 0,
-	'physical renderer before layer renderer must refuse'
+	'physical renderer before the hotstring renderer must refuse'
 );
-for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
+for (const changed of [
+	undefined,
+	'node ./tools/test/browser/hotstring-editor-whitespace.playwright.cjs'
+]) {
 	const scripts = {
 		...PHYSICAL_BROWSER_SCRIPTS,
 		[PHYSICAL_BROWSER_ALIAS]: changed
