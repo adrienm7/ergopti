@@ -1342,6 +1342,12 @@ local function main()
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keystats.cancel_hold_intervals() end
 			keystats.discard_roi()
+			-- A pause stops every metric, as on macOS and Windows; the focused
+			-- application's time starts again with the resume.
+			keystats.set_script_paused(paused == true)
+			if not paused and _cached_app_id then keystats.on_app_focus(_cached_app_id) end
+			-- The spotlight ring is an overlay of its own timer: a pause ends it.
+			if paused then require("modules.gestures.pointer_spotlight").dismiss() end
 			if paused and gestures then gestures.release_clicks() end
 			-- A paused script ends CapsWord, as on Windows: its CapsLock unlocks.
 			if paused and shortcuts then shortcuts.cancel_caps_word("script paused") end
@@ -3544,7 +3550,8 @@ local function main()
 		-- The machine's own state. The sampler decides for itself whether enough
 		-- time has passed, so calling it every tick costs a comparison — putting
 		-- the interval here as well would be a second place to change it.
-		if system_metrics then
+		-- A paused driver counts no system day state either (EDD-1).
+		if system_metrics and not script_actions.is_paused() then
 			local owner = system_metrics
 			RuntimeGuard.call("system metrics sampler", function()
 				owner.sample()

@@ -117,4 +117,24 @@ helpers.describe("a paused Linux driver records no keys (EDD-1)", function()
 		control("shortcut", { code = 31, key = "s", mods = { ctrl = true } })
 		helpers.assert_eq(recorded, {}, "a paused driver counts no chord")
 	end)
+
+	-- Every other metric (application time, pointer, network, topology, system
+	-- rows) follows the keystats pause the listener sets, and the system day
+	-- sampler does not run while paused: before, only the Metrics menu's pause
+	-- stopped them (paused-records-no-keys).
+	helpers.it("(paused-records-no-keys) the pause listener stops every metric and the system sampler", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local first = assert(source:find("on_pause_change = function(paused)", 1, true))
+		local listener = source:sub(first, assert(source:find("\n\t\tend,", first, true)))
+		helpers.assert_true(listener:find("keystats.set_script_paused(paused == true)", 1, true) ~= nil,
+			"the pause listener pauses the metrics with the driver")
+		helpers.assert_true(listener:find("keystats.on_app_focus(_cached_app_id)", 1, true) ~= nil,
+			"the resume starts the focused application's time again")
+		helpers.assert_true(source:find("if system_metrics and not script_actions.is_paused() then", 1, true) ~= nil,
+			"the system day sampler waits for the resume")
+		helpers.assert_true(listener:find('require("modules.gestures.pointer_spotlight").dismiss()', 1, true) ~= nil,
+			"the pause ends the spotlight overlay, as on Windows and macOS")
+	end)
 end)
+

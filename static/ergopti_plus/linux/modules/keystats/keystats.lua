@@ -309,7 +309,11 @@ local _suppressed = false
 -- its own: the password flag above is driven by the focused application and is
 -- cleared whenever focus moves, which would silently end a pause the user set.
 -- Never persisted, so every launch starts recording as its settings say.
-local _suspended = false
+-- `script` is the driver's own pause (EDD-1): it stops every metric,
+-- keystrokes, application time, pointer, network, topology and system rows
+-- alike, as macOS and Windows do, apart from the user's Metrics-menu pause.
+-- One table: this chunk is at Lua's limit of 200 locals.
+local _pause = { user = false, script = false }
 
 -- Cross-driver privacy posture, read from the shared features manifest so the
 -- three drivers cannot drift. Linux had none of these: it recorded
@@ -444,7 +448,7 @@ local _storage_blocked = false
 local function may_record()
 	if _flush_stopping or _storage_blocked then return false end
 	if not _enabled then return false end
-	if _suppressed or _suspended then return false end
+	if _suppressed or _pause.user or _pause.script then return false end
 	if _secure_filter_enabled and _secure_field then return false end
 	if _private_filter_enabled and _private_window then return false end
 	return true
@@ -923,7 +927,7 @@ function M.init(opts)
 
 	_hold_token = {}
 	_hold_focus_app = nil
-	_suspended = false
+	_pause.user = false
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -2321,8 +2325,8 @@ end
 --- Pauses metrics collection at the user's request. Idempotent. The pause is
 --- independent of the password flag: leaving a secure field does not end it.
 function M.suspend_collection()
-	if not _suspended then
-		_suspended = true
+	if not _pause.user then
+		_pause.user = true
 		_live = new_live_tracker()
 		settle_capture_policy()
 		Logger.info(LOG, "Metrics collection suspended by the user.")
@@ -2331,16 +2335,30 @@ end
 
 --- Ends the user's pause. Nothing typed meanwhile is recovered.
 function M.resume_collection()
-	if _suspended then
-		_suspended = false
+	if _pause.user then
+		_pause.user = false
 		Logger.info(LOG, "Metrics collection resumed by the user.")
 	end
+end
+
+--- Follows the driver's pause: nothing is recorded while it lasts, and the
+--- intervals open at the pause are retired, never credited later.
+--- @param paused boolean The driver's settled pause state.
+function M.set_script_paused(paused)
+	if type(paused) ~= "boolean" then
+		error("keystats.set_script_paused() needs a boolean pause state", 2)
+	end
+	if _pause.script == paused then return end
+	_pause.script = paused
+	if paused then _live = new_live_tracker() end
+	settle_capture_policy()
+	Logger.info(LOG, "Metrics collection %s with the driver.", paused and "paused" or "resumed")
 end
 
 --- Returns whether the user paused metrics collection.
 --- @return boolean
 function M.is_collection_suspended()
-	return _suspended
+	return _pause.user
 end
 
 --- Turns keystroke collection on or off. The Linux driver had no off switch at
@@ -2673,7 +2691,7 @@ function M.get_privacy_state()
 		private_window             = _private_window,
 		secure_field               = _secure_field,
 		suppressed                 = _suppressed,
-		suspended                  = _suspended,
+		suspended                  = _pause.user,
 	}
 end
 
@@ -2705,7 +2723,7 @@ function M.export_session()
 		wpm                = wpm,
 		apps               = apps,
 		suppressed         = _suppressed,
-		suspended          = _suspended,
+		suspended          = _pause.user,
 	}
 end
 
