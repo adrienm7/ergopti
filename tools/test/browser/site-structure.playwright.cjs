@@ -284,6 +284,16 @@ async function expectStudioWorkspace(page, origin, basePath, route) {
 	await frame.waitFor({ state: 'visible' });
 	const box = await frame.boundingBox();
 	const viewport = page.viewportSize();
+	// The workspace fills the screen and the page itself never scrolls: a page
+	// taller than the screen shows a classic scrollbar (WebKit, desktop Chrome
+	// on Windows and Linux) that narrows the tool, which headless Chromium hides.
+	const overflow = await page.evaluate(
+		() => document.documentElement.scrollHeight - window.innerHeight
+	);
+	assert.ok(
+		overflow <= 1,
+		`The page around the Studio does not scroll on ${route} (${overflow} px)`
+	);
 	assert.ok(
 		box.x <= 1 && Math.abs(box.x + box.width - viewport.width) <= 1,
 		'Studio frame spans the full width on ' + route

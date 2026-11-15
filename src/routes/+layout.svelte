@@ -92,6 +92,18 @@
 	}
 
 	/**
+	 * Ergopti Studio is an app-like workspace that fills the screen under the
+	 * header (src/routes/studio/+layout.svelte): the site footer below it made
+	 * every Studio page scroll, and a classic scrollbar then narrowed the tool.
+	 * Decided by the agent, to review by the maintainer: no footer there.
+	 * @param {string} pathname - The current URL path.
+	 * @returns {boolean}
+	 */
+	function isStudioPage(pathname) {
+		return isInSection(pathname, resolve('/studio'));
+	}
+
+	/**
 	 * Map the current development path to the same page on the stable site.
 	 * The template calls it so that the $app/state read stays tracked on
 	 * client navigation in this legacy-mode component.
@@ -116,7 +128,9 @@
 		<Header />
 		<slot />
 	</div>
-	<Footer />
+	{#if !isStudioPage(page.url.pathname)}
+		<Footer />
+	{/if}
 </bloc-page>
 
 {#if isLayoutPage(page.url.pathname)}
