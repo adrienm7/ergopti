@@ -1038,7 +1038,12 @@ Released as v1.0.9; these requests of 1-2 November are still open.
       row) and the bundle's Info.plist and variant stats twice; one per-build snapshot now feeds every reader
       (2 listings, 1 plist read; `test_layout_bundle_external_refresh`, `test_input_sources_version_gt`). Not timed
       on a Mac: the next field report's `menu_keyboard_layout.sources` phase says whether the spikes are gone.
-      [CODE] Left (2026-11-15): a proven cache for the macOS `menu_keyboard_layout.sources` read. The Windows PC
+      Done 2026-11-15 (`claude/ergopti-todo-mac-layout-sources-cache`, de5c21d18d): the `menu_keyboard_layout.sources`
+      disk reads (both scopes' highest bundle and its Info.plist variants) are kept between rebuilds only while an
+      FSEvents watcher runs on both Keyboard Layouts folders and has reported nothing since; the driver's own installs
+      invalidate at once; no watcher, no cache (`modules/keymap/layout_sources_cache.lua`, test_layout_sources_cache.lua).
+      Decided by the agent, to review by the maintainer: FSEvents rather than a directory-time key. The next Mac field
+      report's `menu_keyboard_layout.sources` phase confirms the spikes are gone. The Windows PC
       timings and the macOS field points `rerun_2026_11_02` and `main_thread_holds` are in TODO-tests-windows.md and
       TODO-tests-macos.md (2026-11-15).
 - [ ] **Before publishing.** (checked by worker F, 2026-11-13: a release gate for the maintainer, no code step) Whole AHK suite on a quiet machine with no resident driver, `npm run test:ahk-tray-rows-read-as-text`,
