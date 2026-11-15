@@ -118,3 +118,10 @@ the whole `menu_input` group's stubs (`--only` alone fails on `hs.fs`).
   hotstring terminator tests live in another group.
 - Use `--module menu_llm` for the macOS AI tests; `--only` with a module name
   can miss stubs.
+
+Item (3), on `claude/ergopti-todo-pause-parity-3` above block (2): the
+coordinator chose (22:17 Paris) to admit the magic key capture while paused on
+the three OS (report, sixth pass). Item (4): a read-only census found one
+likely real gap, Linux keystats recording physical keys and shortcut chords
+while paused (`handle_physical`, `handle_control` `record_shortcut` in
+`linux/ergopti_hotstrings.lua`); to confirm macOS CapsWord ends at pause.

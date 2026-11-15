@@ -144,6 +144,23 @@ dropped by `Ergopti_OnSuspendResume`); a reload while paused writes them to
 replayed pause reads them back. A file no replayed pause claims is removed.
 Regression: `test_script_chords_follow_their_slot.ahk` `(paused-chord-change)`.
 
+## Sixth pass (2026-11-14, worker P): the magic key capture while paused
+
+Decided by the coordinator on 2026-11-14 (EDD-1): « capture the next key » runs
+while paused on the three OS; the key is saved at once and stays inert until
+resume, since a paused driver remaps nothing; a pause or a resume during the
+capture cancels it. Before, all three refused it while paused (macOS dropped the
+row's action, Linux `can_capture` required `is_active`, Windows
+`MagicKeySourceCapture` returned on `A_IsSuspended`). The Windows tray still
+greys the Layout submenu while paused, so the row is reachable there once that
+greying is lifted (EDD-1 on AHK).
+
+| OS      | Change                                                                                                    | Regression                                                        |
+| ------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| macOS   | `magic_key_source_menu` admits a settled pause and binds the capture to the pause state it started in     | `test_magic_key_source_menu` `(paused-magic-capture)`             |
+| Linux   | `magic_key_source.can_capture` needs the grab only; the pause listener cancels a capture on either edge   | `test_magic_key_source_config_toml_leaf` `(paused-magic-capture)` |
+| Windows | `MagicKeySourceCapture` follows the pause state it started in; the resume reactor stops a capture as well | `test_magic_key_capture_settlement.ahk` `source paused-live`      |
+
 ## Left (next pass, listed rather than guessed)
 
 These still refuse or grey while paused. Ungating the menu alone would let a
@@ -153,7 +170,6 @@ source proofs reworked first:
 - AI menus: turning the AI on (it starts model warmups and may offer an
   install), and on Windows the model and API entry rows, the whole-scope
   restore and clear, and the tray's greying of the AI submenu.
-- macOS magic key source capture: it listens to a physical key press.
 - The audit that every typing feature is inert while paused, and that a
   setting changed while paused applies on resume. Layout emulation is done:
   both Lua drivers gate it on the live pause (`is_active` from
