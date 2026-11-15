@@ -97,7 +97,10 @@ for (const [driver, spec] of Object.entries(wiring)) {
 // 3. The pause is its own state, never the password flag.
 check('linux pause state', () => {
 	const source = read(`${PLUS}/linux/modules/keystats/keystats.lua`);
-	assert(/^local _suspended = false$/m.test(source), 'Linux keystats keeps a state of its own');
+	// The user's metrics pause and the driver pause are two fields of one state,
+	// both apart from the password flag (_suppressed).
+	assert(/^local _pause = \{ user = false, script = false \}$/m.test(source), 'Linux keystats keeps a state of its own');
+	assert(/function M\.set_script_paused\(paused\)/.test(source), 'Linux exposes set_script_paused for the driver pause');
 	assert(/function M\.suspend_collection\(\)/.test(source), 'Linux exposes suspend_collection');
 	assert(/function M\.resume_collection\(\)/.test(source), 'Linux exposes resume_collection');
 	const menu = read(`${PLUS}/linux/ui/menu/builder.lua`);
