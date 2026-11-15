@@ -629,6 +629,9 @@ local function run_exclusive_install(scope_label, install_fn, bundles_dir, bundl
 		return install_fn(bundles_dir, bundle_name)
 	end, debug.traceback)
 	_install_in_flight = false
+	-- Whatever the outcome, the scope folders may have changed: the menu's
+	-- cached view of them is read again at its next rebuild.
+	require("modules.keymap.layout_sources_cache").invalidate(scope_label .. " install")
 	if not call_ok then
 		Logger.error(LOG, "%s keyboard-layout install raised: %s.",
 			scope_label, tostring(committed_or_err))

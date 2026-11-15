@@ -35,6 +35,8 @@ local MagicKeySourceMenu = require("ui.menu.magic_key_source_menu")
 local LayoutManagerWindow = require("ui.layout_manager")
 local install       = require("modules.keymap.layout_install")
 local input_sources = require("modules.keymap.input_sources")
+-- The disk half of the « sources » stage, kept between rebuilds while watched.
+local LayoutSourcesCache = require("modules.keymap.layout_sources_cache")
 local NumberRowPolicy = require("layouts.engine.layout.number_row_policy")
 local PauseSwitchPolicy = require("layouts.engine.layout.pause_switch_policy")
 local LOG           = "menu.keyboard_layout"
@@ -377,7 +379,14 @@ function M.build(ctx)
 	-- Both Keyboard Layouts scopes, listed once for the whole build: four
 	-- readers below each listed both again (eight directory scans and their
 	-- plist probes per rebuild), all with the same answer.
-	local installed  = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
+	-- Read from the disk only when the scope folders changed since the last
+	-- rebuild (layout_sources_cache: FSEvents and the driver's own installs).
+	local sources    = LayoutSourcesCache.read(function()
+		local scopes = { system = highest_installed(SYSTEM_LAYOUTS_DIR), user = highest_installed(USER_LAYOUTS_DIR) }
+		local map, variants = build_kl_name_to_tis_id(scopes)
+		return { installed = scopes, kl_name_to_tis = map, variants = variants }
+	end)
+	local installed  = sources.installed
 	-- Build the active-Ergopti set directly from records — the same source used
 	-- to display the i18n.get("menu.layout.active_layouts") list below. If an entry appears there
 	-- it is truly active; no need to read HIToolbox separately.
@@ -386,8 +395,7 @@ function M.build(ctx)
 	-- NOT a TIS ID. We map it to a stable TIS ID via the installed bundle's keylayout files.
 	-- Records whose KeyboardLayout Name doesn't match any installed variant are orphan entries
 	-- (old bundle, different version) — we flag them so the menu can offer an upgrade.
-	local kl_name_to_tis, installed_variants = build_kl_name_to_tis_id(installed)
-	kl_name_to_tis = kl_name_to_tis or {}
+	local kl_name_to_tis, installed_variants = sources.kl_name_to_tis or {}, sources.variants
 	local active_id_set_pre = {}
 	local legacy_active     = {}
 	for _, r in ipairs(records) do

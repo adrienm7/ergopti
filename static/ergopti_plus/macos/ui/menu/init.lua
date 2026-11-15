@@ -186,7 +186,8 @@ function M.stop_watchers()
 	local theme_stopped = stop_owned("_theme_watcher", "Menubar theme watcher")
 	-- The automatic update checks own a timer and a wake watcher.
 	local checks_stopped = stop_owned("_update_checks", "Automatic update checks")
-	if config_stopped and theme_stopped and checks_stopped then
+	local sources_stopped = stop_owned("_layout_sources_cache", "Keyboard layout sources cache")
+	if config_stopped and theme_stopped and checks_stopped and sources_stopped then
 		Logger.debug(LOG, "Menubar watchers stopped.")
 		return true
 	end
@@ -1969,6 +1970,11 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 
 	M._menu    = myMenu
 	M._watcher = configWatcher
+
+	-- The layout menu's disk reads are kept while FSEvents watches both scopes.
+	local LayoutInstall = require("modules.keymap.layout_install")
+	M._layout_sources_cache = require("modules.keymap.layout_sources_cache").start({
+		LayoutInstall.SYSTEM_LAYOUTS_DIR, LayoutInstall.USER_LAYOUTS_DIR })
 
 	M._theme_watcher = MenuWatchers.start_theme_watcher(function()
 		-- updateMenu refreshes the icon itself, so the bare call was the same double
