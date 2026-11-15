@@ -1048,7 +1048,10 @@ local function set_action(slot_id, action_id, on_error, publication_observer)
 		Logger.warn(LOG, "set_action(): refusing unknown action '%s' for slot '%s'.", action_id, slot_id)
 		return false
 	end
-	if _lifecycle_paused == true or _start_attempt ~= nil then return false end
+	-- A pause admits the edit (EDD-1): the paused module holds no hotkey, so
+	-- the assignment is only published, and the resume start binds it from the
+	-- file. A start in progress is refused, since it is reading that file.
+	if _start_attempt ~= nil then return false end
 	if not owns_slot(slot_id) then return false end
 	if PhysicalSlots.is_namespace(slot_id) and action_id ~= "none" then
 		if not PhysicalAvailability.ready(M.physical_delivery_available) then return false end

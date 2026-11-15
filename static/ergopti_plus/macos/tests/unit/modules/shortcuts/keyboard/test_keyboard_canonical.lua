@@ -196,6 +196,27 @@ helpers.describe("keyboard scope candidate admission", function()
 		end)
 	end)
 
+	-- EDD-1: a slot edited while paused is published at once and bound by the
+	-- resume, which reads the file. Before, the paused module refused the edit.
+	helpers.it("(paused-slot-change) publishes a paused edit and binds it on resume", function()
+		with_subject('[shortcuts.keyboard]\nprimary_a = "send_text"\n', function(subject, _, control)
+			helpers.assert_eq(subject.start(), true)
+			helpers.assert_eq(subject.pause(), true)
+			local handles = #control.handles
+			helpers.assert_eq(subject.set_action("primary_b", "screen_capture"), true, "a paused edit is accepted")
+			helpers.assert_eq(control.writes, 1, "a paused edit is written at once")
+			helpers.assert_eq(#control.handles, handles, "a paused edit binds nothing")
+			helpers.assert_eq(subject.is_started(), false)
+			helpers.assert_eq(subject.resume_after_pause(), true)
+			helpers.assert_eq(subject.get_action("primary_b"), "screen_capture")
+			for index = handles + 1, #control.handles do
+				if control.handles[index].enabled then control.handles[index].callback() end
+			end
+			table.sort(control.fired)
+			helpers.assert_eq(control.fired, { "screen_capture", "send_text" }, "the resume binds the paused edit")
+		end)
+	end)
+
 	helpers.it("compensates a refused candidate acquisition by reapplying the captured source", function()
 		with_subject('[shortcuts.keyboard]\nprimary_a = "send_text"\n', function(subject, _, control)
 			helpers.assert_eq(subject.start(), true)

@@ -254,7 +254,7 @@ local function build_group_rows(group, ctx, disabled, fixed_rows)
 	local getters = {
 		keyboard_group_has_scope = function() return not group.fixed end,
 		keyboard_group_has_fixed = function() return #fixed > 0 end,
-		keyboard_group_ready = function() return not disabled and ctx.paused ~= true and not group.fixed end,
+		keyboard_group_ready = function() return not disabled and not group.fixed end,
 		keyboard_group_add_option = add_for("alt_"),
 		keyboard_group_add_ctrl = add_for("secondary_"),
 		keyboard_group_add_ctrl_shift = add_for("secondary_shift_"),

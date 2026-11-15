@@ -309,7 +309,10 @@ function M.new(options)
 			or mutation.section == require("settings.engine.keys").KEY.SHORTCUTS_KEYBOARD and PhysicalSlots.is_namespace(mutation.key) then return false end
 		for _, name in ipairs({ "read", "apply", "restore" }) do if type(mutation[name]) ~= "function" then return false end end
 		return options.admission("Private program parameter edit", function()
-			if options.paused() ~= false or not current_path() then return false end
+			-- A pause admits the edit: the paused driver runs no parameterized
+			-- action, and every slot owner applies its assignment on resume
+			-- (EDD-1). A pause that is not a boolean is refused.
+			if type(options.paused()) ~= "boolean" or not current_path() then return false end
 			if claim.pending() and claim.retry_restore() ~= true then return false end
 			local stage = "capture"
 			local called, committed = pcall(function()

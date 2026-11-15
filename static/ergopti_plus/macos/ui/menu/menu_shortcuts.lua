@@ -903,7 +903,9 @@ function M.build(ctx)
 			-- The built-in Ctrl and Cmd shortcuts open the group of their own
 			-- modifier: as groups of their own they drew a second "Ctrl" and
 			-- "Cmd" submenu beside the configurable one.
-			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or paused or nil, {
+			-- Editable while paused: the slots are unbound during a pause and an
+			-- edit is bound when resume starts them again (EDD-1).
+			return KeyboardSlots.provide_rows(ctx, (not state.shortcuts) or nil, {
 				secondary_ = ctrl_items,
 				primary_   = cmd_items,
 			})

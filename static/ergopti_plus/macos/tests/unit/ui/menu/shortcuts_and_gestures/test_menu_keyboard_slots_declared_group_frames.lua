@@ -147,17 +147,17 @@ helpers.describe("menu_keyboard_slots: complete declared group frame", function(
 		if not ok then error(detail, 0) end
 	end)
 
-	it("refuses a retained physical Add callback while the actual context is paused", function()
+	-- EDD-1: a slot edited while paused is saved at once and bound by the
+	-- resume (paused-slot-change), so Add opens its picker while paused.
+	it("(paused-slot-change) opens the Add picker while the actual context is paused", function()
 		local ui, shortcuts, picker = fresh()
 		local ctx = make_ctx()
-		local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
-		local action = rows[1].items[#rows[1].items].action
 		ctx.paused = true
-		helpers.assert_eq(action(), false, "retained Add must recheck the current pause owner")
-		helpers.assert_eq(#picker.opened, 0, "refused Add opens no lazy picker")
-		ctx.paused = false
-		action()
-		helpers.assert_eq(#picker.opened, 1, "resume retains the real native slot picker")
+		local rows = physical_rows(ui.provide_rows(ctx, nil), shortcuts)
+		local add = rows[1].items[#rows[1].items]
+		helpers.assert_eq(add.disabled == true, false, "Add is live while paused")
+		add.action()
+		helpers.assert_eq(#picker.opened, 1, "a paused Add opens the real native slot picker")
 	end)
 
 	it("refuses Add callbacks captured from an explicitly disabled group", function()
