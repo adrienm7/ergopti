@@ -285,6 +285,36 @@ helpers.describe("Ergopti Studio personal layouts (Linux bridge)", function()
 			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioProfileResult(")
 			helpers.assert_true(Editor.on_message({ action = "studio_profile_load", request = 5 }, daemon_state).handled)
 			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioProfile(")
+			helpers.assert_contains(state.pushes[1].js, '"studio_workspace":false')
+			helpers.assert_true(Editor.on_message({ action = "studio_workspace_load", request = 6 }, daemon_state).handled == false,
+				"a registry without the workspace refuses it")
+		end)
+		Editor._reset()
+		helpers.assert_true(ok, tostring(err))
+	end)
+
+	helpers.it("forwards the editor's workspace to the registry with the page's request number (studio-editor-workspace)", function()
+		local Bridge, state, daemon_state = bridge()
+		daemon_state.layout_registry.source_open = function(on_done) on_done({ filename = "mine.toml", text = "x" }) end
+		daemon_state.layout_registry.source_save = function() end
+		local saved = {}
+		daemon_state.layout_registry.studio_workspace_load = function(on_done) on_done(true, '{"schema":1,"tabs":[]}') end
+		daemon_state.layout_registry.studio_workspace_save = function(payload, on_done)
+			saved[#saved + 1] = payload
+			on_done(true)
+		end
+		local Editor = Bridge.editor
+		Editor._reset()
+		local ok, err = pcall(function()
+			helpers.assert_true(Editor.on_message({ action = "ready" }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[1].js, '"studio_workspace":true')
+			helpers.assert_true(Editor.on_message({ action = "studio_workspace_load", request = 2 }, daemon_state).handled)
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioWorkspace(")
+			helpers.assert_contains(state.pushes[#state.pushes].js, '"request":2')
+			helpers.assert_true(Editor.on_message({ action = "studio_workspace_save", request = 3, text = '{"tabs":[]}' },
+				daemon_state).handled)
+			helpers.assert_eq(saved, { { text = '{"tabs":[]}', reset = false } })
+			helpers.assert_contains(state.pushes[#state.pushes].js, "window.studioWorkspaceResult(")
 		end)
 		Editor._reset()
 		helpers.assert_true(ok, tostring(err))

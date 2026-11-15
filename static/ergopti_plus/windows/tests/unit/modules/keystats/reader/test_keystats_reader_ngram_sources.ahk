@@ -503,6 +503,32 @@ _KLRSource_StudioProfileMessages() {
 Test("Layout editor window: Ergopti Studio keeps the Comparer's fingering profile (studio-fingering-profile)",
 	_KLRSource_StudioProfileMessages)
 
+; The Studio window keeps the editor's workspace (its tabs) with the page's request numbers.
+_KLRSource_StudioWorkspaceMessages() {
+	Files := Map()
+	Pushed := []
+	Deps := Map("config_dir", "C:\cfg\",
+		"studio_ports", Map("exists", (Path) => Files.Has(Path),
+			"read", (Path, MaxBytes) => Files.Has(Path) ? Files[Path] : false,
+			"write", (Path, Text) => (Files[Path] := Text, true)),
+		"push", (Name, Payload) => (Pushed.Push(Name . " " . _LayMgrWeb_Json(Payload)), true))
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load", "request", 2), Deps))
+	AssertContains(Pushed[1], 'studioWorkspace {')
+	AssertFalse(InStr(Pushed[1], '"workspace"'), "nothing saved yet is an empty workspace")
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_save", "request", 3,
+		"text", '{"tabs":[]}'), Deps))
+	AssertContains(Pushed[2], 'studioWorkspaceResult {')
+	AssertContains(Pushed[2], '"ok":true')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load", "request", 4), Deps))
+	AssertContains(Pushed[3], '"workspace":"{\"tabs\":[]}"')
+	AssertTrue(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_save", "request", 5,
+		"reset", true), Deps))
+	AssertContains(Pushed[4], '"code":"studio_invalid_layout"', "the page never clears the workspace")
+	AssertFalse(LayoutEditorWindow_HandleMessage(Map("action", "studio_workspace_load"), Deps), "a request number is required")
+}
+Test("Layout editor window: Ergopti Studio keeps the editor's tabs (studio-editor-workspace)",
+	_KLRSource_StudioWorkspaceMessages)
+
 ; The Windows host runs no Lua: it offers no lua_export and refuses the message.
 _KLRSource_LuaExportRefused() {
 	Pushed := []

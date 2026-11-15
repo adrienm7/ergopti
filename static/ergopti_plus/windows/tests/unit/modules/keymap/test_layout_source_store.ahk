@@ -326,6 +326,24 @@ _LSS_StudioProfile() {
 }
 Test("Studio layout store: keeps one fingering profile as given (studio-fingering-profile)", _LSS_StudioProfile)
 
+_LSS_StudioWorkspace() {
+	Settings := StudioStore_SharedSettings()
+	Files := Map()
+	Ports := _LSS_StudioDisk(Files)
+	AssertEqual("", StudioStore_WorkspaceLoad(Settings, "C:\cfg\", Ports)["workspace"], "nothing saved is an empty workspace")
+	Text := '{"schema":1,"active":0,"tabs":[{"text":"[layout]\nid = \"mine\"\n","dirty":true}]}'
+	AssertTrue(StudioStore_WorkspaceSave(Settings, "C:\cfg\", Map("text", Text), Ports)["ok"])
+	AssertTrue(Files.Has("C:\cfg\layout_sources\studio_workspace.json"), "kept in the source folder")
+	AssertEqual(Text, StudioStore_WorkspaceLoad(Settings, "C:\cfg\", Ports)["workspace"])
+	for Refused in [Map(), Map("text", ""), Map("text", "[1]"), Map("text", "{broken")]
+		AssertEqual(Settings["failures"]["invalid"], StudioStore_WorkspaceSave(Settings, "C:\cfg\", Refused, Ports)["code"])
+	AssertEqual(Text, StudioStore_WorkspaceLoad(Settings, "C:\cfg\", Ports)["workspace"], "a refused workspace changes nothing")
+	Files[StudioStore_WorkspacePath(Settings, "C:\cfg\")] := "{broken"
+	AssertEqual(Settings["failures"]["unreadable"], StudioStore_WorkspaceLoad(Settings, "C:\cfg\", Ports)["code"])
+	AssertEqual("{broken", Files[StudioStore_WorkspacePath(Settings, "C:\cfg\")], "a damaged workspace is never replaced")
+}
+Test("Studio layout store: keeps the editor's tabs and unsaved edits as given (studio-editor-workspace)", _LSS_StudioWorkspace)
+
 ; The file JSON-encodes the page's text, so each quote takes two bytes there:
 ; reading it back must allow for that, or a large saved document is unreadable.
 _LSS_StudioDocumentBound() {

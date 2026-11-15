@@ -25,7 +25,9 @@
 ; 6. Ergopti Studio's personal layouts (StudioStore_*): the Windows twin of
 ;    _shared/layouts/engine/composer/studio_store.lua, one JSON file of the same
 ;    folder mapping each id to the page's JSON text, stored as given; an
-;    unreadable store refuses every operation and is never replaced.
+;    unreadable store refuses every operation and is never replaced. The
+;    fingering profile and the editor's workspace (its tabs and unsaved edits)
+;    are JSON documents of their own in the same folder, kept as given.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -436,7 +438,8 @@ SourceStore_Export(Settings, Payload, Ports := 0) {
  * @param {Map} LayoutDefaults - Decoded _shared/layouts/data/defaults.json.
  * @returns {Map} folder, file, id_pattern, id_max_length, max_layouts,
  *   max_layout_bytes, corpus_folder, corpus_prefix, corpus_id_pattern,
- *   max_corpus_bytes, profile_file, max_profile_bytes and failures
+ *   max_corpus_bytes, profile_file, max_profile_bytes, workspace_file,
+ *   max_workspace_bytes and failures
  *   (invalid, write, unreadable, corpus).
  * @throws {Error} When the table is missing or one of its fields is not valid.
  */
@@ -445,7 +448,8 @@ StudioStore_Settings(LayoutDefaults) {
 	Studio := (LayoutDefaults is Map) ? LayoutDefaults.Get("studio", 0) : 0
 	if !(Source is Map) || !(Studio is Map)
 		throw Error("The layout defaults have no source or studio table.")
-	for Value in [Source.Get("folder", 0), Studio.Get("file", 0), Studio.Get("profile_file", 0)]
+	for Value in [Source.Get("folder", 0), Studio.Get("file", 0), Studio.Get("profile_file", 0),
+			Studio.Get("workspace_file", 0)]
 		if !(Value is String) || !RegExMatch(Value, "^[A-Za-z0-9._-]+$")
 			throw Error("The studio folder or file is not a plain name.")
 	for Field in ["id_pattern", "corpus_id_pattern"] {
@@ -458,7 +462,8 @@ StudioStore_Settings(LayoutDefaults) {
 		throw Error("The studio corpus_folder is not a plain relative folder.")
 	if !(Studio.Get("corpus_prefix", 0) is String) || !RegExMatch(Studio["corpus_prefix"], "^[a-z0-9_]+$")
 		throw Error("The studio corpus_prefix is not a plain name.")
-	for Field in ["id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes", "max_profile_bytes"]
+	for Field in ["id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes", "max_profile_bytes",
+			"max_workspace_bytes"]
 		if !(Studio.Get(Field, 0) is Integer) || Studio[Field] <= 0
 			throw Error("The studio " . Field . " is not a positive integer.")
 	Failures := Studio.Get("failures", 0)
@@ -470,7 +475,8 @@ StudioStore_Settings(LayoutDefaults) {
 		"max_layout_bytes", Studio["max_layout_bytes"], "corpus_folder", Folder,
 		"corpus_prefix", Studio["corpus_prefix"], "corpus_id_pattern", Studio["corpus_id_pattern"],
 		"max_corpus_bytes", Studio["max_corpus_bytes"], "profile_file", Studio["profile_file"],
-		"max_profile_bytes", Studio["max_profile_bytes"],
+		"max_profile_bytes", Studio["max_profile_bytes"], "workspace_file", Studio["workspace_file"],
+		"max_workspace_bytes", Studio["max_workspace_bytes"],
 		"failures", Map("invalid", Failures["invalid"], "write", Failures["write"], "unreadable", Failures["unreadable"],
 			"corpus", Failures["corpus"]))
 }
@@ -669,33 +675,16 @@ StudioStore_Corpus(Settings, SharedDir, Payload, Ports := 0) {
 
 StudioStore_ProfilePath(Settings, ConfigDir) => ConfigDir . Settings["folder"] . "\" . Settings["profile_file"]
 
+StudioStore_WorkspacePath(Settings, ConfigDir) => ConfigDir . Settings["folder"] . "\" . Settings["workspace_file"]
+
 /**
  * The user's fingering profile (the Comparer's « Doigté ») as the JSON text
  * the page saved; "" when none is saved (the defaults).
  * @returns {Map} ok and profile, or ok false, code and detail.
  */
 StudioStore_ProfileLoad(Settings, ConfigDir, Ports := 0) {
-	Ports := _SourceStore_Ports(Ports)
-	Path := StudioStore_ProfilePath(Settings, ConfigDir)
-	if !Ports["exists"].Call(Path)
-		return Map("ok", true, "profile", "")
-	; The file holds the text JSON-encoded: each quote, backslash, newline or tab
-	; doubles, and the page sends JSON, whose text has no other control.
-	Text := Ports["read"].Call(Path, Settings["max_profile_bytes"] * 2 + 64)
-	Failure := ""
-	if !(Text is String)
-		Failure := Path . " could not be read"
-	else {
-		try Data := JsonParse(Text)
-		catch
-			Data := 0
-		if !(Data is Map) || Data.Get("schema", 0) != 1 || (Data.Has("profile") && !(Data["profile"] is String))
-			Failure := Path . " is not a schema 1 fingering profile"
-		else
-			return Map("ok", true, "profile", Data.Get("profile", ""))
-	}
-	LoggerError("LayoutSource", "The Ergopti Studio fingering profile is unreadable: {1}.", Failure)
-	return Map("ok", false, "code", Settings["failures"]["unreadable"], "detail", Failure)
+	return _StudioStore_DocumentLoad(Settings, StudioStore_ProfilePath(Settings, ConfigDir),
+		Settings["max_profile_bytes"], "profile", "fingering profile", Ports)
 }
 
 /**
@@ -704,6 +693,63 @@ StudioStore_ProfileLoad(Settings, ConfigDir, Ports := 0) {
  * @returns {Map} ok, code and detail.
  */
 StudioStore_ProfileSave(Settings, ConfigDir, Payload, Ports := 0) {
+	return _StudioStore_DocumentSave(Settings, StudioStore_ProfilePath(Settings, ConfigDir),
+		Settings["max_profile_bytes"], "profile", "fingering profile", Payload, Ports)
+}
+
+/**
+ * The editor's workspace (its tabs and their unsaved edits, layout_editor/
+ * workspace.js) as the JSON text the page saved; "" before the first save.
+ * @returns {Map} ok and workspace, or ok false, code and detail.
+ */
+StudioStore_WorkspaceLoad(Settings, ConfigDir, Ports := 0) {
+	return _StudioStore_DocumentLoad(Settings, StudioStore_WorkspacePath(Settings, ConfigDir),
+		Settings["max_workspace_bytes"], "workspace", "editor workspace", Ports)
+}
+
+/**
+ * Stores the editor's workspace as the JSON text the page sent.
+ * @param {Map} Payload - { text } (a JSON object's text).
+ * @returns {Map} ok, code and detail.
+ */
+StudioStore_WorkspaceSave(Settings, ConfigDir, Payload, Ports := 0) {
+	return _StudioStore_DocumentSave(Settings, StudioStore_WorkspacePath(Settings, ConfigDir),
+		Settings["max_workspace_bytes"], "workspace", "editor workspace", Payload, Ports)
+}
+
+/**
+ * Reads one JSON document the page keeps as given ({ schema, <Field>: text }).
+ * @returns {Map} ok and the text under Field ("" when none is saved), or ok false, code and detail.
+ */
+_StudioStore_DocumentLoad(Settings, Path, MaxBytes, Field, Label, Ports) {
+	Ports := _SourceStore_Ports(Ports)
+	if !Ports["exists"].Call(Path)
+		return Map("ok", true, Field, "")
+	; The file holds the text JSON-encoded: each quote, backslash, newline or tab
+	; doubles, and the page sends JSON, whose text has no other control.
+	Text := Ports["read"].Call(Path, MaxBytes * 2 + 64)
+	Failure := ""
+	if !(Text is String)
+		Failure := Path . " could not be read"
+	else {
+		try Data := JsonParse(Text)
+		catch
+			Data := 0
+		if !(Data is Map) || Data.Get("schema", 0) != 1 || (Data.Has(Field) && !(Data[Field] is String))
+			Failure := Path . " is not a schema 1 " . Label
+		else
+			return Map("ok", true, Field, Data.Get(Field, ""))
+	}
+	LoggerError("LayoutSource", "The Ergopti Studio {1} is unreadable: {2}.", Label, Failure)
+	return Map("ok", false, "code", Settings["failures"]["unreadable"], "detail", Failure)
+}
+
+/**
+ * Stores one JSON document the page sent, or clears it (reset).
+ * @param {Map} Payload - { text } (a JSON object's text) or { reset: true }.
+ * @returns {Map} ok, code and detail.
+ */
+_StudioStore_DocumentSave(Settings, Path, MaxBytes, Field, Label, Payload, Ports) {
 	Ports := _SourceStore_Ports(Ports)
 	Reset := (Payload is Map) && Payload.Get("reset", false) == true
 	Data := Map("schema", 1)
@@ -711,27 +757,27 @@ StudioStore_ProfileSave(Settings, ConfigDir, Payload, Ports := 0) {
 		Text := (Payload is Map) ? Payload.Get("text", 0) : 0
 		Refusal := ""
 		if !(Text is String) || Text == ""
-			Refusal := "the profile is empty"
-		else if StrPut(Text, "UTF-8") - 1 > Settings["max_profile_bytes"]
-			Refusal := "the profile is larger than its bound"
+			Refusal := "the " . Label . " is empty"
+		else if StrPut(Text, "UTF-8") - 1 > MaxBytes
+			Refusal := "the " . Label . " is larger than its bound"
 		else {
-			try Profile := JsonParse(Text)
+			try Decoded := JsonParse(Text)
 			catch
-				Profile := 0
-			if !(Profile is Map)
-				Refusal := "the profile is not a JSON object"
+				Decoded := 0
+			if !(Decoded is Map)
+				Refusal := "the " . Label . " is not a JSON object"
 		}
 		if (Refusal != "") {
-			LoggerWarn("LayoutSource", "Refused an Ergopti Studio fingering profile: {1}.", Refusal)
+			LoggerWarn("LayoutSource", "Refused an Ergopti Studio {1}: {2}.", Label, Refusal)
 			return Map("ok", false, "code", Settings["failures"]["invalid"], "detail", Refusal)
 		}
-		Data["profile"] := Text
+		Data[Field] := Text
 	}
-	try Ports["write"].Call(StudioStore_ProfilePath(Settings, ConfigDir), _LayMgrWeb_Json(Data) . "`n")
+	try Ports["write"].Call(Path, _LayMgrWeb_Json(Data) . "`n")
 	catch as Err {
-		LoggerError("LayoutSource", "The Ergopti Studio fingering profile could not be written: {1}.", Err.Message)
+		LoggerError("LayoutSource", "The Ergopti Studio {1} could not be written: {2}.", Label, Err.Message)
 		return Map("ok", false, "code", Settings["failures"]["write"], "detail", Err.Message)
 	}
-	LoggerInfo("LayoutSource", Reset ? "Ergopti Studio fingering profile reset." : "Ergopti Studio fingering profile saved.")
+	LoggerInfo("LayoutSource", Reset ? "Ergopti Studio {1} reset." : "Ergopti Studio {1} saved.", Label)
 	return Map("ok", true, "detail", "")
 }

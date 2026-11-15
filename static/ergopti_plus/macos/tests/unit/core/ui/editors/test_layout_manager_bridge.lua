@@ -569,6 +569,44 @@ helpers.describe("Ergopti Studio personal layouts through the controller (studio
 		helpers.assert_true(manager.on_message({ action = "studio_layouts", request = 1 }) == false)
 	end)
 
+	helpers.it("keeps the editor's workspace through the Studio window only (studio-editor-workspace)", function()
+		local saved = {}
+		local registry = {
+			snapshot = function() return { platform = "macos", installed = {} } end,
+			refresh = function(on_done) on_done({}) end,
+			source_open = function(on_done) on_done({}) end,
+			source_save = function(_, on_done) on_done(true) end,
+			studio_workspace_load = function(on_done) on_done(true, '{"schema":1,"tabs":[]}') end,
+			studio_workspace_save = function(payload, on_done)
+				saved[#saved + 1] = payload
+				on_done(false, "studio_write_failed", "disk full")
+			end,
+		}
+		local function controller(editor_window)
+			local pushes = {}
+			local instance = ManagerBridge.new({ registry = registry, editor_window = editor_window,
+				push = function(name, payload) pushes[#pushes + 1] = { name = name, payload = payload }; return true end,
+				strings = function() return {} end, open_url = function() end, close = function() end,
+				log = function() end })
+			return instance, pushes
+		end
+		local instance, pushes = controller(true)
+		helpers.assert_true(instance.on_message({ action = "ready" }) == true)
+		helpers.assert_true(pushes[1].payload.studio_workspace == true)
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_load", request = 3 }) == true)
+		helpers.assert_eq(pushes[#pushes], { name = "studioWorkspace",
+			payload = { request = 3, ok = true, workspace = '{"schema":1,"tabs":[]}' } })
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_save", request = 4, text = '{"tabs":[]}' }) == true)
+		helpers.assert_eq(saved, { { text = '{"tabs":[]}', reset = false } })
+		helpers.assert_eq(pushes[#pushes], { name = "studioWorkspaceResult",
+			payload = { request = 4, ok = false, code = "studio_write_failed", detail = "disk full" } })
+		helpers.assert_true(instance.on_message({ action = "studio_workspace_load" }) == false, "a request number is required")
+		local manager, manager_pushes = controller(false)
+		helpers.assert_true(manager.on_message({ action = "ready" }) == true)
+		helpers.assert_true(manager_pushes[1].payload.studio_workspace == false)
+		helpers.assert_true(manager.on_message({ action = "studio_workspace_load", request = 1 }) == false)
+	end)
+
 	helpers.it("runs a built-in corpus's tables in the Studio page before answering (studio-corpus-tables)", function()
 		local events, run_result = {}, true
 		local registry = {

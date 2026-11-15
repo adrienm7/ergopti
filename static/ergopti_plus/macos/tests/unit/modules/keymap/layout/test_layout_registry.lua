@@ -1308,6 +1308,38 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(loaded[2], "studio_unreadable")
 	end)
 
+	helpers.it("keeps the editor's tabs and unsaved edits as given, refusing what is not one (studio-editor-workspace)", function()
+		local LayoutRegistry, deps, state = manager()
+		deps.config_dir = "/cfg/"
+		deps.read_bounded = function(path, max_bytes)
+			local text = state.files[path]
+			if not text then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end
+		local loaded
+		helpers.assert_true(LayoutRegistry.studio_workspace_load(function(...) loaded = { ... } end, deps))
+		helpers.assert_eq(loaded, { true }, "no saved workspace is an empty one")
+		local text = '{"schema":1,"active":0,"tabs":[{"text":"[layout]\\nid = \\"mine\\"\\n","dirty":true}]}'
+		local saved
+		helpers.assert_true(LayoutRegistry.studio_workspace_save({ text = text }, function(...) saved = { ... } end, deps))
+		helpers.assert_true(saved[1], tostring(saved[3]))
+		helpers.assert_true(state.files["/cfg/layout_sources/studio_workspace.json"] ~= nil, "kept in the source folder")
+		LayoutRegistry.studio_workspace_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text })
+		for _, refused in ipairs({ {}, { text = "" }, { text = "[1]" }, { text = "{broken" } }) do
+			LayoutRegistry.studio_workspace_save(refused, function(...) saved = { ... } end, deps)
+			helpers.assert_eq(saved[2], "studio_invalid_layout")
+		end
+		LayoutRegistry.studio_workspace_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded, { true, text }, "a refused workspace changes nothing")
+		state.files["/cfg/layout_sources/studio_workspace.json"] = "{broken"
+		LayoutRegistry.studio_workspace_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded[2], "studio_unreadable")
+		helpers.assert_eq(state.files["/cfg/layout_sources/studio_workspace.json"], "{broken",
+			"a damaged workspace is never replaced by a load")
+	end)
+
 	helpers.it("reads back a document full of quotes up to its bound (studio-document-bound)", function()
 		local LayoutRegistry, deps, state = manager()
 		deps.config_dir = "/cfg/"

@@ -27,7 +27,10 @@
 --- 5. One fingering profile per user (the Comparer's « Doigté »): stored as
 ---    the JSON text the page sent, in its own file, so a damaged profile never
 ---    touches the layouts; saving none restores the defaults.
---- 6. PURE Lua: the driver injects its file ports.
+--- 6. The editor's workspace (its tabs and their unsaved edits) the same way,
+---    in a file of its own, so « Éditer » restores every tab after a reload or
+---    a crash (layout_editor/workspace.js owns its content).
+--- 7. PURE Lua: the driver injects its file ports.
 --- ==============================================================================
 
 local M = {}
@@ -55,7 +58,7 @@ M.SCHEMA = 1
 --- @return table|nil settings { folder, file, id_pattern, id_max_length,
 ---   max_layouts, max_layout_bytes, corpus_folder, corpus_prefix,
 ---   corpus_id_pattern, max_corpus_bytes, profile_file, max_profile_bytes,
----   failures = { invalid, write, unreadable, corpus } }
+---   workspace_file, max_workspace_bytes, failures = { invalid, write, unreadable, corpus } }
 --- @return string|nil error
 function M.settings(layout_defaults)
 	local source = type(layout_defaults) == "table" and layout_defaults.source or nil
@@ -63,7 +66,7 @@ function M.settings(layout_defaults)
 	if type(source) ~= "table" or type(studio) ~= "table" then
 		return nil, "the layout defaults have no source or studio table"
 	end
-	for _, value in ipairs({ source.folder, studio.file, studio.profile_file }) do
+	for _, value in ipairs({ source.folder, studio.file, studio.profile_file, studio.workspace_file }) do
 		if type(value) ~= "string" or not value:match("^[A-Za-z0-9._-]+$") then
 			return nil, "the studio folder or file is not a plain name"
 		end
@@ -82,7 +85,7 @@ function M.settings(layout_defaults)
 		return nil, "the studio corpus_prefix is not a plain name"
 	end
 	for _, field in ipairs({ "id_max_length", "max_layouts", "max_layout_bytes", "max_corpus_bytes",
-		"max_profile_bytes" }) do
+		"max_profile_bytes", "max_workspace_bytes" }) do
 		local value = studio[field]
 		if type(value) ~= "number" or value <= 0 or value % 1 ~= 0 then
 			return nil, "the studio " .. field .. " is not a positive integer"
@@ -107,6 +110,8 @@ function M.settings(layout_defaults)
 		max_corpus_bytes = studio.max_corpus_bytes,
 		profile_file = studio.profile_file,
 		max_profile_bytes = studio.max_profile_bytes,
+		workspace_file = studio.workspace_file,
+		max_workspace_bytes = studio.max_workspace_bytes,
 		failures = { invalid = failures.invalid, write = failures.write, unreadable = failures.unreadable,
 			corpus = failures.corpus },
 	}, nil
@@ -181,7 +186,8 @@ end
 ---   write(path, text) -> ok, err (atomic, creating the folder),
 ---   log(level, message, ...).
 --- @param env table
---- @return table { list, save, remove, path, corpus, profile_load, profile_save, profile_path }
+--- @return table { list, save, remove, path, corpus, profile_load, profile_save, profile_path,
+---   workspace_load, workspace_save, workspace_path }
 function M.new(env)
 	local settings = env.settings
 	for _, port in ipairs({ "exists", "read_bounded", "write", "log" }) do
@@ -318,75 +324,118 @@ function M.new(env)
 		on_done(true, text, settings.failures.corpus)
 	end
 
-	local function profile_path()
-		return env.config_dir .. settings.folder .. "/" .. settings.profile_file
-	end
-	operations.profile_path = profile_path
-
-	--- The user's fingering profile as the JSON text the page saved, or nil for the defaults.
-	--- @param on_done function on_done(ok, text_or_code, detail)
-	function operations.profile_load(on_done)
-		local file = profile_path()
-		if not env.exists(file) then
-			on_done(true, nil, nil)
-			return
+	--- Loads and saves one JSON object the page keeps as given in its own file
+	--- of the source folder ({ schema, <field> = text }), so a damaged file
+	--- never touches the layouts and is never replaced by a load.
+	--- @param file string The file name.
+	--- @param max_bytes number The bound of the page's text.
+	--- @param field string The field of the file that holds the text.
+	--- @param label string What the logs call it.
+	--- @return function path, function load(on_done), function save(payload, on_done)
+	local function json_document(file, max_bytes, field, label)
+		local function document_path()
+			return env.config_dir .. settings.folder .. "/" .. file
 		end
-		-- The file holds the text JSON-encoded: each quote, backslash, newline or
-		-- tab doubles, and the page sends JSON, whose text has no other control.
-		local text, status, detail = env.read_bounded(file, settings.max_profile_bytes * 2 + 64)
-		local failure
-		if type(text) ~= "string" or status ~= "ok" then
-			failure = string.format("%s could not be read (%s %s)", file, tostring(status), tostring(detail))
-		else
-			local ok, data = pcall(Json.decode, text)
-			if not ok or type(data) ~= "table" or data.schema ~= M.SCHEMA
-				or (data.profile ~= nil and type(data.profile) ~= "string") then
-				failure = file .. " is not a schema " .. M.SCHEMA .. " fingering profile"
-			else
-				on_done(true, data.profile, nil)
+
+		local function load(on_done)
+			local target = document_path()
+			if not env.exists(target) then
+				on_done(true, nil, nil)
 				return
 			end
-		end
-		env.log("error", "The Ergopti Studio fingering profile is unreadable: %s.", failure)
-		on_done(false, settings.failures.unreadable, failure)
-	end
-
-	--- Stores the user's fingering profile, or restores the defaults.
-	--- @param payload table { text = JSON text of an object } or { reset = true }
-	--- @param on_done function on_done(ok, code, detail)
-	function operations.profile_save(payload, on_done)
-		local reset = type(payload) == "table" and payload.reset == true
-		local text = (type(payload) == "table" and not reset) and payload.text or nil
-		if not reset then
-			local refusal
-			if type(text) ~= "string" or text == "" then
-				refusal = "the profile is empty"
-			elseif #text > settings.max_profile_bytes then
-				refusal = "the profile is larger than its bound"
+			-- The file holds the text JSON-encoded: each quote, backslash, newline or
+			-- tab doubles, and the page sends JSON, whose text has no other control.
+			local text, status, detail = env.read_bounded(target, max_bytes * 2 + 64)
+			local failure
+			if type(text) ~= "string" or status ~= "ok" then
+				failure = string.format("%s could not be read (%s %s)", target, tostring(status), tostring(detail))
 			else
-				-- Lua decodes an array to a table too: an object starts with « { ».
-				local ok, profile = pcall(Json.decode, text)
-				if not ok or type(profile) ~= "table" or not text:match("^%s*{") then
-					refusal = "the profile is not a JSON object"
+				local ok, data = pcall(Json.decode, text)
+				if not ok or type(data) ~= "table" or data.schema ~= M.SCHEMA
+					or (data[field] ~= nil and type(data[field]) ~= "string") then
+					failure = target .. " is not a schema " .. M.SCHEMA .. " " .. label
+				else
+					on_done(true, data[field], nil)
+					return
 				end
 			end
-			if refusal then
-				env.log("warn", "Refused an Ergopti Studio fingering profile: %s.", refusal)
-				on_done(false, settings.failures.invalid, refusal)
+			env.log("error", "The Ergopti Studio %s is unreadable: %s.", label, failure)
+			on_done(false, settings.failures.unreadable, failure)
+		end
+
+		local function save(payload, on_done)
+			local reset = type(payload) == "table" and payload.reset == true
+			local text = (type(payload) == "table" and not reset) and payload.text or nil
+			if not reset then
+				local refusal
+				if type(text) ~= "string" or text == "" then
+					refusal = "the " .. label .. " is empty"
+				elseif #text > max_bytes then
+					refusal = "the " .. label .. " is larger than its bound"
+				else
+					-- Lua decodes an array to a table too: an object starts with « { ».
+					local ok, decoded = pcall(Json.decode, text)
+					if not ok or type(decoded) ~= "table" or not text:match("^%s*{") then
+						refusal = "the " .. label .. " is not a JSON object"
+					end
+				end
+				if refusal then
+					env.log("warn", "Refused an Ergopti Studio %s: %s.", label, refusal)
+					on_done(false, settings.failures.invalid, refusal)
+					return
+				end
+			end
+			local written, write_err = env.write(document_path(), Json.encode({ schema = M.SCHEMA, [field] = text }) .. "\n")
+			if not written then
+				env.log("error", "The Ergopti Studio %s could not be written: %s.", label, tostring(write_err))
+				on_done(false, settings.failures.write, tostring(write_err))
 				return
 			end
+			env.log("info", text and "Ergopti Studio %s saved." or "Ergopti Studio %s reset.", label)
+			on_done(true, nil, nil)
 		end
-		local written, write_err = env.write(profile_path(), Json.encode({ schema = M.SCHEMA, profile = text }) .. "\n")
-		if not written then
-			env.log("error", "The Ergopti Studio fingering profile could not be written: %s.", tostring(write_err))
-			on_done(false, settings.failures.write, tostring(write_err))
-			return
-		end
-		env.log("info", text and "Ergopti Studio fingering profile saved." or "Ergopti Studio fingering profile reset.")
-		on_done(true, nil, nil)
+
+		return document_path, load, save
 	end
 
+	--- The user's fingering profile (the Comparer's « Doigté »): load(on_done)
+	--- answers on_done(ok, text_or_code, detail), nil text for the defaults;
+	--- save({ text } | { reset = true }, on_done) answers on_done(ok, code, detail).
+	operations.profile_path, operations.profile_load, operations.profile_save =
+		json_document(settings.profile_file, settings.max_profile_bytes, "profile", "fingering profile")
+
+	--- The editor's open tabs and their unsaved edits (« Éditer »), saved as the
+	--- page types so a reload or a crash restores them; same contract as the
+	--- profile, nil text when nothing was saved yet.
+	operations.workspace_path, operations.workspace_load, operations.workspace_save =
+		json_document(settings.workspace_file, settings.max_workspace_bytes, "workspace", "editor workspace")
+
 	return operations
+end
+
+-- The documents a registry offers: name -> the operations of M.new that load and save it.
+local DOCUMENTS = { "profile", "workspace" }
+
+--- Adds the registry entry points of the Studio's documents, the same on macOS
+--- and Linux: registry.studio_<name>_load(on_done, deps) and
+--- registry.studio_<name>_save(payload, on_done, deps) for the fingering
+--- profile and the editor's workspace, each dispatched to the store's
+--- <name>_load and <name>_save, or refused with failure_code when the store
+--- is unusable.
+--- @param registry table The driver's layout registry module.
+--- @param with_studio function with_studio(deps, run(operations), refuse(detail)) -> dispatched.
+--- @param failure_code string The code a refused call answers.
+function M.document_entries(registry, with_studio, failure_code)
+	for _, name in ipairs(DOCUMENTS) do
+		registry["studio_" .. name .. "_load"] = function(on_done, deps)
+			return with_studio(deps, function(operations) operations[name .. "_load"](on_done) end,
+				function(detail) on_done(false, failure_code, detail) end)
+		end
+		registry["studio_" .. name .. "_save"] = function(payload, on_done, deps)
+			return with_studio(deps, function(operations) operations[name .. "_save"](payload, on_done) end,
+				function(detail) on_done(false, failure_code, detail) end)
+		end
+	end
 end
 
 return M

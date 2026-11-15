@@ -52,7 +52,8 @@ global LAYOUT_EDITOR_WINDOW_ACTIONS := Map("ready", true, "close", true,
 	"source_open", true, "source_save", true, "source_pick", true, "source_export", true,
 	"nav_save", true, "keystats_ngrams", true, "open_link", true,
 	"studio_layouts", true, "studio_layout_save", true, "studio_layout_remove", true, "studio_corpus", true,
-	"studio_profile_load", true, "studio_profile_save", true, "lua_export", true)
+	"studio_profile_load", true, "studio_profile_save", true, "studio_workspace_load", true,
+	"studio_workspace_save", true, "lua_export", true)
 
 
 
@@ -101,7 +102,7 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 			"source_editor", LayMgrJsonBool_Of(true), "source_pick", LayMgrJsonBool_Of(false),
 			"nav_apply", LayMgrJsonBool_Of(true), "emulate", LayMgrJsonBool_Of(true),
 			"source_export", LayMgrJsonBool_Of(true), "keystats", LayMgrJsonBool_Of(true),
-			"studio_store", LayMgrJsonBool_Of(true)))
+			"studio_store", LayMgrJsonBool_Of(true), "studio_workspace", LayMgrJsonBool_Of(true)))
 		return LayoutManager_HandleEditorAction("source_open", Map("action", "source_open"), Deps)
 	}
 	if (Action == "close") {
@@ -116,6 +117,8 @@ LayoutEditorWindow_HandleMessage(Payload, Deps) {
 		return LayoutEditorWindow_StudioCorpus(Payload, Deps)
 	if (Action == "studio_profile_load" || Action == "studio_profile_save")
 		return LayoutEditorWindow_StudioProfile(Action, Payload, Deps)
+	if (Action == "studio_workspace_load" || Action == "studio_workspace_save")
+		return LayoutEditorWindow_StudioWorkspace(Action, Payload, Deps)
 	; The macOS and Linux hosts run the downloads' export adapter with their own
 	; Lua (lua_export); this host has none and offers no lua_export in initData:
 	; its WebView2 pages carry no content policy that refuses the page's fengari
@@ -269,6 +272,39 @@ LayoutEditorWindow_StudioProfile(Action, Payload, Deps) {
 	if !Result["ok"]
 		Answer["code"] := Result["code"]
 	return Deps["push"].Call("studioProfileResult", Answer)
+}
+
+/**
+ * Answers the editor's workspace messages (its tabs and their unsaved edits,
+ * layout_editor/workspace.js), through StudioStore_Workspace* (source_store.ahk).
+ * @param {String} Action - studio_workspace_load or studio_workspace_save.
+ * @param {Map} Payload - { request } and, to save, { text }.
+ * @param {Map} Deps - "push", "config_dir" and optionally "studio_ports".
+ * @returns {Boolean} Whether the message was accepted.
+ */
+LayoutEditorWindow_StudioWorkspace(Action, Payload, Deps) {
+	Request := Payload.Get("request", 0)
+	if !(Request is Integer) || Request < 1 {
+		LoggerWarn("LayoutEditorWindow", "Refused an Ergopti Studio workspace message without its request number.")
+		return false
+	}
+	Settings := StudioStore_SharedSettings()
+	Ports := Deps.Get("studio_ports", 0)
+	if (Action == "studio_workspace_load") {
+		Result := StudioStore_WorkspaceLoad(Settings, Deps["config_dir"], Ports)
+		Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]))
+		if !Result["ok"]
+			Answer["code"] := Result["code"], Answer["detail"] := Result["detail"]
+		else if (Result["workspace"] != "")
+			Answer["workspace"] := Result["workspace"]
+		return Deps["push"].Call("studioWorkspace", Answer)
+	}
+	; A workspace is never reset from the page: only a text is saved.
+	Result := StudioStore_WorkspaceSave(Settings, Deps["config_dir"], Map("text", Payload.Get("text", 0)), Ports)
+	Answer := Map("request", Request, "ok", LayMgrJsonBool_Of(Result["ok"]), "detail", Result["detail"])
+	if !Result["ok"]
+		Answer["code"] := Result["code"]
+	return Deps["push"].Call("studioWorkspaceResult", Answer)
 }
 
 _LayEdWin_PushRefusal(Deps, Code) {
