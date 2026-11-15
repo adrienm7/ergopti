@@ -35,7 +35,9 @@ where the current tab is brought into view.
 	<ul bind:this={list}>
 		{#each items as item (item.href)}
 			<li>
-				<a href={item.href} aria-current={item.current ? 'page' : undefined}>{item.label}</a>
+				<a href={item.href} aria-current={item.current ? 'page' : undefined}
+					><span class="label">{item.label}</span></a
+				>
 			</li>
 		{/each}
 	</ul>
@@ -71,14 +73,66 @@ where the current tab is brought into view.
 		white-space: nowrap;
 	}
 
-	/* Slim bar above an app-like workspace (Ergopti Studio). */
+	/*
+	 * Slim tab bar of an app-like workspace (Ergopti Studio), in the top menu's
+	 * own style: it continues the header's dark band across the full width (no
+	 * page background shows between them, maintainer 2026-11-15), and its tabs
+	 * are the menu's text links, the current one in the purple gradient.
+	 */
 	.subnav.compact {
-		padding: 0.35rem 16px;
+		background-color: var(--header-color);
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		max-width: none;
+		padding: 0 16px;
+		width: 100%;
+	}
+
+	.subnav.compact ul {
+		gap: var(--items-menu-spacing);
 	}
 
 	.subnav.compact a {
-		font-size: 0.9rem;
-		padding: 0.2rem 0.8rem;
+		background: none;
+		border: 0;
+		border-radius: 0;
+		color: var(--couleur-liens-header);
+		font-size: 1rem;
+		padding: 0.45rem 0.6rem;
+		position: relative;
+	}
+
+	.subnav.compact a:hover .label,
+	.subnav.compact a:focus-visible .label {
+		-webkit-background-clip: text;
+		background-clip: text;
+		background-image: linear-gradient(var(--gradient-blue));
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+
+	.subnav.compact a[aria-current='page'] {
+		background: none;
+		font-weight: bold;
+	}
+
+	.subnav.compact a[aria-current='page'] .label {
+		-webkit-background-clip: text;
+		background-clip: text;
+		background-image: linear-gradient(var(--gradient-purple));
+		color: transparent;
+		-webkit-text-fill-color: transparent;
+	}
+
+	/* The current tab's underline, in the same gradient. */
+	.subnav.compact a[aria-current='page']::after {
+		background-image: linear-gradient(to right, var(--gradient-purple));
+		border-radius: 3px;
+		bottom: 0;
+		content: '';
+		height: 3px;
+		left: 0.6rem;
+		position: absolute;
+		right: 0.6rem;
 	}
 
 	.subnav a:hover,

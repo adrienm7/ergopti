@@ -302,6 +302,45 @@ async function expectStudioWorkspace(page, origin, basePath, route) {
 		Math.abs(box.y + box.height - viewport.height) <= 2,
 		'Studio frame reaches the bottom of the screen on ' + route
 	);
+	// The tab bar continues the top menu's dark band, in the menu's style: no
+	// page background between the header, the tabs and the tool (maintainer,
+	// 2026-11-15), and text tabs, not pills.
+	const bar = await page.evaluate(() => {
+		const nav = document.querySelector('.studio-shell nav.subnav');
+		const header = document.querySelector('header');
+		const tab = nav.querySelector('a');
+		return {
+			background: getComputedStyle(nav).backgroundColor,
+			headerBackground: getComputedStyle(header).backgroundColor,
+			top: nav.getBoundingClientRect().top,
+			bottom: nav.getBoundingClientRect().bottom,
+			// On a phone the dev banner is a band right under the header.
+			headerBottom: Math.max(
+				header.getBoundingClientRect().bottom,
+				...[...document.querySelectorAll('.banner')]
+					.filter((banner) => getComputedStyle(banner).transform === 'none')
+					.map((banner) => banner.getBoundingClientRect().bottom)
+			),
+			left: nav.getBoundingClientRect().left,
+			width: nav.getBoundingClientRect().width,
+			tabRadius: getComputedStyle(tab).borderTopLeftRadius
+		};
+	});
+	assert.equal(
+		bar.background,
+		bar.headerBackground,
+		'Studio tab bar in the header color on ' + route
+	);
+	assert.ok(
+		Math.abs(bar.top - bar.headerBottom) <= 1,
+		'Studio tab bar under the header on ' + route
+	);
+	assert.ok(Math.abs(bar.bottom - box.y) <= 1, 'Studio frame right under the tab bar on ' + route);
+	assert.ok(
+		bar.left <= 1 && Math.abs(bar.width - viewport.width) <= 1,
+		'Studio tab bar spans the width'
+	);
+	assert.equal(bar.tabRadius, '0px', 'Studio tabs are text links, not pills, on ' + route);
 }
 
 /** Every former address lands on its new page, anchors included. */

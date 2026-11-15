@@ -43,6 +43,9 @@ const MIME = Object.freeze({
 	'.js': 'text/javascript; charset=utf-8',
 	'.css': 'text/css; charset=utf-8',
 	'.json': 'application/json; charset=utf-8',
+	// The layout registry's macOS files, which the Studio editor reads (GitHub
+	// Pages has no type for them either).
+	'.keylayout': 'application/octet-stream',
 	'.toml': 'text/plain; charset=utf-8',
 	'.txt': 'text/plain; charset=utf-8',
 	'.svg': 'image/svg+xml',

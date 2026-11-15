@@ -624,6 +624,31 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       layout editor window on macOS and Windows (TODO-tests files).
 - [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
       an app; the footer made every Studio page 80 px taller than the screen.
+- [ ] **Studio screenshot remarks (maintainer, 2026-11-15).** Taken by worker T in this order: (a), 2, 6, 7, 8,
+      5, then 3, 4, 9, then 1.
+      (a) [x] The site's editor opens on a copy of Ergopti too, like the app's (`startFrom` in standalone.js; one
+      `openInitial` decides the first document, so a restored draft can come first). Done 2026-11-15
+      (`claude/ergopti-todo-studio-tabs`); proof: `site-opens-on-ergopti` in layout-editor.playwright.cjs.
+      2 [x] The « Éditer » / « Comparer » tabs in the top menu's style, with no blue band under the header: the
+      tab bar continues the header's dark band, its tabs are text links, the current one in the purple gradient
+      and underlined. Done 2026-11-15 (`claude/ergopti-todo-studio-tabs`); proof: `expectStudioWorkspace` in
+      site-structure.playwright.cjs (header colour, no gap above or below, full width, no pills).
+      6 [ ] Each key's legend centred horizontally and vertically, clear of the small key-name label.
+      7 [ ] Dead keys as the bare accent, centred, with a marker class or badge (no combining mark on U+25CC),
+      through one shared legend formatter: editor board, magnifier, Comparer previews, site keyboard.
+      8 [ ] « Essayer » as one input bar in the site's style with the clear button inside the field, the same
+      component on the site and in the app, light and dark.
+      5 [ ] Proper display names for every library layout, from the library's single data source; ids stay keys.
+      3 [ ] A « Format » dropdown (100 % / TKL / 75 % / 65 % / 60 %) instead of « Pavé numérique », hiding the
+      blocks each format lacks; the same value feeds the Comparer's keyboard model and the compact-keyboard bonus.
+      4 [ ] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their
+      ANSI versions, the other geometry stays listed and unchecked.
+      9 [ ] The start dialog keeps its quick picks and adds a searchable, sorted list of every library layout.
+      1 [ ] An installable Windows package (the keyboard DLLs and a setup installer) from the editor, on the site
+      and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
+      installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
+      review by the maintainer.
+      [CODE] Left (2026-11-15): remarks 6, 7, 8, 5, 3, 4, 9 and 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is
