@@ -298,9 +298,13 @@ check(
 		),
 	'the title and the switch must read the same switch state'
 );
-const gateOn = gate.indexOf('ScriptShortcutChordsAreOn()');
+// The gate reads the live chords: those of pause time while paused
+// (paused-chord-change), the configured ones otherwise.
+const gateOn = gate.indexOf('if !Live["on"]');
 check(
-	gateOn > 0 && gateOn < gate.indexOf('ScriptShortcutAssignments[Slot]'),
+	gate.includes('Live := ScriptShortcutLiveChords(Suspended)') &&
+		gateOn > 0 &&
+		gateOn < gate.indexOf('Live["assignments"][Slot]'),
 	'ScriptShortcutSlotRunsAction must leave every chord to the system while the switch is off'
 );
 const scopeRows = functionBody('ScriptShortcutScopeRows');
@@ -329,6 +333,19 @@ for (const slot of manifestSlots) {
 		`${slot} must start with its preset and declare "none" as the value a clear writes`
 	);
 }
+
+// The chords of pause time (paused-chord-change): taken as the driver pauses,
+// dropped on resume, and carried across a reload while paused before the
+// suspend marker is prepared.
+check(
+	functionBody('Ergopti_OnSuspendEnter').includes('ScriptShortcutPausedChordsBegin(') &&
+		functionBody('Ergopti_OnSuspendResume').includes('ScriptShortcutPausedChordsEnd(') &&
+		/ScriptShortcutPausedChordsPersist\(ScriptShortcutPausedChordsPath\(\),\s*FSWriteDurable, FSRead\) && _SuspendHandoffPrepareMarker\(MarkerPath, Intent\)/.test(
+			SOURCE
+		) &&
+		functionBody('_SuspendRestoreFromMarker').includes('_ScriptShortcutPausedChordsFromReload :='),
+	'the chords of pause time must be taken at pause, dropped at resume and carried across a paused reload'
+);
 
 // ==================================================
 // ==================================================

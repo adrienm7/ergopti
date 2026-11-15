@@ -269,8 +269,11 @@ _ReloadPreservingSuspendNonCritical(SuccessFn, ExistingBundle, RefusedFn,
 		ReloadFn := ReloadTerminalInvoke.Bind(OwnerBundle, SuccessFn,
 			LifecycleLaunchSuccessor, ReloadSuccessorPort(), CommitFn, AbortFn,
 			_ReloadPreservingSuspendRefused.Bind(RefusedFn), ReleaseFn, RetractFn)
+		; The chords of pause time travel with the pause: the successor loads the
+		; new configuration, yet its restored pause keeps the chord that resumes.
 		Launched := SuspendHandoffReload(A_IsSuspended, Path,
-			(MarkerPath) => _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
+			(MarkerPath) => ScriptShortcutPausedChordsPersist(ScriptShortcutPausedChordsPath(),
+				FSWriteDurable, FSRead) && _SuspendHandoffPrepareMarker(MarkerPath, Intent), ReloadFn,
 				ReadyFn, ReportStage, _SuspendHandoffCancelMarker)
 		return Launched
 	} finally {
@@ -395,11 +398,19 @@ _SuspendHandoffFailure(Stage, Path) {
 ; the drain exists for. It also means the reactors and the tray indicator run
 ; exactly as they do for a manual pause.
 _SuspendRestoreFromMarker() {
+		global _ScriptShortcutPausedChordsFromReload
 		Path := _SuspendMarkerPath()
 		; Refused or interrupted preparations are inert. Their cleanup result is
 		; surfaced, but cannot suppress consumption of separately committed intent.
 		SuspendHandoffDiscardPending(Path, FSStrictExists, FSDeleteStrict,
 			_SuspendHandoffFailure)
+		; Only a pause this boot replays takes the chords its reload carried.
+		try _ScriptShortcutPausedChordsFromReload := Path != ""
+			&& (FSStrictExists(Path) || FSStrictExists(Path . ".claim"))
+		catch as Err {
+			_ScriptShortcutPausedChordsFromReload := false
+			try LoggerError("Lifecycle", "The suspend marker could not be probed for the chords of pause time: {1}.", Err.Message)
+		}
 		return SuspendHandoffConsume(Path, A_IsSuspended,
 				FSStrictExists, FSMove, FSDeleteStrict, ToggleSuspend,
 				_SuspendHandoffBeforeToggle, _SuspendHandoffFailure)
@@ -522,6 +533,9 @@ Ergopti_OnSuspendEnter() {
 	; Retire RAM-only note continuations before any suspend step can yield.
 	if IsSet(TakeNoteRevokePending)
 		TakeNoteRevokePending()
+	; The chords that resume stay those of pause time until the resume.
+	ScriptShortcutPausedChordsBegin(ScriptShortcutPausedChordsPath(),
+		FSStrictExists, FSRead, FSDeleteStrict)
 	global _SpaceHoldInputHook
 	global _MagicKeyEditorInputHook
 	Transition := LifecycleTransitionBegin("suspend")
@@ -716,6 +730,7 @@ Ergopti_OnSuspendEnter() {
 }
 Ergopti_OnSuspendResume() {
 		Transition := LifecycleTransitionBegin("resume")
+		ScriptShortcutPausedChordsEnd(ScriptShortcutPausedChordsPath(), FSStrictExists, FSDeleteStrict)
 		if IsSet(ProgramActions_Stop)
 			_LifecycleRunRequiredStep(Transition, "user-programs", () => ProgramActions_Stop(false), true)
 		LoggerStart("Lifecycle", "Resuming from suspend…")

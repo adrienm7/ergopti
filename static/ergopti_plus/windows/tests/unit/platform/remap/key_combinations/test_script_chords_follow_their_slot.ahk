@@ -171,3 +171,118 @@ Test("script chords: every chord criterion asks its own slot (script-chord-slot-
 
 Test("script chords: released AltGr never admits assigned chords (altgr-physical-eligibility)",
 	_SCFS_CriteriaAskTheSlot.Bind(false))
+
+; The maintainer's decision of 2026-11-14: a chord changed while paused is saved
+; at once and takes effect only on resume. Every Windows chord change reloads,
+; and a reload while paused came back suspended with the new chords at once, so
+; a restore that moved the pause toggle left the paused driver without its way
+; back (paused-chord-change).
+_SCFS_WithPausedChords(Body) {
+	global ScriptShortcutPausedChords, _ScriptShortcutPausedChordsFromReload
+	Saved := ScriptShortcutPausedChords, SavedFlag := _ScriptShortcutPausedChordsFromReload
+	try Body.Call()
+	finally {
+		ScriptShortcutPausedChords := Saved
+		_ScriptShortcutPausedChordsFromReload := SavedFlag
+	}
+}
+
+; Fake file ports over one Map, so the test never touches the disk.
+_SCFS_Files() {
+	Files := Map()
+	return { files: Files,
+		exists: (P) => Files.Has(P),
+		read: (P) => Files.Has(P) ? Files[P] : "",
+		write: (P, T) => (Files[P] := T, true),
+		delete: (P) => (Files.Has(P) ? Files.Delete(P) : 0, true) }
+}
+
+_SCFS_PausedAssignments() {
+	Assignments := _SCFS_Assignments("none")
+	Assignments["script_altgr_enter"] := "script_pause_toggle"
+	return Assignments
+}
+
+_SCFS_MovedAssignments() {
+	Assignments := _SCFS_Assignments("none")
+	Assignments["script_altgr_backspace"] := "script_pause_toggle"
+	return Assignments
+}
+
+global _SCFS_FAKE_CHORDS_PATH := "C:\fake\suspend_restore.chords"
+
+_SCFS_PausedChordsKeepTheResumeChord() {
+	_SCFS_WithPausedChords(_SCFS_PausedChordsAcrossAReload)
+}
+_SCFS_PausedChordsAcrossAReload() {
+	global _ScriptShortcutPausedChordsFromReload
+	Fs := _SCFS_Files()
+	_ScriptShortcutPausedChordsFromReload := false
+	_SCFS_WithAssignments(_SCFS_PausedAssignments(), _SCFS_PauseThenReload.Bind(Fs))
+	; The successor loads the configuration the restore wrote, then replays the pause.
+	_SCFS_WithAssignments(_SCFS_MovedAssignments(), _SCFS_SuccessorKeepsPauseChords.Bind(Fs))
+}
+_SCFS_PauseThenReload(Fs) {
+	ScriptShortcutPausedChordsBegin(_SCFS_FAKE_CHORDS_PATH, Fs.exists, Fs.read, Fs.delete)
+	AssertTrue(ScriptShortcutPausedChordsPersist(_SCFS_FAKE_CHORDS_PATH, Fs.write, Fs.read),
+		"a reload while paused writes the chords of pause time")
+}
+_SCFS_SuccessorKeepsPauseChords(Fs) {
+	global _ScriptShortcutPausedChordsFromReload
+	_ScriptShortcutPausedChordsFromReload := true
+	ScriptShortcutPausedChordsBegin(_SCFS_FAKE_CHORDS_PATH, Fs.exists, Fs.read, Fs.delete)
+	AssertTrue(ScriptShortcutSlotRunsAction("script_altgr_enter", true),
+		"the chord active at pause time still resumes after a reload while paused")
+	AssertFalse(ScriptShortcutSlotRunsAction("script_altgr_backspace", true),
+		"the chord chosen while paused waits for the resume")
+	AssertTrue(ScriptShortcutSlotRunsAction("script_altgr_backspace", false),
+		"the configured chords are the new ones at once")
+	ScriptShortcutPausedChordsEnd(_SCFS_FAKE_CHORDS_PATH, Fs.exists, Fs.delete)
+	AssertFalse(Fs.files.Has(_SCFS_FAKE_CHORDS_PATH), "the resume removes the chords of pause time")
+	AssertTrue(ScriptShortcutSlotRunsAction("script_altgr_backspace", true),
+		"after the resume, the chord chosen while paused answers")
+	AssertFalse(ScriptShortcutSlotRunsAction("script_altgr_enter", true),
+		"after the resume, the old chord is given back")
+}
+Test("script chords: a reload while paused keeps the resume chord of pause time (paused-chord-change)",
+	_SCFS_PausedChordsKeepTheResumeChord)
+
+; A file no reload of this boot carried is stale: an ordinary pause takes the
+; configured chords and removes it.
+_SCFS_StaleFileIsRemoved() {
+	_SCFS_WithPausedChords(_SCFS_StaleFileBody)
+}
+_SCFS_StaleFileBody() {
+	global _ScriptShortcutPausedChordsFromReload
+	Fs := _SCFS_Files()
+	Fs.files[_SCFS_FAKE_CHORDS_PATH] := _SCFS_ChordsText(_SCFS_MovedAssignments())
+	_ScriptShortcutPausedChordsFromReload := false
+	_SCFS_WithAssignments(_SCFS_PausedAssignments(), _SCFS_OrdinaryPause.Bind(Fs))
+}
+_SCFS_OrdinaryPause(Fs) {
+	ScriptShortcutPausedChordsBegin(_SCFS_FAKE_CHORDS_PATH, Fs.exists, Fs.read, Fs.delete)
+	AssertFalse(Fs.files.Has(_SCFS_FAKE_CHORDS_PATH), "an ordinary pause removes a stale file")
+	AssertTrue(ScriptShortcutSlotRunsAction("script_altgr_enter", true),
+		"an ordinary pause answers with the configured chords")
+}
+Test("script chords: an ordinary pause ignores and removes a stale chords file (paused-chord-change)",
+	_SCFS_StaleFileIsRemoved)
+
+; The text of the given assignments with the switch on.
+_SCFS_ChordsText(Assignments) {
+	return ScriptShortcutPausedChordsText(Map("assignments", Assignments, "on", true))
+}
+
+_SCFS_ParseRefusesMalformedChords() {
+	Good := _SCFS_ChordsText(_SCFS_PausedAssignments())
+	Parsed := ScriptShortcutPausedChordsParse(Good)
+	AssertEqual("script_pause_toggle", Parsed["assignments"]["script_altgr_enter"], "the text round-trips")
+	AssertTrue(Parsed["on"], "the switch round-trips")
+	AssertThrows(ScriptShortcutPausedChordsParse.Bind(StrReplace(Good, "chords_enabled=1`n", "")),
+		"a file without its switch is refused")
+	AssertThrows(ScriptShortcutPausedChordsParse.Bind(StrReplace(Good, "script_pause_toggle", "no_such_action")),
+		"an unknown action is refused")
+	AssertThrows(ScriptShortcutPausedChordsParse.Bind(Good . "foreign=1`n"), "an unknown key is refused")
+}
+Test("script chords: the chords of pause time refuse a malformed file (paused-chord-change)",
+	_SCFS_ParseRefusesMalformedChords)
