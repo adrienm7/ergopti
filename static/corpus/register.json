@@ -48,24 +48,6 @@
 			"status": "ship",
 			"note": "README: « MIT License for code. CC-by-sa-4.0 for content. » (fetched 2026-11-14). A word list: the n-grams are those inside words and at word boundaries, with no capitals, punctuation or letter pairs across words. Spoken, dialogue-like register."
 		},
-		"original/code/corpus_johnix_prog.txt": {
-			"title": "Hello World programs in many languages",
-			"source": "« prog » of the bépo corpus by Johnix (a 2004 snapshot of the Hello World Collection)",
-			"url": "https://gitlab.com/wolframroesler/helloworld",
-			"licence": "MIT",
-			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
-			"status": "ship",
-			"note": "The collection's repository (gitlab.com/wolframroesler/helloworld) is MIT, « Copyright (c) 2017 Wolfram Rösler ». This 2004 snapshot predates that grant; rebuilding it from the MIT repository would remove the doubt (to review by the maintainer)."
-		},
-		"original/code/corpus_johnix_prog_epure.txt": {
-			"title": "Hello World programs, punctuation only",
-			"source": "« prog_epure » of the bépo corpus by Johnix (the « prog » file with its letters removed)",
-			"url": "https://gitlab.com/wolframroesler/helloworld",
-			"licence": "MIT",
-			"attribution": "Hello World Collection, © 2017 Wolfram Rösler and its contributors",
-			"status": "ship",
-			"note": "Derived from corpus_johnix_prog.txt; same terms."
-		},
 		"original/code/lodash_4.17.21.js.txt": {
 			"title": "JavaScript: lodash 4.17.21",
 			"source": "lodash/lodash, tag 4.17.21, lodash.js",

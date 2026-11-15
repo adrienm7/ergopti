@@ -38,20 +38,6 @@
 			"restore_dead_key_pairs": false
 		},
 		{
-			"id": "code_hello_world",
-			"title": "Hello World programs in many languages",
-			"language": "code",
-			"file": "static/corpus/original/code/corpus_johnix_prog.txt",
-			"restore_dead_key_pairs": false
-		},
-		{
-			"id": "code_punctuation",
-			"title": "Hello World programs, punctuation only",
-			"language": "code",
-			"file": "static/corpus/original/code/corpus_johnix_prog_epure.txt",
-			"restore_dead_key_pairs": false
-		},
-		{
 			"id": "fr_leipzig_news",
 			"title": "Leipzig — French news 2023 (10,000 sentences)",
 			"language": "fr",

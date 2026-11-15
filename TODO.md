@@ -500,7 +500,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       Checked 2026-11-15: done on dev (16e183c748, 0275c9fc9a, e9eaae7998, bf63e361f5, 0c197c6ce8): official and
       custom-fingering scores of eleven analysers in « Comparer » and the « Éditer » panel, with « i » popovers; proof:
       tools/test/test-analyser-scores.cjs, tools/test/test-layout-comparer-page.cjs.
-- [ ] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
+- [x] **Corpora: only what we can rely on (maintainer, 2026-11-14 evening).** Delete from the repository every corpus
       without a clearly compatible, recorded licence, or that could expose the project to a claim; starting from zero
       is acceptable. Deleted by decision: romans.txt, Python for Everybody, Projet GLM, Auxlang_X, the unverified
       KLAnext-style texts, and Johnix mail unless its source page and licence are confirmed. Kept: the public-domain
@@ -511,6 +511,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       (9c862ce3a2, f7b366f6ba, b6deb3d9db, d8d88f3481; test-layout-comparer-page.cjs); static/corpus/frequences_lettres/
       (LdS tables, xlsx, images) has no licence or register entry: delete it or record a licence; and the Johnix « prog
       » file predates its MIT grant: rebuild it from the upstream helloworld repository or accept it.
+      Decided 2026-11-15 (maintainer): delete both. static/corpus/frequences_lettres/ and the two Johnix Hello World
+      files (« prog » and its punctuation-only derivative) are deleted with their register and analysis entries;
+      the frequency tables come back from licensed sources under « Large published frequency tables ».
 - [ ] **More corpora from the internet (maintainer, 2026-11-14 evening).** Rebuild a rich set of built-in corpora under
       compatible licences (public domain, CC0, CC BY, CC BY-SA): French first, then English and the other languages
       Ergopti users type; prose, e-mail and chat-like text, code. Candidates: Wikisource, Project Gutenberg, Wikipedia
