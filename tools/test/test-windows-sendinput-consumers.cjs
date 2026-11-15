@@ -30,7 +30,7 @@ const SITE = /(^|[^_A-Za-z"\\])SendInput\(/;
 
 // Each file and how many direct calls the design note has decided on.
 const DECIDED = {
-	'adapters/text_sender.ahk': 1,
+	'platform/input/text_sender.ahk': 1,
 	'infra/config_io.ahk': 1,
 	'infra/hotstrings/hotstring_send.ahk': 5,
 	'infra/input_probe.ahk': 3

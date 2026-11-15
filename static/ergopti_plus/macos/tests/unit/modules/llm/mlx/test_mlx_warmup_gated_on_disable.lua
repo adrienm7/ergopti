@@ -101,11 +101,11 @@ local SCRIPT_CONTROL_FIXTURE_MODULES = {
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.llm.api_mlx",
@@ -142,7 +142,7 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 		local admission_fence = nil
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 		package.loaded["core.ui.engine.notifications"] = { notify = function() end }
-		package.loaded["infra.keycodes"] = {
+		package.loaded["platform.input.keycodes"] = {
 			F13_KARABINER_RETURN = 106,
 			F14_KARABINER_BACKSPACE = 107,
 			F15_KARABINER_ESCAPE = 108,
@@ -151,11 +151,11 @@ local function exercise_script_control_warmup_transaction(use_exact_owner_api)
 			ESCAPE = 53,
 		}
 		package.loaded["adapters.event_provenance"] = {}
-		package.loaded["adapters.key_state"] = {
+		package.loaded["platform.input.key_state"] = {
 			is_right_altgr_held = function() return false end,
 			describe_held_modifiers = function() return "(none)" end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callback = callback
 				return true
@@ -314,7 +314,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			"modules.llm.api_mlx_discovery", "modules.llm.prediction_engine",
 			"modules.llm", "modules.llm.warmup_controller", "modules.llm.prompt_builder",
 			"modules.llm.streaming_handler", "modules.llm.app_filter", "modules.llm.api_common",
-			"core.ui.ui.tooltip", "modules.keystats", "core.ui.engine.notifications", "infra.keycodes",
+			"core.ui.ui.tooltip", "modules.keystats", "core.ui.engine.notifications", "platform.input.keycodes",
 		}) do
 			saved[name] = package.loaded[name]
 		end
@@ -419,7 +419,7 @@ helpers.describe("M-3: set_llm_enabled(false) stops the api_mlx self-retry chain
 			MIN_CALL_INTERVAL_SEC = 0.5,
 			get_retry_policy = function() return 2, 0.18, 5 end,
 		}
-		package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+		package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 		package.loaded["core.ui.ui.tooltip"] = {
 			set_navigate_callback = function(_) end, set_enter_validates = function(_) end,
 			set_chain_start = function(_) return true end, mark_chain_complete = function() return true end,

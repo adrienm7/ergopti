@@ -19,7 +19,7 @@ local NAMES = { [0x61] = "a", [0x41] = "A", [0xfe51] = "dead_acute", [0x10020ac]
 --- @return table parser
 local function parser(bound)
 	package.loaded["infra.xkb_keymap"] = nil
-	local Keysym = require("infra.keysym")
+	local Keysym = require("platform.input.keysym")
 	Keysym._set_xkb_for_test(bound and {
 		from_name = function() return nil end,
 		to_utf8 = function() return nil end,
@@ -67,5 +67,5 @@ helpers.describe("xkb keymap: libxkbcommon 1.13 serialization", function()
 	end)
 end)
 
-require("infra.keysym")._set_xkb_for_test(nil)
+require("platform.input.keysym")._set_xkb_for_test(nil)
 package.loaded["infra.xkb_keymap"] = nil

@@ -133,8 +133,8 @@ helpers.describe("private injection failure receipts", function()
 		local clip, restore = stub_clipboard(false)
 		local logger, lines = require("core.logger.engine.shim"), {}
 		local original = logger.error
-		local previous_hook = package.loaded["adapters.keyboard_hook"]
-		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function(reason) lines[#lines + 1] = reason end }
+		local previous_hook = package.loaded["platform.input.keyboard_hook"]
+		package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function(reason) lines[#lines + 1] = reason end }
 		logger.error = function(_, format, ...) lines[#lines + 1] = string.format(format, ...) end
 		local ok, err = pcall(function()
 			local channel = fake_channel(true)
@@ -149,7 +149,7 @@ helpers.describe("private injection failure receipts", function()
 			helpers.assert_true(not table.concat(lines, "\n"):find("secret-canary", 1, true))
 		end)
 		logger.error = original
-		package.loaded["adapters.keyboard_hook"] = previous_hook
+		package.loaded["platform.input.keyboard_hook"] = previous_hook
 		restore()
 		if not ok then error(err, 0) end
 	end)
@@ -227,8 +227,8 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 		if not ok then error(why, 0) end
 	end)
 	helpers.it("(injection-fields-preflight) keeps later clipboard failure distinct from backend availability", function()
-		local previous_hook = package.loaded["adapters.keyboard_hook"]
-		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+		local previous_hook = package.loaded["platform.input.keyboard_hook"]
+		package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function() end }
 		local clip, restore = stub_clipboard(false)
 		clip.is_available = function() return true end
 		local ok, why = pcall(function()
@@ -238,7 +238,7 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 			helpers.assert_eq(result.cleanup_ok, true)
 			-- No rollback of earlier fields or Tab is promised once a route fails at delivery.
 		end)
-		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		restore(); package.loaded["platform.input.keyboard_hook"] = previous_hook
 		if not ok then error(why, 0) end
 	end)
 	for _, invalid in ipairs({ "second-type", "hole", "metatable" }) do
@@ -299,9 +299,9 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 	end
 	for _, mode in ipairs({ "unavailable", "native", "mutated-values" }) do
 		helpers.it("(injection-fields-preflight) " .. mode .. " retains the whole multi-field intent", function()
-			local previous_hook = package.loaded["adapters.keyboard_hook"]
+			local previous_hook = package.loaded["platform.input.keyboard_hook"]
 			local stopped = 0
-			package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
+			package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
 			local clip, restore = stub_clipboard(false)
 			local ch, documents, active, planned = fake_channel(true), { "btw", "" }, 1, {}
 			local values = { "seor", mode == "unavailable" and "señor" or "or" }
@@ -341,7 +341,7 @@ helpers.describe("injector: the complete field set is prepared before erasure", 
 				end
 				helpers.assert_eq(result.cleanup_ok, true)
 			end)
-			restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+			restore(); package.loaded["platform.input.keyboard_hook"] = previous_hook
 			if not ok then error(why, 0) end
 		end)
 	end
@@ -411,9 +411,9 @@ helpers.describe("injector: a key typed in place of another is key presses or no
 
 	helpers.it("(magic-key-source) refuses an untypable character without sending or pasting anything", function()
 		local clip, restore = stub_clipboard(true)
-		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		local previous_hook = package.loaded["platform.input.keyboard_hook"]
 		local stops = {}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			emergency_stop = function(reason) stops[#stops + 1] = reason end,
 		}
 		local ch = fake_channel(true)
@@ -438,7 +438,7 @@ helpers.describe("injector: a key typed in place of another is key presses or no
 			helpers.assert_eq(#stops, 0)
 		end)
 		restore()
-		package.loaded["adapters.keyboard_hook"] = previous_hook
+		package.loaded["platform.input.keyboard_hook"] = previous_hook
 		if not ok then error(err, 0) end
 	end)
 
@@ -457,8 +457,8 @@ end)
 helpers.describe("injector: an undeliverable replacement is reported, not swallowed", function()
 
 	helpers.it("(injection-route-preflight) does not commit a failed paste just because its backend exists", function()
-		local previous_hook = package.loaded["adapters.keyboard_hook"]
-		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+		local previous_hook = package.loaded["platform.input.keyboard_hook"]
+		package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function() end }
 		local clip, restore = stub_clipboard(false)
 		clip.is_available = function() return true end
 		local ok, why = pcall(function()
@@ -469,7 +469,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 			helpers.assert_eq(result.failed_phase, "replacement preflight",
 				"actual clipboard preparation now precedes erasure")
 		end)
-		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		restore(); package.loaded["platform.input.keyboard_hook"] = previous_hook
 		if not ok then error(why, 0) end
 	end)
 
@@ -477,13 +477,13 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		local fields = boundary:match("^fields") ~= nil
 		local slug = fields and "(injection-fields-preflight)" or "(injection-route-preflight)"
 		helpers.it(slug .. " retains the original Writer epoch across " .. boundary, function()
-			local Input = require("infra.input_event")
-			local Broker = require("adapters.modifier_broker")
-			local previous_writer = package.loaded["adapters.uinput_writer"]
-			local previous_hook = package.loaded["adapters.keyboard_hook"]
-			package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+			local Input = require("platform.input.event")
+			local Broker = require("platform.input.modifier_broker")
+			local previous_writer = package.loaded["platform.input.uinput_writer"]
+			local previous_hook = package.loaded["platform.input.keyboard_hook"]
+			package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function() end }
 			local path = os.tmpname(); local file = assert(io.open(path, "w")); assert(file:close())
-			local writer, rows = helpers.load_module("adapters.uinput_writer"), {}
+			local writer, rows = helpers.load_module("platform.input.uinput_writer"), {}
 			writer._set_path_for_test(path)
 			writer._set_backend({ open = function() return 7 end, ioctl = function() return true end,
 				close = function() return true end, write = function(_, bytes)
@@ -539,7 +539,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 				helpers.assert_eq(rows, {}, "neither erasure nor replacement reaches the successor Writer")
 			end)
 			assert(injector.close_fast_channel()); writer._reset_backend(); assert(os.remove(path))
-			package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"] = previous_writer, previous_hook
+			package.loaded["platform.input.uinput_writer"], package.loaded["platform.input.keyboard_hook"] = previous_writer, previous_hook
 			if not ok then error(why, 0) end
 		end)
 	end
@@ -576,7 +576,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 		helpers.it("(injection-route-preflight) refuses " .. revoked .. " replacement during route observation", function()
 			local clip, restore = stub_clipboard(true)
 			local ch, successor, observed = fake_channel(true), fake_channel(true), false
-			local previous_hook = package.loaded["adapters.keyboard_hook"]
+			local previous_hook = package.loaded["platform.input.keyboard_hook"]
 			local injector, original_plan, original_current, original_emit, layout_owner
 			local function intervene(layout)
 				observed = true
@@ -599,7 +599,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 				current = function() intervene(layout_owner); return true end,
 				cached = function() return true end,
 			} end
-			if revoked == "held-codes" then package.loaded["adapters.keyboard_hook"] = {
+			if revoked == "held-codes" then package.loaded["platform.input.keyboard_hook"] = {
 				held_text_modifier_codes = function() intervene(layout_owner); return { 42 } end,
 				emergency_stop = function() end,
 			} end
@@ -613,16 +613,16 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 				helpers.assert_eq(#clip.calls, 0, "authority loss is not an untypable-character clipboard fallback")
 			end)
 			layout_owner.plan, layout_owner.plan_current, ch.emit = original_plan, original_current, original_emit
-			package.loaded["adapters.keyboard_hook"] = previous_hook
+			package.loaded["platform.input.keyboard_hook"] = previous_hook
 			restore()
 			if not ok then error(why, 0) end
 		end)
 	end
 
 	helpers.it("(injection-route-preflight) preserves the trigger and grab when no complete replacement route exists", function()
-		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		local previous_hook = package.loaded["platform.input.keyboard_hook"]
 		local stopped = 0
-		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
+		package.loaded["platform.input.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
 		local clip, restore = stub_clipboard(false)
 		local ch, document = fake_channel(true), "btw"
 		local emit = ch.emit
@@ -639,7 +639,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 			helpers.assert_eq(#clip.calls, 0, "an unavailable clipboard is not attempted after erasing")
 			helpers.assert_eq(stopped, 0, "a missing text route cannot disable a healthy grabbed keyboard")
 		end)
-		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		restore(); package.loaded["platform.input.keyboard_hook"] = previous_hook
 		if not ok then error(why, 0) end
 	end)
 

@@ -109,7 +109,7 @@ local function type_through_hook(events, switches, tap_holds, app_id)
 		assert(WordReset.adopt_configuration({ hotstrings = switches }), "the fixture switches must adopt")
 		local engine = fixture_engine()
 		local text, log, seen = {}, {}, {}
-		local kh = helpers.load_module("adapters.keyboard_hook")
+		local kh = helpers.load_module("platform.input.keyboard_hook")
 		if tap_holds then
 			local TapHoldEngine = require("platform.remap.tap_hold_engine")
 			kh.set_remapper(TapHoldEngine.new({ keys = TAP_HOLDS, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000,

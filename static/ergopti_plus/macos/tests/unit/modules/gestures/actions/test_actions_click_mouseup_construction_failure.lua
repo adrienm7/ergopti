@@ -15,7 +15,7 @@ local DEPENDENCIES = {
 	"core.logger.engine.logger",
 	"core.timing.engine.timings",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"diagnostics.engine.reports.error_description",
 	"core.text.engine.number_policy",
@@ -121,7 +121,7 @@ local function with_fixture(failure_mode, body)
 			return nil, "foreign", { events = {} }
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		prepare_mouse_event = function(_, event_type, position, options)
 			local event = hs_stub.eventtap.event.newMouseEvent(event_type, position)
 			if event == nil or event == false then return nil, "newMouseEvent returned nil" end

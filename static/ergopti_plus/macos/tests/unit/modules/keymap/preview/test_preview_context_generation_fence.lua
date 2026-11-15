@@ -17,7 +17,7 @@ local LITERAL_LIFETIME_SEC = 0.01
 --- Runs the scenario while restoring every process-global module mutation.
 local function run_scenario(mode)
 	local dependency_names = {
-		"adapters.synthetic_input",
+		"platform.input.synthetic_input",
 		"core.events.timer_scheduler",
 		"infra.manifest_reader",
 		"modules.hotstrings.hotstrings_config",
@@ -49,7 +49,7 @@ local function run_scenario(mode)
 		star_base = "old",
 	}
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
 	package.loaded["core.events.timer_scheduler"] = {

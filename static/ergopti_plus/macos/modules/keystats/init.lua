@@ -50,9 +50,9 @@ local Metrics        = require("metrics.engine.metrics")
 local TriggerRoi     = require("metrics.engine.privacy.trigger_roi")
 local Watchers       = require("modules.keystats.watchers")
 local ProcessLifecycle = require("core.process.adapters.lifecycle")
-local KeyboardHook   = require("adapters.keyboard_hook")
+local KeyboardHook   = require("platform.input.keyboard_hook")
 local EventProvenance = require("adapters.event_provenance")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local TableUtil = require("core.text.engine.table_util")
 local LOG            = "keystats"
 

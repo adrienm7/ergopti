@@ -2,8 +2,8 @@
 --- Actual detached libxkbcommon + Hook checks within the source gate's Xvfb owner.
 --- Reader/output are private ports: these cases claim no physical input or GUI.
 local Capture = require("adapters.xkb_capture")
-local Hook = require("adapters.keyboard_hook")
-local Reader = require("adapters.evdev_reader")
+local Hook = require("platform.input.keyboard_hook")
+local Reader = require("platform.input.evdev_reader")
 local h = require("tests.helpers")
 local US_MAP = 'xkb_keymap { xkb_keycodes { include "evdev+aliases(qwerty)" }; xkb_types { include "complete" }; xkb_compatibility { include "complete" }; xkb_symbols { include "pc+us+inet(evdev)" }; xkb_geometry { include "pc(pc105)" }; };'
 local function key(code, value) return { type = 1, code = code, value = value } end

@@ -151,8 +151,8 @@ file_name = 'mlx'
 [detection.linux.evdev]
 content = [
 	'EVIOCGRAB',
-	'"adapters\.evdev_reader"',
-	'"adapters\.keyboard_hook"',
+	'"platform\.input\.evdev_reader"',
+	'"platform\.input\.keyboard_hook"',
 	'"modules\.hotstrings\.device_finder"',
 	'"modules\.gestures\.touchpad_finder"',
 ]
@@ -187,7 +187,7 @@ content = [
 "modules/gestures/" = ["gestures.**"]
 
 [detection.linux.evdev.plumbing]
-"adapters/" = "the evdev and uinput adapters the owners call"
+"platform/input/" = "the evdev and uinput adapters the owners call"
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "ui/healthcheck/" = "the health check probes the device access"
 "ui/menu/menu_gestures.lua" = "the gestures menu edits the settings"
@@ -195,7 +195,7 @@ content = [
 "ui/physical_shortcuts/" = "the shortcut editor captures one key combination to store it"
 
 [detection.linux.uinput]
-content = ['/dev/uinput', 'UI_DEV_CREATE', '"adapters\.uinput_writer"', '"modules\.hotstrings\.injector"']
+content = ['/dev/uinput', 'UI_DEV_CREATE', '"platform\.input\.uinput_writer"', '"modules\.hotstrings\.injector"']
 
 [detection.linux.uinput.owners]
 # The layout emulation types its characters through the injector.
@@ -207,6 +207,7 @@ content = ['/dev/uinput', 'UI_DEV_CREATE', '"adapters\.uinput_writer"', '"module
 
 [detection.linux.uinput.plumbing]
 "adapters/" = "the evdev and uinput adapters the owners call"
+"platform/input/" = "the evdev and uinput adapters the owners call"
 "ergopti_hotstrings.lua" = "the daemon entry point that wires the owners"
 "ui/healthcheck/" = "the health check probes the device access"
 

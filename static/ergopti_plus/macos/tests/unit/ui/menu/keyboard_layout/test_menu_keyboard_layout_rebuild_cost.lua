@@ -34,7 +34,7 @@ helpers.describe("Keyboard layout row rebuild cost", function()
 
 	helpers.it("(menu-rebuild-2026-10-31) labels the magic-key candidates from one owner table", function()
 		helpers.with_fresh_modules({ "ui.menu.magic_key_source_menu", "modules.keymap.magic_key_source" }, function()
-			local Geometry = require("adapters.keyboard_geometry")
+			local Geometry = require("platform.input.keyboard_geometry")
 			local Source = require("modules.keymap.magic_key_source")
 			local Menu = require("ui.menu.magic_key_source_menu")
 			local candidates = #Source.resolver().candidates()

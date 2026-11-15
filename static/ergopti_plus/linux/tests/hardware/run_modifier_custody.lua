@@ -9,13 +9,13 @@
 --- This qualifies kernel virtual keyboards, never physical hardware or discovery.
 --- ==============================================================================
 
-local Input = require("infra.input_event")
-local Names = require("infra.device_names")
+local Input = require("platform.input.event")
+local Names = require("platform.input.device_names")
 local Finder = require("modules.hotstrings.device_finder")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
-local Hook = require("adapters.keyboard_hook")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
+local Hook = require("platform.input.keyboard_hook")
 
 -- Match the existing uinput round-trip's node publication bound. This probe runs
 -- before the live daemon/tray host; its existing deadlines remain unchanged.

@@ -15,10 +15,10 @@ local M = {}
 local CAPTURED_STACK = {
 	"modules.keymap.utils",
 	"modules.keymap.terminator_replay",
-	"adapters.text_sender",
+	"platform.input.text_sender",
 	"adapters.clipboard",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 }
 
@@ -35,7 +35,7 @@ function M.load(module_name, hs_overrides)
 		package.loaded[name] = nil
 	end
 	local subject = helpers.load_with_stubs(module_name, hs_overrides)
-	return subject, require("adapters.synthetic_input")
+	return subject, require("platform.input.synthetic_input")
 end
 
 

@@ -3,7 +3,7 @@
 --- Product broker facade. Structural reachability is not native readiness.
 --- Existing previous-window actions retain their direct activation semantics.
 local NativeOwner = require("core.ui.engine.native_app_switcher_owner")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local Scheduler = require("core.events.timer_scheduler")
 local Windows = require("platform.focus.window_manager")
 local M = {}

@@ -20,8 +20,8 @@ local RESET_MODULES = {
 	"modules.keystats.timestamp",
 	"modules.keystats.context_tracker", "modules.keystats.kc_bridge",
 	"modules.keystats.watchers", "core.process.adapters.lifecycle",
-	"adapters.keyboard_hook", "adapters.event_provenance",
-	"adapters.synthetic_input", "adapters.input_source_broker",
+	"platform.input.keyboard_hook", "adapters.event_provenance",
+	"platform.input.synthetic_input", "adapters.input_source_broker",
 	"core.logger.engine.logger", "core.timing.engine.timings",
 	"infra.manifest_reader", "core.i18n.engine.i18n", "core.ui.engine.dialog_util",
 	"metrics.engine.metrics", "modules.keymap",
@@ -212,7 +212,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["platform.input.synthetic_input"] = synthetic_stub
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
@@ -224,7 +224,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 	}
 
 	local handle_key = nil
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
 			return true
@@ -353,7 +353,7 @@ local function load_fixture()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["platform.input.synthetic_input"] = synthetic_stub
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
@@ -373,7 +373,7 @@ local function load_fixture()
 	}
 
 	local handle_key = nil
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(options)
 			if options and options.onEvent then handle_key = options.onEvent end
 			return true

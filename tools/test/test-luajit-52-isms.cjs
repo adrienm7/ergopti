@@ -65,7 +65,7 @@ const FORBIDDEN = [
 	{
 		pattern: /\bstring\.pack\s*\(|\bstring\.unpack\s*\(/g,
 		name: 'string.pack / string.unpack',
-		instead: "infra/input_event.lua's byte helpers, which exist for exactly this"
+		instead: "platform/input/event.lua's byte helpers, which exist for exactly this"
 	},
 	{
 		// Not nil but worse: LuaJIT's math.atan takes one argument and drops the

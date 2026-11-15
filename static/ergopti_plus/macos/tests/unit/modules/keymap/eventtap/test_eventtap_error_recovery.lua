@@ -17,7 +17,7 @@
 local helpers = require("tests.helpers")
 
 local RESET_MODULES = {
-	"adapters.event_provenance", "adapters.synthetic_input",
+	"adapters.event_provenance", "platform.input.synthetic_input",
 	"core.logger.engine.logger", "core.text.engine.utils",
 	"modules.hotstrings.hotstrings_config", "modules.keystats",
 	"modules.keymap", "modules.keymap.init", "modules.keymap.expander",

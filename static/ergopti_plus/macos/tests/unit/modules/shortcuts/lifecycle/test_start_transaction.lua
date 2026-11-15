@@ -58,7 +58,7 @@ local function load_subject(controls)
 		stop = stop_child("script_control"),
 		is_paused = function() return false end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		set_delivery_guard = function() return true end,
 	}
 	package.loaded["core.lifecycle.engine.startup_transaction"] = nil

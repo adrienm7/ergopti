@@ -31,12 +31,12 @@ local Fakes = helpers.load_module("tests.fakes")
 local function press(combo)
 	local writer = Fakes.uinput_writer()
 	writer.open()
-	package.loaded["adapters.uinput_writer"] = writer
+	package.loaded["platform.input.uinput_writer"] = writer
 
 	local Emitter = helpers.load_module("modules.gestures.combo_emitter")
 	local ok = Emitter.press(combo)
 
-	package.loaded["adapters.uinput_writer"] = nil
+	package.loaded["platform.input.uinput_writer"] = nil
 	return writer.events, ok
 end
 
@@ -111,10 +111,10 @@ helpers.describe("combo press: when it must not write", function()
 
 	helpers.it("writes nothing when the device is not open", function()
 		local writer = Fakes.uinput_writer()
-		package.loaded["adapters.uinput_writer"] = writer
+		package.loaded["platform.input.uinput_writer"] = writer
 		local Emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local ok = Emitter.press("ctrl+Right")
-		package.loaded["adapters.uinput_writer"] = nil
+		package.loaded["platform.input.uinput_writer"] = nil
 
 		helpers.assert_true(not ok, "a closed device must refuse")
 		helpers.assert_eq(#writer.events, 0,
@@ -126,8 +126,8 @@ helpers.describe("combo press: when it must not write", function()
 		for _, throws in ipairs({ false, true }) do
 			for fail_at = 1, 4 do
 				local events, held = {}, {}
-				local previous_writer = package.loaded["adapters.uinput_writer"]
-				package.loaded["adapters.uinput_writer"] = {
+				local previous_writer = package.loaded["platform.input.uinput_writer"]
+				package.loaded["platform.input.uinput_writer"] = {
 					is_open = function() return true end,
 					emit = function(code, value)
 						events[#events + 1] = { code = code, value = value }
@@ -141,7 +141,7 @@ helpers.describe("combo press: when it must not write", function()
 				}
 				local Emitter = helpers.load_module("modules.gestures.combo_emitter")
 				local ok = Emitter.press("ctrl+Right")
-				package.loaded["adapters.uinput_writer"] = previous_writer
+				package.loaded["platform.input.uinput_writer"] = previous_writer
 				helpers.assert_true(not ok)
 				helpers.assert_eq(held, {}, "partial chord writes must leave no key held")
 				if fail_at == 2 then
@@ -164,10 +164,10 @@ helpers.describe("combo press: when it must not write", function()
 					return true
 				end,
 			}
-			package.loaded["adapters.uinput_writer"] = writer
+			package.loaded["platform.input.uinput_writer"] = writer
 			local Emitter = helpers.load_module("modules.gestures.combo_emitter")
 			local ok = Emitter.press("ctrl+c")
-			package.loaded["adapters.uinput_writer"] = nil
+			package.loaded["platform.input.uinput_writer"] = nil
 
 			helpers.assert_true(not ok, "event " .. fail_at .. " must reject the chord")
 			helpers.assert_eq(held, {},
@@ -196,9 +196,9 @@ helpers.describe("combo press: a modifier the hand or a hold already has down", 
 			held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return held end,
 		}
-		package.loaded["adapters.keyboard_hook"] = hook
+		package.loaded["platform.input.keyboard_hook"] = hook
 		local ok_press, events, ok = pcall(press, combo)
-		package.loaded["adapters.keyboard_hook"] = nil
+		package.loaded["platform.input.keyboard_hook"] = nil
 		assert(ok_press, events)
 		return events, ok
 	end
@@ -373,17 +373,17 @@ helpers.describe("combo press: foreign carrier modifiers retain their original s
 		end)
 	end)
 	helpers.it("refuses a foreign modifier on a legacy channel without borrowing another source's cleanup rights", function()
-		local saved_writer, saved_hook = package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"]
+		local saved_writer, saved_hook = package.loaded["platform.input.uinput_writer"], package.loaded["platform.input.keyboard_hook"]
 		local saved_combo = package.loaded["modules.gestures.combo_emitter"]
 		local rows = {}
-		package.loaded["adapters.uinput_writer"] = { is_open = function() return true end,
+		package.loaded["platform.input.uinput_writer"] = { is_open = function() return true end,
 			emit = function(code, value) rows[#rows + 1] = { code, value }; return true end }
-		package.loaded["adapters.keyboard_hook"] = { held_text_modifier_codes = function() return { 56 } end,
+		package.loaded["platform.input.keyboard_hook"] = { held_text_modifier_codes = function() return { 56 } end,
 			held_shortcut_modifier_codes = function() return {} end }
 		local called, ok, result = pcall(function()
 			return helpers.load_module("modules.gestures.combo_emitter").press_codes({ 29 }, { 30 }, "unowned carrier")
 		end)
-		package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"] = saved_writer, saved_hook
+		package.loaded["platform.input.uinput_writer"], package.loaded["platform.input.keyboard_hook"] = saved_writer, saved_hook
 		package.loaded["modules.gestures.combo_emitter"] = saved_combo
 		helpers.assert_true(called); helpers.assert_eq(ok, false); helpers.assert_eq(result.kind, "refused")
 		helpers.assert_eq(rows, {}, "no modifier UP or replacement is allowed without an exact original owner")

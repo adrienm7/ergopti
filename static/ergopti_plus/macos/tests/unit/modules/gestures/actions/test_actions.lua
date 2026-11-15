@@ -294,7 +294,7 @@ helpers.describe("gestures.actions: execute helpers do not crash", function()
 	-- win_app_next, which focus windows directly (test_app_switch_direct.lua);
 	-- the windows axis still posts Cmd+`, so its previous direction keeps Shift.
 	helpers.it("uses an explicit Shift modifier for previous-window navigation", function()
-		local SyntheticInput = require("adapters.synthetic_input")
+		local SyntheticInput = require("platform.input.synthetic_input")
 		local original_emit = SyntheticInput.emit_key_stroke
 		local calls = {}
 		SyntheticInput.emit_key_stroke = function(mods, key, delay)
@@ -482,7 +482,7 @@ helpers.describe("gestures.actions: throwing actions are traced via Logger.callb
 
 	helpers.it("logs a native false from the shared keystroke helper", function()
 		local Actions2, FreshLogger = make_actions_with_real_logger_and_throwing_timer()
-		local SyntheticInput = require("adapters.synthetic_input")
+		local SyntheticInput = require("platform.input.synthetic_input")
 		local original_emit = SyntheticInput.emit_key_stroke
 		SyntheticInput.emit_key_stroke = function() return false end
 

@@ -146,7 +146,7 @@ helpers.describe("prediction digit accept: through the keyboard hook", function(
 
 	helpers.it("never lets the accepting digit reach the application", function()
 		with_offer(1, function(engine, state)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted, chars = {}, {}
 			hook._test_drive({
 				{ type = 1, code = 2, value = 1 },
@@ -170,7 +170,7 @@ helpers.describe("prediction digit accept: a digit beyond the offer", function()
 
 	helpers.it("reaches the application through the hook, and keeps the offer", function()
 		with_offer(1, function(engine, state)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted = {}
 			hook._test_drive({
 				{ type = 1, code = 4, value = 1 },

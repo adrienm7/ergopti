@@ -47,7 +47,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 
 	helpers.it("the sibling that was already fixed still restores", function()
 		helpers.with_stub_scope({
-			"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
+			"platform.input.text_sender", "adapters.clipboard", "platform.input.synthetic_input",
 			"core.events.timer_scheduler", "adapters.event_provenance", "core.fs.adapters.storage",
 			"core.fs.adapters.json_codec", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 		}, function()
@@ -73,7 +73,7 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 				clearContents = function() count = count + 1; clipboard = {} end,
 			}
 			local synthetic = f.load()
-			local sender = require("adapters.text_sender")
+			local sender = require("platform.input.text_sender")
 			helpers.assert_eq(sender.send("PRIVATE PAYLOAD", { mode = "clipboard" }, function()
 				notifications = notifications + 1
 			end), false)

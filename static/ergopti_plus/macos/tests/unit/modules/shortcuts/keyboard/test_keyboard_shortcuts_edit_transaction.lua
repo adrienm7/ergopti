@@ -15,7 +15,7 @@ local MODULES = {
 	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
@@ -83,7 +83,7 @@ local function with_subject(initial_action, scenario)
 		return true
 	end
 
-	package.loaded["adapters.hotkey_registrar"] = registrar
+	package.loaded["platform.input.hotkey_registrar"] = registrar
 	package.loaded["core.fs.adapters.file_system"] = {
 		read = function() return '{"keys":[{"id":"a","label":"A"}]}' end,
 	}

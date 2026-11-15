@@ -20,7 +20,7 @@
 ---
 --- WHAT THE THREE LAYERS ARE:
 ---   1. infra/xkb_keymap.lua   — text to (keysym, keycode, level). Pure.
----   2. infra/keysym.lua       — keysym name to character. Pure, plus an
+---   2. platform/input/keysym.lua       — keysym name to character. Pure, plus an
 ---                               optional libxkbcommon path.
 ---   3. this adapter           — the join, the cache, and the refusal to guess.
 --- Each is asserted here through the layer above it, because the seam between

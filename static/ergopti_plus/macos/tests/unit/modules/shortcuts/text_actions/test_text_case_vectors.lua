@@ -78,7 +78,7 @@ local function transformed_by(action_name, selected)
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.fs.engine.paths"] = nil
 	package.loaded["core.timing.engine.timings"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function(_, _, _, tx)
 			helpers.assert_not_nil(tx.publication, "the copy must retain its destination receipt")
 			helpers.assert_eq(tx.publication.cached(), true)

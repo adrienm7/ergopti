@@ -358,7 +358,7 @@ it on real hardware; only the maintainer turns it true.
   carries a Windows platform restriction.
 - Even with the getter true, `PhysicalShortcutsScope.Edit` refuses every
   mapping until a Windows collision owner exists. Key capture is
-  `KHCapturePosition` (`adapters/keyboard_hook.ahk`).
+  `KHCapturePosition` (`platform/input/keyboard_hook.ahk`).
 - Pinned by `tests/unit/ui/physical_shortcuts/test_physical_shortcut_host.ahk`
   on the real chain. Do not turn the getter true, or drop the collision
   refusal, without the maintainer's hardware qualification (TODO.md).

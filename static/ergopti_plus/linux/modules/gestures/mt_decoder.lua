@@ -338,7 +338,7 @@ function M.new(opts)
 
 	--- Feeds one decoded event.
 	---
-	--- @param event table { type, code, value } as infra/input_event.lua decodes it.
+	--- @param event table { type, code, value } as platform/input/event.lua decodes it.
 	--- @return table|nil A completed gesture { fingers, direction, tap, dominant? }, or nil;
 	---   a diagonal carries its dominant straight direction, its unbound slot's fallback.
 	function decoder:feed(event)

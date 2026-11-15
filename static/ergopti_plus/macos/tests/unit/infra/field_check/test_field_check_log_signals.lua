@@ -119,7 +119,7 @@ helpers.describe("field_log_signals: the day log's named lines", function()
 			"2026-11-10 10:00:01:001 [DEBUG] [gestures.engine] Three-finger candidate rejected by tilt: 31.0 deg.",
 			"2026-11-10 10:00:02:001 [DEBUG] [gestures.engine] Three-finger candidate rejected by tilt: 40.0 deg.",
 			"2026-11-10 10:00:03:001 [DEBUG] [gestures.engine] Three-finger candidate rejected by spread: 2.0.",
-			"2026-11-10 10:00:04:001 [WARNING] [adapters.synthetic_input] Synthetic text moved off a held key "
+			"2026-11-10 10:00:04:001 [WARNING] [platform.input.synthetic_input] Synthetic text moved off a held key "
 				.. "(3 byte(s)); its first character would have been lost.",
 			"2026-11-10 10:00:05:001 [DEBUG] [keymap.llm_bridge] User activity (mouseMoved) — pending prediction "
 				.. "cancelled.",

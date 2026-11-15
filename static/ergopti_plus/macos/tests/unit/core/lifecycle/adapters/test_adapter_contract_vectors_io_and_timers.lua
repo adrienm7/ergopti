@@ -314,9 +314,9 @@ helpers.describe("Adapter contract vectors: TextSender", function()
 			return event
 		end
 
-		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
-		local adapter = helpers.load_with_stubs("adapters.text_sender", { eventtap = eventtap })
+		local adapter = helpers.load_with_stubs("platform.input.text_sender", { eventtap = eventtap })
 		local hs_table = _G.hs
 
 		local function drain()

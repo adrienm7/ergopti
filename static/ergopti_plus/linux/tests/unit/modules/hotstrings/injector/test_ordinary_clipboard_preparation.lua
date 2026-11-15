@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
 local names = { "modules.hotstrings.injector", "adapters.clipboard", "modules.hotstrings.output_transaction",
 	"adapters.keyboard_layout", "adapters.xkb_capture", "core.process.adapters.shell_runner", "core.ui.engine.display_server",
-	"core.logger.engine.shim", "adapters.keyboard_hook", "adapters.modifier_broker", "platform.input.modifier_custody", "adapters.uinput_writer" }
+	"core.logger.engine.shim", "platform.input.keyboard_hook", "platform.input.modifier_broker", "platform.input.modifier_custody", "platform.input.uinput_writer" }
 
 local function fixture(options, callback)
 	options = options or {}
@@ -30,7 +30,7 @@ local function fixture(options, callback)
 		shortcut_keycode = function(_, fallback) return fallback end,
 	}
 	package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 		held_forwarded_keys = function() return {} end, emergency_stop = function()
 			world.stops = world.stops + 1
@@ -74,7 +74,7 @@ local function fixture(options, callback)
 		if options.constructor_throws then error("independent transaction constructor exception") end
 		return new_transaction(...)
 	end
-	local Codes = require("infra.evdev_codes")
+	local Codes = require("platform.input.evdev_codes")
 	local channel = { is_open = function() return true end, close = function() record("channel_close"); return true end }
 	function channel.emit(code, value)
 		record("key:" .. code .. ":" .. value)
@@ -91,10 +91,10 @@ local function fixture(options, callback)
 	local Injector = require("modules.hotstrings.injector")
 	local writer, writer_path
 	if options.real_writer then
-		local Input, Broker = require("infra.input_event"), require("adapters.modifier_broker")
+		local Input, Broker = require("platform.input.event"), require("platform.input.modifier_broker")
 		writer_path = os.tmpname()
 		assert(assert(io.open(writer_path, "wb")):close())
-		writer = helpers.load_module("adapters.uinput_writer")
+		writer = helpers.load_module("platform.input.uinput_writer")
 		writer._set_path_for_test(writer_path)
 		writer._set_backend({ open = function() return 7 end, ioctl = function() return true end,
 			close = function() return true end, write = function(_, bytes)

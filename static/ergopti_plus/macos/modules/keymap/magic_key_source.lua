@@ -29,7 +29,7 @@ local Paths      = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local Json       = require("core.text.engine.json")
 local Shared     = require("layouts.engine.layers.magic_key_source")
-local Geometry   = require("adapters.keyboard_geometry")
+local Geometry   = require("platform.input.keyboard_geometry")
 local ConfigKeys = require("settings.engine.keys")
 
 local LOG = "layouts.engine.layers.magic_key_source"

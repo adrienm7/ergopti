@@ -384,14 +384,14 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Runs `body` with a fake open uinput device, a hook holding nothing and
 	--- a layout answering `shortcut_keycode`, and restores all three.
 	local function with_fake_device(shortcut_keycode, body)
-		local names = { "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout",
+		local names = { "platform.input.uinput_writer", "platform.input.keyboard_hook", "adapters.keyboard_layout",
 			"modules.gestures.combo_emitter", "modules.gestures.manager" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local writer = helpers.load_module("tests.fakes").uinput_writer()
 		writer.open()
-		package.loaded["adapters.uinput_writer"] = writer
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.uinput_writer"] = writer
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end,
 			held_shortcut_modifier_codes = function() return {} end,
 		}
@@ -445,10 +445,10 @@ helpers.describe("linux actions: modifier chords", function()
 		Logger.error = function() end
 		-- One unopened device and one manager serve the whole sweep.
 		local writer = helpers.load_module("tests.fakes").uinput_writer()
-		local saved = package.loaded["adapters.uinput_writer"]
+		local saved = package.loaded["platform.input.uinput_writer"]
 		local saved_emitter = package.loaded["modules.gestures.combo_emitter"]
 		local saved_manager = package.loaded["modules.gestures.manager"]
-		package.loaded["adapters.uinput_writer"] = writer
+		package.loaded["platform.input.uinput_writer"] = writer
 		local ok, err = pcall(function()
 			helpers.load_module("modules.gestures.combo_emitter")
 			local Gestures = helpers.load_module("modules.gestures.manager")
@@ -470,7 +470,7 @@ helpers.describe("linux actions: modifier chords", function()
 		end)
 		package.loaded["modules.gestures.combo_emitter"] = saved_emitter
 		package.loaded["modules.gestures.manager"] = saved_manager
-		package.loaded["adapters.uinput_writer"] = saved
+		package.loaded["platform.input.uinput_writer"] = saved
 		Logger.error = real_error
 		if not ok then error(err, 0) end
 	end)
@@ -519,11 +519,11 @@ helpers.describe("linux actions: workspace switch", function()
 		local Display = require("core.ui.engine.display_server")
 		local Shell = require("core.process.adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
-		local saved_writer = package.loaded["adapters.uinput_writer"]
+		local saved_writer = package.loaded["platform.input.uinput_writer"]
 		if not uinput_ok then
 			-- The false branch means a genuinely closed controlled Writer, not a
 			-- failed native send. Admit the issuer only after that actual owner.
-			package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer()
+			package.loaded["platform.input.uinput_writer"] = require("tests.fakes").uinput_writer()
 		end
 		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, switched, commands = {}, {}, {}
@@ -552,7 +552,7 @@ helpers.describe("linux actions: workspace switch", function()
 		Shell._reset_runner()
 		Display._set_for_test(nil, nil)
 		package.loaded["modules.gestures.combo_emitter"] = saved
-		package.loaded["adapters.uinput_writer"] = saved_writer
+		package.loaded["platform.input.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return switched, pressed, commands
 	end
@@ -648,8 +648,8 @@ helpers.describe("linux actions: media and brightness keys", function()
 	--- @return table pressed The combos pressed on the virtual keyboard.
 	local function run(action, tool_ok, uinput_ok)
 		local saved = package.loaded["modules.gestures.combo_emitter"]
-		local saved_writer = package.loaded["adapters.uinput_writer"]
-		if not uinput_ok then package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer() end
+		local saved_writer = package.loaded["platform.input.uinput_writer"]
+		if not uinput_ok then package.loaded["platform.input.uinput_writer"] = require("tests.fakes").uinput_writer() end
 		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, commands = {}, {}
 		package.loaded["modules.gestures.combo_emitter"] = {
@@ -671,7 +671,7 @@ helpers.describe("linux actions: media and brightness keys", function()
 		end)
 		os.execute = real
 		package.loaded["modules.gestures.combo_emitter"] = saved
-		package.loaded["adapters.uinput_writer"] = saved_writer
+		package.loaded["platform.input.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return commands, pressed
 	end

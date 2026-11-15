@@ -21,7 +21,7 @@ local KEYCODE_ESCAPE = 53
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "core.events.timer_scheduler", "core.ui.engine.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
-	"adapters.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
+	"platform.input.keyboard_geometry", "adapters.event_provenance", "modules.shortcuts.script_control",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -103,7 +103,7 @@ local function with_menu(body, faults)
 			world.taps[#world.taps + 1] = tap
 			return tap
 		end
-		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
+		package.loaded["platform.input.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
 		world.keycodes = { map = { [KEYCODE_J] = "j", [KEYCODE_SPACE] = "space" } }
 		local Menu = helpers.load_with_stubs("ui.menu.magic_key_source_menu",
 			{ eventtap = eventtap, keycodes = world.keycodes })

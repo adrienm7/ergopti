@@ -67,7 +67,7 @@ end
 --- the prompt is open while the keyboard is the desktop's.
 --- @param marker string
 local function observe_release(marker)
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	local release = Hook.while_released
 	Hook.while_released = function(fn, opts)
 		local file = assert(io.open(marker, "w"))

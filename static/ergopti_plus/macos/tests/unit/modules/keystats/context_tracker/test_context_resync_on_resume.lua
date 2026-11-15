@@ -56,7 +56,7 @@ helpers.describe("context is re-synchronised on resume", function()
 	helpers.it("picks up a vault while preserving exact event ownership", function()
 		local tracker = helpers.load_with_stubs(
 			"modules.keystats.context_tracker", make_overrides(VAULT_APP))
-		local synthetic_input = require("adapters.synthetic_input")
+		local synthetic_input = require("platform.input.synthetic_input")
 		local provenance = require("adapters.event_provenance")
 		local tagged = provenance_fixture.tagged_key(
 			synthetic_input, "test.resume-context", "replacement", "x")
@@ -106,8 +106,8 @@ helpers.describe("context is re-synchronised on resume", function()
 		local calls = 0
 		local idle_callbacks = {}
 		local admission_fence = nil
-		local saved_synthetic_input = package.loaded["adapters.synthetic_input"]
-		package.loaded["adapters.synthetic_input"] = {
+		local saved_synthetic_input = package.loaded["platform.input.synthetic_input"]
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callbacks[#idle_callbacks + 1] = callback
 				return true
@@ -167,7 +167,7 @@ helpers.describe("context is re-synchronised on resume", function()
 			"resume must refresh context exactly once through the public keystats API")
 		helpers.assert_eq(admission_fence, nil)
 		helpers.assert_eq(exact_fence.active, false)
-		package.loaded["adapters.synthetic_input"] = saved_synthetic_input
+		package.loaded["platform.input.synthetic_input"] = saved_synthetic_input
 		package.loaded["modules.shortcuts.script_control"] = nil
 	end)
 end)

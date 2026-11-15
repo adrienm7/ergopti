@@ -10,7 +10,7 @@ local OWNED = {
 	"core.logger.engine.logger", "core.ui.engine.notifications", "core.i18n.engine.i18n", "infra.ui_restore", "core.text.engine.utils",
 	"core.timing.engine.deferred_work", "infra.preferences", "ui.hotstring_editor", "ui.menu.builder", "ui.menu.hotstring_counter",
 	"ui.menu.menu_paths", "infra.factory_reset_journal", "ui.menu.menu_watchers", "modules.updater",
-	"adapters.tray_menu", "adapters.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "ui.menu.menu_gestures",
+	"adapters.tray_menu", "platform.input.hotkey_registrar", "core.lifecycle.engine.shutdown.termination_coordinator", "ui.menu.menu_gestures",
 	"ui.menu.menu_shortcuts", "ui.menu.menu_keyboard_layout", "ui.menu.menu_hotstrings", "ui.menu.menu_metrics",
 	"ui.menu.menu_tap_holds", "ui.menu.menu_apps", "ui.menu.menu_about", "ui.menu.menu_llm", "infra.personal_shortcuts",
 	"modules.dynamic_hotstrings", "modules.gestures", "modules.keystats.text_cipher", "modules.llm",

@@ -26,8 +26,8 @@
 			"linux": "static/ergopti_plus/linux/core/ui/adapters/graphics_renderer.lua"
 		},
 		"HotkeyRegistrar": {
-			"windows": "static/ergopti_plus/windows/adapters/hotkey_registrar.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/hotkey_registrar.lua"
+			"windows": "static/ergopti_plus/windows/platform/input/hotkey_registrar.ahk",
+			"macos": "static/ergopti_plus/macos/platform/input/hotkey_registrar.lua"
 		},
 		"HttpClient": {
 			"windows": "static/ergopti_plus/windows/core/network/adapters/http_client.ahk",
@@ -35,13 +35,13 @@
 			"linux": "static/ergopti_plus/linux/core/network/adapters/http_client.lua"
 		},
 		"KeyState": {
-			"windows": "static/ergopti_plus/windows/adapters/key_state.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/key_state.lua"
+			"windows": "static/ergopti_plus/windows/platform/input/key_state.ahk",
+			"macos": "static/ergopti_plus/macos/platform/input/key_state.lua"
 		},
 		"KeyboardHook": {
-			"windows": "static/ergopti_plus/windows/adapters/keyboard_hook.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/keyboard_hook.lua",
-			"linux": "static/ergopti_plus/linux/adapters/keyboard_hook.lua"
+			"windows": "static/ergopti_plus/windows/platform/input/keyboard_hook.ahk",
+			"macos": "static/ergopti_plus/macos/platform/input/keyboard_hook.lua",
+			"linux": "static/ergopti_plus/linux/platform/input/keyboard_hook.lua"
 		},
 		"MouseControl": {
 			"windows": "static/ergopti_plus/windows/adapters/mouse_control.ahk",
@@ -72,8 +72,8 @@
 			"linux": "static/ergopti_plus/linux/core/fs/adapters/storage.lua"
 		},
 		"TextSender": {
-			"windows": "static/ergopti_plus/windows/adapters/text_sender.ahk",
-			"macos": "static/ergopti_plus/macos/adapters/text_sender.lua"
+			"windows": "static/ergopti_plus/windows/platform/input/text_sender.ahk",
+			"macos": "static/ergopti_plus/macos/platform/input/text_sender.lua"
 		},
 		"TimerScheduler": {
 			"windows": "static/ergopti_plus/windows/core/events/timer_scheduler.ahk",

@@ -174,7 +174,7 @@ package.loaded["core.i18n.engine.i18n"] = {
 }
 
 -- Stub lib.keycodes.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F16_LLM_CHAIN_SIGNAL = 106,
 }
 
@@ -216,9 +216,9 @@ local function load_real_setting_bridge()
 	local replacements = {
 		["modules.keymap.utils"] = {},
 		["adapters.event_provenance"] = {STATUS_UNREADABLE = "unreadable"},
-		["adapters.synthetic_input"] = {current_action_epoch = function() return 0 end},
+		["platform.input.synthetic_input"] = {current_action_epoch = function() return 0 end},
 		["core.text.engine.utils"] = {},
-		["infra.keycodes"] = {
+		["platform.input.keycodes"] = {
 			ESCAPE = 53,
 			RETURN = 36,
 			F16_LLM_CHAIN_SIGNAL = 106,

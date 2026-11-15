@@ -64,7 +64,7 @@ package.loaded["modules.llm.api_common"] = {
 	get_retry_policy              = function() return 2, 0.18, 5 end,
 }
 package.loaded["core.i18n.engine.i18n"]     = { t = function(k) return k end, get = function(k) return k end }
-package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 -- set_navigate_callback and set_enter_validates are called at module load time.
 package.loaded["core.ui.ui.tooltip"] = {
 	set_navigate_callback = function(_) end,

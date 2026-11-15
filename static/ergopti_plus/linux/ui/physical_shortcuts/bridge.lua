@@ -45,7 +45,7 @@ function M.open(options)
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("core.ui.ui.webview_manager")
 	local Gestures = require("modules.gestures.manager")
-	local Hook = require("adapters.keyboard_hook")
+	local Hook = require("platform.input.keyboard_hook")
 	local capture_position, cancel_position, position_available = rawget(Hook, "capture_position"),
 		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")
 	local current_epoch, page_current = rawget(Manager, "current_epoch"), rawget(Manager, "page_current")
@@ -87,7 +87,7 @@ function M.open(options)
 	-- configuration, which a pause leaves alone (EDD-1, 2026-11-12).
 	local function observation_current()
 		if not current() then return false end
-		return current() and rawequal(package.loaded["adapters.keyboard_hook"], Hook)
+		return current() and rawequal(package.loaded["platform.input.keyboard_hook"], Hook)
 			and rawget(Hook, "capture_position") == capture_position
 			and rawget(Hook, "cancel_position") == cancel_position
 			and rawget(Hook, "position_capture_available") == position_available

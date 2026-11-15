@@ -24,9 +24,9 @@
 ---    waited for: a stalled loop shows as a missing count and a large maximum.
 --- ==============================================================================
 
-local Names = require("infra.device_names")
+local Names = require("platform.input.device_names")
 local Monotonic = require("core.logger.engine.monotonic")
-local EvdevReader = require("adapters.evdev_reader")
+local EvdevReader = require("platform.input.evdev_reader")
 
 local NODE_FILE, CONTROL_FIFO, OUT_DIR = arg[1], arg[2], arg[3]
 assert(NODE_FILE and CONTROL_FIFO and OUT_DIR, "usage: phys_keyboard.lua <node_file> <control_fifo> <out_dir>")

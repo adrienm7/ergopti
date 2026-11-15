@@ -63,10 +63,10 @@ end
 --- @param body function Receives the manager, the config path and the backups list.
 local function with_gestures(body)
 	Sandbox.with_config(GESTURE_SOURCE, function(path)
-		local names = { "modules.gestures.manager", "adapters.evdev_reader", "ui.menu.builder" }
+		local names = { "modules.gestures.manager", "platform.input.evdev_reader", "ui.menu.builder" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
+		package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad", close = function() return true end }
 		local backups = {}
 		local ok, err = pcall(function()
 			local gestures = require("modules.gestures.manager")

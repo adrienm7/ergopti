@@ -43,10 +43,10 @@ local OWNED_MODULES = {
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
 	"core.text.engine.utils",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
-	"adapters.key_state",
+	"platform.input.synthetic_input",
+	"platform.input.key_state",
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
@@ -342,7 +342,7 @@ local function with_fixture(callback)
 			}
 
 			local admission_fence = nil
-			package.loaded["infra.keycodes"] = {
+			package.loaded["platform.input.keycodes"] = {
 				F13_KARABINER_RETURN = 106,
 				F14_KARABINER_BACKSPACE = 107,
 				F15_KARABINER_ESCAPE = 108,
@@ -352,7 +352,7 @@ local function with_fixture(callback)
 				STATUS_UNREADABLE = "unreadable",
 				classify_with_fence = function() return nil, "physical", nil end,
 			}
-			package.loaded["adapters.synthetic_input"] = {
+			package.loaded["platform.input.synthetic_input"] = {
 				when_idle = function(fn) fn() return true end,
 				acquire_admission_fence = function()
 					if admission_fence then return nil end
@@ -367,7 +367,7 @@ local function with_fixture(callback)
 				admission_open = function() return admission_fence == nil end,
 				defer_after_callback = function(_, fn) return fn() == true end,
 			}
-			package.loaded["adapters.key_state"] = {
+			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}

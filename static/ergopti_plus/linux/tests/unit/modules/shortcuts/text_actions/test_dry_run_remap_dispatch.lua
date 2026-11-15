@@ -75,7 +75,7 @@ local function with_remap(route, dry, action, hold, body, revoke)
 				caps_locked = false
 				capture = {
 					is_ready = function() return true end, reset_state = function() caps_locked = false; return true end,
-					modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end,
+					modifier_role = function(code) return require("platform.input.evdev_codes").MODIFIER_OF[code] end,
 					caps_locked = function() return caps_locked end, restore_compose = function() return true end,
 					peek_text = function() return nil end,
 					process = function(code, value) if code == 58 and value == 1 then caps_locked = not caps_locked end end,

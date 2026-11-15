@@ -35,7 +35,7 @@ local Logger   = require("core.logger.engine.shim")
 local Monotonic = require("core.logger.engine.monotonic")
 local Perf = require("core.logger.engine.perf_counters")
 local Timings   = require("core.timing.engine.timings")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 -- Hard requires: the privacy posture must come from the shared manifest, and a
 -- missing filter must fail loudly rather than degrade into "record everything".
 local Manifest      = require("infra.manifest_reader")

@@ -13,9 +13,9 @@
 
 require("core.lifecycle.engine.compat.utf8").install()
 
-local Names = require("infra.device_names")
-local Input = require("infra.input_event")
-local Reader = require("adapters.evdev_reader")
+local Names = require("platform.input.device_names")
+local Input = require("platform.input.event")
+local Reader = require("platform.input.evdev_reader")
 local Finder = require("modules.hotstrings.device_finder")
 local Layout = require("adapters.keyboard_layout")
 local Monotonic = require("core.logger.engine.monotonic")
@@ -79,7 +79,7 @@ local ok, failure = pcall(function()
 	-- The standard finder rejects these synthetic test devices; retain its real
 	-- kernel capability checks and override only the selected test source list.
 	Finder.find_devices = function() return paths, {} end
-	Hook = require("adapters.keyboard_hook")
+	Hook = require("platform.input.keyboard_hook")
 	Hook.start({ intercept = true, onEmitRaw = Injector.emit_key,
 		onChar = function(char) chars[#chars + 1] = char end })
 	assert(Hook.isRunning(), "production Hook refused native source capture")

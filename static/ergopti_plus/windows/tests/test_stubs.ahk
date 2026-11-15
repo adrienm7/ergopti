@@ -616,7 +616,7 @@ SimulateMicrosoftOffice() {
 ; =============================================
 ; =============================================
 
-; Replaces the injectable send primitives from adapters/text_sender.ahk with
+; Replaces the injectable send primitives from platform/input/text_sender.ahk with
 ; no-ops so no real keystroke ever reaches the OS while tests are running.
 ; This mirrors the _SendHook pattern used for hotstring engine tests.
 ; _AHK_SendText and _AHK_SendInput are declared as globals in text_sender.ahk

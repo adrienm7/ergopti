@@ -29,7 +29,7 @@ local function fresh_harness()
 	-- The control owner needs only its deferred diagnostic port in these native
 	-- watcher doubles; callbacks never post synthetic keyboard input here.
 	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
 	-- The broker captures `local hs = hs` at require-time. Reload it only after
@@ -228,14 +228,14 @@ local function fresh_harness()
 		end,
 	}
 
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord, callback)
 			local handle = { chord = chord, callback = callback }
 			h.hotkeys[#h.hotkeys + 1] = handle
 			return "hotkey-" .. tostring(#h.hotkeys)
 		end,
 	}
-	package.loaded["adapters.key_state"] = { set_capslock = function() end }
+	package.loaded["platform.input.key_state"] = { set_capslock = function() end }
 
 	h.current_input_callback = nil
 	h.input_source_set_attempts = 0
@@ -879,9 +879,9 @@ helpers.describe("watchers app-switch teardown is exact and retryable", function
 	helpers.it("(same-name-app-history) tracks distinct bundle identities with the same display name", function()
 		helpers.with_stub_scope({
 			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
-			"adapters.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
-			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "adapters.hotkey_registrar",
-			"adapters.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",
+			"platform.input.synthetic_input", "adapters.input_source_broker", "core.logger.engine.logger",
+			"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.input.hotkey_registrar",
+			"platform.input.key_state", "adapters.mouse_control", "core.process.adapters.task_lifecycle",
 			"platform.remap.ke_paths", "platform.remap.lease_contract", "platform.remap.ke_variables",
 		}, function()
 			local h = fresh_harness()

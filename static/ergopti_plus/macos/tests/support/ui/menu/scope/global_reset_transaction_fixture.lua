@@ -36,7 +36,7 @@ local MODULE_KEYS = {
 	"core.fs.adapters.storage",
 	"adapters.tray_menu",
 	"keyboard.engine.chord",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.lifecycle.engine.shutdown.termination_coordinator",
 	"infra.factory_reset_journal",
 	"ui.menu.recoverable_file_moves",
@@ -394,7 +394,7 @@ local function with_menu_fixture(options, callback)
 		end,
 	}
 	package.loaded["keyboard.engine.chord"] = { format = function() return "ctrl+x" end }
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function() return {} end,
 		setEnabled = function() return true end,
 		unbind = function() return true end,

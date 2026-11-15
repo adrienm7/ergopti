@@ -26,10 +26,10 @@ local OWNERS = {
 	"modules.keystats.watchers",
 	"modules.keystats.timestamp",
 	"modules.keystats.physical_accounting_mode",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"adapters.event_provenance",
 	"core.process.adapters.lifecycle",
-	"adapters.keyboard_hook",
+	"platform.input.keyboard_hook",
 	"adapters.input_source_broker",
 	"core.fs.adapters.storage",
 	"core.events.timer_scheduler",
@@ -50,7 +50,7 @@ local OWNERS = {
 	"core.ui.engine.notifications",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"infra.script_chord_catalogue",
 	"keyboard.engine.layers.script_chords",
 	"modules.llm.api_mlx",
@@ -69,16 +69,16 @@ local OWNERS = {
 	"core.text.engine.toml_codec.record_scanner",
 	"core.logger.engine.shim",
 	"platform.input.keycodes.core",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.text.engine.json",
 	-- Optional keymap startup imports survive a rejected parent construction.
 	"adapters.clipboard",
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
-	"adapters.keyboard_geometry",
+	"platform.input.keyboard_geometry",
 	"core.process.adapters.shell_runner",
 	"core.process.adapters.task_environment",
-	"adapters.text_sender",
+	"platform.input.text_sender",
 	"core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8",
 	"core.lifecycle.engine.core.ollama_runtime_choice",
@@ -242,7 +242,7 @@ function M.with_runtime(callback)
 			package.loaded["core.ui.engine.notifications"] = { notify = function(message) notices[#notices + 1] = message end }
 			package.loaded["modules.gestures.engine"] = {}
 			package.loaded["modules.gestures.actions"] = { SG_NAMES = {}, get_label = function(value) return value end }
-			package.loaded["adapters.key_state"] = {}
+			package.loaded["platform.input.key_state"] = {}
 			package.loaded["infra.script_chord_catalogue"] = {}
 			local function yes() return true end
 			for _, name in ipairs({ "modules.llm.api_mlx", "modules.llm.api_ollama", "modules.llm.api_remote", "modules.llm.warmup_controller" }) do
@@ -262,7 +262,7 @@ function M.with_runtime(callback)
 				has_bindings_pause_debt = function() return false end, pause_bindings = yes, release_bindings_pause_claim = yes }
 			local gestures = { is_enabled = function() return false end, suspend = yes, resume = yes }
 			assert(control.start(keymap, shortcuts, gestures, nil) == true, "Real script-control tap/watchdog startup must commit")
-			local keyboard_hook = assert(package.loaded["adapters.keyboard_hook"])
+			local keyboard_hook = assert(package.loaded["platform.input.keyboard_hook"])
 			keyboard_hook.start = function(options) obs.handle_key = options.onEvent; return true end
 			assert(fixture.start(control) == true)
 			local function upvalue(fn, wanted)

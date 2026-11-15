@@ -15,9 +15,9 @@ local RESET_MODULES = {
 	"modules.keymap", "modules.keymap.init", "modules.keymap.registry",
 	"modules.keymap.expander", "modules.keymap.llm_bridge", "modules.keymap.state",
 	"modules.keymap.terminator_replay", "modules.keymap.utils",
-	"adapters.synthetic_input", "adapters.event_provenance",
+	"platform.input.synthetic_input", "adapters.event_provenance",
 	"core.logger.engine.logger", "core.logger.engine.perf",
-	"infra.hotpath_profiler", "infra.manifest_reader", "infra.keycodes",
+	"infra.hotpath_profiler", "infra.manifest_reader", "platform.input.keycodes",
 }
 
 
@@ -93,7 +93,7 @@ local function load_fixture()
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = synthetic_stub
+	package.loaded["platform.input.synthetic_input"] = synthetic_stub
 	package.loaded["adapters.event_provenance"] = {
 		STATUS_OWNED = "owned",
 		STATUS_FOREIGN = "foreign",
@@ -225,7 +225,7 @@ local function load_fixture()
 			return false
 		end,
 	}
-	package.loaded["infra.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
+	package.loaded["platform.input.keycodes"] = { ESCAPE = 53, BACKSPACE = 51, RETURN = 36 }
 
 	local keymap = require("modules.keymap.init")
 	keymap.start()

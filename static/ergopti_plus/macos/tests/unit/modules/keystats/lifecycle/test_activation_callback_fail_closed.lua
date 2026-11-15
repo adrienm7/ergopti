@@ -57,7 +57,7 @@ local function load_keystats(options)
 	}
 
 	package.loaded["modules.keystats.init"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 	package.loaded["modules.keymap"] = {}
 
@@ -177,7 +177,7 @@ local function load_keystats(options)
 			return results[ctx.process_stop_calls] ~= false
 		end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(start_options)
 			ctx.keyboard_start_calls = ctx.keyboard_start_calls + 1
 			if type(start_options) == "table" then

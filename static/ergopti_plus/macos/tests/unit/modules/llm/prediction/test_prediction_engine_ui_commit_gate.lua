@@ -77,7 +77,7 @@ local function load_fixture(loading_result, options)
 		end,
 	}
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-	package.loaded["infra.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
+	package.loaded["platform.input.keycodes"] = { F16_LLM_CHAIN_SIGNAL = 106 }
 	package.loaded["core.events.timer_scheduler"] = PortFakes.timer_scheduler({
 		after = function(_delay, callback)
 			return { timer = { stop = function() end }, callback = callback }, true

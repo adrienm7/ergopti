@@ -14,8 +14,8 @@ local Fixture = require("tests.support.modifier_broker_fixture")
 --- @param mode string Ordinary, one-field or multiple-field entry point.
 --- @param change string Native writer replacement or broker replacement.
 local function scenario(mode, change)
-	local names = { "modules.hotstrings.device_finder", "adapters.evdev_reader", "adapters.uinput_writer",
-		"adapters.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector", "core.logger.engine.shim" }
+	local names = { "modules.hotstrings.device_finder", "platform.input.evdev_reader", "platform.input.uinput_writer",
+		"platform.input.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector", "core.logger.engine.shim" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local injector, successor, writer
 	local called, failure = pcall(function()
@@ -24,7 +24,7 @@ local function scenario(mode, change)
 		package.loaded["core.logger.engine.shim"] = logger
 		Fixture.with_session(nil, function(session)
 			writer = session.writer
-			local Broker = require("adapters.modifier_broker")
+			local Broker = require("platform.input.modifier_broker")
 			local original = assert(Broker.for_channel(writer))
 			local saved_xkb = package.loaded["adapters.xkb_capture"]
 			package.loaded["adapters.xkb_capture"] = { caps_locked = function() return false end }

@@ -172,10 +172,10 @@ const TESTS_DIR = path.resolve(__dirname, '../../static/ergopti_plus/windows/tes
 assert.deepEqual(unreachedSessionFixtures(TESTS_DIR), []);
 const fixtures = readFixtures(TESTS_DIR);
 for (const file of [
-	'unit/adapters/input/test_clipboard_restore_debt_cas.ahk',
-	'unit/adapters/input/test_suppressive_capture_settlement.ahk',
-	'unit/adapters/input/test_plain_native_cas_owner.ahk',
-	'unit/adapters/input/test_clipboardall_external_lock.ahk',
+	'unit/platform/input/test_clipboard_restore_debt_cas.ahk',
+	'unit/platform/input/test_suppressive_capture_settlement.ahk',
+	'unit/platform/input/test_plain_native_cas_owner.ahk',
+	'unit/platform/input/test_clipboardall_external_lock.ahk',
 	'unit/infra/input_probe/test_input_probe_rival_owner.ahk',
 	'unit/infra/input_probe/test_input_probe_entry_owner.ahk',
 	'unit/core/ui/tooltip/test_hostile_native64.ahk',

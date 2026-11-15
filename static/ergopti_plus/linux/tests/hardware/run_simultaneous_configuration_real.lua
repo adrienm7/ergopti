@@ -38,12 +38,12 @@ for _, directory in ipairs({".config", ".config/ergopti", ".data", ".state", ".c
 end
 
 -- Cold Hook pins the genuine Reader before observation/classification callbacks.
-local Hook = require("adapters.keyboard_hook")
-local Reader = require("adapters.evdev_reader")
-local Writer = require("adapters.uinput_writer")
-local Broker = require("adapters.modifier_broker")
+local Hook = require("platform.input.keyboard_hook")
+local Reader = require("platform.input.evdev_reader")
+local Writer = require("platform.input.uinput_writer")
+local Broker = require("platform.input.modifier_broker")
 local Finder = require("modules.hotstrings.device_finder")
-local Names = require("infra.device_names")
+local Names = require("platform.input.device_names")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
 local Manager = require("platform.remap.tap_hold_manager")

@@ -30,7 +30,7 @@ local function boot(outcomes)
 	package.loaded["ui.personal_info_editor"] = {}
 
 	local record = { attempts = {}, synthetic = {} }
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		emit_key_stroke = function(modifiers, value, delay)
 			record.synthetic[#record.synthetic + 1] = {
 				kind = "stroke", modifiers = modifiers, value = value, delay = delay,

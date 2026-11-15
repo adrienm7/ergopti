@@ -245,7 +245,7 @@ end
 --- The keyboard state at this instant, and the remapping engine's phase.
 --- @return table
 function H.collect_input()
-	local KeyState = require("adapters.key_state")
+	local KeyState = require("platform.input.key_state")
 	local input = {
 		paused    = read("the pause state", function()
 			return require("modules.shortcuts.script_control").is_paused() == true

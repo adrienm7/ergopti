@@ -15,9 +15,9 @@ local hs = hs
 local Logger = require("core.logger.engine.logger")
 local EventProvenance = require("adapters.event_provenance")
 local ControlSentinels = require("modules.keymap.control_sentinels")
-local KeyState = require("adapters.key_state")
-local SyntheticInput = require("adapters.synthetic_input")
-local Keycodes = require("infra.keycodes")
+local KeyState = require("platform.input.key_state")
+local SyntheticInput = require("platform.input.synthetic_input")
+local Keycodes = require("platform.input.keycodes")
 local LOG = "tooltip_llm"
 
 local Config = require("core.ui.ui.tooltip.config")

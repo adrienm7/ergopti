@@ -10,8 +10,8 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.modifier_broker_fixture")
 
 local function with_stage(body)
-	local names = { "modules.hotstrings.device_finder", "adapters.evdev_reader", "adapters.uinput_writer",
-		"adapters.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector",
+	local names = { "modules.hotstrings.device_finder", "platform.input.evdev_reader", "platform.input.uinput_writer",
+		"platform.input.keyboard_hook", "adapters.xkb_capture", "adapters.keyboard_layout", "modules.hotstrings.injector",
 		"modules.hotstrings.selected_output" }
 	local previous, stage, injector = {}, nil, nil
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -41,7 +41,7 @@ helpers.describe("selected output retains its original native custody", function
 		with_stage(function(session, stage)
 			helpers.assert_true(stage.prepare())
 			helpers.assert_true(stage.payload().ok)
-			local broker = assert(require("adapters.modifier_broker").for_channel(session.writer))
+			local broker = assert(require("platform.input.modifier_broker").for_channel(session.writer))
 			helpers.assert_true(broker.output_current(), "the payload transaction must finish before the async probe")
 			helpers.assert_true(stage.reselect().ok)
 			helpers.assert_eq(session.view().down, {})
@@ -82,7 +82,7 @@ helpers.describe("selected output retains its original native custody", function
 		with_stage(function(session, stage)
 			helpers.assert_true(stage.prepare())
 			helpers.assert_true(stage.payload().ok)
-			local broker = require("adapters.modifier_broker")
+			local broker = require("platform.input.modifier_broker")
 			broker.detach(session.writer)
 			helpers.assert_true(broker.attach(session.writer) ~= nil)
 			local count = #session.rows

@@ -27,7 +27,7 @@
 
 local M = {}
 
-local Keycodes  = require("infra.keycodes")
+local Keycodes  = require("platform.input.keycodes")
 local Catalogue = require("infra.script_chord_catalogue")
 -- The shared keycode registry: each slot's sentinel constant and its number.
 -- infra.keycodes only adds the Karabiner name of a code (to_name).

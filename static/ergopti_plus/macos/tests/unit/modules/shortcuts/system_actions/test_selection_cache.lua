@@ -25,11 +25,11 @@ helpers.describe("shortcuts.actions.system: bind_wrap_text_if_selected AX cache 
 	local function make_sys_with_ax_spy(selection, wrap_action)
 		if selection == nil then selection = "selected text" end
 		if selection == "" then selection = nil end
-		package.loaded["infra.keycodes"] = nil
+		package.loaded["platform.input.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 		package.loaded["modules.shortcuts.actions.text"]   = nil
-		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 
 		local ax_call_count = 0

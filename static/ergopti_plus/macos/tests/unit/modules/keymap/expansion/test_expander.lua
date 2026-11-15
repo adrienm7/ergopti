@@ -385,7 +385,7 @@ helpers.describe("keymap.expander: perform_text_replacement", function()
 
 	helpers.it("paces the collected delete prefix for terminal TUI inputs (terminal-stale-render)", function()
 		local E, SyntheticInput = SyntheticStack.load("modules.keymap.expander")
-		local TextSender = require("adapters.text_sender")
+		local TextSender = require("platform.input.text_sender")
 		local target = { bundle = "com.apple.Terminal" }
 		local target_calls = 0
 		local paced = nil

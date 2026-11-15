@@ -50,7 +50,7 @@ helpers.describe("Adapter contract vectors: KeyboardHook", function()
 	-- Override hs.eventtap.new to return a stub with the full tap API surface,
 	-- including isEnabled() which keyboard_hook.lua calls in isRunning() and stop().
 	local tap_running = false
-	local adapter = helpers.load_with_stubs("adapters.keyboard_hook", {
+	local adapter = helpers.load_with_stubs("platform.input.keyboard_hook", {
 		eventtap = {
 			new = function(_types, _fn)
 				return {
@@ -372,7 +372,7 @@ end)
 
 -- KeyState vectors (KeyState.spec.js). Read-only modifier/key state queries.
 helpers.describe("Adapter contract vectors: KeyState", function()
-	local adapter = helpers.load_with_stubs("adapters.key_state")
+	local adapter = helpers.load_with_stubs("platform.input.key_state")
 
 	helpers.it("isDown returns false for an unknown key (is_down_unknown_key_returns_false)", function()
 		helpers.assert_eq(false, adapter.isDown("ERGOPTI_NONEXISTENT_KEY_XYZ"), "isDown(unknown) must be false")

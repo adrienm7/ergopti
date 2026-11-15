@@ -16,7 +16,7 @@ local fire_post_callback_actions = fixture.fire_post_callback_actions
 helpers.describe("shortcuts.actions.system: keep_awake persistent alert", function()
 	-- Builds a fresh module instance with spied alert + timer stubs.
 	local function make_sys_with_alert_spy()
-		package.loaded["infra.keycodes"] = nil
+		package.loaded["platform.input.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
 
@@ -49,7 +49,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 
 	helpers.it("closes the banner on manual toggle OFF", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 
@@ -72,7 +72,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 
 	helpers.it("closes the banner on stop_awake", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 
@@ -99,7 +99,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- reach closeAll, which is a screen-wide sweep.
 	helpers.it("closes only its own alert when an id was captured (never closeAll)", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 
@@ -130,7 +130,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- auto-deactivation — the ID was nil so nothing was ever closed.
 	helpers.it("calls closeAll even when hs.alert.show returned nil (no ID captured)", function()
 		with_fixture(function()
-			package.loaded["infra.keycodes"] = nil
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 
@@ -156,10 +156,10 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 	-- we can step past the activation grace window. Returns the module, a mutable
 	-- clock, a closeAll counter, and the captured callback holder.
 	local function activate_with_watcher()
-		package.loaded["infra.keycodes"] = nil
+		package.loaded["platform.input.keycodes"] = nil
 		package.loaded["modules.shortcuts.actions.system"] = nil
 		package.loaded["core.events.timer_scheduler"] = nil
-		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
 		package.loaded["adapters.event_provenance"] = nil
 		local sys = load_system()
 		local hs  = _G.hs
@@ -186,7 +186,7 @@ helpers.describe("shortcuts.actions.system: keep_awake persistent alert", functi
 		end
 
 		sys.toggle_awake()   -- ON → builds and "starts" the watcher, capturing its callback
-		return sys, clock, close_all, captured, require("adapters.synthetic_input")
+		return sys, clock, close_all, captured, require("platform.input.synthetic_input")
 	end
 
 	-- A fake CGEvent of an arbitrary type that is neither keyDown nor mouseMoved,
@@ -249,11 +249,11 @@ local function fake_activity_event()
 
 	helpers.it("_emit_activity_keystroke pumps one tagged F18 pair without advancing the action epoch (keep-awake-non-action)", function()
 		with_fixture(function()
-			local F18 = require("infra.keycodes").F18_WAKE_OS
-			package.loaded["infra.keycodes"] = nil
+			local F18 = require("platform.input.keycodes").F18_WAKE_OS
+			package.loaded["platform.input.keycodes"] = nil
 			package.loaded["modules.shortcuts.actions.system"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
-			package.loaded["adapters.synthetic_input"] = nil
+			package.loaded["platform.input.synthetic_input"] = nil
 			package.loaded["adapters.event_provenance"] = nil
 
 			-- Drive the production adapter all the way through its deferred Quartz
@@ -287,7 +287,7 @@ local function fake_activity_event()
 			})
 			local hs = _G.hs
 
-			local synthetic = require("adapters.synthetic_input")
+			local synthetic = require("platform.input.synthetic_input")
 			local provenance = require("adapters.event_provenance")
 			local epoch_before = synthetic.current_action_epoch()
 
@@ -339,14 +339,14 @@ local function fake_activity_event()
 
 			-- Do not leak an adapter captured against this test's hs table into later
 			-- system-action fixtures, which intentionally install partial hs overrides.
-			package.loaded["adapters.synthetic_input"] = nil
+			package.loaded["platform.input.synthetic_input"] = nil
 			package.loaded["adapters.event_provenance"] = nil
 		end)
 	end)
 
 	helpers.it("watcher ignores only an exactly tagged F18 and treats physical F18 as user activity (keep-awake-exact-provenance)", function()
 		with_fixture(function()
-			local F18 = require("infra.keycodes").F18_WAKE_OS
+			local F18 = require("platform.input.keycodes").F18_WAKE_OS
 			local _sys, clock, close_all, captured, synthetic = activate_with_watcher()
 			clock.now = clock.now + 100   -- past the activation grace window
 

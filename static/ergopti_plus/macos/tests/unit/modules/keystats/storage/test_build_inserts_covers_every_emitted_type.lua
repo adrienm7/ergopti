@@ -122,7 +122,7 @@ local function load_real_keystats()
 		subscribe = function() return true end,
 		unsubscribe = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function() return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,

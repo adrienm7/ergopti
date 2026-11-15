@@ -32,7 +32,7 @@ helpers.describe("keyboard shortcuts: idle stop guard", function()
 		logger.success = function() successes = successes + 1 end
 
 		package.loaded["core.logger.engine.logger"] = logger
-		package.loaded["adapters.hotkey_registrar"] = {
+		package.loaded["platform.input.hotkey_registrar"] = {
 			bind = function() return nil end,
 			unbind = function() return true end,
 		}

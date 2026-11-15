@@ -284,7 +284,7 @@ _LRPE_ChildSource() {
 	At := RegExMatch(Source, Pattern, &Criterion)
 	AssertTrue(At > 0, "the actual static edge criterion must be found")
 	AssertEqual(0, RegExMatch(Source, Pattern, , At + Criterion.Len), "the edge cohort must have one real static criterion")
-	Extra := "#Include " . _DriverDir . "\adapters\key_state.ahk`n"
+	Extra := "#Include " . _DriverDir . "\platform\input\key_state.ahk`n"
 	Extra .= "#Include " . _SharedDir . "\settings\data\features\number_row_policy.ahk`n"
 	for Name in ["KeylayoutEmulation_IsActive", "KeylayoutEmulation_LayerIsActive",
 		"KeylayoutEmulation_NumberRowLevels", "TapHoldKanaAltGrHeld"] {

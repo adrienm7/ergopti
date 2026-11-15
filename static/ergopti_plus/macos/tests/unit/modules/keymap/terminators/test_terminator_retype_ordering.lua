@@ -12,8 +12,8 @@ local helpers = require("tests.helpers")
 
 local scoped_helpers = helpers
 local OWNED = {
-	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
-	"adapters.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
+	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "platform.input.synthetic_input",
+	"platform.input.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",
 	"infra.hotstring_engine", "core.logger.engine.keystroke_integrity", "core.logger.engine.logger",
@@ -133,7 +133,7 @@ local function load_fixture(options)
 		log_hotstring = function() end,
 	}
 
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local scheduled = {}
 	local awake_time = 0
 	package.loaded["core.events.timer_scheduler"] = {
@@ -170,7 +170,7 @@ local function load_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.text_sender"] = {
+	package.loaded["platform.input.text_sender"] = {
 		eraseChars = function(count, delay)
 			for _ = 1, count do
 				if not synthetic.emit_key_stroke({}, "delete", delay or 0) then return false end

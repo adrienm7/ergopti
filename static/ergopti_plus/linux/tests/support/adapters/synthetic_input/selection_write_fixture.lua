@@ -17,7 +17,7 @@ function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "platform.focus.atspi_focus", "modules.hotstrings.injector",
 			"adapters.clipboard", "core.process.adapters.shell_runner", "core.ui.engine.display_server", "adapters.keyboard_layout",
-			"adapters.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
+			"platform.input.keyboard_hook", "core.logger.engine.shim", "modules.hotstrings.selected_output", "core.logger.engine.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { allowed = true, guard = guard, field = field, wire = {}, held = {}, writes = {},
@@ -71,7 +71,7 @@ function M.with(body)
 			is_wayland = function() return false end, is_x11 = function() return true end,
 			kind = function() return "x11" end,
 		}
-		package.loaded["adapters.keyboard_hook"] = {
+		package.loaded["platform.input.keyboard_hook"] = {
 			held_text_modifier_codes = function() return {} end, held_shortcut_modifier_codes = function() return {} end,
 			held_forwarded_keys = function() return {} end, emergency_stop = function() state.stopped = state.stopped + 1 end,
 		}

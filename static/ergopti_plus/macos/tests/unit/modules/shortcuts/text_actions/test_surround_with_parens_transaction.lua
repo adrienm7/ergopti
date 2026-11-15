@@ -13,7 +13,7 @@
 local helpers = require("tests.helpers")
 
 local MUTATED = {
-	"modules.shortcuts.actions.text", "adapters.clipboard", "adapters.synthetic_input",
+	"modules.shortcuts.actions.text", "adapters.clipboard", "platform.input.synthetic_input",
 	"core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths", "core.timing.engine.timings",
 }
 
@@ -131,7 +131,7 @@ local function fresh_fixture(options)
 		complete(tx, "cancelled")
 		return true
 	end
-	package.loaded["adapters.synthetic_input"] = synthetic
+	package.loaded["platform.input.synthetic_input"] = synthetic
 
 	local timer_calls = {}
 	local next_timer_mode = 0

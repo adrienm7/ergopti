@@ -35,7 +35,7 @@ local STUB_MODULES = {
 	"platform.remap.lease_controller",
 	"platform.remap.onboarding",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.events.timer_scheduler",
 	"adapters.system_info",
 	"platform.remap.deploy_pacing",
@@ -614,7 +614,7 @@ local function with_remap(options, body)
 		end,
 		stop_input_source_watcher = function() return true end,
 	}
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		unbind = function(handle)
 			if handle then handle.enabled = false end
 			return true

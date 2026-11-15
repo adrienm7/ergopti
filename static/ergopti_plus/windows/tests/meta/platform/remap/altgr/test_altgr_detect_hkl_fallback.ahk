@@ -11,7 +11,7 @@
 ; change and never reloaded, and the log named a layout that decided nothing
 ; (altgr-single-probe-2026-09-26). Every boot consumer now reads the record
 ; HotstringEngineInit keeps in _ALTGR_LAYOUT_PROBE, and the VK_RMENU probe
-; lives in adapters/key_state.ahk only.
+; lives in platform/input/key_state.ahk only.
 ;
 ; SCOPE: source introspection of the entry and the driver tree.
 ; ==============================================================================

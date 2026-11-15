@@ -79,7 +79,7 @@ helpers.describe("ergopti_hotstrings CLI", function()
       local fh = io.open(daemon_path(), "r")
       local content = fh:read("*a")
       fh:close()
-      helpers.assert_true(content:find('require%("adapters%.keyboard_hook"%)'), "imports keyboard_hook")
+      helpers.assert_true(content:find('require%("platform%.input%.keyboard_hook"%)'), "imports keyboard_hook")
     end)
 
     helpers.it("daemon file has pump event loop", function()

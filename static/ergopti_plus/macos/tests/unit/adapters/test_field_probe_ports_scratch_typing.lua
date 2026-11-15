@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"core.logger.engine.logger", "adapters.field_probe_ports", "core.events.timer_scheduler", "core.ui.adapters.own_window",
-	"adapters.synthetic_input", "core.ui.ui.builder", "modules.keymap", "infra.field_run_selftest",
+	"platform.input.synthetic_input", "core.ui.ui.builder", "modules.keymap", "infra.field_run_selftest",
 	"modules.keymap.utils",
 }
 
@@ -77,7 +77,7 @@ local function run(world, keys, options)
 				end,
 			}
 		end
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			emit_selftest_key_stroke = function(modifiers, key)
 				world.emitted[#world.emitted + 1] = key
 				world.polls_at_first_key = world.polls_at_first_key or world.polls

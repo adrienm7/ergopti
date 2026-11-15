@@ -46,7 +46,7 @@ local function load_fixture(keystats)
 	return {
 		hs = hs_stub,
 		clock = clock,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
 end

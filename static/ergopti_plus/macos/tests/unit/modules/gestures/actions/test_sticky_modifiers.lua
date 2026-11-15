@@ -66,7 +66,7 @@ local function fresh_sticky()
 		reenter_clear_parent = nil,
 	}
 
-	package.loaded["adapters.modifier_injector"] = {
+	package.loaded["platform.input.modifier_injector"] = {
 		arm = function(flags, on_applied)
 			injector.arm_calls = injector.arm_calls + 1
 			if injector.next_arm_fails then return false end

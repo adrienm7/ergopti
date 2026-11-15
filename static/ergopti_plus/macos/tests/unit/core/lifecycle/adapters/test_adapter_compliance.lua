@@ -58,13 +58,13 @@ local CONTRACTS = load_contracts()
 -- Each adapter by its full module name and the port it implements: the name
 -- follows the module wherever it lives, and the port stays the contract's.
 local ADAPTERS_UNDER_TEST = {
-	{ module = "adapters.keyboard_hook", port = "KeyboardHook" },
-	{ module = "adapters.text_sender", port = "TextSender" },
+	{ module = "platform.input.keyboard_hook", port = "KeyboardHook" },
+	{ module = "platform.input.text_sender", port = "TextSender" },
 	{ module = "core.ui.adapters.tooltip_renderer", port = "TooltipRenderer" },
 	{ module = "core.network.adapters.http_client", port = "HttpClient" },
 	{ module = "core.events.timer_scheduler", port = "TimerScheduler" },
 	{ module = "adapters.notifier", port = "Notifier" },
-	{ module = "adapters.hotkey_registrar", port = "HotkeyRegistrar" },
+	{ module = "platform.input.hotkey_registrar", port = "HotkeyRegistrar" },
 	{ module = "adapters.tray_menu", port = "TrayMenu" },
 	{ module = "core.fs.adapters.file_system", port = "FileSystem" },
 	{ module = "platform.focus.window_info", port = "WindowInfo" },

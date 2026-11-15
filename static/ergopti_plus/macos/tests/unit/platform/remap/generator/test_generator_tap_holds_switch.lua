@@ -22,7 +22,7 @@ package.loaded["core.fs.adapters.file_system"] = {
 package.loaded["infra.config_paths"] = {
 	get_config_dir = function() return "/tmp/ergopti_test" end,
 }
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	to_name                 = function(code) return "key_" .. tostring(code) end,
 	F13_KARABINER_RETURN    = 105,
 	F14_KARABINER_BACKSPACE = 107,

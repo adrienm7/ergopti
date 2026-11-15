@@ -805,7 +805,7 @@ local function scratch_typing(keys, callback, options)
 		started = started or hs.timer.absoluteTime()
 		-- The selftest class: the keymap decodes these keys as typing in this
 		-- window only, keystats never counts them, the passive counter sees them
-		local sent, emitted = pcall(require("adapters.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
+		local sent, emitted = pcall(require("platform.input.synthetic_input").emit_selftest_key_stroke, {}, keys[index])
 		if not sent or emitted ~= true then return settle("injection_refused") end
 		last_key_at = hs.timer.absoluteTime()
 		outcome.posted = index

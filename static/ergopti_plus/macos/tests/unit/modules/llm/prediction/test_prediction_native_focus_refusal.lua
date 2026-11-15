@@ -22,7 +22,7 @@ local OWNED = {
 	"diagnostics.engine.reports.error_description",
 	"core.fs.engine.dir",
 	"core.i18n.engine.i18n",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.lifecycle.engine.launcher_environment",
 	"core.i18n.engine.locale",
 	"core.logger.engine.log_folders",

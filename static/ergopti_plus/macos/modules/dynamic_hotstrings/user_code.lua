@@ -20,7 +20,7 @@
 --- ==============================================================================
 local Driver = require("hotstrings.engine.dynamic.user_code_driver")
 local FileSystem = require("core.fs.adapters.file_system")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("core.logger.engine.logger")
 local Notifier = require("platform.focus.application_notifier")

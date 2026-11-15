@@ -19,7 +19,7 @@ local function load_subject()
 	local counters = {bind = 0, unbind = 0}
 	local live = {}
 
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord, _, options)
 			counters.bind = counters.bind + 1
 			controls.options[chord] = options

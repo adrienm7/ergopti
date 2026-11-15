@@ -15,7 +15,7 @@ local function with_owner(body, options)
 	options = options or {}
 	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "adapters.keyboard_hook",
+		"modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.runtime_factory", "platform.input.keyboard_hook",
 		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -118,7 +118,7 @@ local function with_owner(body, options)
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
-		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil
 		return Hook
 	end
@@ -303,7 +303,7 @@ helpers.describe("Linux prediction enable publication", function()
 				-- This mode explicitly owns a partial native allocation despite refusal.
 				world.owned_http.refused_dispatch_acquired = mode == "cleanup_debt"
 				local Hook = world.use_native_notice()
-				local Reader = require("adapters.evdev_reader")
+				local Reader = require("platform.input.evdev_reader")
 				local grab = Reader.grab
 				if mode == "regrab" then Reader.grab = function() return false end end
 				world.during_dialog = function()

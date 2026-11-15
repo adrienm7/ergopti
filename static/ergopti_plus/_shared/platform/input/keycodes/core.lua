@@ -21,7 +21,7 @@
 ---    without any init pattern.
 --- 4. Platform-neutral: depends only on numeric literals — no hs.* API here.
 ---    The HS-specific to_name() helper (which needs hs.keycodes.map) lives in
----    the Hammerspoon-local infra/keycodes.lua shim instead.
+---    the Hammerspoon-local platform/input/keycodes.lua shim instead.
 --- ==============================================================================
 
 local M = {}
@@ -118,7 +118,7 @@ M.SCRIPT_CHORD_SENTINELS = {
 }
 
 -- NOTE: M.to_name() is Hammerspoon-specific (requires hs.keycodes.map) and
--- lives in the HS-local infra/keycodes.lua shim, not here.
+-- lives in the HS-local platform/input/keycodes.lua shim, not here.
 
 
 

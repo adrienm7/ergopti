@@ -9,7 +9,7 @@ require("ui.action_picker.bridge")
 
 local function with_editor(body)
 	local names = { "ui.physical_shortcuts.bridge", "ui.action_picker.bridge", "core.ui.ui.webview_manager",
-		"modules.gestures.manager", "adapters.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
+		"modules.gestures.manager", "platform.input.keyboard_hook", "core.process.adapters.program_providers", "core.i18n.engine.i18n",
 		"core.ui.ui.text_prompt", "ui.app_chooser", "core.logger.engine.shim" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -72,7 +72,7 @@ local function with_editor(body)
 	}
 	local called, detail = xpcall(function()
 		package.loaded["core.ui.ui.webview_manager"], package.loaded["modules.gestures.manager"] = manager, catalogue
-		package.loaded["adapters.keyboard_hook"] = { position_capture_available = function() return false end }
+		package.loaded["platform.input.keyboard_hook"] = { position_capture_available = function() return false end }
 		package.loaded["core.process.adapters.program_providers"] = {}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		local logger = helpers.make_logger_stub()

@@ -20,7 +20,7 @@
 ---
 --- WHAT THE THREE LAYERS ARE:
 ---   1. infra/xkb_keymap.lua   — text to (keysym, keycode, level). Pure.
----   2. infra/keysym.lua       — keysym name to character. Pure, plus an
+---   2. platform/input/keysym.lua       — keysym name to character. Pure, plus an
 ---                               optional libxkbcommon path.
 ---   3. this adapter           — the join, the cache, and the refusal to guess.
 --- Each is asserted here through the layer above it, because the seam between
@@ -105,7 +105,7 @@ end)
 helpers.describe("keysym: name to character", function()
 
 	helpers.it("resolves the names that spell themselves", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("a"), "a", "a letter names its own character")
 		helpers.assert_eq(ks.to_char("A"), "A", "and so does the capital")
@@ -113,7 +113,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves the ones that do not", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("eacute"), "é", "the whole point of the table")
 		helpers.assert_eq(ks.to_char("ccedilla"), "ç", "French needs this one constantly")
@@ -124,7 +124,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves ASCII punctuation by its protocol name", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("ampersand"), "&", "AZERTY puts this where US puts 1")
 		helpers.assert_eq(ks.to_char("space"), " ", "space is a keysym like any other")
@@ -132,7 +132,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("resolves the Unicode spellings a modern keymap uses", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		-- Everything without a legacy name is written this way, which is how a
 		-- keymap expresses ★ or a narrow no-break space.
@@ -142,7 +142,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("produces nothing for a dead key, even when the library answers", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		-- Driven with a library that DOES return a character for dead_acute, which
 		-- is the case that matters: on a machine with libxkbcommon the guard is
 		-- the only thing standing between the injector and a wrong answer. With
@@ -161,14 +161,14 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("produces nothing for a modifier", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		helpers.assert_eq(ks.to_char("Shift_L"), nil, "a modifier is not a character")
 		helpers.assert_eq(ks.to_char("ISO_Level3_Shift"), nil, "nor is AltGr")
 	end)
 
 	helpers.it("rejects surrogate keysyms and non-scalar values", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		ks._set_xkb_for_test(false)
 		for _, cp in ipairs({ 0xD800, 0xDBFF, 0xDC00, 0xDFFF, 0 / 0, 0.5 }) do
 			helpers.assert_eq(ks.utf8_encode(cp), nil, "only integer Unicode scalar values are encodable")
@@ -180,7 +180,7 @@ helpers.describe("keysym: name to character", function()
 	end)
 
 	helpers.it("encodes above the basic plane", function()
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 		helpers.assert_eq(ks.utf8_encode(0x1F600), "\240\159\152\128",
 			"four-byte UTF-8, because a keymap may legally carry an emoji")
 		helpers.assert_eq(ks.utf8_encode(0x110000), nil, "and nothing above the range")
@@ -244,7 +244,7 @@ helpers.describe("keyboard_layout: resolving against the session's own layout", 
 	helpers.it("prefers the lowest level for every character with two homes", function()
 		local layout = loaded()
 		local kb = helpers.load_module("infra.xkb_keymap")
-		local ks = helpers.load_module("infra.keysym")
+		local ks = helpers.load_module("platform.input.keysym")
 
 		-- Computed independently rather than spot-checked. "~" sits on two keys in
 		-- this fixture, and asserting one expected level passes by accident when

@@ -120,7 +120,7 @@ end)
 Home.it("Linux trigger ROI: refused collection never captures physical metadata or the calendar", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local hook, calendar = require("adapters.keyboard_hook"), require("modules.keystats.calendar")
+		local hook, calendar = require("platform.input.keyboard_hook"), require("modules.keystats.calendar")
 		local original_layout, original_capture = hook.get_layout, calendar.capture
 		local function refused(owner)
 			local physical, clocks = 0, 0
@@ -173,7 +173,7 @@ end)
 Home.it("Linux trigger ROI: early cipher refusal still retires queued text and keeps numerical totals", function()
 	Native.with(function(collector)
 		local writer = start(collector)
-		local hook, cipher = require("adapters.keyboard_hook"), require("modules.keystats.text_cipher")
+		local hook, cipher = require("platform.input.keyboard_hook"), require("modules.keystats.text_cipher")
 		local original_layout, original_enabled = hook.get_layout, cipher.is_enabled
 		local probes = { { "on", "observe" }, { "unknown", "text" }, { "on", "key" }, { "unknown", "shortcut" } }
 		for _, probe in ipairs(probes) do

@@ -111,7 +111,7 @@ function M.run(harness_path, options)
 		"options.advertise_msc must be a boolean")
 	local ffi, drain = emulated_device(options)
 	local Finder = require("modules.gestures.touchpad_finder")
-	local Reader = require("adapters.evdev_reader")
+	local Reader = require("platform.input.evdev_reader")
 	local saved = {
 		ffi = package.loaded.ffi, open = io.open, execute = os.execute, exit = os.exit, print = print,
 		list = Finder.list, reader_open = Reader.open, reader_close = Reader.close, reader_drain = Reader.drain,

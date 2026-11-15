@@ -175,7 +175,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
-	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
+	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
 	package.loaded["modules.gestures.engine"]={}
 	package.loaded["modules.gestures.actions"]={}
@@ -522,7 +522,7 @@ shell.run(function(capture, observed, native)
 	package.loaded["modules.keystats.kc_bridge"]={init=function() return true end,set_log_manager=function() return true end,start=function() kc_running=true;return true end,stop=function() kc_running=false;return true end,is_running=function() return kc_running end,is_ke_managed_output_kc=function() return false end}
 	package.loaded["core.process.adapters.lifecycle"]={onAppActivate=function(fn) observations.app=fn;return true end,start=function() return true end,stop=function() return true end}
 	package.loaded["adapters.input_source_broker"]={subscribe=function() return true end,unsubscribe=function() return true end}
-	package.loaded["adapters.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
+	package.loaded["platform.input.keyboard_hook"]={start=function() return true end,stop=function() return true end,isRunning=function() return true end}
 	package.loaded["modules.keymap"]={is_running=function() return false end}
 	package.loaded["modules.gestures.engine"]={}
 	package.loaded["modules.gestures.actions"]={}

@@ -118,7 +118,7 @@ local function run_fixture(body, source)
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
 	package.loaded["core.logger.engine.logger"] = logger
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F18_WAKE_OS = 79, F19_LAYER_NAV_EXITED = 80,
 		F13_KARABINER_RETURN = 106, F14_KARABINER_BACKSPACE = 107, F15_KARABINER_ESCAPE = 108,
 		F18_KARABINER_DELETE = 79, SCRIPT_CHORD_SENTINELS = require("platform.input.keycodes.core").SCRIPT_CHORD_SENTINELS,
@@ -141,8 +141,8 @@ local function run_fixture(body, source)
 		return native
 	end
 	hs.hotkey.bind = function() return handle("binding") end
-	package.loaded["adapters.hotkey_registrar"] = nil
-	local registrar = require("adapters.hotkey_registrar")
+	package.loaded["platform.input.hotkey_registrar"] = nil
+	local registrar = require("platform.input.hotkey_registrar")
 	local bind = hs.hotkey.bind
 	hs.hotkey.bind = function(...)
 		local native = bind(...)

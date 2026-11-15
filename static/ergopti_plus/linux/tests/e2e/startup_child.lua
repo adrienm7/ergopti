@@ -159,7 +159,7 @@ package.preload["adapters.keyboard_layout"] = function()
 	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
 	return require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 end
-package.preload["adapters.uinput_writer"] = function()
+package.preload["platform.input.uinput_writer"] = function()
 	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
 	return require("tests.fakes").uinput_writer()
 end
@@ -198,7 +198,7 @@ if SEED and SEED ~= "" then
 	fh:close()
 end
 
-local hook = require("adapters.keyboard_hook")
+local hook = require("platform.input.keyboard_hook")
 hook.start = function() end
 hook.isRunning = function() return true end
 hook.get_mode = function() return "scripted" end

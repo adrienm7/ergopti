@@ -8,7 +8,7 @@
 local M = {}
 local helpers = require("tests.helpers")
 local Coordinator = require("core.lifecycle.engine.shutdown.coordinator")
-local Gate = require("infra.input_capture_gate")
+local Gate = require("platform.input.capture_gate")
 local Onboarding = require("ui.onboarding.startup")
 
 --- Runs actual Main startup statements through its first real idle callback.
@@ -238,7 +238,7 @@ function M.run(options)
 			return { bind = noop }
 		elseif name == "luv" then
 			return { os_getpid = function() return 4242 end }
-		elseif name == "infra.input_access" then
+		elseif name == "platform.input.access" then
 			return { missing_program = function() return nil end, report = function() observed.access_reported = true; return 1 end }
 		elseif name == "core.i18n.engine.i18n" then
 			return { init = noop, set_trigger_provider = noop, get = function(key) return key end }

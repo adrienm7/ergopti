@@ -629,13 +629,13 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       if ok then
         -- resolve_char, not new(). The reader instance this used to name had no
         -- production caller for its whole life; reading the device belongs to
-        -- adapters/evdev_reader.lua now, and what remains here is the layout.
+        -- platform/input/evdev_reader.lua now, and what remains here is the layout.
         helpers.assert_true(type(ir.resolve_char) == "function", "input_reader.resolve_char is a function")
       end
     end)
 
     helpers.it("evdev_reader can be required", function()
-      local ok, er = pcall(require, "adapters.evdev_reader")
+      local ok, er = pcall(require, "platform.input.evdev_reader")
       helpers.assert_true(ok, "evdev_reader module loads")
       if ok then
         helpers.assert_true(type(er.grab) == "function", "evdev_reader.grab is a function")

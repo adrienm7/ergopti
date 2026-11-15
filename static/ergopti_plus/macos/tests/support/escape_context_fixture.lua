@@ -11,12 +11,12 @@ local helpers = require("tests.helpers")
 local STUBBED_MODULES = {
 	"core.logger.engine.logger",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
 	"modules.keymap.utils",
 	"core.text.engine.utils",
 	"modules.llm",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.keystats",
 	"core.ui.ui.tooltip",
 	"modules.llm.prediction_engine",
@@ -44,7 +44,7 @@ local function load_fixture(options, lifetime)
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return epoch end,
 		defer_after_callback = function(_label, callback)
 			if options.defer_throws then error("DEFER_THROW") end
@@ -73,7 +73,7 @@ local function load_fixture(options, lifetime)
 		DEFAULT_STATE = { llm_after_hotstring = false, llm_reset_on_nav = false },
 		check_modifiers = function() return false end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,

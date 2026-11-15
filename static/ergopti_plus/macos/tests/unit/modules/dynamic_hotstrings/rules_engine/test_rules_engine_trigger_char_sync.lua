@@ -30,7 +30,7 @@ local active_fixture = nil
 local function with_dynamic_fixture(body)
 	helpers.with_stub_scope({ "modules.dynamic_hotstrings", "modules.dynamic_hotstrings.rules_engine",
 		"modules.dynamic_hotstrings.personal_info", "modules.dynamic_hotstrings.user_code",
-		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "adapters.synthetic_input",
+		"hotstrings.engine.dynamic.core", "hotstrings.engine.dynamic.user_source", "platform.input.synthetic_input",
 		"core.events.timer_scheduler", "adapters.event_provenance", "modules.keymap.utils",
 		"core.fs.adapters.file_system", "infra.config_paths", "platform.focus.application_notifier" }, function()
 		local previous = active_fixture

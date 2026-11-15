@@ -11,12 +11,12 @@ local support = require("tests.support.system_actions_fixture")
 local OWNERS = {
 	"hs", "tests.stubs.hs", "modules.shortcuts.actions.system",
 	"modules.shortcuts.actions.screenshot_save", "modules.shortcuts.actions.text",
-	"modules.gestures", "infra.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
-	"adapters.event_provenance", "core.fs.adapters.file_system", "adapters.key_state",
-	"core.process.adapters.shell_runner", "adapters.synthetic_input", "core.events.timer_scheduler",
+	"modules.gestures", "platform.input.keycodes", "core.logger.engine.logger", "core.ui.engine.notifications",
+	"adapters.event_provenance", "core.fs.adapters.file_system", "platform.input.key_state",
+	"core.process.adapters.shell_runner", "platform.input.synthetic_input", "core.events.timer_scheduler",
 	"core.fs.adapters.storage", "core.process.adapters.task_lifecycle", "adapters.mouse_control",
 	"core.timing.engine.deferred_work", "core.fs.engine.dir", "modules.keymap.utils",
-	"modules.keymap.terminator_replay", "adapters.text_sender", "adapters.clipboard",
+	"modules.keymap.terminator_replay", "platform.input.text_sender", "adapters.clipboard",
 }
 
 local function with_observer(callback)
@@ -95,7 +95,7 @@ helpers.describe("System action fixture isolation", function()
 					end
 					local first = mount()
 					configure(first.hs, 11)
-					local previous_key_state = require("adapters.key_state")
+					local previous_key_state = require("platform.input.key_state")
 					local previous_notifications = require("core.ui.engine.notifications")
 					local second = mount()
 					configure(second.hs, 22)
@@ -125,7 +125,7 @@ helpers.describe("System action fixture isolation", function()
 						support.fire_latest_timer(second.hs)
 						helpers.assert_eq(delivered, 1)
 					end
-					helpers.assert_true(require("adapters.key_state") ~= previous_key_state)
+					helpers.assert_true(require("platform.input.key_state") ~= previous_key_state)
 					helpers.assert_true(require("core.ui.engine.notifications") ~= previous_notifications)
 				end)
 				for _, name in ipairs(OWNERS) do helpers.assert_nil(package.loaded[name], name) end

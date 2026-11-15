@@ -18,7 +18,7 @@ local function with_owner(body, options)
 	options = options or {}
 	local names = { "core.network.adapters.http_client", "modules.llm.enable_admission", "ui.llm_enable_refusal",
 		"modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.model_inventory", "infra.llm_preferences",
-		"modules.llm.local_servers", "modules.llm.api_entries", "adapters.keyboard_hook",
+		"modules.llm.local_servers", "modules.llm.api_entries", "platform.input.keyboard_hook",
 		"core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.ui.engine.window_titles", "modules.llm.runtime_factory" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -115,7 +115,7 @@ local function with_owner(body, options)
 		}
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 		package.loaded["core.ui.engine.window_titles"] = { compose = function(value) return value end }
-		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local Hook = helpers.load_module("platform.input.keyboard_hook")
 		package.loaded["ui.llm_enable_refusal"] = nil
 		return Hook
 	end

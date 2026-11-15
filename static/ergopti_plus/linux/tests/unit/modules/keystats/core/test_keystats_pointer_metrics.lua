@@ -15,8 +15,8 @@
 local helpers = require("tests.helpers")
 local Fakes = helpers.load_module("tests.fakes")
 local unpack_values = table.unpack or unpack
-local EvdevCodes = require("infra.evdev_codes")
-local InputEvent = require("infra.input_event")
+local EvdevCodes = require("platform.input.evdev_codes")
+local InputEvent = require("platform.input.event")
 local PointerMetrics = require("modules.keystats.pointer_metrics")
 
 -- A code no pointer counts: the middle button

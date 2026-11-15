@@ -55,7 +55,7 @@ local OBSERVED_STREAM = {
 --- @return table chars   Characters delivered to on_char.
 --- @return table keys    Control-key names delivered to on_key.
 local function drive(events, intercept)
-	local kh      = helpers.load_module("adapters.keyboard_hook")
+	local kh      = helpers.load_module("platform.input.keyboard_hook")
 	local emitted = {}
 	local chars   = {}
 	local keys    = {}

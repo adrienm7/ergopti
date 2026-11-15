@@ -108,8 +108,8 @@ global HSE_CONSUMED_DELIMITERS := HSE_TerminatorDefaultConsumedDelimiters()
 ; tap-hold holds around the output (_HSE_SendWithAltGrUp). Without these files
 ; the call failed, the dispatch logged it and sent nothing, so the harness saw
 ; an empty expansion. They load in run_all.ahk's order.
-#Include ../../adapters/text_sender.ahk
-#Include ../../adapters/key_state.ahk
+#Include ../../platform/input/text_sender.ahk
+#Include ../../platform/input/key_state.ahk
 #Include ../../platform/remap/constants.ahk
 #Include ../../platform/remap/tap_hold_roll.ahk
 ; The number row (test_e2e_number_row.ahk): the modules the number-row hotkeys

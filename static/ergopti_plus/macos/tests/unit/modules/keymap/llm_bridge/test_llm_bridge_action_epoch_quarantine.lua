@@ -30,7 +30,7 @@ local function load_fixture(reset_result)
 	local reset_hook
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return current_token end,
 	}
 	package.loaded["core.events.timer_scheduler"] = {
@@ -58,7 +58,7 @@ local function load_fixture(reset_result)
 		},
 		check_modifiers = function() return false end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		ESCAPE = 53,
 		RETURN = 36,
 		F16_LLM_CHAIN_SIGNAL = 106,

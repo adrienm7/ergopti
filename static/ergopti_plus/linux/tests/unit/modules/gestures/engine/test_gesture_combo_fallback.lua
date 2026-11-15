@@ -8,22 +8,22 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Input = require("infra.input_event")
+local Input = require("platform.input.event")
 
 --- Runs actual owners over controlled byte ports and restores every dependency.
 --- @param options table Controlled constructor/wire refusals.
 --- @param body function Receives the exact actual-owner environment.
 local function with_environment(options, body)
 	options = options or {}
-	local names = { "core.logger.engine.shim", "adapters.uinput_writer", "adapters.modifier_broker",
-		"adapters.keyboard_hook", "modules.gestures.combo_emitter", "modules.gestures.manager" }
+	local names = { "core.logger.engine.shim", "platform.input.uinput_writer", "platform.input.modifier_broker",
+		"platform.input.keyboard_hook", "modules.gestures.combo_emitter", "modules.gestures.manager" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	package.loaded["core.logger.engine.shim"] = helpers.make_logger_stub()
 	local original_execute = os.execute
 	local s = { rows = {}, commands = {}, opens = 0, closes = 0, ioctls = 0, emergency = 0 }
 	local ok, err = pcall(function()
-		s.writer = helpers.load_module("adapters.uinput_writer")
+		s.writer = helpers.load_module("platform.input.uinput_writer")
 		local last
 		s.writer._set_backend({
 			open = function()
@@ -45,8 +45,8 @@ local function with_environment(options, body)
 				return true
 			end,
 		})
-		s.broker_factory = helpers.load_module("adapters.modifier_broker")
-		s.hook = helpers.load_module("adapters.keyboard_hook")
+		s.broker_factory = helpers.load_module("platform.input.modifier_broker")
+		s.hook = helpers.load_module("platform.input.keyboard_hook")
 		local original_stop = s.hook.emergency_stop
 		s.hook.emergency_stop = function(reason) s.emergency = s.emergency + 1; return original_stop(reason) end
 		s.emitter = helpers.load_module("modules.gestures.combo_emitter")
@@ -237,9 +237,9 @@ helpers.describe("gesture fallback custody", function()
 			helpers.assert_eq(s.emitter.can_fallback(result, "ctrl+Right"), false)
 			s.writer.emit = old
 			local _, second = s.emitter.press("ctrl+Right")
-			package.loaded["adapters.uinput_writer"] = { unavailable_for_output = function() return true, 0 end }
+			package.loaded["platform.input.uinput_writer"] = { unavailable_for_output = function() return true, 0 end }
 			helpers.assert_eq(s.emitter.can_fallback(second, "ctrl+Right"), false)
-			package.loaded["adapters.uinput_writer"] = s.writer
+			package.loaded["platform.input.uinput_writer"] = s.writer
 		end)
 	end)
 
@@ -255,7 +255,7 @@ helpers.describe("gesture fallback custody", function()
 
 	helpers.it("a substituted Writer before a later press is not admitted as a fresh unavailable authority", function()
 		with_environment(nil, function(s)
-			package.loaded["adapters.uinput_writer"] = {
+			package.loaded["platform.input.uinput_writer"] = {
 				emit = function() return true end,
 				is_open = function() return false end,
 				unavailable_for_output = function() return true, 0 end,
@@ -263,7 +263,7 @@ helpers.describe("gesture fallback custody", function()
 			s.run()
 			helpers.assert_eq(s.commands, {})
 			helpers.assert_eq(s.opens, 0)
-			package.loaded["adapters.uinput_writer"] = s.writer
+			package.loaded["platform.input.uinput_writer"] = s.writer
 		end)
 	end)
 

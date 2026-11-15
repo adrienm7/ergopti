@@ -96,7 +96,7 @@ the desktop keeps a button down. `EVIOCGRAB` does not label reports already
 queued at acquisition or release. The current grab state, event timestamps and
 an `EAGAIN` read do not by themselves establish an atomic boundary with the
 ioctl; changes to this handoff must account for reports on both sides.
-`adapters/keyboard_hook.lua`'s main chunk is
+`platform/input/keyboard_hook.lua`'s main chunk is
 at LuaJIT's 200-local ceiling ("main function has more than 200 local
 variables" at load): new hook state goes into an existing table such as
 `LayerPointer`, never into new top-level locals. The same holds for
@@ -1012,7 +1012,7 @@ replays that check on a host without libayatana. Its tray pass left-clicks the
 icon (libayatana's GtkStatusIcon fallback pops the menu on both buttons), then
 right-clicks the same spot, which closes the grabbed override-redirect menu
 before the screenshot; only a named visible window survives into it, so the
-no-keyboard state opens an "Ergopti+" status window (`infra/input_access.lua`).
+no-keyboard state opens an "Ergopti+" status window (`platform/input/access.lua`).
 Action: read the catalogue's
 full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
 trusting its "first error", which is only the first stderr line.

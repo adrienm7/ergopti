@@ -37,13 +37,13 @@ local M = {}
 local Errors = require("diagnostics.engine.adapter_errors")
 local Logger = require("core.logger.engine.shim")
 local Perf = require("core.logger.engine.perf_counters")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local KeyboardLayout = require("adapters.keyboard_layout")
 local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, KeyboardLayout.plan_current, KeyboardLayout.plan_view
 local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
-local ModifierBroker = require("adapters.modifier_broker")
+local ModifierBroker = require("platform.input.modifier_broker")
 local broker_for_channel = ModifierBroker.for_channel
 local NumberPolicy = require("core.text.engine.number_policy")
 
@@ -111,7 +111,7 @@ end
 --- Exact layout-level modifier keycodes the user is physically holding.
 --- @return table Ordered evdev keycodes.
 local function held_text_modifier_codes()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_text_modifier_codes) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_text_modifier_codes)
 	return (ok_call and type(held) == "table") and held or {}
@@ -120,7 +120,7 @@ end
 --- Shortcut modifiers (Ctrl, Alt, Super) the user is holding.
 --- @return table Ordered evdev keycodes.
 local function held_shortcut_modifier_codes()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_shortcut_modifier_codes) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_shortcut_modifier_codes)
 	return (ok_call and type(held) == "table") and held or {}
@@ -129,7 +129,7 @@ end
 --- Non-modifier keys the hook forwarded as pressed and not yet released.
 --- @return table evdev keycodes.
 local function held_forwarded_keys()
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if not ok or type(hook.held_forwarded_keys) ~= "function" then return {} end
 	local ok_call, held = pcall(hook.held_forwarded_keys)
 	return (ok_call and type(held) == "table") and held or {}
@@ -433,7 +433,7 @@ end
 local function stop_after_failure(result, label)
 	Logger.error(LOG, "%s failed in %s — %s (cleanup_ok=%s).",
 		label, tostring(result.failed_phase), tostring(result.error), tostring(result.cleanup_ok))
-	local ok_hook, hook = pcall(require, "adapters.keyboard_hook")
+	local ok_hook, hook = pcall(require, "platform.input.keyboard_hook")
 	if ok_hook and type(hook.emergency_stop) == "function" then
 		pcall(hook.emergency_stop, label .. ": " .. tostring(result.error))
 	end
@@ -834,7 +834,7 @@ end
 --- instead of grabbing a keyboard it has no way to give back.
 --- @return boolean True when the non-forking channel is live.
 function M.open_fast_channel()
-	local ok_mod, mod = pcall(require, "adapters.uinput_writer")
+	local ok_mod, mod = pcall(require, "platform.input.uinput_writer")
 	if not ok_mod or type(mod) ~= "table" then
 		Logger.error(LOG, "uinput_writer unavailable — there is no way to emit keys.")
 		return false
@@ -848,7 +848,7 @@ function M.open_fast_channel()
 		Logger.error(LOG, "uinput channel could not be opened — check /dev/uinput permissions.")
 		return false
 	end
-	local Broker = require("adapters.modifier_broker")
+	local Broker = require("platform.input.modifier_broker")
 	if not Broker.attach(mod) then
 		mod.close()
 		Logger.error(LOG, "The acknowledged output channel could not be reserved.")
@@ -862,7 +862,7 @@ end
 --- Returns the exact shared output owner installed before native input opens.
 --- @return table|nil broker
 function M.output_broker()
-	return _uinput and require("adapters.modifier_broker").for_channel(_uinput) or nil
+	return _uinput and require("platform.input.modifier_broker").for_channel(_uinput) or nil
 end
 
 --- Closes the non-forking channel, if one is open.
@@ -870,7 +870,7 @@ end
 function M.close_fast_channel()
 	local clipboard_closed = retire_clipboard()
 	if not _uinput then return clipboard_closed end
-	local Broker = require("adapters.modifier_broker")
+	local Broker = require("platform.input.modifier_broker")
 	local channel, broker = _uinput, Broker.for_channel(_uinput)
 	if broker then
 		local acknowledged = channel.close() == true
@@ -1241,7 +1241,7 @@ local KEY_LEFT = nil
 for code, name in pairs(EvdevCodes.CONTROL_NAME_OF) do
 	if name == "left" then KEY_LEFT = code end
 end
-if not KEY_LEFT then error("infra.evdev_codes names no Left arrow") end
+if not KEY_LEFT then error("platform.input.evdev_codes names no Left arrow") end
 
 -- Code point ranges that extend the character before them instead of starting
 -- a new one: combining marks, variation selectors, emoji skin tones and tag

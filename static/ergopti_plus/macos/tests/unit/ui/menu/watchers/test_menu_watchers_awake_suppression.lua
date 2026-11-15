@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"platform.focus.application_notifier",
 	"core.logger.adapters.boot_journal",
 	"core.fs.adapters.file_system",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.fs.adapters.json_codec",
 	"core.logger.adapters.log_transport",
 	"adapters.python_interpreter",

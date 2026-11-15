@@ -70,9 +70,9 @@ const bodyOf = (source, name) => {
 };
 
 // 1. One owner of the emission SendLevel.
-const sender = stripComments(read('adapters/text_sender.ahk'));
+const sender = stripComments(read('platform/input/text_sender.ahk'));
 const owner = bodyOf(sender, '_TextSenderAtSendLevel');
-check(owner !== '', 'adapters/text_sender.ahk must define _TextSenderAtSendLevel');
+check(owner !== '', 'platform/input/text_sender.ahk must define _TextSenderAtSendLevel');
 const setAt = owner.indexOf('SendLevel(TEXT_SENDER_SEND_LEVEL)');
 const callAt = owner.indexOf('SendFn.Call()', setAt);
 const restoreAt = owner.indexOf('SendLevel(PreviousSendLevel)', callAt);

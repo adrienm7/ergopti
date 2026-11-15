@@ -102,7 +102,7 @@ local function fresh_registry(variable_write_result)
 		clear = function() end,
 		armed = function() return {} end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		isDown = function() return false end,
 		isUp = function() return true end,
 		set_capslock = function(on) seen.capslock = on end,

@@ -425,7 +425,7 @@ local SHIFT = { cmd = false, ctrl = false, alt = false, shift = true }
 --- @param bundle string Bundle identifier.
 --- @param name string Application name.
 local function focus_app(bundle, name)
-	require("adapters.text_sender").focusedAppIdentity = function() return bundle, name, {} end
+	require("platform.input.text_sender").focusedAppIdentity = function() return bundle, name, {} end
 end
 
 --- Presses Backspace `count` times.

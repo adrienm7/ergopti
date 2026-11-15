@@ -25,7 +25,7 @@ local COMMAND_FLAGS = { left_command = true, right_command = true }
 helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.logger.engine.logger",
 	"core.text.engine.toml.codec",
 	"platform.remap.config",
@@ -37,7 +37,7 @@ helpers.with_fresh_modules({
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,

@@ -44,7 +44,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 
 	helpers.it("binds and labels shifted slots through the real declared prefix consumer", function()
 		return helpers.with_stub_scope({
-			"core.fs.adapters.file_system", "adapters.hotkey_registrar", "core.fs.engine.paths", "infra.config_paths",
+			"core.fs.adapters.file_system", "platform.input.hotkey_registrar", "core.fs.engine.paths", "infra.config_paths",
 			"infra.preferences", "modules.gestures.actions", "modules.shortcuts.keyboard_shortcuts",
 		}, function()
 			helpers.load_with_stubs("infra.preferences")
@@ -53,7 +53,7 @@ helpers.describe("ordinary shortcut prefixes (shortcuts-core-1)", function()
 			package.loaded["core.fs.adapters.file_system"] = {read = function(path)
 				local file = assert(io.open(path, "rb")); local bytes = file:read("*a"); file:close(); return bytes
 			end}
-			package.loaded["adapters.hotkey_registrar"] = {
+			package.loaded["platform.input.hotkey_registrar"] = {
 				bind = function(chord) observed[chord] = (observed[chord] or 0) + 1; return chord end,
 				unbind = function() return true end,
 			}

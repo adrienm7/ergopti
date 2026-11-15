@@ -169,7 +169,7 @@ os.remove(user_path)
 		local Manager, hook, actions, user_path = manager()
 		local Engine = require("platform.remap.tap_hold_engine")
 		local code = Engine.KEY_CODES.tab
-		local saved_hook, native_hook = package.loaded["adapters.keyboard_hook"], nil
+		local saved_hook, native_hook = package.loaded["platform.input.keyboard_hook"], nil
 		local ok, failure = pcall(function()
 			hook.engine:process(code, 1, 0)
 			local _, tap, binding = hook.engine:process(code, 0, 100)
@@ -177,7 +177,7 @@ os.remove(user_path)
 			helpers.assert_eq(binding, "tap_hold__tab", "the shared key id survives to the native owner")
 			hook.on_tap(tap, binding)
 			helpers.assert_eq(actions[1], "alt_tab_monitor@tap_hold__tab")
-			native_hook = helpers.load_module("adapters.keyboard_hook")
+			native_hook = helpers.load_module("platform.input.keyboard_hook")
 			local received
 			native_hook.set_remapper(hook.engine, function(action, origin)
 				if action == "alt_tab_monitor" then received = origin end
@@ -203,7 +203,7 @@ os.remove(user_path)
 			helpers.assert_eq(delivered.binding, "tap_hold__win")
 		end)
 		if native_hook then native_hook.set_remapper(nil) end
-		package.loaded["adapters.keyboard_hook"] = saved_hook
+		package.loaded["platform.input.keyboard_hook"] = saved_hook
 		Manager._reset_for_test()
 		os.remove(user_path)
 		assert(ok, failure)
@@ -211,7 +211,7 @@ os.remove(user_path)
 
 	helpers.it("admits a monitor tap only from its active canonical tap-hold source", function()
 		local names = { "modules.gestures.manager", "platform.remap.tap_hold_manager", "adapters.window_switch",
-			"adapters.keyboard_hook", "core.fs.adapters.file_system", "infra.config_paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
+			"platform.input.keyboard_hook", "core.fs.adapters.file_system", "infra.config_paths", "core.fs.adapters.storage", "ui.gesture_conflicts" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local user_path, config_path = os.tmpname(), os.tmpname()
@@ -219,7 +219,7 @@ os.remove(user_path)
 		local file = assert(io.open(config_path, "w")); file:write("[gesture_parameters]\nprivate = 'unchanged'\n"); file:close()
 		local Manager, generation, capture, accepted, on_read = nil, 1, nil, 0, nil
 		local ok, failure = pcall(function()
-			package.loaded["adapters.keyboard_hook"] = { physical_source_receipt = function()
+			package.loaded["platform.input.keyboard_hook"] = { physical_source_receipt = function()
 				return { ready = true, generation = generation }
 			end }
 			package.loaded["core.fs.adapters.file_system"] = { read_with_status = function(path)
@@ -1690,7 +1690,7 @@ helpers.describe("OneShot daemon Manager bootstrap", function()
 	helpers.it("selects Hook at setup when keystats already constructed Manager before it", function()
 		local file = assert(io.open("ergopti_hotstrings.lua", "r")); local daemon = file:read("*a"); file:close()
 		local keystats_at = assert(daemon:find('require("modules.keystats.keystats")', 1, true))
-		local hook_at = assert(daemon:find('require("adapters.keyboard_hook")', 1, true))
+		local hook_at = assert(daemon:find('require("platform.input.keyboard_hook")', 1, true))
 		helpers.assert_true(keystats_at < hook_at, "actual daemon loads keystats before its Hook import")
 		-- modules/keystats/keystats, selected by a declaration unique to it.
 		local source = assert(helpers.read_driver_unit("local function new_live_tracker("))
@@ -1698,10 +1698,10 @@ helpers.describe("OneShot daemon Manager bootstrap", function()
 			"actual keystats constructs Manager before daemon Hook setup")
 		local options = {}
 		options.before_manager = function(s)
-			local hook = package.loaded["adapters.keyboard_hook"]
-			package.loaded["adapters.keyboard_hook"] = nil
+			local hook = package.loaded["platform.input.keyboard_hook"]
+			package.loaded["platform.input.keyboard_hook"] = nil
 			local ok, manager = pcall(helpers.load_module, "platform.remap.tap_hold_manager")
-			package.loaded["adapters.keyboard_hook"] = hook
+			package.loaded["platform.input.keyboard_hook"] = hook
 			if not ok then error(manager, 0) end
 			options.cached_manager = manager
 		end

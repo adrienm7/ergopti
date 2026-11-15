@@ -78,7 +78,7 @@ end
 helpers.describe("input_event: little-endian primitives", function()
 
 	helpers.it("decodes a u16 low byte first, not high byte first", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		-- 0x1E00 vs 0x001E is the difference between KEY_A and a code no keyboard
 		-- reports. Byte order is the one mistake that produces plausible output.
 		helpers.assert_eq(ie.unpack_u16_le("\30\0", 1), 30, "0x1E 0x00 is 30, not 7680")
@@ -86,19 +86,19 @@ helpers.describe("input_event: little-endian primitives", function()
 	end)
 
 	helpers.it("decodes a u16 from the given offset", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.unpack_u16_le("\255\255\30\0", 3), 30,
 			"the offset must be honoured; every field but the first depends on it")
 	end)
 
 	helpers.it("decodes a positive i32", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.unpack_i32_le("\1\0\0\0", 1), 1, "a key press is value 1")
 		helpers.assert_eq(ie.unpack_i32_le("\2\0\0\0", 1), 2, "an autorepeat is value 2")
 	end)
 
 	helpers.it("converts the high half of the range to a negative number", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		-- EV_REL and EV_ABS carry signed deltas. Reading -1 as 4294967295 would
 		-- not fail, it would move a pointer four billion units.
 		helpers.assert_eq(ie.unpack_i32_le("\255\255\255\255", 1), -1,
@@ -106,24 +106,24 @@ helpers.describe("input_event: little-endian primitives", function()
 	end)
 
 	helpers.it("leaves the boundary value just below the sign bit positive", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.unpack_i32_le("\255\255\255\127", 1), 2147483647,
 			"0x7FFFFFFF is the largest positive int32 and must not wrap")
 	end)
 
 	helpers.it("returns nil rather than arithmetic on a truncated field", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.unpack_u16_le("\30", 1), nil, "one byte is not a u16")
 		helpers.assert_eq(ie.unpack_i32_le("\1\0\0", 1), nil, "three bytes are not an i32")
 	end)
 
 	helpers.it("packs a u16 low byte first", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.pack_uint_le(30, 2), "\30\0", "the wire is little-endian in both directions")
 	end)
 
 	helpers.it("packs a negative i32 in two's complement", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.pack_i32_le(-1), "\255\255\255\255", "-1 is 0xFFFFFFFF, not a truncation")
 	end)
 
@@ -142,7 +142,7 @@ end)
 helpers.describe("input_event: decode", function()
 
 	helpers.it("reads type, code and value out of a 64-bit struct", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		local ev = ie.decode(build(SIZE_64, 1, 30, 1), SIZE_64)
 		helpers.assert_true(ev ~= nil, "a well-formed struct must decode")
 		helpers.assert_eq(ev.type, 1, "EV_KEY")
@@ -151,7 +151,7 @@ helpers.describe("input_event: decode", function()
 	end)
 
 	helpers.it("reads the same fields out of a 32-bit struct", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		-- THE regression. The old decoder hardcoded offset 17, so on a 32-bit
 		-- userspace it read the last two timeval bytes as the type and the value
 		-- as whatever followed the buffer. Offsets are derived from the size now,
@@ -164,7 +164,7 @@ helpers.describe("input_event: decode", function()
 	end)
 
 	helpers.it("decodes the kernel timestamp on both native struct shapes", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		for _, size in ipairs({ SIZE_64, SIZE_32 }) do
 			local ev = ie.decode(build(size, 1, 30, 1, 123, 456789), size)
 			helpers.assert_eq(ev.seconds, 123, "timeval.tv_sec at size " .. size)
@@ -175,14 +175,14 @@ helpers.describe("input_event: decode", function()
 	end)
 
 	helpers.it("distinguishes press, autorepeat and release", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.decode(build(SIZE_64, 1, 30, 1), SIZE_64).value, 1, "press")
 		helpers.assert_eq(ie.decode(build(SIZE_64, 1, 30, 2), SIZE_64).value, 2, "autorepeat")
 		helpers.assert_eq(ie.decode(build(SIZE_64, 1, 30, 0), SIZE_64).value, 0, "release")
 	end)
 
 	helpers.it("decodes a keycode above 255", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		-- KEY_BRIGHTNESS_CYCLE. The high byte is exactly what a one-byte read
 		-- would lose, and under a grab a lost key is one the user never sees.
 		local ev = ie.decode(build(SIZE_64, 1, 243, 1), SIZE_64)
@@ -190,20 +190,20 @@ helpers.describe("input_event: decode", function()
 	end)
 
 	helpers.it("does not filter by type — that is the dispatcher's job", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		local ev = ie.decode(build(SIZE_64, 4, 4, 458756), SIZE_64)
 		helpers.assert_eq(ev.type, 4, "EV_MSC decodes like anything else")
 		helpers.assert_eq(ev.value, 458756, "including a value far outside key range")
 	end)
 
 	helpers.it("rejects a short buffer instead of decoding garbage", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.decode(string.rep("\0", SIZE_64 - 1), SIZE_64), nil,
 			"a partial read is a truncated struct; decoding it invents a keystroke")
 	end)
 
 	helpers.it("rejects a non-string", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.decode(nil, SIZE_64), nil, "a failed read is nil, and must stay nil")
 	end)
 
@@ -222,19 +222,19 @@ end)
 helpers.describe("input_event: encode", function()
 
 	helpers.it("produces exactly the struct size asked for", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(#ie.encode(1, 30, 1, SIZE_64), SIZE_64, "64-bit struct")
 		helpers.assert_eq(#ie.encode(1, 30, 1, SIZE_32), SIZE_32, "32-bit struct")
 	end)
 
 	helpers.it("matches a hand-built struct byte for byte", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		helpers.assert_eq(ie.encode(1, 30, 1, SIZE_64), build(SIZE_64, 1, 30, 1),
 			"the encoder must agree with the header, not merely with the decoder")
 	end)
 
 	helpers.it("zeroes the timestamp, which is what makes these tests possible", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		local bytes = ie.encode(1, 30, 1, SIZE_64)
 		helpers.assert_eq(bytes:sub(1, SIZE_64 - 8), string.rep("\0", SIZE_64 - 8),
 			"the kernel stamps events arriving from uinput; sending a clock reading "
@@ -242,7 +242,7 @@ helpers.describe("input_event: encode", function()
 	end)
 
 	helpers.it("encodes an explicit timestamp only when a fixture asks for one", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		for _, size in ipairs({ SIZE_64, SIZE_32 }) do
 			local bytes = ie.encode(1, 30, 1, size, 123456789)
 			helpers.assert_eq(bytes, build(size, 1, 30, 1, 123, 456789),
@@ -251,7 +251,7 @@ helpers.describe("input_event: encode", function()
 	end)
 
 	helpers.it("round-trips every field, on both struct sizes", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		for _, size in ipairs({ SIZE_64, SIZE_32 }) do
 			for _, case in ipairs({ { 1, 30, 1 }, { 1, 243, 2 }, { 1, 42, 0 }, { 3, 8, -1 } }) do
 				local ev = ie.decode(ie.encode(case[1], case[2], case[3], size), size)
@@ -277,7 +277,7 @@ end)
 helpers.describe("input_event: native_size", function()
 
 	helpers.it("answers with a struct size big enough to hold the payload", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		local size = ie.native_size()
 		helpers.assert_type(size, "number", "the size must be a number to index with")
 		helpers.assert_true(size >= 16,
@@ -287,7 +287,7 @@ helpers.describe("input_event: native_size", function()
 	end)
 
 	helpers.it("falls back to the 64-bit size on a runtime with no FFI to ask", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		ie._reset_measurement()
 		-- This interpreter has no ffi module, so the fallback IS the path taken
 		-- here — and the fallback value is the one every fixture above is written
@@ -303,7 +303,7 @@ helpers.describe("input_event: native_size", function()
 	end)
 
 	helpers.it("caches the answer rather than probing per event", function()
-		local ie = helpers.load_module("infra.input_event")
+		local ie = helpers.load_module("platform.input.event")
 		ie._reset_measurement()
 		local first = ie.native_size()
 		helpers.assert_eq(ie.native_size(), first,

@@ -26,7 +26,7 @@ local BTN_TOUCH = 0x14a
 local TOOL = { [1] = 0x145, [2] = 0x14d, [3] = 0x14e, [4] = 0x14f, [5] = 0x148 }
 local EMITTER = "modules.gestures.combo_emitter"
 local MANAGER = "modules.gestures.manager"
-local READER = "adapters.evdev_reader"
+local READER = "platform.input.evdev_reader"
 
 --- The evdev events of one whole gesture, landing, moving and lifting.
 --- @param fingers integer Contacts reported through BTN_TOOL_*.

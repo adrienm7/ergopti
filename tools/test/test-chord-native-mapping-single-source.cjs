@@ -48,7 +48,10 @@ const CATALOGUE = path.join(
 	ROOT,
 	'static/ergopti_plus/_shared/shortcuts/data/actions/modifier_chords.json'
 );
-const AHK_ADAPTER = path.join(ROOT, 'static/ergopti_plus/windows/adapters/hotkey_registrar.ahk');
+const AHK_ADAPTER = path.join(
+	ROOT,
+	'static/ergopti_plus/windows/platform/input/hotkey_registrar.ahk'
+);
 const AHK_SLOTS = path.join(ROOT, 'static/ergopti_plus/windows/_generated/slot_roles.ahk');
 const SLOT_ROLES = path.join(
 	ROOT,

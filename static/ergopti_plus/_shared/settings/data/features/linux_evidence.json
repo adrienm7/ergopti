@@ -34,7 +34,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/caps_word_auto_off.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+				"static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/caps_word/test_caps_word_auto_off.lua",
 				"static/ergopti_plus/_shared/keyboard/engine/caps_word_auto_off.lua"
 			]
@@ -581,7 +581,7 @@
 				"static/ergopti_plus/linux/ui/menu/builder.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_user_code_contract.lua",
 				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_user_hotstring_runtime.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/synthetic_input/test_user_hotstring_destination.lua",
+				"static/ergopti_plus/linux/tests/unit/platform/input/synthetic_input/test_user_hotstring_destination.lua",
 				"static/ergopti_plus/linux/tests/unit/ui/menu/hotstrings/test_user_hotstring_menu.lua"
 			]
 		},
@@ -1064,7 +1064,7 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/navigation_settings.lua",
-				"static/ergopti_plus/linux/adapters/keyboard_hook.lua",
+				"static/ergopti_plus/linux/platform/input/keyboard_hook.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_navigation_settings.lua"
 			]
 		},

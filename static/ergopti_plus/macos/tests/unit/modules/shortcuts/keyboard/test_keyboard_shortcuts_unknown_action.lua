@@ -23,7 +23,7 @@ local MODULES = {
 	"core.fs.adapters.storage",
 	"infra.preferences",
 	"infra.config_paths",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.fs.adapters.file_system",
 	"core.fs.engine.paths",
 	"core.logger.engine.logger",
@@ -48,7 +48,7 @@ local function with_subject(store, scenario)
 	local logger = helpers.make_logger_stub()
 	logger.warn = function(_, fmt, ...) observed.warnings[#observed.warnings + 1] = string.format(fmt, ...) end
 
-	package.loaded["adapters.hotkey_registrar"] = {
+	package.loaded["platform.input.hotkey_registrar"] = {
 		bind = function(chord)
 			observed.bound[#observed.bound + 1] = chord
 			return { id = #observed.bound }

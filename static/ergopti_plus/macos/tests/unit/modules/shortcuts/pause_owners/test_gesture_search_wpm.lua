@@ -15,7 +15,7 @@ local load_inventory_context = fixtures.load_inventory_context
 
 --- Adds only the transaction and clock boundaries used by queued Search.
 local function search_transaction_ports(hs_stub)
-	local input = package.loaded["adapters.synthetic_input"]
+	local input = package.loaded["platform.input.synthetic_input"]
 	local function complete(tx, status)
 		if tx.status then return false end
 		tx.status, tx.sealed = status, true
@@ -152,7 +152,7 @@ local function load_real_search_capture(stop_mode, click_mode, compose_gestures)
 	hs_stub.pasteboard.writeAllData = function() return true end
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 	package.loaded["core.timing.engine.timings"] = { sec = function() return 0.2 end }
-	package.loaded["adapters.synthetic_input"] = setmetatable({
+	package.loaded["platform.input.synthetic_input"] = setmetatable({
 		emit_key_stroke = function() return true end,
 		defer_after_callback = function() return false end,
 	}, { __index = function() return function() return true end end })

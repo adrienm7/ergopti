@@ -26,7 +26,7 @@
 
 local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 local Fakes = require("tests.fakes")
 
 local NAVIGATION_KEY = "llm.navigation.nav_modifiers"
@@ -66,7 +66,7 @@ local FAKED = {
 }
 local RELOADED = {
 	"modules.llm.navigation_settings", "modules.llm.display_settings", "modules.llm.prediction_engine", "core.ui.ui.tooltip.llm",
-	"adapters.keyboard_hook",
+	"platform.input.keyboard_hook",
 }
 
 
@@ -212,7 +212,7 @@ local function with_offer(options, body)
 		--- Types evdev events through the real keyboard hook in intercept mode.
 		--- @return table emitted "code:value" of every event the application receives
 		function world.drive(events)
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			local emitted = {}
 			hook._test_drive(events, {
 				onConsume = function(detail) return world.engine.handle_shortcut(detail) end,
@@ -388,7 +388,7 @@ helpers.describe("prediction tooltip: Shift+Tab (llm-nav-left-right-windows)", f
 	end)
 
 	helpers.it("(llm-nav-left-right-windows) the hook names the side of the one Shift held", function()
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local sides = {}
 		hook._test_drive({
 			{ type = EV_KEY, code = EvdevCodes.KEY_LEFTSHIFT, value = 1 },
@@ -495,7 +495,7 @@ end)
 --- @return table details { code, mods }
 local function consumed_details(keys, events)
 	local Engine = require("platform.remap.tap_hold_engine")
-	local hook = helpers.load_module("adapters.keyboard_hook")
+	local hook = helpers.load_module("platform.input.keyboard_hook")
 	hook.set_remapper(Engine.new({ keys = keys, tap_min_ms = 0, lone_tap_max_ms = 0, one_shot_timeout_ms = 2000 }))
 	local details = {}
 	local ok, err = pcall(hook._test_drive, events, {

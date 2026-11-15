@@ -21,7 +21,7 @@ them the same way since fc5d3a11df: it rebuilds the `.keylayout` and replaces it
 
 The keyboard hook could have retyped ten keys of the system layout on every
 press (the dormant owner of d70c2d9aa3, `_number_row` in
-`adapters/keyboard_hook.lua`). That is a partial emulation, which the Linux
+`platform/input/keyboard_hook.lua`). That is a partial emulation, which the Linux
 design avoids, and its backend was never qualified on a desktop. Rebuilding the
 layout keeps one rule (`layout.number_row_policy`, the same as Windows and the
 composer), keeps Ctrl, AltGr and dead keys exactly as the layout defines them, and

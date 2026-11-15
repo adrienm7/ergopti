@@ -62,7 +62,7 @@ global LAYER_EDITOR_TAP_HOLD_KEY_CODES := Map(
 	"enter", "Enter", "backspace", "Backspace", "delete", "Delete"
 )
 
-; The OS calls a legend needs, all in adapters/key_state.ahk: the layout the
+; The OS calls a legend needs, all in platform/input/key_state.ahk: the layout the
 ; user types with now, a scan code's virtual key on it, and what that key types
 ; unshifted there, read without arming a dead key. The unit suite passes a fake.
 global _LayerEditorOsProbe := {

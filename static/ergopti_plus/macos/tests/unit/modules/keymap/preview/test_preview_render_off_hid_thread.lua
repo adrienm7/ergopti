@@ -171,7 +171,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 
 	helpers.it("reset_predictions drops a render already queued for the next tick", function()
 		local dependency_names = {
-			"adapters.synthetic_input",
+			"platform.input.synthetic_input",
 			"core.events.timer_scheduler",
 			"modules.keymap.utils",
 			"modules.llm",
@@ -187,7 +187,7 @@ helpers.describe("llm_bridge: dismissals cancel a pending render", function()
 		local shown = 0
 		local reset_count = 0
 		local action_epoch = {}
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			current_action_epoch = function() return action_epoch end,
 		}
 		local timer_scheduler = { hotstring_time = function() return _G.hs.timer.secondsSinceEpoch() end }

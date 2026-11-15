@@ -130,7 +130,7 @@ describe("Actual pause writer observer ordering",function()
 	end)
 	it("denies before the first foreign synthetic-input drain",function()
 		with_context({input_drain_deferred=true},function(script,ctx,records)
-			local native=package.loaded["adapters.synthetic_input"]
+			local native=package.loaded["platform.input.synthetic_input"]
 			local original=native.when_idle
 			native.when_idle=function(...)
 				helpers.assert_eq(last(records).source,"pause")
@@ -182,7 +182,7 @@ describe("Actual pause writer observer ordering",function()
 				denied(records)
 			end)
 			commit_pause(script,ctx)
-			local native=package.loaded["adapters.synthetic_input"]
+			local native=package.loaded["platform.input.synthetic_input"]
 			local original=native.release_admission_fence
 			native.release_admission_fence=function(token)
 				denied(records);helpers.assert_true(token==ctx.admission_fence)
@@ -325,7 +325,7 @@ describe("Actual pause writer observer ordering",function()
 	it("stop invalidates current observation before foreign native cleanup",function()
 		with_context({},function(script,ctx,records)
 			commit_pause(script,ctx)
-			local native=package.loaded["adapters.synthetic_input"]
+			local native=package.loaded["platform.input.synthetic_input"]
 			local original=native.release_admission_fence
 			native.release_admission_fence=function(token)
 				helpers.assert_eq(last(records).source,"stop");denied(records)

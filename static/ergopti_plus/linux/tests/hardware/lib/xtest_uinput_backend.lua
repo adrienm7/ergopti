@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: uinput Backend Delivered Through XTest
 --- DESCRIPTION:
---- A syscall backend for adapters/uinput_writer.lua (its _set_backend seam)
+--- A syscall backend for platform/input/uinput_writer.lua (its _set_backend seam)
 --- whose writes go to a real X server through XTest instead of a kernel node.
 --- The writer, the modifier broker and the injector above it are production
 --- code: only the last hop changes, from /dev/uinput to XTestFakeKeyEvent with

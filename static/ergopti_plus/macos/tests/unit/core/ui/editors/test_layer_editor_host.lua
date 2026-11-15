@@ -79,7 +79,7 @@ end
 --- @param scenario function(editor, world)
 local function with_editor(scenario)
 	local names = { "core.logger.engine.logger", "core.i18n.engine.i18n", "core.fs.engine.paths", "infra.config_paths", "core.fs.adapters.file_system",
-		"core.ui.ui.builder", "ui.layer_editor", "platform.remap.nav_layer", "infra.keycodes",
+		"core.ui.ui.builder", "ui.layer_editor", "platform.remap.nav_layer", "platform.input.keycodes",
 		"modules.shortcuts.bindings", "modules.keymap.layout_registry", "modules.keymap.layout_emulation",
 		"core.ui.engine.notifications" }
 	local saved = {}

@@ -36,7 +36,7 @@ local function fresh_harness(overrides)
 	package.loaded["platform.remap.watchers"] = nil
 	package.loaded["infra.capsword_auto_off"] = nil
 	package.loaded["modules.keymap.control_sentinels"] = nil
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		defer_after_callback = function(_label, callback) callback(); return true end,
 	}
 	package.loaded["core.process.adapters.shell_runner"] = nil
@@ -70,7 +70,7 @@ local function fresh_harness(overrides)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		set_capslock = function(value) h.capslock[#h.capslock + 1] = value end,
 	}
 	package.loaded["platform.remap.ke_variables"] = {

@@ -16,7 +16,7 @@ local OWNED_MODULES = {
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
 	"platform.remap.watchers",
-	"adapters.hotkey_registrar",
+	"platform.input.hotkey_registrar",
 	"core.timing.engine.timings",
 	"core.events.timer_scheduler",
 	"infra.config_paths",
@@ -31,9 +31,9 @@ local OWNED_MODULES = {
 	"core.text.engine.utils",
 	"platform.remap.ke_paths",
 	"core.process.adapters.task_lifecycle",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"modules.gestures.actions",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.llm.warmup_controller",
 	"modules.llm.api_mlx",
 	"modules.llm.api_ollama",
@@ -42,7 +42,7 @@ local OWNED_MODULES = {
 	"ui.wpm.wpm_widget",
 	"core.ui.ui.tooltip",
 	"modules.keystats",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"modules.shortcuts.script_control",
 	"platform.remap.ke_variables",
 	"core.fs.adapters.json_codec",
@@ -444,7 +444,7 @@ return function(run, dependencies)
 				stop_input_source_watcher = function() return true end,
 				stop_alt_tab_apps_tracker = function() return true end,
 			}
-			package.loaded["adapters.hotkey_registrar"] = {
+			package.loaded["platform.input.hotkey_registrar"] = {
 				unbind = function()
 					calls.unbound = calls.unbound + 1
 					return options.unbind_succeeds ~= false
@@ -781,7 +781,7 @@ return function(run, dependencies)
 					}
 				end,
 			}
-			package.loaded["infra.keycodes"] = {
+			package.loaded["platform.input.keycodes"] = {
 				F13_KARABINER_RETURN = 0x6A,
 				F14_KARABINER_BACKSPACE = 0x6B,
 				F15_KARABINER_ESCAPE = 0x6C,
@@ -796,7 +796,7 @@ return function(run, dependencies)
 				SG_NAMES = { "none", "script_pause_toggle" },
 				AX_NAMES = {},
 			}
-			package.loaded["adapters.key_state"] = {
+			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
@@ -830,7 +830,7 @@ return function(run, dependencies)
 
 			-- Bind both native timer owners to the same fresh hs run loop as script_control;
 			-- cached adapters would retain prior timers or an obsolete commitment contract.
-			package.loaded["adapters.synthetic_input"] = nil
+			package.loaded["platform.input.synthetic_input"] = nil
 			package.loaded["core.events.timer_scheduler"] = nil
 			local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
 			local script_hs = hs

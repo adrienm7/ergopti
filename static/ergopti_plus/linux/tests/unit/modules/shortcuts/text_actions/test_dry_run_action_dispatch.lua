@@ -84,7 +84,7 @@ local function with_action(route, mode, action, body)
 			package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
 				return { path = "controlled-touchpad", name = "controlled", max_fingers = 3 }
 			end }
-			package.loaded["adapters.evdev_reader"] = { TOUCHPAD = "touchpad",
+			package.loaded["platform.input.evdev_reader"] = { TOUCHPAD = "touchpad",
 				open = function() return true end, close = function() return true end }
 			local layout = require("adapters.keyboard_layout")
 			layout._set_table_for_test({ o = { keycode = 24, mods = {} }, k = { keycode = 37, mods = {} },
@@ -99,12 +99,12 @@ local function with_action(route, mode, action, body)
 			for field, name in pairs({ shortcuts = "modules.shortcuts.manager", event_loop = "core.events.loop",
 				gestures = "modules.gestures.manager", ActionHandlers = "modules.shortcuts.action_handlers",
 				prediction_engine = "modules.llm.prediction_engine", keyboard_shortcuts = "modules.shortcuts.keyboard_shortcuts",
-				keyboard_hook = "adapters.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
+				keyboard_hook = "platform.input.keyboard_hook", keystats = "modules.keystats.keystats", Monotonic = "core.logger.engine.monotonic",
 				MagicKeySource = "modules.hotstrings.magic_key_source", script_chords = "modules.shortcuts.script_chords",
 				tap_keys = "modules.shortcuts.tap_keys", hotstrings_config = "modules.hotstrings.hotstrings_config",
 				MagicKey = "modules.hotstrings.magic_key", TapHold = "platform.remap.tap_hold_manager" }) do environment[field] = require(name) end
 			environment.secure_focus_guard, environment.injector = guard, injector
-			environment.input_capture_gate = require("infra.input_capture_gate").new()
+			environment.input_capture_gate = require("platform.input.capture_gate").new()
 			environment.on_char = function() error("The bound chord must not become a text callback") end
 			environment.privacy_owners = {}
 			evaluate(assert(source:match("\n\t\t(gestures%.init%b())")), environment)

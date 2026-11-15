@@ -296,7 +296,7 @@ helpers.describe("tap-hold engine: a tap with no hold", function()
 	end)
 
 	helpers.it("holds what the Windows block of a special tap holds (tap-no-hold-per-key)", function()
-		local F24 = require("infra.evdev_codes").KEY_F24
+		local F24 = require("platform.input.evdev_codes").KEY_F24
 		local masked_alt_up = F24 .. "↓ " .. F24 .. "↑ 56↑"
 		local cases = {
 			-- tab.ahk 8.1, lalt.ahk 4.3: Alt for the switcher, the monitor on a tap.

@@ -8,8 +8,8 @@ local OWNERS = {
 	"core.ui.engine.dialog_util", "core.lifecycle.engine.shutdown.teardown_transaction", "modules.keystats.init",
 	"modules.keystats.log_manager", "modules.keystats.context_tracker",
 	"modules.keystats.kc_bridge", "modules.keystats.watchers", "modules.keystats.timestamp",
-	"modules.keystats.physical_accounting_mode", "adapters.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
-	"adapters.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
+	"modules.keystats.physical_accounting_mode", "platform.input.synthetic_input", "adapters.event_provenance", "core.process.adapters.lifecycle",
+	"platform.input.keyboard_hook", "adapters.input_source_broker", "core.fs.adapters.storage",
 	"core.events.timer_scheduler", "modules.keystats.aggregator.events",
 	"modules.keystats.aggregator.state", "modules.keystats.aggregator.core",
 	"modules.keystats.aggregator.physical", "ui.metrics_typing.init",
@@ -41,7 +41,7 @@ helpers.describe("Observed public keystats writers keep their native identity",f
 			local handler=upvalue(fixture.keystats.start,"handle_key")
 			helpers.assert_eq(type(handler),"function")
 			local installed,calls=nil,0
-			package.loaded["adapters.keyboard_hook"].start=function(options) installed=options.onEvent;calls=calls+1;return true end
+			package.loaded["platform.input.keyboard_hook"].start=function(options) installed=options.onEvent;calls=calls+1;return true end
 			fixture.start({is_paused=function() return false end})
 			helpers.assert_eq(calls,1)
 			helpers.assert_true(rawequal(handler,installed),"The public upvalue must be the actual installed production handler")
@@ -55,7 +55,7 @@ helpers.describe("Observed public keystats writers keep their native identity",f
 			fixture.hs.timer.absoluteTime=function() clock=clock+1;return clock end
 			helpers.assert_true(fixture.keystats.bind_physical_lifecycle_observer({},100,function(record) records[#records+1]=record;return true end)~=nil)
 			local calls=0
-			package.loaded["adapters.keyboard_hook"].start=function(options)
+			package.loaded["platform.input.keyboard_hook"].start=function(options)
 				calls=calls+1
 				helpers.assert_eq(records[#records].source,"start")
 				helpers.assert_eq(records[#records].stage,"boundary")

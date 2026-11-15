@@ -17,14 +17,14 @@ local FIXTURE_MODULES = {
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",
 	"core.i18n.engine.i18n",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.fs.engine.paths",
 	"core.fs.adapters.storage",
 	"core.ui.adapters.graphics_renderer",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
 	"modules.llm.api_mlx",
@@ -109,7 +109,7 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			package.loaded["core.ui.engine.notifications"] = { notify = function() end }
 			package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
-			package.loaded["infra.keycodes"] = {
+			package.loaded["platform.input.keycodes"] = {
 				F13_KARABINER_RETURN = 106,
 				F14_KARABINER_BACKSPACE = 107,
 				F15_KARABINER_ESCAPE = 108,
@@ -214,11 +214,11 @@ helpers.describe("WPM widget callbacks are fenced by a real ScriptControl PAUSE"
 			canvases[1].mouse_callback(canvases[1], "mouseDown", 1, 0, 0)
 
 			package.loaded["adapters.event_provenance"] = {}
-			package.loaded["adapters.key_state"] = {
+			package.loaded["platform.input.key_state"] = {
 				is_right_altgr_held = function() return false end,
 				describe_held_modifiers = function() return "(none)" end,
 			}
-			package.loaded["adapters.synthetic_input"] = {
+			package.loaded["platform.input.synthetic_input"] = {
 				when_idle = function(callback)
 					idle_callback = callback
 					return true

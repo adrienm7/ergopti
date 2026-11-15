@@ -240,12 +240,12 @@ local function install_script_control_dependencies(options)
 	local function settled() return true end
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["adapters.event_provenance"] = {}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}
 	local fence
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback) callback(); return true end,
 		acquire_admission_fence = function()
 			fence = { active = true }
@@ -258,7 +258,7 @@ local function install_script_control_dependencies(options)
 			return true
 		end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,

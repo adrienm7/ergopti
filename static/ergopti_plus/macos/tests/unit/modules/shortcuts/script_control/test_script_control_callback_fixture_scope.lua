@@ -11,11 +11,11 @@ local helpers = require("tests.helpers")
 local Fixture = require("tests.support.script_control_callback_fixture")
 
 local OWNERS = {
-	"core.logger.engine.logger", "core.ui.engine.notifications", "infra.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
+	"core.logger.engine.logger", "core.ui.engine.notifications", "platform.input.keycodes", "core.i18n.engine.i18n", "core.fs.engine.paths",
 	"modules.gestures.engine", "modules.gestures.actions", "modules.keystats",
-	"adapters.event_provenance", "adapters.synthetic_input", "core.events.timer_scheduler",
-	"adapters.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
-	"adapters.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
+	"adapters.event_provenance", "platform.input.synthetic_input", "core.events.timer_scheduler",
+	"platform.input.key_state", "modules.shortcuts.script_control", "core.fs.adapters.file_system",
+	"platform.input.hotkey_registrar", "core.fs.adapters.storage", "modules.shortcuts.keyboard_shortcuts", "keyboard.engine.chord",
 	"infra.config_paths", "infra.preferences",
 }
 
@@ -26,7 +26,7 @@ helpers.describe("Script control callback fixture isolation", function()
 				helpers.with_stub_scope(OWNERS, function()
 					helpers.load_with_stubs("hs")
 					local prior_hs = _G.hs
-					local identity_name = kind == "sentinel" and "infra.keycodes" or "core.fs.adapters.storage"
+					local identity_name = kind == "sentinel" and "platform.input.keycodes" or "core.fs.adapters.storage"
 					local prior_identity = {}
 					package.loaded[identity_name] = prior_identity
 					package.loaded["core.logger.engine.logger"] = false

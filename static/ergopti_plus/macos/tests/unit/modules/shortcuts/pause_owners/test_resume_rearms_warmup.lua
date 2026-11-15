@@ -22,7 +22,7 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 	helpers.it("pause stops the warmup chain AND resume re-arms it", function()
 		local calls = { stop = 0, rearm = 0 }
 		local owner_names = {
-			"adapters.synthetic_input",
+			"platform.input.synthetic_input",
 			"modules.llm.warmup_controller",
 			"modules.llm.api_mlx",
 			"modules.llm.api_ollama",
@@ -36,7 +36,7 @@ helpers.describe("script_control pause/resume warmup symmetry", function()
 		for _, name in ipairs(owner_names) do saved[name] = package.loaded[name] end
 		local idle_callbacks = {}
 		local admission_fence = nil
-		package.loaded["adapters.synthetic_input"] = {
+		package.loaded["platform.input.synthetic_input"] = {
 			when_idle = function(callback)
 				idle_callbacks[#idle_callbacks + 1] = callback
 				return true

@@ -45,7 +45,7 @@ helpers.assert_true(
 )
 
 local adapter_src = helpers.read_driver_source("local function drain_deferred_lifecycle")
-helpers.assert_true(adapter_src ~= nil, "adapters/synthetic_input.lua source must be locatable")
+helpers.assert_true(adapter_src ~= nil, "platform/input/synthetic_input.lua source must be locatable")
 helpers.assert_true(adapter_src:find("run_logged%(call%.label, call%.callback") ~= nil,
 	"the deferred FIFO must keep its shared xpcall/logger boundary")
 

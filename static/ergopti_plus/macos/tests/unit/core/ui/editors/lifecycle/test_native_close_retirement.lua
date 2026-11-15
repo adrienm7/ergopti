@@ -21,7 +21,7 @@ local function with_window(module_name, scenario)
 		return helpers.with_stub_scope({
 			"ui.layer_editor", "ui.action_picker", "core.ui.ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
 			"infra.config_paths", "core.process.adapters.program_providers", "apps.engine.program_provider_picker", "modules.keymap.layout_registry",
-			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "infra.keycodes", "core.fs.adapters.file_system",
+			"layouts.engine.layers.editor", "layouts.engine.layers.layers", "platform.remap.nav_layer", "platform.input.keycodes", "core.fs.adapters.file_system",
 			"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "layouts.engine.manager_bridge",
 
 			"adapters.apple_shortcuts", "adapters.apple_shortcuts_native", "core.process.adapters.shell_runner", "core.process.adapters.task_environment",

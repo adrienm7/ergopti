@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.clipboard", "core.events.timer_scheduler", "adapters.synthetic_input",
+		"modules.keymap.utils", "adapters.clipboard", "core.events.timer_scheduler", "platform.input.synthetic_input",
 		"core.logger.engine.logger", "core.timing.engine.timings", "core.text.engine.utils",
 	}) do
 		package.loaded[name] = nil
@@ -65,7 +65,7 @@ local function load_fixture()
 			callback(tx, "complete")
 		end
 	end
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_transaction = function() return tx end,
 		begin = function()
 			assert(debt_tx == nil, "one clipboard owner must create one drain debt")

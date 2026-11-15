@@ -44,7 +44,7 @@ local Emulation = require("layouts.engine.composer.keylayout_emulation")
 local SourceEmulation = require("layouts.engine.composer.source_emulation")
 local Settings = require("layouts.engine.emulation.settings")
 local Logger = require("core.logger.engine.shim")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local M = {}
 

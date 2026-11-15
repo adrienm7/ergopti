@@ -24,7 +24,7 @@ helpers.describe("tooltip: a failed render does not leave the tooltip 'visible'"
 	helpers.it("rolls the visibility claim back when render_stacked throws", function()
 		helpers.load_with_stubs("core.ui.ui.tooltip.config")
 		package.loaded["adapters.event_provenance"] = nil
-		package.loaded["adapters.synthetic_input"] = nil
+		package.loaded["platform.input.synthetic_input"] = nil
 		local renderer
 		renderer = {
 			standard_hidden = false,

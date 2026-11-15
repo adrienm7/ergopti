@@ -397,7 +397,7 @@ downloaded again`). Ollama deletes that layer before it reports the
   replay `_shared/tests/corpus/diagnostics/hotpath_nesting_vectors.json`
   (`slow` and `reports` per case, the Lua replay is
   `_shared/tests/lua/core/hotpath_nesting_replay.lua`) in a new test beside
-  `tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk`. The
+  `tests/unit/platform/input/dispatch/test_hotpath_per_segment_threshold.ahk`. The
   `slow_child_is_reported_with_its_parent_and_the_parent_is_not_billed` case
   fails on today's code.
 - PAR-63, the rest of the 2026-10-18 test items (Windows only): behaviour tests

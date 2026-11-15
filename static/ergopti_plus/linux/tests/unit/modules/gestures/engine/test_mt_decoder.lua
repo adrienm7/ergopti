@@ -567,8 +567,8 @@ helpers.describe("mt decoder: lost queue recovery", function()
 
 	helpers.it("mt-drop-recovery: retains packet loss across actual binary Reader drain calls", function()
 		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
-		local reader = helpers.load_module("adapters.evdev_reader")
-		local codec = require("infra.input_event")
+		local reader = helpers.load_module("platform.input.evdev_reader")
+		local codec = require("platform.input.event")
 		local pending, cursor, closed = {}, 1, 0
 		reader._set_backend({
 			open = function() return 123 end,

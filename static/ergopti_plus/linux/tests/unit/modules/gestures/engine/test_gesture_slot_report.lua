@@ -83,11 +83,11 @@ local function start_with(max_fingers, bindings)
 	end
 	local saved = {
 		logger = package.loaded["core.logger.engine.shim"],
-		reader = package.loaded["adapters.evdev_reader"],
+		reader = package.loaded["platform.input.evdev_reader"],
 		finder = package.loaded["modules.gestures.touchpad_finder"],
 	}
 	package.loaded["core.logger.engine.shim"] = logger
-	package.loaded["adapters.evdev_reader"] = Fakes.evdev_reader({ events = {} })
+	package.loaded["platform.input.evdev_reader"] = Fakes.evdev_reader({ events = {} })
 	-- Only find() and a pad with no resolution, as the other gesture tests fake
 	-- it: the report must not need the finder.
 	package.loaded["modules.gestures.touchpad_finder"] = { read_resolution = function() return nil end, read_axes = function() return nil end, find = function()
@@ -104,7 +104,7 @@ local function start_with(max_fingers, bindings)
 		M.stop_reading()
 	end)
 	package.loaded["core.logger.engine.shim"] = saved.logger
-	package.loaded["adapters.evdev_reader"] = saved.reader
+	package.loaded["platform.input.evdev_reader"] = saved.reader
 	package.loaded["modules.gestures.touchpad_finder"] = saved.finder
 	package.loaded["modules.gestures.manager"] = nil
 	assert(ok, err)

@@ -81,8 +81,8 @@ Each `.spec.js` file exports:
 
 | Port                | AHK Adapter                                | HS Adapter                                 |
 | ------------------- | ------------------------------------------ | ------------------------------------------ |
-| KeyboardHook        | `adapters/keyboard_hook.ahk`               | `adapters/keyboard_hook.lua`               |
-| TextSender          | `adapters/text_sender.ahk`                 | `adapters/text_sender.lua`                 |
+| KeyboardHook        | `platform/input/keyboard_hook.ahk`         | `platform/input/keyboard_hook.lua`         |
+| TextSender          | `platform/input/text_sender.ahk`           | `platform/input/text_sender.lua`           |
 | TooltipRenderer     | `core/ui/adapters/tooltip_renderer.ahk`    | `core/ui/adapters/tooltip_renderer.lua`    |
 | HttpClient          | `core/network/adapters/http_client.ahk`    | `core/network/adapters/http_client.lua`    |
 | TimerScheduler      | `core/events/timer_scheduler.ahk`          | `core/events/timer_scheduler.lua`          |
@@ -93,7 +93,7 @@ Each `.spec.js` file exports:
 | Clipboard           | `adapters/clipboard.ahk`                   | `adapters/clipboard.lua`                   |
 | Storage             | `core/fs/adapters/storage.ahk`             | `core/fs/adapters/storage.lua`             |
 | ProcessLifecycle    | `core/process/adapters/lifecycle.ahk`      | `core/process/adapters/lifecycle.lua`      |
-| KeyState            | `adapters/key_state.ahk`                   | `adapters/key_state.lua`                   |
+| KeyState            | `platform/input/key_state.ahk`             | `platform/input/key_state.lua`             |
 | MouseControl        | `adapters/mouse_control.ahk`               | `adapters/mouse_control.lua`               |
 | NetworkInfo         | `core/network/adapters/info.ahk`           | `core/network/adapters/info.lua`           |
 | WindowInfo          | `platform/focus/window_info.ahk`           | `platform/focus/window_info.lua`           |

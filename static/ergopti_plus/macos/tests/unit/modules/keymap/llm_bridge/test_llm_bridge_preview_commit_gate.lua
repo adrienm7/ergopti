@@ -36,7 +36,7 @@ local function load_fixture(render_result, previews_enabled, options)
 	fixture.schedule_calls = 0
 	fixture.cancel_mode = options.cancel_mode
 
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		current_action_epoch = function() return action_epoch end,
 	}
 	local scheduler = {}

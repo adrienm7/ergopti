@@ -275,7 +275,7 @@ for (const field of [
 	check(erasingRecord.includes(field), `the parser must record the exact erasure: ${field}`);
 }
 
-const sender = read('adapters/text_sender.ahk');
+const sender = read('platform/input/text_sender.ahk');
 check(
 	bodyOf(sender, 'TextSend').includes('_AHK_SendInput.Bind(ErasePrefix . "{Text}" . Text)'),
 	'the direct sender must send the erasure and the text as one SendInput batch'

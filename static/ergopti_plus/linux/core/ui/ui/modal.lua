@@ -16,7 +16,7 @@ local M = {}
 --- @param opts table|nil Optional native restoration observer, forwarded intact.
 --- @return any
 function M.run(fn, opts)
-	local ok, hook = pcall(require, "adapters.keyboard_hook")
+	local ok, hook = pcall(require, "platform.input.keyboard_hook")
 	if ok and type(hook) == "table" and type(hook.while_released) == "function" then
 		return hook.while_released(fn, opts)
 	end

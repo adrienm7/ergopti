@@ -27,7 +27,7 @@
  * 3. Geometry: no two keys overlap and every alphanumeric row spans the same
  *    width on both form factors.
  * 4. Parity with every existing hand copy, each an independent oracle written
- *    before the registry: evdev.json, linux/infra/evdev_codes.lua,
+ *    before the registry: evdev.json, linux/platform/input/evdev_codes.lua,
  *    _shared/platform/input/keycodes/core.lua, azerty.json, heatmap_win.js SC_TO_KC, the
  *    Karabiner legacy_layer_keys.json and the native tap-hold input keys. Each scan is
  *    floored so a parser that stops matching cannot pass over nothing.
@@ -333,9 +333,9 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	if (n < 45) fail(`evdev.json: only ${n} codes compared (floor 45)`);
 }
 
-// --- 4.2 linux/infra/evdev_codes.lua: named kernel codes.
+// --- 4.2 linux/platform/input/evdev_codes.lua: named kernel codes.
 {
-	const src = read('linux/infra/evdev_codes.lua');
+	const src = read('linux/platform/input/evdev_codes.lua');
 	const NAMED = {
 		LEFTSHIFT: 'ShiftLeft',
 		RIGHTSHIFT: 'ShiftRight',

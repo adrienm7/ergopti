@@ -38,10 +38,10 @@ local helpers = require("tests.helpers")
 ---   up on a turn up and volume down on a turn down.
 --- @return table ctx { scroll, posted, strokes, asked, owner, hs }.
 local function make_ctx(slots)
-	package.loaded["infra.keycodes"] = nil
+	package.loaded["platform.input.keycodes"] = nil
 	package.loaded["modules.shortcuts.actions.system"] = nil
 	package.loaded["core.events.timer_scheduler"] = nil
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
 	local sys = helpers.load_with_stubs("modules.shortcuts.actions.system")
@@ -65,7 +65,7 @@ local function make_ctx(slots)
 		}
 	end
 	-- The same module table system.lua holds, so the spy sees its calls.
-	require("adapters.synthetic_input").emit_key_stroke = function(mods, keycode)
+	require("platform.input.synthetic_input").emit_key_stroke = function(mods, keycode)
 		ctx.strokes[#ctx.strokes + 1] = { mods = mods, keycode = keycode }
 		return true
 	end
@@ -101,7 +101,7 @@ end
 --- Publishes one navigation-layer sentinel as the keymap tap that claims it.
 --- @param name string "F20_LAYER_NAV_ENTERED" or "F19_LAYER_NAV_EXITED".
 local function sentinel(name)
-	local keycode = require("infra.keycodes")[name]
+	local keycode = require("platform.input.keycodes")[name]
 	helpers.assert_true(require("modules.keymap.control_sentinels").claim_key(keycode, true, {}),
 		name .. " must be a claimed control sentinel")
 end

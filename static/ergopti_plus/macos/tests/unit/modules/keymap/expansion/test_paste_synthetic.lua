@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 
 local function load_fixture()
 	for _, name in ipairs({
-		"modules.keymap.utils", "adapters.clipboard", "adapters.synthetic_input",
+		"modules.keymap.utils", "adapters.clipboard", "platform.input.synthetic_input",
 		"adapters.event_provenance", "core.events.timer_scheduler",
 		"core.logger.engine.logger", "core.timing.engine.timings",
 	}) do
@@ -34,7 +34,7 @@ local function load_fixture()
 
 	return {
 		hs = hs_stub,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		utils = require("modules.keymap.utils"),
 	}
 end

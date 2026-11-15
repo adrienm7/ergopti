@@ -205,10 +205,10 @@ end
 helpers.describe("ordered pairs through actual native consumers", function()
 	helpers.it("dispatches the action between acknowledged lift and restore in the actual hook", function()
 		local state = make(); local emitted, observed = {}, false
-		protected_modules({ ["adapters.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"] = false, ["modules.hotstrings.device_finder"] = { physical_sources = function(devices)
 			local out = {}; for _, device in ipairs(devices) do out[#out + 1] = { path=device,sysfs="/controlled/physical",name="controlled",physical=true } end; return out
 		end } }, function()
-			local hook = helpers.load_module("adapters.keyboard_hook")
+			local hook = helpers.load_module("platform.input.keyboard_hook")
 			helpers.assert_true(hook.set_remapper(state.native,function(action,slot)
 				observed = action == "run_program" and slot == binding and not hook.held_modifiers().ctrl
 				emitted[#emitted + 1] = "action"
@@ -280,10 +280,10 @@ end)
 helpers.describe("pair native receipt refusal boundaries",function()
 	helpers.it("never invokes action or modal after a refused real hook output port",function()
 		local state = make(); local actions, modal = 0,0
-		protected_modules({ ["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({ ["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _, device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end} },function()
-			local hook = require("adapters.keyboard_hook")
+			local hook = require("platform.input.keyboard_hook")
 			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},{type=1,code=15,value=0,at_ms=100}},
 				{onEmitRaw=function(code,value) return not (code==42 and value==1) end},true)
@@ -352,10 +352,10 @@ end)
 helpers.describe("pair source and restoration refusals",function()
 	helpers.it("refuses malformed source after installation and forwards unrelated grabbed input",function()
 		local state=make();state.bytes='[shortcuts.key_combination_taps\n'
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");local emitted,actions={},0
+			local hook=require("platform.input.keyboard_hook");local emitted,actions={},0
 			helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=30,value=1,at_ms=0},{type=1,code=30,value=0,at_ms=10}},
 				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;return true end},true)
@@ -445,10 +445,10 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("resumes baseline letters after exact source-revocation retirement through the actual hook",function()
 		local state=make();local emitted,actions={},0
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
+			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() actions=actions+1 end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0},{type=1,code=15,value=1,at_ms=10},
 				{type=1,code=30,value=1,at_ms=20},{type=1,code=30,value=0,at_ms=30}},
 				{onEmitRaw=function(code,value) emitted[#emitted+1]=code..":"..value;if code==42 and value==1 then state.bytes='[malformed\n' end;return true end},true)
@@ -458,10 +458,10 @@ helpers.describe("pair external-boundary ownership",function()
 	end)
 	helpers.it("keeps baseline output acquisition owned during reentrant native retirement",function()
 		local state=make();local accepted,entered
-		protected_modules({["adapters.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
+		protected_modules({["platform.input.keyboard_hook"]=false,["modules.hotstrings.device_finder"]={physical_sources=function(devices)
 			local out={};for _,device in ipairs(devices) do out[#out+1]={path=device,sysfs="/controlled/physical",name="controlled",physical=true} end;return out
 		end}},function()
-			local hook=require("adapters.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
+			local hook=require("platform.input.keyboard_hook");helpers.assert_true(hook.set_remapper(state.native,function() error("stale action must not run") end))
 			hook._test_drive({{type=1,code=58,value=1,at_ms=0}}, {onEmitRaw=function(code,value)
 				if code==29 and value==1 and not entered then entered=true;accepted=hook.set_remapper(nil) end
 				return true
@@ -634,7 +634,7 @@ helpers.describe("installed input-owner OneShot prerequisite (controlled ports)"
 			assert_false(s.hook.input_owner_current({})); s.lease.ready = true
 			assert_false(s.hook.input_owner_current(s.lease))
 		end)
-		local broker = require("adapters.modifier_broker").controlled(); assert_false(broker.output_current())
+		local broker = require("platform.input.modifier_broker").controlled(); assert_false(broker.output_current())
 	end)
 	helpers.it("leaves ordinary custom Reader callbacks usable without issuing an input lease", function()
 		InputOwnerFixture.with_session({ custom_reader = true }, function(s)
@@ -980,12 +980,12 @@ helpers.describe("original output lifetime terminal settlement (controlled ports
 			local ignored, terminal = s.writer.capture_output_observer(s.output)
 			assert_false(terminal({})); assert_false(s.broker.output_retired())
 			-- A separately issued Writer has its own real private terminal record.
-			local old = package.loaded["adapters.uinput_writer"]; package.loaded["adapters.uinput_writer"] = nil
-			local other = require("adapters.uinput_writer"); other._set_backend({ open = function() return 7 end,
+			local old = package.loaded["platform.input.uinput_writer"]; package.loaded["platform.input.uinput_writer"] = nil
+			local other = require("platform.input.uinput_writer"); other._set_backend({ open = function() return 7 end,
 				close = function() return true end, ioctl = function() return true end, write = function() return true end })
 			helpers.assert_true(other.open()); local cap = assert(other.capture_output()); local current, foreign = other.capture_output_observer(cap)
 			helpers.assert_true(other.close_owned(cap)); helpers.assert_true(foreign(cap)); assert_false(foreign(s.output)); assert_false(terminal(cap))
-			package.loaded["adapters.uinput_writer"] = old
+			package.loaded["platform.input.uinput_writer"] = old
 			assert_false(s.broker.output_retired()); helpers.assert_true(s.writer.output_current(s.output))
 		end)
 	end)
@@ -1016,7 +1016,7 @@ helpers.describe("original output observer constructor provenance (controlled po
 					helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open())
 					s.output = assert(capture()); s.writer.capture_output = function() return s.output, factory end
 				else
-					local other = helpers.fresh_module("adapters.uinput_writer")
+					local other = helpers.fresh_module("platform.input.uinput_writer")
 					s.writer.capture_output_observer = other.capture_output_observer
 				end
 				s.restore_factory = function() s.writer.capture_output, s.writer.capture_output_observer = capture, factory end
@@ -1183,7 +1183,7 @@ end)
 helpers.describe("cold installed input authority bootstrap (controlled ports)", function()
  helpers.it("the genuine Hook and Reader load before programmable backend callbacks",function()
   InputOwnerFixture.with_session({before_hook=function(s)
-   helpers.assert_eq(package.loaded["adapters.keyboard_hook"],s.hook)
+   helpers.assert_eq(package.loaded["platform.input.keyboard_hook"],s.hook)
    helpers.assert_eq(s.bootstrap,"cold-hook-before-backend")
   end},function(s)
    arm_input(s);helpers.assert_eq(s.before_arm_acquisitions,s.after_arm_acquisitions)

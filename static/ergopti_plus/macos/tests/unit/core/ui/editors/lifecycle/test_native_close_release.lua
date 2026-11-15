@@ -21,7 +21,7 @@ local function with_native_editor(name, scenario)
 		"ui.personal_info_editor", "ui.prompt_editor", "core.ui.ui.builder", "core.ui.ui.webview_close_owner", "core.events.timer_scheduler",
 		"core.ui.adapters.webview_result", "core.timing.engine.deferred_work", "core.fs.engine.paths", "core.fs.engine.dir", "core.ui.engine.notifications",
 		"core.text.engine.toml.reader", "core.text.engine.toml.writer", "modules.hotstrings.hotstrings_config",
-		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "keyboard.engine.chord",
+		"modules.hotstrings.hotstrings_config_schema", "platform.input.hotkey_registrar", "keyboard.engine.chord",
 		"core.logger.engine.log_folders", "core.i18n.engine.core", "core.text.engine.json", "core.fs.adapters.json_codec", "diagnostics.engine.reports.redact",
 		"core.ui.engine.window_titles", "core.ui.engine.webview.presentation", "core.lifecycle.engine.launcher_environment", "core.logger.adapters.log_transport",
 		"core.fs.engine.app_dirs", "core.logger.engine.logger", "core.i18n.engine.locale", "_generated.logger_sub_files", "core.ui.engine.webview.i18n_seed",

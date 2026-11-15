@@ -157,7 +157,7 @@ end
 helpers.with_fresh_modules({
 	"core.fs.adapters.file_system",
 	"infra.config_paths",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"core.logger.engine.logger",
 	"core.text.engine.toml.codec",
 	"platform.remap.config",
@@ -169,7 +169,7 @@ helpers.with_fresh_modules({
 	package.loaded["infra.config_paths"] = {
 		get_config_dir = function() return "/tmp/ergopti_test" end,
 	}
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		to_name                 = function(code) return "key_" .. tostring(code) end,
 		F13_KARABINER_RETURN    = 105,
 		F14_KARABINER_BACKSPACE = 107,
@@ -413,7 +413,7 @@ helpers.with_fresh_modules({
 		helpers.it("a tap sending a Cmd, Ctrl or Option chord is led by the command marker (macos-tap-hold-word-reset)", function()
 			local state = Config.build_recommended_state(keys, combos)
 			state.tap_holds_enabled = true
-			local sentinel = package.loaded["infra.keycodes"].to_name(90)
+			local sentinel = package.loaded["platform.input.keycodes"].to_name(90)
 			local tag = require("layouts.engine.layers.control_signals").modifiers_for("tap_hold_command")
 			local function is_command(event)
 				for _, modifier in ipairs(type(event) == "table" and event.modifiers or {}) do

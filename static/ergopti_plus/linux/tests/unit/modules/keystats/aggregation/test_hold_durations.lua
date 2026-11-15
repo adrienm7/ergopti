@@ -294,7 +294,7 @@ local function run_hold(transition, expected, options)
 			secure_focus_guard = { invalidate = noop, blocks_text = function() return false end },
 		}
 		local block = assert(main:match("input_capture_gate = InputCaptureGate.new%({%s*on_block = function(.-)\n\t\tend,"))
-		local gate = require("infra.input_capture_gate").new({ on_block = source_callback(block, environment) })
+		local gate = require("platform.input.capture_gate").new({ on_block = source_callback(block, environment) })
 		environment.input_capture_gate = gate
 		local pause_body = assert(main:match("on_pause_change = function(.-)\n\t\tend,"))
 		local on_pause = source_callback(pause_body, environment)
@@ -322,7 +322,7 @@ local function run_hold(transition, expected, options)
 		-- existing captured-press bookkeeping is shared exactly as in production.
 		local physical = assert(main:match("(local capture_owned_scancodes = {}.-\n\tlocal on_physical = input_capture_gate.guard%(.-\n\t\tend%))"))
 		local hold = assert(main:match("(local hold_token = keystats.hold_accounting_token.-\n\tlocal on_hold = input_capture_gate.guard%(.-\n\tend%))"))
-		environment.InputEvent = require("infra.input_event")
+		environment.InputEvent = require("platform.input.event")
 		environment.Monotonic = clock
 		environment._cached_app_id = "code"
 		local startup = assert(main:match("keyboard_hook.start%(%{(.-)\n\t%}%)"))
@@ -338,7 +338,7 @@ local function run_hold(transition, expected, options)
 		local callbacks = chunk()
 
 		if options.before then options.before(logger, state) end
-		local hook = helpers.load_module("adapters.keyboard_hook")
+		local hook = helpers.load_module("platform.input.keyboard_hook")
 		local forwarded = {}
 		local changed = false
 		local code = options.code or 30
@@ -481,7 +481,7 @@ helpers.describe("physical hold exclusion epochs", function()
 			on_capture_reset = function()
 				-- The real startup XKB reset is reentrant foreign work. Its
 				-- observations must precede admission of the tentative owner.
-				local hook = require("adapters.keyboard_hook")
+				local hook = require("platform.input.keyboard_hook")
 				helpers.assert_nil(admission_of(hook))
 				checked = true
 				return true

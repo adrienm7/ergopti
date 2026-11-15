@@ -37,7 +37,7 @@ function M.load_keystats()
 	-- require-time. This fixture deliberately uses the production instances, so it
 	-- owns their reload rather than making the generic helper erase intentional
 	-- adapter stubs installed by unrelated tests.
-	package.loaded["adapters.synthetic_input"] = nil
+	package.loaded["platform.input.synthetic_input"] = nil
 	package.loaded["adapters.event_provenance"] = nil
 
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
@@ -130,7 +130,7 @@ function M.load_keystats()
 		stop = function() return true end,
 	}
 	local keyboard_event
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(opts) keyboard_event = opts.onEvent; return true end,
 		stop = function() return true end,
 		isRunning = function() return true end,
@@ -151,7 +151,7 @@ function M.load_keystats()
 		state = state,
 		flushes = flushes,
 		hs = _G.hs,
-		synthetic_input = require("adapters.synthetic_input"),
+		synthetic_input = require("platform.input.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 	}
 	--- Runs deferred keystats builders after the simulated eventtap returns.

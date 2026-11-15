@@ -393,7 +393,7 @@ helpers.describe("exclusive file publication", function()
 		-- declared a typed global statx, which turned this writer's void*
 		-- declaration into a no-op and made every later metadata call raise.
 		if not pcall(require, "ffi") then return end
-		local Uinput, uv = helpers.load_module("adapters.uinput_writer"), package.loaded.luv
+		local Uinput, uv = helpers.load_module("platform.input.uinput_writer"), package.loaded.luv
 		helpers.assert_true(Uinput.use_ffi_backend(), "the production uinput backend binds without a device")
 		Uinput._reset_backend()
 		local path = os.tmpname(); os.remove(path)

@@ -61,7 +61,7 @@ local function with_caps_word(source, body)
 			end
 			-- No keyboard is captured here: the session's CapsLock goes to a fake hook.
 			context.hook = require("tests.support.caps_word_lock_hook_fake").new()
-			package.loaded["adapters.keyboard_hook"] = context.hook
+			package.loaded["platform.input.keyboard_hook"] = context.hook
 			package.loaded["modules.shortcuts.caps_word_auto_off"] = nil
 			package.loaded["modules.shortcuts.manager"] = nil
 			context.AutoOff = require("modules.shortcuts.caps_word_auto_off")
@@ -218,7 +218,7 @@ end)
 helpers.describe("caps word auto-off: evdev pointer kinds", function()
 	helpers.it("caps word auto-off, names the kind of every pointer press", function()
 		with_caps_word(nil, function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			local kind = c.AutoOff.pointer_kind_of_button
 			helpers.assert_eq(kind(Codes.BTN_LEFT), "left_click")
 			helpers.assert_eq(kind(Codes.BTN_RIGHT), "right_click")
@@ -377,7 +377,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("caps word auto-off, a checked pointer kind ends CapsWord and an unchecked one keeps it", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nright_click = false\npointer_motion = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_RIGHT)), false)
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_motion()), false)
@@ -457,7 +457,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 			Emitter.press_codes = original
 			helpers.assert_true(called, tostring(result))
 			helpers.assert_eq(result, true)
-			helpers.assert_eq(pressed, { mods = {}, keys = { require("infra.evdev_codes").KEY_CAPSLOCK } })
+			helpers.assert_eq(pressed, { mods = {}, keys = { require("platform.input.evdev_codes").KEY_CAPSLOCK } })
 		end)
 	end)
 
@@ -530,7 +530,7 @@ helpers.describe("caps word auto-off: the manager session", function()
 
 	helpers.it("(cwl-002) enabling left click mid-session ends CapsWord at the next click", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nleft_click = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer(c.AutoOff.pointer_kind_of_button(Codes.BTN_LEFT)), false,
 				"control: unchecked, a click keeps it")
@@ -788,7 +788,7 @@ helpers.describe("caps word auto-off: daemon and hook wiring", function()
 
 	helpers.it("caps word auto-off, the manager maps a native press and motion to their declared kinds", function()
 		with_caps_word('[shortcuts.caps_word.pointer]\nmiddle_click = false\n', function(c)
-			local Codes = require("infra.evdev_codes")
+			local Codes = require("platform.input.evdev_codes")
 			helpers.assert_true(c.manager.toggle_caps_word())
 			helpers.assert_eq(c.manager.caps_word_observe_pointer_event("press", Codes.BTN_MIDDLE), false,
 				"an unchecked middle click keeps CapsWord on")

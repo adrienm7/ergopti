@@ -14,11 +14,11 @@
 --- the clipboard when the layout could not type a brace.
 --- ==============================================================================
 
-local restore_loaded = require("tests.helpers").keep_loaded({ "adapters.keyboard_hook" })
+local restore_loaded = require("tests.helpers").keep_loaded({ "platform.input.keyboard_hook" })
 local helpers = require("tests.helpers")
 local json = require("core.text.engine.json")
 local OutputTokens = require("modules.hotstrings.output_tokens")
-local EvdevCodes = require("infra.evdev_codes")
+local EvdevCodes = require("platform.input.evdev_codes")
 
 local CORPUS = helpers.driver_root() .. "/../_shared/tests/corpus/hotstrings/output_token_vectors.json"
 
@@ -57,7 +57,7 @@ local function with_recorder(chars)
 	local layout = helpers.load_module("adapters.keyboard_layout")
 	layout._set_table_for_test(layout_table)
 	package.loaded["adapters.keyboard_layout"] = layout
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		held_text_modifier_codes = function() return {} end,
 	}
 	local injector = helpers.load_module("modules.hotstrings.injector")

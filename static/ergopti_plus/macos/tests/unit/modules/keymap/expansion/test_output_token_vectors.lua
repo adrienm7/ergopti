@@ -116,7 +116,7 @@ local function load_expander(buffer)
 		end,
 	}
 	package.loaded["core.fs.adapters.json_codec"] = { decode = json.decode }
-	local synthetic = require("adapters.synthetic_input")
+	local synthetic = require("platform.input.synthetic_input")
 	local expander = require("modules.keymap.expander")
 	local state = {
 		buffer = buffer, magic_key = "\226\152\133", start_is_word_boundary = true,

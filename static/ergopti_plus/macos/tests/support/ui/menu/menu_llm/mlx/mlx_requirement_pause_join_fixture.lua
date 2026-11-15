@@ -18,11 +18,11 @@ local OWNED_MODULES = {
 	"core.i18n.engine.i18n",
 	"core.fs.engine.dir",
 	"core.ui.engine.dialog_util",
-	"infra.keycodes",
+	"platform.input.keycodes",
 	"adapters.event_provenance",
-	"adapters.synthetic_input",
+	"platform.input.synthetic_input",
 	"core.events.timer_scheduler",
-	"adapters.key_state",
+	"platform.input.key_state",
 	"core.process.adapters.task_lifecycle",
 	"modules.gestures.engine",
 	"modules.gestures.actions",
@@ -149,7 +149,7 @@ local function install_subject_stubs(native)
 	package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key end }
 	package.loaded["core.fs.engine.dir"] = { entries = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = { block_alert = function() return false end }
-	package.loaded["infra.keycodes"] = {
+	package.loaded["platform.input.keycodes"] = {
 		F13_KARABINER_RETURN = 106,
 		F14_KARABINER_BACKSPACE = 107,
 		F15_KARABINER_ESCAPE = 108,
@@ -212,7 +212,7 @@ local function install_subject_stubs(native)
 		STATUS_UNREADABLE = "unreadable",
 		classify_with_fence = function() return nil, "physical", nil end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
+	package.loaded["platform.input.synthetic_input"] = {
 		when_idle = function(callback)
 			callback()
 			return true
@@ -276,7 +276,7 @@ local function install_subject_stubs(native)
 			return true
 		end,
 	}
-	package.loaded["adapters.key_state"] = {
+	package.loaded["platform.input.key_state"] = {
 		is_right_altgr_held = function() return false end,
 		describe_held_modifiers = function() return "(none)" end,
 	}

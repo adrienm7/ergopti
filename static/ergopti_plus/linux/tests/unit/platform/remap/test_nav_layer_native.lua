@@ -97,7 +97,7 @@ helpers.describe("native navigation source capabilities", function()
 			"linux", ctx, Toml.decode)
 		helpers.assert_eq(result.ok, true)
 		local native = require("platform.remap.nav_layer").compile(result.layers.nav, ctx.registry)
-		local code = require("infra.input_event").wheel_layer_code("vertical", 1)
+		local code = require("platform.input.event").wheel_layer_code("vertical", 1)
 		helpers.assert_eq(native[code].chords[1].keys[1], 115, "WheelUp is KEY_VOLUMEUP")
 		-- engine() holds the layer key: one notch is one volume-up press and release.
 		helpers.assert_eq(trail(engine(native):wheel("vertical", 1)), "115:1 115:0")

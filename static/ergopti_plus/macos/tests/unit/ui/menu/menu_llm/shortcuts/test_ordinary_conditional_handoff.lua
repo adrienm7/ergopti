@@ -39,7 +39,7 @@ local function with_handoff_fixture(body)
 			keycode_owner.map = scoped_keycode_map
 			helpers.assert_eq(keycode_owner.map.a, 0, "fixture physical A must use the canonical macOS code")
 			helpers.assert_eq(keycode_owner.map.b, 11, "fixture physical B must differ from physical A")
-			local registrar = require("adapters.hotkey_registrar")
+			local registrar = require("platform.input.hotkey_registrar")
 			local owned = {}
 			local owned_claims, finalizers = {}, {}
 			local function remember(token, conditional)

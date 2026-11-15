@@ -39,9 +39,9 @@
 local M = {}
 
 local Logger         = require("core.logger.engine.logger")
-local TextSender     = require("adapters.text_sender")
+local TextSender     = require("platform.input.text_sender")
 local TimerScheduler = require("core.events.timer_scheduler")
-local SyntheticInput = require("adapters.synthetic_input")
+local SyntheticInput = require("platform.input.synthetic_input")
 
 local LOG = "keymap.terminator_replay"
 

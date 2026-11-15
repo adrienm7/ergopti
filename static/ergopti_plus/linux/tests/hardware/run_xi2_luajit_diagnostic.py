@@ -13,7 +13,7 @@ import time
 import uuid
 
 
-CANDIDATE_SHA = "56021317bab15b806d47abe57ea5bb60bf252b0fac35cfe84b57d6e6658ad554"
+CANDIDATE_SHA = "ce158acea690e558c0c40423108d7db61ee5d4044a1562df0f800495597ca9e9"
 FAMILY_SHA = "7545c2d6aa8d48e5d48557b2b218e6d8a864eeb42ae761e055d4f917cdf06334"
 HERE = Path(__file__).resolve().parent
 

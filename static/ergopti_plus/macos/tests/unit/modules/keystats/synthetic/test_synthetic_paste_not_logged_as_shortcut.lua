@@ -66,7 +66,7 @@ local function load_fixture()
 		start = function() return true end,
 		stop = function() return true end,
 	}
-	package.loaded["adapters.keyboard_hook"] = {
+	package.loaded["platform.input.keyboard_hook"] = {
 		start = function(options)
 			if options then captured_handle = options.onEvent end
 			return true
@@ -140,7 +140,7 @@ local function load_fixture()
 		shortcuts = shortcuts,
 		clipboard = clipboard,
 		paused = paused,
-		synthetic = require("adapters.synthetic_input"),
+		synthetic = require("platform.input.synthetic_input"),
 		provenance = require("adapters.event_provenance"),
 		hs = require("hs"),
 		cleanup = function()
@@ -152,9 +152,9 @@ local function load_fixture()
 				"modules.keystats.kc_bridge",
 				"modules.keystats.watchers",
 				"core.process.adapters.lifecycle",
-				"adapters.keyboard_hook",
+				"platform.input.keyboard_hook",
 				"adapters.event_provenance",
-				"adapters.synthetic_input",
+				"platform.input.synthetic_input",
 				"modules.keymap",
 				"infra.manifest_reader",
 				"infra.config_paths",

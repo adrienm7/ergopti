@@ -15,7 +15,7 @@
 ---    keyboard Ergopti deploys, which passes the pair through. The layout's
 ---    keycode convention while Karabiner runs, else each event's keyboard
 ---    model, chooses one code
----    (adapters/keyboard_geometry.lua), so the extra ISO key is never mistaken
+---    (platform/input/keyboard_geometry.lua), so the extra ISO key is never mistaken
 ---    for the key left of 1.
 --- 2. Assignments live in canonical config.toml, beside the
 ---    keyboard slots, and are cached by load(): the shortcut layer's eventtap
@@ -36,10 +36,10 @@ local Logger     = require("core.logger.engine.logger")
 local Paths      = require("core.fs.engine.paths")
 local Manifest   = require("infra.manifest_reader")
 local ConfigOutdated = require("settings.engine.migration.outdated")
-local Keycodes   = require("infra.keycodes")
+local Keycodes   = require("platform.input.keycodes")
 local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec  = require("core.fs.adapters.json_codec")
-local Geometry   = require("adapters.keyboard_geometry")
+local Geometry   = require("platform.input.keyboard_geometry")
 local Writer     = require("core.text.engine.toml_codec.writer")
 local Codec      = require("core.text.engine.toml_codec")
 local Preferences = require("infra.preferences")

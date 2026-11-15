@@ -16,7 +16,7 @@ local labels = assert(Json.decode_lossless(file:read("*a")))
 file:close()
 
 local function with_notice(tool, body)
-	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "adapters.keyboard_hook",
+	local names = { "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "platform.input.keyboard_hook",
 		"adapters.notifier", "ui.llm_enable_refusal", "core.ui.engine.window_titles" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -36,7 +36,7 @@ local function with_notice(tool, body)
 			return world.command_ok ~= false, world.answer
 		end,
 	}
-	package.loaded["adapters.keyboard_hook"] = { while_released = function(callback, options)
+	package.loaded["platform.input.keyboard_hook"] = { while_released = function(callback, options)
 		world.order[#world.order + 1] = "release"
 		world.observer = type(options) == "table" and options.observer
 		if not world.release_ok then

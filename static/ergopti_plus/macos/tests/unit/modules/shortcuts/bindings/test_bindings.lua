@@ -19,7 +19,7 @@ local _ = helpers.load_with_stubs("core.logger.engine.logger")
 -- at module level. The real implementation iterates hs.keycodes.map, which
 -- is not populated in the unit-test stub, so to_name would error. We provide
 -- the two fields that system.lua actually needs.
-package.loaded["infra.keycodes"] = {
+package.loaded["platform.input.keycodes"] = {
 	F18_WAKE_OS             = 79,
 	F19_LAYER_NAV_EXITED    = 80,
 	to_name = function(code)
