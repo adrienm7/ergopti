@@ -485,6 +485,12 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       combination of Ctrl, Alt, Shift, Win/Cmd/Super sending any combination + key (Ctrl+é → Ctrl+Shift+C,
       Ctrl+A → Ctrl+B), listed and editable. Stored in the Ergopti TOML shortcut model; each export target says
       honestly what it cannot carry, Ergopti+ emulation keeps it. Playwright checks through save and reload.
+- [ ] **Native carriage of `shortcut_key` (2026-11-15).** The editor stores `keys.<code>.shortcut_key`; the native
+      exports do not carry it yet. Windows: write the shortcut VK into the KLC and the built DLL. macOS: write the
+      .keylayout Command level. Linux: state in the export what XKB cannot carry. Ergopti+ emulation already keeps it.
+- [ ] **JSON decoder `null` follow-up (worker P, 2026-11-15).** The default Lua decode turns `null` into `{}`.
+      Audit every caller first, then make the default decode give `nil` for `null` and keep holes in arrays, with a
+      regression test that fails on the old behaviour.
 - [ ] **Google Books Ngram letter tables, later (2026-11-14 night).** The 1-gram files are several GB per language:
       a one-off offline streaming import that ships only letter and bigram tables, with licence and attribution.
 
