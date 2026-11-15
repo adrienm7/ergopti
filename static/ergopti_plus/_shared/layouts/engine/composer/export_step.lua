@@ -101,4 +101,46 @@ function M.run(settings, step, input_text)
 	return true, output, nil
 end
 
+
+
+
+
+-- ========================================
+-- ========================================
+-- ======= 3/ Layout registry entry =======
+-- ========================================
+-- ========================================
+
+--- Builds a driver layout registry's source_export_step, the same on macOS and
+--- Linux: it reads the layout defaults through the registry, runs one step and
+--- answers on_done(ok, output_or_code, detail).
+--- @param registry table The driver's layout registry module.
+--- @param read_defaults function Returns the decoded layout defaults, or nil and an error.
+--- @param logger table The driver's logger.
+--- @param log_tag string The registry's log tag.
+--- @param failure_code string The code an unusable defaults file answers.
+function M.registry_entry(registry, read_defaults, logger, log_tag, failure_code)
+	--- Runs one step of the shared export adapter for the layout editor's XKB
+	--- and KLC downloads, with this driver's Lua.
+	--- @param payload table { step = "read"|"xkb", input = JSON text }
+	--- @param on_done function on_done(ok, output_or_code, detail)
+	--- @return boolean dispatched
+	registry.source_export_step = function(payload, on_done)
+		local layout_defaults, defaults_err = read_defaults()
+		local settings, settings_err
+		if layout_defaults then settings, settings_err = M.settings(layout_defaults) end
+		if not settings then
+			local detail = tostring(defaults_err or settings_err)
+			logger.error(log_tag, "The layout editor's export step is unusable: %s.", detail)
+			on_done(false, failure_code, detail)
+			return false
+		end
+		local ok, output_or_code, detail = M.run(settings, type(payload) == "table" and payload.step or nil,
+			type(payload) == "table" and payload.input or nil)
+		if not ok then logger.warn(log_tag, "The layout editor's export step was refused: %s.", tostring(detail)) end
+		on_done(ok, output_or_code, detail)
+		return true
+	end
+end
+
 return M

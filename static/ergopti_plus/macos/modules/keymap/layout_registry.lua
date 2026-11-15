@@ -1332,28 +1332,10 @@ function M.studio_corpus(payload, on_done, deps)
 		function(detail) on_done(false, M.FAILURE_WRITE, detail) end)
 end
 
---- Runs one step of the shared export adapter for the layout editor's XKB and
---- KLC downloads (layouts/engine/composer/export_step.lua), with this driver's Lua.
---- @param payload table { step = "read"|"xkb", input = JSON text }
---- @param on_done function on_done(ok, output_or_code, detail)
---- @return boolean dispatched
-function M.source_export_step(payload, on_done)
-	local layout_defaults, defaults_err = read_shared_json("layouts/data/defaults.json")
-	local ExportStep = require("layouts.engine.composer.export_step")
-	local settings, settings_err
-	if layout_defaults then settings, settings_err = ExportStep.settings(layout_defaults) end
-	if not settings then
-		local detail = tostring(defaults_err or settings_err)
-		Logger.error(LOG, "The layout editor's export step is unusable: %s.", detail)
-		on_done(false, M.FAILURE_INVALID, detail)
-		return false
-	end
-	local ok, output_or_code, detail = ExportStep.run(settings, type(payload) == "table" and payload.step or nil,
-		type(payload) == "table" and payload.input or nil)
-	if not ok then Logger.warn(LOG, "The layout editor's export step was refused: %s.", tostring(detail)) end
-	on_done(ok, output_or_code, detail)
-	return true
-end
+--- The layout editor's XKB and KLC export step, built once for both Lua drivers
+--- (layouts/engine/composer/export_step.lua), with this driver's Lua.
+require("layouts.engine.composer.export_step").registry_entry(M,
+	function() return read_shared_json("layouts/data/defaults.json") end, Logger, LOG, M.FAILURE_INVALID)
 
 -- The Studio's documents the page keeps as given: studio_profile_load and
 -- studio_profile_save (the fingering profile), studio_workspace_load and
