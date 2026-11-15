@@ -648,7 +648,12 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       editor page's one bar (rounded border, accent focus ring, placeholder, its own caret, × inside at the end, no
       « Effacer » button), in the theme's light and dark colours; proof: `try-input-bar` in
       layout-editor.playwright.cjs.
-      5 [ ] Proper display names for every library layout, from the library's single data source; ids stay keys.
+      5 [x] Proper display names for every library layout, from the library's single data source; ids stay keys.
+      Done 2026-11-15 (`claude/ergopti-todo-library-names`): the 91 lower-case or id-like names of
+      layout_library.json written as their authors do (Colemak-DH, Hands Down, Semimak JQ, MTGAP 3.0…); the
+      spelling of BEO, INTS, UCIEA, AHEI, MTGAP-T and CTGAP 3, which their sources only give in lower case, was
+      decided by the agent, to review by the maintainer; proof: test-layout-comparer-page.cjs (no layout shows
+      its id, an underscore or a lower-case slug, no two share a name).
       3 [ ] A « Format » dropdown (100 % / TKL / 75 % / 65 % / 60 %) instead of « Pavé numérique », hiding the
       blocks each format lacks; the same value feeds the Comparer's keyboard model and the compact-keyboard bonus.
       4 [ ] The Comparer's default selection follows the keyboard: ISO checks Ergopti and Ergopti+, ANSI their
@@ -658,7 +663,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       and in the app. makensis cannot run in a page: proposal sent to the coordinator 2026-11-15 (one generic
       installer built by CI, reading the DLL name and layout text from a file beside it), decided by the agent, to
       review by the maintainer.
-      [CODE] Left (2026-11-15): remarks 5, 3, 4, 9 and 1.
+      [CODE] Left (2026-11-15): remarks 3, 4, 9 and 1.
 - [x] **Linux live updater E2E across the test-folder move (maintainer decision, 2026-11-15).** While the newest
       published release predates the move, the live E2E requires the installer's exact ownership refusal and the
       old build to stay installed; it becomes a full install and restart proof again once a post-move release is

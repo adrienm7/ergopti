@@ -16,7 +16,7 @@
 	"layouts": [
 		{
 			"id": "aptv3",
-			"name": "aptv3",
+			"name": "APTv3",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/aptv3.dof",
@@ -56,7 +56,7 @@
 		},
 		{
 			"id": "aptv4",
-			"name": "aptv4",
+			"name": "APTv4",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/aptv4.dof",
@@ -96,7 +96,7 @@
 		},
 		{
 			"id": "blaze",
-			"name": "blaze",
+			"name": "Blaze",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/blaze.dof",
@@ -136,7 +136,7 @@
 		},
 		{
 			"id": "boo",
-			"name": "boo",
+			"name": "Boo",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/boo.dof",
@@ -176,7 +176,7 @@
 		},
 		{
 			"id": "canary",
-			"name": "canary",
+			"name": "Canary",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/canary.dof",
@@ -216,7 +216,7 @@
 		},
 		{
 			"id": "celestial",
-			"name": "celestial",
+			"name": "Celestial",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/celestial.dof",
@@ -256,7 +256,7 @@
 		},
 		{
 			"id": "colemak",
-			"name": "colemak",
+			"name": "Colemak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemak.dof",
@@ -296,7 +296,7 @@
 		},
 		{
 			"id": "colemak_dh",
-			"name": "colemak_dh",
+			"name": "Colemak-DH",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemak_dh.dof",
@@ -336,7 +336,7 @@
 		},
 		{
 			"id": "colemak_dhv",
-			"name": "colemak_dhv",
+			"name": "Colemak-DHv",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemak_dhv.dof",
@@ -376,7 +376,7 @@
 		},
 		{
 			"id": "colemak_dn",
-			"name": "colemak_dn",
+			"name": "Colemak-DN",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemak_dn.dof",
@@ -416,7 +416,7 @@
 		},
 		{
 			"id": "colemak_qi",
-			"name": "colemak_qi",
+			"name": "Colemak Qi",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemak_qi.dof",
@@ -456,7 +456,7 @@
 		},
 		{
 			"id": "colemaq",
-			"name": "colemaq",
+			"name": "Colemaq",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemaq.dof",
@@ -496,7 +496,7 @@
 		},
 		{
 			"id": "colemaq_f",
-			"name": "colemaq-f",
+			"name": "Colemaq-F",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/colemaq-f.dof",
@@ -536,7 +536,7 @@
 		},
 		{
 			"id": "crest",
-			"name": "crest",
+			"name": "Crest",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/crest.dof",
@@ -576,7 +576,7 @@
 		},
 		{
 			"id": "ctgap3",
-			"name": "ctgap3",
+			"name": "CTGAP 3",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/ctgap3.dof",
@@ -616,7 +616,7 @@
 		},
 		{
 			"id": "dhorf",
-			"name": "dhorf",
+			"name": "Dhorf",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/dhorf.dof",
@@ -656,7 +656,7 @@
 		},
 		{
 			"id": "dvorak",
-			"name": "dvorak",
+			"name": "Dvorak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/dvorak.dof",
@@ -696,7 +696,7 @@
 		},
 		{
 			"id": "dwarf",
-			"name": "dwarf",
+			"name": "Dwarf",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/dwarf.dof",
@@ -736,7 +736,7 @@
 		},
 		{
 			"id": "engram",
-			"name": "engram",
+			"name": "Engram",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/engram.dof",
@@ -776,7 +776,7 @@
 		},
 		{
 			"id": "fire",
-			"name": "fire",
+			"name": "Fire",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/fire.dof",
@@ -816,7 +816,7 @@
 		},
 		{
 			"id": "flame",
-			"name": "flame",
+			"name": "Flame",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/flame.dof",
@@ -856,7 +856,7 @@
 		},
 		{
 			"id": "flare",
-			"name": "flare",
+			"name": "Flare",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/flare.dof",
@@ -936,7 +936,7 @@
 		},
 		{
 			"id": "halmak",
-			"name": "halmak",
+			"name": "Halmak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/halmak.dof",
@@ -977,7 +977,7 @@
 		},
 		{
 			"id": "hands_down",
-			"name": "hands_down",
+			"name": "Hands Down",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/hands_down.dof",
@@ -1017,7 +1017,7 @@
 		},
 		{
 			"id": "heart",
-			"name": "heart",
+			"name": "Heart",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/heart.dof",
@@ -1057,7 +1057,7 @@
 		},
 		{
 			"id": "hyperroll",
-			"name": "hyperroll",
+			"name": "Hyperroll",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/hyperroll.dof",
@@ -1097,7 +1097,7 @@
 		},
 		{
 			"id": "isrt",
-			"name": "isrt",
+			"name": "ISRT",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/isrt.dof",
@@ -1137,7 +1137,7 @@
 		},
 		{
 			"id": "lumin",
-			"name": "lumin",
+			"name": "Lumin",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/lumin.dof",
@@ -1177,7 +1177,7 @@
 		},
 		{
 			"id": "mtgap30",
-			"name": "mtgap30",
+			"name": "MTGAP 3.0",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/mtgap30.dof",
@@ -1217,7 +1217,7 @@
 		},
 		{
 			"id": "mtgapt",
-			"name": "mtgapt",
+			"name": "MTGAP-T",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/mtgapt.dof",
@@ -1257,7 +1257,7 @@
 		},
 		{
 			"id": "nerbs",
-			"name": "nerbs",
+			"name": "Nerbs",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/nerbs.dof",
@@ -1297,7 +1297,7 @@
 		},
 		{
 			"id": "nerps",
-			"name": "nerps",
+			"name": "Nerps",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/nerps.dof",
@@ -1337,7 +1337,7 @@
 		},
 		{
 			"id": "nerts",
-			"name": "nerts",
+			"name": "Nerts",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/nerts.dof",
@@ -1377,7 +1377,7 @@
 		},
 		{
 			"id": "noctum",
-			"name": "noctum",
+			"name": "Noctum",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/noctum.dof",
@@ -1417,7 +1417,7 @@
 		},
 		{
 			"id": "norman",
-			"name": "norman",
+			"name": "Norman",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/norman.dof",
@@ -1457,7 +1457,7 @@
 		},
 		{
 			"id": "pine",
-			"name": "pine",
+			"name": "Pine",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/pine.dof",
@@ -1497,7 +1497,7 @@
 		},
 		{
 			"id": "qgmlwy",
-			"name": "qgmlwy",
+			"name": "QGMLWY",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/qgmlwy.dof",
@@ -1537,7 +1537,7 @@
 		},
 		{
 			"id": "recurva",
-			"name": "recurva",
+			"name": "Recurva",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/recurva.dof",
@@ -1577,7 +1577,7 @@
 		},
 		{
 			"id": "rolll",
-			"name": "rolll",
+			"name": "Rolll",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/rolll.dof",
@@ -1617,7 +1617,7 @@
 		},
 		{
 			"id": "rollla",
-			"name": "rollla",
+			"name": "Rollla",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/rollla.dof",
@@ -1657,7 +1657,7 @@
 		},
 		{
 			"id": "rollmak",
-			"name": "rollmak",
+			"name": "Rollmak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/rollmak.dof",
@@ -1697,7 +1697,7 @@
 		},
 		{
 			"id": "s_roll",
-			"name": "s-roll",
+			"name": "S-Roll",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/s-roll.dof",
@@ -1737,7 +1737,7 @@
 		},
 		{
 			"id": "seht_drai",
-			"name": "seht_drai",
+			"name": "Seht Drai",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/seht_drai.dof",
@@ -1777,7 +1777,7 @@
 		},
 		{
 			"id": "semimak",
-			"name": "semimak",
+			"name": "Semimak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/semimak.dof",
@@ -1817,7 +1817,7 @@
 		},
 		{
 			"id": "semimak_jq",
-			"name": "semimak_jq",
+			"name": "Semimak JQ",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/semimak_jq.dof",
@@ -1857,7 +1857,7 @@
 		},
 		{
 			"id": "sent",
-			"name": "sent",
+			"name": "Sent",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/sent.dof",
@@ -1897,7 +1897,7 @@
 		},
 		{
 			"id": "sertain",
-			"name": "sertain",
+			"name": "Sertain",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/sertain.dof",
@@ -1937,7 +1937,7 @@
 		},
 		{
 			"id": "setrain",
-			"name": "setrain",
+			"name": "Setrain",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/setrain.dof",
@@ -1977,7 +1977,7 @@
 		},
 		{
 			"id": "sind",
-			"name": "sind",
+			"name": "Sind",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/sind.dof",
@@ -2017,7 +2017,7 @@
 		},
 		{
 			"id": "stronk",
-			"name": "stronk",
+			"name": "Stronk",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/stronk.dof",
@@ -2057,7 +2057,7 @@
 		},
 		{
 			"id": "sturdy",
-			"name": "sturdy",
+			"name": "Sturdy",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/sturdy.dof",
@@ -2097,7 +2097,7 @@
 		},
 		{
 			"id": "trendei",
-			"name": "trendei",
+			"name": "Trendei",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/trendei.dof",
@@ -2137,7 +2137,7 @@
 		},
 		{
 			"id": "trendy",
-			"name": "trendy",
+			"name": "Trendy",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/trendy.dof",
@@ -2177,7 +2177,7 @@
 		},
 		{
 			"id": "typehack",
-			"name": "typehack",
+			"name": "Typehack",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/typehack.dof",
@@ -2217,7 +2217,7 @@
 		},
 		{
 			"id": "vitrimak",
-			"name": "vitrimak",
+			"name": "Vitrimak",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/vitrimak.dof",
@@ -2257,7 +2257,7 @@
 		},
 		{
 			"id": "vitrimak_ortho",
-			"name": "vitrimak_ortho",
+			"name": "Vitrimak Ortho",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/vitrimak_ortho.dof",
@@ -2297,7 +2297,7 @@
 		},
 		{
 			"id": "whorf",
-			"name": "whorf",
+			"name": "Whorf",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/whorf.dof",
@@ -2337,7 +2337,7 @@
 		},
 		{
 			"id": "workman",
-			"name": "workman",
+			"name": "Workman",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/workman.dof",
@@ -2377,7 +2377,7 @@
 		},
 		{
 			"id": "wreath",
-			"name": "wreath",
+			"name": "Wreath",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/english/wreath.dof",
@@ -2417,7 +2417,7 @@
 		},
 		{
 			"id": "adnw",
-			"name": "adnw",
+			"name": "AdNW",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/adnw.dof",
@@ -2457,7 +2457,7 @@
 		},
 		{
 			"id": "bone",
-			"name": "bone",
+			"name": "Bone",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/bone.dof",
@@ -2497,7 +2497,7 @@
 		},
 		{
 			"id": "koy",
-			"name": "koy",
+			"name": "KOY",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/koy.dof",
@@ -2537,7 +2537,7 @@
 		},
 		{
 			"id": "mine",
-			"name": "mine",
+			"name": "Mine",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/mine.dof",
@@ -2577,7 +2577,7 @@
 		},
 		{
 			"id": "qwertz",
-			"name": "qwertz",
+			"name": "QWERTZ",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/qwertz.dof",
@@ -2617,7 +2617,7 @@
 		},
 		{
 			"id": "morgenstern",
-			"name": "morgenstern",
+			"name": "Morgenstern",
 			"language": "de",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/german/morgenstern.dof",
@@ -2657,7 +2657,7 @@
 		},
 		{
 			"id": "optimot",
-			"name": "optimot",
+			"name": "Optimot",
 			"language": "fr",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/french/optimot.dof",
@@ -2696,7 +2696,7 @@
 		},
 		{
 			"id": "beo",
-			"name": "beo",
+			"name": "BEO",
 			"language": "fr",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/french/beo.dof",
@@ -2735,7 +2735,7 @@
 		},
 		{
 			"id": "engram_es",
-			"name": "engram_es",
+			"name": "Engram (ES)",
 			"language": "es",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/spanish/engram_es.dof",
@@ -2774,7 +2774,7 @@
 		},
 		{
 			"id": "jcuken",
-			"name": "jcuken",
+			"name": "ЙЦУКЕН (JCUKEN)",
 			"language": "ru",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/russian/jcuken.dof",
@@ -2855,7 +2855,7 @@
 		},
 		{
 			"id": "xpert",
-			"name": "xpert",
+			"name": "Xpert",
 			"language": "en",
 			"source": "oxeylyzer",
 			"source_path": "static/layouts/shai/xpert.dof",
@@ -2895,7 +2895,7 @@
 		},
 		{
 			"id": "graphite",
-			"name": "graphite",
+			"name": "Graphite",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/graphite.json",
@@ -2938,7 +2938,7 @@
 		},
 		{
 			"id": "gallium",
-			"name": "gallium",
+			"name": "Gallium",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/gallium.json",
@@ -3303,7 +3303,7 @@
 		},
 		{
 			"id": "focal",
-			"name": "focal",
+			"name": "Focal",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/focal.json",
@@ -3343,7 +3343,7 @@
 		},
 		{
 			"id": "hands_down_neu",
-			"name": "hands-down-neu",
+			"name": "Hands Down Neu",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/hands-down-neu.json",
@@ -3385,7 +3385,7 @@
 		},
 		{
 			"id": "hands_down_reference",
-			"name": "Hands-Down-Reference",
+			"name": "Hands Down Reference",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/hands-down-reference.json",
@@ -3425,7 +3425,7 @@
 		},
 		{
 			"id": "engrammer",
-			"name": "engrammer",
+			"name": "Engrammer",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/engrammer.json",
@@ -3467,7 +3467,7 @@
 		},
 		{
 			"id": "apt",
-			"name": "apt",
+			"name": "APT",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/apt.json",
@@ -3508,7 +3508,7 @@
 		},
 		{
 			"id": "hiyou",
-			"name": "hiyou",
+			"name": "Hiyou",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/hiyou.json",
@@ -3630,7 +3630,7 @@
 		},
 		{
 			"id": "ints",
-			"name": "ints",
+			"name": "INTS",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/ints.json",
@@ -3670,7 +3670,7 @@
 		},
 		{
 			"id": "vylet",
-			"name": "vylet",
+			"name": "Vylet",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/vylet.json",
@@ -3752,7 +3752,7 @@
 		},
 		{
 			"id": "uciea",
-			"name": "uciea",
+			"name": "UCIEA",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/uciea.json",
@@ -3794,7 +3794,7 @@
 		},
 		{
 			"id": "ahei",
-			"name": "ahei",
+			"name": "AHEI",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/ahei.json",
@@ -3876,7 +3876,7 @@
 		},
 		{
 			"id": "octa8",
-			"name": "octa8",
+			"name": "Octa8",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/octa8.json",
@@ -3916,7 +3916,7 @@
 		},
 		{
 			"id": "noted",
-			"name": "noted",
+			"name": "Noted",
 			"language": "de",
 			"source": "cmini",
 			"source_path": "layouts/noted.json",
@@ -3958,7 +3958,7 @@
 		},
 		{
 			"id": "maya",
-			"name": "maya",
+			"name": "Maya",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/maya.json",
@@ -4039,7 +4039,7 @@
 		},
 		{
 			"id": "eucalyn",
-			"name": "eucalyn",
+			"name": "Eucalyn",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/eucalyn.json",
@@ -4079,7 +4079,7 @@
 		},
 		{
 			"id": "inrolly",
-			"name": "inrolly",
+			"name": "Inrolly",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/inrolly.json",
@@ -4120,7 +4120,7 @@
 		},
 		{
 			"id": "middlemak",
-			"name": "middlemak",
+			"name": "Middlemak",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/middlemak.json",
@@ -4160,7 +4160,7 @@
 		},
 		{
 			"id": "rain",
-			"name": "rain",
+			"name": "Rain",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/rain.json",
@@ -4242,7 +4242,7 @@
 		},
 		{
 			"id": "canary_ortho",
-			"name": "canary-ortho",
+			"name": "Canary Ortho",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/canary-ortho.json",
@@ -4282,7 +4282,7 @@
 		},
 		{
 			"id": "colemak_dh_angle",
-			"name": "colemak-dh-angle",
+			"name": "Colemak-DH Angle",
 			"language": "en",
 			"source": "cmini",
 			"source_path": "layouts/colemak-dh-angle.json",

@@ -17,6 +17,8 @@
  *    21 locales, the page draws an « i » button for each, and the placeholders
  *    of each explanation match English.
  * 4. Corpora: every built-in corpus of the generated data has its tables file.
+ *    Layouts: every layout has a display name, not its id (« Colemak-DH », not
+ *    « colemak_dh »), and no two layouts share one.
  * 5. Globals: no page script reads `window.X` for an X a loaded script
  *    declares with a top-level const or let, which is a page global but not
  *    a window property (the .keylayout import once read window.LAYOUT_COMPOSER_DATA
@@ -250,6 +252,21 @@ for (const corpus of DATA.corpora)
 		fs.existsSync(path.join(PAGE_DIR, corpus.script)),
 		`corpus ${corpus.id}: no ${corpus.script}`
 	);
+
+// Display names (maintainer, 2026-11-15): the library's one data source names
+// each layout as people write it; its id stays the key.
+const shownNames = new Map();
+for (const layout of DATA.layouts) {
+	check(
+		layout.name !== layout.id && !/_/.test(layout.name) && !/^[a-z]+(-[a-z]+)*$/.test(layout.name),
+		`layout ${layout.id}: « ${layout.name} » is not a display name`
+	);
+	check(
+		!shownNames.has(layout.name),
+		`layouts ${shownNames.get(layout.name)} and ${layout.id} share « ${layout.name} »`
+	);
+	shownNames.set(layout.name, layout.id);
+}
 
 // 5/ Globals
 const lexical = new Set();
