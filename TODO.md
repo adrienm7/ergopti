@@ -639,6 +639,17 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       maintainer: a Lua runtime for the AutoHotkey driver would be a new dependency). A host with neither keeps
       the « converters cannot run in this window » notice. Real-machine checks: the XKB and KLC downloads of the
       layout editor window on macOS and Windows (TODO-tests files).
+- [ ] **Windows export step in native Lua (maintainer, 2026-11-15).** The Windows app builds XKB and KLC with
+      the same export step as macOS and Linux, not with fengari, which stays the site's runner.
+      Code done 2026-11-15 (worker X, 254d9300, 9077b793, c69f77a9): the restricted host
+      `windows/native/ergopti_lua_export.c` on the pinned lua.org Lua 5.4.6 (`ergopti_lua_export.pin.json`), built
+      by `tools/build/build_windows_lua_export.ps1` in package-windows and uploaded with its identity; the AHK host
+      offers `lua_export` only when the committed exe matches its identity, with a private input file and the
+      defaults' `export_step_timeout_ms`. Proofs: the host's self-test, and test-layout-editor-target-exports.cjs
+      gives the site's bytes through a gcc build of it (`tools/build/build-lua-export-host.cjs`).
+      [RELEASE] Left (2026-11-15): commit the CI artifact's `ergopti_lua_export.exe` and `.json` into
+      `windows/vendor` with their `required` entries in `tools/build/windows_bundle_manifest.json`; then
+      test-windows-lua-export-identity.cjs checks them, and the Windows lane runs the byte-equality proof.
 - [x] **No site footer on /studio (maintainer decision, 2026-11-15).** The Studio workspace fills the screen like
       an app; the footer made every Studio page 80 px taller than the screen.
 - [ ] **Studio screenshot remarks (maintainer, 2026-11-15).** Taken by worker T in this order: (a), 2, 6, 7, 8,
