@@ -325,3 +325,20 @@ _LSS_StudioProfile() {
 	AssertEqual(Settings["failures"]["unreadable"], StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)["code"])
 }
 Test("Studio layout store: keeps one fingering profile as given (studio-fingering-profile)", _LSS_StudioProfile)
+
+; The file JSON-encodes the page's text, so each quote takes two bytes there:
+; reading it back must allow for that, or a large saved document is unreadable.
+_LSS_StudioDocumentBound() {
+	Settings := StudioStore_SharedSettings()
+	Files := Map()
+	Ports := Map(
+		"exists", (Path) => Files.Has(Path),
+		"read", (Path, MaxBytes) => (Files.Has(Path) && StrLen(Files[Path]) <= MaxBytes) ? Files[Path] : false,
+		"write", (Path, Text) => (Files[Path] := Text, true))
+	Text := '{"a":"' . StrReplace(Format("{:100000}", ""), " ", '\"') . '"}'
+	AssertTrue(StudioStore_ProfileSave(Settings, "C:\cfg\", Map("text", Text), Ports)["ok"])
+	Loaded := StudioStore_ProfileLoad(Settings, "C:\cfg\", Ports)
+	AssertTrue(Loaded["ok"], Loaded.Get("detail", ""))
+	AssertEqual(Text, Loaded["profile"])
+}
+Test("Studio layout store: reads back a document full of quotes up to its bound (studio-document-bound)", _LSS_StudioDocumentBound)

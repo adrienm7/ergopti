@@ -331,7 +331,9 @@ function M.new(env)
 			on_done(true, nil, nil)
 			return
 		end
-		local text, status, detail = env.read_bounded(file, settings.max_profile_bytes + 64)
+		-- The file holds the text JSON-encoded: each quote, backslash, newline or
+		-- tab doubles, and the page sends JSON, whose text has no other control.
+		local text, status, detail = env.read_bounded(file, settings.max_profile_bytes * 2 + 64)
 		local failure
 		if type(text) ~= "string" or status ~= "ok" then
 			failure = string.format("%s could not be read (%s %s)", file, tostring(status), tostring(detail))

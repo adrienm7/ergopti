@@ -1308,6 +1308,25 @@ helpers.describe("layout editor files (macOS): the registry stores what the edit
 		helpers.assert_eq(loaded[2], "studio_unreadable")
 	end)
 
+	helpers.it("reads back a document full of quotes up to its bound (studio-document-bound)", function()
+		local LayoutRegistry, deps, state = manager()
+		deps.config_dir = "/cfg/"
+		deps.read_bounded = function(path, max_bytes)
+			local text = state.files[path]
+			if not text then return nil, "absent" end
+			if #text > max_bytes then return nil, "too_large" end
+			return text, "ok"
+		end
+		-- The file JSON-encodes the page's text, so each quote takes two bytes there.
+		local text = '{"a":"' .. string.rep('\\"', 100000) .. '"}'
+		local saved, loaded
+		LayoutRegistry.studio_profile_save({ text = text }, function(...) saved = { ... } end, deps)
+		helpers.assert_true(saved[1], tostring(saved[3]))
+		LayoutRegistry.studio_profile_load(function(...) loaded = { ... } end, deps)
+		helpers.assert_eq(loaded[1], true, tostring(loaded[3]))
+		helpers.assert_eq(loaded[2], text)
+	end)
+
 	helpers.it("runs the layout editor's export step with the shipped bounds (lua-export-host)", function()
 		local LayoutRegistry, deps = manager({ files = shipped_files() })
 		local answer

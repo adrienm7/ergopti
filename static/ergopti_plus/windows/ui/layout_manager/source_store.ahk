@@ -679,7 +679,9 @@ StudioStore_ProfileLoad(Settings, ConfigDir, Ports := 0) {
 	Path := StudioStore_ProfilePath(Settings, ConfigDir)
 	if !Ports["exists"].Call(Path)
 		return Map("ok", true, "profile", "")
-	Text := Ports["read"].Call(Path, Settings["max_profile_bytes"] + 64)
+	; The file holds the text JSON-encoded: each quote, backslash, newline or tab
+	; doubles, and the page sends JSON, whose text has no other control.
+	Text := Ports["read"].Call(Path, Settings["max_profile_bytes"] * 2 + 64)
 	Failure := ""
 	if !(Text is String)
 		Failure := Path . " could not be read"
