@@ -10,10 +10,8 @@
 
 #Requires AutoHotkey v2.0
 
-_APNR_Require(Condition, Message) {
-	if !Condition
-		throw Error(Message)
-}
+; The document wait and its one page budget (a unit test drives it with a fake view).
+#Include %A_LineFile%\..\action_picker_native_page_wait.ahk
 
 ; The smoke owns no user catalogue, AI settings or external program discovery.
 t(Key) => Key
@@ -99,20 +97,6 @@ _APNR_Confirm(Id) {
 	_APNR.Confirmed += 1
 }
 
-_APNR_Script(View, Script) {
-	global _APNR
-	_APNR.ScriptCalls += 1
-	_APNR_Phase("script-submit-before")
-	Pending := View.ExecuteScriptAsync(Script)
-	_APNR_Phase("script-submit-after")
-	; Keep a rejecting native Promise observed while its genuine await pumps.
-	Pending.onSettled((*) => 0, (*) => 0)
-	_APNR_Phase("script-await-before")
-	Result := Pending.await(3000)
-	_APNR_Phase("script-await-after")
-	return JsonParse(Result)
-}
-
 ; Each observed native core proves its environment identity before we retain
 ; a stable browser handle. A new browser PID is allowed by the real SDK.
 _APNR_CaptureBrowser(Core) {
@@ -148,20 +132,9 @@ _APNR_Page(Title) {
 	View := _ActPickWeb_WebView, Window := _ActPickWeb_Gui, Epoch := _ActPickWeb_SessionEpoch
 	_APNR_CaptureBrowser(View)
 	_APNR_Phase("page-browser-captured")
-	Started := A_TickCount
-	loop {
-		if IsObject(_APNR.Failure)
-			throw _APNR.Failure
-		_APNR_Require(_ActPickWeb_Gui == Window && _ActPickWeb_SessionEpoch == Epoch,
-			"The document observation must retain its exact session.")
-		Data := _APNR_Script(View, "({title:document.getElementById('title')?.textContent||'',"
-			. "none:!!document.querySelector('[data-id=none]'),source:location.href})")
-		if Data is Map && Data.Get("title", "") == Title && Data.Get("none", false)
-			break
-		_APNR_Require(((A_TickCount - Started) & 0xFFFFFFFF) < 10000,
-			"The actual frontend must render its host init payload and the none row.")
-		Sleep(10)
-	}
+	Data := _APNR_AwaitDocument(View, Title, () => _APNR_Require(
+		_ActPickWeb_Gui == Window && _ActPickWeb_SessionEpoch == Epoch,
+		"The document observation must retain its exact session."))
 	_APNR_Require(InStr(Data["source"], "https://ergopti.actionpicker/ui/action_picker/index.html?cb=") == 1,
 		"The rendered page must be the actual HTTPS virtual-host document.")
 	_APNR.Frames.Push(Map("epoch", Epoch, "hwnd", Window.Hwnd, "browser_pid", View.BrowserProcessId,

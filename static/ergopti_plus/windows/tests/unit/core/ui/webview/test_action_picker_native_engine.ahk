@@ -138,3 +138,47 @@ _APNT_Case() {
 
 Test("Action picker native WebView: current close and reopen preserve the real page and private browser (action-picker-native-engine)",
 	_APNT_Case)
+
+
+
+; (apne-page-budget) The page wait's scripts share the page budget: a first
+; WebView2 load slower than 3 s is still read, where a fixed 3 s wait per
+; script once raised a TimeoutError (Promise.ahk) inside the 10 s budget.
+#Include ../../../../fixtures/action_picker_native_page_wait.ahk
+
+; The fixture's phase log, silent here: the native child alone writes it.
+_APNR_Phase(Name) => 0
+
+class _APNT_SlowView {
+	__New(DelayMs) {
+		this.DelayMs := DelayMs, this.Budgets := []
+	}
+	ExecuteScriptAsync(Script) => _APNT_SlowPending(this)
+}
+
+; A script answered after the view's delay: an await shorter than it times out.
+class _APNT_SlowPending {
+	__New(View) {
+		this.View := View
+	}
+	onSettled(*) => 0
+	await(Timeout) {
+		this.View.Budgets.Push(Timeout)
+		if (Timeout >= 0 && Timeout < this.View.DelayMs)
+			throw TimeoutError("The fake first load is slower than this wait.")
+		return '{"title":"Slow picker","none":true,"source":"https://ergopti.actionpicker/ui/action_picker/index.html?cb=1"}'
+	}
+}
+
+_APNT_SlowFirstLoad() {
+	global _APNR
+	_APNR := {ScriptCalls: 0, Failure: 0}
+	View := _APNT_SlowView(3500)
+	Data := _APNR_AwaitDocument(View, "Slow picker", () => 0)
+	AssertEqual("Slow picker", Data["title"])
+	AssertEqual(1, _APNR.ScriptCalls, "one read within the page budget")
+	AssertTrue(View.Budgets[1] > 9000 && View.Budgets[1] <= _APNR_PageBudgetMs(),
+		"the script waits for what is left of the page budget")
+}
+Test("Action picker native child: a first load slower than 3 s is read within the page budget (apne-page-budget)",
+	_APNT_SlowFirstLoad)
