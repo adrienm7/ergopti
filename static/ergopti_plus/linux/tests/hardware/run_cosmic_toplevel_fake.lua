@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: COSMIC Toplevel Worker Against a Protocol Fake
 --- DESCRIPTION:
---- Proves adapters/cosmic_toplevel_worker.lua through the real
+--- Proves platform/focus/cosmic_toplevel_worker.lua through the real
 --- libwayland-client: this script is a Wayland server of its own (the wire
 --- protocol over a Unix socket, in LuaJIT FFI) that offers
 --- `zcosmic_toplevel_info_v1` the way cosmic-comp does, announces windows,
@@ -53,7 +53,7 @@ local POLLIN = 1
 local WNOHANG = 1
 -- The worker reads its protocol names from the shared identifiers.
 package.path = "./?.lua;./?/init.lua;../_shared/?.lua;../_shared/?/init.lua;" .. package.path
-local Worker = dofile("adapters/cosmic_toplevel_worker.lua")
+local Worker = dofile("platform/focus/cosmic_toplevel_worker.lua")
 local MODE = arg and arg[1]
 local MODES = { v1 = { offer = 1, list = false, bound = 1 }, v2 = { offer = 3, list = true, bound = 2 },
 	["v2-without-list"] = { offer = 3, list = false, bound = 1 } }
@@ -139,7 +139,7 @@ local errors_path = runtime .. "/worker.err"
 ffi.C.setenv("XDG_RUNTIME_DIR", runtime, 1)
 ffi.C.setenv("WAYLAND_DISPLAY", socket_name, 1)
 local parent = ffi.C.getpid()
-local argv_strings = { "luajit", "adapters/cosmic_toplevel_worker.lua", "libwayland-client.so.0", tostring(parent),
+local argv_strings = { "luajit", "platform/focus/cosmic_toplevel_worker.lua", "libwayland-client.so.0", tostring(parent),
 	"../_shared" }
 local argv = ffi.new("char *[?]", #argv_strings + 1)
 local anchor = {}

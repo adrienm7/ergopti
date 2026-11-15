@@ -10,7 +10,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 
 --- Builds one running application as hs.application.runningApplications lists it.
 --- @param name string Localised name.

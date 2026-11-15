@@ -11,7 +11,7 @@ local METHODS = {
 
 local function with_facade(callback, configure)
 	local names = { "modules.gestures.native_app_switcher", "adapters.synthetic_input",
-		"core.events.timer_scheduler", "adapters.window_manager" }
+		"core.events.timer_scheduler", "platform.focus.window_manager" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local f = { front = 100, time = 10, source = true, release = true,
@@ -49,7 +49,7 @@ local function with_facade(callback, configure)
 	if configure then configure(f) end
 	package.loaded["adapters.synthetic_input"] = input
 	package.loaded["core.events.timer_scheduler"] = f.scheduler
-	package.loaded["adapters.window_manager"] = windows
+	package.loaded["platform.focus.window_manager"] = windows
 	local ok, failure = xpcall(function()
 		f.facade = require("modules.gestures.native_app_switcher")
 		callback(f)

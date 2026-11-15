@@ -40,7 +40,7 @@ end
 --- The modules a fixture replaces; with_fresh_modules restores each one, so a
 --- recording port never reaches the next test file the runner loads.
 local OWNED_MODULES = {
-	"modules.shortcuts.actions.apps", "adapters.window_info", "core.process.adapters.shell_runner",
+	"modules.shortcuts.actions.apps", "platform.focus.window_info", "core.process.adapters.shell_runner",
 	"core.fs.adapters.file_system", "core.ui.engine.notifications", "core.logger.engine.logger",
 }
 
@@ -51,7 +51,7 @@ local function with_apps(existing, body)
 	helpers.with_fresh_modules(OWNED_MODULES, function()
 		local world = { urls = {}, opened = {}, notices = {} }
 		package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-		package.loaded["adapters.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
+		package.loaded["platform.focus.window_info"] = { getFocused = function() return { appId = "TextEdit" } end }
 		package.loaded["core.ui.engine.notifications"] = {
 			notify = function(message) world.notices[#world.notices + 1] = message; return true end,
 		}

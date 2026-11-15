@@ -411,7 +411,7 @@ helpers.describe("keystats privacy — coverage never narrows", function()
 	end)
 
 	it("reads the shared list in the detector and the metrics (add1-secure-app)", function()
-		local Detector = helpers.load_module("adapters.secure_field_detector")
+		local Detector = helpers.load_module("platform.focus.secure_field_detector")
 		for _, app in ipairs({ "org.keepassxc.KeePassXC", "1password", "Seahorse", "org.gnome.seahorse.Application" }) do
 			helpers.assert_true(Detector.isSecureApp(app), "the detector must match " .. app)
 		end
@@ -451,7 +451,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 
 	it("asks AT-SPI whether the focused element is a password field", function()
 		-- The sibling of the defect above, and worse, because this one had a whole
-		-- adapter behind it. adapters/secure_field_detector.lua was written and
+		-- adapter behind it. platform/focus/secure_field_detector.lua was written and
 		-- tested, keystats.set_secure_field was written, and `refresh()` had no
 		-- caller anywhere in the driver — so isSecureField() answered false forever
 		-- and the setter was never called. metrics.secure_filter_enabled ships
@@ -464,7 +464,7 @@ helpers.describe("keystats privacy — the daemon supplies the signals", functio
 		-- call deleted, because the filter simply never fires.
 		local code = code_of("ergopti_hotstrings.lua")
 		local guard_code = unit_code('error("focus_guard requires keystats.set_secure_field")')
-		helpers.assert_contains(code, "adapters.secure_field_detector",
+		helpers.assert_contains(code, "platform.focus.secure_field_detector",
 			"the daemon must reach the detector at all")
 		helpers.assert_contains(code, "keystats  = keystats",
 			"the daemon must give the focus guard the real keystats")

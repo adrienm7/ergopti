@@ -737,6 +737,7 @@ console.log('lint-conventions: scanning…');
 // AHK files — lib/ and modules/ only (skip vendor/, tests/ for header check)
 const ahkSourceDirs = [
 	join(REPO_ROOT, 'static/ergopti_plus/windows/adapters'),
+	join(REPO_ROOT, 'static/ergopti_plus/windows/platform/focus'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/ui/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/process/adapters'),
 	join(REPO_ROOT, 'static/ergopti_plus/windows/core/lifecycle'),

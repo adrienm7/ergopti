@@ -79,6 +79,7 @@ const TREES = [
 	'macos/core/crypto',
 	'linux/modules',
 	'linux/adapters',
+	'linux/platform/focus',
 	'linux/core/ui/adapters',
 	'linux/core/process/adapters',
 	'linux/core/fs/adapters',

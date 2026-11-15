@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 local function load_fixture(options)
 	options = options or {}
 	for _, name in ipairs({
-		"modules.shortcuts.actions.apps", "adapters.window_info",
+		"modules.shortcuts.actions.apps", "platform.focus.window_info",
 		"adapters.synthetic_input", "core.events.timer_scheduler", "adapters.clipboard", "core.logger.engine.logger",
 	}) do package.loaded[name] = nil end
 	local original = {
@@ -29,7 +29,7 @@ local function load_fixture(options)
 	local copies = 0
 	local snapshots = 0
 	package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
-	package.loaded["adapters.window_info"] = {
+	package.loaded["platform.focus.window_info"] = {
 		getFocused = function() return { appId = "TextEdit" } end,
 	}
 	local function complete(tx, status)

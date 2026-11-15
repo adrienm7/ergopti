@@ -26,7 +26,7 @@ local M = {}
 --- @param expected table Independent { default, named, decorated } captions.
 --- @param bypass boolean|nil Causal control routes through the original generic port.
 function M.run(assert_eq, driver, compose, expected, bypass)
-	local names = { "adapters.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
+	local names = { "platform.focus.application_notifier", "adapters.notifier", "platform.focus.application_notifier_core",
 		"core.ui.engine.window_titles", "core.process.adapters.shell_runner", "core.i18n.engine.i18n", "core.logger.engine.logger", "core.logger.engine.shim" }
 	local previous, previous_hs = {}, _G.hs
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -68,11 +68,11 @@ function M.run(assert_eq, driver, compose, expected, bypass)
 		notes[#notes + 1] = note
 		return note
 	end } }
-	package.loaded["adapters.application_notifier"] = nil
+	package.loaded["platform.focus.application_notifier"] = nil
 	package.loaded["adapters.notifier"] = nil
 	local ok, detail = xpcall(function()
 		local generic = require("adapters.notifier")
-		local application = require("adapters.application_notifier")
+		local application = require("platform.focus.application_notifier")
 		if bypass then application = generic end
 		if driver == "macos" then
 			assert_eq(generic.send("Literal title", { body = "Literal body" }), true)

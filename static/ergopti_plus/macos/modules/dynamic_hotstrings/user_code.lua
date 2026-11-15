@@ -23,7 +23,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local SyntheticInput = require("adapters.synthetic_input")
 local ConfigPaths = require("infra.config_paths")
 local Logger = require("core.logger.engine.logger")
-local Notifier = require("adapters.application_notifier")
+local Notifier = require("platform.focus.application_notifier")
 local I18n = require("core.i18n.engine.i18n")
 local Manifest = require("infra.manifest_reader")
 

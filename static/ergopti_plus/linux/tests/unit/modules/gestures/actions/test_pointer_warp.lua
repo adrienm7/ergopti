@@ -36,13 +36,13 @@ local function run(action, session, monitors, location)
 		return true
 	end)
 	os.execute = function(cmd) commands[#commands + 1] = tostring(cmd) return true end
-	local saved_notifier = package.loaded["adapters.application_notifier"]
-	package.loaded["adapters.application_notifier"] = { send = function(text) notices[#notices + 1] = text return true end }
+	local saved_notifier = package.loaded["platform.focus.application_notifier"]
+	package.loaded["platform.focus.application_notifier"] = { send = function(text) notices[#notices + 1] = text return true end }
 	local ok, err = pcall(function()
 		local Gestures = helpers.load_module("modules.gestures.manager")
 		Gestures.execute_action(action, "test__slot")
 	end)
-	package.loaded["adapters.application_notifier"] = saved_notifier
+	package.loaded["platform.focus.application_notifier"] = saved_notifier
 	os.execute = real_execute
 	Shell._reset_runner()
 	Display._set_for_test(nil, nil)

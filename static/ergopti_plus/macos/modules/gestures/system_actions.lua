@@ -35,7 +35,7 @@ local Clipboard = require("adapters.clipboard")
 local MouseControl = require("adapters.mouse_control")
 local FileSystem = require("core.fs.adapters.file_system")
 local TccGrant = require("adapters.tcc_grant")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 local FileSelection = require("core.fs.engine.file_selection")
 local AppParameter = require("apps.engine.parameter")
 

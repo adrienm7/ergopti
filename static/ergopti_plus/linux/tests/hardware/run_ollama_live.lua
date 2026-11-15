@@ -34,7 +34,7 @@ end
 
 -- The privacy gate needs a desktop; this test is about the backend, so the
 -- focused field is declared an ordinary one.
-package.loaded["adapters.secure_field_detector"] = {
+package.loaded["platform.focus.secure_field_detector"] = {
 	isSecureField = function() return false end,
 	isSecureApp = function() return false end,
 	isUrlBar = function() return false end,

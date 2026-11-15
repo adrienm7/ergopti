@@ -8,7 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local Atspi = require("adapters.atspi_focus")
+local Atspi = require("platform.focus.atspi_focus")
 local Destination = require("adapters.user_hotstring_destination")
 
 local function response(bus, path, active, role)
@@ -35,7 +35,7 @@ end
 --- Native accessibility still uses the bounded helper owned above.
 --- @return table WindowInfo
 local function unsupported_wayland()
-	local names = { "adapters.window_info", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
+	local names = { "platform.focus.window_info", "core.process.adapters.shell_runner", "core.ui.engine.display_server" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	package.loaded["core.ui.engine.display_server"] = {
@@ -43,7 +43,7 @@ local function unsupported_wayland()
 		desktop = function() return "GNOME" end,
 	}
 	package.loaded["core.process.adapters.shell_runner"] = { has_command = function() return false end }
-	local ok, adapter = pcall(helpers.load_module, "adapters.window_info")
+	local ok, adapter = pcall(helpers.load_module, "platform.focus.window_info")
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(adapter, 0) end
 	return adapter

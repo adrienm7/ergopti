@@ -53,7 +53,7 @@ end)
 -- The modules each fixture loads fresh, and the owners it replaces.
 local OWNED = {
 	"modules.gestures.user_actions", "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner",
-	"adapters.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
+	"platform.focus.application_notifier", "adapters.clipboard", "core.fs.adapters.file_system", "modules.shortcuts.manager",
 }
 
 --- Runs body with every owner of the user actions recorded.
@@ -70,7 +70,7 @@ local function with_world(body)
 		end
 		package.loaded["core.logger.engine.shim"] = logger
 		package.loaded["core.i18n.engine.i18n"] = { get = function(key) return key .. "|{1}|{2}" end }
-		package.loaded["adapters.application_notifier"] = { send = function(text)
+		package.loaded["platform.focus.application_notifier"] = { send = function(text)
 			world.notices[#world.notices + 1] = (text:gsub("|{%d}", ""))
 			return true
 		end }
@@ -351,7 +351,7 @@ helpers.describe("private user-action notification fallback", function()
 	for _, mode in ipairs({ "unavailable", "refused" }) do
 		helpers.it("does not log command stderr when notifier is " .. mode, function()
 			local names = { "core.logger.engine.shim", "core.i18n.engine.i18n", "core.process.adapters.shell_runner", "adapters.notifier",
-				"adapters.application_notifier", "modules.gestures.user_actions" }
+				"platform.focus.application_notifier", "modules.gestures.user_actions" }
 			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 			local logs = {}
 			local logger = assert(dofile(require("core.fs.engine.paths").shared("core/logger/engine/init.lua")))
@@ -365,7 +365,7 @@ helpers.describe("private user-action notification fallback", function()
 				run_async = function() return nil, "controlled spawn refusal" end,
 			}
 			package.loaded["adapters.notifier"] = nil
-			package.loaded["adapters.application_notifier"] = nil
+			package.loaded["platform.focus.application_notifier"] = nil
 			package.loaded["modules.gestures.user_actions"] = nil
 			local ok, err = xpcall(function()
 				local user = require("modules.gestures.user_actions")

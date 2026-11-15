@@ -72,7 +72,7 @@ function M.attach(world, application)
 		observer = { new = function() return watcher(function() end) end },
 	}
 	package.loaded["modules.keymap.utils"] = nil
-	package.loaded["adapters.secure_field_detector"] = nil
+	package.loaded["platform.focus.secure_field_detector"] = nil
 	native.utils = require("modules.keymap.utils")
 	native.utils.start_ignored_win_tracking({}, {})
 	-- A normal asynchronous classification, rather than a fabricated receipt.

@@ -14,7 +14,7 @@ local Identifiers = require("core.text.engine.identifiers")
 local Logger = require("core.logger.engine.logger")
 local NativePath = require("core.fs.engine.native_path")
 local TimerScheduler = require("core.events.timer_scheduler")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 
 local LOG = "notifications"
 
@@ -150,7 +150,7 @@ function M.notify(title_or_msg, body, kind, on_click)
 
 	local owner_id = nil
 	local created, notification_or_err = xpcall(function()
-		return require("adapters.application_notifier").new(function()
+		return require("platform.focus.application_notifier").new(function()
 			if owner_id == nil or _notification_owners[owner_id] == nil then return end
 			release_notification(owner_id)
 			if type(on_click) == "function" then

@@ -38,7 +38,7 @@ local RELOADED = {
 }
 -- The boundaries a scenario scripts
 local FAKED = {
-	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -75,7 +75,7 @@ local function scenario(opts, body)
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local world = { posts = {}, notices = {}, injected = {}, shown = {}, live_changes = 0,
 			preferences = preferences, buffer = opts.buffer or "", paused = false, preview = false }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,

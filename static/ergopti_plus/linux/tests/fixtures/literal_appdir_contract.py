@@ -208,7 +208,7 @@ test -z "${ERGOPTI_LITERAL_NATIVE_MODULES:-}"
 assert(os.getenv('ERGOPTI_LITERAL_DRIVER_ROOT'), 'relative entry did not export its root')
 assert(os.getenv('ERGOPTI_LITERAL_DAEMON')=='1', 'daemon did not export its search order')
 local shared=assert(os.getenv('ERGOPTI_LITERAL_SHARED_ROOT'))
-local child=assert(io.popen('luajit ./adapters/atspi_context_worker.lua bus / 0 '..string.format('%q',shared)..' 1 invalid 2>&1'))
+local child=assert(io.popen('luajit ./platform/focus/atspi_context_worker.lua bus / 0 '..string.format('%q',shared)..' 1 invalid 2>&1'))
 local result=child:read('*a'); child:close()
 assert(result:find('context worker parent already exited',1,true), result)
 exit(n) end
@@ -290,7 +290,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         context = subprocess.run(
             [
                 usr / "bin/luajit",
-                "./adapters/atspi_context_worker.lua",
+                "./platform/focus/atspi_context_worker.lua",
                 "bus",
                 "/",
                 "0",
@@ -310,7 +310,7 @@ arg={[0]='ergopti_hotstrings.lua','--help'}; dofile('ergopti_hotstrings.lua')"""
         watch = subprocess.run(
             [
                 usr / "bin/luajit",
-                "./adapters/atspi_focus_watch_worker.lua",
+                "./platform/focus/atspi_focus_watch_worker.lua",
                 "0",
                 "0",
                 "0",

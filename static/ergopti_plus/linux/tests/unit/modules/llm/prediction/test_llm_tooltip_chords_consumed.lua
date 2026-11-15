@@ -61,7 +61,7 @@ local MODIFIER_SETS = {
 }
 
 local FAKED = {
-	"infra.llm_preferences", "adapters.secure_field_detector",
+	"infra.llm_preferences", "platform.focus.secure_field_detector",
 	"modules.llm.api_ollama", "modules.llm.profiles",
 }
 local RELOADED = {
@@ -151,7 +151,7 @@ local function with_offer(options, body)
 		} })
 		helpers.load_module("modules.llm.navigation_settings")._reset()
 		helpers.load_module("modules.llm.display_settings")._reset()
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 		}

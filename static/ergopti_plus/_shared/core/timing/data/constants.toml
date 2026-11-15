@@ -684,7 +684,7 @@ focus_barrier_timeout_ms = 20
 # Linux: how long the accessibility worker's pump sleeps between two polls of its
 # transport while it waits for the desktop to answer (one libuv tick, so the wait
 # neither spins a core nor adds a visible delay).
-# Linux: adapters/atspi_focus_watch.lua.
+# Linux: platform/focus/atspi_focus_watch.lua.
 focus_pump_sleep_ms = 1
 
 

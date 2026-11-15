@@ -7,7 +7,7 @@ local helpers = require("tests.helpers")
 ---@param callback function Receives the real filter and native controls.
 local function with_filter(callback)
 	return helpers.with_stub_scope({ "core.logger.engine.logger", "modules.keymap.utils",
-		"adapters.secure_field_detector", "modules.llm.app_filter" }, function()
+		"platform.focus.secure_field_detector", "modules.llm.app_filter" }, function()
 		local c = { mode = "healthy", role = "AXTextField", subrole = nil,
 			bundle = "com.apple.Safari", ignored = false, focus_reads = 0, calls = {} }
 		local field = { attributeValue = function(_, attribute)

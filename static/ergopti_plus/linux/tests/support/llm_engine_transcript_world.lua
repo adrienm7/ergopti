@@ -31,7 +31,7 @@ local RELOADED = {
 	"modules.llm.api_remote",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -71,7 +71,7 @@ function M.with_world(config, body)
 			cancel = function() return true end,
 		}
 		local world = { model_label = "qwen-3.8-27b" }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,

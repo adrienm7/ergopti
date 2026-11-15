@@ -5,7 +5,7 @@
  * MODULE: Source-Tree Scan Coverage Gate
  * DESCRIPTION:
  * Twenty meta-tests and tools enumerate a driver's source by a HARDCODED list of
- * top-level folders — `{ "adapters", "infra", "modules", "ui", "core" }` and its
+ * top-level folders — `{ "adapters", "infra", "modules", "ui", "core", "platform" }` and its
  * variants. Adding a new top-level tree makes every one of them quietly stop
  * covering it.
  *

@@ -10,10 +10,10 @@
 
 local helpers = require("tests.helpers")
 local OWNERS = { "hs", "tests.stubs.hs", "core.ui.engine.dialog_util", "core.logger.engine.logger",
-	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "adapters.running_application",
+	"core.events.timer_scheduler", "core.process.adapters.shell_runner", "platform.focus.running_application",
 	"core.text.engine.utils", "core.text.engine.utils_core", "core.lifecycle.engine.compat.utf8", "core.ui.engine.window_titles",
 	"diagnostics.engine.reports.error_description", "core.text.engine.number_policy", "modules.gestures.action_confirm",
-	"adapters.mouse_control", "adapters.window_info", "adapters.window_manager", "core.i18n.engine.i18n" }
+	"adapters.mouse_control", "platform.focus.window_info", "platform.focus.window_manager", "core.i18n.engine.i18n" }
 
 
 
@@ -71,7 +71,7 @@ local function with_dialog(callback)
 			local logger = helpers.make_logger_stub()
 			logger.run_modal = function(work, ...) return work(...) end
 			package.loaded["core.logger.engine.logger"] = logger
-			package.loaded["adapters.running_application"] = {
+			package.loaded["platform.focus.running_application"] = {
 				current = function() return { activate = function() return true end } end,
 			}
 			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(executable, args)
@@ -255,8 +255,8 @@ helpers.describe("dialog alert: a call without hs.dialog.alert's shape fails fas
 			package.loaded["adapters.mouse_control"] = {
 				screen_frame_under_cursor = function() return { x = 0, y = 0, w = 1200, h = 900 } end,
 			}
-			package.loaded["adapters.window_info"] = { frontmost_application = function() return nil end }
-			package.loaded["adapters.window_manager"] = { activate = function() return true end }
+			package.loaded["platform.focus.window_info"] = { frontmost_application = function() return nil end }
+			package.loaded["platform.focus.window_manager"] = { activate = function() return true end }
 			package.loaded["modules.gestures.action_confirm"] = nil
 			local Confirm = require("modules.gestures.action_confirm")
 			local ran = 0

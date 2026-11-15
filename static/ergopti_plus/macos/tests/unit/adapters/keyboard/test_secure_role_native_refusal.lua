@@ -7,7 +7,7 @@ local SECURE = "AXSecureTextField"
 --- Loads a fresh detector over a counted native attribute boundary.
 ---@param callback function Receives the detector and declared native controls.
 local function with_detector(callback)
-	return helpers.with_stub_scope({ "adapters.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
+	return helpers.with_stub_scope({ "platform.focus.secure_field_detector", "core.logger.engine.logger", "hs", "tests.stubs.hs" }, function()
 		local control = { role = "AXTextField", queries = {}, logs = {} }
 		package.loaded["core.logger.engine.logger"] = { debug = function(_, format, ...)
 			control.logs[#control.logs + 1] = string.format(format, ...)
@@ -25,7 +25,7 @@ local function with_detector(callback)
 			return control.subrole
 		end }
 		local app = { pid = function() return 4242 end }
-		local detector = helpers.load_with_stubs("adapters.secure_field_detector", {
+		local detector = helpers.load_with_stubs("platform.focus.secure_field_detector", {
 			application = { frontmostApplication = function() return app end },
 			axuielement = { applicationElementForPID = function(pid)
 				helpers.assert_eq(pid, 4242)

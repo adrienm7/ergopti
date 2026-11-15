@@ -1219,7 +1219,7 @@ The tell in a log is the console line "Some applications have alternate
 names…", which `find()` prints (once per Lua state) just before that
 fallback. The keystats's per-flush category lookup of a quit application
 froze Hammerspoon 13.4 s and cost the Karabiner lease (#99). Resolve
-applications through `adapters/running_application.lua` (exact name, bundle
+applications through `platform/focus/running_application.lua` (exact name, bundle
 identifier, PID); `tests/meta/runloop/test_app_lookup_never_scans_windows.lua`
 admits no new direct `get`/`find` call. A timer callback that holds the main
 thread over a second is now named by the runtime capture ("held the main
@@ -1263,7 +1263,7 @@ switcher follows the Command key's own press and release, which the posted
 keystroke never sends; Karabiner's `cmd_tab` works because its virtual keyboard
 presses and releases Command. Action: switch applications from Lua
 (`modules/gestures/app_switch.lua`, window reads in
-`adapters/window_manager.lua`), never by posting Cmd+Tab or Cmd+Shift+Tab.
+`platform/focus/window_manager.lua`), never by posting Cmd+Tab or Cmd+Shift+Tab.
 
 ### project-hs-f17-actions-are-told-apart-by-modifiers
 

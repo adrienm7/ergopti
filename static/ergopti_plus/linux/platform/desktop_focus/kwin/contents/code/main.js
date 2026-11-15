@@ -21,8 +21,8 @@
  * ==============================================================================
  */
 
-// Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
-// against adapters/compositor_focus.lua, which owns them.
+// Pinned by tests/unit/platform/focus/compositor_focus/test_assets.lua
+// against platform/focus/compositor_focus.lua, which owns them.
 const BUS_NAME = 'org.ergopti.Focus';
 const OBJECT_PATH = '/org/ergopti/Focus';
 const INTERFACE = 'org.ergopti.Focus1';

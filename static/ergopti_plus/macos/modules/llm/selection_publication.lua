@@ -9,7 +9,7 @@
 --- ==============================================================================
 
 local Utils = require("modules.keymap.utils")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 local M = {}
 
 --- Captures one classified destination without manufacturing an unknown context.

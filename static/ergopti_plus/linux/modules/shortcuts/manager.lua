@@ -136,7 +136,7 @@ local function record(key)
 	local ok, keystats = pcall(require, "modules.keystats.keystats")
 	if not ok or type(keystats.record_shortcut) ~= "function" then return end
 	local app = "unknown"
-	local ok_win, WindowInfo = pcall(require, "adapters.window_info")
+	local ok_win, WindowInfo = pcall(require, "platform.focus.window_info")
 	if ok_win and type(WindowInfo.focused_app_id) == "function" then
 		local ok_id, id = pcall(WindowInfo.focused_app_id)
 		if ok_id and type(id) == "string" and id ~= "" then app = id end

@@ -30,7 +30,7 @@ if arg[2] == "--worker" then
 end
 
 require("core.lifecycle.engine.compat.utf8").install()
-local Watch = require("adapters.atspi_focus_watch")
+local Watch = require("platform.focus.atspi_focus_watch")
 local Owned = require("core.process.adapters.owned_process")
 local Logger = require("core.logger.engine.shim")
 local original_error = Logger.error

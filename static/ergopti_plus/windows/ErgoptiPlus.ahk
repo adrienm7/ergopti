@@ -407,7 +407,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 ; operations at this integration boundary; the portable core remains OS-free.
 #Include infra/config_transition.ahk
 #Include infra/config_transition_runtime.ahk
-#Include adapters/window_info.ahk
+#Include platform/focus/window_info.ahk
 #Include core/process/adapters/uia_worker.ahk
 #Include adapters/hotkey_registrar.ahk
 #Include ../_shared/shortcuts/data/magic_editor.ahk
@@ -417,7 +417,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/text_sender.ahk
 #Include ../_shared/core/network/data/failure.ahk
 #Include core/network/adapters/http_client.ahk
-#Include adapters/secure_field_detector.ahk
+#Include platform/focus/secure_field_detector.ahk
 #Include core/fs/adapters/storage.ahk
 #Include core/process/adapters/lifecycle.ahk
 #Include adapters/key_state.ahk
@@ -431,7 +431,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include core/ui/adapters/terminal_output_sendinput.ahk
 #Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
-#Include adapters/window_manager.ahk
+#Include platform/focus/window_manager.ahk
 #Include adapters/system_control.ahk
 #Include core/ui/adapters/graphics_renderer.ahk
 #Include adapters/notify_icon.ahk

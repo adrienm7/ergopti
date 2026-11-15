@@ -79,8 +79,8 @@ end
 --- Loads a fresh detector over the supplied AX tree.
 --- @return table The detector module.
 local function load_detector(role, subrole_throws, subrole)
-	package.loaded["adapters.secure_field_detector"] = nil
-	return helpers.load_with_stubs("adapters.secure_field_detector",
+	package.loaded["platform.focus.secure_field_detector"] = nil
+	return helpers.load_with_stubs("platform.focus.secure_field_detector",
 		make_overrides(role, subrole_throws, subrole))
 end
 

@@ -35,7 +35,7 @@ local _session = nil
 --- The production ports: the focused-window adapter and the monotonic clock.
 --- @return table ports
 local function default_ports()
-	local WindowInfo = require("adapters.window_info")
+	local WindowInfo = require("platform.focus.window_info")
 	local TimerScheduler = require("core.events.timer_scheduler")
 	return {
 		focused = WindowInfo.focused_topology,

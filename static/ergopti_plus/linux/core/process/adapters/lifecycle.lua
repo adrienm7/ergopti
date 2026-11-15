@@ -32,7 +32,7 @@ local Logger = require("core.logger.engine.shim")
 -- it a second time, with its own xdotool calls, and it was the copy that fed the
 -- keystroke path — so teaching WindowInfo about Wayland would have changed
 -- nothing a user experiences.
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 -- The process table is read in this process: minimal Arch, Fedora and
 -- openSUSE images ship no `ps`, and a poll every two seconds forked one.
 local NativeDirectory = require("core.fs.engine.native_directory")

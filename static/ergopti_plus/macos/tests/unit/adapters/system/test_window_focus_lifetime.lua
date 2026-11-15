@@ -13,7 +13,7 @@ local helpers = require("tests.helpers")
 
 local function with_windows(options, callback)
 	helpers.with_stub_scope({
-		"adapters.window_manager", "adapters.mouse_control",
+		"platform.focus.window_manager", "adapters.mouse_control",
 		"modules.gestures.app_switch", "core.logger.engine.logger",
 	}, function()
 		local focused = {}
@@ -43,7 +43,7 @@ local function with_windows(options, callback)
 		local candidate = window(22, 202, options.behavior)
 		local healthy = window(33, options.same_application and 202 or 303)
 		local alternate = window(44, 404)
-		local manager = helpers.load_with_stubs("adapters.window_manager", {
+		local manager = helpers.load_with_stubs("platform.focus.window_manager", {
 			window = {
 				get = function(id) if id == 22 then return candidate end end,
 				orderedWindows = function() return { candidate, alternate, healthy } end,
@@ -79,7 +79,7 @@ helpers.describe("window focus refuses a detached native window", function()
 			unminimize = function(self) restores = restores + 1; minimized = false; return self end,
 			focus = function(self) return self end,
 		}
-		local manager = helpers.load_with_stubs("adapters.window_manager", {
+		local manager = helpers.load_with_stubs("platform.focus.window_manager", {
 			window = { get = function() return win end },
 		})
 		helpers.assert_eq(manager.focus_window({ window = win, id = 1, minimized = false }), true)

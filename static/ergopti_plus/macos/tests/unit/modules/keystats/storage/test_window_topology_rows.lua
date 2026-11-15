@@ -91,13 +91,13 @@ helpers.describe("macOS window topology: the watcher", function()
 	helpers.it("macos-topology-private: the watchers ask the whole privacy context", function()
 		helpers.with_stub_scope({ "modules.keystats.watchers", "modules.keystats.log_manager", "core.logger.engine.logger",
 			"modules.keystats.privacy_context", "modules.keystats.topology_watcher", "modules.keystats.network_watcher",
-			"adapters.window_info", "core.network.adapters.info", "core.events.timer_scheduler",
+			"platform.focus.window_info", "core.network.adapters.info", "core.events.timer_scheduler",
 			"metrics.engine.capture.physical_lifecycle_observation", "adapters.physical_observation_clock" }, function()
 			package.loaded["core.logger.engine.logger"] = helpers.make_logger_stub()
 			local rows, refused, now, window, ids, reach = {}, true, 0, nil, {}, nil
 			package.loaded["modules.keystats.log_manager"] = { append_log = function(entry) rows[#rows + 1] = entry end }
 			package.loaded["modules.keystats.privacy_context"] = { allows_logging = function() return not refused end }
-			package.loaded["adapters.window_info"] = {
+			package.loaded["platform.focus.window_info"] = {
 				focused_topology = function() return window end,
 				running_bundle_ids = function() return ids end,
 			}

@@ -34,7 +34,7 @@ end
 --- @param excluded table Set of excluded identifiers.
 --- @return table Array of identifiers.
 local function running_apps(excluded)
-	local ok, WindowInfo = pcall(require, "adapters.window_info")
+	local ok, WindowInfo = pcall(require, "platform.focus.window_info")
 	if not ok then return {} end
 	local list, seen = {}, {}
 	for _, info in ipairs(WindowInfo.getAll()) do

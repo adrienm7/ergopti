@@ -35,13 +35,13 @@ import GLib from 'gi://GLib';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Keyboard from 'resource:///org/gnome/shell/ui/status/keyboard.js';
 
-// Pinned by tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua
-// against adapters/compositor_focus.lua, which owns them.
+// Pinned by tests/unit/platform/focus/compositor_focus/test_assets.lua
+// against platform/focus/compositor_focus.lua, which owns them.
 const BUS_NAME = 'org.ergopti.Focus';
 const OBJECT_PATH = '/org/ergopti/Focus';
 const INTERFACE = 'org.ergopti.Focus1';
 // How long the shell waits for the worker to take one report; the worker's own
-// bus calls have their bound in adapters/compositor_focus.lua.
+// bus calls have their bound in platform/focus/compositor_focus.lua.
 const REPORT_TIMEOUT_MS = 1000;
 // Pinned by the same test against adapters/input_source_switch.lua, which calls them.
 const INPUT_SOURCE_PATH = '/org/ergopti/InputSource';

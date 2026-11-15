@@ -846,8 +846,8 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/adapters/secure_field_detector.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/atspi/test_secure_field_detector.lua"
+				"static/ergopti_plus/linux/platform/focus/secure_field_detector.lua",
+				"static/ergopti_plus/linux/tests/unit/platform/focus/atspi/test_secure_field_detector.lua"
 			]
 		},
 		"llm.trigger.disabled_apps": {

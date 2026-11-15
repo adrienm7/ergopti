@@ -9,8 +9,8 @@
 
 local helpers = require("tests.helpers")
 local ClipboardTargets = require("tests.support.adapters.synthetic_input.clipboard_targets")
-local Atspi = require("adapters.atspi_focus")
-local Detector = require("adapters.secure_field_detector")
+local Atspi = require("platform.focus.atspi_focus")
+local Detector = require("platform.focus.secure_field_detector")
 local FocusGuard = require("modules.keystats.focus_guard")
 local CaptureGate = require("infra.input_capture_gate")
 local Engine = require("modules.hotstrings.engine")
@@ -35,7 +35,7 @@ local function drain()
 end
 
 local function with_runtime(body)
-	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "adapters.application_notifier" }
+	local owned = { "modules.dynamic_hotstrings.user_code", "infra.config_paths", "platform.focus.application_notifier" }
 	for _, name in ipairs(DISCOVERY_OWNERS) do owned[#owned + 1] = name end
 	local previous = {}
 	for _, path in ipairs(owned) do previous[path] = package.loaded[path]; package.loaded[path] = nil end
@@ -47,7 +47,7 @@ local function with_runtime(body)
 	_G.__LINUX_USER_HOTSTRING_FIXTURE = f
 	package.loaded["infra.config_paths"] = setmetatable({ get_config_dir = function() return "/owned" end },
 		{ __index = NativeConfigPaths })
-	package.loaded["adapters.application_notifier"] = { send = function() f.notified = true; return true end }
+	package.loaded["platform.focus.application_notifier"] = { send = function() f.notified = true; return true end }
 	f.content = [[return function(api)
 		local f=__LINUX_USER_HOTSTRING_FIXTURE
 		f.factories=f.factories+1

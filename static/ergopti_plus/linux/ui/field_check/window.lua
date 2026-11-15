@@ -41,7 +41,7 @@ local function native(spec)
 	return {
 		translate = I18n.get,
 		env = spec.env,
-		notify = function(message) return require("adapters.application_notifier").send(message, { level = "info" }) end,
+		notify = function(message) return require("platform.focus.application_notifier").send(message, { level = "info" }) end,
 		--- Shows the report; returns true when the user asked to copy it.
 		dialog = function(title, text, copy_label, close_label)
 			local command = require("core.ui.ui.native_dialog").command() .. " --question --no-markup --title=" .. Shell.quote(require("core.ui.engine.window_titles").compose(title))

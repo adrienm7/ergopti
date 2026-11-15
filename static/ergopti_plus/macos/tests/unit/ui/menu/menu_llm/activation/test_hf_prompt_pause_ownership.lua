@@ -6,7 +6,7 @@ local MODULES = {
 	"core.process.adapters.task_lifecycle",
 	"core.events.timer_scheduler",
 	"core.process.adapters.task_environment", "core.lifecycle.engine.launcher_environment", "diagnostics.engine.reports.error_description",
-	"core.text.engine.number_policy", "adapters.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
+	"core.text.engine.number_policy", "platform.focus.running_application", "ui.menu.menu_llm.models_manager_mlx_repo",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 	"core.ui.engine.notifications",

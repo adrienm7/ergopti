@@ -27,8 +27,8 @@ local CONFIRM_OWNED = {
 	"modules.gestures.action_confirm",
 	"core.ui.engine.dialog_util",
 	"adapters.mouse_control",
-	"adapters.window_info",
-	"adapters.window_manager",
+	"platform.focus.window_info",
+	"platform.focus.window_manager",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
 }
@@ -42,10 +42,10 @@ local function with_confirm(body, frame, focus)
 	focus.activated = {}
 	helpers.with_fresh_modules(CONFIRM_OWNED, function()
 		local alerts = {}
-		package.loaded["adapters.window_info"] = {
+		package.loaded["platform.focus.window_info"] = {
 			frontmost_application = function() return focus.front end,
 		}
-		package.loaded["adapters.window_manager"] = {
+		package.loaded["platform.focus.window_manager"] = {
 			activate = function(spec)
 				focus.activated[#focus.activated + 1] = spec
 				return focus.activates

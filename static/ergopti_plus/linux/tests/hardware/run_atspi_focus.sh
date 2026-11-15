@@ -45,7 +45,7 @@ WORK="$(mktemp -d)"
 
 FAILURES=0
 probe() {
-	luajit -e "local m=require('adapters.atspi_focus'); local s,ok=m._get_native_snapshot(); print(ok and ('role='..s.role) or 'inconclusive')" 2>"${WORK}/probe.err" | tail -1
+	luajit -e "local m=require('platform.focus.atspi_focus'); local s,ok=m._get_native_snapshot(); print(ok and ('role='..s.role) or 'inconclusive')" 2>"${WORK}/probe.err" | tail -1
 }
 check() {
 	local what="$1" expected="$2" got

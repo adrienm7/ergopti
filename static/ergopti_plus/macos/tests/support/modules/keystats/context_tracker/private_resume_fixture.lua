@@ -40,7 +40,7 @@ local OWNERS = {
 	"ui.metrics_typing.init",
 	"modules.keystats",
 	"modules.keystats.privacy_context",
-	"adapters.secure_field_detector",
+	"platform.focus.secure_field_detector",
 	"metrics.engine.view.private_window",
 	"metrics.engine.metrics",
 	"metrics.engine.capture.physical_context_observation",
@@ -263,7 +263,7 @@ function M.with_runtime(callback)
 					start = function(self) obs.ax_started = obs.ax_started + 1; return self end,
 					stop = function(self) obs.ax_stopped = obs.ax_stopped + 1; return self end }
 			end }
-			package.loaded["adapters.secure_field_detector"] = nil
+			package.loaded["platform.focus.secure_field_detector"] = nil
 			local tracker_path = driver .. "/modules/keystats/context_tracker.lua"
 			tracker = assert(loadfile(tracker_path))()
 			local tracker_port = assert(package.loaded["modules.keystats.context_tracker"])

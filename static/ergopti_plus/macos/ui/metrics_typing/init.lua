@@ -30,7 +30,7 @@
 local M = {}
 local ManifestKeys = require("metrics.engine.view.manifest_keys")
 local WebviewResult = require("core.ui.adapters.webview_result")
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 local OwnWindow = require("core.ui.adapters.own_window")
 
 local hs         = hs

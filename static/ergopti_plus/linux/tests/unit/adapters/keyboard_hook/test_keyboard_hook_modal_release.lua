@@ -227,7 +227,7 @@ helpers.describe("keyboard_hook.while_released: running observe dialogs", functi
 		local InputEvent = require("infra.input_event")
 		local Reader
 		local names = { "modules.hotstrings.device_finder", "adapters.xkb_capture",
-			"adapters.window_info", "adapters.keyboard_hook", "adapters.evdev_reader" }
+			"platform.focus.window_info", "adapters.keyboard_hook", "adapters.evdev_reader" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local ctx = { paths = {}, queues = {}, held = {}, chars = {}, stages = {},

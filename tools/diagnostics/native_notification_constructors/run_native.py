@@ -25,7 +25,7 @@ DEPENDENCIES = {
     "inventory": "453f090f4907e140d0e6529e95f1d713972949962c376a3d1b9c88f633caebe0",
 }
 PINS = (
-    "static/ergopti_plus/macos/adapters/application_notifier.lua",
+    "static/ergopti_plus/macos/platform/focus/application_notifier.lua",
     "static/ergopti_plus/_shared/platform/focus/application_notifier_core.lua",
     "static/ergopti_plus/_shared/core/ui/engine/window_titles.lua",
     "static/ergopti_plus/_shared/ui/apps.manifest.json",

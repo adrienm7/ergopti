@@ -37,13 +37,13 @@ local last_opts = nil
 
 local function messages_for(profile, context)
 	local names = {
-		"adapters.secure_field_detector", "modules.llm.api_ollama",
+		"platform.focus.secure_field_detector", "modules.llm.api_ollama",
 		"modules.llm.profiles", "modules.llm.profile_settings",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local sent
-	package.loaded["adapters.secure_field_detector"] = {
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
 		isUrlBar = function() return false end,

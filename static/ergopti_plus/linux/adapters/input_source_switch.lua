@@ -55,7 +55,7 @@ M.X11 = "x11"
 
 local GNOME_SCHEMA = "org.gnome.desktop.input-sources"
 -- Exported by platform/desktop_focus/gnome/extension.js on GNOME Shell's own connection;
--- tests/unit/adapters/compositor_focus/test_compositor_focus_assets.lua pins both.
+-- tests/unit/platform/focus/compositor_focus/test_assets.lua pins both.
 local LinuxDesktop = require("core.text.engine.identifiers").linux_desktop
 M.GNOME_SWITCH_PATH = LinuxDesktop.gnome_switch_path
 M.GNOME_SWITCH_INTERFACE = LinuxDesktop.gnome_switch_interface

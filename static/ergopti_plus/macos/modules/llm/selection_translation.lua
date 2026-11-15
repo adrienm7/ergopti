@@ -37,7 +37,7 @@ local i18n       = require("core.i18n.engine.i18n")
 local Paths      = require("core.fs.engine.paths")
 local FileSystem = require("core.fs.adapters.file_system")
 local JsonCodec  = require("core.fs.adapters.json_codec")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.selection_translation"

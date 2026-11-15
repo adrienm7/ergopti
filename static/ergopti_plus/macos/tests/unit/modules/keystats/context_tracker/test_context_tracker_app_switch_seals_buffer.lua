@@ -28,7 +28,7 @@ local NOW_NS = 9000000000
 --- @param options table Scenario state and destination application.
 --- @return table snapshot Observable calls, rows, and final state.
 local function drive_activation(options)
-	local saved_detector = package.loaded["adapters.secure_field_detector"]
+	local saved_detector = package.loaded["platform.focus.secure_field_detector"]
 	local saved_tracker = package.loaded["modules.keystats.context_tracker"]
 	local rows = {}
 	local order = {}
@@ -56,7 +56,7 @@ local function drive_activation(options)
 
 	local result
 	local ok, err = xpcall(function()
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			refresh = function() end,
 			isSecureField = function() return false end,
 			isSecureApp = function() return false end,
@@ -136,7 +136,7 @@ local function drive_activation(options)
 	end, debug.traceback)
 
 	package.loaded["modules.keystats.context_tracker"] = saved_tracker
-	package.loaded["adapters.secure_field_detector"] = saved_detector
+	package.loaded["platform.focus.secure_field_detector"] = saved_detector
 	if not ok then error(err, 0) end
 	return result
 end

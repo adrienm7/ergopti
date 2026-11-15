@@ -20,7 +20,7 @@ SetWorkingDir(A_ScriptDir)
 ; Browser messages and JavaScript payloads share the actual native JSON owner.
 #Include ../core/text/engine/json.ahk
 #Include ../core/events/timer_scheduler.ahk
-#Include ../adapters/window_manager.ahk
+#Include ../platform/focus/window_manager.ahk
 
 ; --- Globals the browser module reads ---
 global _LLM_Menu   := Map("model", "Qwen3.5-2B")

@@ -11,8 +11,8 @@ helpers.describe("visible window inventories", function()
 		local hidden = { id = function() return 5 end, title = function() return "Hidden" end,
 			application = function() return app end, isVisible = function() return false end }
 		native.window.__windows = { shown, hidden }
-		local info = helpers.load_with_stubs("adapters.window_info", { window = native.window })
-		local manager = helpers.load_with_stubs("adapters.window_manager", { window = native.window })
+		local info = helpers.load_with_stubs("platform.focus.window_info", { window = native.window })
+		local manager = helpers.load_with_stubs("platform.focus.window_manager", { window = native.window })
 		local rows = info.getAll()
 		helpers.assert_eq(#rows, 1)
 		helpers.assert_eq(rows[1].windowTitle, "Shown")
@@ -26,8 +26,8 @@ helpers.describe("visible window inventories", function()
 			application = visible.application }
 		local native = { allWindows = function() return { visible, hidden } end,
 			visibleWindows = function() return { visible } end }
-		local info = helpers.load_with_stubs("adapters.window_info", { window = native })
-		local manager = helpers.load_with_stubs("adapters.window_manager", { window = native })
+		local info = helpers.load_with_stubs("platform.focus.window_info", { window = native })
+		local manager = helpers.load_with_stubs("platform.focus.window_manager", { window = native })
 		helpers.assert_eq(#info.getAll(), 1)
 		helpers.assert_eq(manager.getList(), { 1 })
 	end)

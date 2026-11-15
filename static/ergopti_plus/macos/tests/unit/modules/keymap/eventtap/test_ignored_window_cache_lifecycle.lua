@@ -102,7 +102,7 @@ local function new_fixture()
 		title_watcher_active = false,
 		secure_watcher_active = false,
 	}
-	package.loaded["adapters.secure_field_detector"] = {
+	package.loaded["platform.focus.secure_field_detector"] = {
 		isSecureApp = function() return state.secure_app == true end,
 		inspectFocusedElementWithReceipt = function()
 			state.secure_reads = state.secure_reads + 1

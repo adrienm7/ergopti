@@ -50,7 +50,7 @@ function M.new(ports)
 	local pipe = ports.pipe or hold_pipe
 	local has_command = ports.has_command or require("core.process.adapters.shell_runner").has_command
 	local notify = ports.notify or function(key)
-		require("adapters.application_notifier").send(i18n.get(key))
+		require("platform.focus.application_notifier").send(i18n.get(key))
 	end
 	local now_ms = ports.now_ms or require("core.logger.engine.monotonic").now_ms
 	-- A finished session is the day's awake_ms, as on Windows and macOS (KMD-3).

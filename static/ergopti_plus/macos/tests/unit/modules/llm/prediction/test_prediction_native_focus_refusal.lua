@@ -12,7 +12,7 @@ local OWNED = {
 	"core.fs.adapters.file_system",
 	"core.fs.adapters.json_codec",
 	"core.logger.adapters.log_transport",
-	"adapters.secure_field_detector",
+	"platform.focus.secure_field_detector",
 	"core.fs.adapters.storage",
 	"core.events.timer_scheduler",
 	"core.fs.engine.app_dirs",

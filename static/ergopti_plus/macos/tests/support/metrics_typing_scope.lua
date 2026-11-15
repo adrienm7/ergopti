@@ -13,7 +13,7 @@ local OWNERS = {
 	"core.ui.adapters.webview_result",
 	"diagnostics.engine.operation_reporter",
 	-- The real dashboard resolves application icons through this adapter.
-	"adapters.running_application",
+	"platform.focus.running_application",
 	-- It also tells whether its own window is focused through this adapter.
 	"core.ui.adapters.own_window",
 	"core.fs.adapters.file_system", "adapters.metadata_command_stats", "core.fs.adapters.write_lock_path", "core.events.timer_scheduler", "core.logger.engine.logger", "core.fs.engine.paths",

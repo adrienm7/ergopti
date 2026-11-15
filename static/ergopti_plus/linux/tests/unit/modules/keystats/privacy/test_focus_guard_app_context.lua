@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 --- Runs real privacy consumers against controlled native observations.
 --- @param body function Fixture assertions.
 local function fixture(body, asynchronous)
-	local names = { "modules.keystats.keystats", "modules.keystats.focus_guard", "adapters.secure_field_detector" }
+	local names = { "modules.keystats.keystats", "modules.keystats.focus_guard", "platform.focus.secure_field_detector" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
 	local called, detail = pcall(function()
@@ -58,7 +58,7 @@ local function fixture(body, asynchronous)
 			end,
 		}
 		local ports = {
-			watch = watch, detector = require("adapters.secure_field_detector"), keystats = logger,
+			watch = watch, detector = require("platform.focus.secure_field_detector"), keystats = logger,
 			now_ms = function() return state.now end, settle_ms = 250, retry_ms = 1000,
 			capture_context = function()
 				helpers.assert_eq(state.pumping == true, false, "context must not query from watch callbacks")
@@ -190,7 +190,7 @@ helpers.describe("Native field application privacy context", function()
 				helpers.assert_eq(logger._pending_buffer_count_for_test(), 1, "role 61 cannot override app/window privacy")
 				helpers.assert_eq(state.engine_calls, 1, "protected input cannot reach the text engine")
 				helpers.assert_true(guard.blocks_text(), "manual consumers must see protected context before physical input")
-				helpers.assert_true(require("adapters.secure_field_detector").isSecureField())
+				helpers.assert_true(require("platform.focus.secure_field_detector").isSecureField())
 				helpers.assert_eq(state.reads, 2)
 				helpers.assert_eq(state.max_depth, 1)
 			end)

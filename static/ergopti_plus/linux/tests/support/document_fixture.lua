@@ -10,7 +10,7 @@ function M.new(app_name, handler, state)
 	local c = { views = {}, windows = {}, timers = {}, now = 100, scripts = {}, effects = {}, notices = {}, idles = {}, signal_serial = 0 }
 	local saved = {}
 	local names = {"lgi","core.logger.engine.monotonic","core.timing.engine.timings","core.network.engine.managed_http_deadline",
-		"core.events.loop","adapters.notifier","adapters.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
+		"core.events.loop","adapters.notifier","platform.focus.application_notifier","core.ui.ui.webkit_host","core.ui.ui.webview_manager"}
 	for _,name in ipairs(names) do saved[name] = { value = package.loaded[name] } end
 	local real_host = require("core.ui.ui.webkit_host")
 	local host = setmetatable({}, {__index=real_host})
@@ -120,7 +120,7 @@ function M.new(app_name, handler, state)
 			if c.on_notice_probe then c.on_notice_probe() end
 			if not admit() then return false end
 			c.notices[#c.notices+1]={message=message,title=opts.title};return true end}
-		package.loaded["adapters.application_notifier"]=package.loaded["adapters.notifier"]
+		package.loaded["platform.focus.application_notifier"]=package.loaded["adapters.notifier"]
 		package.loaded["core.ui.ui.webkit_host"]=host
 		package.loaded["core.ui.ui.webview_manager"]=nil
 		Manager=require("core.ui.ui.webview_manager");c.manager=Manager

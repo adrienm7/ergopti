@@ -310,16 +310,16 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 	for _, mode in ipairs({ "x11", "wayland", "missing_identity" }) do
 		helpers.it("uses one native " .. mode .. " focus snapshot for file copy (copy-focus-snapshot)", function()
 			local Subject = require("modules.shortcuts.open_selection")
-			local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+			local previous_window, previous_atspi = package.loaded["platform.focus.window_info"], package.loaded["platform.focus.atspi_focus"]
 			local copied, queries = {}, 0
-			package.loaded["adapters.window_info"] = {
+			package.loaded["platform.focus.window_info"] = {
 				focused_snapshot = function()
 					if mode == "x11" then return { appId = "nautilus" }, "x11:one" end
 					if mode == "missing_identity" then return { appId = "nautilus" }, nil end
 					return { appId = "" }, nil
 				end,
 			}
-			package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+			package.loaded["platform.focus.atspi_focus"] = { get_context_snapshot = function()
 				queries = queries + 1
 				return { app_id = "nautilus", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
 			end }
@@ -329,7 +329,7 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 				message = function() return "%s" end, notify_success = function() return true end })
 			local called, result = pcall(Subject.copy_selected_path, function() return "" end)
 			Subject._set_deps_for_test(nil)
-			package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+			package.loaded["platform.focus.window_info"], package.loaded["platform.focus.atspi_focus"] = previous_window, previous_atspi
 			helpers.assert_true(called and result)
 			helpers.assert_eq(copied, { "/tmp/a" })
 			helpers.assert_eq(queries, mode ~= "x11" and 3 or 0, "one observation per boundary")
@@ -338,16 +338,16 @@ helpers.describe("copy_selected_path copies the selected files' paths in a file 
 
 	helpers.it("refuses an AT-SPI fallback from another application (copy-focus-snapshot)", function()
 		local Subject = require("modules.shortcuts.open_selection")
-		local previous_window, previous_atspi = package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"]
+		local previous_window, previous_atspi = package.loaded["platform.focus.window_info"], package.loaded["platform.focus.atspi_focus"]
 		local reads = 0
-		package.loaded["adapters.window_info"] = { focused_snapshot = function() return { appId = "nautilus" }, nil end }
-		package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+		package.loaded["platform.focus.window_info"] = { focused_snapshot = function() return { appId = "nautilus" }, nil end }
+		package.loaded["platform.focus.atspi_focus"] = { get_context_snapshot = function()
 			return { app_id = "dolphin", window_bus_name = ":1.42", window_object_path = "/window/1" }, true
 		end }
 		Subject._set_deps_for_test({ read_uri_list = function() reads = reads + 1; return false end })
 		local called, result = pcall(Subject.copy_selected_path, function() error("unexpected fallback") end)
 		Subject._set_deps_for_test(nil)
-		package.loaded["adapters.window_info"], package.loaded["adapters.atspi_focus"] = previous_window, previous_atspi
+		package.loaded["platform.focus.window_info"], package.loaded["platform.focus.atspi_focus"] = previous_window, previous_atspi
 		helpers.assert_true(called)
 		helpers.assert_eq(result, false)
 		helpers.assert_eq(reads, 0)

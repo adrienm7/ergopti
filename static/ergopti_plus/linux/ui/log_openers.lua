@@ -64,7 +64,7 @@ end
 --- @return boolean delivered
 local function notify_default(key)
 	local message = require("core.i18n.engine.i18n").get(key)
-	return require("adapters.application_notifier").send(message, { level = "info" }) == true
+	return require("platform.focus.application_notifier").send(message, { level = "info" }) == true
 end
 
 

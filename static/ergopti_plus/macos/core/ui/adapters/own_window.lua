@@ -31,7 +31,7 @@
 
 local M = {}
 
-local RunningApplication = require("adapters.running_application")
+local RunningApplication = require("platform.focus.running_application")
 
 -- True while a native hswindow() call runs with windowForID recorded.
 local _capturing = false

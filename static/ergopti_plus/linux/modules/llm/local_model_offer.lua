@@ -68,7 +68,7 @@ local function dependencies(automatic)
 	return {
 		confirm = deps.confirm or confirm,
 		notify = deps.notify or function(text, title)
-			return require("adapters.application_notifier").send(text, { title = title, level = "warning" })
+			return require("platform.focus.application_notifier").send(text, { title = title, level = "warning" })
 		end,
 		install = download and function(base_url, model, on_done, current, on_retired)
 			local handled, acquired = install(base_url, model, model, on_done, current, on_retired)

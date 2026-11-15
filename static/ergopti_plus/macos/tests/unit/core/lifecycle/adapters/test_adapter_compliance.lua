@@ -67,7 +67,7 @@ local ADAPTERS_UNDER_TEST = {
 	{ module = "adapters.hotkey_registrar", port = "HotkeyRegistrar" },
 	{ module = "adapters.tray_menu", port = "TrayMenu" },
 	{ module = "core.fs.adapters.file_system", port = "FileSystem" },
-	{ module = "adapters.window_info", port = "WindowInfo" },
+	{ module = "platform.focus.window_info", port = "WindowInfo" },
 }
 
 

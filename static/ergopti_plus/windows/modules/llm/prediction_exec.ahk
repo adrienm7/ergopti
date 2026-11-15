@@ -317,7 +317,7 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; context. Gate is only active when the flag is on to avoid the OS call
 	; on every keystroke when the user has not opted in.
 	;
-	; MUST be the adapters/secure_field_detector.ahk port contract function
+	; MUST be the platform/focus/secure_field_detector.ahk port contract function
 	; (SFD_IsSecureField) — not the keystats's own KL_IsFocusedFieldPassword —
 	; so this privacy gate has a single, directly-testable source of truth
 	; shared with every other consumer of the SecureFieldDetector port instead

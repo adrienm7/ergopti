@@ -189,7 +189,7 @@ assert(native_caption_closed and native_caption_close ~= nil and native_caption_
 
 local native_caption_corpus = assert(Json.decode(native_caption_bytes))
 
-local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "adapters.application_notifier",
+local magic_notice_module_names = { "ui.menu.builder", "infra.native_presentation", "platform.focus.application_notifier",
 	"core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core", "infra.manifest_menu" }
 
 -- A caller catching an expected primary must also consume cleanup_failures.
@@ -212,7 +212,7 @@ local function with_magic_notice(body, cleanup_failures)
 		policy = require("core.ui.engine.window_titles")
 		lookup_owner, lookup_captured = policy.native_presentation, true
 		local notices = {}
-		rawset(cache, "adapters.application_notifier", { send = function(message, options)
+		rawset(cache, "platform.focus.application_notifier", { send = function(message, options)
 			notices[#notices + 1] = { message = message, title = options.title, level = options.level }
 			return true
 		end })

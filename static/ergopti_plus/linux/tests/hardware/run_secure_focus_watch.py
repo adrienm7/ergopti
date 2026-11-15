@@ -203,7 +203,7 @@ def session(root):
                     if (
                         len(parts) == 3
                         and parts[1] == str(worker.pid)
-                        and "/adapters/atspi_focus_watch_worker.lua " in parts[2]
+                        and "/platform/focus/atspi_focus_watch_worker.lua " in parts[2]
                     ):
                         endpoints = [
                             Path(argument)
@@ -303,10 +303,10 @@ def session(root):
                         "source_sha256": {
                             name: hashlib.sha256((DRIVER / name).read_bytes()).hexdigest()
                             for name in (
-                                "adapters/atspi_focus.lua",
-                                "adapters/atspi_focus_watch.lua",
-                                "adapters/atspi_focus_watch_worker.lua",
-                                "adapters/secure_field_detector.lua",
+                                "platform/focus/atspi_focus.lua",
+                                "platform/focus/atspi_focus_watch.lua",
+                                "platform/focus/atspi_focus_watch_worker.lua",
+                                "platform/focus/secure_field_detector.lua",
                                 "modules/keystats/focus_guard.lua",
                             )
                         },

@@ -583,7 +583,7 @@ function M.build_callbacks(ctx)
 				CONSECUTIVE_FAIL_WARN_THRESHOLD, tostring(current_backend))
 			if current_backend == "mlx" then
 				pcall(function()
-					require("adapters.application_notifier").new(nil, {
+					require("platform.focus.application_notifier").new(nil, {
 						title           = i18n.get("notify.llm_mlx_failures_title"),
 						informativeText = i18n.get("notify.llm_mlx_failures_body"),
 						alwaysPresent   = false,

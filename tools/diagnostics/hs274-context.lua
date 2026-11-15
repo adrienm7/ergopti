@@ -4,7 +4,7 @@ local Context = require("modules.keystats.physical_context")
 local Privacy = require("modules.keystats.privacy_context")
 local Timestamp = require("modules.keystats.timestamp")
 local Lifecycle = require("core.process.adapters.lifecycle")
-local Secure = require("adapters.secure_field_detector")
+local Secure = require("platform.focus.secure_field_detector")
 local PrivateWindow = require("metrics.engine.view.private_window")
 local M = {}
 

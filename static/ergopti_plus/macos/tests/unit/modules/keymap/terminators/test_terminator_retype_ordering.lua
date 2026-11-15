@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local scoped_helpers = helpers
 local OWNED = {
-	"adapters.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
+	"platform.focus.secure_field_detector", "core.fs.adapters.storage", "adapters.synthetic_input",
 	"adapters.text_sender", "core.events.timer_scheduler", "core.ui.adapters.tooltip_renderer",
 	"core.lifecycle.engine.compat.utf8", "hotstrings.engine.matcher", "hotstrings.engine.catalogue.personal_files",
 	"hs", "infra.capsword_output", "core.timing.engine.deferred_work",

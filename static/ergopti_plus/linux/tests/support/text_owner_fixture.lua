@@ -11,13 +11,13 @@ local M = {}
 --- Runs an isolated real guard against controlled resident focus observations.
 --- @param body function Receives guard, state, detector, policy and watch.
 function M.with(body)
-	local names = { "modules.keystats.focus_guard", "adapters.secure_field_detector", "modules.keystats.keystats" }
+	local names = { "modules.keystats.focus_guard", "platform.focus.secure_field_detector", "modules.keystats.keystats" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local guard
 	local ok, detail = pcall(function()
 		local policy = require("modules.keystats.keystats")
-		local detector = require("adapters.secure_field_detector")
+		local detector = require("platform.focus.secure_field_detector")
 		local configuration = assert(policy.configuration_snapshot())
 		configuration.private_filter_enabled = false
 		assert(policy.apply_configuration(configuration))

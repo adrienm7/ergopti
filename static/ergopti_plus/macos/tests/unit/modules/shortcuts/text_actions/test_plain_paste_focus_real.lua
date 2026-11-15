@@ -25,7 +25,7 @@ local function emitted(f)
 end
 
 local function with_focus(callback)
-	helpers.with_stub_scope({ "modules.keymap.utils", "adapters.secure_field_detector",
+	helpers.with_stub_scope({ "modules.keymap.utils", "platform.focus.secure_field_detector",
 		"modules.shortcuts.actions.text", "modules.shortcuts.actions.text_continuation",
 		"modules.shortcuts.actions.text_dispatch", "modules.shortcuts.actions.text_transform_grace" }, function()
 		with_sender(function(f)
@@ -44,7 +44,7 @@ local function with_focus(callback)
 			hs.application = { watcher = { activated = 1, deactivated = 2,
 				new = function(receive) return watcher("app", receive) end } }
 			hs.window = { focusedWindow = function() focus.reads = focus.reads + 1; return window end }
-			package.loaded["adapters.secure_field_detector"] = {
+			package.loaded["platform.focus.secure_field_detector"] = {
 				isSecureApp = function() return false end,
 				inspectFocusedElementWithReceipt = function()
 					focus.reads = focus.reads + 1

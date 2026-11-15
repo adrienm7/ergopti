@@ -7,7 +7,7 @@
 --- with `lswt` on the PATH (the private foreign_toplevel_probe standing in for
 --- lswt 2.x, which Ubuntu 24.04 does not package).
 ---   - labwc: two real windows; the compositor's activated toplevel is the one
----     adapters/window_info.lua reports, and process_lifecycle's focus callback
+---     platform/focus/window_info.lua reports, and process_lifecycle's focus callback
 ---     (the per-application rules' input) follows each activation.
 ---   - gnome / kde: no wlr-foreign-toplevel interface, so the adapter answers
 ---     unknown and logs the single "No focused-window query" line however often
@@ -33,7 +33,7 @@ local QUERIES = 5
 local unsupported_lines = 0
 local real_warn = Logger.warn
 Logger.warn = function(tag, fmt, ...)
-	if tag == "adapters.window_info" and tostring(fmt):find(NO_QUERY_LINE, 1, true) then
+	if tag == "platform.focus.window_info" and tostring(fmt):find(NO_QUERY_LINE, 1, true) then
 		unsupported_lines = unsupported_lines + 1
 	end
 	return real_warn(tag, fmt, ...)
@@ -41,7 +41,7 @@ end
 
 assert(Display.refresh() == Display.WAYLAND, "the session must be a Wayland one")
 assert(Shell.has_command("lswt"), "the lswt listing must be on the PATH")
-local WindowInfo = require("adapters.window_info")
+local WindowInfo = require("platform.focus.window_info")
 local Lifecycle = require("core.process.adapters.lifecycle")
 print(string.format("SESSION mode=%s desktop=%s", mode, Display.desktop()))
 

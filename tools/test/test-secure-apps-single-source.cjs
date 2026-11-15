@@ -59,8 +59,8 @@ for (const app of document.apps || []) {
 // 2. No local list in a Lua driver. A secure-app table is a Lua table literal
 // keyed by a password manager's name next to `= true`, or a flat list of them.
 const LUA_SOURCES = [
-	'macos/adapters/secure_field_detector.lua',
-	'linux/adapters/secure_field_detector.lua',
+	'macos/platform/focus/secure_field_detector.lua',
+	'linux/platform/focus/secure_field_detector.lua',
 	'linux/modules/keystats/keystats.lua'
 ];
 const LOCAL_LIST =
@@ -81,12 +81,14 @@ for (const app of document.apps || [])
 				);
 
 // 3. Windows reads the file (ADD-1): no typed list is left in its detector.
-const ahk = read('windows/adapters/secure_field_detector.ahk');
+const ahk = read('windows/platform/focus/secure_field_detector.ahk');
 if (/global SFD_SECURE_APPS := Map\(/.test(ahk) || /"[^"]+\.exe",\s*true/.test(ahk))
-	errors.push('windows/adapters/secure_field_detector.ahk keeps a typed secure application list');
+	errors.push(
+		'windows/platform/focus/secure_field_detector.ahk keeps a typed secure application list'
+	);
 if (!ahk.includes('\\data\\secure_apps.json'))
 	errors.push(
-		'windows/adapters/secure_field_detector.ahk does not read _shared/data/secure_apps.json'
+		'windows/platform/focus/secure_field_detector.ahk does not read _shared/data/secure_apps.json'
 	);
 
 if (errors.length) {

@@ -66,7 +66,7 @@ local ok, failure = xpcall(function()
 	assert(uv.os_setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=" .. directory .. "/no-session-bus"))
 	assert(uv.os_setenv("AT_SPI_BUS_ADDRESS", "unix:path=" .. directory .. "/no-accessibility-bus"))
 	assert(Display.refresh() == Display.WAYLAND)
-	local window = require("adapters.window_info")
+	local window = require("platform.focus.window_info")
 	local command = case.binary .. " " .. case.arguments
 	write_client(case, case.payload, 0)
 	local status = os.execute(command .. " >/dev/null 2>&1")

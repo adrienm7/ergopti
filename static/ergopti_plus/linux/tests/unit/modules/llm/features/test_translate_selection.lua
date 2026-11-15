@@ -35,7 +35,7 @@ local RELOADED = {
 	"modules.llm.api_remote", "modules.llm.translation",
 }
 local FAKED = {
-	"adapters.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
+	"platform.focus.secure_field_detector", "core.network.adapters.http_client", "modules.llm.api_entries",
 	"modules.llm.profiles", "modules.llm.api_ollama",
 }
 
@@ -78,7 +78,7 @@ local function scenario(opts, body)
 		I18n.get_locale = function() return locale end
 		local world = { wire = {}, posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
 			focus = "editor\1Draft", selection = opts.selection }
-		package.loaded["adapters.secure_field_detector"] = {
+		package.loaded["platform.focus.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,

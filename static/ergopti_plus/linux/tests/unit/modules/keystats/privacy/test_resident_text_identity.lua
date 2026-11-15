@@ -10,7 +10,7 @@
 local helpers = require("tests.helpers")
 
 local function fixture(body, asynchronous)
-	local name = "adapters.secure_field_detector"
+	local name = "platform.focus.secure_field_detector"
 	local previous = package.loaded[name]
 	package.loaded[name] = nil
 	local called, detail = pcall(function()

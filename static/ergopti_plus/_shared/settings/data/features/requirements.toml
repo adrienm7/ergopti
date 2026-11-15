@@ -228,7 +228,7 @@ content = ['["\x27]xdotool[ "\x27]']
 ]
 
 [detection.linux.xdotool.plumbing]
-"adapters/window_info.lua" = "the focused-window port answers through libxcb in process; xdotool is only its fallback when libxcb is missing"
+"platform/focus/window_info.lua" = "the focused-window port answers through libxcb in process; xdotool is only its fallback when libxcb is missing"
 
 [detection.linux.wmctrl]
 content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
@@ -238,7 +238,7 @@ content = ['["\x27]wmctrl[ "\x27]', 'has_command\("wmctrl"']
 "modules/gestures/workspace_switcher.lua" = ["gestures.*"]
 
 [detection.linux.wmctrl.plumbing]
-"adapters/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"
+"platform/focus/window_info.lua" = "the window list answers through libxcb in process; wmctrl is only its fallback when libxcb is missing"
 
 [detection.linux.ollama]
 file_name = 'ollama'
