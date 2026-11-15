@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows が管理者権限を付与しなかったため、配列はインストールされませんでした。",
 	"layout_editor.error.foreign_layout": "別の Windows キーボード配列がこの DLL 名を既に使用しています。Windows オプションで変更してください。",
 	"layout_editor.error.install_failed": "Windows は配列をインストールできませんでした。",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "配列はインストールされましたが、Windows が入力言語に追加しませんでした。設定で追加してください。",
 	"layout_editor.error.export_assets_unavailable": "エクスポート用の変換ツールを読み込めませんでした。接続を確認して、もう一度お試しください。",
 	"layout_editor.error.file_unreadable": "ファイルを読み取れません。",

@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows heeft geen beheerdersrecht verleend: de indeling is niet geïnstalleerd.",
 	"layout_editor.error.foreign_layout": "Een andere Windows-toetsenbordindeling gebruikt deze DLL-naam al; wijzig hem in de Windows-opties.",
 	"layout_editor.error.install_failed": "Windows kon de indeling niet installeren.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "De indeling is geïnstalleerd, maar Windows heeft hem niet aan de invoertalen toegevoegd; voeg hem toe in Instellingen.",
 	"layout_editor.error.export_assets_unavailable": "De exportconverters konden niet worden geladen; controleer de verbinding en probeer het opnieuw.",
 	"layout_editor.error.file_unreadable": "Het bestand kan niet worden gelezen.",

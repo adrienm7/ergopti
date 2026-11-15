@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows non ha concesso i diritti di amministratore: il layout non è stato installato.",
 	"layout_editor.error.foreign_layout": "Un altro layout di tastiera di Windows usa già questo nome di DLL; cambialo nelle opzioni Windows.",
 	"layout_editor.error.install_failed": "Windows non è riuscito a installare il layout.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "Il layout è installato, ma Windows non l’ha aggiunto alle lingue di input; aggiungilo in Impostazioni.",
 	"layout_editor.error.export_assets_unavailable": "Impossibile caricare i convertitori di esportazione; controlla la connessione e riprova.",
 	"layout_editor.error.file_unreadable": "Il file non può essere letto.",

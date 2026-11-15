@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows가 관리자 권한을 부여하지 않아 레이아웃이 설치되지 않았습니다.",
 	"layout_editor.error.foreign_layout": "다른 Windows 키보드 레이아웃이 이미 이 DLL 이름을 사용합니다. Windows 옵션에서 변경하세요.",
 	"layout_editor.error.install_failed": "Windows가 레이아웃을 설치하지 못했습니다.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "레이아웃은 설치되었지만 Windows가 입력 언어에 추가하지 않았습니다. 설정에서 추가하세요.",
 	"layout_editor.error.export_assets_unavailable": "내보내기 변환기를 불러올 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
 	"layout_editor.error.file_unreadable": "파일을 읽을 수 없습니다.",

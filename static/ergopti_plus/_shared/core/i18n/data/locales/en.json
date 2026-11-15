@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows did not grant the administrator right: the layout was not installed.",
 	"layout_editor.error.foreign_layout": "Another Windows keyboard layout already uses this DLL name; change it in the Windows options.",
 	"layout_editor.error.install_failed": "Windows could not install the layout.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "The layout is installed, but Windows did not add it to the input languages; add it in Settings.",
 	"layout_editor.error.export_assets_unavailable": "The export converters could not be loaded; check the connection and try again.",
 	"layout_editor.error.file_unreadable": "The file cannot be read.",

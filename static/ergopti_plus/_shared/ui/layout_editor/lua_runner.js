@@ -65,7 +65,12 @@ var LayoutLuaRunner = (function () {
 	 */
 	function loadedVm(scope) {
 		const fengari = (scope.exports && scope.exports.fengari) || scope.fengari;
-		if (!fengari || !fengari.lua) throw new Error('lua vm not loaded: vendor/fengari-web.js');
+		// The code names the reason the editor shows (layout_editor.error.lua_vm_unavailable):
+		// the macOS and Linux app windows refuse the VM's string evaluation (their CSP).
+		if (!fengari || !fengari.lua)
+			throw Object.assign(new Error('lua vm not loaded: vendor/fengari-web.js'), {
+				code: 'lua_vm_unavailable'
+			});
 		return fengari;
 	}
 

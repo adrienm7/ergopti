@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows не предоставила права администратора: раскладка не установлена.",
 	"layout_editor.error.foreign_layout": "Другая раскладка клавиатуры Windows уже использует это имя DLL; измените его в параметрах Windows.",
 	"layout_editor.error.install_failed": "Windows не удалось установить раскладку.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "Раскладка установлена, но Windows не добавила её в языки ввода; добавьте её в Параметрах.",
 	"layout_editor.error.export_assets_unavailable": "Не удалось загрузить конвертеры экспорта; проверьте подключение и повторите попытку.",
 	"layout_editor.error.file_unreadable": "Не удаётся прочитать файл.",

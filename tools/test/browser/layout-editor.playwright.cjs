@@ -152,14 +152,18 @@ async function exerciseDownloadWithoutLuaVm(browser, origin) {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 	const errors = [];
 	page.on('pageerror', (error) => errors.push(error.message));
-	await page.addInitScript(() => {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	await page.addInitScript((strings) => {
+		window._i18n_strings = strings;
 		window.__posted = [];
 		window.webkit = {
 			messageHandlers: {
 				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
 			}
 		};
-	});
+	}, strings);
 	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
 	await page.evaluate(() =>
 		window.initData({
@@ -176,9 +180,8 @@ async function exerciseDownloadWithoutLuaVm(browser, origin) {
 	await page.waitForSelector('#le-tools');
 	// The page as the inlining hosts leave it: the VM's script never ran.
 	await page.evaluate(() => {
-		window.LayoutLuaRunner.assets = () => {
-			throw new Error('lua vm not loaded: vendor/fengari-web.js');
-		};
+		if (window.exports) delete window.exports.fengari;
+		delete window.fengari;
 	});
 	await tool(page, 'export');
 	for (const target of ['xkb', 'klc']) {
@@ -188,8 +191,9 @@ async function exerciseDownloadWithoutLuaVm(browser, origin) {
 			null,
 			{ timeout: 5000 }
 		);
-		assert.ok(
-			(await page.textContent('#le-message')).trim().length > 0,
+		assert.equal(
+			(await page.textContent('#le-message')).trim(),
+			strings['layout_editor.error.lua_vm_unavailable'],
 			`${target}: the reason is shown`
 		);
 		assert.equal(

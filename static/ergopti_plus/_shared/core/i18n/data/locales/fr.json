@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows n’a pas accordé le droit d’administrateur : la disposition n’a pas été installée.",
 	"layout_editor.error.foreign_layout": "Une autre disposition de clavier Windows utilise déjà ce nom de DLL ; changez-le dans les options Windows.",
 	"layout_editor.error.install_failed": "Windows n’a pas pu installer la disposition.",
+	"layout_editor.error.lua_vm_unavailable": "Les convertisseurs XKB et KLC ne peuvent pas s’exécuter dans cette fenêtre. L’éditeur d’ergopti.fr produit ces fichiers.",
 	"layout_editor.error.profile_not_added": "La disposition est installée, mais Windows ne l’a pas ajoutée aux langues de saisie ; ajoutez-la dans les Paramètres.",
 	"layout_editor.error.export_assets_unavailable": "Les convertisseurs d’export n’ont pas pu être chargés. Vérifiez la connexion et réessayez.",
 	"layout_editor.error.file_unreadable": "Le fichier ne peut pas être lu.",

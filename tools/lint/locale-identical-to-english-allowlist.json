@@ -1392,6 +1392,30 @@
 				"zh"
 			]
 		},
+		"layout_editor.error.lua_vm_unavailable": {
+			"reason": "pending-translation",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
 		"layout_editor.error.source_shortcut_key_self": {
 			"reason": "pending-translation",
 			"locales": [

@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows ने व्यवस्थापक अधिकार नहीं दिया: लेआउट इंस्टॉल नहीं हुआ।",
 	"layout_editor.error.foreign_layout": "Windows का कोई अन्य कीबोर्ड लेआउट पहले से इस DLL नाम का उपयोग करता है; इसे Windows विकल्पों में बदलें।",
 	"layout_editor.error.install_failed": "Windows लेआउट इंस्टॉल नहीं कर सका।",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "लेआउट इंस्टॉल हो गया है, लेकिन Windows ने इसे इनपुट भाषाओं में नहीं जोड़ा; इसे सेटिंग्स में जोड़ें।",
 	"layout_editor.error.export_assets_unavailable": "निर्यात कनवर्टर लोड नहीं हो सके; कनेक्शन जाँचें और फिर से प्रयास करें।",
 	"layout_editor.error.file_unreadable": "फ़ाइल पढ़ी नहीं जा सकती।",

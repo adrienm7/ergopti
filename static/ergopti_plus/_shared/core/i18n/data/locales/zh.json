@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows 未授予管理员权限：布局未安装。",
 	"layout_editor.error.foreign_layout": "另一个 Windows 键盘布局已在使用此 DLL 名称；请在 Windows 选项中更改。",
 	"layout_editor.error.install_failed": "Windows 无法安装此布局。",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "布局已安装，但 Windows 未将其添加到输入语言；请在设置中添加。",
 	"layout_editor.error.export_assets_unavailable": "无法加载导出转换器；请检查网络连接后重试。",
 	"layout_editor.error.file_unreadable": "无法读取该文件。",

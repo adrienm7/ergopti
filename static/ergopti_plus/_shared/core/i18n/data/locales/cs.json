@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Systém Windows neudělil oprávnění správce: rozložení nebylo nainstalováno.",
 	"layout_editor.error.foreign_layout": "Jiné rozložení klávesnice Windows již používá tento název DLL; změňte jej v možnostech Windows.",
 	"layout_editor.error.install_failed": "Systému Windows se nepodařilo rozložení nainstalovat.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "Rozložení je nainstalováno, ale Windows je nepřidal do vstupních jazyků; přidejte je v Nastavení.",
 	"layout_editor.error.export_assets_unavailable": "Převodníky exportu se nepodařilo načíst; zkontrolujte připojení a zkuste to znovu.",
 	"layout_editor.error.file_unreadable": "Soubor nelze přečíst.",

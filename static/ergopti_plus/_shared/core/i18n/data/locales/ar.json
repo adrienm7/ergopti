@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "لم يمنح Windows صلاحية المسؤول: لم يتم تثبيت التخطيط.",
 	"layout_editor.error.foreign_layout": "يستخدم تخطيط لوحة مفاتيح آخر في Windows اسم DLL هذا بالفعل؛ غيّره في خيارات Windows.",
 	"layout_editor.error.install_failed": "تعذّر على Windows تثبيت التخطيط.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "تم تثبيت التخطيط، لكن Windows لم يضفه إلى لغات الإدخال؛ أضفه من الإعدادات.",
 	"layout_editor.error.export_assets_unavailable": "تعذّر تحميل محوّلات التصدير؛ تحقّق من الاتصال وحاول مجددًا.",
 	"layout_editor.error.file_unreadable": "تتعذّر قراءة الملف.",

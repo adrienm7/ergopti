@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows ga ikke administratorrettighet: oppsettet ble ikke installert.",
 	"layout_editor.error.foreign_layout": "Et annet Windows-tastaturoppsett bruker allerede dette DLL-navnet; endre det i Windows-alternativene.",
 	"layout_editor.error.install_failed": "Windows kunne ikke installere oppsettet.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "Oppsettet er installert, men Windows la det ikke til inndataspråkene; legg det til i Innstillinger.",
 	"layout_editor.error.export_assets_unavailable": "Eksportkonverterne kunne ikke lastes inn; sjekk tilkoblingen og prøv igjen.",
 	"layout_editor.error.file_unreadable": "Filen kan ikke leses.",

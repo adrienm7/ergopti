@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "System Windows nie przyznał uprawnień administratora: układ nie został zainstalowany.",
 	"layout_editor.error.foreign_layout": "Inny układ klawiatury Windows używa już tej nazwy DLL; zmień ją w opcjach Windows.",
 	"layout_editor.error.install_failed": "System Windows nie mógł zainstalować układu.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "Układ jest zainstalowany, ale Windows nie dodał go do języków wprowadzania; dodaj go w Ustawieniach.",
 	"layout_editor.error.export_assets_unavailable": "Nie udało się wczytać konwerterów eksportu; sprawdź połączenie i spróbuj ponownie.",
 	"layout_editor.error.file_unreadable": "Nie można odczytać pliku.",

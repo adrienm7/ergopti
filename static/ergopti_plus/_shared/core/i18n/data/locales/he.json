@@ -359,6 +359,7 @@
 	"layout_editor.error.elevation_refused": "Windows לא העניק הרשאת מנהל: הפריסה לא הותקנה.",
 	"layout_editor.error.foreign_layout": "פריסת מקלדת אחרת של Windows כבר משתמשת בשם DLL זה; שנה אותו באפשרויות Windows.",
 	"layout_editor.error.install_failed": "Windows לא הצליח להתקין את הפריסה.",
+	"layout_editor.error.lua_vm_unavailable": "The XKB and KLC converters cannot run in this window. The editor on ergopti.fr builds these files.",
 	"layout_editor.error.profile_not_added": "הפריסה הותקנה, אך Windows לא הוסיף אותה לשפות הקלט; הוסף אותה בהגדרות.",
 	"layout_editor.error.export_assets_unavailable": "לא ניתן היה לטעון את ממירי הייצוא; בדקו את החיבור ונסו שוב.",
 	"layout_editor.error.file_unreadable": "אי אפשר לקרוא את הקובץ.",
