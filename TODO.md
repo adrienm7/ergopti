@@ -292,6 +292,9 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [CODE] Left (2026-11-15): the Comparer reads a local file or pasted text (6e798c9afb, 1fb3330e32, be84e5ba93;
       test-layout-comparer-page.cjs), but the edited layout cannot be analysed on it: the editor's panel offers only the
       built-in corpora and « My typing ».
+      In the app 2026-11-15 (`claude/ergopti-todo-edited-into-comparer`): « Compare with other layouts » in the
+      editor's panel puts the edited layout in « Comparer », where a pasted text or a file is the corpus. Left: the
+      same on the site, whose editor and Comparer are two framed pages.
 - [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
       (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
@@ -303,7 +306,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       review by the maintainer.
       [CODE] Left (2026-11-15): the library (115 layouts, fea99ea2ab), the Comparer tables and charts and the app tabs
       are done (f0854d0f46, b200e583eb; test-layout-analysis-engine.cjs, test-layout-comparer-page.cjs); the layout
-      being edited is not in the Comparer's tables, only ranked in the editor panel. [DECISION] the ergopti/benchmarks
+      being edited is not in the Comparer's tables, only ranked in the editor panel (done in the app 2026-11-15:
+      « Compare with other layouts », ranked against the layouts ticked there). [DECISION] the ergopti/benchmarks
       pages do not read layout_library.json: rebuild them on the shared library, or drop that requirement.
 
 - [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and

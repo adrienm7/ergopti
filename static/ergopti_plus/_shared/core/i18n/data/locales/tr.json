@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "A–Z her harfin 1'den 10'a bir yararı vardır: kopyala, yapıştır, kes ve geri al için 10, tümünü seç ve kaydet için 8, kalın, italik ve altı çizili için 5, nadir olanlar için 1. Üreticilerin kısayol listelerine göre sıralanmış bir tahmin.",
 	"layout_analysis.info.weights": "Her ölçünün birimi başına puan; her biri incelenen analizcilerde olduğu kadar ağır gelsin diye ayarlandı. Her ağırlık düzenlenebilir.",
 	"layout_analysis.info.fingering": "Her tuşa hangi parmağın bastığı: 6 sağ işaret parmağıyla, boşluk sol başparmakla, AltGr sağ başparmakla; ya da angle mod. Ortolineer klavyelerde kaydırma yoktur.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "Düzen analizi",
 	"layout_analysis.panel.score": "Puan {score} · {count} içinde {rank}. sıra",
 	"layout_analysis.panel.ranking": "Kütüphaneyle sıralanıyor…",

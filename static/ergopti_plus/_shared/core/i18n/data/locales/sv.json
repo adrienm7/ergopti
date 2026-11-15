@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "Varje bokstav A–Z har en nytta från 1 till 10: 10 för kopiera, klistra in, klipp ut och ångra, 8 för markera allt och spara, 5 för fet, kursiv och understruken, 1 för sällsynta. En uppskattning ordnad efter leverantörernas kortkommandolistor.",
 	"layout_analysis.info.weights": "Poäng per enhet av varje mått, satta så att varje mått väger som i de studerade analysverktygen. Varje vikt kan ändras.",
 	"layout_analysis.info.fingering": "Vilket finger som skriver varje tangent: 6 med höger pekfinger, mellanslag med vänster tumme, AltGr med höger tumme; eller angle mod. Ortolinjära tangentbord saknar förskjutning.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "Layoutanalys",
 	"layout_analysis.panel.score": "Poäng {score} · plats {rank} av {count}",
 	"layout_analysis.panel.ranking": "Rangordnar mot biblioteket…",

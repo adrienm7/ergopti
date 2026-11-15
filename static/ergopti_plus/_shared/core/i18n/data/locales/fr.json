@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "Chaque lettre de A à Z a une utilité de 1 à 10 : 10 pour copier, coller, couper et annuler, 8 pour tout sélectionner et enregistrer, 5 pour gras, italique et souligné, 1 pour les plus rares. Une estimation ordonnée d’après les listes de raccourcis des éditeurs.",
 	"layout_analysis.info.weights": "Points par unité de chaque mesure, réglés pour que chacune pèse comme dans les analyseurs étudiés. Chaque poids est modifiable.",
 	"layout_analysis.info.fingering": "Quel doigt tape chaque touche : 6 par l’index droit, la barre d’espace par le pouce gauche, AltGr par le pouce droit ; ou l’angle mod. Les claviers ortholinéaires n’ont pas de décalage.",
+	"layout_analysis.panel.compare": "Comparer avec d’autres dispositions",
 	"layout_analysis.panel.title": "Analyse de la disposition",
 	"layout_analysis.panel.score": "Score {score} · rang {rank} sur {count}",
 	"layout_analysis.panel.ranking": "Classement parmi la bibliothèque…",

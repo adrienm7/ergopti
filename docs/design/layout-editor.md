@@ -263,6 +263,11 @@ comparer is embedded were decided by the agent, to be reviewed by the maintainer
   (`studio_profile_load`, `studio_profile_save` with `text` or `reset`). Each user has one profile, kept in
   `layout_sources/studio_profile.json` as the JSON text the page sent, separately from the layouts; `null` (reset)
   restores the defaults, and an unreadable profile is reported, not replaced by the defaults.
+- « Compare with other layouts »: the editor's analysis panel offers it when its page gives `onCompare` (the
+  editor's host option `compare`); the Studio window then opens « Comparer » and adds the edited layout, ticked,
+  beside the layouts chosen there, so it is ranked against that selection on the chosen corpus, a pasted text or
+  a file included. It is not stored with the personal layouts. The site's editor and Comparer are two pages and do
+  not offer it yet.
 - « My typing »: the keystats counts loaded with « Analyse my typing » become the comparer's default corpus
   (`studio-ngrams` event).
 

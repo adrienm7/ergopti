@@ -271,7 +271,9 @@ var LayoutEditorPage = (function () {
 	 *   savedStatus names the message shown after a save; onClose leaves the editor;
 	 *   exportAssets() resolves what the XKB and KLC downloads run (standalone.js)
 	 *   on a host that can fetch them; startFrom names the start source (a
-	 *   loadSources or built-in id) the editor copies when it has no initial text.
+	 *   loadSources or built-in id) the editor copies when it has no initial text;
+	 *   compare(layout) receives the edited layout from the analysis panel's
+	 *   « Compare with other layouts » (the app's Studio).
 	 * @returns {{open: function(string, string): void, current: function(): object}}
 	 */
 	function mount(root, host) {
@@ -350,7 +352,9 @@ var LayoutEditorPage = (function () {
 		// The live analysis beside the board, on the pages that load its scripts.
 		const analysisPanel =
 			typeof window.LAYOUT_ANALYSIS_PANEL === 'object'
-				? window.LAYOUT_ANALYSIS_PANEL.create()
+				? window.LAYOUT_ANALYSIS_PANEL.create({
+						onCompare: typeof host.compare === 'function' ? host.compare : null
+					})
 				: null;
 
 		function apply(edit) {

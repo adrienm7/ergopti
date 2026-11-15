@@ -141,6 +141,99 @@ async function downloaded(page, click) {
 }
 
 /**
+ * Answers every corpus request the window has posted (studio_corpus) as the app
+ * hosts do: the generated file runs in the page, then the request settles.
+ * @param {import('playwright').Page} page
+ */
+async function serveCorpora(page) {
+	const ids = await page.evaluate(() => [
+		...new Set(
+			window.__posted.filter((p) => p.action === 'studio_corpus' && !p.served).map((p) => p.id)
+		)
+	]);
+	for (const id of ids)
+		await page.addScriptTag({
+			path: shared('ui', 'layout_analysis', '_generated', 'corpus_' + id + '.js')
+		});
+	await page.evaluate(() => {
+		for (const posted of window.__posted)
+			if (posted.action === 'studio_corpus' && !posted.served) {
+				posted.served = true;
+				window.studioCorpus({ request: posted.request, ok: true });
+			}
+	});
+}
+
+/**
+ * (studio-compare-edited) « Compare with other layouts » in the editor's
+ * analysis panel shows the edited layout in « Comparer », ticked and ranked
+ * with the layouts chosen there.
+ * @param {import('playwright').Browser} browser
+ * @param {string} origin
+ */
+async function exerciseCompareEdited(browser, origin) {
+	const strings = JSON.parse(
+		fs.readFileSync(shared('core', 'i18n', 'data', 'locales', 'en.json'), 'utf8')
+	);
+	const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+	const errors = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript((strings) => {
+		window._i18n_strings = strings;
+		window.__posted = [];
+		window.webkit = {
+			messageHandlers: {
+				layout_editor_window_bridge: { postMessage: (payload) => window.__posted.push(payload) }
+			}
+		};
+	}, strings);
+	await page.goto(`${origin}/ui/layout_editor_window/index.html`);
+	await page.evaluate(() =>
+		window.initData({ strings: {}, state: { platform: 'linux' }, studio_store: true })
+	);
+	await page.evaluate(
+		(text) => window.sourceData({ filename: 'source.toml', text, folder: 'layout_sources/' }),
+		fs.readFileSync(SOURCE_FIXTURE, 'utf8')
+	);
+	const button = page.locator('#la-panel-compare');
+	await button.waitFor({ state: 'visible' });
+	assert.equal((await button.textContent()).trim(), strings['layout_analysis.panel.compare']);
+	await button.click();
+	assert.equal(await page.isVisible('#studio-comparer'), true, 'the click opens « Comparer »');
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_layouts'));
+	await page.evaluate(() => {
+		const list = window.__posted.find((p) => p.action === 'studio_layouts');
+		window.studioLayouts({ request: list.request, ok: true, layouts: [] });
+	});
+	await page.waitForFunction(() => window.__posted.some((p) => p.action === 'studio_corpus'));
+	await serveCorpora(page);
+	await page.waitForFunction(() =>
+		[...document.querySelectorAll('#la-table tbody tr')].some((row) =>
+			row.textContent.includes('Source Fixture')
+		)
+	);
+	assert.equal(
+		await page.evaluate(() =>
+			[...document.querySelectorAll('#la-layout-list label')].some(
+				(label) =>
+					label.textContent.includes('Source Fixture') && label.querySelector('input').checked
+			)
+		),
+		true,
+		'the edited layout is ticked in the list'
+	);
+	assert.equal(
+		await page.evaluate(
+			() => window.__posted.filter((p) => p.action === 'studio_layout_save').length
+		),
+		0,
+		'the edited layout is not stored with the personal layouts'
+	);
+	assert.deepEqual(errors, []);
+	await page.close();
+}
+
+/**
  * (studio-opens-on-ergopti) With no saved source, the Studio window opens on a
  * copy of Ergopti, not an empty keyboard, once the host lists its sources; a
  * file the user opened in the meantime is kept.
@@ -1294,6 +1387,7 @@ async function exercisePhoneWidth(browser, origin) {
 		await exerciseManager(browser, origin);
 		await exerciseDownloadWithoutLuaVm(browser, origin);
 		await exerciseOpensOnErgopti(browser, origin);
+		await exerciseCompareEdited(browser, origin);
 		await exerciseLayerSelector(browser, origin);
 		await exercisePhoneWidth(browser, origin);
 		await exerciseLongLabels(browser, origin);

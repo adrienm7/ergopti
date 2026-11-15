@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "A–Z 각 글자는 1에서 10까지의 유용도를 가집니다: 복사, 붙여넣기, 잘라내기, 실행 취소는 10, 모두 선택과 저장은 8, 굵게, 기울임, 밑줄은 5, 드문 것은 1. 각 업체의 단축키 목록에 따라 정한 추정치입니다.",
 	"layout_analysis.info.weights": "각 지표의 단위당 점수로, 조사한 분석기에서처럼 무게가 실리도록 정했습니다. 모든 가중치를 편집할 수 있습니다.",
 	"layout_analysis.info.fingering": "각 키를 누르는 손가락: 6은 오른손 검지, 스페이스는 왼손 엄지, AltGr은 오른손 엄지. 또는 angle mod. 오소리니어 키보드는 엇갈림이 없습니다.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "자판 분석",
 	"layout_analysis.panel.score": "점수 {score} · {count}개 중 {rank}위",
 	"layout_analysis.panel.ranking": "라이브러리와 순위 비교 중…",

@@ -27,6 +27,10 @@
  *    sections register with addSection and draw after each analysis.
  * 6. A layout the page cannot analyse says why; nothing is shown as a score
  *    that was not computed.
+ * 7. « Compare with other layouts »: on a page that gives it onCompare (the
+ *    app's Studio, whose « Comparer » tab ranks it against the chosen
+ *    layouts on any corpus, a pasted text or a file included), one click
+ *    hands over the edited layout in the library shape.
  * ==============================================================================
  */
 
@@ -147,7 +151,12 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 	 * @returns {{node: HTMLElement, update: function(object): void,
 	 *   addSection: function(function(HTMLElement, object): void): void}}
 	 */
-	function create() {
+	/**
+	 * @param {{onCompare?: function(object): void}} [options] - onCompare receives
+	 *   the edited layout in the library shape when the user asks to compare it.
+	 */
+	function create(options) {
+		const onCompare = options && typeof options.onCompare === 'function' ? options.onCompare : null;
 		const saved = readStorage(STORAGE_KEY);
 		const corpora = DATA.corpora.map((c) => ({ id: c.id, title: c.title, builtin: c }));
 		const state = {
@@ -175,6 +184,27 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		keyboardLabel.htmlFor = keyboardSelect.id;
 		const controls = el('div', 'la-panel-controls');
 		controls.append(corpusLabel, corpusSelect, keyboardLabel, keyboardSelect);
+		const compareButton = onCompare ? el('button', 'la-panel-compare') : null;
+		if (compareButton) {
+			compareButton.type = 'button';
+			compareButton.id = 'la-panel-compare';
+			compareButton.addEventListener('click', () => {
+				if (!state.doc) return;
+				let layout;
+				try {
+					layout = layoutFromEditorDoc(state.doc);
+				} catch (error) {
+					showError(
+						t('layout_analysis.panel.unavailable', {
+							reason: (error && (error.code || error.message)) || 'error'
+						})
+					);
+					return;
+				}
+				onCompare(layout);
+			});
+			controls.append(compareButton);
+		}
 		const headline = el('p', 'la-panel-score');
 		headline.setAttribute('role', 'status');
 		const note = el('p', 'la-panel-note');
@@ -215,6 +245,7 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 			fingersTitle.textContent = t('layout_analysis.details.fingers');
 			analysersTitle.textContent = t('layout_analysis.analysers.title');
 			note.textContent = t('layout_analysis.panel.weights_note');
+			if (compareButton) compareButton.textContent = t('layout_analysis.panel.compare');
 			corpusSelect.replaceChildren(
 				...corpora.map((c) => {
 					const option = el(

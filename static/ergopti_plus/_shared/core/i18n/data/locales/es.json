@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "Cada letra de la A a la Z tiene una utilidad de 1 a 10: 10 para copiar, pegar, cortar y deshacer, 8 para seleccionar todo y guardar, 5 para negrita, cursiva y subrayado, 1 para las raras. Una estimación ordenada según las listas de atajos de los fabricantes.",
 	"layout_analysis.info.weights": "Puntos por unidad de cada medida, fijados para que cada una pese como en los analizadores estudiados. Cada peso es editable.",
 	"layout_analysis.info.fingering": "Qué dedo pulsa cada tecla: el 6 con el índice derecho, la barra espaciadora con el pulgar izquierdo, AltGr con el pulgar derecho; o el angle mod. Los teclados ortolineales no tienen desplazamiento.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "Análisis de la distribución",
 	"layout_analysis.panel.score": "Puntuación {score} · puesto {rank} de {count}",
 	"layout_analysis.panel.ranking": "Clasificando frente a la biblioteca…",

@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "Hver bokstav A–Z har en nytte fra 1 til 10: 10 for kopier, lim inn, klipp ut og angre, 8 for merk alt og lagre, 5 for fet, kursiv og understreket, 1 for sjeldne. Et anslag ordnet etter leverandørenes snarveislister.",
 	"layout_analysis.info.weights": "Poeng per enhet av hvert mål, satt slik at hvert mål veier som i de undersøkte analyseverktøyene. Hver vekt kan endres.",
 	"layout_analysis.info.fingering": "Hvilken finger som skriver hver tast: 6 med høyre pekefinger, mellomrom med venstre tommel, AltGr med høyre tommel; eller angle mod. Ortolineære tastaturer har ingen forskyvning.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "Oppsettanalyse",
 	"layout_analysis.panel.score": "Poeng {score} · plass {rank} av {count}",
 	"layout_analysis.panel.ranking": "Rangerer mot biblioteket…",

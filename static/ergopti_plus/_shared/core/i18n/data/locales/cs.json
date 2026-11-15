@@ -4545,6 +4545,7 @@
 	"layout_analysis.info.shortcut_letters": "Každé písmeno A–Z má užitečnost 1 až 10: 10 pro kopírovat, vložit, vyjmout a zpět, 8 pro vybrat vše a uložit, 5 pro tučné, kurzívu a podtržení, 1 pro vzácné. Odhad seřazený podle seznamů zkratek výrobců.",
 	"layout_analysis.info.weights": "Body za jednotku každé míry, nastavené tak, aby každá vážila jako ve studovaných analyzátorech. Každou váhu lze upravit.",
 	"layout_analysis.info.fingering": "Který prst píše kterou klávesu: 6 pravým ukazováčkem, mezerník levým palcem, AltGr pravým palcem; nebo angle mod. Ortolineární klávesnice nemají posun.",
+	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "Analýza rozložení",
 	"layout_analysis.panel.score": "Skóre {score} · pořadí {rank} z {count}",
 	"layout_analysis.panel.ranking": "Řazení vůči knihovně…",

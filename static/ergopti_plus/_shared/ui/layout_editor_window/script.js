@@ -443,6 +443,9 @@ window.sourceData = function (data) {
 		// empty keyboard (maintainer, 2026-11-15); the user's own layout, once saved,
 		// is what the host sends next time.
 		startFrom: initial === null ? ERGOPTI_START : null,
+		// « Compare with other layouts »: the Comparer ranks the edited layout
+		// against the layouts ticked there, on its chosen corpus.
+		compare: compareEdited,
 		// The editor is the whole window: leaving it closes the window.
 		onClose: function () {
 			send('close');
@@ -727,6 +730,16 @@ function showTab(tab) {
 		// Its charts lay out again once visible.
 		window.dispatchEvent(new Event('resize'));
 	}
+}
+
+/**
+ * Shows the edited layout in « Comparer », ticked beside the layouts already
+ * chosen there; it is not stored with the personal layouts.
+ * @param {Object} layout - The analysis panel's layout (library shape).
+ */
+function compareEdited(layout) {
+	showTab('compare');
+	window.LAYOUT_ANALYSIS_COMPARER.addLayouts([layout]);
 }
 
 document.getElementById('studio-tab-edit').addEventListener('click', function () {
