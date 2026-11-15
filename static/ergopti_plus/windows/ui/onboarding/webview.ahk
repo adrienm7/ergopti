@@ -300,8 +300,10 @@ _OnbWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("An onboarding page action")
 		return
+	}
 	if (Action == "ready") {
 		_OnbWeb_FlushQueue(SessionEpoch)
 		; Reading the configuration and the catalogue, and closing the window when

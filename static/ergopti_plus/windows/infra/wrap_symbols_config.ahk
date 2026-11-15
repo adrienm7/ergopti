@@ -446,7 +446,7 @@ _WS_CommitCandidate(BuildFn, WriterFn := 0, ReplaceFn := 0, DeleteFn := 0) {
 	}
 	try {
 		if A_IsSuspended {
-			try LoggerError("WrapSymbols", "Refusing to save wrap symbols while the driver is suspended.")
+			NotifyPausedRefusal("The wrap symbols save")
 			return false
 		}
 		if !_ConfigWriteLeaseOwns(OwnerToken, BoundPath)
@@ -812,7 +812,7 @@ _WS_Save(DisabledCandidate := unset, CustomCandidate := unset,
 		return false
 	}
 	if A_IsSuspended {
-		try LoggerError("WrapSymbols", "Refusing to save wrap symbols while the driver is suspended.")
+		NotifyPausedRefusal("The wrap symbols save")
 		return false
 	}
 	if _WS_LoadFailed {

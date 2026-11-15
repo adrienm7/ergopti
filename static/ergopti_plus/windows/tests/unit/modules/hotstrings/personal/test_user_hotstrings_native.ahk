@@ -138,6 +138,10 @@ _UCHNativePreferences() {
 				Suspend(true)
 				Receipt := _HS_TryLiveToggleV2("hotstrings.dynamic.user_code")
 				Assert(Receipt.handled && !Receipt.ok, "a retained live toggle cannot activate code while paused")
+				; The user is told it waits for the resume, never that it failed to persist.
+				AssertTrue(Receipt.HasOwnProp("paused"), "the refusal names the pause (paused-refusal-notice)")
+				AssertFalse(ToggleFeatureV2("hotstrings.dynamic.user_code", "Programmable"),
+					"the switch refuses while paused")
 				AssertEqual(Before, FSReadUtf8Exact(Fixture.path))
 			} finally Suspend(WasSuspended)
 			OwnerFixture := _UCHFixture(), _UserHotstringsOwner := OwnerFixture.owner

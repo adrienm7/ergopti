@@ -395,6 +395,9 @@ ToggleFeatureV2(V2Path, Label := "") {
 	; Fast path: live hotstring section toggle, no Reload (see _HS_TryLiveToggleV2).
 	LiveResult := _HS_TryLiveToggleV2(V2Path)
 	if LiveResult.handled {
+		; A pause refusal was told already: nothing failed to persist.
+		if !LiveResult.ok && LiveResult.HasOwnProp("paused")
+			return false
 		if !LiveResult.ok
 			return ConfigReportPersistenceFailure("the live feature toggle '" . V2Path . "'")
 		; Every menu toggle is logged with its id and outcome: until now the only
@@ -478,7 +481,11 @@ _HS_WriteHotstringFamily(V2Path, Enabled) {
 ; This avoids publishing disabled preferences while a factory still runs.
 _HS_ToggleProgrammableHotstrings(V2Path) {
 	global Features
-	if A_IsSuspended || !IsCategoryGated("Hotstrings")
+	if A_IsSuspended {
+		NotifyPausedRefusal("The programmable hotstrings switch")
+		return {handled: true, ok: false, paused: true}
+	}
+	if !IsCategoryGated("Hotstrings")
 		return {handled: true, ok: false}
 	State := ReadFeatureStateV2(V2Path)
 	WasEnabled := State.Has("enabled") && State["enabled"]

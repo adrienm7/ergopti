@@ -1569,8 +1569,12 @@ _LLM_MBW_RepaintRefusal(ExpectedEpoch) {
  */
 _LLM_MBW_RunAction(Payload, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch, _LLM_MBW_Rows, _LLM_MBW_Tools, _LLM_Menu
-	if A_IsSuspended || (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+	if ExpectedEpoch != _LLM_MBW_SessionEpoch
 		return
+	if A_IsSuspended {
+		NotifyPausedRefusal("A model browser page action")
+		return
+	}
 	Action := Payload["action"]
 	Backend := Payload.Has("backend") && Payload["backend"] is String ? Payload["backend"] : ""
 	Name := Payload.Has("name") && Payload["name"] is String ? Payload["name"] : ""
@@ -1677,8 +1681,12 @@ _LLM_MBW_IsCatalogueSourceUrl(Url) {
 ; in-flight COM dispatch is still standing on.
 _LLM_MBW_ApplyModel(Name, ExpectedEpoch) {
 	global _LLM_MBW_SessionEpoch
-	if A_IsSuspended or (ExpectedEpoch != _LLM_MBW_SessionEpoch)
+	if ExpectedEpoch != _LLM_MBW_SessionEpoch
 		return
+	if A_IsSuspended {
+		NotifyPausedRefusal("A model choice")
+		return
+	}
 	; Teardown can pump a pause or a new browser session. Commit the selection
 	; before those callouts, and close only the session which requested it.
 	try Applied := LLM_Menu_SetModel(Name)

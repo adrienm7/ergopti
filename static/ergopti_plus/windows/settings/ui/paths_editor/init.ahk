@@ -237,8 +237,10 @@ _PathsEdWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("A paths editor page action")
 		return
+	}
 	if (Action == "ready") {
 		SetTimer(_PathsEdWeb_SessionCall.Bind(SessionEpoch, _PathsEdWeb_PushInitData), -1)
 	} else if (Action == "browse") {
@@ -317,8 +319,10 @@ _PathsEdNative_Cancel(Window, *) {
 ; The native fallback owns a concrete control rather than a WebView epoch.
 ; Closing its window while the picker pumps must not write the dead control.
 _PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
-	if A_IsSuspended
+	if A_IsSuspended {
+		NotifyPausedRefusal("The configuration folder browse")
 		return false
+	}
 	try Hwnd := Window.Hwnd
 	catch
 		return false

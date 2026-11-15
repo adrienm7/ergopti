@@ -286,8 +286,10 @@ _HCWWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("A hotstrings window page action")
 		return
+	}
 	if (Action == "ready") {
 		SetTimer(_HCWWeb_SessionCall.Bind(SessionEpoch, _HCWWeb_PushState), -1)
 		return
@@ -335,8 +337,10 @@ _HCWWeb_SessionCall(SessionEpoch, Callback, Params*) {
 ; on_message dispatch: bulk actions hit every category, per-entry actions resolve
 ; the entry by its key and route through the shared write helpers.
 _HCWWeb_Dispatch(Payload) {
-	if A_IsSuspended
+	if A_IsSuspended {
+		NotifyPausedRefusal("A hotstrings window page action")
 		return false
+	}
 	Action := Payload.Has("action") ? Payload["action"] : ""
 
 	if (Action == "close") {

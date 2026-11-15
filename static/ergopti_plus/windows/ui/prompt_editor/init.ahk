@@ -471,8 +471,10 @@ _PromptEdWeb_OnWebMessage(Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("A prompt editor page action")
 		return
+	}
 	_PromptEdWeb_HandlePayload(Payload, Action)
 }
 

@@ -25,7 +25,7 @@ global SubMenus := Map()
 ; so only failures surface a blocking dialog (the user must know something went wrong).
 GestureAutoConfigureAction() {
 	if A_IsSuspended {
-		try LoggerWarn("gestures", "Ignoring touchpad auto-configure while suspended.")
+		NotifyPausedRefusal("The touchpad auto-configure")
 		return
 	}
 	if !GestureAutoConfigureRegistry(_GestureAutoConfigureActionDone) {

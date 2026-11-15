@@ -418,8 +418,10 @@ _ActPickWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	; config, re-register hotstrings or launch an elevated install.
 	; Page-lifecycle signals are deliberately NOT gated — dropping `ready` strands
 	; the SafetyFlush and leaves the page permanently un-initialised.
-	if (A_IsSuspended && Action != "ready")
+	if (A_IsSuspended && Action != "ready") {
+		NotifyPausedRefusal("An action picker page action")
 		return
+	}
 	if (Action == "ready") {
 		SetTimer(_ActPickWeb_SessionCall.Bind(SessionEpoch, _ActPickWeb_PushInit), -1)
 	} else if (Action == "cancel") {

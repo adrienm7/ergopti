@@ -653,8 +653,10 @@ KLWV_OnWebMessage(which, Epoch, sender, args) {
 		; inert while paused. A range request is the exception only long enough to
 		; capture its request id and queue a canceled terminal for resume; it must
 		; never start the detached projection while suspended.
-		if A_IsSuspended && (action != "range") && (action != "range_consumed")
+		if A_IsSuspended && (action != "range") && (action != "range_consumed") {
+				NotifyPausedRefusal("A metrics page action")
 				return
+		}
 		switch action {
 		case "pick", "edit":
 			if which == "apps"

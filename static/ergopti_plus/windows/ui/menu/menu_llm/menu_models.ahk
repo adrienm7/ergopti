@@ -232,7 +232,11 @@ _LLM_Menu_PullModel(name, IsTag := false, BaseUrl := "", RunFn := 0, ScheduleFn 
 _LLM_Menu_PromptDeleteCachedModel(name, ConfirmFn := Ui_MsgBox, TransportPort := 0) {
 	global _LLM_Menu
 	MenuOwner := _LLM_Menu
-	if A_IsSuspended || !(MenuOwner is Map) || MenuOwner.Get("backend", "") != "ollama"
+	if A_IsSuspended {
+		NotifyPausedRefusal("A cached model deletion")
+		return false
+	}
+	if !(MenuOwner is Map) || MenuOwner.Get("backend", "") != "ollama"
 		return false
 	tag := LLM_ResolveOllamaTag(name)
 	if (tag == "")

@@ -1005,8 +1005,10 @@ _LayMgrWeb_OnWebMessage(SessionEpoch, Handler, Args) {
 	}
 	; A COM callback bypasses Suspend: a paused driver must not install or
 	; reload from a page click, but the page's own ready signal still loads it.
-	if A_IsSuspended && !((Payload is Map) && Payload.Get("action", "") == "ready")
+	if A_IsSuspended && !((Payload is Map) && Payload.Get("action", "") == "ready") {
+		NotifyPausedRefusal("A layout manager page action")
 		return
+	}
 	SetTimer(_LayMgrWeb_SessionCall.Bind(SessionEpoch, LayoutManager_HandleMessage, Payload), -1)
 }
 

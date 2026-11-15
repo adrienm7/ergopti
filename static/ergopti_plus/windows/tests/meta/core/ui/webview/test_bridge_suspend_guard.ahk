@@ -237,3 +237,23 @@ _A0720WV_ReadyIsNotGatedAway() {
 }
 Test("webview: the suspend guard exempts page-lifecycle signals (F-25)",
 	_A0720WV_ReadyIsNotGatedAway)
+
+; Every tray row stays live under a pause (EDD-1), so a click reaches these
+; entry points while paused. Each one that still refuses then tells the user
+; that the action waits for the resume: a refusal that reached only the log made
+; the click look dead (paused-refusal-notice).
+_WBSG_PausedRefusalsAreTold() {
+	for _, Fn in ["_OnbWeb_OnWebMessage", "_HCWWeb_OnWebMessage", "_HCWWeb_Dispatch",
+			"_PathsEdWeb_OnWebMessage", "_PathsEdNative_Browse", "_PromptEdWeb_OnWebMessage",
+			"_ActPickWeb_OnWebMessage", "_LayMgrWeb_OnWebMessage", "KLWV_OnWebMessage",
+			"_LLM_MBW_RunAction", "_LLM_MBW_ApplyModel", "_LLM_Menu_PromptDeleteCachedModel",
+			"_HS_ToggleProgrammableHotstrings", "GestureAutoConfigureAction", "FilePathsEditor"] {
+		Body := _StripFullLineComments(_DriverFuncBody(Fn))
+		GuardPos := InStr(Body, "A_IsSuspended")
+		Assert(GuardPos > 0, Fn . " must keep its pause guard")
+		Assert(RegExMatch(Body, "s)A_IsSuspended[^\n]*\{\s*NotifyPausedRefusal\(", , GuardPos) > 0,
+			Fn . " must tell the user that the action waits for the resume, not refuse silently")
+	}
+}
+Test("webview and menu: a click refused while paused is told (paused-refusal-notice)",
+	_WBSG_PausedRefusalsAreTold)
