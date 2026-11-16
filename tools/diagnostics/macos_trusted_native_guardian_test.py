@@ -33,17 +33,18 @@ class TrustedGuardianControls(unittest.TestCase):
         self.binary.write_bytes(b"independent executable bytes")
         self.binary.chmod(0o755)
         self.platform = (
-            self.root / "Native.app/Contents/Resources/static/ergopti_plus/macos/platform"
+            self.root / "Native.app/Contents/Resources/static/ergopti_plus/macos/ai/adapters"
         )
+        driver = self.platform.parent.parent
         self.platform.mkdir(parents=True)
-        (self.platform.parent / "core/network/adapters").mkdir(parents=True)
+        (driver / "core/network/adapters").mkdir(parents=True)
         for name in ("trusted_native_guardian.py", "suspended_image_owner.py"):
             shutil.copyfile(
-                ROOT / "static/ergopti_plus/macos/platform" / name, self.platform / name
+                ROOT / "static/ergopti_plus/macos/ai/adapters" / name, self.platform / name
             )
         shutil.copyfile(
             SOURCE / "static/ergopti_plus/macos/core/network/adapters/native_http.py",
-            self.platform.parent / "core/network/adapters/native_http.py",
+            driver / "core/network/adapters/native_http.py",
         )
         self.guardian = load(
             "trusted_native_guardian", self.platform / "trusted_native_guardian.py"
