@@ -1141,15 +1141,21 @@ and the next module candidates. The audit is paused at the maintainer's request.
       next activity on Windows too, which hid it after the 50 ms floor (`llm-zero-lifetime`). Still open on
       Windows: KMD-1 (UTC metrics rows, a cache migration) and the Notepad and terminal Backspace undo (item
       below).
-      TWD-1 and TWD-2, decided by the maintainer and done on 2026-11-16: - TWD-1: a hotstring preview with no delay hides after the shared `[timing] safety_timeout_sec` on the three
-      OS (Windows read a typed 3.0, macOS and Linux kept the bubble until the next key); the single-source gate
-      `test-tooltip-style-single-source.cjs` now requires the three readers. Tests `twd1-zero-delay-safety`. - TWD-2: the typing-speed widget shows only while text is typed, never for a shortcut, an arrow, a
-      navigation or function key or a modifier alone, and hides as soon as the burst ends (shortcut, ending
-      key, modifier tapped alone, click, focus change or the idle delay), on the three OS. One rule:
-      `[typing_burst]` of `_shared/metrics/data/wpm_widget/constants.toml` names the keys by
-      `KeyboardEvent.code`, mapped through `physical_keys.json` (`metrics/engine/wpm/typing_keys.lua` and
-      `activity.lua` on macOS and Linux, `WPMWidget_TypingBurstIndex` and `WPMWidget_Burst*` on Windows).
-      Tests `twd2-typing-burst`. Left: a real-keyboard look on each OS (not yet in the TODO-tests files).
+      TWD-1 and TWD-2, decided by the maintainer and done on 2026-11-16. TWD-1: a hotstring preview with no delay
+      hides after the shared `[timing] safety_timeout_sec` on the three OS (Windows read a typed 3.0, macOS and
+      Linux kept the bubble until the next key), a no-delay row of a macOS timed stack too; the single-source gate
+      `test-tooltip-style-single-source.cjs` requires the three readers (tests `twd1-zero-delay-safety`,
+      `twd1-stacked-safety`). TWD-2: the typing-speed widget shows only while text is typed and hides as soon as
+      the burst ends: a shortcut (Ctrl, Alt but not AltGr, Win or Cmd, Fn), a function, navigation or media key, a
+      shortcut modifier tapped alone, a focus change, the idle delay, or any pointer input, a single pixel of
+      movement, a click, a wheel or touchpad scroll (never a move the driver posts itself). Shift, AltGr and
+      Shift+AltGr (macOS: both Option keys) are level modifiers and never end it, held or tapped; AltGr's LCtrl
+      on Windows is no lone Ctrl. One rule: `[typing_burst]` of `_shared/metrics/data/wpm_widget/constants.toml`
+      names the keys by `KeyboardEvent.code`, mapped through `physical_keys.json`
+      (`metrics/engine/wpm/typing_keys.lua` and `activity.lua` on macOS and Linux, `WPMWidget_TypingBurstIndex`,
+      `WPMWidget_Burst*` and `WPMWidget_PointerEndsBurst` on Windows). Tests `twd2-typing-burst`,
+      `twd2-level-modifiers`, `twd2-pointer-hides`. Left: a real-keyboard look on each OS (not yet in the
+      TODO-tests files), and a Linux fifth-level key placed on a Ctrl key, which the input hook reports as Ctrl.
 
 ## Dead-key composition parity follow-up
 
