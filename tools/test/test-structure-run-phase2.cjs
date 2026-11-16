@@ -94,6 +94,26 @@ function run() {
 		['codegen', 'codegen (after staging)']
 	);
 	assert.equal(settle([0]).receipt.actions.length, 1, 'a clean run is not repeated');
+	// On Windows the Linux bundle never builds (its native output needs Linux):
+	// a run that stops at the step the tree before the step stopped at counts
+	// for the steps before it, and any other stop still fails the step.
+	const aborted = (name) => `x\n  Pipeline aborted after failed step: ${name}\n`;
+	assert.equal(Runner.abortedPipelineStep(aborted('build:linux — b')), 'build:linux — b');
+	assert.equal(Runner.abortedPipelineStep('Total: 3 step(s)'), null);
+	const hostRun = (output) => {
+		const receipt = { actions: [] };
+		Runner.settleCodegen('S', receipt, {
+			codegen: () => ({ status: 1, tail: 'stopped', output }),
+			unstaged: () => ({ changed: [], added: [] }),
+			stage: () => {},
+			hostAborted: 'build:linux — b'
+		});
+		return receipt;
+	};
+	assert.equal(hostRun(aborted('build:linux — b')).actions.length, 1);
+	assert.throws(() => hostRun(aborted('build:menu — m')), /S: codegen does not settle/);
+	assert.throws(() => hostRun('crashed'), /S: codegen does not settle/);
+	assert.ok(source.indexOf('baseCodegenAborted =') < source.indexOf("'--apply'"));
 	// Every leaf generator runs too: npm run codegen alone left the layer editor
 	// and unicode case outputs to regenerate later with old paths. A generator
 	// the host already refuses is reported; one the step broke stops it.

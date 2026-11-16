@@ -144,16 +144,37 @@ function runGenerators(key, receipt, before, io = {}) {
 		);
 }
 
+/** The domain build step an `npm run codegen` output says it aborted after. */
+function abortedPipelineStep(output) {
+	const m = /Pipeline aborted after failed step: (.+)$/m.exec(output || '');
+	return m ? m[1].trim() : null;
+}
+
 /**
  * Runs the generators on the step's tree and stages what they wrote.
  * Generators whose inputs or outputs moved write their new bytes; a generator
  * that still writes an old path leaves an untracked file. The drift check of
  * a first run compares against HEAD, so a failed first run is repeated on the
  * staged tree, and a run that still fails stops the step.
+ * A run that stops at the very pipeline step the tree before the step already
+ * stopped at (hostAborted: the Linux bundle on a Windows host) counts as a
+ * pass for the steps before it; that step is the CI lanes' to prove.
  * @param {object} [io] The commands, replaced in the runner's test.
  */
 function settleCodegen(key, receipt, io = {}) {
-	const codegen = io.codegen || (() => run('npm', ['run', '--silent', 'codegen']));
+	const plain = () => {
+		const { output, ...result } = run('npm', ['run', '--silent', 'codegen'], { full: true });
+		return { ...result, output };
+	};
+	const raw = io.codegen || plain;
+	const hostAborted = io.hostAborted || receipt.baseCodegenAborted || null;
+	const codegen = () => {
+		const { output = '', ...result } = raw();
+		const aborted = abortedPipelineStep(output);
+		if (result.status !== 0 && hostAborted && aborted === hostAborted)
+			return { ...result, status: 0, hostAborted: aborted };
+		return result;
+	};
 	const unstaged = io.unstaged || unstagedPaths;
 	const stage = io.stage || stagePaths;
 	const fail = (message) => Object.assign(new Error(`${key}: ${message}`), { receipt });
@@ -194,6 +215,14 @@ function runStep(key, opts) {
 	receipt.baseGenerators = failedGenerators(baseGen.output);
 	if (git('status', '--porcelain').trim() !== '')
 		throw Object.assign(new Error(`${key}: npm run gen changes the tree before the step`), {
+			receipt
+		});
+	// The domain build step the host alone stops at before the step, if any.
+	const baseCodegen = run('npm', ['run', '--silent', 'codegen'], { full: true });
+	receipt.baseCodegenAborted =
+		baseCodegen.status === 0 ? null : abortedPipelineStep(baseCodegen.output);
+	if (git('status', '--porcelain').trim() !== '')
+		throw Object.assign(new Error(`${key}: npm run codegen changes the tree before the step`), {
 			receipt
 		});
 	const movesFile = path.resolve(
@@ -370,4 +399,11 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { needsShell, parseArgs, settleCodegen, runGenerators, failedGenerators };
+module.exports = {
+	abortedPipelineStep,
+	needsShell,
+	parseArgs,
+	settleCodegen,
+	runGenerators,
+	failedGenerators
+};
