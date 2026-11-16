@@ -1041,7 +1041,7 @@ function validateExplicitSender(sender, receivingTests) {
 	);
 	assert.ok(
 		receivingTests.includes(
-			String.raw`#Include %A_LineFile%\..\..\..\..\..\..\core\ui\adapters\terminal_output_sendinput.ahk`
+			String.raw`#Include %A_LineFile%\..\..\..\..\..\core\ui\adapters\terminal_output_sendinput.ahk`
 		)
 	);
 	for (const caseName of [
