@@ -866,6 +866,17 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       macOS open panel (`source_pick`), in the `layout_editor_window` items of the three TODO-tests files.
       Progress (2026-11-11): macOS and Linux open the editor from the layout manager window and save its files through the host (`layouts/source_store.lua`, `layout_sources/` of the configuration folder). Windows: the WebView2 host needs `source_open`/`source_save` and `source_editor` in `windows/ui/layout_manager/init.ahk` as described in [layout-editor.md](docs/design/layout-editor.md#hosts); the page hides the button there meanwhile (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). « Install and use » sends the source and its compiled `.keylayout` through the composer host, which installs it as the composed layout and switches to it (macOS defers to the next login when it must). Linux, in a container (2026-11-11): `tests/hardware/run_layout_editor_webview.lua` opens the real layout manager window in WebKit2GTK under Xvfb, clicks « Editor », opens the Ergopti source, « Install and use », « Yes »; the composer host stores the source and the page's Linux emulation table, installs the composed layout, and the server's keymap read back after loading it types a/A, the Kana level on AltGr (<, œ), ê on the ISO key and $ on `TLDE` (CI step « Install a layout source from the editor in the daemon's WebView », desktop-webview shard). The installer refuses to write a desktop setting as root, so a root run checks that refusal and a user run checks the switch. Proven as a regular user on CI run 43105583384 (desktop-webview): installed and selected, the GNOME input sources start with the composed layout, 27/27. The same probe first runs « Emulate without installing »: nothing installed, `composed` becomes the emulated layout, and the daemon's emulation types a, ê and $ for KeyA, IntlBackslash and Backquote from the composer folder's copy. Entry point (2026-11-11, maintainer request): « Create or edit a layout… » in the Keyboard layout menu opens the editor directly (macOS, Linux; greyed on Windows with its reason); « New » starts blank or from QWERTY, AZERTY, Bépo, Ergo-L or Ergopti; « Install on the system » and « Emulate without installing » (`composer_emulate`: no system install, no admin; the emulation reads the composer folder's copy) each say what they do; the site page links ErgoptiPlus and its downloads and says the Windows DLL and installer come from `tools/kbd-dll.cjs`. Left: a native check of that install on a Mac and on a real Linux desktop (GNOME, KDE), the Windows host (`windows/ui/layout_manager/composer.ahk` accepts no source yet), and a Mac check of the native open panel the macOS host now shows for « Open » (`source_pick`).
 
+- [ ] **[CODE] The wow64 image's KbdLayerDescriptor returns a 32-bit pointer (found 2026-11-16 on the PC).** kbd.h
+      types the descriptor's return as `KBD_LONG_POINTER` (`__ptr64` under `BUILD_WOW6432`), and Microsoft's own
+      `C:\Windows\SysWOW64\KBDFR.DLL` returns it in EDX:EAX (`B8 imm32 99 C3`: `mov eax, imm32; cdq; ret`), as the
+      MSVC builder's wow64 `kbdergop.dll` does. The `kbd-dll` wow64 image (clang `const KBDTABLES *__stdcall`, and
+      `pe-writer.cjs`) returns EAX only (`B8 imm32 C3`), leaving EDX to chance for a 32-bit caller that reads the
+      64-bit return, and `reader.cjs` (`descriptorTarget`) refuses Microsoft's form. Left: emit the 64-bit return for
+      wow64 in `emit-c.cjs` and `pe-writer.cjs`, make the reader require `cdq` for a wow64 image (and accept it), then
+      regenerate the page writer bundle and `kbd_setup_stub.js` if they embed it. The same comparison found two
+      differences that are not bugs: Microsoft leaves `dwType` at 0 (`kbd-dll` writes 4 and its reader requires 4;
+      kbd.h calls the field optional), and the MSVC builder's merged `.data` is writable where Microsoft's is
+      read-only.
 - [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller, `<dll>-setup.exe` and the layout
       editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`; added 2026-11-15) (SHA-256,
       RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » says.
@@ -1834,8 +1845,23 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
       about 3 minutes at 5, never ending at 16. Every longer combo already works at fire time on the three OS
       (`HSE_TryPersonalInfoCombo`, macOS `resolve_combo`, Linux `manager.resolve_combo`); macOS and Linux ignore the
       key. Registration only matters for priority: a registered `@t★` beats a shorter registered trigger such as
-      `t★`, which the fire-time fallback never reaches. Kept meanwhile: 1 to 16, default 1. 1. **(recommended) Cap the schema at 2**, the longest length with no measurable boot cost; a config holding 3 or
-      more is refused at load like any out-of-range value, with its reason, and the Windows tests that accept 16
-      move to 2. 2. Retire the key on the three OS: Windows registers the single letters only (as Linux) and resolves the rest at
-      fire time; the setting disappears from the schema, the manifest and the menus. 3. Keep 16 and register lazily (a combo is registered the first time it fires): no boot cost, but the first use
-      of each long combo still loses to a shorter registered trigger. 4. Keep 1 to 16 as today and document the boot cost beside the setting.
+      `t★`, which the fire-time fallback never reaches. Kept meanwhile: 1 to 16, default 1.
+  1. **(recommended) Cap the schema at 2**, the longest length with no measurable boot cost; a config holding 3 or
+     more is refused at load like any out-of-range value, with its reason, and the Windows tests that accept 16
+     move to 2.
+  2. Retire the key on the three OS: Windows registers the single letters only (as Linux) and resolves the rest at
+     fire time; the setting disappears from the schema, the manifest and the menus.
+  3. Keep 16 and register lazily (a combo is registered the first time it fires): no boot cost, but the first use
+     of each long combo still loses to a shorter registered trigger.
+  4. Keep 1 to 16 as today and document the boot cost beside the setting.
+- [ ] **Windows layout DLL builder on a PC without the ARM64 C++ tools? (asked 2026-11-16)** The PC's Visual Studio
+      2019 Build Tools have the x64/x86 tools only; `build_windows_keyboard_layout.ps1` requires ARM64 too and refuses
+      before compiling. The three other images compile there (TODO-tests-windows.md, PC run 2026-11-16).
+      `docs/design/layout-windows-dll.md` wants all four images in every package (the installer copies the one of
+      the running Windows), so an x64-only package would break an ARM64 install. Kept meanwhile: four images or
+      nothing.
+  1. **(recommended) Keep the builder strict;** the release package stays CI-built (the Windows runner has ARM64),
+     and the PC checks install the CI artifact `Ergopti_windows_layout.zip`.
+  2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
+     written to `vendor/keyboard_layout`.
+  3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
