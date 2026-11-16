@@ -4,7 +4,39 @@ This file is the single place to resume the phase 2 structure migration
 (docs/design/structure-plan.md) from this branch alone. It is updated in the
 same commit as each step or checkpoint. Times are Paris time.
 
-## Where things stand (2026-11-14, 17:20)
+## Where things stand (2026-11-17)
+
+- S01 to S22 are on dev; S23 (clipboard) is next. The sections below are the
+  history of S01–S20 and stay for their lessons.
+- Run each step on the Windows PC with
+  `ERGOPTI_STRUCTURE_PHASE=2 node tools/audit/structure/run-phase2.cjs --from <key> --to <key>`
+  in an own worktree (one step takes 15 to 25 minutes); the runner now passes
+  paths to Git in batches and tolerates the domain build stopping at
+  build:linux, the step the host alone cannot run.
+- Then push a proof branch (`claude/ergopti-structure-<step>-proof-<n>`),
+  dispatch `ci.yml` with `os_lanes=all`, and fix what it finds in follow-up
+  commits after the step before landing. Dev baseline reds at the S21/S22
+  landing: Linux E2E platform-metrics; Common Data and source contracts
+  (behavior owner `windows/infra/hotstrings/hotstring_engine_main.ahk` needs
+  its source review, from dev 6436cc2d6c); a racy Windows llm case
+  (`test_ollama_streaming.ahk:861`, WaitForSingleObject 0 returns 258).
+- What S21/S22 taught, to check after every later step:
+  - folder joins onto a scattered folder are respelled to the nearest common
+    folder (Windows managed bootstrap `Directory`, PowerShell test roots);
+  - Lua patterns and runtime-built module names are never rewritten
+    (`source:match(".../x%.lua$")`, `"modules.llm." .. name`, chunk names);
+  - a bare sibling file name in a file that moves into a subfolder becomes
+    `../name`, wrong in a join;
+  - the folder-gain widening of ratchet lists (OS purity, pinned reads)
+    counts files that were never counted; name the moved files' folder only;
+  - the macOS and Linux CI lots (`tests/support/module_groups.lua`) must name
+    the new test folders, or suites change process and order-dependent
+    leaks appear;
+  - log tags follow module names: check `_shared/core/logger/data/sub_files.toml`;
+  - the plan split a shell cohort that sources siblings by `$SCRIPT_DIR`
+    (fixed with a `keep` rule in `rules.cjs` SPLITS before the step).
+
+## History (2026-11-14, 17:20)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night2`, from dev
   `0604ff954`, fast-forward only. The `-night` branch could not fast-forward
