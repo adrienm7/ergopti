@@ -252,7 +252,8 @@ update_widget_body = function(generation)
 	local show
 	show = WPMModel.widget_visible({
 		wpm = display_wpm, source = active_source, tooltip_visible = tooltip_visible, now_s = now,
-		last_input_s = stats.last_input_time, last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
+		last_input_s = stats.last_input_time, last_break_s = stats.last_break_time,
+		last_mouse_s = _last_mouse_sec, idle_hide_s = IDLE_HIDE_S,
 	})
 
 	-- The pointer belongs to the canvas while its drag is in progress.

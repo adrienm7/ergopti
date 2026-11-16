@@ -1184,6 +1184,10 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	if _state.active_app_name ~= app_name or not app_object then
 		discard_roi_word()
 		_state.roi_window_id = nil
+		-- A focus change ends the typing burst: the speed widget hides (TWD-2).
+		if type(_state.wpm_activity) == "table" then
+			require("metrics.engine.wpm.activity").record_break(_state.wpm_activity, hs.timer.absoluteTime() / 1000000)
+		end
 	end
 	-- « pause = tout éteint »: a paused script records NOTHING
 	-- (project-suspend-pause-invariant). ProcessLifecycle.onAppActivate keeps

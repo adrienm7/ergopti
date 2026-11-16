@@ -666,6 +666,17 @@ end
 --- @param flags table The modifier flags from the key event.
 --- @param keycode number The raw keycode.
 --- @return boolean True when this event is a shortcut candidate.
+--- The macOS role index of the typing burst rule (TWD-2), nil when the shared
+--- files cannot be read; the first failure is logged.
+--- @return table|nil
+local function burst_index()
+	local index, err, first_failure = require("metrics.engine.wpm.typing_keys").native_index("hs")
+	if first_failure then
+		Logger.error(LOG, "Typing burst keys unreadable (%s): no key ends a burst until a reload.", tostring(err))
+	end
+	return index
+end
+
 local function is_shortcut_candidate(flags, keycode)
 	if MODIFIER_KEYCODES[keycode] then return false end
 	-- Nav keys (arrows, Home, End…) are never shortcuts — always recorded as bracket markers
@@ -969,7 +980,9 @@ local function handle_key(event_obj)
 				if not down_at then
 					-- Press — record timestamp and credit the kc dict
 					CoreState.modifier_down_at[keycode] = now
-					WPMActivity.record_input(CoreState.wpm_activity, now)
+					-- A modifier never starts a typing burst; tapped alone it ends one (TWD-2).
+					local index = burst_index()
+					WPMActivity.observe_key(CoreState.wpm_activity, index and index[keycode] or "modifier", keycode, false, now)
 					if credits then
 						LogManager.log_modifier_press(keycode, current_cached_app_name())
 					end
@@ -977,6 +990,7 @@ local function handle_key(event_obj)
 					-- Release — compute hold duration and feed the manifest
 					local hold_ms = math.floor(now - down_at)
 					CoreState.modifier_down_at[keycode] = nil
+					WPMActivity.observe_release(CoreState.wpm_activity, keycode, now)
 					if credits then
 						LogManager.log_modifier_hold(keycode, current_cached_app_name(), hold_ms)
 					end
@@ -991,7 +1005,18 @@ local function handle_key(event_obj)
 
 		local flags   = event_obj:getFlags() or {}
 		local keycode = event_obj:getKeyCode()
-		if not SILENT_KEYCODES[keycode] then WPMActivity.record_input(CoreState.wpm_activity, now) end
+		-- Only text starts or keeps a typing burst; a shortcut or an ending key
+		-- (arrows, F-keys, Escape) ends it, as on Windows and Linux (TWD-2).
+		if not SILENT_KEYCODES[keycode] then
+			local index = burst_index()
+			local role = index and index[keycode] or nil
+			local shortcut = is_shortcut_candidate(flags, keycode)
+			if role == nil and not shortcut then
+				WPMActivity.record_input(CoreState.wpm_activity, now)
+			else
+				WPMActivity.observe_key(CoreState.wpm_activity, role, keycode, shortcut, now)
+			end
+		end
 
 		-- Shortcuts: flush then log immediately without entering the typing pipeline.
 		-- Current-process shortcuts (including paste-backed replacements) already

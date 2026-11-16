@@ -445,7 +445,8 @@ function M.tick(stats, now_s, paused)
 
 	local show = Model.widget_visible({
 		wpm = wpm, source = source, tooltip_visible = M.tooltip_visible(), now_s = now_s,
-		last_input_s = stats and stats.last_input_time, last_mouse_s = _state.last_mouse_s,
+		last_input_s = stats and stats.last_input_time, last_break_s = stats and stats.last_break_time,
+		last_mouse_s = _state.last_mouse_s,
 		idle_hide_s = IDLE_HIDE_S,
 	})
 	-- A drag moves the pointer; the widget the user is holding must not vanish.

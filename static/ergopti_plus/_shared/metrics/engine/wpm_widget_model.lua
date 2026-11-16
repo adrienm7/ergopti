@@ -93,6 +93,19 @@ function M.validate(canon)
 			end
 		end
 	end
+	-- The typing burst rule: lists of KeyboardEvent.code names and registry groups.
+	if type(canon.typing_burst) ~= "table" then return nil, "missing [typing_burst]" end
+	for _, key in ipairs({ "ending_groups", "modifier_codes", "neutral_codes" }) do
+		local list = canon.typing_burst[key]
+		if type(list) ~= "table" or #list == 0 then
+			return nil, string.format("[typing_burst].%s must be a non-empty list", key)
+		end
+		for _, value in ipairs(list) do
+			if type(value) ~= "string" or value == "" then
+				return nil, string.format("[typing_burst].%s holds a value that is not a name", key)
+			end
+		end
+	end
 	return canon
 end
 
@@ -336,9 +349,12 @@ function M.menubar_visible(stats, source, tooltip_visible)
 	return (tonumber(stats and stats.wpm) or 0) > 0 or tooltip_visible == true or source ~= "none"
 end
 
---- Whether the floating widget shows after real keyboard activity.
---- A preview is the only exception to pointer and keyboard-idle hiding.
---- @param ctx table { tooltip_visible, now_s, last_input_s, last_mouse_s, idle_hide_s }
+--- Whether the floating widget shows: only during a typing burst (TWD-2,
+--- decided by the maintainer on 2026-11-16). The last text key must be newer than
+--- the last burst end (shortcut, ending key, modifier tapped alone, focus change)
+--- and the last pointer use, and within the idle delay. A preview is the only
+--- exception.
+--- @param ctx table { tooltip_visible, now_s, last_input_s, last_break_s, last_mouse_s, idle_hide_s }
 --- @return boolean
 function M.widget_visible(ctx)
 	if ctx.tooltip_visible == true then return true end
@@ -346,6 +362,7 @@ function M.widget_visible(ctx)
 	if type(input) ~= "number" or input > ctx.now_s then return false end
 	return (ctx.now_s - input) < ctx.idle_hide_s
 		and (ctx.last_mouse_s == nil or ctx.last_mouse_s <= input)
+		and (ctx.last_break_s == nil or ctx.last_break_s < input)
 end
 
 --- The pill's default top-left corner: the screen's bottom-right, inset.

@@ -55,7 +55,8 @@ _WPMZ_ChildSource(Canon, Recovery := false) {
 	Symbols := ["TickElapsed64", "_WPMWidget_TickDelta", "_WPMWidget_NeutralCategory", "_WPMWidget_ResetRolling",
 		"_WPMWidget_Collecting",
 		"WPMWidget_Push", "WPMWidget_Calc", "WPMWidget_Tick", "_WPMWidget_TooltipUp",
-		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex"]
+		"_WPMWidget_HideSurface", "WPMWidget_ResolveBgColor", "_WPMWidget_DarkenHex",
+		"WPMWidget_BurstEnded"]
 	if Recovery {
 		for Symbol in ["_WPMWidget_DiscardSurface", "_WPMWidget_RebuildSurface", "_WPMWidget_ApplySurfaceGeometry",
 			"WPMWidget_ShowPos", "WPMWidget_ResolveGraphColor", "WPMWidget_BuildCompact", "WPMWidget_BuildGraph",

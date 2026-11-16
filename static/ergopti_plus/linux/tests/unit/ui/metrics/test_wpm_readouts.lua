@@ -344,6 +344,72 @@ helpers.describe("wpm readouts: the live speed", function()
 		end)
 	end)
 
+	-- TWD-2, decided by the maintainer on 2026-11-16: the widget shows only while
+	-- text is typed; a shortcut, an arrow, a modifier tapped alone or a focus
+	-- change hides it, as on Windows and macOS. Before, every physical key counted
+	-- as input, so an arrow or Ctrl+C showed « 0 ».
+	helpers.it("(twd2-typing-burst) text shows the widget, a shortcut, arrow, lone modifier or focus change hides it", function()
+		require("tests.support.keystats_native_fixture").with(function(keystats)
+			require("tests.support.metrics_consent_fixture").enable(keystats)
+			local clock = require("core.logger.engine.monotonic")
+			local previous = clock.now_ms
+			local now = 20000
+			clock.now_ms = function() return now end
+			local ok, err = pcall(function()
+				local function visible()
+					local live = keystats.get_live_stats(now)
+					return Model.widget_visible({ last_input_s = live.last_input_time,
+						last_break_s = live.last_break_time, now_s = now / 1000, idle_hide_s = 3 })
+				end
+				-- evdev: 30 = A, 103 = Up, 29 = LeftCtrl, 46 = C, 42 = LeftShift, 14 = Backspace.
+				keystats.record_physical_key("app", 103, now)
+				helpers.assert_true(not visible(), "an arrow alone never shows the widget")
+				now = now + 10
+				keystats.record_physical_key("app", 30, now)
+				keystats.on_keydown("a", now, "app", 30)
+				helpers.assert_true(visible(), "typed text shows it")
+				now = now + 10
+				keystats.record_physical_key("app", 103, now)
+				helpers.assert_true(not visible(), "an arrow hides it")
+				now = now + 10
+				keystats.record_physical_key("app", 30, now)
+				keystats.on_keydown("a", now, "app", 30)
+				now = now + 10
+				keystats.record_physical_key("app", 29, now)
+				helpers.assert_true(visible(), "Ctrl pressed alone hides nothing yet")
+				now = now + 10
+				keystats.record_physical_key("app", 46, now, true)
+				helpers.assert_true(not visible(), "Ctrl+C hides it")
+				keystats.record_physical_release(29)
+				now = now + 10
+				keystats.record_physical_key("app", 42, now)
+				now = now + 10
+				keystats.record_physical_key("app", 30, now)
+				keystats.on_keydown("A", now, "app", 30)
+				keystats.record_physical_release(42)
+				helpers.assert_true(visible(), "a Shift held for a capital keeps the burst")
+				now = now + 10
+				keystats.record_physical_key("app", 14, now)
+				keystats.on_keydown("[BS]", now, "app", 14)
+				helpers.assert_true(visible(), "a Backspace keeps the burst")
+				now = now + 10
+				keystats.record_physical_key("app", 42, now)
+				now = now + 10
+				keystats.record_physical_release(42)
+				helpers.assert_true(not visible(), "a Shift tapped alone hides it")
+				now = now + 10
+				keystats.record_physical_key("app", 30, now)
+				keystats.on_keydown("a", now, "app", 30)
+				helpers.assert_true(visible())
+				now = now + 10
+				keystats.end_typing_burst()
+				helpers.assert_true(not visible(), "a focus change hides it")
+			end)
+			clock.now_ms = previous
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	helpers.it("(wpm-source-parity) real keystats preserves independent holds and the physical clock", function()
 		require("tests.support.keystats_native_fixture").with(function(keystats)
 			require("tests.support.metrics_consent_fixture").enable(keystats)

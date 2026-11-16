@@ -32,6 +32,8 @@ class WPMWidgetConst {
     ; reads) and _shared/core/timing/data/constants.toml. Zero here, never a
     ; copied default: a key missing from the canon keeps the widget off.
     ; [compact]
+    ; [typing_burst]: scan code name ("SC14B") → "ends", "modifier" or "neutral".
+    static BURST              := 0
     static W                  := 0
     static H                  := 0
     static H_NUMBER           := 0
@@ -201,6 +203,13 @@ class WPMWidget {
     ; Idle-hide state: wall clock of the last keyboard event seen by the widget.
     static _last_input_ms := 0
 
+    ; Typing burst (TWD-2): tick of the last burst end (shortcut, ending key,
+    ; modifier tapped alone, focus change), the scan code of a modifier pressed
+    ; with no key since, and the foreground window the last tick saw.
+    static _last_break_ms := 0
+    static _lone_modifier := 0
+    static _last_foreground := 0
+
     ; Last observed cursor position for the fast mouse-watch hide. Seeded in
     ; WPMWidget_Show so the very first poll never fires a spurious hide.
     static _last_mouse_x  := 0
@@ -286,6 +295,7 @@ WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", s
 		WPMWidget._ring_head := Mod(head + 1, cap)
 		WPMWidget._last_tick := now_t
 		WPMWidget._last_input_ms := now_t
+		WPMWidget._lone_modifier := 0
 		WPMWidget._last_hs := is_hs
 		WPMWidget._last_ai := is_ai
 		WPMWidget._last_ac := is_ac
@@ -551,6 +561,25 @@ WPMWidget_PrewarmGraph() {
 }
 
 
+; The typing burst rule (TWD-2, decided by the maintainer on 2026-11-16), the
+; same as macOS and Linux: the widget shows only while text is typed. A key that
+; is not text by itself goes through here; text arrives through WPMWidget_Push.
+; @param Sc {Integer} The key's scan code.
+; @param IsShortcut {Boolean} A Ctrl, Alt or Win chord.
+; @param Now {Integer} A_TickCount of the press.
+WPMWidget_ObserveKey(Sc, IsShortcut, Now := A_TickCount) {
+	if !_WPMWidget_Collecting()
+		return
+	WPMWidget_BurstObserveKey(WPMWidget, WPMWidget_BurstRole(WPMWidgetConst.BURST, Sc), Sc, IsShortcut, Now)
+}
+
+; A modifier released with no other key since its press ends the burst.
+; @param Sc {Integer} The released key's scan code.
+; @param Now {Integer} A_TickCount of the release.
+WPMWidget_ObserveKeyUp(Sc, Now := A_TickCount) {
+	WPMWidget_BurstObserveKeyUp(WPMWidget, Sc, Now)
+}
+
 ; Clears the rolling WPM state (keystroke ring, history, input/category
 ; timestamps). Called by WPMWidget_Show so keystrokes typed during boot/reload --
 ; before the widget surface is armed -- cannot trigger an immediate reveal: the
@@ -565,6 +594,9 @@ _WPMWidget_ResetRolling() {
     }
     WPMWidget._graph_hist    := []
     WPMWidget._last_input_ms := 0
+    WPMWidget._last_break_ms := 0
+    WPMWidget._lone_modifier := 0
+    WPMWidget._last_foreground := 0
     WPMWidget._last_hs_tick  := 0
     WPMWidget._last_ai_tick  := 0
     WPMWidget._last_ac_tick  := 0
@@ -742,6 +774,12 @@ WPMWidget_Tick() {
         last_ai := WPMWidget._last_ai_tick
         last_ac := WPMWidget._last_ac_tick
         last_input := WPMWidget._last_input_ms
+        ; A focus change ends the typing burst, as on macOS and Linux.
+        Foreground := DllCall("GetForegroundWindow", "Ptr")
+        if WPMWidget._last_foreground != 0 && Foreground != WPMWidget._last_foreground
+            WPMWidget._last_break_ms := now
+        WPMWidget._last_foreground := Foreground
+        last_break := WPMWidget._last_break_ms
     } finally {
         Critical(StampCritical)
     }
@@ -765,7 +803,8 @@ WPMWidget_Tick() {
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
     mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
     should_show   := _WPMWidget_TooltipUp()
-        || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
+        || (!keyboard_idle && !mouse_active && !WPMWidget_BurstEnded(last_input, last_break)
+            && ((wpm > 0) || has_hs || has_ai || has_ac))
     gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
     if !should_show {
         if gui_ref

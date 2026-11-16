@@ -980,8 +980,14 @@ local function ingest_keydown(ch, timestamp_ms, app_id, scancode)
 	if Metrics and not is_correction then
 		Metrics.on_keydown(ch, timestamp_ms)
 	end
-	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+	-- Only text starts or keeps a typing burst (TWD-2): a correction, a new line
+	-- or a Tab is neutral, as on Windows, which pushes characters only.
+	if not is_correction and type(ch) == "string" and ch ~= "" and ch ~= "\n" and ch ~= "\r" and ch ~= "\t"
+		and type(timestamp_ms) == "number" then
 		LiveWpm.record_input(_live, timestamp_ms)
+	elseif type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		-- A correction, a new line or a Tab keeps a live burst going (TWD-2).
+		LiveWpm.observe_key(_live, "neutral", nil, false, timestamp_ms)
 	end
 	if not is_correction and type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
 		LiveWpm.record(_live, 1, timestamp_ms)
@@ -1177,17 +1183,36 @@ end
 --- @param app_id string|nil Focused application identifier.
 --- @param scancode number Linux evdev key code.
 --- @param timestamp_ms number Event time in ms.
-function M.record_physical_key(app_id, scancode, timestamp_ms)
+--- @param shortcut boolean|nil A Ctrl, Alt or Super chord: it ends the typing burst.
+function M.record_physical_key(app_id, scancode, timestamp_ms, shortcut)
 	if not may_record() then return end
 	if type(scancode) ~= "number" or scancode <= 0 then return end
 	-- The history stamp is rounded; pointer activity uses this same precise clock.
-	LiveWpm.record_input(_live, Monotonic.now_ms())
+	-- A physical key alone never starts a typing burst: text does (ingest_keydown).
+	-- The typing burst rule (TWD-2): evdev code → role from the shared files.
+	local index, index_err, first_failure = require("metrics.engine.wpm.typing_keys").native_index("evdev")
+	if first_failure then
+		Logger.error(LOG, "Typing burst keys unreadable (%s): no key ends a burst until a reload.", tostring(index_err))
+	end
+	LiveWpm.observe_key(_live, index and index[scancode] or nil, scancode, shortcut == true, Monotonic.now_ms())
 	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
 	local live, dated = app_pair(resolved_app, timestamp_ms)
 	local code = math.floor(scancode)
 	for _, app in ipairs({ live, dated }) do
 		app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
 	end
+end
+
+--- Records one physical key release: a modifier tapped alone ends the burst.
+--- @param scancode number Linux evdev key code.
+function M.record_physical_release(scancode)
+	if not may_record() or type(scancode) ~= "number" then return end
+	LiveWpm.observe_release(_live, scancode, Monotonic.now_ms())
+end
+
+--- Ends the typing burst: the focus moved to another window.
+function M.end_typing_burst()
+	LiveWpm.record_break(_live, Monotonic.now_ms())
 end
 
 ensure_pending = function(app_id, clock, after_exclusion)

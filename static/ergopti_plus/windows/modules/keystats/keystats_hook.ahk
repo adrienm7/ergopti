@@ -922,6 +922,10 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 		try Intent.shortcut := IsSet(ShortcutFn)
 			? ShortcutFn.Call(vk, sc) : KL_Watchers_DetectShortcut(vk, sc)
 		Intent.activity := Intent.shortcut != "" || KLHOOK_SPECIAL.Has(vk)
+		; The speed widget's typing burst: a physical shortcut or ending key ends it
+		; (TWD-2); the driver's own output (a hotstring's {Left}) does not.
+		if !Intent.synth_active
+			try WPMWidget_ObserveKey(sc, Intent.shortcut != "", Intent.tick)
 		if Intent.activity {
 			try Intent.filtered := HasMethod(Intent.filter_fn, "Call")
 				? Intent.filter_fn.Call() : MF_ShouldFilter()
@@ -945,6 +949,8 @@ KL_Hook_OnKeyDown(ih, vk, sc, FilterFn := unset, NowTick := unset, ShortcutFn :=
 
 ; A released key cannot authorize dropping a later standalone LF/Tab payload.
 KL_Hook_OnKeyUp(ih, vk, sc) {
+	; A modifier tapped alone ends the speed widget's typing burst (TWD-2).
+	try WPMWidget_ObserveKeyUp(sc)
 	PreviousCritical := Critical("On")
 	try {
 		Echo := KLHook.control_char_echo

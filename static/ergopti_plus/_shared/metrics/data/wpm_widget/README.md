@@ -13,9 +13,9 @@ Refresh rates, the colour hold and the idle hide are timings, and live in
 
 ## Key files
 
-| File             | Description                                                                |
-| ---------------- | -------------------------------------------------------------------------- |
-| `constants.toml` | Pill and graph geometry, colours, neutral sources, opacity, menu bar style |
+| File             | Description                                                                                   |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| `constants.toml` | Pill and graph geometry, colours, neutral sources, opacity, menu bar style, typing burst keys |
 
 ## Driver implementations
 
@@ -30,3 +30,10 @@ source, the graph's curve, when to show, the default place — in
 `_shared/metrics/engine/wpm_widget_model.lua`, and the live speed in
 `_shared/metrics/engine/wpm/live_wpm.lua` (Linux; macOS keeps its keystats's own
 buffers over the same timings).
+
+The widget shows only while text is typed (`[typing_burst]`, decided by the
+maintainer on 2026-11-16): the keys that end a burst, the modifiers and the
+neutral keys are named by `KeyboardEvent.code` and mapped to each driver's codes
+through `_shared/layouts/data/keycodes/physical_keys.json`
+(`_shared/metrics/engine/wpm/typing_keys.lua` on macOS and Linux,
+`WPMWidget_TypingBurstIndex` on Windows).

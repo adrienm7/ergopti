@@ -1951,7 +1951,13 @@ local function main()
 	-- from disappearing and avoids a printable-key double count.
 	local capture_owned_scancodes = {}
 	local function handle_physical(scancode, _key_name, _char, value, source)
-		if value ~= InputEvent.VALUE_DOWN then return end
+		if value ~= InputEvent.VALUE_DOWN then
+			-- A modifier tapped alone ends the typing burst (TWD-2).
+			if value == InputEvent.VALUE_UP and not script_actions.is_paused() then
+				keystats.record_physical_release(scancode)
+			end
+			return
+		end
 		TapHold.observe_copy_activity()
 		-- Any key press ends a gesture's click hold, as on Windows.
 		if gestures then gestures.release_clicks_on_activity() end
@@ -1974,7 +1980,10 @@ local function main()
 			keystats.record_media_press(app_id, scancode, keyboard_hook.source_device_identity(source))
 			return
 		end
-		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()))
+		-- A Ctrl, Alt or Super chord ends the typing burst; AltGr types text (TWD-2).
+		local held = keyboard_hook.held_modifiers()
+		local shortcut = (held.ctrl or held.alt or held.meta) and true or false
+		keystats.record_physical_key(app_id, scancode, math.floor(Monotonic.now_ms()), shortcut)
 	end
 	local on_physical = input_capture_gate.guard(handle_physical,
 		function(scancode, _key_name, _char, value)
@@ -3434,6 +3443,8 @@ local function main()
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
 			keystats.discard_roi()
 			wrap_on_type.end_selection_window()
+			-- A focus change ends the typing burst: the speed widget hides (TWD-2).
+			keystats.end_typing_burst()
 			keystats.observe_hold_focus(appName)
 			keystats.set_private_window(keystats.is_private_window(windowTitle))
 			-- A focus change moves the caret to a different text context. The matcher

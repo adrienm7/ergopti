@@ -89,4 +89,55 @@ helpers.describe("keystats WPM activity", function()
 		helpers.assert_eq(#fixture.keystats.get_live_stats().source_holds, 0, "resuming cannot revive old colour")
 		helpers.assert_true(fixture.keystats.stop())
 	end)
+
+	-- TWD-2, decided by the maintainer on 2026-11-16: the widget shows only while
+	-- text is typed. Before, every keyDown and every modifier press counted as
+	-- input, so an arrow or Cmd+C showed « 0 ».
+	helpers.it("(twd2-typing-burst) text shows the widget, a shortcut, arrow or lone modifier hides it", function()
+		local fixture = fixtures.load_keystats()
+		fixture.hs.caffeinate = { watcher = { new = function()
+			return { start = function(self) return self end, stop = function(self) return self end }
+		end } }
+		fixture.start()
+		local now = 20000
+		fixture.hs.timer.absoluteTime = function() return now * 1000000 end
+		package.loaded["modules.keystats.log_manager"].append_log = function() return true end
+		local types = fixture.hs.eventtap.event.types
+		local function key(keycode, characters, flags, kind)
+			local event = fixtures.physical_key(fixture.hs, "a")
+			function event:getType() return kind or types.keyDown end
+			function event:getKeyCode() return keycode end
+			function event:getFlags() return flags or {} end
+			function event:getCharacters() return characters end
+			return event
+		end
+		local function visible()
+			local live = fixture.keystats.get_live_stats()
+			return Model.widget_visible({ last_input_s = live.last_input_time,
+				last_break_s = live.last_break_time, now_s = now / 1000, idle_hide_s = 3 })
+		end
+		local function step(event) now = now + 10; fixture.dispatch(event) end
+		-- macOS key codes: 0 = A, 123 = Left, 55 = Left Cmd, 8 = C, 56 = Left Shift.
+		step(key(123, ""))
+		helpers.assert_true(not visible(), "an arrow alone never shows the widget")
+		step(key(0, "a"))
+		helpers.assert_true(visible(), "typed text shows it")
+		step(key(123, ""))
+		helpers.assert_true(not visible(), "an arrow hides it")
+		step(key(0, "a"))
+		step(key(55, "", { cmd = true }, types.flagsChanged))
+		helpers.assert_true(visible(), "Cmd pressed alone hides nothing yet")
+		step(key(8, "c", { cmd = true }))
+		helpers.assert_true(not visible(), "Cmd+C hides it")
+		step(key(55, "", {}, types.flagsChanged))
+		step(key(56, "", { shift = true }, types.flagsChanged))
+		step(key(0, "A", { shift = true }))
+		step(key(56, "", {}, types.flagsChanged))
+		helpers.assert_true(visible(), "a Shift held for a capital keeps the burst")
+		step(key(56, "", { shift = true }, types.flagsChanged))
+		step(key(56, "", {}, types.flagsChanged))
+		helpers.assert_true(not visible(), "a Shift tapped alone hides it")
+		fixture.drain()
+		helpers.assert_true(fixture.keystats.stop())
+	end)
 end)

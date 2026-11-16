@@ -210,3 +210,31 @@ alpha_active = 220
 
 # Opacity of the pill when it is idle (0-255).
 alpha_idle = 140
+
+
+# ===============================
+# ===============================
+# ======= 8/ Typing burst =======
+# ===============================
+# ===============================
+
+# The widget shows only while text is being typed (maintainer, 2026-11-16, TWD-2).
+# A text key shows or updates it; a shortcut, a key of an ending group, a modifier
+# tapped alone, a click or a focus change ends the burst and hides it at once.
+# Keys are named by their KeyboardEvent.code in
+# _shared/layouts/data/keycodes/physical_keys.json, which maps them to each
+# driver's native code.
+[typing_burst]
+
+# physical_keys.json groups whose keys end a burst (Escape, F-keys, arrows,
+# Home, End, Page Up/Down, Insert, Delete, media keys).
+ending_groups = ["function", "navigation", "media"]
+
+# Modifiers: pressed they neither show nor hide the widget (a held Shift types
+# capitals); tapped alone, with no other key between press and release, they end
+# the burst.
+modifier_codes = ["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"]
+
+# Keys that edit or lay out text without being text: they keep a burst going but
+# never start one.
+neutral_codes = ["Backspace", "Enter", "NumpadEnter", "Tab", "CapsLock"]
