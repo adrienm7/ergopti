@@ -183,7 +183,7 @@ const ALLOWED = {
 			reason: "printf '%b' operand: backslashes and NUL are escaped before the quote"
 		}
 	},
-	'linux/adapters/desktop_opener_worker.lua': {
+	'linux/apps/adapters/desktop_opener_worker.lua': {
 		basename: {
 			count: 1,
 			reason: 'arg[0] has its backslashes rewritten to "/" first, which native_path never does'

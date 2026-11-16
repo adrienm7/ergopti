@@ -23,7 +23,7 @@ return function(run)
 			if key == "HOME" then return state.home end
 			return original_getenv(key)
 		end
-		helpers.with_fresh_modules({ "infra.app_picker", "core.process.adapters.shell_runner",
+		helpers.with_fresh_modules({ "apps.engine.picker", "core.process.adapters.shell_runner",
 			"core.fs.adapters.file_system", "core.logger.engine.logger", "core.i18n.engine.i18n", "core.text.engine.utils", "core.timing.engine.deferred_work" }, function()
 			package.loaded["core.timing.engine.deferred_work"] = { after = function(_, callback)
 				state.deferred[#state.deferred + 1] = callback
@@ -79,7 +79,7 @@ return function(run)
 					return chooser
 				end },
 			}
-			local picker = require("infra.app_picker")
+			local picker = require("apps.engine.picker")
 			run(picker, state)
 		end)
 	end, debug.traceback)

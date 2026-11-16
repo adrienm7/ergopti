@@ -26,7 +26,7 @@ local function fresh_apps()
 		"modules.shortcuts.actions.apps",
 		"core.events.timer_scheduler",
 		"core.process.adapters.shell_runner",
-		"adapters.app_launcher",
+		"apps.adapters.launcher",
 		"platform.focus.window_info",
 		"platform.focus.window_manager",
 		"platform.input.synthetic_input",
@@ -252,7 +252,7 @@ local function fresh_apps()
 			return start_shell("applescript", script, callback)
 		end,
 	}
-	package.loaded["adapters.app_launcher"] = {
+	package.loaded["apps.adapters.launcher"] = {
 		launch = function(name)
 			fixture.launched[#fixture.launched + 1] = name
 			return fixture.launch_result

@@ -189,9 +189,9 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 	end)
 
 	helpers.it("picks an open_app application in the desktop-entry chooser, never a text prompt", function()
-		local prior_chooser = package.loaded["ui.app_chooser"]
+		local prior_chooser = package.loaded["apps.ui.chooser"]
 		local chooser_titles = {}
-		package.loaded["ui.app_chooser"] = {
+		package.loaded["apps.ui.chooser"] = {
 			pick = function(shell, title)
 				helpers.assert_eq(type(shell.exec_line), "function", "the chooser runs through the shell runner")
 				chooser_titles[#chooser_titles + 1] = title
@@ -206,7 +206,7 @@ helpers.describe("shortcuts menu: dispatched by id", function()
 				helpers.assert_eq(scene.events[#scene.events], "assign:primary_k:open_app")
 			end)
 		end)
-		package.loaded["ui.app_chooser"] = prior_chooser
+		package.loaded["apps.ui.chooser"] = prior_chooser
 		if not ok then error(err, 0) end
 	end)
 

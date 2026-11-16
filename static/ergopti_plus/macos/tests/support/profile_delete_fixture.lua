@@ -21,7 +21,7 @@ local MODULES = {
 	-- The timer scheduler admits delays through this pure owner.
 	"core.text.engine.number_policy",
 	"keyboard.engine.chord",
-	"infra.app_picker",
+	"apps.engine.picker",
 	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",

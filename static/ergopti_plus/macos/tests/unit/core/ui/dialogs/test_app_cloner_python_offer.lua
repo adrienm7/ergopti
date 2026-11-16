@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: App Cloner Python Offer Tests
 --- DESCRIPTION:
---- Pins ui/app_cloner_python_offer.lua: an installed managed PyObjC opens App
+--- Pins apps/ui/cloner_python_offer.lua: an installed managed PyObjC opens App
 --- Cloner with its link at once; otherwise nothing installs before « Install »,
 --- a success opens App Cloner with the link, and a decline or a failure still
 --- opens it without one, the failure reported first.
@@ -16,7 +16,7 @@
 local helpers = require("tests.helpers")
 
 local STUBBED = { "core.i18n.engine.i18n", "core.ui.engine.dialog_util", "core.timing.engine.deferred_work", "core.ui.engine.notifications",
-	"ui.app_cloner_python_offer" }
+	"apps.ui.cloner_python_offer" }
 local ORIGINALS = {}
 for _, name in ipairs(STUBBED) do ORIGINALS[name] = package.loaded[name] end
 
@@ -46,8 +46,8 @@ local function load(answer)
 	}
 	package.loaded["core.timing.engine.deferred_work"] = { after = function(_, fn) fn(); return true end }
 	package.loaded["core.ui.engine.notifications"] = { notify = function() world.notices = world.notices + 1 end }
-	package.loaded["ui.app_cloner_python_offer"] = nil
-	return require("ui.app_cloner_python_offer"), world
+	package.loaded["apps.ui.cloner_python_offer"] = nil
+	return require("apps.ui.cloner_python_offer"), world
 end
 
 --- An owner double.

@@ -35,7 +35,7 @@
 _MetaCheckI18nFallbackDeferred() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 
-	I18n := _DriverDirsConcat("infra", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
+	I18n := _DriverDirsConcat("infra", "apps/engine", "ai/engine", "tray", "menu/engine", "settings/engine", "platform/input", "core/ui/engine", "core/timing/engine", "core/text/engine", "core/network/engine", "core/logger/engine", "core/lifecycle/engine", "core/i18n/engine", "core/fs/engine")
 	Assert(I18n != "", "core\i18n\engine\i18n.ahk must be readable")
 
 	; The boot preload must load the active locale only, with a separate warmer and

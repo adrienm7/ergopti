@@ -3,8 +3,8 @@
 --- ==============================================================================
 --- MODULE: Applications > Encryptor On A Real X11 Desktop
 --- DESCRIPTION:
---- Clicks the tray row (ui/bundled_apps.lua rows(), the provider of
---- Applications in ui/menu/menu_apps.lua) and answers the real dialogs of the
+--- Clicks the tray row (apps/ui/bundled_apps.lua rows(), the provider of
+--- Applications in apps/ui/menu/apps.lua) and answers the real dialogs of the
 --- spawned apps/encryptor.lua child through the session keyboard (xdotool):
 --- 1. The row starts the child and writes the desktop entry and its launcher,
 ---    the Linux drop target.
@@ -124,7 +124,7 @@ local function run()
 	file:write(PLAIN)
 	file:close()
 	-- The chooser starts in the session's home: the proof gives the full path.
-	local BundledApps = require("ui.bundled_apps")
+	local BundledApps = require("apps.ui.bundled_apps")
 	local row
 	for _, candidate in ipairs(BundledApps.rows()) do
 		if candidate.label:find("^Encryptor") then row = candidate end

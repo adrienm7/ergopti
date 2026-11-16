@@ -41,7 +41,7 @@ local MODULES = {
 	"core.i18n.engine.i18n",
 	"core.ui.engine.dialog_util",
 	"ui.menu.shortcut_utils",
-	"infra.app_picker",
+	"apps.engine.picker",
 	"menu.engine.manifest_menu",
 	"settings.engine.preferences.preferences",
 }
@@ -329,7 +329,7 @@ local function with_fixture(options, callback)
 		prompt_shortcut = function() return true end,
 	}
 	local app_change = nil
-	package.loaded["infra.app_picker"] = {
+	package.loaded["apps.engine.picker"] = {
 		build_menu = function(_, on_change)
 			app_change = on_change
 			return {}

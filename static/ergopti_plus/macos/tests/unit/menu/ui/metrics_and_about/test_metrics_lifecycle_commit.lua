@@ -32,7 +32,7 @@ local function load_menu(start_result)
 		revoke_roi_text = function() ctx.revocations = ctx.revocations + 1 end,
 		set_disabled_apps = function() end,
 	}, { __index = function() return function() end end })
-	package.loaded["infra.app_picker"] = { build_menu = function() return {} end }
+	package.loaded["apps.engine.picker"] = { build_menu = function() return {} end }
 	package.loaded["core.ui.engine.dialog_util"] = {
 		block_alert = function(_, body) ctx.alerts[#ctx.alerts + 1] = body; return "button.activate" end,
 	}

@@ -98,7 +98,7 @@ Each `.spec.js` file exports:
 | NetworkInfo         | `core/network/adapters/info.ahk`           | `core/network/adapters/info.lua`           |
 | WindowInfo          | `platform/focus/window_info.ahk`           | `platform/focus/window_info.lua`           |
 | WindowManager       | `platform/focus/window_manager.ahk`        | `platform/focus/window_manager.lua`        |
-| AppLauncher         | `adapters/app_launcher.ahk`                | `adapters/app_launcher.lua`                |
+| AppLauncher         | `apps/adapters/launcher.ahk`               | `apps/adapters/launcher.lua`               |
 | Crypto              | `adapters/crypto.ahk`                      | `adapters/crypto.lua`                      |
 | GraphicsRenderer    | `core/ui/adapters/graphics_renderer.ahk`   | `core/ui/adapters/graphics_renderer.lua`   |
 

@@ -149,7 +149,7 @@ const OPENS_SUBMENU = {
 		menu: 'apps_empty_rows',
 		platforms: ['hs'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
+		native_sources: { hs: 'macos/apps/ui/menu/apps.lua' }
 	},
 	system_gesture_status: [
 		{

@@ -5,11 +5,11 @@ local helpers = require("tests.helpers")
 
 helpers.describe("application launch with arguments", function()
 	helpers.it("keeps the actual task runner's child pinned until completion", function()
-		helpers.with_stub_scope({ "adapters.app_launcher", "core.process.adapters.shell_runner" }, function()
+		helpers.with_stub_scope({ "apps.adapters.launcher", "core.process.adapters.shell_runner" }, function()
 			package.loaded["core.process.adapters.shell_runner"] = nil
 			local callback, task
 			local env = { HOME = "/tmp", PATH = "/usr/bin:/bin" }
-			local launcher = helpers.load_with_stubs("adapters.app_launcher", {
+			local launcher = helpers.load_with_stubs("apps.adapters.launcher", {
 				task = { new = function(_, done)
 					callback = done
 					task = {
@@ -29,13 +29,13 @@ helpers.describe("application launch with arguments", function()
 	end)
 
 	helpers.it("dispatches asynchronously without a shell", function()
-		helpers.with_stub_scope({ "adapters.app_launcher", "core.process.adapters.shell_runner" }, function()
+		helpers.with_stub_scope({ "apps.adapters.launcher", "core.process.adapters.shell_runner" }, function()
 			local seen, started, sync_calls = nil, 0, 0
 			package.loaded["core.process.adapters.shell_runner"] = { spawn = function(path, args)
 				seen = { path = path, args = args }
 				return { start = function() started = started + 1; return true end }
 			end }
-			local launcher = helpers.load_with_stubs("adapters.app_launcher", {
+			local launcher = helpers.load_with_stubs("apps.adapters.launcher", {
 				execute = function() sync_calls = sync_calls + 1; return "", true, "exit", 0 end,
 			})
 			launcher.launchWithArgs("/Applications/My App.app", { "a; b", "$HOME", "" })

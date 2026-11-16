@@ -108,7 +108,7 @@ global _DYNAMIC_HOTSTRINGS_ORDER := _MR_DynamicHotstringsOrder()
 #Include builder/submenus.ahk
 #Include ../../ui/menu/menu_shortcuts.ahk
 #Include ../../ui/menu/menu_taphold.ahk
-#Include ../../ui/menu/menu_apps.ahk
+#Include ../../apps/ui/menu/apps.ahk
 #Include builder/menu_init.ahk
 #Include builder/actions.ahk
 #Include ../../ui/log_openers.ahk

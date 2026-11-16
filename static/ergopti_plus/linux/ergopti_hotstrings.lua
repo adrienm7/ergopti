@@ -496,7 +496,7 @@ local shutdown = ShutdownCoordinator.new({
 				return function()
 					if not resolved then
 						resolved = true
-						opener = package.loaded["adapters.desktop_opener"]
+						opener = package.loaded["apps.adapters.desktop_opener"]
 						stop = opener and opener.shutdown
 					end
 					return not opener or (type(stop) == "function" and stop() == true)

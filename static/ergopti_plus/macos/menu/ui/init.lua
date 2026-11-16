@@ -111,7 +111,7 @@ local menu_mods = _branch_rows.wrap({
 	llm             = safe_require("ai.ui.menu",             "AI menu"),
 	keystats       = safe_require("ui.menu.menu_metrics",         "metrics menu"),
 	tap_holds       = safe_require("ui.menu.menu_tap_holds",    "tap-holds menu"),
-	apps            = safe_require("ui.menu.menu_apps",            "apps menu"),
+	apps            = safe_require("apps.ui.menu.apps",            "apps menu"),
 	about           = safe_require("ui.menu.menu_about",           "about/update menu"),
 })
 

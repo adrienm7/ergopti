@@ -130,7 +130,7 @@ end
 --- Opens a path or URL on the desktop, logging a refusal or a failed launch.
 --- @param target string
 local function open_on_desktop(target)
-	local request, reason = require("adapters.desktop_opener").open(target, function(result)
+	local request, reason = require("apps.adapters.desktop_opener").open(target, function(result)
 		if result.ok ~= true then
 			require("core.logger.engine.shim").error(LOG, "Desktop open of %s failed (%s).",
 				target, tostring(result.error or result.code))

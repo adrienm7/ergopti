@@ -12,7 +12,7 @@ local helpers = require("tests.helpers")
 
 local OWNED = {
 	"ai.ui.menu.panels.agent_panel", "ai.engine.agent.runner", "ai.engine.agent.connectors",
-	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "infra.app_picker", "menu.engine.manifest_menu", "ai.engine.api.remote",
+	"core.ui.engine.dialog_util", "core.ui.ui.tooltip", "apps.engine.picker", "menu.engine.manifest_menu", "ai.engine.api.remote",
 	"core.logger.engine.logger", "core.i18n.engine.locale", "ai.engine.api.ollama", "ai.engine.ollama.local_model_offer",
 	"ai.engine.local_servers.local_servers", "ai.ui.menu.panels.local_server_panel",
 }
@@ -57,7 +57,7 @@ local function with_panel(state, scenario, language)
 		package.loaded["core.ui.ui.tooltip"] = {
 			show = function(text) world.notices[#world.notices + 1] = text; return true end,
 		}
-		package.loaded["infra.app_picker"] = {
+		package.loaded["apps.engine.picker"] = {
 			build_menu = function(apps, on_change, placeholder)
 				world.pickers[#world.pickers + 1] = { apps = apps, on_change = on_change, placeholder = placeholder }
 				return { { label = "picker-row", action = function() end } }

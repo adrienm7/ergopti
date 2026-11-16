@@ -12,7 +12,7 @@ local MetricsState = require("infra.metrics_state_keys")
 
 local MODULES = {
 	"hs.fs",
-	"infra.app_picker",
+	"apps.engine.picker",
 	"core.ui.engine.dialog_util",
 	"core.i18n.engine.i18n",
 	"core.logger.engine.logger",
@@ -90,7 +90,7 @@ local function with_filter(filter, options, callback)
 
 	local captured_commands
 	package.loaded["hs.fs"] = {}
-	package.loaded["infra.app_picker"] = { build_menu = function(_, on_change)
+	package.loaded["apps.engine.picker"] = { build_menu = function(_, on_change)
 		observations.change_apps = on_change
 		return {}
 	end }

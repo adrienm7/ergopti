@@ -11,9 +11,9 @@
 return {
 	"tests.unit.menu.hotstrings.test_section_order",
 	"tests.unit.menu.hotstrings.test_section_order_persistence",
-	"tests.unit.ui.bundled_apps.test_bundled_apps_launcher",
-	"tests.unit.ui.bundled_apps.test_app_cloner_core",
-	"tests.unit.ui.bundled_apps.test_encryptor_core",
+	"tests.unit.apps.test_bundled_apps_launcher",
+	"tests.unit.apps.test_cloner_core",
+	"tests.unit.apps.test_encryptor_core",
 	"tests.unit.modules.keystats.storage.test_metrics_ledger",
 	"tests.unit.modules.keystats.storage.test_ledger_import",
 	"tests.unit.modules.keystats.core.test_network_metrics",

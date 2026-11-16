@@ -38,7 +38,7 @@ const LINUX_MENU_ROOT = 'linux/menu/ui/builder/builder.lua';
 const PART_MODULES = new Set([
 	'ui.menu.menu_about',
 	'ai.ui.menu.agent',
-	'ui.menu.menu_apps',
+	'apps.ui.menu.apps',
 	'settings.ui.menu.configuration',
 	'ui.menu.menu_debug',
 	'menu.ui.builder.dialogs',

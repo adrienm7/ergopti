@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 local function with_apps(callback)
 	local previous_hs = _G.hs
 	local ok, err = xpcall(function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.logger.engine.logger", "core.fs.engine.paths", "core.fs.engine.dir",
+		helpers.with_stub_scope({ "apps.ui.menu.apps", "core.logger.engine.logger", "core.fs.engine.paths", "core.fs.engine.dir",
 			"core.i18n.engine.i18n", "menu.engine.manifest_menu", "core.process.adapters.task_lifecycle", "core.text.engine.utils",
 			"core.fs.adapters.json_codec", "menu.engine.renderer", "core.logger.engine.shim" }, function()
 			local state = { calls = {}, warnings = {}, images = {}, app_scans = 0,
@@ -54,7 +54,7 @@ local function with_apps(callback)
 				start = function() return state.start ~= false end,
 				terminate = function() state.terminations = (state.terminations or 0) + 1; return true end,
 			}
-			local module = helpers.load_with_stubs("ui.menu.menu_apps", {
+			local module = helpers.load_with_stubs("apps.ui.menu.apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
 				application = { infoForBundlePath = function() return state.metadata or {} end },
 				image = { imageFromPath = function(path)
@@ -275,7 +275,7 @@ local function with_native_apps_parent(language, body)
 	for name, value in pairs(package.loaded) do previous[name] = value end
 	local native, owner, receipt, acquired, scratch
 	local result, detail = xpcall(function()
-		for _, name in ipairs({ "ui.menu.menu_apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
+		for _, name in ipairs({ "apps.ui.menu.apps", "core.i18n.engine.i18n", "core.i18n.engine.locale", "core.i18n.engine.core",
 			"menu.engine.manifest_menu", "settings.engine.paths", "core.fs.engine.paths", "core.fs.adapters.json_codec", "menu.engine.renderer",
 			"core.process.adapters.task_lifecycle", "core.text.engine.utils", "core.fs.engine.dir" }) do
 			package.loaded[name] = nil
@@ -328,7 +328,7 @@ local function with_native_apps_parent(language, body)
 			state.finished = finished
 			return finished
 		end
-		local module = require("ui.menu.menu_apps")
+		local module = require("apps.ui.menu.apps")
 		body(module, renderer, state, { base_dir = "/virtual/Apps" }, native)
 	end, debug.traceback)
 	local restored, released, forgotten = true, true, true
@@ -492,7 +492,7 @@ helpers.describe("Apps native locale cohort restoration", function()
 	for _, raises in ipairs({ false, true }) do
 		helpers.it("(apps-parent-native) restores a genuine French predecessor after " .. (raises and "raise" or "success"), function()
 			with_native_apps_parent("fr", function(_, renderer, _, _, native)
-				local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "menu.engine.manifest_menu", "ui.menu.menu_apps" }
+				local names = { "core.i18n.engine.i18n", "core.i18n.engine.locale", "menu.engine.manifest_menu", "apps.ui.menu.apps" }
 				local prior = {}
 				for _, name in ipairs(names) do prior[name] = rawget(package.loaded, name) end
 				local ok, message = pcall(function()
@@ -530,9 +530,9 @@ helpers.describe("Apps final logger publication fence", function()
 						return get_root()
 					end
 					-- Capture the actual current export in the real Apps constructor.
-					package.loaded["ui.menu.menu_apps"] = nil
+					package.loaded["apps.ui.menu.apps"] = nil
 				end
-				local module = require("ui.menu.menu_apps")
+				local module = require("apps.ui.menu.apps")
 				logger.done = function(...)
 					if select(2, ...) == "Applications submenu built (%d item(s))." then
 						final_calls = final_calls + 1

@@ -225,7 +225,7 @@ REQUIRED_FILES=(
 	"linux/bin/ergopti-proxy-relay"
 	"linux/ergopti_hotstrings.lua"
 	"linux/apps/encryptor.lua"
-	"linux/apps/app_cloner.lua"
+	"linux/apps/cloner.lua"
 	"_shared/apps/data/encryptor/format.json"
 	"_shared/apps/data/app_cloner/families.json"
 	"linux/modules/hotstrings/engine.lua"

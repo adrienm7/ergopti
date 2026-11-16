@@ -5,7 +5,7 @@ local helpers = require("tests.helpers")
 helpers.describe("application bundle launch", function()
 	helpers.it("does not relaunch by bundle after a successful name launch", function()
 		local bundle_calls = 0
-		local launcher = helpers.load_with_stubs("adapters.app_launcher", {
+		local launcher = helpers.load_with_stubs("apps.adapters.launcher", {
 			application = {
 				launchOrFocus = function() return true end,
 				launchOrFocusByBundleID = function() bundle_calls = bundle_calls + 1; return true end,
@@ -17,7 +17,7 @@ helpers.describe("application bundle launch", function()
 
 	helpers.it("falls back to the native bundle lookup after name refusal", function()
 		local names, bundles = {}, {}
-		local launcher = helpers.load_with_stubs("adapters.app_launcher", {
+		local launcher = helpers.load_with_stubs("apps.adapters.launcher", {
 			application = {
 				launchOrFocus = function(name) names[#names + 1] = name; return false end,
 				launchOrFocusByBundleID = function(id) bundles[#bundles + 1] = id; return id == "com.example.app" end,

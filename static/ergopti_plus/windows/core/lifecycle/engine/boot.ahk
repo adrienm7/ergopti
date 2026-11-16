@@ -71,7 +71,7 @@ ConfigTransitionRecoverAtBootOrThrow(_PathsFile)
 global _PathsOverrides := ReadPathsToml(_PathsFile)
 
 ; ConfigDirPath is the single relocatable folder that holds all personal files.
-; Defaults to %LOCALAPPDATA%\Ergopti\config\ (infra/app_folders.ahk); must end
+; Defaults to %LOCALAPPDATA%\Ergopti\config\ (apps/engine/folders.ahk); must end
 ; with a backslash.
 global _DefaultConfigDir := (_DriverStartupSmokeDir != "")
 		? (_DriverStartupSmokeDir . "\config\")

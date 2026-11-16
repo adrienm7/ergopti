@@ -16,7 +16,7 @@
 local M = {}
 
 local llm_mod      = require("ai.engine")
-local AppPickerLib = require("infra.app_picker")
+local AppPickerLib = require("apps.engine.picker")
 local i18n         = require("core.i18n.engine.i18n")
 local ManifestMenu = require("menu.engine.manifest_menu")
 local Logger       = require("core.logger.engine.logger")

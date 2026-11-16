@@ -504,7 +504,7 @@ end)
 -- AppLauncher vectors (AppLauncher.spec.js). launch() is stubbed here (hs is
 -- mocked) so no real process is spawned; the AHK twin only tests isRunning.
 helpers.describe("Adapter contract vectors: AppLauncher", function()
-	local adapter = helpers.load_with_stubs("adapters.app_launcher")
+	local adapter = helpers.load_with_stubs("apps.adapters.launcher")
 
 	helpers.it("isRunning returns false for an unknown process (is_running_unknown_process_returns_false)", function()
 		helpers.assert_eq(false, adapter.isRunning("ergopti_nonexistent_proc_xyz"), "isRunning(unknown) must be false")

@@ -149,7 +149,7 @@
 		},
 		{
 			"driver": "macos",
-			"source": "static/ergopti_plus/macos/infra/app_picker.lua",
+			"source": "static/ergopti_plus/macos/apps/engine/picker.lua",
 			"template": "Application exclusion menu built successfully (%d excluded app(s), %.1f ms).",
 			"line": "2026-10-30 10:00:00:123 [INFO] [app_picker] Application exclusion menu built successfully (0 excluded app(s), 14.2 ms).",
 			"expect": {

@@ -161,7 +161,7 @@ package.loaded["ui.menu.menu_keyboard_layout"] = {
 	prime = function() prime_counts.keyboard_layout = prime_counts.keyboard_layout + 1 end,
 }
 package.loaded["ai.ui.menu"] = { create = function() return {} end }
-package.loaded["ui.menu.menu_apps"] = {
+package.loaded["apps.ui.menu.apps"] = {
 	prime = function() prime_counts.apps = prime_counts.apps + 1 end,
 }
 package.loaded["ui.menu.menu_tap_holds"] = {

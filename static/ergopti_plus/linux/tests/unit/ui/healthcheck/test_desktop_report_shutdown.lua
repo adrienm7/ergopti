@@ -26,7 +26,7 @@ h.describe("desktop-report actual Main confirmation owner", function()
 				if acknowledged then return true end
 				if value == "zero" then return 0 elseif value == "false" then return false end
 			end }
-			local shutdown, observed = Scenario.shutdown({ loaded = { ["adapters.desktop_opener"] = owner } })
+			local shutdown, observed = Scenario.shutdown({ loaded = { ["apps.adapters.desktop_opener"] = owner } })
 			shutdown.request("pending desktop control")
 			h.assert_eq(true, shutdown.is_pending())
 			h.assert_eq(0, observed.stops)
@@ -43,13 +43,13 @@ h.describe("desktop-report actual Main confirmation owner", function()
 		h.it("desktop-report actual Main pins its initial module and method across " .. replacement, function()
 			local acknowledged, foreign_calls = false, 0
 			local owner = { shutdown = function() return acknowledged end }
-			local loaded = { ["adapters.desktop_opener"] = owner }
+			local loaded = { ["apps.adapters.desktop_opener"] = owner }
 			local shutdown, observed = Scenario.shutdown({ loaded = loaded })
 			shutdown.request("pin desktop owner")
 			local foreign = function() foreign_calls = foreign_calls + 1; return true end
-			if replacement == "module" then loaded["adapters.desktop_opener"] = { shutdown = foreign }
+			if replacement == "module" then loaded["apps.adapters.desktop_opener"] = { shutdown = foreign }
 			elseif replacement == "method" then owner.shutdown = foreign
-			else loaded["adapters.desktop_opener"] = nil end
+			else loaded["apps.adapters.desktop_opener"] = nil end
 			shutdown.poll()
 			h.assert_eq(true, shutdown.is_pending())
 			h.assert_eq(0, foreign_calls)
@@ -64,7 +64,7 @@ end)
 
 h.describe("desktop-report default opener authority", function()
 	h.it("desktop-report default ports retain the exact action predicate and cancellation", function()
-		local name, adapter = "ui.healthcheck.report", "adapters.desktop_opener"
+		local name, adapter = "ui.healthcheck.report", "apps.adapters.desktop_opener"
 		local previous_report, previous_adapter = package.loaded[name], package.loaded[adapter]
 		package.loaded[name] = nil
 		local calls, cancels, completions, live, authority = {}, 0, 0, true, nil

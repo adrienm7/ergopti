@@ -113,7 +113,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 		local saved_shell_runner = package.loaded["core.process.adapters.shell_runner"]
 		local slots = {
 			"platform.focus.window_manager",
-			"adapters.app_launcher",
+			"apps.adapters.launcher",
 			"core.events.timer_scheduler",
 			"adapters.clipboard",
 			"settings.engine.paths",
@@ -130,7 +130,7 @@ helpers.describe("file-manager shortcut: a refused running app falls through", f
 			package.loaded["platform.focus.window_manager"] = {
 				activate = function() return false end,
 			}
-			package.loaded["adapters.app_launcher"] = {
+			package.loaded["apps.adapters.launcher"] = {
 				launch = function() return false end,
 			}
 			package.loaded["core.events.timer_scheduler"] = {

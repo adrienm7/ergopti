@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 helpers.describe("menu_apps: native discovery preserves pathnames", function()
 	helpers.it("enumerates app and icon directories without shell execution", function()
-		helpers.with_stub_scope({ "ui.menu.menu_apps", "core.fs.engine.dir" }, function()
+		helpers.with_stub_scope({ "apps.ui.menu.apps", "core.fs.engine.dir" }, function()
 			local base = "/tmp/Ergopti $HOME `injected` O'Brien"
 			local app = base .. "/apps/Fixture.app"
 			local directories, metadata = {}, {}
@@ -20,7 +20,7 @@ helpers.describe("menu_apps: native discovery preserves pathnames", function()
 				if dir == base .. "/apps" then return { "Fixture.app" }, true end
 				return {}, true
 			end }
-			local apps = helpers.load_with_stubs("ui.menu.menu_apps", {
+			local apps = helpers.load_with_stubs("apps.ui.menu.apps", {
 				fs = { attributes = function() return { mode = "directory" } end },
 				execute = function() error("discovery must not start a shell") end,
 				application = { infoForBundlePath = function(path) metadata[#metadata + 1] = path; return nil end },

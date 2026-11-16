@@ -122,7 +122,7 @@ check('the logs folder and names come from app_dirs.toml', () => {
 
 // The builds before the single folder name read paths.toml from Roaming AppData
 // and defaulted the configuration to %USERPROFILE%\.config: the collector now
-// resolves both from [config.windows], like infra/app_folders.ahk.
+// resolves both from [config.windows], like apps/engine/folders.ahk.
 check('the paths.toml and configuration defaults come from app_dirs.toml', () => {
 	const resolver = code.match(/^function Resolve-ConfigDir \{\n([\s\S]*?)^\}$/m);
 	assert(resolver, 'no Resolve-ConfigDir');

@@ -404,7 +404,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
 			local fs = require("core.fs.adapters.file_system")
 			local old_write, old_shell = fs.write_new, package.loaded["core.process.adapters.shell_runner"]
-			local old_desktop = package.loaded["adapters.desktop_opener"]
+			local old_desktop = package.loaded["apps.adapters.desktop_opener"]
 			local calls, written = {}, {}
 			fs.write_new = function(path, value)
 				assert(path:sub(1, #HOME) == HOME and path:find("/diagnostics/", 1, true))
@@ -414,7 +414,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				quote = function(value) return string.format("%q", value) end,
 				run = function(command) calls[#calls + 1] = command; return true end,
 			}
-			package.loaded["adapters.desktop_opener"] = {
+			package.loaded["apps.adapters.desktop_opener"] = {
 				open = function(target, done)
 					calls[#calls + 1] = { executable = "xdg-open", args = { target } }
 					done({ ok = true, code = 0 })
@@ -435,7 +435,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				helpers.assert_eq(calls[4], { executable = "xdg-open", args = { url } })
 			end, debug.traceback)
 			fs.write_new, package.loaded["core.process.adapters.shell_runner"] = old_write, old_shell
-			package.loaded["adapters.desktop_opener"] = old_desktop
+			package.loaded["apps.adapters.desktop_opener"] = old_desktop
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -447,7 +447,7 @@ end)
 local function with_deferred_opener(body)
 	with_bridge({ logs_dir = HOME .. "/.local/state/" .. FOLDER }, function(bridge, context)
 		local shell, fs = package.loaded["core.process.adapters.shell_runner"], require("core.fs.adapters.file_system")
-		local held_write, desktop = fs.write_new, package.loaded["adapters.desktop_opener"]
+		local held_write, desktop = fs.write_new, package.loaded["apps.adapters.desktop_opener"]
 		context.openers, context.writes = {}, 0
 		fs.write_new = function()
 			context.writes = context.writes + 1
@@ -457,7 +457,7 @@ local function with_deferred_opener(body)
 		package.loaded["core.process.adapters.shell_runner"] = {
 			quote = require("core.process.adapters.shell_runner").quote, run = function() return true end,
 		}
-		package.loaded["adapters.desktop_opener"] = {
+		package.loaded["apps.adapters.desktop_opener"] = {
 			open = function(target, done)
 				local call = { program = "xdg-open", args = { target }, done = done, cancelled = 0 }
 				context.openers[#context.openers + 1] = call
@@ -472,7 +472,7 @@ local function with_deferred_opener(body)
 			bridge.on_message("ready", {}, page(context)); body(bridge, context, request)
 		end, debug.traceback)
 		fs.write_new, package.loaded["core.process.adapters.shell_runner"] = held_write, shell
-		package.loaded["adapters.desktop_opener"] = desktop
+		package.loaded["apps.adapters.desktop_opener"] = desktop
 		if not ok then error(detail, 0) end
 	end)
 end
