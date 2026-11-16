@@ -230,9 +230,11 @@ _AOPR_BASELINE_CORE  := 247
 _AOPR_BASELINE_UI    := 125
 _AOPR_BASELINE_ENTRY := 7
 
+; apps\engine holds the app picker and folders the structure plan took out of
+; infra\; the bundled apps beside it were never part of this tree's count.
 _AOPR_RatchetCore() {
 	global _AOPR_BASELINE_CORE
-	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps"]), _AOPR_BASELINE_CORE)
+	_AOPR_AssertTree("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps\engine"]), _AOPR_BASELINE_CORE)
 }
 Test("meta: windows/ OS-call purity ratchet — modules + lib", _AOPR_RatchetCore)
 
@@ -376,7 +378,7 @@ _AOPR_FAMILY_BASELINE_ENTRY := 10
 
 _AOPR_FamilyRatchetCore() {
 	global _AOPR_FAMILY_BASELINE_CORE
-	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps"]), _AOPR_FAMILY_BASELINE_CORE)
+	_AOPR_AssertFamilies("windows/modules + windows/lib", _AOPR_FilesIn(["modules", "infra", "platform", "core", "settings", "menu", "tray", "ai", "apps\engine"]), _AOPR_FAMILY_BASELINE_CORE)
 }
 Test("meta: windows/ platform-API family ratchet — modules + lib", _AOPR_FamilyRatchetCore)
 
