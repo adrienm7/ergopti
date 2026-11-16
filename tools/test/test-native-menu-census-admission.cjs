@@ -27,12 +27,14 @@ const DRIVERS = ['windows', 'macos', 'linux'];
 const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 // The tray model list retired with the model selector page (2026-10-27), the
 // Windows chord switches with schema v19, the macOS Karabiner switch rows with
-// the owned runtime default.
+// the owned runtime default, the Windows navigation layer editor host with
+// Ergopti Studio.
 const RETIRED_SOURCES = new Set([
 	RETIRED,
 	'macos/ui/menu/menu_llm/models_selector.lua',
 	'macos/ui/menu/remap_switch.lua',
-	'windows/modules/shortcuts/ctrl.ahk'
+	'windows/modules/shortcuts/ctrl.ahk',
+	'windows/ui/layer_editor/init.ahk'
 ]);
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
 const CORPUS = 'tools/test/fixtures/native-menu-census-legacy.json';
