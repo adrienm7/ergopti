@@ -100,7 +100,8 @@ $HostSource = Join-Path $NativeSource 'ergopti_lua_export.c'
 $HostSha = (Get-FileHash -LiteralPath $HostSource -Algorithm SHA256).Hash.ToLowerInvariant()
 $Fingerprint = Get-TextSha256 ($Pin.sha256 + "`n" + $HostSha + "`n")
 
-$Common = @('/nologo', '/Brepro', '/TC', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', ('/I' + $LuaSource))
+# /Tc names each C source: /TC would also read the .obj inputs of a link step as C.
+$Common = @('/nologo', '/Brepro', '/std:c11', '/O2', '/MT', '/guard:cf', '/D_CRT_SECURE_NO_WARNINGS', ('/I' + $LuaSource))
 $Strict = @('/W4', '/WX', '/wd5105', ('/DERGOPTI_LUA_EXPORT_FINGERPRINT=' + $Fingerprint))
 $Link = @('/link', '/Brepro', '/MACHINE:X64', '/DYNAMICBASE', '/HIGHENTROPYVA', '/NXCOMPAT', '/guard:cf')
 $Objects = @()
@@ -110,14 +111,14 @@ try {
 	foreach ($File in $Pin.sources) {
 		if ($File -cnotmatch '^l[a-z0-9]+\.c$') { throw ('Pinned Lua source name refused: ' + $File) }
 		$Object = [IO.Path]::ChangeExtension($File, '.obj')
-		Invoke-LuaExportBuildCommand 'cl.exe' ($Common + @('/W0', '/c', (Join-Path $LuaSource $File), ('/Fo' + $Object)))
+		Invoke-LuaExportBuildCommand 'cl.exe' ($Common + @('/W0', '/c', ('/Tc' + (Join-Path $LuaSource $File)), ('/Fo' + $Object)))
 		$Objects += $Object
 	}
-	Invoke-LuaExportBuildCommand 'cl.exe' ($Common + $Strict + @(('/I' + $NativeSource), (Join-Path $NativeSource 'ergopti_lua_export_test.c')) + $Objects + @('/Feergopti_lua_export_test.exe') + $Link)
+	Invoke-LuaExportBuildCommand 'cl.exe' ($Common + $Strict + @(('/I' + $NativeSource), ('/Tc' + (Join-Path $NativeSource 'ergopti_lua_export_test.c'))) + $Objects + @('/Feergopti_lua_export_test.exe') + $Link)
 	$Scratch = Join-Path $BuildRoot 'scratch'
 	New-Item -ItemType Directory -Force -Path $Scratch | Out-Null
 	Invoke-LuaExportBuildCommand (Join-Path $BuildRoot 'ergopti_lua_export_test.exe') @($SharedRoot, $Scratch)
-	Invoke-LuaExportBuildCommand 'cl.exe' ($Common + $Strict + @($HostSource) + $Objects + @('/Feergopti_lua_export.exe') + $Link)
+	Invoke-LuaExportBuildCommand 'cl.exe' ($Common + $Strict + @(('/Tc' + $HostSource)) + $Objects + @('/Feergopti_lua_export.exe') + $Link)
 } finally { Pop-Location }
 
 $Executable = Join-Path $BuildRoot 'ergopti_lua_export.exe'
