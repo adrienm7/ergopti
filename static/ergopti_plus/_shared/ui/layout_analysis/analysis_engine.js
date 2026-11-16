@@ -649,8 +649,8 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   of the non-thumb presses; the model's ideal_finger_load when absent), the
 	 *   fingering profile, and whether each key's worst groups are counted for
 	 *   every event (keys[code].worst; the SFB ones always are).
-	 * @returns {object} {layout, keyboard, metrics, fingers, rows, coverage,
-	 *   trigramClasses, keys, score}.
+	 * @returns {object} {layout, keyboard, metrics, fingers, fingerShares,
+	 *   idealLoad, hands, rows, coverage, trigramClasses, keys, score}.
 	 */
 	function analyse(layoutInput, ngrams, options) {
 		const opts = options || {};
@@ -893,6 +893,12 @@ var LAYOUT_ANALYSIS = (function () {
 			profile: board.profile,
 			metrics,
 			fingers,
+			// Each non-thumb finger's share of the non-thumb presses, and the ideal
+			// load it is measured against: the two sides of finger_imbalance.
+			fingerShares: Object.fromEntries(
+				Object.keys(ideal).map((id) => [id, pct(fingerLoad[fingerIds.indexOf(id)], pressed)])
+			),
+			idealLoad: Object.assign({}, ideal),
 			hands: { left: pct(left, left + right), right: pct(right, left + right) },
 			rows: {
 				number: metrics.number_row,
@@ -1502,6 +1508,37 @@ var LAYOUT_ANALYSIS = (function () {
 		return sorted;
 	}
 
+	/**
+	 * Compares two analyses metric by metric: each value, the difference and
+	 * which one the metric prefers, then the global score the same way.
+	 * @param {object} a - analyse() output, the layout read.
+	 * @param {object} b - analyse() output, the layout it is compared with.
+	 * @returns {{metrics: object, score: object}} metric → {a, b, delta, verdict},
+	 *   delta = a − b; verdict is `better` or `worse` for a, `same` when equal,
+	 *   `none` for a metric shown but not scored; score → {a, b, delta, verdict}.
+	 * @throws {Error} When either result lacks a metric of METRICS or its score.
+	 */
+	function diff(a, b) {
+		const verdict = (better, delta) => {
+			if (better === 'none') return 'none';
+			if (delta === 0) return 'same';
+			return (better === 'higher') === delta > 0 ? 'better' : 'worse';
+		};
+		const metrics = {};
+		for (const [id, metric] of Object.entries(METRICS)) {
+			const [x, y] = [a.metrics[id], b.metrics[id]];
+			if (!Number.isFinite(x) || !Number.isFinite(y))
+				throw new Error(`layout_analysis: diff needs the metric ${id} on both results`);
+			metrics[id] = { a: x, b: y, delta: x - y, verdict: verdict(metric.better, x - y) };
+		}
+		if (!a.score || !b.score) throw new Error('layout_analysis: diff needs both scores');
+		const delta = a.score.total - b.score.total;
+		return {
+			metrics,
+			score: { a: a.score.total, b: b.score.total, delta, verdict: verdict('higher', delta) }
+		};
+	}
+
 	/** Re-scores and re-ranks results with new weights (no re-analysis). */
 	function rescore(results, weights) {
 		for (const result of results) result.score = score(result, weights);
@@ -1539,7 +1576,8 @@ var LAYOUT_ANALYSIS = (function () {
 		defaultFormFactorWeights,
 		formFactorWeights,
 		compare,
-		rescore
+		rescore,
+		diff
 	};
 })();
 

@@ -84,6 +84,8 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
     keyboard: 'iso',                 // iso | iso_angle | ansi | ortho
     metrics: {sfb: 0.97, ...},       // every metric below, by id
     fingers: {lp, lr, lm, li, lt, rt, ri, rm, rr, rp},  // % of all presses
+    fingerShares: {lp, lr, lm, li, ri, rm, rr, rp},     // % of the non-thumb presses
+    idealLoad: {lp, ..., rp},        // the ideal load finger_imbalance used
     hands: {left, right},            // % of the presses, thumbs apart
     rows: {number, top, home, bottom},
     trigramClasses: {roll3_in, roll3_out, alternation, redirect, roll_mixed, same_finger},
@@ -124,6 +126,10 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
   with `rank`.
 - `rescore(results, weights)` → the same results re-scored and re-ranked with
   new weights, without re-analysis (live weight editing).
+- `diff(a, b)` → `{metrics: {id: {a, b, delta, verdict}}, score: {a, b, delta,
+verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
+  `worse` for `a` by the metric's `better`, `same` when equal, `none` for a
+  metric shown but not scored. The Comparer's « Compare with » column.
 - `METRICS` → `{id: {unit, better, of}}`; `better` is `lower`, `higher` or
   `none` (shown, not scored).
 

@@ -95,6 +95,75 @@ check(heat.KeyE.sfb === 100 && heat.KeyD.sfb === 100, 'keys: both keys of "ed" c
 check(heat.KeyE.worst.sfb[0][0][0] === 'KeyD', 'keys: KeyE names KeyD as its SFB partner');
 check(heat.KeyF.sfb === 0 && heat.KeyE.presses === 50, 'keys: other keys carry nothing');
 
+// Finger shares beside their ideal load, worked by hand: « asdf » on QWERTY is
+// one press on each left finger, so each holds 25 % of the non-thumb presses
+// and the right hand none. Against the default ideal (6.5, 11.5, 15.5, 16.5 %
+// per hand), the gaps are 18.5 + 13.5 + 9.5 + 8.5 on the left and 50 on the
+// right: finger_imbalance is half of 100, 50 %.
+{
+	const result = E.analyse(byId.get('qwerty'), E.ngramsFromText('asdf'), { keyboard: 'iso' });
+	const expected = { lp: 25, lr: 25, lm: 25, li: 25, ri: 0, rm: 0, rr: 0, rp: 0 };
+	check(
+		JSON.stringify(Object.keys(result.fingerShares).sort()) ===
+			JSON.stringify(Object.keys(expected).sort()),
+		`fingerShares: fingers ${Object.keys(result.fingerShares).join(' ')}`
+	);
+	for (const [id, share] of Object.entries(expected))
+		check(near(result.fingerShares[id], share), `fingerShares: ${id} = ${result.fingerShares[id]}`);
+	check(
+		JSON.stringify(result.idealLoad) === JSON.stringify(E.defaultIdealLoad()),
+		'fingerShares: the result names the default ideal load it was measured against'
+	);
+	check(
+		near(result.metrics.finger_imbalance, 50),
+		`fingerShares: finger_imbalance = ${result.metrics.finger_imbalance}, expected 50`
+	);
+}
+
+// diff, worked by hand: « ed » is an SFB on QWERTY (E and D, left middle) and a
+// hand change on Dvorak (E on KeyD, D on KeyH): QWERTY is worse by 100 points
+// of SFB, hand_change is shown but not scored, and the score delta is the
+// difference of the two totals.
+{
+	const tables = E.ngramsFromText('ed');
+	const qwerty = E.analyse(byId.get('qwerty'), tables, { keyboard: 'iso' });
+	const dvorak = E.analyse(byId.get('dvorak'), tables, { keyboard: 'iso' });
+	const d = E.diff(qwerty, dvorak);
+	check(
+		d.metrics.sfb.a === 100 &&
+			d.metrics.sfb.b === 0 &&
+			d.metrics.sfb.delta === 100 &&
+			d.metrics.sfb.verdict === 'worse',
+		`diff: sfb ${JSON.stringify(d.metrics.sfb)}`
+	);
+	check(
+		d.metrics.hand_change.delta === -100 && d.metrics.hand_change.verdict === 'none',
+		`diff: hand_change ${JSON.stringify(d.metrics.hand_change)}`
+	);
+	check(
+		near(d.score.delta, qwerty.score.total - dvorak.score.total) &&
+			d.score.verdict === (d.score.delta > 0 ? 'better' : 'worse'),
+		`diff: score ${JSON.stringify(d.score)}`
+	);
+	check(
+		E.diff(dvorak, qwerty).metrics.sfb.verdict === 'better',
+		'diff: the other way round, Dvorak is better on SFB'
+	);
+	check(
+		Object.values(E.diff(qwerty, qwerty).metrics).every(
+			(m) => m.delta === 0 && (m.verdict === 'same' || m.verdict === 'none')
+		),
+		'diff: a layout against itself changes nothing'
+	);
+	let refused = false;
+	try {
+		E.diff(qwerty, { metrics: {} });
+	} catch {
+		refused = true;
+	}
+	check(refused, 'diff: a result without metrics is refused');
+}
+
 // =====================================
 // ======= 2/ Exact key n-grams ========
 // =====================================
