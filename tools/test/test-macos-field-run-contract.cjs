@@ -41,6 +41,8 @@ const IDENTIFIERS = 'static/ergopti_plus/_shared/core/text/data/identifiers.sh';
 const SHELL_CHECKS = 'tools/dev/macos-field-shell-checks.sh';
 const PRIVACY_PANES = 'static/ergopti_plus/macos/data/privacy_panes.json';
 const FIELD_GIT = 'tools/dev/field-report-git.sh';
+// A pending Xcode license is accepted before any /usr/bin shim runs.
+const XCODE_LICENSE = 'tools/dev/macos-accept-xcode-license.sh';
 // The logs are scrubbed of typed text before they reach the pushed branch.
 const LOG_SCRUB = 'tools/dev/field-log-scrub.py';
 const REPORT_REDACT = 'tools/dev/field-report-redact.py';
@@ -129,6 +131,7 @@ function fixture(name, { onDev = false } = {}) {
 		SHELL_CHECKS,
 		PRIVACY_PANES,
 		FIELD_GIT,
+		XCODE_LICENSE,
 		LOG_SCRUB,
 		REPORT_REDACT,
 		COLLISIONS,
