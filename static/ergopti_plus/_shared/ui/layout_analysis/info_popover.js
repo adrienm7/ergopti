@@ -17,6 +17,8 @@
  *    LAYOUT_ANALYSIS_HOST.openLink(url); otherwise links open a new tab.
  * 4. Explanations are locale keys layout_analysis.info.<item> (21 locales);
  *    the values they quote come from the data, never from the text.
+ * 5. format() writes every number of the Studio pages in the language of
+ *    their strings (locale()), the same in the app and on the site.
  * ==============================================================================
  */
 
@@ -83,8 +85,23 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		return node;
 	}
 
+	/**
+	 * The language of the page's strings: the locale of the strings shown (an
+	 * app window seeds them without naming a locale), else the one asked for,
+	 * else the page's declared language. Numbers follow it, never the
+	 * browser's own language, so a French browser shows an English page's
+	 * numbers in English.
+	 * @returns {string} A BCP 47 language code.
+	 */
+	function locale() {
+		const strings = window._i18n_strings || {};
+		if (typeof strings['_meta.locale'] === 'string') return strings['_meta.locale'];
+		return window._i18n_locale || document.documentElement.lang;
+	}
+
+	/** A number with exactly this many decimals, written the page's way. */
 	const format = (value, digits) =>
-		Number(value).toLocaleString(window._i18n_locale || undefined, {
+		Number(value).toLocaleString(locale(), {
 			minimumFractionDigits: digits,
 			maximumFractionDigits: digits
 		});
@@ -238,5 +255,5 @@ var LAYOUT_ANALYSIS_INFO = (function () {
 		else start();
 	}
 
-	return { t, refusal, button, routeLink };
+	return { t, refusal, button, routeLink, locale, format };
 })();

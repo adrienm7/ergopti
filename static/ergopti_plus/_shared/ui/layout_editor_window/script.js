@@ -588,7 +588,10 @@ window.keystatsNgrams = function (result) {
 	}
 	_keystatsNgrams = ngrams;
 	setKeystatsStatus(
-		tr('layout_editor.studio.keystats.loaded', Math.round(ngrams.total || 0).toLocaleString())
+		tr(
+			'layout_editor.studio.keystats.loaded',
+			window.LAYOUT_ANALYSIS_INFO.format(Math.round(ngrams.total || 0), 0)
+		)
 	);
 	document.dispatchEvent(new CustomEvent('studio-ngrams', { detail: ngrams }));
 };

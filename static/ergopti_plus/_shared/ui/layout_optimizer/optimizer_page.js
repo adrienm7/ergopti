@@ -208,8 +208,10 @@
 			return node;
 		}
 
+		// The language of the page's strings (i18n.js loads _i18n_locale, else the
+		// page's declared language), never the browser's own.
 		const number = (value, digits) =>
-			Number(value).toLocaleString(window._i18n_locale || undefined, {
+			Number(value).toLocaleString(window._i18n_locale || document.documentElement.lang, {
 				minimumFractionDigits: digits,
 				maximumFractionDigits: digits
 			});

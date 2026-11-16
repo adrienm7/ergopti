@@ -439,6 +439,49 @@ check(
 	);
 }
 
+// (studio-number-locale) Numbers follow the language of the page's strings,
+// never the browser's: an app window seeds English strings without naming a
+// locale, and a French browser printed « 1 949 220 » in its English status.
+{
+	const pageWindow = {};
+	const numbers = {
+		window: pageWindow,
+		// Still loading: the popover waits for a DOMContentLoaded that never comes.
+		document: { documentElement: { lang: 'fr' }, readyState: 'loading', addEventListener() {} },
+		Number,
+		Object,
+		String
+	};
+	vm.createContext(numbers);
+	vm.runInContext(fs.readFileSync(path.join(PAGE_DIR, 'info_popover.js'), 'utf8'), numbers);
+	const info = vm.runInContext('LAYOUT_ANALYSIS_INFO', numbers);
+	const written = (setup) => {
+		delete pageWindow._i18n_strings;
+		delete pageWindow._i18n_locale;
+		Object.assign(pageWindow, setup);
+		return info.format(1949220.5, 1);
+	};
+	check(
+		written({ _i18n_strings: { '_meta.locale': 'en' }, _i18n_locale: 'de' }) === '1,949,220.5',
+		'the locale of the strings shown decides how numbers are written'
+	);
+	check(
+		written({ _i18n_locale: 'de' }) === '1.949.220,5',
+		'without strings, the locale asked for decides'
+	);
+	check(
+		written({}) === (1949220.5).toLocaleString('fr', { minimumFractionDigits: 1 }),
+		"without either, the page's declared language decides"
+	);
+	// The whole class: every Studio script writes its numbers through INFO.format.
+	for (const dir of ['layout_analysis', 'layout_editor', 'layout_editor_window'])
+		for (const file of fs.readdirSync(shared('ui', dir)).filter((f) => f.endsWith('.js'))) {
+			if (dir === 'layout_analysis' && file === 'info_popover.js') continue;
+			const source = fs.readFileSync(shared('ui', dir, file), 'utf8');
+			check(!/\.toLocaleString\(/.test(source), `${dir}/${file} formats numbers itself`);
+		}
+}
+
 if (errors.length > 0) {
 	for (const error of errors) console.error(`  ✗ ${error}`);
 	console.error(`test-layout-comparer-page: ${errors.length} problem(s)`);

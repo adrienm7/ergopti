@@ -106,11 +106,8 @@ var LAYOUT_ANALYSIS_PANEL = (function () {
 		return node;
 	}
 
-	const format = (value, digits) =>
-		Number(value).toLocaleString(window._i18n_locale || undefined, {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
+	// Every number in the language of the page's strings (info_popover.js).
+	const format = INFO.format;
 	const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
 	const unitText = (id) => (E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%');
 

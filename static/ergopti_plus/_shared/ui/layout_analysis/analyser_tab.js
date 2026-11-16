@@ -53,11 +53,9 @@ var LAYOUT_ANALYSER_TAB = (function () {
 		return node;
 	}
 
-	const format = (value, digits) =>
-		Number(value).toLocaleString(window._i18n_locale || undefined, {
-			minimumFractionDigits: digits,
-			maximumFractionDigits: digits
-		});
+	// Every number in the language of the page's strings; info_popover.js loads
+	// after this script, so it is read when a number is written.
+	const format = (value, digits) => window.LAYOUT_ANALYSIS_INFO.format(value, digits);
 
 	/**
 	 * Draws the view in a container and follows the Comparer.

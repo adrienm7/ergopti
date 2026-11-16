@@ -380,11 +380,8 @@
 		}
 
 		const $ = (id) => document.getElementById(id);
-		const format = (value, digits) =>
-			Number(value).toLocaleString(window._i18n_locale || undefined, {
-				minimumFractionDigits: digits,
-				maximumFractionDigits: digits
-			});
+		// Every number in the language of the page's strings (info_popover.js).
+		const format = INFO.format;
 		const metricDigits = (id) => (E.METRICS[id].unit === 'mm' ? 1 : 2);
 
 		/** Reads the saved conveniences; an unavailable storage gives none. */
