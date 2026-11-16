@@ -88,7 +88,7 @@ LayoutRegistryWatch_DefaultKeys() {
  */
 LayoutRegistryWatch_Start(Capture, Keys := 0, Port := 0) {
 	global _LayoutRegistryWatch
-	if IsObject(_LayoutRegistryWatch)
+	if IsSet(_LayoutRegistryWatch) && IsObject(_LayoutRegistryWatch)
 		throw Error("The keyboard layout registry watch is already running.", -1)
 	if !HasMethod(Capture, "Call")
 		throw ValueError("The keyboard layout registry watch needs a capture.", -1)
@@ -127,7 +127,10 @@ LayoutRegistryWatch_Start(Capture, Keys := 0, Port := 0) {
  */
 LayoutRegistryWatch_Stop() {
 	global _LayoutRegistryWatch
-	if !IsObject(_LayoutRegistryWatch)
+	; The lifecycle teardown can run before boot reached this file's top-level
+	; assignment (a reload or quit during startup): the global is then unset,
+	; and no watch runs (live checks of 2026-11-16 logged the unset read).
+	if !IsSet(_LayoutRegistryWatch) || !IsObject(_LayoutRegistryWatch)
 		return true
 	Watch := _LayoutRegistryWatch
 	_LayoutRegistryWatch := 0
@@ -146,7 +149,7 @@ LayoutRegistryWatch_Stop() {
 /** Whether a watch runs. */
 LayoutRegistryWatch_IsRunning() {
 	global _LayoutRegistryWatch
-	return IsObject(_LayoutRegistryWatch)
+	return IsSet(_LayoutRegistryWatch) && IsObject(_LayoutRegistryWatch)
 }
 
 ; Closes every key (which ends its notification) and event the watch opened.
@@ -181,7 +184,7 @@ _LayoutRegistryWatchRelease(Watch) {
 _LayoutRegistryWatchTick(Watch) {
 	global _LayoutRegistryWatch
 	; A tick queued before the stop belongs to a retired watch.
-	if (_LayoutRegistryWatch != Watch)
+	if !IsSet(_LayoutRegistryWatch) || (_LayoutRegistryWatch != Watch)
 		return
 	Port := Watch["port"]
 	Changed := ""

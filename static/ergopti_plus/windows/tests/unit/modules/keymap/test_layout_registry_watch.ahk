@@ -173,6 +173,41 @@ _LRWT_Join(Items) {
 	return Text
 }
 
+; A reload or quit during startup ran the lifecycle teardown before boot reached
+; the module's top-level assignment: Stop read the unset global and the live
+; checks of 2026-11-16 logged "This global variable has not been assigned a
+; value." on every reload. A child script calls Stop and IsRunning before its
+; #Include of the module has run any top-level line.
+_LRWT_StopBeforeBootAssignment() {
+	Dir := A_Temp . "\ergopti_lrwt_" . A_TickCount
+	DirCreate(Dir)
+	try {
+		Module := A_LineFile . "\..\..\..\..\..\modules\keymap\layout_registry_watch.ahk"
+		Loop Files Module
+			Module := A_LoopFileFullPath
+		Out := Dir . "\out.txt"
+		Script := Dir . "\child.ahk"
+		FileAppend('#Requires AutoHotkey v2.0`n#NoTrayIcon`n#Warn All, Off`n'
+			. 'LoggerError(*) => 0`nLoggerInfo(*) => 0`n'
+			. 'Result := "stop=" . LayoutRegistryWatch_Stop() . " running=" . LayoutRegistryWatch_IsRunning()`n'
+			. 'FileAppend(Result, "' . Out . '", "UTF-8")`nExitApp(0)`n'
+			. '#Include "' . Module . '"`n', Script, "UTF-8")
+		Run('"' . A_AhkPath . '" /ErrorStdOut "' . Script . '"', , "Hide", &Pid)
+		; A dialog in the child (a runtime error) must fail the test, not hang the suite.
+		if ProcessWaitClose(Pid, 20) {
+			try ProcessClose(Pid)
+			throw Error("The child script did not end within 20 s (a dialog?).", -1)
+		}
+		AssertTrue(FileExist(Out) != "", "the child script ran to its end")
+		AssertEqual("stop=1 running=0", FileRead(Out, "UTF-8"),
+			"Stop and IsRunning answer when the module's global is still unset")
+	} finally {
+		try DirDelete(Dir, true)
+	}
+}
+
+Test("layout registry watch: Stop before boot assigned its global is a no-op (layout-registry-watch-unset-2026-11-16)",
+	_LRWT_StopBeforeBootAssignment)
 Test("layout registry watch: a notification runs the capture at once (layout-registry-watch-2026-11-11)",
 	_LRWT_NotificationCapturesAtOnce)
 Test("layout registry watch: a refused start leaks nothing (layout-registry-watch-2026-11-11)",
