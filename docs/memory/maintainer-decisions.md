@@ -1466,3 +1466,59 @@ systemd a relaunch from the application menu restarts the unit. Only the login
 autostart (`--session-start`) leaves a running instance alone. Action: keep the
 restart pinned by `testASecondLauncherAsksTheRunningOneToQuitAndTakesOver` and
 `test_second_launch_restarts_the_running_daemon`.
+
+## Agent decisions of 2026-11-11 to 2026-11-13 validated as they are (2026-11-13)
+
+Structured import keeps action/state names and modifier tokens; the editor
+page compiles and the host never recompiles; macOS ANSI swaps are declared per
+layout; Unicode names are inlined in the app and lazy on the site; KMD-3 Linux
+`awake_ms`; the MRT-004 `core.json` fence; the resting-thumb bounds (tighten
+from the next Mac report); a custom logs folder named `ergopti_plus` is renamed
+to `Ergopti`; a superseded site deployment stays red; macOS marks a keyless API
+entry when its key is read; the navigation-owner DLL fingerprint derived by the
+migration (byte identity confirmed on the PC on 2026-11-16).
+
+## Ergopti Studio, site and corpus decisions (2026-11-14 to 2026-11-16)
+
+- **Names.** « Ergopti » is the project, « Disposition Ergopti » the layout,
+  « Ergopti+ » the software (name kept everywhere), « Ergopti Studio » the
+  layout editor; its window title is exactly « Ergopti Studio », without the
+  brand prefix (`apps.manifest.json` `window_title.product_names`).
+- **Exports in the app.** The app windows keep a strict content policy (no
+  `'unsafe-eval'`), so the hosts build XKB and KLC with the native Lua export
+  step (`composer/export_step.lua`, `lua_export`): macOS and Linux in process,
+  Windows through the pinned, restricted Lua 5.4 exe `ergopti_lua_export`.
+  fengari stays the site's runner. Downloads go to the Downloads folder, never
+  replacing a file (Hammerspoon and WebKitGTK have no save panel).
+- **One format of record.** The Ergopti TOML source is saved and compiled to
+  XKB, KLC and `.keylayout`; the export section has one « Format » drop-down and
+  one « Download » button; a KbdEdit `.kbe` is refused (its body is encrypted,
+  and decompiling KbdEdit breaks the clean-room rule).
+- **Studio page.** No hero, sidebar or footer on `/studio`; the Comparer's
+  default ticks follow the keyboard; display names come from
+  `layout_library.json`; one shared legend formatter (centred legends, bare
+  dead-key accents); « Essayer » is one input bar; « New » offers every library
+  layout; « Download the Windows installer » gives the DLLs and one generic NSIS
+  stub (pinned makensis v3.10-2).
+- **Benchmarks** frame the live Comparer: the Ergo-L PDF reports and the KLAnext
+  screenshots are deleted, one source of truth.
+- **Layout library.** Each arrangement is re-encoded as Ergopti TOML (what each
+  key types), never another tool's file copied verbatim, with its author and
+  source credited. Basis recorded on 2026-11-14 (not legal advice): a key
+  arrangement is a functionality, and SAS Institute v World Programming (CJEU
+  C-406/10, 2012) holds functionality and data formats outside copyright.
+- **Corpora.** Only texts with a clearly compatible, recorded licence ship, each
+  in `static/corpus/register.json` with source, licence and attribution shown in
+  the UI. Deleted by decision: romans.txt, Python for Everybody, Projet GLM,
+  Auxlang_X, the unverified KLAnext-style texts, the Johnix mail and « prog »
+  files, `static/corpus/frequences_lettres/`. Leipzig ships under CC BY 4.0.
+- **Analysis model.** Digit6 is typed by the right index, the space bar by the
+  left thumb; default weights as justified in the analyser study; ideal finger
+  load 6.5 / 11.5 / 15.5 / 16.5 % per hand with index ≥ middle ≥ ring ≥ pinky
+  enforced on edited loads; every sourced value has an « i » popover; every
+  other analyser shows its official score and the score under the user's
+  fingering.
+- **Personal info.** `pattern_max_length` is retired on the three OS
+  (2026-11-16): Windows registers the single-letter combos only and resolves
+  longer ones at fire time, as macOS and Linux do; a config that still holds the
+  key reports it once as unused.

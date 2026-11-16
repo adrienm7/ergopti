@@ -100,13 +100,18 @@ commit. After touching a sealed Windows updater source, reseal with
 The root `TODO.md` is the only checklist: open work only, with no separate
 handoff file (an agent writes what is left into the item itself). A finished
 item is removed and its lessons go to `docs/memory`; its history stays in Git
-(`git log --follow -p -- TODO.md`; the long form before the 2026-10-31 shrink
-is `git show 2a0083cb11:TODO.md`, before the 2026-10-31 pass
+(`git log --follow -p -- TODO.md`; the long form before the 2026-11-17 pruning
+is `git show e20edbf92b:TODO.md`, before the 2026-10-31 shrink
+`git show 2a0083cb11:TODO.md`, before the 2026-10-31 pass
 `git show 1aa287427a:TODO.md`, before the 2026-10-30 pass
-`git show 7f80d3d141:TODO.md`). Its sections are one line per hardware check
-per machine (naming the field-run step or hand action and the commits it
-confirms), "Remaining code work", "CI acceptance" and "Maintainer decisions
-pending"; it is meant to be deleted once the field reports close the checks.
+`git show 7f80d3d141:TODO.md`). The hardware checks live only in
+`TODO-tests-macos.md`, `TODO-tests-windows.md` and `TODO-tests-linux.md`, one
+line per check naming the field-run step or hand action and the commits it
+confirms; `TODO.md` keeps the feature sections, "Remaining code work", "CI
+acceptance" and "Maintainer decisions pending". Commit ids written before
+2026-11-16 in older documents may name the pre-rewrite dev history (git
+filter-repo replaced the « Claude » identities that day); find the commit by
+its subject on the current `dev` when an id no longer resolves.
 Item numbers are stable and never reused. Tags:
 **[CODE]** software to write or adopt; **[CI]** only a hosted or native CI run
 qualifies it; **[PHYS-W]**, **[PHYS-M]**, **[PHYS-L]** needs a real Windows PC,

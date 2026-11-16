@@ -2,303 +2,43 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-11-13. Latest stable: [v1.0.9](https://github.com/adrienm7/ergopti/releases/tag/v1.0.9).
-Conventions and tags: [workflow and verification memory](docs/memory/workflow-and-verification.md). Finished items are in Git
-(`git show b6f18b99e2:TODO.md` is the long form before the 2026-11-12 cleanup).
+Open work only. Latest stable: [v1.0.9](https://github.com/adrienm7/ergopti/releases/tag/v1.0.9). Conventions and
+tags: [workflow and verification memory](docs/memory/workflow-and-verification.md#project-todo-checklist-conventions).
+Finished items and their history stay in Git: `git show e20edbf92b:TODO.md` is the long form before the 2026-11-17
+pruning.
 
 This file lists features and fixes. The checks only real hardware can answer are in
 [TODO-tests-macos.md](TODO-tests-macos.md), [TODO-tests-windows.md](TODO-tests-windows.md) and
 [TODO-tests-linux.md](TODO-tests-linux.md).
 
-## Resume here (2026-11-15, 14:30 Paris, read first)
+## Resume here
 
-The coordinator session hit its usage limit. A new coordinator resumes from this section.
+Any agent can continue from this file alone. Follow [AGENTS.md](AGENTS.md) and the skills it routes; report to the
+maintainer in French with Paris times, ask questions as multiple choice with the recommended option first, and record
+every maintainer request here.
 
-- **Role.** Coordinate the worker containers, land their branches on `dev`, report to the maintainer in French
-  with Paris times, ask questions as multiple choice with the recommended option first, and record every
-  maintainer request in this file.
-- **Hard rules.**
-  - No merge commits on dev: `git fetch origin dev && git rebase origin/dev`, then
-    `git push origin HEAD:refs/heads/dev`. Never force-push, and never push main, tags or releases.
-  - Every commit is authored and committed as « Adrien MOYAUX <49562406+adrienm7@users.noreply.github.com> »,
-    with no AI trailer; `tools/lint/check-commit-identity.cjs` enforces it. The global git config of a cloud
-    container resets to « Claude » on restart, so set the repository's local `user.name` and `user.email`
-    first.
-  - Gates before each push: `node tools/lint/format.cjs --check` and
-    `node tools/lint/lint-conventions.js --fail-on-violations`, plus the tests of the change.
-- **Landing a worker branch** (workers cannot push dev):
-  - check out the branch, then
-    `git rebase origin/dev --exec 'git commit --amend --no-edit --reset-author --no-verify -q'`;
-  - then `node tools/dev/coordinator/renumber-suite-ordinals.cjs`, `node tools/test/test-js-feature-inventory.cjs`,
-    `node tools/lint/check-commit-identity.cjs --range origin/dev..HEAD`, format and lint;
-  - push. On a conflict, ask the worker to rebase and push a new branch name.
-- **CI.** Each push cancels the previous dev run. Space the pushes so that one full run completes, read its reds
-  by name, and route each red to the worker of its area.
-- **Site deploy.** Once a dev run is complete with its 5 site jobs green, run
-  `gh workflow run deploy-site.yml --repo adrienm7/ergopti --ref dev -f run_id=<id>`. The last deploy was
-  8da05134e3 (10:31 Paris); everything after it waits for a green run.
-- **Windows Lua export exe.** Once a dev run builds « Windows / Build », download its artifact
-  `windows-lua-export-*` and commit the exe and its JSON into `windows/vendor`, with the `required` entries in
-  `tools/build/windows_bundle_manifest.json`. The identity test then turns on.
-- **Active workers** (cloud sessions; message them with send_message). Each was told to push its branch often.
-  - T (`session_01Xt8dDwwe4sUNNVXsz1nfNH`): rebasing onto dev editable-tables, pdf-text and
-    workspace-in-comparer plus compare-reuses-editor (new `-2` names); then retiring the navigation layer editor
-    in 3 steps. Step 1 is on `claude/ergopti-todo-retire-layer-editor`. The step 2 design is approved: the Studio
-    opens on « nav » and imports layers.toml, which becomes compiled output with a documented generated-from
-    header.
-  - W (`session_01Xt8dDuPL4iepfyANYxdFMc`): Windows pause slices. Slice 2a (no greyed rows,
-    `claude/ergopti-pause-c2-drop-greyed`) is HELD until no handler that can be reached while paused refuses
-    silently. 2b renames greyed_when_paused to boot_deferred. Also the Windows wrap_selection clipboard red
-    (test_wrap_selection_action.ahk:475), and MLC-005 (`claude/ergopti-todo-mlc005-rows`), which waits for a
-    green macOS build row.
-  - X (`session_01Xt8dDti7Ph8qRbgEgSGURC`): text corpora in other languages (de, es, it; public domain), then the
-    CI keyboard-source fixture investigation.
-  - Y (`session_01Xt8dDw17eucqsrvamXCVnf`): structure phase 2. S18 to S20 are on dev; S21 (ai) is next, in pushes
-    of 2 or 3 steps; also the linux-feature-parity re-pin of ergopti_hotstrings.lua.
-- **Maintainer decisions of 2026-11-15:**
-  - Studio: XKB and KLC built by the host on the 3 OS (Windows through a pinned, restricted Lua 5.4 exe); no
-    footer on /studio; a « Format » dropdown; Comparer ticks follow the keyboard; display names; centred legends
-    and bare dead-key accents; an « Essayer » input bar; every library layout as a start; an installable Windows
-    zip (generic NSIS stub pinned to makensis v3.10-2).
-  - Data: the Ergo-L PDFs and the KLAnext screenshots are deleted, and benchmarks show the live Comparer. The
-    corpora frequences_lettres and Johnix prog are deleted; Leipzig ships as CC BY 4.0.
-  - Process: structure phase 2 launched; real-machine checks live in the TODO-tests-<os>.md files only.
-- **Open for the maintainer:**
-  - the identity gate's false positive on every PDF's root trailer key in containers whose home is the root
-    account's (left unchanged);
-  - the casing of BEO, INTS, UCIEA, AHEI, MTGAP-T and CTGAP 3;
-  - the dead-key marker style;
-  - ISO ticks for split and ortholinear boards.
-
-## Resume here (2026-11-13 evening, read first)
-
-Any agent can continue from this section alone: the maintainer answered every open question on 2026-11-13 and
-wants the whole list done without them. Follow [AGENTS.md](AGENTS.md) and the skills it routes.
-
-### How to work alone
-
-- **Push rights.** `dev` may be pushed only when the maintainer's starting message in your conversation says so
-  (the 2026-11-13 hand-off message does). Before each push: `git fetch origin dev && git rebase origin/dev`, then
-  `git push origin HEAD:refs/heads/dev`. Never force-push, never a merge commit on `dev` (rebase branches, do not
-  merge `dev` into them), never `main`, never a tag or release, never a `Dev-Prerelease: yes` trailer (a plain
-  push to `dev` publishes nothing). No `Co-Authored-By` or `Claude-Session` trailers. Do not touch
+- **Push.** `dev` only, linear: `git fetch origin dev && git rebase origin/dev`, then
+  `git push origin HEAD:refs/heads/dev`. Never force-push, never a merge commit (rebase branches, do not merge `dev`
+  into them), never `main`, a tag, a release or a `Dev-Prerelease: yes` trailer. Do not touch
   `remap-runtime-v16.3.0-ergopti.6`, `vendor/remap-runtime/manifest.json` or the ci-seed tags.
-- **Before each commit:** `node tools/lint/format.cjs --check` (needs Ruff 0.15.8 first on `PATH`) and
-  `node tools/lint/lint-conventions.js --fail-on-violations`; never bypass the pre-commit hook.
-- **A change is done** when local gates pass and CI on the three OS (ci.yml, `os_lanes=all`, Windows allowed)
-  shows only the reds listed below; then land it on `dev` in a small linear block.
-- **New design questions:** pick the safest option that follows AGENTS.md, write « decided by the agent on
-  <date>, to review by the maintainer » on the item, and keep going. Do not stop to wait.
-- **Do not end a turn while work remains.** Wait for CI with a background poll and work on the next item meanwhile.
-- **Never** rewrite the « To confirm on the Windows PC » section, never commit a non-anonymized field report, never
-  cancel a CI run you did not start, never use `git stash`, `reset` or `clean` as shortcuts.
-- Keep this section current at each landing (state, next item).
-
-### Order of work
-
-1. **Folder migration by OS (structure plan).** Plan: [docs/design/structure-plan.md](docs/design/structure-plan.md).
-   Work branch `claude/ergopti-todo-structure-phase2-night` (linear on `dev`; the older `…-phase2` is frozen).
-   Read its `docs/plans/structure-migration-resume.md` first: base commit, steps done with proofs, next command,
-   traps, maintainer decisions. One step per commit with `tools/audit/structure/apply-step.cjs`. State at 21:00
-   Paris (2026-11-13): S01 and S02 are on `dev` (landed 16:50, 98a7b2ff7, CI run 43430776650). S03–S05 proof 16
-   (run 43481259457) failed and is being triaged. 33 steps remain; the approved shared module predicate handles
-   the Lua module-prefix sweeps. Land in blocks of a few steps. Paths that describe a published artifact (a prior
-   release's payload, a historical pin) must keep their old spelling: 471744488c respelled the v1.0.9 upgrade fixture.
-   Windows lane state (worker I, 2026-11-14): the whole Windows verdict is green on run 43549510667 (Build,
-   Install and launch, Driver startup included).
-2. **The maintainer decisions of 2026-11-13 below** (section « Maintainer decisions of 2026-11-13, to implement »).
-   State at 01:50 Paris (2026-11-14), worker D (Linux desktop): COSMIC v1/v2+ focus, the GNOME switch through the
-   extension (daemon and installer) and GTK 3 Compose through IBus are on `dev` (proof run 43519814090); next for D:
-   the Linux E2E confirmation of the pause-argument fix, then only hardware checks remain in its queue.
-   State (worker C, 2026-11-14 afternoon, Paris): « Direct XKB and KLC compilers » and « XKB and KLC downloads
-   generated by the local host » landed; « The same UI inside ErgoptiPlus » ticked (hardware checks left) and the
-   composer view retired on `claude/ergopti-todo-layout-followups`. The dead-key follow-up section has no open item;
-   the generator's other items need the maintainer (DLL signing keys) or a measurement (JIS/ABNT) or wait for the
-   `nav` layer (layer editor retirement).
-   State at 03:00 Paris (2026-11-14): the one-shot modifiers item is done (worker A, branch
-   `claude/ergopti-todo-oneshot`, CI run 43535291046); the validation contract builds on its one timeout rule per OS.
-3. **« Remaining code work »**, then the feature sections, then « CI acceptance ». Items that need real hardware
-   or a release stay for the maintainer; say so on the item and move on.
-
-State of the parity queue (worker H, 2026-11-14 21:32 Paris): on `dev`, the pause fourth pass (CI run 43574300302),
-the AI switch and profile rows (CI run 43614764011), then the AI model and API rows on macOS and Linux with the macOS
-warmup replayed on resume (CI run 43628135718). Next: the macOS slot and legacy shortcut rows, the magic key capture
-and the typing-inertness audit, with the notes in docs/plans/parity-pause-resume.md; then « Sequential WPM, wrap and
-personal-info parity follow-up », whose rows are mostly CI and hardware.
-
-### Reds `dev` already has (2026-11-14 morning), the baseline a change is compared with
-
-From run [43579693369](https://github.com/adrienm7/ergopti/actions/runs/43579693369) (worker G's landing, dispatched
-10:15 Paris): Windows Integration Driver startup (`toml.flat_values` over its ceiling on the realistic fixture; worker
-I's fix landed on `dev` after this run's base); Linux E2E updater (its temporary native Lua 5.4 provider refusal was
-Meson 1.10+ on Ubuntu 26.04 naming each vendor test « cffi-lua:<test> », fixed by worker G, Linux run
-[43601289533](https://github.com/adrienm7/ergopti/actions/runs/43601289533); still red only at the live step, which
-updates this checkout to the newest published prerelease, v1.0.10-dev.175 from before the move: a post-move dev
-prerelease, the maintainer's, turns it green); Linux E2E desktop-webview (AT-SPI first-focus race, worker J,
-`claude/ergopti-todo-linux-flakes`); Common Packaging and boot (`test:windows-bundle-manifest`:
-`windows/_generated/value_schema.ahk` names the Lua `max_from` provenance of `llm.generation.context_length`, from
-ca0a3464b5; owner to be named by the coordinator). Not run because an earlier stage was red, so not yet proven green:
-Windows E2E, Build and Install; Linux Build and Install; Common Shared UI rendering, Build and Install (Shared UI now
-runs on `ubuntu-24.04`, the newest release the locked Playwright 1.58.2 supports). Known flakes: Windows Unit core
-`plain-native-cas-owner` (worker A, c400dfd2 on `claude/ergopti-todo-cas-flake`); Windows Unit tests in the native step « Native
-editor receiver matrix failed » (`editor_replace_test.c`, 45/48, one shard of 14 on the same tree in run 43509959681;
-probably the worker's 100 ms message or 250 ms visibility window on a loaded runner, case not named; naming it changes
-the DLL manifest fingerprint, so it waits for a Windows rebuild of `ergopti_nav_owner.dll`). Green again since the 2026-11-12
-list: Windows Unit meta, Linux E2E platform-metrics and input-display, Linux unit rows on every distribution, Common
-App Cloner literals, the Linux uninstall and Arch desktop entry fixtures, the macOS release Darwin receiver and the
-macOS Intel Managed Ollama Go race (`TestCancellationAndConcurrentClosePhysicallyRetirePeer`, fixed with its
-`slow-start` case). Run [43585486177](https://github.com/adrienm7/ergopti/actions/runs/43585486177) (worker G,
-11:20 Paris) adds Windows Integration Driver startup and Unit core to the green list; its reds are the updater,
-desktop-webview and Packaging and boot rows above, with their verdicts and Release Verify. The « Linux layout
-installer » workflow, red since the structure move, is green again in run
-[43585483614](https://github.com/adrienm7/ergopti/actions/runs/43585483614): its BOM gate admits the Windows-written
-tap-hold corpus file, which pins the BOM on purpose (efb4bf580f); each Compose prefix is written before the sequences
-it starts, because libxkbcommon 1.13 lets a later shorter rule replace them (8d0e066cb2); and the Python 3.8 floor
-runs on `ubuntu-24.04`, since setup-python has no 3.8 build for 26.04 (775f0dd0e3).
-
-### Maintainer decisions of 2026-11-13, to implement
-
-- [x] **One-shot modifiers (OSM-002 and beyond).** Timeout (decided 2026-11-13, replaces the 2026-11-06 refusal of
-      0 and unlimited): `0` means « no time limit » on every OS. Today each OS asks the delay in a numeric box that
-      accepts only a positive whole number (`TapHoldValidOneShotTimeoutMs`, Linux `valid_one_shot_timeout_ms`, the
-      macOS `sticky_dialog` prompt): accept 0 there and in `config.toml`, say « 0 = no time limit » in the prompt
-      and show « no time limit » in the menu label (`menu.tapholds.*`, 21 locales through the i18n skill); keep
-      refusing negative or non-integer values. Any positive value stays valid, no other minimum (a fast typist
-      presses the next key almost at once). Features: make sure every one-shot exists on Windows, macOS and Linux,
-      single and combined: Shift, Ctrl, Alt, AltGr, Kana, Win/Cmd, and chords such as Ctrl+Shift or Win+Ctrl; a key
-      can tap one modifier's one-shot and hold that modifier (AltGr key: one-shot AltGr on tap, AltGr on hold).
-      Shared defaults, tests per OS.
-      Claimed by worker A (branch `claude/ergopti-todo-oneshot`). Progress:
-  - [x] Timeout `0` = no time limit on the three OS: one rule per OS, ready for the shared validation schema
-        (`_shared/tap_hold/engine/one_shot_timeout.lua` for macOS and Linux at entry, load and engine boundary;
-        `TapHoldValidOneShotTimeoutMs` and `TapHoldOneShotHookTimeoutOption` on Windows); prompt says
-        « 0 = no time limit », menu label `menu.tapholds.sticky_no_limit` in 21 locales; negative and
-        fractional values refused.
-  - [x] Every one-shot on every OS: Linux runs the fifteen `sticky_*` actions in its tap-hold engine
-        (`arm_sticky`), and `sticky_altgr` / `sticky_altgr_shift` exist on the three OS. One action covers AltGr
-        and Kana: the layouts compile their Kana layers to the AltGr level, and Windows sends the layout's own
-        AltGr key, Kana on a Kana-style layout (decided by the agent on 2026-11-13, to review by the maintainer).
-  - [x] Tap = one-shot of a modifier, hold = that modifier: every OS takes a `sticky_*` action as a tap-hold tap
-        (Right Ctrl already ships one-shot Shift + Shift); the AltGr pair is pinned by tests per OS. The shipped
-        AltGr key keeps its Tab tap (decided by the agent on 2026-11-13, to review by the maintainer).
-  - Hardware checks are in TODO-tests-windows.md, TODO-tests-macos.md and TODO-tests-linux.md.
-- [x] **One validation contract for every user-entered value (maintainer request 2026-11-13).** Every input box,
-      editor field and `config.toml`/TOML key on Windows, macOS and Linux declares its type (integer, decimal,
-      boolean, enum, string, path), minimum, maximum, whether decimals are allowed and any special value (such as
-      the one-shot `0` = no limit), in one shared schema per setting (single source, read by the three drivers and
-      the web pages). Check it at three places: (1) at entry, refusing with a localized message that names the
-      allowed range; (2) at load of the saved configuration, reporting and logging a bad stored value and keeping
-      the default, never silently; (3) at the consuming code's boundary, where the value reaches the engine (a
-      setter, a timer, a Karabiner/ydotool/AHK call), so a value altered after load (a string instead of a number,
-      NaN, out of range) fails fast with a log line instead of crashing. Start with an inventory of every prompt and
-      key per OS, then regression tests per OS that feed a wrong type, a boundary and an out-of-range value at each
-      of the three places.
-      Claimed by worker B (2026-11-13). Landed on 2026-11-14 after CI run 43557223413: the inventory
-      ([docs/design/value-validation-inventory.md](docs/design/value-validation-inventory.md), its « Migration status
-      » table is the state per family), the shared schema `_shared/settings/data/value_schema/value_schema.json` and
-      its check in JS, Lua (macOS, Linux) and AHK, pinned by shared vectors, with the localized refusals in 21
-      locales; then the families wired at entry, load and boundary: tap-hold timings, hotstring delays and priorities,
-      LLM settings, the CapsWord idle timeout, gesture steps, web addresses (a new `url` type), personal info (Linux
-      reports a field that is not text) and the user-code delay (prompt on macOS and Linux, engine check on Windows).
-      Confirmed by the maintainer on 2026-11-13: `lone_modifier_tap_max_ms` gets a 10000 ms maximum and
-      `mod_combos.simultaneous_threshold_ms` becomes a whole number from 1 to 1000 ms on the three OS. Decided by the
-      agent, to review by the maintainer: LLM temperature 0 to 1.3 and context length 80 to 4000 (their engines'
-      limits), CapsWord idle timeout at most 3600 s, URLs at most 2048 characters, the updater interval kept on its
-      snap-to-preset rule, a typed user-code delay the one menu refusal told in words. Worker J landed the remaining
-      families on 2026-11-14 after CI run [43573261329](https://github.com/adrienm7/ergopti/actions/runs/43573261329) (its macOS Install-and-launch rows passed on the same
-      macOS code in [43550976833](https://github.com/adrienm7/ergopti/actions/runs/43550976833)): the updater check interval, the metrics application score, the layer
-      editor repeat count, the layout editor's tap-hold threshold and virtual key, the prompt binding's prediction
-      count, the Linux stored proxy override, the Windows magic-key source and log level, and the macOS hotstring
-      editor shortcut, each at entry, load and boundary with tests per OS (« Migration status » rows of the
-      inventory, each with its agent decision). The one-shot timeout followed on 2026-11-14 after CI run
-      [43587610549](https://github.com/adrienm7/ergopti/actions/runs/43587610549) (its failed jobs rerun: the
-      Windows core input-burst case passed, the macOS Intel managed Ollama cell failed on a refused model pull,
-      then on the rerun's missing build handoff): `tap_holds.sticky_timeout_ms` is declared from 0 (no time
-      limit, worker A's rule) to 2147483647 ms, the Windows timer ceiling (decided by the agent on 2026-11-14,
-      to review by the maintainer), and the shared Lua rule and its AHK port read it at entry, load and
-      boundary. The same landing keeps the schema's provenance (default_from, max_from) out of the generated
-      runtime projections, the Windows bundle manifest red of dev run 43579693369.
-- [x] **Direct XKB and KLC compilers.** Replace the compiled `.keylayout` as the intermediate form for Linux and
-      Windows: compile the Ergopti TOML source straight to XKB and to KLC, using each format's full capability
-      (XKB levels 3 and 5 on any key and sided modifiers; KLC Kana/Roya/Loya bits), so sided-modifier layers are
-      no longer dropped. What a format truly cannot express goes in the per-target omission report and is emulated
-      by the driver. The existing layouts stay byte-for-byte regression fixtures.
-      Done 2026-11-13 (worker C, `claude/ergopti-todo-compilers`): `layout_composer/target_compiler.js` compiles a
-      source straight to the writers' canonical form (no `.keylayout` text); XKB gets an eleven-level type with one
-      modifier on the fifth level (a sided or custom modifier, on Caps Lock, Shift, Ctrl, Win, Left Alt or Menu),
-      KLC the Kana/Roya/Loya shift states on a plain scan code; the rest is reported with a stable reason
-      ([layout-source-format.md](docs/design/layout-source-format.md#direct-xkb-and-klc-compilation)). The registry
-      layouts keep their XKB and KLC bytes; libxkbcommon and xkbcomp load the fifth level. Decided by the agent on
-      2026-11-13, to review by the maintainer: Kana keeps AltGr in a KLC when its key is Right Alt. One
-      fifth-level modifier, the first in layer order: confirmed by the maintainer on 2026-11-13 (relayed by the
-      coordinator). The Linux install writes its XKB from the same compilation (the page's `target`, checked by
-      `composer.lua` `check_target`, test `direct-xkb-install`); a real desktop check is in
-      [TODO-tests-linux.md](TODO-tests-linux.md). Fixed 2026-11-14 (worker C): the shared page bridge
-      (`manager_bridge.lua`) rebuilt the `composer_save` payload without `target`, so the editor's Linux install
-      still converted the `.keylayout`; it now forwards the target, test « hands the page's converter target to the
-      registry ».
-- [x] **Layout editor in its own window on the three OS.** Move the unified editor out of the layout manager
-      window into a separate window (macOS, Linux and Windows), and give the Windows WebView2 host
-      `source_open`/`source_save`/`source_editor` so Windows also replaces the old composer.
-      Done 2026-11-13 by worker E: page `_shared/ui/layout_editor_window` (manifest id `layout_editor_window`), opened
-      by the menu row and the manager's « Layout editor » (`open_editor`); macOS `ui/layout_manager` window factory,
-      Linux `ui/layout_manager/bridge.lua` handler factory (`editor_bridge.lua`), Windows `editor_window.ahk` over
-      `LayoutManager_HandleEditorAction`. One page per window decided by the agent on 2026-11-13, to review by the
-      maintainer. Left: retire the hidden composer section of the manager page; the window on a real PC and Mac is in
-      the TODO-tests files.
-- [x] **XKB and KLC downloads generated by the local host.** The app's editor page no longer sends the user to the
-      site for these two files: the host generates them with the shared code, offline. Done 2026-11-14 (worker C):
-      the layout editor window loads the Lua VM, the KLC generator and the generated export data
-      (`layout_editor/_generated/export_assets.js`: the export adapter's Lua sources and the XKB converter data) and
-      builds the XKB archive and the `.klc` (and the DLL images and the macOS bundle) as the site does, byte for
-      byte; the new `source_export` action hands the bytes to the host's store, which writes them to the Downloads
-      folder without replacing a file (`source_store.lua` on macOS and Linux, `source_store.ahk` on Windows). Tests:
-      `test-layout-editor-target-exports.cjs` (same bytes as the site), `test-layout-manager-page.cjs`, the Lua store
-      and bridge cases, the macOS registry case, the AHK store and editor window cases. Decided by the agent on
-      2026-11-14, to review by the maintainer: the Downloads folder rather than a save dialog (Hammerspoon and
-      WebKitGTK have no save panel). Real-window checks in the three TODO-tests files (`layout_editor_downloads`).
-- [x] **COSMIC focus: support `zcosmic_toplevel_info` v1 and v2+** (v2+ announces windows through
-      ext-foreign-toplevel-list); choose by what the compositor offers, with tests for both. Done 2026-11-13 (worker D):
-      `cosmic_toplevel_worker.lua` binds version 2 when the compositor offers it beside
-      `ext_foreign_toplevel_list_v1` (windows from the list, each one's state through `get_cosmic_toplevel`, the batch
-      committed atomically by the info `done`), version 1 otherwise; unit tests plus the protocol fake in three modes
-      (v1, v2, v2-without-list) in the compositor-focus CI step. Linux only: COSMIC is a Linux desktop. Real
-      cosmic-comp check in TODO-tests-linux.md (`wayland_focus`).
-- [x] **GNOME layout switch through the Ergopti GNOME Shell extension** (the one planned for focused-app identity),
-      instead of rewriting the `sources` list; keep a clear refusal when the extension is absent. Done 2026-11-13
-      (worker D): `focus@ergopti.fr` exports `org.ergopti.InputSource1.Activate(s) -> b` at `/org/ergopti/InputSource` on
-      the Shell's connection and activates the source as the Shell's switcher does (interactive, so the recent list
-      follows); `input_source_switch.lua` calls it through `gdbus` and never writes `sources`. Without the extension
-      (Flatpak, turned off, or an update before the next login) the switch is refused with `gnome_extension_missing`
-      and the menu says why (`menu.layout.select_failed_gnome_extension`, 21 locales). Proved on a headless GNOME
-      Shell 46 (`run_input_sources_live.sh gnome`: 16 checks, the sources list untouched; `gnome-no-extension`: 9
-      checks, the refusal named, the layout kept). Linux only: Windows and macOS switch through their own system
-      APIs. Decided by the agent on 2026-11-13, to review by the maintainer: the exported method admits any client of
-      the user's session bus, which can already write the same `gsettings`. Real-desktop check in TODO-tests-linux.md
-      (`wayland_focus`).
-- [x] **GTK 3 Compose:** enable IBus for Compose when no input method is active; never replace an active fcitx5;
-      keep the inlined single-character rules as the safety net, and state the remaining limit in the menu. Done
-      2026-11-13 (worker D): the user installer (`publish_compose_input_method` in `layout_package.py`) writes
-      `GTK_IM_MODULE=ibus` to `~/.config/environment.d/90-ergopti-ibus.conf` and an autostart for `ibus-daemon` (system
-      layout kept) only while a Compose block exists, IBus is installed and no input method runs; a running fcitx5 (or
-      any other) withdraws Ergopti's files, a user file of the same name is never touched, GNOME already composes
-      through IBus. The inlined single-character rules stay. Layout > « Custom layouts » shows a row from the state the
-      installer records (`compose_input_method`, 5 keys in 21 locales): all sequences through IBus, IBus from the next
-      login, your input method, or single-character sequences only. Linux only: macOS and Windows have no Compose file.
-      Decided by the agent on 2026-11-13, to review by the maintainer: GTK_IM_MODULE only (Qt and libX11 read the
-      includes), and only from the user installer (the site's system installer runs as root and cannot see the
-      session's input method). Real-desktop check in TODO-tests-linux.md (`input_policies`).
-- [x] **UPD-2 on AHK confirmed:** manual checks, changelog/Versions windows, channel and interval settings and the
-      update prompt run while paused, as on macOS and Linux; background checks keep their pause drop.
-      Done 2026-11-13 by worker E (see the « UPD-2 on AHK » line of « Remaining code work »).
-- Validated as they are: structured import keeps action/state names and modifier tokens; the editor page compiles
-  and the host never recompiles; macOS ANSI swaps are declared per layout; Unicode names inlined in the app and
-  lazy on the site; KMD-3 Linux `awake_ms`; MRT-004 `core.json` fence; resting-thumb bounds (tighten from the next
-  Mac report); custom logs folder named `ergopti_plus` renamed to `Ergopti`; a superseded site deployment stays
-  red; macOS marks a keyless API entry when its key is read; the navigation-owner DLL fingerprint derived by the
-  migration (byte identity to confirm on the Windows PC, see TODO-tests-windows.md).
-- **Hardware checks** are in [TODO-tests-macos.md](TODO-tests-macos.md),
-  [TODO-tests-windows.md](TODO-tests-windows.md) and [TODO-tests-linux.md](TODO-tests-linux.md).
+- **Identity.** Every commit is authored and committed as the maintainer (skill `commit-and-push`), with no AI
+  trailer (`tools/lint/check-commit-identity.cjs` checks it in the `commit-msg` hook and over each pushed range in
+  CI); in a fresh container set the repository's local `user.name` and `user.email` first.
+- **Gates** before each commit: `node tools/lint/format.cjs --check` (Ruff 0.15.8 on `PATH`),
+  `node tools/lint/lint-conventions.js --fail-on-violations` and the tests of the change; never bypass the hook.
+- **Done** means local gates pass and CI on the three OS (ci.yml, `os_lanes=all`) shows no new red. Each push cancels
+  the previous dev run: space the pushes so a full run completes, then read its reds by name.
+- **Landing someone else's branch:**
+  `git rebase origin/dev --exec 'git commit --amend --no-edit --reset-author --no-verify -q'`, then
+  `node tools/dev/coordinator/renumber-suite-ordinals.cjs`, `node tools/test/test-js-feature-inventory.cjs`,
+  `node tools/lint/check-commit-identity.cjs --range origin/dev..HEAD`, format and lint, push.
+- **Site deploy.** Once a dev run completes with its 5 site jobs green:
+  `gh workflow run deploy-site.yml --repo adrienm7/ergopti --ref dev -f run_id=<id>`.
+- **New design questions:** pick the safest option that follows AGENTS.md, note « decided by the agent on <date>,
+  to review by the maintainer » under « Maintainer decisions pending », and keep going.
+- **Delete what you finish** in the same commit, naming it and its proof in the commit message; real-machine checks
+  live only in the TODO-tests files. Never commit a non-anonymized field report, never cancel a CI run you did not
+  start, never use `git stash`, `reset` or `clean` as shortcuts.
 
 ## Full accessibility (maintainer request, 2026-11-16, very important)
 
@@ -339,25 +79,6 @@ is held to it from now on.
       accessibility texts (alt texts and labels are translated, not left in English).
 - [ ] **Accessibility statement.** A public page stating the conformance level, known gaps and a contact to
       report a barrier.
-
-## Commit identity (maintainer request, 2026-11-14)
-
-- [x] **Commits in the maintainer's name.** From 2026-11-14 23:00 Paris every agent commits as the maintainer
-      (skill `commit-and-push`); `tools/lint/check-commit-identity.cjs` refuses an AI assistant author or committer
-      and AI attribution trailers in the `commit-msg` hook and over each pushed range in CI.
-- [x] **Rewrite the « Claude » commits on dev (maintainer, 2026-11-14; done 2026-11-16).** git filter-repo mapped
-      author and committer « Claude <noreply@anthropic.com> » to the maintainer on all 21616 dev commits (1297
-      authored, 1343 committed), dropped any Co-Authored-By Claude/Anthropic, Claude-Session and session-link line,
-      and kept the final tree byte-identical; dev was force-pushed once with --force-with-lease (4b3069af83 →
-      e953d7fe69). The commit ids cited in tracked files were mapped to the new history. Scope chosen by the
-      maintainer on 2026-11-16: identity and trailers only; the technical mentions (CLAUDE.md, the Anthropic API
-      provider, model names) stay in the messages. main had none. The old dev is kept as the local ref
-      backup/dev-before-rewrite-2026-11-16 on the maintainer's Windows clone.
-      [LATER] The 230 remote topic branches (`claude/*`, `wip/*`, `tmp/*`, `dependabot/*`) still hold the old history:
-      28 are contained in dev, 5 merge cleanly with new work (claude/ergopti-todo-mlc005-rows,
-      claude/ergopti-devfix-full-save-reschedule, claude/ergopti-todo-linux-macos-tqq3lp, two dependabot), 185
-      conflict with dev; sort them (land or drop) so only dev, main, gh-pages and sparkle-appcasts remain.
-      Every clone made before 2026-11-16 must be reset to the new dev (git fetch && git reset --hard origin/dev).
 
 ## Ergopti Studio inside Ergopti+ (maintainer request, 2026-11-14)
 
@@ -2005,33 +1726,18 @@ Each closes on a named green hosted or native run, recorded here.
 
 ## Maintainer decisions pending
 
-The questions answered on 2026-11-13 (OSM-002, the coordinator's decisions of 2026-11-11 and 2026-11-12) are
-under « Maintainer decisions of 2026-11-13, to implement » at the top.
+Each question names the default kept meanwhile; an answer moves into the item or into
+[maintainer decisions](docs/memory/maintainer-decisions.md).
 
-- [x] **Name the in-app layout editor window Ergopti Studio?** Answered by the maintainer on 2026-11-14: yes, under
-      « Ergopti Studio inside Ergopti+ » (window and menu row « Ergopti Studio », 21 locales).
-- [x] **Site restructured around the project (maintainer, 2026-11-14).** Short home page presenting the three
-      products; header « Ergopti » / « Optimisation de l’ergonomie clavier » with a three-entry menu (Ergopti,
-      Ergopti+, Studio), each with its icon; the layout version selector only on the `/ergopti` pages and the
-      Ergopti+ version on the `/ergopti-plus` pages. Map in `src/lib/js/siteNavigation.js`; every former address and
-      anchor redirects (`/editeur`, `/benchmarks`, `/utilisation`, `/informations`, `/#…`, `/ergopti-plus#ep-…`).
-      Ergopti+ one page → overview plus seven sub-pages, measured headless Chromium at 4× CPU slowdown, median of 3
-      (weight, DOM nodes, load event, total blocking time): before `/ergopti-plus` 1804 KiB, 9548 nodes, 1434 ms,
-      1498 ms; after `/ergopti-plus` 408 KiB, 347 nodes, 1168 ms, 520 ms; the heaviest sub-pages are `ia` (1487 KiB,
-      its lazy driver frames) and `fonctionnalites` (1079 nodes, TBT 564 ms); `installation` 976 KiB, 329 nodes once
-      its five inventory tables render only when opened (6678 nodes before).
-- [ ] **For the maintainer: placements decided by the agent on 2026-11-14, to review.** The former Utilisation page is
-      split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and `/ergopti/installation`
-      (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on installation. No
-      `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations). Ergopti+ sub-pages:
-      présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités (tap-holds, raccourcis,
-      trackpad, métriques), configuration (réglages, vie privée), installation (démarrer, télécharger), faq; no
-      « versions » page, its changelog stays in the app. The floating reference keyboard only shows on the
-      `/ergopti` pages. Ergopti Studio has two tabs, « Éditer » (`/studio`) and « Comparer » (`/studio/comparer`,
-      framing the shared layout analysis page and fitting its reported height). The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark disc of the
-      logos) is new.
-      [DECISION] Left (2026-11-15): all of it is implemented (fb510e1113, f555c231e5); the maintainer approves or
-      changes the placements listed above.
+- [ ] **Site placements decided by the agent on 2026-11-14 (implemented: fb510e1113, f555c231e5).** The former
+      Utilisation page is split into `/ergopti/utilisation` (« Essayer » : online typing and text replacements) and
+      `/ergopti/installation` (downloads, OS guides, printable layouts); `/utilisation` without an anchor lands on
+      installation. No `/ergopti/faq`: the layout has no FAQ content yet (« Autocritiques » stays in Informations).
+      Ergopti+ sub-pages: présentation (Pour qui, Déjà en Ergopti, Comparatif), hotstrings, ia, fonctionnalités
+      (tap-holds, raccourcis, trackpad, métriques), configuration (réglages, vie privée), installation (démarrer,
+      télécharger), faq; no « versions » page, its changelog stays in the app. The floating reference keyboard only
+      shows on the `/ergopti` pages. The Studio icon (`static/img/logo/studio.svg`: a keycap and a pencil on the dark
+      disc of the logos) is new. Approve or change.
 - [ ] **Windows layout DLL builder on a PC without the ARM64 C++ tools? (asked 2026-11-16)** The PC's Visual Studio
       2019 Build Tools have the x64/x86 tools only; `build_windows_keyboard_layout.ps1` requires ARM64 too and refuses
       before compiling. The three other images compile there (TODO-tests-windows.md, PC run 2026-11-16).
@@ -2056,3 +1762,21 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
   2. Turn the master off at loss (the config keeps `enabled = true`, the next start reads the pad again) and
      notify the user once; settings stay editable.
   3. Keep today's stop and only make the settings editable while no reader runs.
+- [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
+      key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
+      MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
+      and corner mark); ISO ticks for split and ortholinear boards.
+- [ ] **Agent decisions to review.** Each is implemented as written; confirm or change:
+  - one-shot modifiers: one `sticky_altgr` covers AltGr and Kana (Windows sends the layout's own AltGr key, Kana on
+    a Kana-style layout); the shipped AltGr key keeps its Tab tap;
+  - value limits ([inventory](docs/design/value-validation-inventory.md), « Migration status »): LLM temperature 0
+    to 1.3, context length 80 to 4000, CapsWord idle timeout at most 3600 s, URLs at most 2048 characters, the
+    updater interval on its snap-to-preset rule, `tap_holds.sticky_timeout_ms` up to 2147483647 ms, and each
+    family's row decision;
+  - compilers: Kana keeps AltGr in a KLC when its key is Right Alt;
+  - Ergopti Studio: one page per window; the menu row right after « Keyboard layout »; the editor's tab bar
+    placement; the key-colour selector and its green-to-red scale; the Comparer's colours, folding and share
+    wording; one fingering profile per keyboard model (version 1 profiles not carried over);
+  - Linux: the GNOME extension's `org.ergopti.InputSource1` admits any client of the session bus; GTK 3 Compose
+    sets `GTK_IM_MODULE` only, from the user installer only;
+  - pause: a dead key pending in the system's own layout (no emulation) stays the OS's state.
