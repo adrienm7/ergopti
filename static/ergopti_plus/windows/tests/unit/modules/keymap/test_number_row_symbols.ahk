@@ -686,7 +686,9 @@ Test("number row: with the layout off a stored « digits first » says it is not
 _NRP_NoHardcodedEdgeTable() {
 	Source := _DriverSourceNoComments()
 	StrReplace(Source, "NumberRowEdgeText(", , , &Readers)
-	AssertTrue(Readers >= 5, "the edge-key readers must be found (" . Readers . ")")
+	; The definition and its three readers: the magic editor, the tap keys and the
+	; number-row send (the retired layer editor page was the fifth).
+	AssertTrue(Readers >= 4, "the edge-key readers must be found (" . Readers . ")")
 	for Pattern in ['0x29, "$"', '0x0C, "%"', '0x0D, "="', "ErgoptiNumberRowEdgeMapping"]
 		AssertEqual(0, InStr(Source, Pattern), "no hardcoded edge table: " . Pattern)
 	AssertEqual(0, RegExMatch(Source, '"\$"\s*,[^\n]*"%"\s*,[^\n]*"="'), "no « $ % = » literal list")
