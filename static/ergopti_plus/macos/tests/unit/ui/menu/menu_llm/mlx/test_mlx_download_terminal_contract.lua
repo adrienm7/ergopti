@@ -174,6 +174,23 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 		end)
 	end)
 
+	-- CI 2026-11-17: an admission port without refusal_exit_code (the receiving
+	-- owner fixture's) made the module unloadable, a load-time nil table key.
+	helpers.it("loads and names the step with an admission port lacking the refusal code (mlx-launcher-cause-2026-11-15)", function()
+		local real = require("modules.llm.opaque_network_admission")
+		local port = setmetatable({}, { __index = function(_, key)
+			if key ~= "refusal_exit_code" then return real[key] end
+		end })
+		with_fixture({ network_admission = port }, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			fixture.controls.latest("launcher"):complete(78)
+			assert_cancelled(fixture, "launcher_failed")
+			local line = fixture.records.errors[#fixture.records.errors]
+			helpers.assert_true(line:find("exit=78, step=unknown,", 1, true) ~= nil,
+				"without the port's refusal code the step stays unknown: " .. line)
+		end)
+	end)
+
 	-- The two launcher refusals shared exit 1 and the import probe discarded the
 	-- interpreter's error (>/dev/null 2>&1): neither the code nor the output named why.
 	helpers.it("gives each launcher refusal its own exit and keeps the import error (mlx-launcher-cause-2026-11-15)", function()

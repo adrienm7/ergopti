@@ -79,18 +79,23 @@ local LAUNCHER_IMPORTS_FAILED_EXIT = 11
 local LAUNCHER_STEPS = {
 	[LAUNCHER_INTERPRETER_MISSING_EXIT] = "interpreter_missing",
 	[LAUNCHER_IMPORTS_FAILED_EXIT] = "download_imports_failed",
-	[NetworkAdmission.refusal_exit_code] = "network_admission_refused",
 }
 -- Launcher output lines kept for the failure line: the import error's
 -- traceback ends with the line that names the module and the cause.
 local LAUNCHER_TAIL_LINES = 16
 
 --- Names the launcher step a terminal exit code reports.
---- A clean exit fails only when it never reported the download PID.
+--- A clean exit fails only when it never reported the download PID. The
+--- admission's refusal code is read at call time, never at module load: a
+--- load-time table key made the module unloadable wherever the admission is
+--- an owner without that field (a nil key raises "table index is nil").
 --- @param code any Launcher exit code.
 --- @return string step Stable step name for the failure line.
 local function launcher_failed_step(code)
 	if code == 0 then return "pid_not_reported" end
+	if code ~= nil and code == NetworkAdmission.refusal_exit_code then
+		return "network_admission_refused"
+	end
 	return LAUNCHER_STEPS[code] or "unknown"
 end
 

@@ -925,10 +925,16 @@ exit "$received"`;
 		}
 	);
 	assert.ifError(admittedLauncher.error);
+	// The dependency refusal has its own exit (11, since the 2026-11-15 field
+	// report's bare exit 1 could not name the step) and states itself on stdout.
 	assert.equal(
 		admittedLauncher.status,
-		1,
+		11,
 		'original dependency refusal stops the admitted full MLX launcher'
+	);
+	assert.ok(
+		admittedLauncher.stdout.includes('huggingface_hub/truststore manquants (import status 1)'),
+		'the dependency refusal names the import status on stdout'
 	);
 	assert.equal(
 		fs.readFileSync(managedCalls, 'utf8'),
