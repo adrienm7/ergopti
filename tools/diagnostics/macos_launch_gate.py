@@ -31,6 +31,14 @@ driver log, never an exit: a user whose grant went stale with a new build was
 otherwise told to relaunch into the same refusal. plain_open launches the way
 a double-click does, without `open -n`.
 
+symlinked_applications, spaced_accented_path and translocated launch the same
+installed bundle from another location (macos_app_relocation.py): through a
+linked application folder, from a folder named with a space and an accent, and
+from an App Translocation mount. The exact-path launcher helper proof of
+platform/remap/lease_helper.lua compares paths derived from the bundle path
+macOS reports, so every healthy scenario must log that the helper resolved to
+the launcher it actually runs, and none may log its refusal.
+
 karabiner_config uses the real packaged Hammerspoon JSON runtime and production
 build, merge and conditional file publication owners for eight preset/switch
 vectors. It preserves personal rules and restores the exact private source
@@ -78,6 +86,7 @@ import time
 import uuid
 
 import macos_app_dirs as app_dirs
+import macos_app_relocation as relocation
 from hs_delayed_timer_probe import (
     AppleScriptPreference,
     INSTALLED_EXECUTABLE,
@@ -113,6 +122,11 @@ CONFIG_TEMPLATE = (
     / "static/ergopti_plus/macos/_generated/config_template.toml"
 )
 CONFIGURED_MARKER = "embedded Hammerspoon bootstrap logger configured"
+# init.lua's boot note of the exact-path launcher helper proof (MLC-005).
+HELPER_RESOLVED = re.compile(r"Launcher helper resolved: ([/~].+)\.$")
+HELPER_REFUSED = "Launcher helper refused:"
+# How long the gate waits for one candidate bundle's launcher to appear.
+RUNNING_BUNDLE_SECONDS = 15
 STARTUP_TIMEOUT_SECONDS = 90
 ALIVE_WINDOW_SECONDS = 15
 QUIT_TIMEOUT_SECONDS = 10
@@ -142,6 +156,7 @@ SCENARIOS = (
     "dangling_logs",
     "configured_symlink",
     "plain_open",
+    *relocation.SCENARIOS,
 )
 # The pull-request and plain-push gate has always launched every scenario but
 # these two on one runner. Each repeats a state that a CI scenario already
@@ -514,6 +529,7 @@ def evaluate(scenario, observation, *, defer_native=False):
     errors = [line for line in driver_log.splitlines() if "[ERROR]" in line]
     if errors:
         failures.append("the driver logged an ERROR: " + errors[0])
+    failures.extend(helper_failures(observation))
     if not observation.get("alive_after_window"):
         failures.append(
             "the launcher and embedded Hammerspoon did not both survive the observation window"
@@ -526,6 +542,48 @@ def evaluate(scenario, observation, *, defer_native=False):
     for problem in observation.get("state_problems", []):
         failures.append(problem)
     return failures
+
+
+def helper_failures(observation):
+    """Require the boot note that the launcher helper resolved to a running launcher."""
+    driver_log = observation.get("driver_log", "")
+    refused = [line for line in driver_log.splitlines() if HELPER_REFUSED in line]
+    if refused:
+        return ["the exact-path launcher helper was refused: " + refused[0]]
+    resolved = [
+        match.group(1)
+        for match in (HELPER_RESOLVED.search(line) for line in driver_log.splitlines())
+        if match
+    ]
+    if len(resolved) != 1:
+        return [f"the driver log holds {len(resolved)} launcher helper resolutions, not one"]
+    expected = observation.get("launcher_helpers", [])
+    if resolved[0] not in expected:
+        return [f"the launcher helper resolved to {resolved[0]}, not one of {expected}"]
+    return []
+
+
+def helper_spellings(executables, home):
+    """Each launcher path as logged: raw, or with the home folder redacted to "~"."""
+    spellings = []
+    for executable in executables:
+        text = str(executable)
+        spellings.append(text)
+        if text.startswith(str(home) + "/"):
+            spellings.append("~" + text[len(str(home)) :])
+    return spellings
+
+
+def running_bundle(candidates, timeout=RUNNING_BUNDLE_SECONDS, sleep=time.sleep):
+    """Return the first candidate bundle whose launcher runs, or None after the timeout."""
+    deadline = time.monotonic() + timeout
+    while True:
+        for bundle in candidates:
+            if processes(bundle / "Contents/MacOS/ErgoptiPlus"):
+                return bundle
+        if time.monotonic() >= deadline:
+            return None
+        sleep(0.25)
 
 
 def quit_evidence_detail(evidence):
@@ -1032,9 +1090,27 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
         report["qualification"] = qualification
         report["native_qualified"] = False
     state = seed(scenario, home, seed_tag, datetime.date.today().isoformat())
-    started = time.monotonic()
     observation = {}
     diagnostic_errors = []
+    moved = None
+    opened = app
+    candidates = [app]
+    if scenario in relocation.SCENARIOS:
+        moved = relocation.Relocation(scenario, app, home)
+        try:
+            opened = moved.enter()
+        except Exception:
+            # A half-entered location must not outlive the scenario that made it.
+            moved.leave()
+            raise
+        candidates = moved.candidates(opened)
+        report["opened_bundle"] = str(opened)
+        launcher = opened / "Contents/MacOS/ErgoptiPlus"
+        child = opened / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
+    observation["launcher_helpers"] = helper_spellings(
+        [bundle / "Contents/MacOS/ErgoptiPlus" for bundle in candidates], home
+    )
+    started = time.monotonic()
     native = scenario in NATIVE_FEATURES
     scripting = AppleScriptPreference(HS_DOMAIN) if native else None
     preference_settled = not native
@@ -1055,9 +1131,17 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
             observation["native_scripting_preference_error"] = bounded_refusal(error)
     try:
         result = subprocess.run(
-            launch_command(scenario, app), capture_output=True, text=True, timeout=15
+            launch_command(scenario, opened), capture_output=True, text=True, timeout=15
         )
         report["open"] = {"code": result.returncode, "stderr": result.stderr}
+        if moved is not None:
+            # macOS may run the bundle as opened or at its resolved path; follow
+            # the one that runs, so every later check names the real processes.
+            bundle = running_bundle(candidates)
+            report["running_bundle"] = str(bundle) if bundle is not None else None
+            if bundle is not None:
+                launcher = bundle / "Contents/MacOS/ErgoptiPlus"
+                child = bundle / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
         ready_at = None
         while time.monotonic() - started < STARTUP_TIMEOUT_SECONDS:
             alive = bool(processes(launcher)) and bool(processes(child))
@@ -1133,6 +1217,18 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
                         os.kill(pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+            if moved is not None:
+                try:
+                    deadline = time.monotonic() + QUIT_TIMEOUT_SECONDS
+                    while processes(launcher) or processes(child):
+                        if time.monotonic() >= deadline:
+                            raise RuntimeError("the relocated application did not stop")
+                        time.sleep(0.05)
+                    moved.leave()
+                except Exception as error:
+                    diagnostic_errors.append(
+                        f"Relocation could not be undone: {type(error).__name__}: {error}"
+                    )
         finally:
             if scripting is not None:
                 try:

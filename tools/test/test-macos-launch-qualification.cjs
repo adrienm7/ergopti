@@ -51,7 +51,10 @@ const scenarios = [
 	'tilde_paths',
 	'dangling_logs',
 	'configured_symlink',
-	'plain_open'
+	'plain_open',
+	'symlinked_applications',
+	'spaced_accented_path',
+	'translocated'
 ];
 const runners = ['macos-15', 'macos-15-intel'];
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
@@ -113,7 +116,7 @@ try {
 	// Apple silicon launches its first lot on macOS 15 and its last lot, which
 	// holds no deferrable scenario, on macOS 26; Intel launches all on macOS 15.
 	const layout = [
-		...scenarios.map((scenario, index) => [index < 7 ? runners[0] : 'macos-latest', scenario]),
+		...scenarios.map((scenario, index) => [index < 8 ? runners[0] : 'macos-latest', scenario]),
 		...scenarios.map((scenario) => [runners[1], scenario])
 	];
 	// A deferrable scenario is refused on macOS 26; any other one records full there.
