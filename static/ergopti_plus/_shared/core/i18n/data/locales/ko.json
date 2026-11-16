@@ -4558,7 +4558,7 @@
 	"layout_analysis.panel.compare": "Compare with other layouts",
 	"layout_analysis.panel.title": "자판 분석",
 	"layout_analysis.panel.score": "점수 {score} · {count}개 중 {rank}위",
-	"layout_analysis.panel.ranking": "라이브러리와 순위 비교 중…",
+	"layout_analysis.panel.ranking": "선택한 배열 중 순위 계산 중…",
 	"layout_analysis.panel.unavailable": "이 자판은 여기서 분석할 수 없습니다({reason}).",
 	"layout_analysis.panel.weights_note": "« 비교 »에서 설정한 가중치와 이상적인 손가락 부하로 채점했습니다.",
 	"layout_analysis.panel.heat.label": "Key colours",
