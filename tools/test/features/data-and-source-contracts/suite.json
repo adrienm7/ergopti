@@ -925,7 +925,7 @@
 		},
 		{
 			"id": "js-0541",
-			"ordinal": 668,
+			"ordinal": 669,
 			"name": "Windows OS-purity ratchet exempts the structure plan's platform domains as its adapters",
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-os-purity-platform.cjs"],
@@ -933,7 +933,7 @@
 		},
 		{
 			"id": "js-0542",
-			"ordinal": 669,
+			"ordinal": 670,
 			"name": "structure plan puts every platform domain on every driver, by moved files or a listed README marker",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-platform-markers.cjs"],
@@ -941,7 +941,7 @@
 		},
 		{
 			"id": "layout-shortcut-keys",
-			"ordinal": 670,
+			"ordinal": 671,
 			"name": "a key's shortcut key is carried by the .keylayout, XKB, KLC and DLL goldens",
 			"cmd": "node",
 			"args": ["tools/test/test-layout-shortcut-keys.cjs"],
@@ -949,7 +949,7 @@
 		},
 		{
 			"id": "windows-lua-export-identity",
-			"ordinal": 672,
+			"ordinal": 673,
 			"name": "the committed Windows Lua export host matches its pin, sources and identity, or neither is shipped",
 			"cmd": "node",
 			"args": ["tools/test/test-windows-lua-export-identity.cjs"],
@@ -957,7 +957,7 @@
 		},
 		{
 			"id": "structure-keymap-registry",
-			"ordinal": 673,
+			"ordinal": 674,
 			"name": "structure plan keeps the macOS hotstring registry beside its expander siblings",
 			"cmd": "node",
 			"args": ["tools/test/test-structure-keymap-registry.cjs"],
