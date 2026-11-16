@@ -123,8 +123,8 @@ local KINDS = {
 	},
 }
 
---- The longest cause a field check value carries (Report.MAX_VALUE_LENGTH is 48).
-M.CAUSE_MAX_LENGTH = 40
+--- The longest cause: the field check reports it as one step value.
+M.CAUSE_MAX_LENGTH = require("diagnostics.engine.field_check.report").MAX_VALUE_LENGTH
 
 --- The helper trail's first refusal, or else its last note, as one closed
 --- token: `refused-source-root-dup-errno-24@OwnedRuntimeInstallWorker.swift:239`
