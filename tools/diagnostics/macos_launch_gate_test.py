@@ -1406,22 +1406,19 @@ class LauncherHelperTests(unittest.TestCase):
             self.assertIn(name, gate.PROFILES["release"])
 
 
-class FakeTranslocation:
-    """Records the mount calls a translocated relocation makes."""
+class FakeMounts:
+    """The mount(8), umount(8) and xattr(1) commands a translocated relocation runs."""
 
-    def __init__(self, root):
-        self.root = root
-        self.calls = []
+    def __init__(self, listing="", umount_status=0):
+        self.listing = listing
+        self.umount_status = umount_status
+        self.commands = []
 
-    def create(self, original):
-        self.calls.append(("create", original))
-        mounted = self.root / "AppTranslocation/0123/d" / original.name
-        mounted.mkdir(parents=True)
-        return mounted
-
-    def delete(self, mounted):
-        self.calls.append(("delete", mounted))
-        mounted.rmdir()
+    def __call__(self, arguments, **_):
+        self.commands.append(arguments)
+        stdout = self.listing if arguments == ["mount"] else ""
+        status = self.umount_status if arguments[0] == "umount" else 0
+        return subprocess.CompletedProcess(arguments, status, stdout, "busy" if status else "")
 
 
 class RelocationTests(unittest.TestCase):
@@ -1464,30 +1461,52 @@ class RelocationTests(unittest.TestCase):
             self.assertTrue(app.is_dir())
             self.assertFalse((home / "gitcfg/Applications de L\u00e9a").exists())
 
-    def test_translocation_quarantines_mounts_and_undoes_everything(self):
+    def test_translocation_approves_the_download_and_unmounts_its_mount(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             app, home = self.installed(root), root / "home"
-            commands = []
-            mounts = FakeTranslocation(root)
-            moved = relocation.Relocation(
-                "translocated",
-                app,
-                home,
-                runner=lambda arguments, **_: commands.append(arguments),
-                translocation=mounts,
-            )
-            opened = moved.enter()
             downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
-            self.assertEqual(opened, root / "AppTranslocation/0123/d/ErgoptiPlus.app")
-            self.assertEqual(commands[0][:4], ["xattr", "-r", "-w", "com.apple.quarantine"])
-            self.assertRegex(commands[0][4], r"^0083;[0-9a-f]+;Safari;[0-9A-F-]{36}$")
-            self.assertEqual(commands[0][5], str(downloaded))
+            mount = (
+                "/private/var/folders/2s/x/T/AppTranslocation/B2C29E2B-930B-4797-9886-B09FB53589D4"
+            )
+            mounts = FakeMounts(
+                f"{downloaded} on {mount} (nullfs, local, nodev, nosuid, read-only, nobrowse, "
+                "mounted by runner)\n/dev/disk3s1 on / (apfs, sealed, local, read-only)\n"
+            )
+            moved = relocation.Relocation("translocated", app, home, runner=mounts)
+            opened = moved.enter()
+            self.assertEqual(opened, downloaded)
+            self.assertEqual(mounts.commands[0][:4], ["xattr", "-r", "-w", "com.apple.quarantine"])
+            # The user-approved flags, not the pending 0083 that opens the Gatekeeper prompt.
+            self.assertRegex(mounts.commands[0][4], r"^00c3;[0-9a-f]+;Safari;[0-9A-F-]{36}$")
+            running = f"{mount}/d/ErgoptiPlus.app"
+            table = (
+                f"  12 {running}/Contents/MacOS/ErgoptiPlus\n"
+                f"  13 {running}/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon\n"
+            )
+            self.assertEqual(moved.find_running(opened, table), Path(running))
+            # The bundle as downloaded is not a translocation.
+            plain = f"  12 {downloaded}/Contents/MacOS/ErgoptiPlus\n"
+            self.assertIsNone(moved.find_running(opened, plain))
             moved.leave()
-            self.assertEqual(mounts.calls, [("create", downloaded), ("delete", opened)])
-            self.assertEqual(commands[1], ["xattr", "-dr", "com.apple.quarantine", str(downloaded)])
+            self.assertIn(["umount", mount], mounts.commands)
+            self.assertIn(
+                ["xattr", "-dr", "com.apple.quarantine", str(downloaded)], mounts.commands
+            )
             self.assertTrue(app.is_dir())
             self.assertFalse((home / "gitcfg/Downloads").exists())
+
+    def test_linked_folder_follows_the_resolved_bundle_that_runs(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, home = self.installed(root), root / "home"
+            moved = relocation.Relocation("symlinked_applications", app, home)
+            opened = moved.enter()
+            resolved = Path(os.path.realpath(home / "gitcfg/Applications/ErgoptiPlus.app"))
+            table = f"  7 {resolved}/Contents/MacOS/ErgoptiPlus\n"
+            self.assertEqual(moved.find_running(opened, table), resolved)
+            self.assertIsNone(moved.find_running(opened, "  7 /Applications/Other.app/x\n"))
+            moved.leave()
 
     def test_existing_location_is_refused_before_moving_the_bundle(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -1503,13 +1522,14 @@ class RelocationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             app, home = self.installed(root), root / "home"
-            mounts = FakeTranslocation(root)
-            mounts.delete = mock.Mock(side_effect=RuntimeError("busy mount"))
-            moved = relocation.Relocation(
-                "translocated", app, home, runner=lambda *_, **__: None, translocation=mounts
+            downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
+            mounts = FakeMounts(
+                f"{downloaded} on /private/var/folders/T/AppTranslocation/1 (nullfs, local)\n",
+                umount_status=1,
             )
+            moved = relocation.Relocation("translocated", app, home, runner=mounts)
             moved.enter()
-            with self.assertRaisesRegex(RuntimeError, "busy mount"):
+            with self.assertRaisesRegex(RuntimeError, "umount .* failed: busy"):
                 moved.leave()
             self.assertTrue(app.is_dir())
 

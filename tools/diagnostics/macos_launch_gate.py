@@ -574,13 +574,16 @@ def helper_spellings(executables, home):
     return spellings
 
 
-def running_bundle(candidates, timeout=RUNNING_BUNDLE_SECONDS, sleep=time.sleep):
-    """Return the first candidate bundle whose launcher runs, or None after the timeout."""
+def running_bundle(moved, opened, timeout=RUNNING_BUNDLE_SECONDS, sleep=time.sleep):
+    """Return the relocated bundle whose launcher runs, or None after the timeout."""
     deadline = time.monotonic() + timeout
     while True:
-        for bundle in candidates:
-            if processes(bundle / "Contents/MacOS/ErgoptiPlus"):
-                return bundle
+        table = subprocess.run(
+            ["ps", "-axo", "pid=,command="], capture_output=True, text=True, check=True
+        ).stdout
+        bundle = moved.find_running(opened, table)
+        if bundle is not None:
+            return bundle
         if time.monotonic() >= deadline:
             return None
         sleep(0.25)
@@ -1135,13 +1138,21 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
         )
         report["open"] = {"code": result.returncode, "stderr": result.stderr}
         if moved is not None:
-            # macOS may run the bundle as opened or at its resolved path; follow
-            # the one that runs, so every later check names the real processes.
-            bundle = running_bundle(candidates)
+            # macOS may run the bundle as opened, at its resolved path or from a
+            # translocation mount; follow the one that runs, so every later
+            # check names the real processes and the helper path they export.
+            bundle = running_bundle(moved, opened)
             report["running_bundle"] = str(bundle) if bundle is not None else None
             if bundle is not None:
                 launcher = bundle / "Contents/MacOS/ErgoptiPlus"
                 child = bundle / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
+                observation["launcher_helpers"] = helper_spellings(
+                    [launcher] + [b / "Contents/MacOS/ErgoptiPlus" for b in candidates], home
+                )
+            elif scenario == "translocated":
+                observation["launch_gate_error"] = (
+                    "macOS did not run the approved download from an App Translocation mount"
+                )
         ready_at = None
         while time.monotonic() - started < STARTUP_TIMEOUT_SECONDS:
             alive = bool(processes(launcher)) and bool(processes(child))
