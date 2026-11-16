@@ -550,7 +550,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!download ||
 		!soleBinding(safeRequire, 'mod_or_err', 'local ok, mod_or_err = pcall(require, module_id)') ||
 		!unique(safeRequire, 'return mod_or_err') ||
-		!unique(lex(init), 'llm = safe_require("ui.menu.menu_llm", "AI menu")') ||
+		!unique(lex(init), 'llm = safe_require("ai.ui.menu", "AI menu")') ||
 		!soleBinding(start, 'res', 'local ok_h, res = pcall(menu_mods.llm.create, {') ||
 		!unique(start, 'if ok_h then llm_handler = res') ||
 		!unique(start, 'llm_handler = llm_handler,') ||

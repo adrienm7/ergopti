@@ -114,8 +114,8 @@ module.exports.push(
 		},
 		{
 			path: 'macos/menu/ui/init.lua',
-			before: 'llm             = safe_require("ui.menu.menu_llm",             "AI menu")',
-			after: 'llm             = safe_require("ui.menu.unrelated_llm",             "AI menu")',
+			before: 'llm             = safe_require("ai.ui.menu",             "AI menu")',
+			after: 'llm             = safe_require("ai.ui.unrelated_menu",             "AI menu")',
 			reason: 'actual exported native download producer import disconnected',
 			expected: false
 		},
