@@ -1418,6 +1418,29 @@ class LauncherHelperTests(unittest.TestCase):
         )
         self.assertEqual(gate.evaluate("spaced_accented_path", logged), [])
 
+    def test_decomposed_helper_spelling_is_admitted(self):
+        # CI run 43923292049: the driver logged the macOS-reported NFD spelling.
+        home = Path("/Users/runner")
+        helper = home / "gitcfg/Applications de Léa/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+        logged = observe(
+            launcher_helpers=gate.helper_spellings([helper], home),
+            driver_log=helper_line(
+                "~/gitcfg/Applications de Léa/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
+            )
+            + "[SUCCESS] [onboarding] Onboarding wizard opened.\n",
+        )
+        self.assertEqual(gate.evaluate("spaced_accented_path", logged), [])
+
+    def test_processes_match_the_decomposed_ps_spelling(self):
+        executable = Path("/Users/runner/gitcfg/Applications de Léa/ErgoptiPlus.app/x")
+        table = (
+            "  41 /Users/runner/gitcfg/Applications de Léa/ErgoptiPlus.app/x\n"
+            "  42 /Users/runner/gitcfg/Applications de Lea/ErgoptiPlus.app/x\n"
+        )
+        listing = subprocess.CompletedProcess(["ps"], 0, table, "")
+        with mock.patch.object(gate.subprocess, "run", return_value=listing):
+            self.assertEqual(gate.processes(executable), [41])
+
     def test_relocated_scenarios_join_both_profiles(self):
         for name in relocation.SCENARIOS:
             self.assertIn(name, gate.PROFILES["ci"])
@@ -1479,6 +1502,10 @@ class RelocationTests(unittest.TestCase):
             self.assertIn(" ", str(opened))
             self.assertTrue((opened / "Contents/MacOS/ErgoptiPlus").is_file())
             self.assertEqual(moved.candidates(opened), [opened])
+            # macOS runs it under the decomposed spelling (CI run 43923292049).
+            running = str(opened).replace("Léa", "Léa")
+            table = f"  9 {running}/Contents/MacOS/ErgoptiPlus\n"
+            self.assertEqual(moved.find_running(opened, table), Path(running))
             moved.leave()
             self.assertTrue(app.is_dir())
             self.assertFalse((home / "gitcfg/Applications de L\u00e9a").exists())

@@ -21,6 +21,12 @@ for one launch-gate scenario and left exactly as it was found:
    SecTranslocateCreateSecureDirectoryForURL is refused there with EPERM.
 
 Every location lives under ~/gitcfg, which the runner reset owns.
+
+macOS reports a bundle path in its decomposed file-system spelling (NFD): the
+precomposed "Léa" the gate opens runs as "e" plus U+0301 in ps(1) and in the
+paths the launcher exports. APFS treats both spellings as one name, so paths
+are compared under one normalization (same_path_text) and the bundle is named
+as it runs (CI run 43923292049 never found the running launcher).
 """
 
 import os
@@ -29,6 +35,7 @@ import re
 import shutil
 import subprocess
 import time
+import unicodedata
 import uuid
 
 # Folder names below the home folder; "Léa" is written precomposed (NFC), the
@@ -45,6 +52,11 @@ APPROVED_QUARANTINE_FLAGS = "00c3"
 LAUNCHER_RELATIVE = "Contents/MacOS/ErgoptiPlus"
 TRANSLOCATION_MARKER = "/AppTranslocation/"
 NULLFS_MOUNT = re.compile(r"^(?P<source>.+) on (?P<target>.+) \(nullfs, ")
+
+
+def same_path_text(left, right):
+    """Whether two path spellings name one APFS path, precomposed or decomposed."""
+    return unicodedata.normalize("NFC", str(left)) == unicodedata.normalize("NFC", str(right))
 
 
 def quarantine_stamp(flags=APPROVED_QUARANTINE_FLAGS, now=time.time, identifier=uuid.uuid4):
@@ -108,9 +120,11 @@ class Relocation:
                 if TRANSLOCATION_MARKER in command and command.endswith(suffix):
                     return Path(command[: -len("/" + LAUNCHER_RELATIVE)])
             return None
+        # Named as it runs, so later exact-path checks see macOS's own spelling.
         for bundle in self.candidates(opened):
-            if str(bundle / LAUNCHER_RELATIVE) in commands:
-                return bundle
+            for command in commands:
+                if same_path_text(command, bundle / LAUNCHER_RELATIVE):
+                    return Path(command[: -len("/" + LAUNCHER_RELATIVE)])
         return None
 
     def translocation_mounts(self):

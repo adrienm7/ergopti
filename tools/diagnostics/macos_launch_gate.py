@@ -560,7 +560,8 @@ def helper_failures(observation):
     if len(resolved) != 1:
         return [f"the driver log holds {len(resolved)} launcher helper resolutions, not one"]
     expected = observation.get("launcher_helpers", [])
-    if resolved[0] not in expected:
+    # The driver logs the path macOS reports, in its decomposed spelling.
+    if not any(relocation.same_path_text(resolved[0], spelling) for spelling in expected):
         return [f"the launcher helper resolved to {resolved[0]}, not one of {expected}"]
     return []
 
@@ -636,7 +637,8 @@ def processes(executable):
     found = []
     for line in result.stdout.splitlines():
         parts = line.strip().split(None, 1)
-        if len(parts) == 2 and parts[1] == str(executable):
+        # ps(1) spells an accented path decomposed, as macOS reports it.
+        if len(parts) == 2 and relocation.same_path_text(parts[1], executable):
             found.append(int(parts[0]))
     return found
 
