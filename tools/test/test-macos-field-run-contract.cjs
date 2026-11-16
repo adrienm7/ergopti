@@ -1205,7 +1205,10 @@ function reportFolder(paths) {
 					fs.readFileSync(reportFile(folder, 'field_run_refused.json'), 'utf8'),
 					/"reason":"busy"/
 				);
-				assert.match(fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'), /^versions\s+exit=/m);
+				assert.match(
+					fs.readFileSync(reportFile(folder, 'steps.txt'), 'utf8'),
+					/^versions\s+exit=/m
+				);
 			} finally {
 				driver.child.kill();
 			}

@@ -593,7 +593,10 @@ function read(folder, name) {
 			assert.doesNotMatch(result.stderr, /could not be stashed/);
 			assert.match(result.stdout, /Tracked changes found/);
 			assert.match(git(paths.clone, 'stash', 'list'), /field-report auto-stash/);
-			assert.doesNotMatch(fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'), /# edit\n$/);
+			assert.doesNotMatch(
+				fs.readFileSync(path.join(paths.clone, '.gitignore'), 'utf8'),
+				/# edit\n$/
+			);
 		});
 	} finally {
 		fs.rmSync(scratch, { recursive: true, force: true });

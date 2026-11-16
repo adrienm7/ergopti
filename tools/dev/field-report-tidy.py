@@ -70,7 +70,9 @@ def write_readme(folder):
         "",
         "- `../{}/`: the scrubbed driver logs.".format(LOGS),
         "- `../{}/`: grep digests over those logs and crash summaries.".format(DIGESTS),
-        "- `../{}/`: every other step output (system, toolchain, Karabiner, runtime).".format(SYSTEM),
+        "- `../{}/`: every other step output (system, toolchain, Karabiner, runtime).".format(
+            SYSTEM
+        ),
         "- `../field_run/`: the app's own results per step (field_run_attempt_N: runs a reload cut short).",
         "",
     ]
@@ -84,7 +86,10 @@ def tidy(folder):
         target_dir.mkdir(exist_ok=True)
         target = target_dir / path.name
         if target.exists():
-            print("[field-report-tidy] kept {}: {} already exists".format(path.name, target), file=sys.stderr)
+            print(
+                "[field-report-tidy] kept {}: {} already exists".format(path.name, target),
+                file=sys.stderr,
+            )
             continue
         path.rename(target)
     (folder / MAIN).mkdir(exist_ok=True)
