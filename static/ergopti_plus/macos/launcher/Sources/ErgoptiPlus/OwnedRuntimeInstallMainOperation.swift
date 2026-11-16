@@ -14,8 +14,9 @@ import Security
 /// - `OWNED_RUNTIME_INSTALL|1|<result>` relays the helper's own closed line (exit 0);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|refused|<reason>` before any prompt (exit 77);
 /// - `OWNED_RUNTIME_INSTALL_REQUEST|1|cancelled` when the prompt was closed (exit 1);
-/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>[|<step>]` when the administrator shell failed (exit 75),
-///   with the staged program's failing step when it named one.
+/// - `OWNED_RUNTIME_INSTALL_REQUEST|1|failed|<status>[|<step>[|<trail>]]` when the administrator shell failed
+///   (exit 75), with the staged program's failing step when it named one and the helper's trail notes
+///   (`trailCause`) when it wrote any.
 ///
 /// `--request-owned-runtime-repair` runs the same staged helper's service repair (`--owned-repair-service`,
 /// OwnedRuntimeServiceRepairEntry) for an already published Runtime (MRT-004), with the same lines under the
@@ -92,6 +93,26 @@ enum OwnedRuntimeInstallMainOperation {
 		guard let range = message.range(of: OwnedVirtualHIDDaemonReportMainOperation.failedStepMarker, options: .backwards) else { return nil }
 		let step = message[range.upperBound...].prefix { $0 == "_" || ("a"..."z").contains($0) }
 		return step.isEmpty || step.count > 32 ? nil : String(step)
+	}
+	/// The prefix of each install trail note (OwnedRuntimeInstallTrail.note).
+	static let trailMarker = "OWNED_RUNTIME_INSTALL_TRAIL|"
+	/// The longest trail the answer line carries.
+	static let trailLimit = 600
+	/// The helper's trail notes as one closed token for the answer line: field report 2026-11-15 read only
+	/// « the helper left cleanup pending » in the driver log and the field check, while the cause
+	/// (`refused-source-root-dup-errno-24`) was on the launcher's own log line alone.
+	/// - Parameter message: The AppleScript error message, which carries the shell's stderr.
+	/// - Returns: The notes in order, deduplicated, joined by commas, each cut at its first character outside
+	///   letters, digits and `._@:+-`; nil when there is none.
+	static func trailCause(_ message: String) -> String? {
+		var notes: [String] = []
+		for piece in message.components(separatedBy: trailMarker).dropFirst() {
+			let note = String(piece.prefix { $0.isASCII && ($0.isLetter || $0.isNumber || "._@:+-".contains($0)) })
+			if !note.isEmpty && !notes.contains(note) { notes.append(note) }
+		}
+		guard !notes.isEmpty else { return nil }
+		let joined = notes.joined(separator: ",")
+		return joined.count > trailLimit ? String(joined.prefix(trailLimit)) : joined
 	}
 	/// The longest stderr one log line keeps. The helper names every refusal it meets on its trail, with the
 	/// file and line, so a failed install needs room for all of them, not only the first few.
@@ -217,7 +238,9 @@ enum OwnedRuntimeInstallMainOperation {
 			let step = failedStep(message)
 			LauncherLog.write("\(mode.logName): the administrator shell failed with status \(number) at step "
 				+ (step ?? "unnamed") + ": " + oneLine(message) + ".")
-			return answer(mode.requestKind + "|1|failed|" + String(number) + (step.map { "|" + $0 } ?? ""), 75)
+			let cause = step == nil ? nil : trailCause(message)
+			return answer(mode.requestKind + "|1|failed|" + String(number) + (step.map { "|" + $0 } ?? "")
+				+ (cause.map { "|" + $0 } ?? ""), 75)
 		}
 		let line = (output.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 		guard let relayed = relayedLine(line, mode: mode) else {

@@ -215,9 +215,11 @@ function M.install(ports, report, finish)
 			return driver()
 		end
 		report.step("install_needed", "info", "yes:" .. tostring(reason))
-		port.install(function(ok, why)
+		port.install(function(ok, why, _, cause)
 			if ok ~= true then
 				report.step("installed", "fail", tostring(why))
+				-- Field report 2026-11-15: « install_cleanup_pending » alone; the helper trail named errno 24.
+				if cause ~= nil then report.step("install_cause", "info", cause) end
 				report.step("driver_active", "skip", "not_installed")
 				return finish()
 			end

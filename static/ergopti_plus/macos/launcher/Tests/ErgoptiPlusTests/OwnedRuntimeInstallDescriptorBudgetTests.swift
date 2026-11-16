@@ -50,4 +50,22 @@ final class OwnedRuntimeInstallDescriptorBudgetTests: XCTestCase {
 		XCTAssertEqual(parts[4], "of")
 		XCTAssertGreaterThan(Int(parts[5]) ?? 0, 0, detail)
 	}
+
+	/// The launcher carries the helper's trail on its answer line, so the driver log and the field check name it.
+	func testTheAnswerLineCarriesTheHelperTrail() {
+		let message = "OWNED_RUNTIME_INSTALL_TRAIL|fd-limit-256-to-10240\n"
+			+ "OWNED_RUNTIME_INSTALL_TRAIL|refused-source-root-dup-errno-24@OwnedRuntimeInstallWorker.swift:239\n"
+			+ "OWNED_RUNTIME_INSTALL_TRAIL|publish-failed-source\n"
+			+ "OWNED_RUNTIME_INSTALL_TRAIL|refused-cleanupPending@OwnedRuntimeInstallJournal.swift:388\n"
+			+ "OWNED_RUNTIME_INSTALL_TRAIL|publish-failed-source\nergopti-step=helper status=75"
+		XCTAssertEqual(OwnedRuntimeInstallMainOperation.trailCause(message),
+			"fd-limit-256-to-10240,refused-source-root-dup-errno-24@OwnedRuntimeInstallWorker.swift:239,"
+				+ "publish-failed-source,refused-cleanupPending@OwnedRuntimeInstallJournal.swift:388")
+		XCTAssertNil(OwnedRuntimeInstallMainOperation.trailCause("ergopti-step=helper status=75"))
+		// A field separator or a space never reaches the closed line.
+		XCTAssertEqual(OwnedRuntimeInstallMainOperation.trailCause("OWNED_RUNTIME_INSTALL_TRAIL|core-print-5|x y"), "core-print-5")
+		let long = String(repeating: "OWNED_RUNTIME_INSTALL_TRAIL|" + String(repeating: "a", count: 90) + "\n", count: 1)
+			+ (0..<20).map { "OWNED_RUNTIME_INSTALL_TRAIL|step-" + String($0) + String(repeating: "b", count: 60) + "\n" }.joined()
+		XCTAssertEqual(OwnedRuntimeInstallMainOperation.trailCause(long)?.count, OwnedRuntimeInstallMainOperation.trailLimit)
+	}
 }

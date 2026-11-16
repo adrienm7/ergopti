@@ -101,6 +101,31 @@ helpers.describe("owned runtime first install", function()
 		end
 	end)
 
+	-- Field report 2026-11-15: every attempt read « the helper left cleanup pending » while the launcher's own log
+	-- line named the helper trail's errno 24 (owned-install-trail-cause).
+	helpers.it("names the helper trail's cause of a cleanup left pending", function()
+		local trail = "fd-limit-256-to-10240,refused-source-root-dup-errno-24-fds-250-of-256@OwnedRuntimeInstallWorker.swift:239,"
+			.. "publish-failed-source,refused-cleanupPending@OwnedRuntimeInstallJournal.swift:388"
+		local installer, world = fake(function()
+			return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|" .. trail .. "\n"
+		end)
+		local result
+		installer.install(function(ok, reason, detail, cause)
+			result = { ok = ok, reason = reason, detail = detail, cause = cause }
+		end)
+		helpers.assert_eq(result.reason, "install_cleanup_pending")
+		helpers.assert_eq(result.cause, "source-root-dup-errno-24-fds-250-of-256")
+		helpers.assert_eq(result.detail, "the helper left cleanup pending at step helper, trail " .. trail)
+		helpers.assert_eq(#world.commands, 1, "no activation after a cleanup left pending")
+		local Install = require("platform.remap.runtime_install")
+		helpers.assert_eq(Install.trail_cause("publish-failed-source"), "publish-failed-source")
+		helpers.assert_nil(Install.trail_cause(nil))
+		helpers.assert_eq(#Install.trail_cause("refused-" .. string.rep("x", 90)), Install.CAUSE_MAX_LENGTH)
+		-- A line whose trail breaks the closed grammar is not read as a trail.
+		local odd = install((fake(function() return 75, "OWNED_RUNTIME_INSTALL_REQUEST|1|failed|75|helper|a b\n" end)))
+		helpers.assert_eq(odd.reason, "install_unanswered")
+	end)
+
 	helpers.it("refuses without a launcher and when the manager is absent or fails", function()
 		local installer, world = fake(function() error("unreachable") end,
 			{ launcher = function() return nil, "no bundle" end })

@@ -84,7 +84,7 @@ local function with_install(ports, options)
 	port.install_reasons = function() return { runtime_not_installed = true } end
 	port.install = function(callback)
 		world.installs = world.installs + 1
-		if options.install_ok == false then return callback(false, "install_cancelled") end
+		if options.install_ok == false then return callback(false, options.reason or "install_cancelled", nil, options.cause) end
 		callback(true)
 	end
 	port.driver_active = function(callback)
@@ -117,6 +117,7 @@ helpers.describe("field run: the owned runtime's first install with no click of 
 		helpers.assert_eq(result.passed, false)
 		helpers.assert_eq(steps.installed.value, "install_cancelled")
 		helpers.assert_eq(steps.driver_active.value, "not_installed")
+		helpers.assert_nil(steps.install_cause, "no cause step without a helper trail")
 		local waiting = mac({ state = "unavailable", reason = "virtual_hid_not_active" })
 		local world = with_install(waiting, { active = { false } })
 		steps = run("owned_install", waiting)
@@ -125,6 +126,18 @@ helpers.describe("field run: the owned runtime's first install with no click of 
 		helpers.assert_eq(steps.driver_active.value, "not_approved")
 		local shared = run("owned_install", (mac({ owned = false })))
 		helpers.assert_eq(shared.installed.value, "shared_runtime")
+	end)
+
+	-- Field report 2026-11-15: « installed=fail:install_cleanup_pending » alone; the trail named errno 24.
+	helpers.it("names the helper trail's cause beside a refused install (owned-install-trail-cause)", function()
+		local ports = mac({ state = "unavailable", reason = "runtime_not_installed" })
+		with_install(ports, { install_ok = false, reason = "install_cleanup_pending",
+			cause = "source-root-dup-errno-24-fds-250-of-256" })
+		local steps, result = run("owned_install", ports)
+		helpers.assert_eq(result.passed, false)
+		helpers.assert_eq(steps.installed.value, "install_cleanup_pending")
+		helpers.assert_eq(steps.install_cause.state, "info")
+		helpers.assert_eq(steps.install_cause.value, "source-root-dup-errno-24-fds-250-of-256")
 	end)
 end)
 

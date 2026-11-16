@@ -123,11 +123,31 @@ local KINDS = {
 	},
 }
 
+--- The longest cause a field check value carries (Report.MAX_VALUE_LENGTH is 48).
+M.CAUSE_MAX_LENGTH = 40
+
+--- The helper trail's first refusal, or else its last note, as one closed
+--- token: `refused-source-root-dup-errno-24@OwnedRuntimeInstallWorker.swift:239`
+--- reads `source-root-dup-errno-24`. The full trail stays in the detail.
+--- @param trail string|nil Comma-joined notes the launcher relayed.
+--- @return string|nil cause Letters, digits and `_.:+-` only, at most CAUSE_MAX_LENGTH long.
+function M.trail_cause(trail)
+	if type(trail) ~= "string" or trail == "" then return nil end
+	local first_refusal, last
+	for note in trail:gmatch("[^,]+") do
+		if not first_refusal and note:sub(1, 8) == "refused-" then first_refusal = note:sub(9) end
+		last = note
+	end
+	local cause = ((first_refusal or last or ""):gsub("@.*$", ""):gsub("[^%w_%.:%+%-]", ""))
+	if cause == "" then return nil end
+	return cause:sub(1, M.CAUSE_MAX_LENGTH)
+end
+
 --- Reads one role's answer line.
 --- @param role table KINDS entry.
 --- @param code any Exit status.
 --- @param stdout any Standard output.
---- @return boolean done, string|nil reason, string|nil detail
+--- @return boolean done, string|nil reason, string|nil detail, string|nil cause
 local function parse_role(role, code, stdout)
 	local line = type(stdout) == "string" and stdout:match("^([^\n]*)\n?$") or nil
 	if line == nil then return false, REASON.UNANSWERED, "no answer line" end
@@ -142,20 +162,29 @@ local function parse_role(role, code, stdout)
 	if line == request .. "cancelled" then return false, REASON.CANCELLED, nil end
 	local refused = line:match("^" .. request .. "refused|([%w_%-]+)$")
 	if refused then return false, REASON.REFUSED, refused end
-	local status, step = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)$")
+	local status, step, trail = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)|([%w%._@:%+,%-]+)$")
+	if not status then status, step = line:match("^" .. request .. "failed|(%-?[%w]+)|([%l_]+)$") end
 	if not status then status = line:match("^" .. request .. "failed|(%-?[%w]+)$") end
 	if status then
 		local number = math.tointeger(tonumber(status))
+		local cause = M.trail_cause(trail)
+		-- Field report 2026-11-15: the driver log and the field check said only « cleanup pending »; the helper's
+		-- trail named the descriptor exhaustion that left it.
+		local traced = trail and (", trail " .. trail) or ""
 		if number == HELPER_REFUSED then
-			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "")
+			return false, REASON.REFUSED, role.refused .. (step and (" at step " .. step) or "") .. traced, cause
 		end
-		if number == HELPER_CLEANUP then return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" end
+		if number == HELPER_CLEANUP then
+			return false, REASON.CLEANUP_PENDING, "the helper left cleanup pending" .. (step and (" at step " .. step) or "")
+				.. traced, cause
+		end
 		if number == Update.EXIT_DIGEST or number == Update.EXIT_SIGNATURE then
 			return false, REASON.DRIVER, "the kept VirtualHIDDevice package failed its "
 				.. (number == Update.EXIT_DIGEST and "digest" or "signature") .. " check as root"
 		end
 		-- The staged program names the step that failed (field reports 2026-11-05 and 2026-11-06 had only "1").
 		return false, REASON.FAILED, "administrator shell status " .. status .. (step and (" at step " .. step) or "")
+			.. traced, cause
 	end
 	return false, REASON.UNANSWERED, "unexpected answer: " .. line
 end
@@ -166,6 +195,7 @@ end
 --- @return boolean installed True only for the helper's full success.
 --- @return string|nil reason Stable reason when not installed.
 --- @return string|nil detail The refusal or status the line names.
+--- @return string|nil cause The helper trail's closed cause (trail_cause), when the launcher relayed one.
 function M.parse(code, stdout)
 	return parse_role(KINDS.install, code, stdout)
 end
@@ -176,6 +206,7 @@ end
 --- @return boolean repaired True only when the helper observed every service.
 --- @return string|nil reason Stable reason when not repaired.
 --- @return string|nil detail The refusal or status the line names.
+--- @return string|nil cause The helper trail's closed cause (trail_cause), when the launcher relayed one.
 function M.parse_repair(code, stdout)
 	return parse_role(KINDS.repair, code, stdout)
 end
@@ -209,7 +240,7 @@ function M.new(ports)
 	local repair_waiters
 
 	--- Settles every waiter of the running install once.
-	local function settle(ok, reason, detail)
+	local function settle(ok, reason, detail, cause)
 		local pending = waiters
 		waiters = nil
 		if ok then
@@ -220,7 +251,7 @@ function M.new(ports)
 			Logger.error(LOG, "Owned runtime install refused (%s): %s", tostring(reason), tostring(detail))
 		end
 		for _, waiter in ipairs(pending or {}) do
-			local called, failure = pcall(waiter, ok, reason, detail)
+			local called, failure = pcall(waiter, ok, reason, detail, cause)
 			if not called then Logger.error(LOG, "Owned runtime install callback failed: %s.", tostring(failure)) end
 		end
 	end
@@ -240,7 +271,7 @@ function M.new(ports)
 	end
 
 	--- Installs the owned runtime, then requests the driver's activation.
-	--- @param callback function fn(ok, reason|nil, detail|nil) called once.
+	--- @param callback function fn(ok, reason|nil, detail|nil, cause|nil) called once.
 	function installer.install(callback)
 		assert(type(callback) == "function", "Missing owned runtime install callback")
 		if waiters then
@@ -259,8 +290,8 @@ function M.new(ports)
 		Logger.start(LOG, "Installing Ergopti's own Karabiner runtime on the user's request…")
 		local function run_role()
 			ports.exec(executable, { M.FLAG }, M.INSTALL_TIMEOUT_SEC, function(code, stdout)
-				local installed, reason, why = M.parse(code, stdout)
-				if not installed then return settle(false, reason, why) end
+				local installed, reason, why, cause = M.parse(code, stdout)
+				if not installed then return settle(false, reason, why, cause) end
 				activate()
 			end, environment)
 		end
