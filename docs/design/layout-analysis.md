@@ -130,6 +130,14 @@ shortcut_key_ease}`; `shortcuts(table)` → `table` checked (the model's
 verdict}}`: two results side by side, `delta = a − b`, `verdict` `better` or
   `worse` for `a` by the metric's `better`, `same` when equal, `none` for a
   metric shown but not scored. The Comparer's « Compare with » column.
+- `scoreSession(layout, ngrams, options)` → `{total, trial(layout) → {total,
+changed, commit()}}`: the global score of layouts that change a little at a
+  time (the layout optimizer), equal to `analyse(...).score.total` within
+  float rounding. A trial re-walks only the n-grams of the characters whose
+  key sequence changed, through the same visitor as `analyse()`; `commit`
+  makes the trial's layout the one the next trials are measured from. A
+  layout on another board is refused. See
+  [layout-optimizer.md](layout-optimizer.md).
 - `METRICS` → `{id: {unit, better, of}}`; `better` is `lower`, `higher` or
   `none` (shown, not scored).
 

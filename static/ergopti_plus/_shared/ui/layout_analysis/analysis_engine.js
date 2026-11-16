@@ -26,6 +26,9 @@
  *    come from LAYOUT_ANALYSIS_DATA (_generated/analysis_data.js), read on
  *    first use so the codegen can load this file to convert layouts.
  * 4. Fail fast: an unknown keyboard, metric or weight throws.
+ * 5. Incremental: scoreSession re-scores a changed layout by walking only the
+ *    n-grams of the characters whose key sequence changed, through the same
+ *    visitor and metric code as analyse(), for the layout optimizer.
  * ==============================================================================
  */
 
@@ -131,6 +134,10 @@ var LAYOUT_ANALYSIS = (function () {
 
 	/** Splits a string into code points. */
 	const codePoints = (text) => Array.from(text);
+
+	/** Whether a string is one code point (codePoints(text).length === 1), without splitting it. */
+	const isOneCodePoint = (text) =>
+		text.length === 1 || (text.length === 2 && text.codePointAt(0) > 0xffff);
 
 	/**
 	 * FNV-1a 32-bit hash of a text, the cache key of its n-gram tables.
@@ -502,7 +509,7 @@ var LAYOUT_ANALYSIS = (function () {
 					cost: 1 + MODIFIER_COST * (LAYER_SHIFT[layer] + LAYER_ALTGR[layer])
 				};
 				if (typeof cell === 'string') {
-					if (codePoints(cell).length === 1) offer(best, cell, stroke);
+					if (isOneCodePoint(cell)) offer(best, cell, stroke);
 				} else offer(deadSeq, cell.dead, stroke);
 			});
 		}
@@ -526,7 +533,7 @@ var LAYOUT_ANALYSIS = (function () {
 					const candidate = join(prefix, tail, true);
 					const map = typeof result === 'string' ? best : deadSeq;
 					const target = typeof result === 'string' ? result : result.dead;
-					if (typeof result === 'string' && codePoints(result).length !== 1) continue;
+					if (typeof result === 'string' && !isOneCodePoint(result)) continue;
 					const before = map.get(target);
 					offer(map, target, candidate);
 					if (map.get(target) !== before) changed = true;
@@ -658,9 +665,121 @@ var LAYOUT_ANALYSIS = (function () {
 		const board = boardFor(layout, opts.keyboard || DEFAULT_KEYBOARD, opts.profile);
 		const table = prepareNgrams(ngrams);
 		const best = compileLayout(layout, board, null);
-		const thumb = board.finger.map((f) => f === LEFT_THUMB || f === RIGHT_THUMB);
 		const keyCount = new Float64Array(board.codes.length);
-		const c = {
+		const c = streamCounts();
+		const unsupportedChars = {};
+		// Per key: how often it takes part in each bad event, and each event's
+		// key groups (a pair, or the trigram of a redirect), for the heatmap.
+		const perKey = {};
+		const groups = {};
+		for (const event of KEY_EVENTS) {
+			perKey[event] = new Float64Array(board.codes.length);
+			groups[event] = new Map();
+		}
+		// A pair's or a trigram's group id holds its keys in increasing order.
+		// Counting every event's groups costs about 40 % on a whole library, so
+		// only the SFB partners the ranking shows are counted unless asked.
+		const grouped = {};
+		for (const event of KEY_EVENTS) grouped[event] = opts.keyGroups === true || event === 'sfb';
+		const count = (event, id, n) => groups[event].set(id, (groups[event].get(id) || 0) + n);
+		const blame = {
+			pair(event, n, a, b) {
+				perKey[event][a] += n;
+				perKey[event][b] += n;
+				if (grouped[event]) count(event, a < b ? a * KEY_BASE + b : b * KEY_BASE + a, n);
+			},
+			triple(event, n, a, b, d) {
+				perKey[event][a] += n;
+				perKey[event][b] += n;
+				perKey[event][d] += n;
+				if (!grouped[event]) return;
+				const low = Math.min(a, b, d);
+				const high = Math.max(a, b, d);
+				count(event, (low * KEY_BASE + (a + b + d - low - high)) * KEY_BASE + high, n);
+			}
+		};
+
+		walkKeyStream(board, best, table, streamVisitor(board, c, keyCount, unsupportedChars, blame));
+		const m = streamMetrics(
+			layout,
+			board,
+			best,
+			c,
+			keyCount,
+			opts,
+			compactFit(layout, board, table, opts.format, opts.formWeights)
+		);
+		const metrics = m.metrics;
+		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
+		const fingerIds = data().model.fingers;
+		const result = {
+			layout: {
+				id: layout.id,
+				name: layout.name,
+				origin: layout.origin,
+				source: layout.source,
+				authors: layout.authors,
+				url: layout.url,
+				language: layout.language
+			},
+			keyboard: board.id,
+			// The fingering profile measured with (null: the defaults), for the key map.
+			profile: board.profile,
+			metrics,
+			fingers: m.fingers,
+			// Each non-thumb finger's share of the non-thumb presses, and the ideal
+			// load it is measured against: the two sides of finger_imbalance.
+			fingerShares: Object.fromEntries(
+				Object.keys(m.ideal).map((id) => [id, pct(m.fingerLoad[fingerIds.indexOf(id)], m.pressed)])
+			),
+			idealLoad: Object.assign({}, m.ideal),
+			hands: { left: pct(m.left, m.left + m.right), right: pct(m.right, m.left + m.right) },
+			rows: {
+				number: metrics.number_row,
+				top: metrics.top_row,
+				home: metrics.home_row,
+				bottom: metrics.bottom_row
+			},
+			trigramClasses: {
+				roll3_in: metrics.roll3_in,
+				roll3_out: metrics.roll3_out,
+				alternation: metrics.alternation,
+				redirect: metrics.redirect,
+				roll_mixed: pct(c.roll_mixed, c.trigrams),
+				same_finger: pct(c.same_finger_trigram, c.trigrams)
+			},
+			keys: keyReport(board, {
+				keyCount,
+				allPresses: m.allPresses,
+				pressed: m.pressed,
+				fingerLoad: m.fingerLoad,
+				ideal: m.ideal,
+				perKey,
+				groups,
+				counts: c
+			}),
+			coverage: {
+				// Keys the layout puts characters on that this keyboard lacks (a
+				// 36-key board has no number row): their characters count as unsupported.
+				missingKeys: Object.keys(layout.rows)
+					.filter(
+						(code) => !board.index.has(code) && layout.rows[code].some((cell) => cell !== null)
+					)
+					.sort(),
+				typed: c.chars,
+				unsupported: c.unsupported,
+				unsupportedChars,
+				bigrams: c.bigrams,
+				trigrams: c.trigrams
+			}
+		};
+		result.score = score(result, opts.weights);
+		return result;
+	}
+
+	/** The counters the key stream adds to: every one a sum over the n-grams. */
+	function streamCounts() {
+		return {
 			chars: 0,
 			unsupported: 0,
 			modifiers: 0,
@@ -685,116 +804,25 @@ var LAYOUT_ANALYSIS = (function () {
 			roll_mixed: 0,
 			same_finger_trigram: 0
 		};
-		const unsupportedChars = {};
-		// Per key: how often it takes part in each bad event, and each event's
-		// key groups (a pair, or the trigram of a redirect), for the heatmap.
-		const perKey = {};
-		const groups = {};
-		for (const event of KEY_EVENTS) {
-			perKey[event] = new Float64Array(board.codes.length);
-			groups[event] = new Map();
-		}
-		// A pair's or a trigram's group id holds its keys in increasing order.
-		// Counting every event's groups costs about 40 % on a whole library, so
-		// only the SFB partners the ranking shows are counted unless asked.
-		const grouped = {};
-		for (const event of KEY_EVENTS) grouped[event] = opts.keyGroups === true || event === 'sfb';
-		const count = (event, id, n) => groups[event].set(id, (groups[event].get(id) || 0) + n);
-		const blame2 = (event, n, a, b) => {
-			perKey[event][a] += n;
-			perKey[event][b] += n;
-			if (grouped[event]) count(event, a < b ? a * KEY_BASE + b : b * KEY_BASE + a, n);
-		};
-		const blame3 = (event, n, a, b, d) => {
-			perKey[event][a] += n;
-			perKey[event][b] += n;
-			perKey[event][d] += n;
-			if (!grouped[event]) return;
-			const low = Math.min(a, b, d);
-			const high = Math.max(a, b, d);
-			count(event, (low * KEY_BASE + (a + b + d - low - high)) * KEY_BASE + high, n);
-		};
+	}
 
-		const bigram = (k1, k2, n) => {
-			if (thumb[k1] || thumb[k2]) return;
-			c.bigrams += n;
-			const f1 = board.finger[k1];
-			const f2 = board.finger[k2];
-			if (k1 === k2) {
-				c.repeat += n;
-				return;
-			}
-			if (f1 === f2) {
-				c.sfb += n;
-				blame2('sfb', n, k1, k2);
-				return;
-			}
-			if (board.hand[k1] !== board.hand[k2]) {
-				c.hand_change += n;
-				return;
-			}
-			const o1 = board.order[k1];
-			const o2 = board.order[k2];
-			if (Math.abs(o1 - o2) === 1) {
-				// A scissor: the longer finger bends down while the shorter one
-				// reaches up, one row apart (half) or two (full).
-				const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
-				const shorter = longer === k1 ? k2 : k1;
-				const down = board.row[longer] - board.row[shorter];
-				if (down >= 2) {
-					c.scissors += n;
-					blame2('scissors', n, k1, k2);
-				} else if (down === 1) {
-					c.half_scissors += n;
-					blame2('half_scissors', n, k1, k2);
-				}
-				if (board.lateral[k1] || board.lateral[k2]) {
-					c.lsb += n;
-					blame2('lsb', n, k1, k2);
-				}
-			}
-			if (o2 > o1) c.roll_in += n;
-			else c.roll_out += n;
-		};
-
-		const trigram = (k1, k2, k3, n) => {
-			if (thumb[k1] || thumb[k2] || thumb[k3]) return;
-			c.trigrams += n;
-			const f1 = board.finger[k1];
-			const f2 = board.finger[k2];
-			const f3 = board.finger[k3];
-			if (f1 === f3 && k1 !== k3) {
-				c.sfs += n;
-				blame2('sfs', n, k1, k3);
-			}
-			if (f1 === f2 || f2 === f3) {
-				c.same_finger_trigram += n;
-				return;
-			}
-			const h1 = board.hand[k1];
-			const h2 = board.hand[k2];
-			const h3 = board.hand[k3];
-			if (h1 === h2 && h2 === h3) {
-				const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
-				if (d > 0) {
-					if (board.order[k2] > board.order[k1]) c.roll3_in += n;
-					else c.roll3_out += n;
-				} else {
-					c.redirect += n;
-					blame3('redirect', n, k1, k2, k3);
-					const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
-					if (!index) {
-						c.redirect_bad += n;
-						blame3('redirect_bad', n, k1, k2, k3);
-					}
-				}
-				return;
-			}
-			if (h1 !== h2 && h2 !== h3) c.alternation += n;
-			else c.roll_mixed += n;
-		};
-
-		walkKeyStream(board, best, table, {
+	/**
+	 * The visitor of walkKeyStream that classifies every press, key bigram and
+	 * key trigram into the counters: the one definition of the stream metrics.
+	 * Every count is a sum, so a negative n takes an n-gram back out (scoreSession).
+	 * @param {object} board - From keyboard().
+	 * @param {object} c - From streamCounts().
+	 * @param {Float64Array} keyCount - Presses per key, modifiers included.
+	 * @param {object} unsupportedChars - Character → count, filled.
+	 * @param {{pair: function, triple: function}|null} blame - Receives each bad
+	 *   event's keys (the heatmap), or null.
+	 * @returns {object} The visitor.
+	 */
+	function streamVisitor(board, c, keyCount, unsupportedChars, blame) {
+		const thumb = board.finger.map((f) => f === LEFT_THUMB || f === RIGHT_THUMB);
+		const blame2 = blame ? blame.pair : () => {};
+		const blame3 = blame ? blame.triple : () => {};
+		return {
 			char(char, seq, n) {
 				c.chars += n;
 				if (seq.dead) c.dead += n;
@@ -808,10 +836,99 @@ var LAYOUT_ANALYSIS = (function () {
 				keyCount[k] += n;
 				c.distance += board.reach[k] * n;
 			},
-			bigram,
-			trigram
-		});
+			bigram(k1, k2, n) {
+				if (thumb[k1] || thumb[k2]) return;
+				c.bigrams += n;
+				const f1 = board.finger[k1];
+				const f2 = board.finger[k2];
+				if (k1 === k2) {
+					c.repeat += n;
+					return;
+				}
+				if (f1 === f2) {
+					c.sfb += n;
+					blame2('sfb', n, k1, k2);
+					return;
+				}
+				if (board.hand[k1] !== board.hand[k2]) {
+					c.hand_change += n;
+					return;
+				}
+				const o1 = board.order[k1];
+				const o2 = board.order[k2];
+				if (Math.abs(o1 - o2) === 1) {
+					// A scissor: the longer finger bends down while the shorter one
+					// reaches up, one row apart (half) or two (full).
+					const longer = FINGER_LENGTH[o1] > FINGER_LENGTH[o2] ? k1 : k2;
+					const shorter = longer === k1 ? k2 : k1;
+					const down = board.row[longer] - board.row[shorter];
+					if (down >= 2) {
+						c.scissors += n;
+						blame2('scissors', n, k1, k2);
+					} else if (down === 1) {
+						c.half_scissors += n;
+						blame2('half_scissors', n, k1, k2);
+					}
+					if (board.lateral[k1] || board.lateral[k2]) {
+						c.lsb += n;
+						blame2('lsb', n, k1, k2);
+					}
+				}
+				if (o2 > o1) c.roll_in += n;
+				else c.roll_out += n;
+			},
+			trigram(k1, k2, k3, n) {
+				if (thumb[k1] || thumb[k2] || thumb[k3]) return;
+				c.trigrams += n;
+				const f1 = board.finger[k1];
+				const f2 = board.finger[k2];
+				const f3 = board.finger[k3];
+				if (f1 === f3 && k1 !== k3) {
+					c.sfs += n;
+					blame2('sfs', n, k1, k3);
+				}
+				if (f1 === f2 || f2 === f3) {
+					c.same_finger_trigram += n;
+					return;
+				}
+				const h1 = board.hand[k1];
+				const h2 = board.hand[k2];
+				const h3 = board.hand[k3];
+				if (h1 === h2 && h2 === h3) {
+					const d = (board.order[k2] - board.order[k1]) * (board.order[k3] - board.order[k2]);
+					if (d > 0) {
+						if (board.order[k2] > board.order[k1]) c.roll3_in += n;
+						else c.roll3_out += n;
+					} else {
+						c.redirect += n;
+						blame3('redirect', n, k1, k2, k3);
+						const index = [k1, k2, k3].some((k) => board.order[k] === INDEX_ORDER);
+						if (!index) {
+							c.redirect_bad += n;
+							blame3('redirect_bad', n, k1, k2, k3);
+						}
+					}
+					return;
+				}
+				if (h1 !== h2 && h2 !== h3) c.alternation += n;
+				else c.roll_mixed += n;
+			}
+		};
+	}
 
+	/**
+	 * Every metric of a layout from its stream counters, and the loads the
+	 * report shows: the one definition analyse() and scoreSession() share.
+	 * @param {object} layout - Library shape, checked.
+	 * @param {object} board - From keyboard().
+	 * @param {Map} best - From compileLayout().
+	 * @param {object} c - The stream counters (streamCounts).
+	 * @param {Float64Array} keyCount - Presses per key.
+	 * @param {object} opts - The analyse() options.
+	 * @param {number} compact - compact_fit, measured by the caller.
+	 * @returns {object} {metrics, fingers, fingerLoad, ideal, pressed, allPresses, left, right}.
+	 */
+	function streamMetrics(layout, board, best, c, keyCount, opts, compact) {
 		const pct = (part, whole) => (whole > 0 ? (100 * part) / whole : 0);
 		const allChars = c.chars + c.unsupported;
 		// Finger load over every press but the thumbs'.
@@ -821,15 +938,16 @@ var LAYOUT_ANALYSIS = (function () {
 		let pressed = 0;
 		let outer = 0;
 		let typing = 0;
+		const isThumb = (k) => board.finger[k] === LEFT_THUMB || board.finger[k] === RIGHT_THUMB;
 		for (let k = 0; k < keyCount.length; k++) {
 			fingerLoad[board.finger[k]] += keyCount[k];
-			if (thumb[k]) continue;
+			if (isThumb(k)) continue;
 			pressed += keyCount[k];
 			if (board.outer[k]) outer += keyCount[k];
 		}
 		const modifierKeys = new Set(Object.values(board.modifiers));
 		for (let k = 0; k < keyCount.length; k++) {
-			if (thumb[k] || modifierKeys.has(k)) continue;
+			if (isThumb(k) || modifierKeys.has(k)) continue;
 			typing += keyCount[k];
 			// Rows relative to each finger's home key: a staggered home counts as home.
 			rowLoad[board.relRow[k]] = (rowLoad[board.relRow[k]] || 0) + keyCount[k];
@@ -845,7 +963,6 @@ var LAYOUT_ANALYSIS = (function () {
 			imbalance += Math.abs(pct(fingerLoad[fingerIds.indexOf(id)], pressed) - target);
 		const left = fingerLoad.slice(0, LEFT_THUMB).reduce((sum, v) => sum + v, 0);
 		const right = fingerLoad.slice(RIGHT_THUMB + 1).reduce((sum, v) => sum + v, 0);
-
 		const metrics = {
 			sfb: pct(c.sfb, c.bigrams),
 			repeat: pct(c.repeat, c.bigrams),
@@ -873,74 +990,12 @@ var LAYOUT_ANALYSIS = (function () {
 			dead_key_usage: pct(c.dead, c.chars),
 			outer_column: pct(outer, pressed),
 			unsupported: pct(c.unsupported, allChars),
-			compact_fit: compactFit(layout, board, table, opts.format, opts.formWeights),
+			compact_fit: compact,
 			char_coverage: charCoverage(best),
 			direct_digits: directDigits(layout, board),
 			shortcut_left: shortcutLeft(layout, board, shortcuts(opts.shortcuts))
 		};
-		const result = {
-			layout: {
-				id: layout.id,
-				name: layout.name,
-				origin: layout.origin,
-				source: layout.source,
-				authors: layout.authors,
-				url: layout.url,
-				language: layout.language
-			},
-			keyboard: board.id,
-			// The fingering profile measured with (null: the defaults), for the key map.
-			profile: board.profile,
-			metrics,
-			fingers,
-			// Each non-thumb finger's share of the non-thumb presses, and the ideal
-			// load it is measured against: the two sides of finger_imbalance.
-			fingerShares: Object.fromEntries(
-				Object.keys(ideal).map((id) => [id, pct(fingerLoad[fingerIds.indexOf(id)], pressed)])
-			),
-			idealLoad: Object.assign({}, ideal),
-			hands: { left: pct(left, left + right), right: pct(right, left + right) },
-			rows: {
-				number: metrics.number_row,
-				top: metrics.top_row,
-				home: metrics.home_row,
-				bottom: metrics.bottom_row
-			},
-			trigramClasses: {
-				roll3_in: metrics.roll3_in,
-				roll3_out: metrics.roll3_out,
-				alternation: metrics.alternation,
-				redirect: metrics.redirect,
-				roll_mixed: pct(c.roll_mixed, c.trigrams),
-				same_finger: pct(c.same_finger_trigram, c.trigrams)
-			},
-			keys: keyReport(board, {
-				keyCount,
-				allPresses,
-				pressed,
-				fingerLoad,
-				ideal,
-				perKey,
-				groups,
-				counts: c
-			}),
-			coverage: {
-				// Keys the layout puts characters on that this keyboard lacks (a
-				// 36-key board has no number row): their characters count as unsupported.
-				missingKeys: Object.keys(layout.rows)
-					.filter(
-						(code) => !board.index.has(code) && layout.rows[code].some((cell) => cell !== null)
-					)
-					.sort(),
-				typed: c.chars,
-				unsupported: c.unsupported,
-				unsupportedChars,
-				bigrams: c.bigrams,
-				trigrams: c.trigrams
-			}
-		};
-		result.score = score(result, opts.weights);
-		return result;
+		return { metrics, fingers, fingerLoad, ideal, pressed, allPresses, left, right };
 	}
 
 	/**
@@ -968,42 +1023,52 @@ var LAYOUT_ANALYSIS = (function () {
 	 *   (modifiers included), bigram(k1, k2, n), trigram(k1, k2, k3, n).
 	 */
 	function walkKeyStream(board, best, table, visit) {
-		for (const [char, n] of table.uni) {
-			const seq = best.get(char);
-			if (!seq) {
-				visit.unsupported(char, n);
-				continue;
-			}
-			visit.char(char, seq, n);
-			for (const k of seq.keys) visit.press(k, n);
-			// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
-			if (seq.shift > 0)
-				visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
-			if (seq.altgr > 0) visit.press(board.modifiers.altgr, n * seq.altgr);
-			const keys = seq.keys;
-			for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
-			for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
+		for (const [char, n] of table.uni) walkChar(board, best.get(char), char, n, visit);
+		for (const [a, b, n] of table.bi) walkPair(best.get(a), best.get(b), n, visit);
+		for (const [a, b, d, n] of table.tri)
+			walkTriple(best.get(a), best.get(b), best.get(d), n, visit);
+	}
+
+	/**
+	 * The stream of one character typed n times: its presses and inner key
+	 * n-grams. seq is its sequence (compileLayout), undefined when unsupported.
+	 */
+	function walkChar(board, seq, char, n, visit) {
+		if (!seq) {
+			visit.unsupported(char, n);
+			return;
 		}
-		for (const [a, b, n] of table.bi) {
-			const sa = best.get(a);
-			const sb = best.get(b);
-			if (!sa || !sb) continue;
-			const ka = sa.keys;
-			const kb = sb.keys;
-			visit.bigram(ka[ka.length - 1], kb[0], n);
-			// Key trigrams that start in a and end in b.
-			const s = ka.concat(kb);
-			for (let i = Math.max(0, ka.length - 2); i < ka.length; i++)
-				if (i + 2 >= ka.length && i + 2 < s.length) visit.trigram(s[i], s[i + 1], s[i + 2], n);
-		}
-		for (const [a, b, d, n] of table.tri) {
-			const sb = best.get(b);
-			if (!sb || sb.keys.length !== 1) continue;
-			const sa = best.get(a);
-			const sd = best.get(d);
-			if (!sa || !sd) continue;
-			visit.trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
-		}
+		visit.char(char, seq, n);
+		for (const k of seq.keys) visit.press(k, n);
+		// The held modifiers: Shift by the other hand's pinky, AltGr by a thumb.
+		if (seq.shift > 0)
+			visit.press(shiftKeyFor(board, seq.keys[seq.keys.length - 1]), n * seq.shift);
+		if (seq.altgr > 0) visit.press(board.modifiers.altgr, n * seq.altgr);
+		const keys = seq.keys;
+		for (let i = 0; i + 1 < keys.length; i++) visit.bigram(keys[i], keys[i + 1], n);
+		for (let i = 0; i + 2 < keys.length; i++) visit.trigram(keys[i], keys[i + 1], keys[i + 2], n);
+	}
+
+	/**
+	 * The key n-grams across one character bigram (sequences sa, sb): the pair,
+	 * and the key triples that start in a and end in b.
+	 */
+	function walkPair(sa, sb, n, visit) {
+		if (!sa || !sb) return;
+		const ka = sa.keys;
+		const kb = sb.keys;
+		const la = ka.length;
+		const length = la + kb.length;
+		const at = (j) => (j < la ? ka[j] : kb[j - la]);
+		visit.bigram(ka[la - 1], kb[0], n);
+		for (let i = Math.max(0, la - 2); i < la; i++)
+			if (i + 2 < length) visit.trigram(at(i), at(i + 1), at(i + 2), n);
+	}
+
+	/** The key trigram across one character trigram whose middle is one key. */
+	function walkTriple(sa, sb, sd, n, visit) {
+		if (!sb || sb.keys.length !== 1 || !sa || !sd) return;
+		visit.trigram(sa.keys[sa.keys.length - 1], sb.keys[0], sd.keys[0], n);
 	}
 
 	// Key n-gram codes: k1 * KEY_BASE + k2, and (k1 * KEY_BASE + k2) * KEY_BASE + k3.
@@ -1094,6 +1159,314 @@ var LAYOUT_ANALYSIS = (function () {
 		});
 		perBoard.set(board.id, out);
 		return out;
+	}
+
+	/** Whether two key sequences put the same presses and modifiers in the stream. */
+	function sameSequence(a, b) {
+		if (a === b) return true;
+		if (!a || !b) return false;
+		if (a.shift !== b.shift || a.altgr !== b.altgr || a.dead !== b.dead) return false;
+		if (a.keys.length !== b.keys.length) return false;
+		for (let i = 0; i < a.keys.length; i++) if (a.keys[i] !== b.keys[i]) return false;
+		return true;
+	}
+
+	/** A cell as a token for a multiset comparison: null adds nothing. */
+	const cellToken = (cell) =>
+		cell === null ? null : typeof cell === 'string' ? `s${cell}` : `d${cell.dead}`;
+
+	/** Whether two layouts' dead-key rules are the same. */
+	function sameDead(a, b) {
+		const states = Object.keys(a);
+		if (states.length !== Object.keys(b).length) return false;
+		for (const state of states) {
+			const ra = a[state];
+			const rb = b[state];
+			if (!rb) return false;
+			const typed = Object.keys(ra);
+			if (typed.length !== Object.keys(rb).length) return false;
+			for (const t of typed)
+				if (cellToken(ra[t]) !== cellToken(rb[t] === undefined ? null : rb[t])) return false;
+		}
+		return true;
+	}
+
+	/**
+	 * An incremental scorer for a search that changes a layout a little at a
+	 * time (the optimizer's swaps). trial(layout).total is the global score
+	 * analyse(layout, ngrams, options).score.total gives, up to float
+	 * rounding, but a trial walks only the corpus n-grams that hold a
+	 * character whose key sequence changed: the whole layout is compiled
+	 * again (so a change anywhere in a dead-key chain or a cheapest-way
+	 * choice is seen), each character's sequence is compared with the
+	 * current one, and those n-grams are taken out with the old sequences and
+	 * put back with the new ones through the same visitor analyse() uses.
+	 * A compact form factor is measured again only when the trial changes the
+	 * cells on the keys that form keeps, or the dead-key rules.
+	 * @param {object} layoutInput - The current layout (library shape).
+	 * @param {object} ngrams - Counts or prepareNgrams() output.
+	 * @param {object} [options] - As analyse() (keyGroups aside).
+	 * @returns {{total: number, trial: function(object): {total: number,
+	 *   changed: number, commit: function(): void}}} total is the current
+	 *   layout's score; trial scores another layout on the same board without
+	 *   changing the session, and its commit makes that layout the current one.
+	 * @throws {Error} When a trial's layout is measured on another board.
+	 */
+	function scoreSession(layoutInput, ngrams, options) {
+		const opts = options || {};
+		const table = prepareNgrams(ngrams);
+		const keyboardId = opts.keyboard || DEFAULT_KEYBOARD;
+		const firstLayout = layoutFromRows(layoutInput);
+		const board = boardFor(firstLayout, keyboardId, opts.profile);
+		const forms = compactForms(opts.format, opts.formWeights);
+		const formMissing = forms.map((form) => new Set(form.missing));
+		// The corpus's characters as ids, and its n-grams as id lists: an array
+		// lookup costs a fraction of a Map lookup by string.
+		const chars = [];
+		const idOf = new Map();
+		const id = (char) => {
+			if (!idOf.has(char)) {
+				idOf.set(char, chars.length);
+				chars.push(char);
+			}
+			return idOf.get(char);
+		};
+		const uniIds = Int32Array.from(table.uni, (entry) => id(entry[0]));
+		const uniN = Float64Array.from(table.uni, (entry) => entry[1]);
+		const biN = Float64Array.from(table.bi, (entry) => entry[2]);
+		const triN = Float64Array.from(table.tri, (entry) => entry[3]);
+		const biIds = new Int32Array(2 * table.bi.length);
+		table.bi.forEach((entry, i) => {
+			biIds[2 * i] = id(entry[0]);
+			biIds[2 * i + 1] = id(entry[1]);
+		});
+		const triIds = new Int32Array(3 * table.tri.length);
+		table.tri.forEach((entry, i) => {
+			for (let j = 0; j < 3; j++) triIds[3 * i + j] = id(entry[j]);
+		});
+		// Character id → the entries it appears in, each entry once.
+		const uniOf = chars.map(() => []);
+		const biOf = chars.map(() => []);
+		const triOf = chars.map(() => []);
+		uniIds.forEach((u, i) => uniOf[u].push(i));
+		for (let i = 0; i < table.bi.length; i++) {
+			biOf[biIds[2 * i]].push(i);
+			if (biIds[2 * i + 1] !== biIds[2 * i]) biOf[biIds[2 * i + 1]].push(i);
+		}
+		for (let i = 0; i < table.tri.length; i++) {
+			const [a, b, d] = [triIds[3 * i], triIds[3 * i + 1], triIds[3 * i + 2]];
+			triOf[a].push(i);
+			if (b !== a) triOf[b].push(i);
+			if (d !== a && d !== b) triOf[d].push(i);
+		}
+		// An entry already walked in this trial carries the trial's stamp.
+		const stamps = {
+			uni: new Uint32Array(table.uni.length),
+			bi: new Uint32Array(table.bi.length),
+			tri: new Uint32Array(table.tri.length)
+		};
+		let stamp = 0;
+		// The unsupported characters are not scored; the visitor needs a place for them.
+		const unsupportedChars = {};
+		const sequences = (best) => chars.map((char) => best.get(char));
+
+		// What one key bigram or trigram adds, probed once from the visitor with
+		// n = 1: the counters it raises (each by n). The trial then adds n to
+		// those counters in a typed array, the same sums at a fraction of the cost.
+		const names = Object.keys(streamCounts());
+		const K = board.codes.length;
+		const patterns = [];
+		const patternOf = new Map();
+		const probe = (call) => {
+			const counts = streamCounts();
+			call(streamVisitor(board, counts, new Float64Array(K), {}, null));
+			const raised = [];
+			names.forEach((name, j) => {
+				if (counts[name] === 0) return;
+				if (counts[name] !== 1)
+					throw new Error(`layout_analysis: ${name} is not a plain count of the key stream`);
+				raised.push(j);
+			});
+			const key = raised.join(',');
+			if (!patternOf.has(key)) {
+				patternOf.set(key, patterns.length);
+				patterns.push(Int32Array.from(raised));
+			}
+			return patternOf.get(key);
+		};
+		const pairPattern = new Int32Array(K * K).fill(-1);
+		const triplePattern = new Int32Array(K * K * K).fill(-1);
+		/** The session's visitor: the presses through analyse()'s own, the key n-grams memoized. */
+		const sessionVisitor = (c, keyCount, counts) => {
+			const plain = streamVisitor(board, c, keyCount, unsupportedChars, null);
+			return {
+				char: plain.char,
+				unsupported: plain.unsupported,
+				press: plain.press,
+				bigram(k1, k2, n) {
+					const at = k1 * K + k2;
+					if (pairPattern[at] < 0) pairPattern[at] = probe((v) => v.bigram(k1, k2, 1));
+					const raised = patterns[pairPattern[at]];
+					for (let j = 0; j < raised.length; j++) counts[raised[j]] += n;
+				},
+				trigram(k1, k2, k3, n) {
+					const at = (k1 * K + k2) * K + k3;
+					if (triplePattern[at] < 0) triplePattern[at] = probe((v) => v.trigram(k1, k2, k3, 1));
+					const raised = patterns[triplePattern[at]];
+					for (let j = 0; j < raised.length; j++) counts[raised[j]] += n;
+				}
+			};
+		};
+
+		const totalOf = (layout, best, c, counts, keyCount, formValues) => {
+			const all = Object.assign({}, c);
+			names.forEach((name, j) => {
+				all[name] += counts[j];
+			});
+			return score(
+				streamMetrics(layout, board, best, all, keyCount, opts, weightedFit(forms, formValues)),
+				opts.weights
+			).total;
+		};
+
+		const delta = {
+			c: streamCounts(),
+			counts: new Float64Array(names.length),
+			keyCount: new Float64Array(K)
+		};
+		const deltaVisitor = sessionVisitor(delta.c, delta.keyCount, delta.counts);
+		const best = compileLayout(firstLayout, board, null);
+		const c = streamCounts();
+		const counts = new Float64Array(names.length);
+		const keyCount = new Float64Array(K);
+		walkKeyStream(board, best, table, sessionVisitor(c, keyCount, counts));
+		const formValues = forms.map((form) => formFit(firstLayout, board, table, form));
+		let state = {
+			layout: firstLayout,
+			best,
+			seqs: sequences(best),
+			c,
+			counts,
+			keyCount,
+			formValues,
+			total: totalOf(firstLayout, best, c, counts, keyCount, formValues)
+		};
+
+		/** Whether a form keeps the same cells on its keys in both layouts. */
+		function sameForm(before, after, codes, missing) {
+			const tokens = (layout) => {
+				const out = [];
+				for (const code of codes) {
+					if (!board.index.has(code) || missing.has(code)) continue;
+					for (const cell of layout.rows[code] || []) {
+						const token = cellToken(cell);
+						if (token !== null) out.push(token);
+					}
+				}
+				return out.sort().join('\u0000');
+			};
+			return tokens(before) === tokens(after);
+		}
+
+		/** The keys whose cells differ between two layouts. */
+		function changedCodes(before, after) {
+			const out = [];
+			const cellAt = (layout, code, i) =>
+				layout.rows[code] && layout.rows[code][i] !== undefined ? layout.rows[code][i] : null;
+			for (const code of new Set(Object.keys(before.rows).concat(Object.keys(after.rows))))
+				for (let i = 0; i < LAYER_IDS.length; i++)
+					if (cellToken(cellAt(before, code, i)) !== cellToken(cellAt(after, code, i))) {
+						out.push(code);
+						break;
+					}
+			return out;
+		}
+
+		function trial(layoutInput) {
+			const layout = layoutFromRows(layoutInput);
+			if (boardFor(layout, keyboardId, opts.profile) !== board)
+				throw new Error('layout_analysis: a score session keeps the board it started on');
+			const nextBest = compileLayout(layout, board, null);
+			const old = state.seqs;
+			const seqs = sequences(nextBest);
+			// The trial's changes go to the delta buffers, then onto a copy of the state.
+			for (const name of names) delta.c[name] = 0;
+			delta.counts.fill(0);
+			delta.keyCount.fill(0);
+			const visit = deltaVisitor;
+			stamp += 1;
+			let changed = 0;
+			for (let ch = 0; ch < chars.length; ch++) {
+				if (sameSequence(old[ch], seqs[ch])) continue;
+				changed += 1;
+				for (const i of uniOf[ch]) {
+					if (stamps.uni[i] === stamp) continue;
+					stamps.uni[i] = stamp;
+					const u = uniIds[i];
+					const n = uniN[i];
+					walkChar(board, old[u], chars[u], -n, visit);
+					walkChar(board, seqs[u], chars[u], n, visit);
+				}
+				for (const i of biOf[ch]) {
+					if (stamps.bi[i] === stamp) continue;
+					stamps.bi[i] = stamp;
+					const a = biIds[2 * i];
+					const b = biIds[2 * i + 1];
+					const n = biN[i];
+					walkPair(old[a], old[b], -n, visit);
+					walkPair(seqs[a], seqs[b], n, visit);
+				}
+				for (const i of triOf[ch]) {
+					if (stamps.tri[i] === stamp) continue;
+					stamps.tri[i] = stamp;
+					const a = triIds[3 * i];
+					const b = triIds[3 * i + 1];
+					const d = triIds[3 * i + 2];
+					const n = triN[i];
+					walkTriple(old[a], old[b], old[d], -n, visit);
+					walkTriple(seqs[a], seqs[b], seqs[d], n, visit);
+				}
+			}
+			const nextC = Object.assign({}, state.c);
+			for (const name of names) nextC[name] += delta.c[name];
+			const nextCounts = state.counts.slice();
+			for (let j = 0; j < nextCounts.length; j++) nextCounts[j] += delta.counts[j];
+			const nextKeys = state.keyCount.slice();
+			for (let k = 0; k < K; k++) nextKeys[k] += delta.keyCount[k];
+			// A compact form is measured again only when its kept cells changed.
+			const before = state.layout;
+			const deadSame = sameDead(before.dead, layout.dead);
+			const codes = changedCodes(before, layout);
+			const nextForms = forms.map((form, i) =>
+				deadSame && sameForm(before, layout, codes, formMissing[i])
+					? state.formValues[i]
+					: formFit(layout, board, table, form)
+			);
+			const total = totalOf(layout, nextBest, nextC, nextCounts, nextKeys, nextForms);
+			return {
+				total,
+				changed,
+				commit() {
+					state = {
+						layout,
+						best: nextBest,
+						seqs,
+						c: nextC,
+						counts: nextCounts,
+						keyCount: nextKeys,
+						formValues: nextForms,
+						total
+					};
+				}
+			};
+		}
+
+		return {
+			get total() {
+				return state.total;
+			},
+			trial
+		};
 	}
 
 	/**
@@ -1258,19 +1631,33 @@ var LAYOUT_ANALYSIS = (function () {
 	 * form factor, averaged with the form factors' weights.
 	 */
 	function compactFit(layout, board, table, format, formWeights) {
+		const forms = compactForms(format, formWeights);
+		return weightedFit(
+			forms,
+			forms.map((form) => formFit(layout, board, table, form))
+		);
+	}
+
+	/** The share of the characters still typed on one compact form factor. */
+	function formFit(layout, board, table, form) {
+		const reachable = compileLayout(layout, board, new Set(form.missing));
+		let kept = 0;
+		let all = 0;
+		for (const [char, n] of table.uni) {
+			all += n;
+			if (reachable.has(char)) kept += n;
+		}
+		return all > 0 ? (100 * kept) / all : 0;
+	}
+
+	/** The form factors' shares averaged with their weights: compact_fit. */
+	function weightedFit(forms, values) {
 		let sum = 0;
 		let weights = 0;
-		for (const form of compactForms(format, formWeights)) {
-			const reachable = compileLayout(layout, board, new Set(form.missing));
-			let kept = 0;
-			let all = 0;
-			for (const [char, n] of table.uni) {
-				all += n;
-				if (reachable.has(char)) kept += n;
-			}
-			sum += form.weight * (all > 0 ? (100 * kept) / all : 0);
+		forms.forEach((form, i) => {
+			sum += form.weight * values[i];
 			weights += form.weight;
-		}
+		});
 		return weights > 0 ? sum / weights : 0;
 	}
 
@@ -1566,6 +1953,7 @@ var LAYOUT_ANALYSIS = (function () {
 		ngramsFromText,
 		prepareNgrams,
 		analyse,
+		scoreSession,
 		score,
 		keyScoreCost,
 		defaultWeights,

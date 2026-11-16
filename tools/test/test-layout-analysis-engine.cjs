@@ -22,7 +22,10 @@
  *    an edited one is the one measured, and an invalid one throws.
  * 4. Library: about a hundred layouts with unique ids, every registry layout
  *    with its dead keys, and the reference QWERTY as its source says.
- * 5. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
+ * 5. Incremental score: scoreSession gives the full analysis's score after
+ *    random swaps of any cells and dead-key rules (a property test), keeps a
+ *    trial only once committed, and refuses a layout on another board.
+ * 6. Speed: the whole library on a 2.5 MB corpus, from prepared tables, well
  *    under a second.
  * ==============================================================================
  */
@@ -668,8 +671,122 @@ for (const layout of library) {
 	check(plainKeys.KeyE.worst.sfb.length === 1, 'worst groups: the SFB partners are always counted');
 }
 
+// ====================================
+// ======= 5/ Incremental score =======
+// ====================================
+
+// scoreSession re-scores only the n-grams a change touches; it must give the
+// full analysis's score after any change. Property: random swaps of any two
+// cells (any level, dead keys and holes included), some dead-key rules
+// changed, on layouts with dead keys and AltGr levels, several boards,
+// formats and weights, with trials kept or dropped at random.
+{
+	const SWAPS = 120;
+	const SESSION_TOLERANCE = 1e-9;
+	const sessionTable = E.prepareNgrams(
+		E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8').slice(0, 30000))
+	);
+	let state = 20261116;
+	const next = () => {
+		state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+		return state / 4294967296;
+	};
+	const pick = (items) => items[Math.floor(next() * items.length)];
+	const clone = (layout) => ({
+		id: layout.id,
+		fingering: layout.fingering,
+		rows: Object.fromEntries(Object.entries(layout.rows).map(([code, row]) => [code, row.slice()])),
+		dead: Object.fromEntries(
+			Object.entries(layout.dead).map(([dead, rules]) => [dead, Object.assign({}, rules)])
+		),
+		command: Object.assign({}, layout.command)
+	});
+	/** A copy of layout with two cells swapped, or two dead-key outputs swapped. */
+	const mutate = (layout) => {
+		const out = clone(layout);
+		const states = Object.keys(out.dead).filter((dead) => Object.keys(out.dead[dead]).length > 1);
+		if (states.length && next() < 0.15) {
+			const rules = out.dead[pick(states)];
+			const [x, y] = [pick(Object.keys(rules)), pick(Object.keys(rules))];
+			[rules[x], rules[y]] = [rules[y], rules[x]];
+			return out;
+		}
+		const codes = Object.keys(out.rows);
+		const [a, b] = [pick(codes), pick(codes)];
+		const [i, j] = [Math.floor(next() * 4), Math.floor(next() * 4)];
+		[out.rows[a][i], out.rows[b][j]] = [out.rows[b][j], out.rows[a][i]];
+		return out;
+	};
+	const cases = [
+		{ layout: 'azerty', options: { format: 'tkl' } },
+		{ layout: 'ergol', options: {} },
+		{ layout: 'ergopti', options: { keyboard: 'ansi', weights: { sfb: 9, distance: 0.5 } } },
+		{ layout: 'bepo', options: { keyboard: 'corne', format: '60' } }
+	];
+	let trials = 0;
+	let worst = 0;
+	for (const { layout: id, options } of cases) {
+		if (!byId.has(id)) {
+			check(false, `incremental: the library has no ${id}`);
+			continue;
+		}
+		let current = clone(byId.get(id));
+		const session = E.scoreSession(current, sessionTable, options);
+		const full = (layout) => E.analyse(layout, sessionTable, options).score.total;
+		check(
+			Math.abs(session.total - full(current)) <= SESSION_TOLERANCE,
+			`incremental: ${id} starts at the full score`
+		);
+		for (let s = 0; s < SWAPS; s++) {
+			const candidate = mutate(current);
+			const trial = session.trial(candidate);
+			const expected = full(candidate);
+			const gap = Math.abs(trial.total - expected);
+			worst = Math.max(worst, gap);
+			trials += 1;
+			if (gap > SESSION_TOLERANCE * Math.max(1, Math.abs(expected))) {
+				check(
+					false,
+					`incremental: ${id} swap ${s} scores ${trial.total}, the full score is ${expected}`
+				);
+				break;
+			}
+			if (next() < 0.5) {
+				trial.commit();
+				current = candidate;
+				check(session.total === trial.total, `incremental: ${id} keeps a committed trial`);
+				// The next trials are measured from the committed layout: the same one walks nothing.
+				check(session.trial(candidate).changed === 0, `incremental: ${id} stands on its commit`);
+			}
+		}
+	}
+	check(trials >= cases.length * SWAPS, `incremental: only ${trials} trials ran`);
+	// A trial leaves the session where it was until it is committed.
+	const azerty = byId.get('azerty');
+	const session = E.scoreSession(azerty, sessionTable, {});
+	const before = session.total;
+	const moved = clone(azerty);
+	[moved.rows.KeyA, moved.rows.KeyQ] = [moved.rows.KeyQ, moved.rows.KeyA];
+	const trial = session.trial(moved);
+	check(trial.changed > 0, 'incremental: a swap of two letters changes their sequences');
+	check(session.total === before, 'incremental: an uncommitted trial changes nothing');
+	check(
+		Math.abs(session.trial(azerty).total - before) <= SESSION_TOLERANCE,
+		'incremental: the session still stands on the first layout'
+	);
+	// A layout measured on another board is refused, not scored wrongly.
+	let refused = false;
+	try {
+		session.trial(Object.assign(clone(azerty), { fingering: 'angle' }));
+	} catch (error) {
+		refused = /keeps the board/.test(error.message);
+	}
+	check(refused, 'incremental: a trial on another board is refused');
+	console.log(`  incremental: ${trials} trials, largest gap ${worst.toExponential(1)}`);
+}
+
 // ========================
-// ======= 5/ Speed =======
+// ======= 6/ Speed =======
 // ========================
 
 const prepared = E.prepareNgrams(E.ngramsFromText(fs.readFileSync(SPEED_CORPUS, 'utf8')));
