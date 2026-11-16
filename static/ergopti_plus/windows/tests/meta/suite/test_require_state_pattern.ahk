@@ -131,12 +131,14 @@ _MetaListAhkFilesGuardV2(Dir) {
 ; Runs inside its test: scanning the tree at registration taxed every runner boot.
 ; Whether a stateful file guards its state: a lazy check on a private global
 ; (if !_X), or an owner start that rejects a duplicate initialization
-; (if IsObject(_X) followed by a throw), as AGENTS.md asks of a stateful module.
+; (if IsObject(_X), or if IsSet(_X) && IsObject(_X) for an owner whose stop can
+; run before its top-level assignment, followed by a throw), as AGENTS.md asks
+; of a stateful module.
 ; @param Body {String} The file's source.
 ; @returns {Boolean}
 _MetaRequireStateHasGuard(Body) {
 	return (Body ~= "i)if\s*\(!_\w") or (Body ~= "i)if\s+!_\w")
-		or (Body ~= "im)^\s*if\s*\(?\s*IsObject\(_\w+\)\s*\)?[ \t]*\r?\n\s*throw\b")
+		or (Body ~= "im)^\s*if\s*\(?\s*(?:IsSet\((_\w+)\)\s*&&\s*IsObject\(\1\)|IsObject\(_\w+\))\s*\)?[ \t]*\r?\n\s*throw\b")
 }
 
 _MetaGuardRatchet() {
@@ -197,6 +199,10 @@ Test("meta require_state: module-level state without an init guard does not incr
 _MetaRequireStateGuardShapes() {
 	AssertTrue(_MetaRequireStateHasGuard('Start() {`n`tif IsObject(_Owner)`n`t`tthrow Error("started")`n}'))
 	AssertTrue(_MetaRequireStateHasGuard("Get() {`n`tif (!_Cache)`n`t`t_Cache := Map()`n}"))
+	AssertTrue(_MetaRequireStateHasGuard('Start() {`n`tif IsSet(_Owner) && IsObject(_Owner)`n`t`tthrow Error("started")`n}'),
+		"an unset-tolerant duplicate-start rejection is the same guard")
+	AssertFalse(_MetaRequireStateHasGuard('Start() {`n`tif IsSet(_Other) && IsObject(_Owner)`n`t`tthrow Error("started")`n}'),
+		"the IsSet half must test the owner itself")
 	AssertFalse(_MetaRequireStateHasGuard('Stop() {`n`tif IsObject(_Owner)`n`t`t_Owner := ""`n}'))
 	AssertFalse(_MetaRequireStateHasGuard("Read() {`n`treturn _Owner`n}"))
 }
