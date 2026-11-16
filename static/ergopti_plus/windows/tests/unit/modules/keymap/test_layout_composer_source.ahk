@@ -462,7 +462,14 @@ _LCS_StudioTitleCase() {
 	AssertEqual("Ergopti Studio", WindowTitle(t("layout_editor.title")), "the whole title is the product name")
 	AssertEqual("ErgoptiPlus — Paths", WindowTitle("Paths"), "every other window keeps the brand")
 	AssertEqual("ErgoptiPlus — Ergopti Studio 2", WindowTitle("Ergopti Studio 2"))
-	Body := _DriverFuncBody("LayoutEditorWindow_Open")
-	Assert(Body != "", "the editor window opener must be readable")
+	; Both entry points (the plain opener and the navigation-layer one) open
+	; through the one host opener, which owns the caption.
+	for Opener in ["LayoutEditorWindow_Open", "LayoutEditorWindow_OpenOnNav"] {
+		Body := _DriverFuncBody(Opener)
+		Assert(Body != "", "the editor window opener " . Opener . " must be readable")
+		AssertContains(Body, "_LayEdWin_TryOpen()", Opener . " opens through the shared host opener")
+	}
+	Body := _DriverFuncBody("_LayEdWin_TryOpen")
+	Assert(Body != "", "the editor window host opener must be readable")
 	AssertContains(Body, '"Title", t("layout_editor.title")', "the window passes its caption to the composing host")
 }
