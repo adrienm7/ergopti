@@ -784,7 +784,7 @@ global TEST_MODULE_GROUPS := [
 	; Source-scanning meta tests of the whole driver.
 	["meta", "^meta/"],
 	; Local LLM server panel (view preparation, discovery, panel actions).
-	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	["llm-server-panel", "^unit/ai/servers/test_local_server_panel"],
 	; Every other local and managed LLM server test: sharing, publication, Ollama.
 	["llm-servers", "^unit/ai/servers/"],
 	; LLM terminal navigation owner.
