@@ -48,7 +48,7 @@ M.GROUPS = {
 	} },
 	{ name = "meta", prefixes = { "tests/meta/" } },
 	{ name = "core", prefixes = { "tests/unit/adapters/", "tests/unit/infra/", "tests/unit/platform/" } },
-	{ name = "modules", prefixes = { "tests/unit/modules/" } },
+	{ name = "modules", prefixes = { "tests/unit/modules/", "tests/unit/ai/engine/", "tests/unit/ai/adapters/" } },
 	{ name = "menu_llm", prefixes = { "tests/unit/ai/ui/menu/" } },
 	{ name = "menu_input", prefixes = {
 		"tests/unit/menu/ui/hotstrings/",

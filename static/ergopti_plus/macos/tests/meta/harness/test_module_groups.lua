@@ -95,6 +95,7 @@ helpers.describe("test module groups (macos-test-shards)", function()
 
 	helpers.it("matches whole folder prefixes, first group first", function()
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.ai.ui.menu.mlx.test_x"), "menu_llm")
+		helpers.assert_eq(ModuleGroups.group_of("tests.unit.ai.engine.mlx.test_x"), "modules")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.menu.ui.hotstrings.test_x"), "menu_input")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.menu.ui.test_x"), "ui")
 		helpers.assert_eq(ModuleGroups.group_of("tests.unit.platform.remap.test_x"), "core")
