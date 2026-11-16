@@ -1083,6 +1083,7 @@ local MODULE_FAMILIES = {
 		"modules.keymap.layout_install",
 		"modules.keymap.layout_registry",
 		"modules.keymap.layout_rows_build",
+		"modules.keymap.layout_sources_cache",
 		"modules.keymap.llm_bridge",
 		"modules.keymap.llm_context",
 		"modules.keymap.magic_key_source",
