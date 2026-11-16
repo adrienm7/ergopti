@@ -171,7 +171,9 @@ TestFeatureStateBootTapBindingSourceWiring() {
 		"all actual declaration, reader and native prerequisite source bindings must exist")
 	AssertTrue(KeyStatePos < StatePos && StatePos < ApplyPos && ApplyPos < GesturePos && GesturePos < LaterTapPos && LaterTapPos < TapReadPos,
 		"native declarations precede both config readers while actual tap configuration stays in its original stage")
-	IncludePos := InStr(State, "#Include %A_LineFile%\..\tap_keys.ahk")
+	; The owner left infra/ for settings/engine/preferences/: match its include of
+	; the one infra/tap_keys.ahk by target, whatever relative spelling reaches it.
+	IncludePos := RegExMatch(State, "im)^#Include\s+%A_LineFile%(?:[\\/]\.\.)+[\\/]infra[\\/]tap_keys\.ahk\s*$")
 	PublishPos := InStr(State, "global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)")
 	AssertTrue(IncludePos > 0 && PublishPos > IncludePos,
 		"the exact existing native source publishes only after its ordinary early include")
