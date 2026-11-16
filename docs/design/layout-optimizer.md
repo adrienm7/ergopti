@@ -142,6 +142,12 @@ to « Éditer », which opens it in a new tab (`LAYOUT_ANALYSIS_FILES
 .handOffToEditor`, editor `openLayout`); « Compare with other layouts » hands
 it to « Comparer » the way the editor does.
 
+The page keeps the reader's choices (corpus, start, keyboard, switches, pins,
+zones, weights, budget) and their last text in this browser's storage
+(`ergopti.layout_optimizer.v1`, `ergopti.layout_optimizer.text.v1`), and puts
+them back on the next visit, skipping a value it no longer knows; a browser
+that refuses storage, or a text over the quota, gets the same page unsaved.
+
 Where a worker cannot start (a page a host inlines, without a script URL),
 the same runner runs on the page in 40 ms slices.
 
@@ -169,4 +175,3 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
   shares of ways changed, and re-plans only their contexts.
 - The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
   (Windows, macOS, Linux), with the keystats corpus « My typing ».
-- Saving the page's choices per viewer (localStorage), as the Comparer does.

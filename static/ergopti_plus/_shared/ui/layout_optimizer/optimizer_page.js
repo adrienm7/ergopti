@@ -23,6 +23,12 @@
  * 5. Pins: a click on a key of the start layout keeps it in place; the QWERTY
  *    board keeps chosen letters at their QWERTY place (presets for the Ctrl
  *    shortcuts Z X C V and A S), whatever the start.
+ * 6. Corpora: the built-in ones, or the reader's own text, pasted or opened
+ *    from a file (the Comparer's reader), counted on the device, with its
+ *    size limits said in words.
+ * 7. Zones: a click on the zone board keeps a character on the keys chosen.
+ * 8. Remembered: the choices and the last text are kept in this browser's
+ *    storage; a browser that refuses storage gets the same page, unsaved.
  * ==============================================================================
  */
 
@@ -85,6 +91,9 @@
 	// Files larger than this are refused before they are read (MB).
 	const MAX_FILE_MB = 50;
 	const TEXT_DEBOUNCE_MS = 400;
+	// The reader's choices and last text, kept in this browser for the next visit.
+	const STORAGE_KEY = 'ergopti.layout_optimizer.v1';
+	const TEXT_KEY = 'ergopti.layout_optimizer.text.v1';
 	const STANDALONE_ROOT_ID = 'layout-optimizer';
 
 	// The site passes ?lang=<code>; i18n.js loads that locale, then English and French.
@@ -279,6 +288,8 @@
 			tables: new Map(),
 			// The pasted or opened text's tables: {hash, chars, tables}.
 			custom: null,
+			// The saved start layout, until the reader picks another.
+			savedStart: null,
 			running: null,
 			startResult: null,
 			best: null,
@@ -359,14 +370,18 @@
 					max: number(MAX_TEXT_CHARS, 0)
 				});
 			if (chars === 0 || problem) {
+				if (restored && chars === 0) writeStored(TEXT_KEY, null);
 				state.custom = null;
 				status.textContent = problem || '';
 				status.classList.toggle('lo-error', Boolean(problem));
 				return;
 			}
 			const hash = E.hashText(trimmed);
-			if (!state.custom || state.custom.hash !== hash)
+			if (!state.custom || state.custom.hash !== hash) {
 				state.custom = { hash, chars, tables: E.ngramsFromText(trimmed) };
+				// Too long for the storage quota: the text is simply not kept.
+				if (restored) writeStored(TEXT_KEY, { text: trimmed });
+			}
 			status.textContent = t(`${PREFIX}corpus.text_ready`, { chars: number(chars, 0) });
 			status.classList.remove('lo-error');
 		}
@@ -410,7 +425,8 @@
 
 		function fillStarts() {
 			const select = $('lo-start');
-			const kept = select.value || DEFAULT_START;
+			// A saved layout of « Éditer » is chosen once its tab is listed.
+			const kept = state.savedStart || select.value || DEFAULT_START;
 			const group = (label, layouts) => {
 				const node = el('optgroup');
 				node.label = label;
@@ -611,6 +627,7 @@
 				}
 			});
 			if (start) drawZones(start);
+			save();
 		}
 
 		/** The characters a zone can hold: each one on a base level of the start layout's keys. */
@@ -651,7 +668,7 @@
 					else zone.add(code);
 					if (zone.size) state.zones.set(char, zone);
 					else state.zones.delete(char);
-					drawZones(start);
+					drawPinBoards();
 				}
 			});
 			const summary = [...state.zones.entries()]
@@ -993,7 +1010,101 @@
 		}
 
 		// ============================
-		// ======= 7/ Start ===========
+		// ======= 7/ Saved choices ===
+		// ============================
+
+		/** Reads a saved value; a browser that refuses storage gives none. */
+		function readStored(key) {
+			try {
+				const raw = window.localStorage.getItem(key);
+				return raw ? JSON.parse(raw) : null;
+			} catch {
+				return null;
+			}
+		}
+
+		/** Writes a saved value; a refused or full storage keeps none, the page works the same. */
+		function writeStored(key, value) {
+			try {
+				if (value === null) window.localStorage.removeItem(key);
+				else window.localStorage.setItem(key, JSON.stringify(value));
+			} catch {
+				// A private window, blocked site data or a full quota: nothing is kept.
+			}
+		}
+
+		/** The reader's choices, kept for their next visit (this browser only). */
+		function save() {
+			if (!restored) return;
+			const switches = {};
+			for (const id of SWITCHES) switches[id] = $(`lo-switch-${id}`).checked;
+			writeStored(STORAGE_KEY, {
+				language: $('lo-language').value,
+				corpus: $('lo-corpus').value,
+				start: $('lo-start').value,
+				startMode: root.querySelector('input[name="lo-start-mode"]:checked').value,
+				keyboard: $('lo-keyboard').value,
+				switches,
+				pinnedCodes: [...state.pinnedCodes],
+				qwertyPins: [...state.qwertyPins],
+				zones: options().zones,
+				weights: state.weights,
+				seconds: $('lo-seconds').value,
+				iterations: $('lo-iterations').value,
+				restarts: $('lo-restarts').value,
+				seed: $('lo-seed').value,
+				accuracy: $('lo-accuracy').value
+			});
+		}
+
+		/** Puts back the saved choices; a value this page no longer knows is skipped. */
+		function restore() {
+			const saved = readStored(STORAGE_KEY);
+			if (!saved || typeof saved !== 'object') return;
+			const choose = (id, value) => {
+				const select = $(id);
+				if (Array.from(select.options).some((option) => option.value === value))
+					select.value = value;
+			};
+			const strings = (list) =>
+				Array.isArray(list) ? list.filter((item) => typeof item === 'string') : [];
+			choose('lo-language', saved.language);
+			fillCorpora();
+			choose('lo-corpus', saved.corpus);
+			syncCorpus();
+			// A layout open in « Éditer » may arrive after the mount: it is chosen then.
+			state.savedStart = typeof saved.start === 'string' ? saved.start : null;
+			choose('lo-start', saved.start);
+			if (saved.startMode === 'layout' || saved.startMode === 'random')
+				root.querySelector(`input[name="lo-start-mode"][value="${saved.startMode}"]`).checked =
+					true;
+			choose('lo-keyboard', saved.keyboard);
+			for (const id of SWITCHES)
+				if (saved.switches && typeof saved.switches[id] === 'boolean')
+					$(`lo-switch-${id}`).checked = saved.switches[id];
+			syncSwitches();
+			state.pinnedCodes = new Set(strings(saved.pinnedCodes));
+			state.qwertyPins = new Set(strings(saved.qwertyPins));
+			state.zones = new Map();
+			for (const [char, codes] of Object.entries(saved.zones || {}))
+				if (strings(codes).length) state.zones.set(char, new Set(strings(codes)));
+			const defaults = E.defaultWeights();
+			for (const [id, value] of Object.entries(saved.weights || {}))
+				if (id in defaults && Number.isFinite(value) && value >= 0) state.weights[id] = value;
+			fillWeights();
+			for (const id of ['seconds', 'iterations', 'restarts', 'seed'])
+				if (typeof saved[id] === 'string' && /^\d+$/.test(saved[id]))
+					$(`lo-${id}`).value = saved[id];
+			choose('lo-accuracy', saved.accuracy);
+			const text = readStored(TEXT_KEY);
+			if (text && typeof text.text === 'string') {
+				$('lo-text').value = text.text;
+				useText(text.text);
+			}
+		}
+
+		// ============================
+		// ======= 8/ Start ===========
 		// ============================
 
 		const threads = () => Math.max(1, (navigator.hardwareConcurrency || 2) - 1);
@@ -1013,6 +1124,7 @@
 				event.target.value = '';
 			});
 			$('lo-start').addEventListener('change', () => {
+				state.savedStart = null;
 				state.pinnedCodes.clear();
 				drawPinBoards();
 			});
@@ -1061,12 +1173,18 @@
 			fillPresets();
 		}
 
+		// Saving waits until the saved choices are back, or the defaults would replace them.
+		let restored = false;
 		refreshStrings();
 		$('lo-seconds').value = String(DEFAULT_SECONDS);
 		$('lo-iterations').value = String(DEFAULT_ITERATIONS);
 		$('lo-restarts').value = String(defaultRestarts());
 		$('lo-seed').value = String(DEFAULT_SEED);
 		bind();
+		restore();
+		restored = true;
+		// Every field and switch saves on change; the boards save as they redraw.
+		root.addEventListener('change', save);
 		drawPinBoards();
 		FILES.onEditorLayouts((layouts) => {
 			state.editorLayouts = Array.isArray(layouts) ? layouts : [];
