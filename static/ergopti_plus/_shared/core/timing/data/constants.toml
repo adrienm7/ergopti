@@ -315,6 +315,13 @@ decoder_swipe_minimum_mm = 10.0
 pair_scroll_travel_mm = 10.0
 touchpad_fallback_units_per_mm = 12
 
+# How often the Linux driver looks for a touchpad again after the one it read
+# was unplugged, while gestures are on: one read of /proc/bus/input/devices
+# (maintainer decision of 2026-11-17). macOS and Windows receive gestures from
+# the OS, which keeps them across a reconnect.
+# LX: modules/gestures/manager.lua.
+touchpad_rescan_ms = 2000
+
 # The incremental swipe step rule and the live direction lock, for a driver
 # that cannot require the shared Lua modules: travel before the first action
 # (FIRST_STEP), the most actions one frame may earn before a sensor jump is

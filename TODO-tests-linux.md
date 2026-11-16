@@ -26,7 +26,9 @@ yet; the first run also proves the field run without a click (53c1766514), the r
       its order; with the extension turned off the menu names it.
 - [ ] <!-- field-point: physical_acceptance --> Physical acceptance: evdev/uinput grabs, polkit, autostart, Wayland
       and X11; the wizard (7) on Wayland; the magic key grab, injection and hotplug (30); sway or Xorg reading the
-      daemon's real virtual keyboard on real evdev nodes (93).
+      daemon's real virtual keyboard on real evdev nodes (93); touchpad hotplug: with gestures on, unplug a USB or
+      Bluetooth touchpad (the log says « lost … looking for a touchpad every 2000 ms » once and the gesture switch
+      still commits), plug it back (« A touchpad is back » once) and a bound swipe fires.
 - [ ] <!-- field-point: item50_cascade --> Item 50 cascade on a physical keyboard (`fb` + Space, Enter and ★ at 1, 2
       and 3 arrows, consumed and not, as `cascade_vectors.json` `fb_*`), and the composed layout typed on it.
 - [ ] <!-- field-point: layout_emulation_w1_w4 --> Layout emulation W1 to W4 of

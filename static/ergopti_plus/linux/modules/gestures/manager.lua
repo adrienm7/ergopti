@@ -194,6 +194,10 @@ end
 -- held for seconds would report elapsed ~= 0 and be misclassified as a tap.
 local _now_sec = Monotonic.now_sec
 
+-- How often a lost touchpad is looked for again: one read of
+-- /proc/bus/input/devices, as the keyboard watchdog does for keyboards.
+local TOUCHPAD_RESCAN_SEC = Timings.sec("gestures", "touchpad_rescan_ms")
+
 -- Click holds are independent from the touchpad reader: keyboard shortcuts
 -- may acquire them on a desktop without a touchpad too.
 local function NEVER_PAUSED() return false end
@@ -1206,6 +1210,12 @@ local _persist       = false
 local _actions       = {}   -- slot → action_name
 local _reading       = false -- the touchpad's evdev node is open and being drained
 local _reader_stop_error = nil -- an unacknowledged close must fence reacquisition
+-- The touchpad being read vanished (unplugged, or its node failed): while the
+-- master is on, the pump looks for a touchpad again every TOUCHPAD_RESCAN_SEC,
+-- and the gesture settings stay editable meanwhile, applied once one is read.
+local _touchpad_lost = false
+local _next_rescan_at = nil
+local _refused_touchpads = nil -- the listed paths a rescan failed to open, not retried
 local _decoder       = nil   -- the multitouch frame decoder for that device
 local _touchpad      = nil   -- what touchpad_finder chose, and what it can express
 local _parameter_delivery_epoch = 0
@@ -1990,9 +2000,12 @@ end
 --- Captures detached preferences and the acknowledged touchpad reader state.
 --- @return table|nil snapshot Nil when the current master has no live reader.
 function M.capture_scope_state()
-	if _reader_stop_error or (_enabled and not _reading) then return nil end
+	-- A master on whose touchpad was lost is a live state: its reader starts
+	-- again as soon as a touchpad is back (`reading` means live or awaited).
+	local awaited = _enabled and _touchpad_lost
+	if _reader_stop_error or (_enabled and not _reading and not awaited) then return nil end
 	return {
-		enabled = _enabled, reading = _reading,
+		enabled = _enabled, reading = _reading or awaited,
 		actions = copy_state(_actions), parameters = copy_state(_action_params),
 	}
 end
@@ -2023,7 +2036,13 @@ function M.apply_scope_state(candidate, preserve_clicks)
 	if not retire_window_operation() then return false end
 	_scope_native = true
 	local called, acknowledged = pcall(function()
-		if candidate.reading then return M.start_reading() == true and M.is_reading() end
+		if candidate.reading then
+			local started, unavailable = M.start_reading()
+			-- No touchpad since the last one was lost: acknowledged, and the pump
+			-- starts the reader with these settings when a touchpad comes back.
+			if not started and unavailable == "no_touchpad" and _touchpad_lost then return true end
+			return started == true and M.is_reading()
+		end
 		local stopped
 		if preserve_clicks == preserve_scope_clicks then stopped = stop_reading_preserving_clicks()
 		else stopped = M.stop_reading() end
@@ -2071,7 +2090,7 @@ end
 --- one, « recommended » can never start the reader it requires.
 --- @return boolean available
 function M.scope_available()
-	if _reading then return true end
+	if _reading or _touchpad_lost then return true end
 	return require("modules.gestures.touchpad_finder").find() ~= nil
 end
 
@@ -2487,6 +2506,10 @@ function M.start_reading()
 	end
 	_touchpad = touchpad
 	_reading = true
+	if _touchpad_lost then
+		_touchpad_lost, _next_rescan_at, _refused_touchpads = false, nil, nil
+		Logger.info(LOG, "A touchpad is back (%s): gestures resume.", touchpad.path)
+	end
 	_incremental = new_incremental(units_x, units_y)
 	if _incremental then
 		Logger.info(LOG, "%s: %d x %d units per mm; incremental swipes count millimetres.", touchpad.path, units_x, units_y)
@@ -2509,6 +2532,21 @@ end
 function M.pump()
 	_click_holds.pump()
 	if _is_paused() then M.release_clicks() end
+	if _touchpad_lost and _enabled and not _reading and not _reader_stop_error then
+		local now = _now_sec()
+		if _next_rescan_at == nil or now >= _next_rescan_at then
+			_next_rescan_at = now + TOUCHPAD_RESCAN_SEC
+			-- Quiet until a touchpad is listed, and one attempt per listed set:
+			-- start_reading logs its refusal, which must not repeat every rescan.
+			local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
+			local listed = {}
+			for _, found in ipairs(ok_finder and Finder.list() or {}) do listed[#listed + 1] = tostring(found.path) end
+			local key = table.concat(listed, " ")
+			if #listed > 0 and key ~= _refused_touchpads then
+				if M.start_reading() ~= true then _refused_touchpads = key end
+			end
+		end
+	end
 	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
 	local ok_reader, Reader = pcall(require, "platform.input.evdev_reader")
@@ -2532,9 +2570,18 @@ function M.pump()
 		if gesture then M.dispatch_gesture(gesture) end
 	end, Reader.TOUCHPAD)
 	if status == "fatal" or status == "closed" then
-		Logger.error(LOG, "Touchpad drain %s — stopping gesture reading; re-enable gestures to retry.",
-			tostring(status))
-		M.stop_reading()
+		local path = _touchpad and _touchpad.path or "the touchpad"
+		if M.stop_reading() == true then
+			-- Unplugging a touchpad is not a failure: its gestures resume when
+			-- one is back, and the settings stay editable until then.
+			_touchpad_lost, _refused_touchpads = true, nil
+			_next_rescan_at = _now_sec() + TOUCHPAD_RESCAN_SEC
+			Logger.warn(LOG, "Touchpad %s lost (drain %s): looking for a touchpad every %d ms.", path,
+				tostring(status), math.floor(TOUCHPAD_RESCAN_SEC * 1000 + 0.5))
+		else
+			Logger.error(LOG, "Touchpad drain %s and its reader did not stop: gestures stay off until restart.",
+				tostring(status))
+		end
 	end
 	return drained or 0
 end

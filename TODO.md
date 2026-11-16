@@ -194,8 +194,7 @@ Native receiving stays unqualified everywhere; the real-machine scenarios are in
       [receipts](docs/audits/linux-container-proofs/2026-11-11-recovery/README.md)).
 - [ ] **Linux native acceptance.** Multi-field Tab settling and grapheme deletion in host editors (hotstrings), pointer
       metrics, live layout apply on KDE (GNOME is proved by `run_input_sources_live.sh gnome`), desktop connectors and
-      real mail/calendar (llm) ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)); touchpad
-      hotplug waits on its question under « Maintainer decisions pending ».
+      real mail/calendar (llm) ([18-scope review](docs/audits/platform-parity/2026-11-04-deep/report.md)).
 
 ## Carried over from the 1.0.9 requests
 
@@ -355,19 +354,6 @@ Each question names the default kept meanwhile; an answer moves into the item or
   2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
      written to `vendor/keyboard_layout`.
   3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
-- [ ] **Linux: a touchpad unplugged while gestures are on (asked 2026-11-16, deep audit linux-gestures « Device
-      loss / hotplug »).** A failed touchpad read stops the reader and logs « re-enable gestures to retry »
-      (`modules/gestures/manager.lua` `pump`); plugging the pad back starts nothing. Read in the source on 2026-11-16:
-      the master stays on with no reader, and `capture_scope_state` refuses that state, so every gesture setting
-      (the switch, bindings, the restore and clear of the section) is refused until the daemon restarts. macOS and
-      Windows receive gestures from the OS, which keeps them across a reconnect. Kept meanwhile: today's stop.
-  1. **(recommended) Look for the pad again:** while the master is on and its pad is lost, the pump runs the
-     finder every few seconds (a new `[gestures]` registry delay, one INFO line at loss and one at return, none per
-     attempt) and reopens it; « on, waiting for its touchpad » becomes a state the gesture scope admits, so settings
-     stay editable meanwhile. A pad first plugged after a start that found none is not watched.
-  2. Turn the master off at loss (the config keeps `enabled = true`, the next start reads the pad again) and
-     notify the user once; settings stay editable.
-  3. Keep today's stop and only make the settings editable while no reader runs.
 - [ ] **Open questions of the 2026-11-15 hand-off.** The identity gate's false positive on every PDF's root trailer
       key in containers whose home is the root account's (left unchanged); the casing of BEO, INTS, UCIEA, AHEI,
       MTGAP-T and CTGAP 3 (the agent's spelling kept); the dead-key marker style (`key-legend-dead`: accent colour
