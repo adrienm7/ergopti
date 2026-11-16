@@ -132,7 +132,69 @@ helpers.describe("HS-024 MLX download terminal owner", function()
 			fixture.controls.latest("launcher"):complete(0, "", "")
 			assert_cancelled(fixture, "launcher_failed")
 			helpers.assert_eq(fixture.records.errors[#fixture.records.errors],
-				"MLX download launcher failed (exit=0, pid=missing, sentinel in final output=no).")
+				"MLX download launcher failed (exit=0, step=pid_not_reported, cause=exit, pid=missing,"
+					.. " sentinel in final output=no): no output.")
+		end)
+	end)
+
+	-- Field run 2026-11-15 23:57:53: "exit=1, pid=missing" and nothing else. The
+	-- launcher printed its refusal and the interpreter's error to the progress
+	-- window only; the failure line now names the step and quotes those lines.
+	helpers.it("names the launcher step and quotes its streamed output (mlx-launcher-cause-2026-11-15)", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			local launcher = fixture.controls.latest("launcher")
+			launcher:emit("Python utilisé: /venv/bin/python\n")
+			launcher:emit("[MLX] huggingface_hub/truststore manquants (import status 1)\n"
+				.. "Traceback (most recent call last):\n", "")
+			launcher:emit("", "ModuleNotFoundError: No module named 'truststore'\n")
+			launcher:complete(11)
+			assert_cancelled(fixture, "launcher_failed")
+			local line = fixture.records.errors[#fixture.records.errors]
+			helpers.assert_type(line, "string", "the launcher failure must be logged")
+			helpers.assert_true(line:find("exit=11, step=download_imports_failed, cause=import_failed,", 1, true) ~= nil,
+				"the failure line must name the step and the cause: " .. line)
+			helpers.assert_true(line:find("ModuleNotFoundError: No module named 'truststore'", 1, true) ~= nil,
+				"the failure line must quote the interpreter's error: " .. line)
+			helpers.assert_true(line:find("Python utilisé: /venv/bin/python | [MLX]", 1, true) ~= nil,
+				"the streamed lines must be kept in order: " .. line)
+		end)
+	end)
+
+	helpers.it("quotes a launcher error that arrives only with its final output (mlx-launcher-cause-2026-11-15)", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			fixture.controls.latest("launcher"):complete(10, "", "[MLX] venv introuvable : /venv/bin/python\n")
+			assert_cancelled(fixture, "launcher_failed")
+			local line = fixture.records.errors[#fixture.records.errors]
+			helpers.assert_true(line:find("exit=10, step=interpreter_missing,", 1, true) ~= nil,
+				"exit 10 must name the missing interpreter: " .. line)
+			helpers.assert_true(line:find("venv introuvable", 1, true) ~= nil,
+				"the final output must be quoted: " .. line)
+		end)
+	end)
+
+	-- The two launcher refusals shared exit 1 and the import probe discarded the
+	-- interpreter's error (>/dev/null 2>&1): neither the code nor the output named why.
+	helpers.it("gives each launcher refusal its own exit and keeps the import error (mlx-launcher-cause-2026-11-15)", function()
+		with_fixture({}, function(fixture)
+			helpers.assert_eq(fixture.controls.pull(), true)
+			local script
+			for path, content in pairs(fixture.controls.files) do
+				if path:match("^/tmp/hs_mlx_dl_.*%.sh$") then script = content end
+			end
+			helpers.assert_type(script, "string", "the launcher script must be written")
+			helpers.assert_true(script:find("\n  exit 10\n", 1, true) ~= nil,
+				"a missing interpreter must exit 10")
+			local import_line = script:match("[^\n]*import huggingface_hub, truststore[^\n]*")
+			helpers.assert_type(import_line, "string", "the launcher must check the download imports")
+			helpers.assert_true(import_line:find("2>&1)", 1, true) ~= nil
+				and import_line:find("/dev/null", 1, true) == nil,
+				"the import check must capture the interpreter's error, not discard it: " .. import_line)
+			helpers.assert_true(import_line:find("exit 11;", 1, true) ~= nil,
+				"a failed import must exit 11: " .. import_line)
+			helpers.assert_eq(select(2, script:gsub("exit 1\n", "")), 0,
+				"no launcher refusal may share the generic exit 1")
 		end)
 	end)
 

@@ -36,6 +36,7 @@ local FileSystem = require("core.fs.adapters.file_system")
 local Json = require("core.text.engine.json")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
 local NativePath = require("core.fs.engine.native_path")
+local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 -- A backslash is a filename byte on macOS: only the host's separators split it.
 local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", "")
 local _source_sep = "[" .. NativePath.separators() .. "]"
@@ -68,6 +69,30 @@ local PID_IDENTITY_MISMATCH_EXIT = 73
 local PID_IDENTITY_UNKNOWN_EXIT = 74
 local PID_SIGNAL_REFUSED_EXIT = 75
 local PID_TERM_ATTEMPT_LIMIT = 4
+
+-- Exit codes of the launcher's own refusals, one per step, so a failure the
+-- log reports names the step even when its output is lost. The 2026-11-15
+-- field run logged only "exit=1": the two refusals then shared that code and
+-- printed their reason to the progress window alone.
+local LAUNCHER_INTERPRETER_MISSING_EXIT = 10
+local LAUNCHER_IMPORTS_FAILED_EXIT = 11
+local LAUNCHER_STEPS = {
+	[LAUNCHER_INTERPRETER_MISSING_EXIT] = "interpreter_missing",
+	[LAUNCHER_IMPORTS_FAILED_EXIT] = "download_imports_failed",
+	[NetworkAdmission.refusal_exit_code] = "network_admission_refused",
+}
+-- Launcher output lines kept for the failure line: the import error's
+-- traceback ends with the line that names the module and the cause.
+local LAUNCHER_TAIL_LINES = 16
+
+--- Names the launcher step a terminal exit code reports.
+--- A clean exit fails only when it never reported the download PID.
+--- @param code any Launcher exit code.
+--- @return string step Stable step name for the failure line.
+local function launcher_failed_step(code)
+	if code == 0 then return "pid_not_reported" end
+	return LAUNCHER_STEPS[code] or "unknown"
+end
 
 --- Creates one download's presentation lease without coupling it to process cleanup.
 --- @return table|nil presentation Session-bound window operations.
@@ -1275,7 +1300,7 @@ function M.install(ctx)
 			f:write("PYTHON_BIN=\"" .. script_project_venv_python_escaped .. "\"\n")
 			f:write("if [ ! -x \"$PYTHON_BIN\" ]; then\n")
 			f:write("  echo \"[MLX] ❌ venv introuvable : $PYTHON_BIN — rechargez Hammerspoon (bootstrap auto)\"\n")
-			f:write("  exit 1\n")
+			f:write("  exit " .. LAUNCHER_INTERPRETER_MISSING_EXIT .. "\n")
 			f:write("fi\n")
 			f:write("echo \"Python utilisé: $PYTHON_BIN\"\n")
 			f:write("export HF_HUB_DISABLE_SYMLINKS_WARNING=1\n")
@@ -1286,8 +1311,14 @@ function M.install(ctx)
 			f:write(network_prelude .. "\n")
 			f:write("export HF_HUB_DISABLE_XET=1\n")
 			-- Dependencies are pinned in pyproject.toml and installed by uv pip
-			-- sync — no runtime install/upgrade. Just verify the imports succeed.
-			f:write("\"$PYTHON_BIN\" -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] ❌ huggingface_hub/truststore manquants — relancez ensure-mlx-deps.sh'; exit 1; }\n")
+			-- sync — no runtime install/upgrade. Just verify the imports succeed,
+			-- and print the interpreter's own error: discarding it left the
+			-- 2026-11-15 field report with an exit code and no cause.
+			f:write("_ergopti_import_out=$(\"$PYTHON_BIN\" -c 'import huggingface_hub, truststore' 2>&1) || { "
+				.. "_ergopti_import_status=$?; "
+				.. "echo \"[MLX] ❌ huggingface_hub/truststore manquants (import status $_ergopti_import_status) — relancez ensure-mlx-deps.sh\"; "
+				.. "printf '%s\\n' \"$_ergopti_import_out\" | tail -n " .. LAUNCHER_TAIL_LINES .. "; "
+				.. "exit " .. LAUNCHER_IMPORTS_FAILED_EXIT .. "; }\n")
 			f:write("export HF_HUB_ENABLE_HF_TRANSFER=0\n")
 			f:write("HUB_DIR=\"$HOME/.cache/huggingface/hub\"\n")
 			f:write("SNAP_DIR=\"$HUB_DIR/" .. safe_repo_bash .. "/snapshots\"\n")
@@ -1833,6 +1864,10 @@ function M.install(ctx)
 			local launcher_start_committed = false
 			local pending_launcher_completion = nil
 			local pending_launcher_chunks = {}
+			-- Every launcher line, streamed or final, for the failure line: the
+			-- stream callback takes the output before the completion runs, so a
+			-- tail read from the completion alone was empty.
+			local launcher_output = Diagnosis.new_tail({ max_lines = LAUNCHER_TAIL_LINES })
 			local function persist_owned_pid()
 				local sf = open_owned_file(session_file, "r", "MLX download session")
 				if not sf then return false end
@@ -1919,10 +1954,18 @@ function M.install(ctx)
 					-- The 2026-10-27 21:08 field run showed only "the launcher failed (code 0)"
 					-- in a notification: name the exit and whether the PID line arrived only in
 					-- the final output, after the stream had stopped, so the next report says why.
+					-- The 2026-11-15 run showed "exit=1" alone: the step and the launcher's
+					-- own lines (the interpreter's import error) now follow it.
 					local final_output = tostring(stdout or "") .. tostring(stderr or "")
-					Logger.error(LOG, "MLX download launcher failed (exit=%s, pid=%s, sentinel in final output=%s).",
-						tostring(code), owner.partial.pid and "received" or "missing",
-						final_output:find("__DLPID__:%d+") and "yes" or "no")
+					launcher_output.push(stdout, "stdout")
+					launcher_output.push(stderr, "stderr")
+					local output_lines = launcher_output.lines()
+					local cause = Diagnosis.classify(output_lines, code)
+					Logger.error(LOG, "MLX download launcher failed (exit=%s, step=%s, cause=%s, pid=%s, sentinel in final output=%s): %s.",
+						tostring(code), launcher_failed_step(code), tostring(cause.kind),
+						owner.partial.pid and "received" or "missing",
+						final_output:find("__DLPID__:%d+") and "yes" or "no",
+						#output_lines > 0 and table.concat(output_lines, " | ") or "no output")
 					-- Reset icon here: handle_download_done will not run after a launcher failure
 					update_icon("MLX launcher-failure icon reset")
 					if not current_or_cancel() then return false end
@@ -1972,6 +2015,8 @@ function M.install(ctx)
 					return run_owner_callback(owner,
 						"MLX detached launcher stream callback", function()
 							if still_current() then network_admission.push(stderr or "") end
+							launcher_output.push(stdout, "stdout")
+							launcher_output.push(stderr, "stderr")
 							local out = (stdout or "") .. (stderr or "")
 							-- Resource discovery remains live after logical revocation: a queued PID
 							-- sentinel is cleanup evidence, never publication authority.
