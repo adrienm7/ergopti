@@ -39,6 +39,12 @@ helpers.describe("actual Main startup capture admission", function()
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "diagnostics"))
 		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "boot.complete"))
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "hook.pump"))
+		-- Withheld input is told as it happens from the ready announcement to the
+		-- exit summary, and the observer is released once that summary is logged.
+		helpers.assert_true(position(state.events, "layout.publish") < position(state.events, "withheld.observe"))
+		helpers.assert_true(position(state.events, "withheld.observe") < position(state.events, "daemon.ready"))
+		helpers.assert_true(position(state.events, "withheld.summary") < position(state.events, "withheld.unobserve"))
+		helpers.assert_eq(state.withheld_observer, nil)
 		-- (linux-reload-budget) The Reload this boot ends is measured to its completion.
 		helpers.assert_true(position(state.events, "boot.complete") < position(state.events, "reload.complete"))
 		-- An update watcher keeps the new installation only once the boot is complete.
