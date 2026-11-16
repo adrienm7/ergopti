@@ -96,7 +96,7 @@ helpers.describe("consented native managed Ollama bootstrap port", function()
 			helpers.assert_eq(prepared, true)
 			helpers.assert_eq(#state.calls, 1)
 			local call = state.calls[1]
-			helpers.assert_true(call.script:match("/modules/llm/ensure%-ollama%-native%-deps%.sh$") ~= nil)
+			helpers.assert_true(call.script:match("/ai/engine/ensure%-ollama%-native%-deps%.sh$") ~= nil)
 			helpers.assert_eq(call.budget, BUDGET)
 			local environment = {}
 			for _, pair in ipairs(call.environment) do environment[pair[1]] = pair[2] end
@@ -281,7 +281,7 @@ local function shell_receiving(body, refused, python_source)
 		write(root .. "/foreign-python", "#!/bin/bash\nprintf inherited > \"$FIXTURE_ROOT/foreign-called\"\nexit 0\n")
 		write(root .. "/recording-python", python_source or [[#!/bin/bash
 set -eu
-[ "$1" = "$FIXTURE_ROOT/source/managed_ollama_runtime.py" ]
+[ "$1" = "$FIXTURE_ROOT/source/ollama/managed_ollama_runtime.py" ]
 [ "$2" = install ]
 [ "$3" = --timeout ] && [ "$4" = 1 ]
 [ "$5" = --idle-timeout ] && [ "$6" = 60 ]

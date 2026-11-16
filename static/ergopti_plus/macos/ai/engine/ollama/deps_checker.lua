@@ -155,7 +155,7 @@ local _pause_controller = BootstrapPauseOwner.new({
 local function resolve_project_root()
 	local source = debug.getinfo(1, "S").source or ""
 	source = source:sub(1, 1) == "@" and source:sub(2) or source
-	local root = source:match("^(.*)/static/ergopti_plus/macos/modules/llm/ollama_deps_checker%.lua$")
+	local root = source:match("^(.*)/static/ergopti_plus/macos/ai/engine/ollama/deps_checker%.lua$")
 	if root and root ~= "" and hs.fs.attributes(root, "mode") then
 		return root
 	end

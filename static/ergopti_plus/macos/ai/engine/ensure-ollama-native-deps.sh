@@ -50,7 +50,7 @@ fi
 bootstrap_stage runtime_install
 # The original PTY guardian's 30-minute deadline remains earliest through the
 # native Python bootstrap and this receiver; no subprocess resets that owner.
-"$ERGOPTI_BOOTSTRAP_PYTHON" "$SCRIPT_DIR/managed_ollama_runtime.py" install \
+"$ERGOPTI_BOOTSTRAP_PYTHON" "$SCRIPT_DIR/ollama/managed_ollama_runtime.py" install \
 	--timeout "$(( ${ERGOPTI_BOOTSTRAP_TIMEOUT_MS:?native bootstrap owner budget is missing} / 1000 ))" \
 	--idle-timeout "$CURL_STALL_SEC" --connect-timeout "$CURL_CONNECT_TIMEOUT_SEC" \
 	--minimum-bytes-per-second "$CURL_STALL_BYTES_PER_SEC"

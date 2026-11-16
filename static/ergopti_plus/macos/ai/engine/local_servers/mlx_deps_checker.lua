@@ -998,7 +998,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return settle_preflight_failure("../ensure-mlx-deps.sh introuvable.")
 	end
 
-	local hs_root = script_path:match("^(.*)/modules/llm/ensure%-mlx%-deps%.sh$") or ""
+	local hs_root = script_path:match("^(.*)/ai/engine/ensure%-mlx%-deps%.sh$") or ""
 	if hs_root == "" then
 		Logger.error(LOG, "Could not derive HS root from script path '%s' — bootstrap aborted.", script_path)
 		return settle_preflight_failure("Chemin du script MLX invalide.")
