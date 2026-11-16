@@ -56,7 +56,7 @@ helpers.describe("mlx_deps_checker source invariants", function()
 
 	helpers.it("derives hs_root from resolved ensure-mlx-deps.sh path", function()
 		helpers.assert_true(
-			SOURCE:find("script_path:match(\"^(.*)/modules/llm/ensure%-mlx%-deps%.sh$\")", 1, true) ~= nil
+			SOURCE:find("script_path:match(\"^(.*)/ai/engine/ensure%-mlx%-deps%.sh$\")", 1, true) ~= nil
 		)
 	end)
 

@@ -545,7 +545,7 @@ local function with_fixture(plan, callback)
 			-- fixture's file system has no shared policy file to source.
 			if plan.network_admission then package.loaded["ai.engine.api.opaque_network_admission"] = plan.network_admission end
 			package.loaded["ai.engine.api.network_env"] = plan.network_env or {
-				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
+				policy_path = function() return "/fixture/ai/engine/network-retry.sh" end,
 				prelude = function() return "", nil end,
 				opaque_prelude = function() return "", nil end,
 				managed_http_prelude = function() return "", nil end,

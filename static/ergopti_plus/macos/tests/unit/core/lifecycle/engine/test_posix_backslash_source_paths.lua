@@ -36,7 +36,7 @@ local function network_env_under(root)
 	return helpers.with_fresh_modules({ "core.fs.adapters.file_system" }, function()
 		package.loaded["core.fs.adapters.file_system"] = fs
 		-- Same relative layout as the real file, under the fixture root.
-		local real_root = assert(path:match("^(.*)/ai/engine/[^/]+$"))
+		local real_root = assert(path:match("^(.*)/ai/engine/api/[^/]+$"))
 		local chunk = assert(load(source, "@" .. root .. path:sub(#real_root + 1)))
 		return chunk(), probed
 	end)

@@ -65,7 +65,7 @@ helpers.describe("SHA-256 of a file whose name shasum escapes (sha256-escaped-na
 
 	helpers.it("no macOS installer takes shasum's first field as the digest unescaped", function()
 		local root = helpers.driver_root()
-		local pipe = assert(io.popen("cd " .. quote(root) .. " && find modules adapters platform -name '*.sh' -type f"))
+		local pipe = assert(io.popen("cd " .. quote(root) .. " && find modules adapters platform ai -name '*.sh' -type f"))
 		local offenders, scanned = {}, 0
 		for relative in pipe:lines() do
 			local file = assert(io.open(root .. relative, "rb"))

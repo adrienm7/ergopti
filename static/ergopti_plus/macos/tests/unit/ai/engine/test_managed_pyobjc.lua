@@ -66,7 +66,7 @@ helpers.describe("managed PyObjC for App Cloner", function()
 		local owner, world = fake()
 		local result
 		owner.install(function(ok, value) result = { ok = ok, value = value } end)
-		helpers.assert_eq(world.prepared[1].source, "/driver/modules/llm/ensure-managed-pyobjc.sh")
+		helpers.assert_eq(world.prepared[1].source, "/driver/ai/engine/ensure-managed-pyobjc.sh")
 		helpers.assert_eq(world.prepared[1].environment, {})
 		helpers.assert_eq(world.task.arguments, { "--managed-pty-worker", "1800000" })
 		helpers.assert_eq(world.started, 1)

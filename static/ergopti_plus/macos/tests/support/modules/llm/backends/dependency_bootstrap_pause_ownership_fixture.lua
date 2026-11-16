@@ -232,7 +232,7 @@ local function load_fixture(options)
 	if options.backend == "mlx" then
 		package.loaded["core.fs.engine.paths"] = {
 			find_from_configdir = function()
-				return "/repo/modules/llm/ensure-mlx-deps.sh"
+				return "/repo/ai/engine/ensure-mlx-deps.sh"
 			end,
 		}
 		package.loaded["ai.engine.bootstrap.pty_process_group"] = {
@@ -256,7 +256,7 @@ local function load_fixture(options)
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,
 			"resolve_bootstrap_script_path", function()
 				interrupt_preflight("path")
-				return "/repo/modules/llm/ensure-mlx-deps.sh"
+				return "/repo/ai/engine/ensure-mlx-deps.sh"
 			end))
 	elseif options.backend ~= "mlx" then
 		helpers.assert_true(set_upvalue(checker.check_and_install_deps,

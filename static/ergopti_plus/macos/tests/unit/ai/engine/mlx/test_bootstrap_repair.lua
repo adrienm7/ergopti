@@ -475,7 +475,7 @@ helpers.describe("Native PTY caller joins the original MLX task transaction", fu
 			}))
 			package.loaded["ai.adapters.native_bootstrap_pty"] = {
 				prepare = function(source, environment, budget)
-					helpers.assert_true(source:match("/modules/llm/ensure%-mlx%-deps%.sh$") ~= nil)
+					helpers.assert_true(source:match("/ai/engine/ensure%-mlx%-deps%.sh$") ~= nil)
 					helpers.assert_eq(budget, 1800000, "original bootstrap budget is preserved")
 					helpers.assert_eq(#environment, 3, "original bootstrap environment joins native source")
 					return {
