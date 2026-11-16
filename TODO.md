@@ -866,7 +866,7 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       macOS open panel (`source_pick`), in the `layout_editor_window` items of the three TODO-tests files.
       Progress (2026-11-11): macOS and Linux open the editor from the layout manager window and save its files through the host (`layouts/source_store.lua`, `layout_sources/` of the configuration folder). Windows: the WebView2 host needs `source_open`/`source_save` and `source_editor` in `windows/ui/layout_manager/init.ahk` as described in [layout-editor.md](docs/design/layout-editor.md#hosts); the page hides the button there meanwhile (decided by the coordinator on 2026-11-11 overnight, to review by the maintainer). « Install and use » sends the source and its compiled `.keylayout` through the composer host, which installs it as the composed layout and switches to it (macOS defers to the next login when it must). Linux, in a container (2026-11-11): `tests/hardware/run_layout_editor_webview.lua` opens the real layout manager window in WebKit2GTK under Xvfb, clicks « Editor », opens the Ergopti source, « Install and use », « Yes »; the composer host stores the source and the page's Linux emulation table, installs the composed layout, and the server's keymap read back after loading it types a/A, the Kana level on AltGr (<, œ), ê on the ISO key and $ on `TLDE` (CI step « Install a layout source from the editor in the daemon's WebView », desktop-webview shard). The installer refuses to write a desktop setting as root, so a root run checks that refusal and a user run checks the switch. Proven as a regular user on CI run 43105583384 (desktop-webview): installed and selected, the GNOME input sources start with the composed layout, 27/27. The same probe first runs « Emulate without installing »: nothing installed, `composed` becomes the emulated layout, and the daemon's emulation types a, ê and $ for KeyA, IntlBackslash and Backquote from the composer folder's copy. Entry point (2026-11-11, maintainer request): « Create or edit a layout… » in the Keyboard layout menu opens the editor directly (macOS, Linux; greyed on Windows with its reason); « New » starts blank or from QWERTY, AZERTY, Bépo, Ergo-L or Ergopti; « Install on the system » and « Emulate without installing » (`composer_emulate`: no system install, no admin; the emulation reads the composer folder's copy) each say what they do; the site page links ErgoptiPlus and its downloads and says the Windows DLL and installer come from `tools/kbd-dll.cjs`. Left: a native check of that install on a Mac and on a real Linux desktop (GNOME, KDE), the Windows host (`windows/ui/layout_manager/composer.ahk` accepts no source yet), and a Mac check of the native open panel the macOS host now shows for « Open » (`source_pick`).
 
-- [ ] **[CODE] The wow64 image's KbdLayerDescriptor returns a 32-bit pointer (found 2026-11-16 on the PC).** kbd.h
+- [x] **[CODE] The wow64 image's KbdLayerDescriptor returns a 32-bit pointer (found 2026-11-16 on the PC).** kbd.h
       types the descriptor's return as `KBD_LONG_POINTER` (`__ptr64` under `BUILD_WOW6432`), and Microsoft's own
       `C:\Windows\SysWOW64\KBDFR.DLL` returns it in EDX:EAX (`B8 imm32 99 C3`: `mov eax, imm32; cdq; ret`), as the
       MSVC builder's wow64 `kbdergop.dll` does. The `kbd-dll` wow64 image (clang `const KBDTABLES *__stdcall`, and
@@ -877,6 +877,17 @@ into an exported `.keylayout`, since macOS may refuse to load it.
       differences that are not bugs: Microsoft leaves `dwType` at 0 (`kbd-dll` writes 4 and its reader requires 4;
       kbd.h calls the field optional), and the MSVC builder's merged `.data` is writable where Microsoft's is
       read-only.
+      Done 2026-11-16 on the PC: `pe-writer.cjs` and `emit-c.cjs` write `mov eax, imm32; cdq; ret` for wow64 (x86,
+      x64 and arm64 images byte-identical to before); `reader.cjs` requires the descriptor as wide as the table
+      pointers (refuses wow64 EAX alone and x86 EDX:EAX) and reads another toolchain's image with `{ foreign: true }`
+      (writable or code-section tables, any `dwType`); the page bundle is regenerated (`kbd_setup_stub.js` embeds no
+      DLL). Proof: `test-kbd-dll-wow64.cjs` (no compiler) compares the writer's wow64 image with a committed MSVC
+      wow64 build of the registry Ergopti: same export, descriptor code, 64-bit pointers and tables; all 216
+      Microsoft SysWOW64 layouts on the PC use `cdq`. Re-checked: `dwType` is 0 in every Microsoft layout the reader
+      accepts (178 SysWOW64, 179 System32), kept at 4 (`KEYBOARD_TYPE_GENERIC_101`, optional field); Microsoft keeps
+      tables read-only (214 of 216; KBDJPN and KBDKOR carry code), so `kbd-dll` stays read-only. Left: the clang
+      build's wow64 code is checked by CI (`test-kbd-dll.cjs`, no LLVM on the PC), and a native 32-bit typing check
+      stays with the PC install items.
 - [ ] **Sign the generated Windows layout DLLs.** The four DLLs, the uninstaller, `<dll>-setup.exe` and the layout
       editor's generic installer (`ergopti-layout-setup.exe`, `_generated/kbd_setup_stub.js`; added 2026-11-15) (SHA-256,
       RFC 3161 timestamp) once SignPath or the release PFX is on, as `docs/design/layout-windows-dll.md` « Signing » says.

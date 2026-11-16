@@ -76,7 +76,10 @@ each size is pinned by `_Static_assert` in the generated C and checked again by 
   so its tables have the x64 layout. To confirm natively: that 32-bit applications on 64-bit Windows read this
   image.
 - **Tables:** `KBDTABLES` (104 bytes with 64-bit pointers, 60 with 32-bit ones), `fLocaleFlags` =
-  `MAKELONG(KLLF_*, KBD_VERSION = 1)`, `dwType = 4`; `MODIFIERS` with `VK_TO_BIT` and `ModNumber[wMaxModBits + 1]`
+  `MAKELONG(KLLF_*, KBD_VERSION = 1)`, `dwType = 4` (`KEYBOARD_TYPE_GENERIC_101`: kbd.h calls the field optional,
+  and Microsoft's own layouts and the MSVC builder leave it 0; checked on 2026-11-16 over the 178 SysWOW64 and
+  179 System32 layouts the reader accepts on the PC, every one 0. Kept: it states the 101/102-key PC keyboard the
+  tables are for, and changing it would change every image); `MODIFIERS` with `VK_TO_BIT` and `ModNumber[wMaxModBits + 1]`
   (`SHFT_INVALID` for a combination without column); one main `VK_TO_WCHARS` table as wide as the columns, then the
   one-column keypad table last, as VkKeyScan expects; a dead key's cells are `WCH_DEAD` followed by a `0xFF` row
   holding the dead characters, an SGCAPS key by a `0xFF` row holding its Caps Lock characters; `WCH_LGTR` cells
@@ -86,9 +89,15 @@ each size is pinned by `_Static_assert` in the generated C and checked again by 
   Escape, Space, Cancel) and the keypad operators get the characters Windows' own layouts give them unless the
   layout defines them.
 - **Export:** `KbdLayerDescriptor` at ordinal 1, undecorated on every architecture (a no-argument function, so
-  `__stdcall` and `__cdecl` agree on x86).
+  `__stdcall` and `__cdecl` agree on x86). It returns kbd.h's `KBD_LONG_POINTER`, so the wow64 image returns 64
+  bits in EDX:EAX: `mov eax, imm32; cdq; ret`, the code of Microsoft's `SysWOW64\KBDFR.DLL` (and of all 216
+  Microsoft SysWOW64 layouts on the PC) and of the MSVC builder's wow64 build. Until 2026-11-16 it returned EAX alone, leaving EDX to
+  whatever the caller held.
 - **Image:** no entry point, no CRT, subsystem native, `/release` checksum, `/Brepro` (reproducible bytes); every
-  table const in `.rdata`, no writable section, base relocations for every table pointer. A version resource typed
+  table const in `.rdata`, no writable section, base relocations for every table pointer. Microsoft's layouts keep
+  their tables read-only too (`.data` without the write flag, or merged into the code section in some SysWOW64
+  ones such as KBDFR): 214 of 216 on the PC, the two others KBDJPN and KBDKOR, which carry code. The MSVC
+  builder's `/MERGE:.rdata=.data` makes its tables writable; the loader accepts both. A version resource typed
   as a keyboard driver (VFT_DRV, VFT2_DRV_KEYBOARD) and the display name as string 1000, for a Layout Display Name
   of the form `@%SystemRoot%\system32\<dll>.dll,-1000`.
 
@@ -99,7 +108,8 @@ KLC `export-klc` writes for the registry Ergopti (ligatures, Shift+Ctrl), a Kana
 and a non-BMP ligature, and seeded random models, in all four images. For each image the reader:
 
 - parses the PE headers, sections, exports and base relocations; finds the tables by decoding KbdLayerDescriptor's
-  own instructions (x86 `mov eax, imm32; ret`, x64 `lea rax, [rip + d]; ret`, arm64 `adrp; add; ret`);
+  own instructions (x86 `mov eax, imm32; ret`, wow64 `mov eax, imm32; cdq; ret`, x64 `lea rax, [rip + d]; ret`,
+  arm64 `adrp; add; ret`), and refuses a descriptor narrower or wider than the table pointers;
 - requires every table pointer to land in a read-only initialized section, aligned, with the base relocation of its
   width, every list terminated inside its section, `cbSize = 2 + 2 * nModifications`, `cbLgEntry` against `nLgMax`,
   each column selected by exactly one modifier combination, `KBD_VERSION = 1`, `dwType = 4`, every dead cell,
@@ -120,6 +130,15 @@ dead keys, Ergopti's Kana, CAPLOKALTGR, SGCAPS Kana), on all four images:
 - the logical layout, machine, pointer width, wow64 flag, ordinal and subsystem are equal;
 - every resource leaf (string 1000, the version resource) is byte for byte llvm-rc's;
 - both images carry a correct PE checksum. A changed table byte changes the trace (negative control).
+
+`test-kbd-dll-wow64.cjs` needs no compiler: it compares the writer's wow64 image with the MSVC wow64 build of the
+registry Ergopti (`kbdergop-wow64-msvc.dll` and the `.klc` the same generator writes, see the fixtures' NOTICE):
+the same export and ordinal, the same descriptor code, 64-bit table pointers, and the same tables once read (every
+key and column wherever each image puts its system keys, dead keys, names, scan codes, modifiers). It pins the two
+differences that are choices (`dwType`, MSVC's writable `.data`), refuses a wow64 descriptor truncated to EAX and a
+native x86 one widened to EDX:EAX, and reads KBDFR-shaped data (tables in the code section, `dwType = 0`) as a
+foreign image (`readDll(bytes, { foreign: true })`, which the tool's own images never use); on Windows it also
+reads Microsoft's `SysWOW64\KBDFR.DLL` and `KBDUS.DLL`.
 
 The files themselves differ: lld-link adds a reproducibility debug entry and places sections and tables its own
 way, which the loader does not read. Decided by the coordinator on 2026-11-11, to review by the maintainer: the
