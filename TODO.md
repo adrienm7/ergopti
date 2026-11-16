@@ -544,6 +544,36 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       cmini; KLA's built-in list) needs its layout list, which this session cannot list (no GitHub directory access);
       no third-party KLA JSON, XKB symbols, KLC or DOF file under a licence that allows shipping it was found.
       [DECISION] confirm the KLA JSON and Kalamine TOML exports.
+      KLAnext JSON, .keylayout and KbdEdit .kbe, import and export (2026-11-16, on dev; proof:
+      test-layout-formats.cjs sections 6-10, test_layout_editor_source_store.lua, test_app_parameter_chooser.lua): - KLAnext JSON: import and export done. Every committed KLAnext file (52, ISO and ErgoDox) reads, and
+      import → « Download KLA / KLAnext JSON » → import gives the same layout; an ErgoDox key the ISO board lacks
+      is listed with what it types (« key 39 (z Z % ‰) has no place on this keyboard »), never dropped silently. - .keylayout: import (verbatim, then « Convert ») and export (the macOS format drop-down: bundle, ISO, ANSI)
+      were already there; now held by an import → export → import round trip through the source compiler on
+      bépo, KbdEdit's own .keylayout exports (`static/ergopti/macos/raw_kbdedit_keylayouts`) and the Ergopti 2.2.2
+      bundle, the output checked against Apple's DTD structure. - KbdEdit .kbe: neither import nor export is possible. The header is read (signature, version 5, length), but
+      the body is encrypted: random-looking bytes, no deflate stream, and the 2.2.0 and 2.2.1 exports, a few keys
+      apart, share no 8-byte run (a ratchet test keeps that evidence); only KbdEdit holds the key, and decompiling
+      it breaks the clean-room rule. « Open » recognises a .kbe and says so in the user's language, pointing to
+      KbdEdit's .keylayout export; the export section says KbdEdit imports the .keylayout and KLC downloads
+      (docs/design/layout-analysis.md, « Layout file formats »). - Every refusal and loss is worded in the 21 locales (`layout_analysis.formats.*`), on the site and in the
+      app; malformed files are refused with a stable code, never a crash (fixed: a KLC `DEADKEY` without its
+      character, a Kalamine JSON dead-key table that is not a table, a DOF or cmini row of another type, a KLA
+      key that is not an object; a KLC chained dead key `0022@` was read as « " »). - In the app: the macOS « Open » panel offered only .toml and .keylayout, so no KLAnext JSON, KLC or other
+      file could be opened there; it now offers `source.pick_extensions` (= `LAYOUT_FORMATS.EXTENSIONS`, held
+      equal by the gate) and hands a non-UTF-8 file to the page as bytes. The KLA and Kalamine downloads went
+      to the app's source store, which keeps only sources and refused them on the three OS; they now go to
+      Downloads (`source.export_extensions` gains json and toml). « Open » also decodes a UTF-16 KLC by its
+      byte-order mark (it read it as UTF-8 before).
+      [CODE] Left: KLAnext's `matrix` board is refused (`format_unsupported_board`): KLAnext is closed source and
+      no matrix file was found to read its key indexes from. The ErgoDox index → ISO key table (`KLA_KEYS.ergodox`)
+      maps 27 to Backslash and 60-62 to the brackets and quote, while the committed bépo and Optimot ErgoDox files
+      put on 27 what their ISO files put on BracketLeft and on 39 what they put on Quote: check it against KLA's
+      ErgoDox key set before changing it. The Playwright `editor-reads-every-format` scenario does not open a .kbe
+      yet (to add with the next browser run). Real-machine checks: the macOS « Open » panel with a .json, a UTF-16
+      .klc and a .kbe, and the KLA and Kalamine downloads landing in Downloads (TODO-tests-macos.md,
+      TODO-tests-windows.md, TODO-tests-linux.md, `layout_editor_window`).
+      [DECISION] the export section keeps one button per format plus the macOS format drop-down; a single
+      « Format » drop-down with one download button is not built.
 - [x] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
       two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
       (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such

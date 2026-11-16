@@ -153,6 +153,7 @@ Account and tester actions (maintainer, from the PC):
       Studio »: both tabs and their unsaved edits are back, from `layout_sources\studio_workspace.json`; « Export
       all » writes `ergopti-studio-layouts.zip` to the Downloads folder and « Import » of that file reopens every
       layout.
+      Other layout formats (2026-11-16): « Open » in WebView2's file chooser lists .json, .klc and .kbe files, opens a KLAnext JSON (static/layouts/kla_iso) and a UTF-16 .klc, and refuses a KbdEdit .kbe with the « KbdEdit encrypts » message; « Download KLA / KLAnext JSON » and « Download Kalamine TOML » land in the Downloads folder.
       Navigation layer in the Studio (2026-11-15, `claude/ergopti-todo-studio-nav-entry`): the Tap-Holds menu's « Edit the navigation layer… » row and a
       gesture bound to « Navigation layer » open Ergopti Studio on its « nav » layer, holding the current layer
       key, with the user's layers.toml bindings; « Apply the navigation layer » then changes the layer live, and
