@@ -348,9 +348,15 @@ local function arm_expiry(group, section, revision)
 	if revision ~= _revision then return false end
 	if not ok or type(resolved) ~= "table" then return true end
 	local delay = tonumber(resolved.delay)
-	if not delay or delay <= 0 then return true end
-	-- Hidden just before the trigger window closes (shared decrement and floor).
-	delay = require("core.ui.ui.tooltip.config").effective_delay(delay)
+	if not delay then return true end
+	local TooltipConfig = require("core.ui.ui.tooltip.config")
+	if delay <= 0 then
+		-- No trigger delay: the shared safety lifetime, as on Windows and macOS (TWD-1).
+		delay = TooltipConfig.safety_timeout_seconds()
+	else
+		-- Hidden just before the trigger window closes (shared decrement and floor).
+		delay = TooltipConfig.effective_delay(delay)
+	end
 
 	local token = {}
 	_expiry_token = token

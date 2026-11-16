@@ -96,9 +96,9 @@ local ARROW_NAVIGATION_DELTA = {
 
 -- ── UI / display parameters ──────────────────────────────────────────────────
 
--- Fallback sentinel used when no row contributes a timeout. A committed
--- infinite row itself carries duration 0, which TooltipConfig treats as the
--- canonical "never auto-dismiss" value.
+-- Fallback sentinel used when no row contributes a timeout. A committed row
+-- with no deadline carries duration 0, which TooltipConfig turns into the shared
+-- safety lifetime (TWD-1).
 local INFINITE_TOOLTIP_SEC       = Timings.sec("tooltip", "infinite_ttl_ms")  -- 24h stand-in for "never auto-dismiss"
 -- Tiny offset added on top of the tooltip timeout when chaining LLM after a hotstring,
 -- so the LLM fires just after the tooltip would normally close.

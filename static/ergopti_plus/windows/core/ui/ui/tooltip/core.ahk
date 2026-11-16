@@ -469,6 +469,7 @@ Tooltip_UpdateStyles() {
     _TOOLTIP_WINDOW_BOTTOM_INSET_PX := UI_WINDOW_BOTTOM_INSET_PX
     _TOOLTIP_TIMEOUT_DECREMENT_SEC := UI_TIMEOUT_DECREMENT_SEC
     _TOOLTIP_TIMEOUT_FLOOR_SEC := UI_TIMEOUT_FLOOR_SEC
+    _TOOLTIP_SAFETY_SEC := UI_TOOLTIP_SAFETY_SEC
 }
 Tooltip_UpdateStyles()
 
@@ -488,11 +489,12 @@ Tooltip_UpdateStyles()
 global _TOOLTIP_TIMEOUT_DECREMENT_SEC := 0
 global _TOOLTIP_TIMEOUT_FLOOR_SEC := 0
 
-; Safety deadline applied whenever the caller passes DurationSec = 0
-; (i.e. "stay until TooltipHide()"). Guards against ghost tooltips that
-; linger when the normal hide path (buffer reset, expansion fire, etc.)
-; is skipped due to an unhandled exception or a missed timer callback.
-global _TOOLTIP_SAFETY_SEC := 3.0
+; Deadline applied whenever the caller passes DurationSec = 0 (a preview with
+; no delay): the shared [timing] safety_timeout_sec, read on the three OS
+; (TWD-1, decided by the maintainer on 2026-11-16). It also guards against
+; ghost tooltips when the normal hide path is skipped. Starts at the sentinel 0,
+; overwritten by Tooltip_UpdateStyles() from UI_TOOLTIP_SAFETY_SEC at boot.
+global _TOOLTIP_SAFETY_SEC := 0
 
 
 

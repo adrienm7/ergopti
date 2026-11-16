@@ -188,4 +188,39 @@ helpers.describe("preview expiry follows the shared decrement and floor", functi
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
 	end)
+
+	-- TWD-1, decided by the maintainer on 2026-11-16: a preview with no trigger
+	-- delay hides after the shared safety_timeout_sec, as on Windows and macOS;
+	-- it used to stay until the next key.
+	helpers.it("(twd1-zero-delay-safety) a preview with no delay hides after the shared safety lifetime", function()
+		local names = { "core.ui.adapters.graphics_renderer", "core.events.timer_scheduler", "core.ui.ui.tooltip.preview" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local delays = {}
+		local ok, err = pcall(function()
+			package.loaded["core.ui.adapters.graphics_renderer"] = {
+				is_available = function() return true end,
+				show = function() return true end,
+				hide = function() return true end,
+			}
+			package.loaded["core.events.timer_scheduler"] = {
+				after = function(delay) delays[#delays + 1] = delay; return { armed = true } end,
+				cancel = function() return true end,
+			}
+			package.loaded["core.ui.ui.tooltip.preview"] = nil
+			local P = require("core.ui.ui.tooltip.preview")
+			P.init({ style = { positioning = { window_bottom_inset = 0 } }, config = {
+				resolve = function() return { delay = 0, color = "#1e88e5", show_tooltip = true, has_override = false } end,
+			} })
+			P.resolve_anchor = function() return { x = 0, y = 0 } end
+			P.screen_frame = function() return { x = 0, y = 0, w = 100, h = 100 } end
+			helpers.assert_true(P.show(CANDIDATES, "star"))
+			local Config = require("core.ui.ui.tooltip.config")
+			helpers.assert_eq(#delays, 1, "a lifetime is armed")
+			helpers.assert_eq(delays[1], Config.safety_timeout_seconds())
+			helpers.assert_true(delays[1] > 0, "the shared safety lifetime is positive")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(err, 0) end
+	end)
 end)

@@ -122,6 +122,7 @@ global UI_HOTSTRING_TIMEOUT_SEC := 0
 global UI_LLM_TIMEOUT_SEC       := 0
 global UI_TIMEOUT_DECREMENT_SEC := 0
 global UI_TIMEOUT_FLOOR_SEC     := 0
+global UI_TOOLTIP_SAFETY_SEC    := 0
 
 
 
@@ -223,6 +224,8 @@ UiStyle_LoadSharedConst() {
 	global UI_LLM_TIMEOUT_SEC       := Float(_UiStyleRequire(c, "timing", "llm_timeout_sec"))
 	global UI_TIMEOUT_DECREMENT_SEC := Float(_UiStyleRequire(c, "timing", "timeout_decrement_sec"))
 	global UI_TIMEOUT_FLOOR_SEC     := Float(_UiStyleRequire(c, "timing", "timeout_floor_sec"))
+	; A preview shown with no delay hides after this, on the three OS (TWD-1).
+	global UI_TOOLTIP_SAFETY_SEC    := Float(_UiStyleRequire(c, "timing", "safety_timeout_sec"))
 
 	; [llm_colors] — diff-chunk rendering colors for the LLM multi-slot tooltip.
 	global UI_LLM_CORR_SEL_HEX   := _UiStyleRequireHex(c, "llm_colors", "corr_sel_hex")

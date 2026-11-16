@@ -174,6 +174,14 @@ function M.load()
 	return style
 end
 
+--- How long a preview with no trigger delay stays: the shared [timing]
+--- safety_timeout_sec, read on the three OS (TWD-1, decided by the maintainer on
+--- 2026-11-16), so a bubble never lingers after the typing stopped.
+--- @return number seconds
+function M.safety_timeout_seconds()
+	return require_key("timing", "safety_timeout_sec")
+end
+
 --- A preview's visible lifetime for its trigger delay: the shared decrement
 --- hides the bubble just before the trigger window closes, never below the
 --- shared floor, as on Windows and macOS. A delay of 0 or less is no expiry.

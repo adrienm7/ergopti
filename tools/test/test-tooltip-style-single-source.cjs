@@ -81,7 +81,9 @@ const SHARED = [
 	['llm_ui', 'footer_combined_separator'],
 	['llm_ui', 'shortcut_modifier_order'],
 	['tint', 'lightness'],
-	['tint', 'saturation']
+	['tint', 'saturation'],
+	// TWD-1: a preview with no delay hides after this on the three OS.
+	['timing', 'safety_timeout_sec']
 ];
 
 // [section, AHK key, macOS key] — one visual value, one platform spelling each.
@@ -114,6 +116,16 @@ function declared(section, key) {
 		return false;
 	}
 	return true;
+}
+
+const LINUX = fs.readFileSync(
+	path.join(SP, 'linux', 'core', 'ui', 'ui', 'tooltip', 'config.lua'),
+	'utf8'
+);
+// The timing keys every driver reads, Linux included (TWD-1).
+for (const [section, key] of [['timing', 'safety_timeout_sec']]) {
+	if (!new RegExp(`require_key\\("${section}",\\s*"${key}"\\)`).test(LINUX))
+		errors.push(`Linux does not read [${section}].${key} through require_key`);
 }
 
 for (const [section, key] of SHARED) {

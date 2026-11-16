@@ -42,6 +42,7 @@
 ---   [timing]      llm_timeout_sec        → DEFAULT_LLM_TIMEOUT_SEC
 ---   [timing]      timeout_decrement_sec  → TIMEOUT_DECREMENT_SEC
 ---   [timing]      timeout_floor_sec      → TIMEOUT_FLOOR_SEC
+---   [timing]      safety_timeout_sec     → SAFETY_TIMEOUT_SEC
 --- ==============================================================================
 
 local M = {}
@@ -65,6 +66,8 @@ local DEFAULT_TIMEOUT_SEC     = nil
 local DEFAULT_LLM_TIMEOUT_SEC = nil
 local TIMEOUT_FLOOR_SEC       = nil
 local TIMEOUT_DECREMENT_SEC   = nil
+-- How long a tooltip asked for with no duration stays (TWD-1).
+local SAFETY_TIMEOUT_SEC      = nil
 
 M.settings = {
 	timeout_sec          = 0,
@@ -86,12 +89,14 @@ M.accent_colors = {}
 -- ===================================
 
 --- Safely sets the general tooltip timeout.
---- @param seconds number The duration in seconds. Uses 0 for infinite.
+--- A duration of 0 (a hotstring preview with no delay) hides after the shared
+--- [timing] safety_timeout_sec, as on Windows and Linux (TWD-1, decided by the
+--- maintainer on 2026-11-16); it used to stay until the next key.
+--- @param seconds number The duration in seconds; 0 for the safety lifetime.
 function M.set_timeout(seconds)
 	local base_timeout = tonumber(seconds) or DEFAULT_TIMEOUT_SEC
 	if base_timeout <= 0 then
-		M.settings.timeout_sec = 0
-		Logger.info(LOG, "Standard timeout disabled (infinite).")
+		M.settings.timeout_sec = SAFETY_TIMEOUT_SEC
 	else
 		M.settings.timeout_sec = math.max(TIMEOUT_FLOOR_SEC, base_timeout - TIMEOUT_DECREMENT_SEC)
 	end
@@ -355,9 +360,11 @@ local function load_from_shared()
 	DEFAULT_LLM_TIMEOUT_SEC = require_key("timing", "llm_timeout_sec")
 	TIMEOUT_DECREMENT_SEC   = require_key("timing", "timeout_decrement_sec")
 	TIMEOUT_FLOOR_SEC       = require_key("timing", "timeout_floor_sec")
+	SAFETY_TIMEOUT_SEC      = require_key("timing", "safety_timeout_sec")
 	M.timing = {
 		timeout_decrement_sec = TIMEOUT_DECREMENT_SEC,
 		timeout_floor_sec     = TIMEOUT_FLOOR_SEC,
+		safety_timeout_sec    = SAFETY_TIMEOUT_SEC,
 	}
 	M.settings.timeout_sec     = DEFAULT_TIMEOUT_SEC
 	M.settings.llm_timeout_sec = DEFAULT_LLM_TIMEOUT_SEC
