@@ -132,6 +132,16 @@
 		<p class="lo-muted" data-i18n="layout_optimizer.qwerty.help"></p>
 		<div class="lo-buttons" id="lo-qwerty-presets"></div>
 		<div class="lo-board-box"><div id="lo-qwerty-board" class="lo-board"></div></div>
+		<h3 data-i18n="layout_optimizer.zones.title"></h3>
+		<p class="lo-muted" data-i18n="layout_optimizer.zones.help"></p>
+		<div class="lo-buttons">
+			<label class="lo-field lo-inline"><span data-i18n="layout_optimizer.zones.char"></span>
+				<select id="lo-zone-char"></select></label>
+			<button type="button" id="lo-zone-clear" data-i18n="layout_optimizer.zones.clear"></button>
+			<button type="button" id="lo-zones-clear" data-i18n="layout_optimizer.zones.clear_all"></button>
+		</div>
+		<div class="lo-board-box"><div id="lo-zone-board" class="lo-board"></div></div>
+		<p id="lo-zones-summary" class="lo-muted" role="status"></p>
 	</div>
 	<details class="lo-panel lo-wide">
 		<summary data-i18n="layout_optimizer.weights.title"></summary>
@@ -263,6 +273,8 @@
 			editorLayouts: [],
 			pinnedCodes: new Set(),
 			qwertyPins: new Set(),
+			// Character → the keys it may sit on (LAYOUT_OPTIMIZER zones).
+			zones: new Map(),
 			weights: E.defaultWeights(),
 			tables: new Map(),
 			// The pasted or opened text's tables: {hash, chars, tables}.
@@ -549,6 +561,7 @@
 				if (modifiers.has(code)) return;
 				const text = opts.label ? opts.label(code) : legend(layout, code);
 				const key = el(opts.onKey ? 'button' : 'span', 'lo-key', text);
+				key.dataset.code = code;
 				const row = layout.rows[code];
 				if (row && row[0] && typeof row[0] === 'object')
 					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
@@ -597,6 +610,56 @@
 					drawPinBoards();
 				}
 			});
+			if (start) drawZones(start);
+		}
+
+		/** The characters a zone can hold: each one on a base level of the start layout's keys. */
+		function zoneChars(layout) {
+			const out = [];
+			for (const code of E.typingCodes()) {
+				const cell = (layout.rows[code] || [])[0];
+				if (typeof cell === 'string' && cell.trim() && Array.from(cell).length === 1)
+					out.push(cell);
+			}
+			return out.sort((a, b) => a.localeCompare(b));
+		}
+
+		/** The zone board: the chosen character's keys marked; a click adds or removes a key. */
+		function drawZones(start) {
+			const select = $('lo-zone-char');
+			const chars = zoneChars(start);
+			// A zone of a character the start lacks would be refused: it goes.
+			for (const char of [...state.zones.keys()])
+				if (!chars.includes(char)) state.zones.delete(char);
+			const kept = select.value;
+			select.replaceChildren(
+				...chars.map((char) => {
+					const option = el('option', '', state.zones.has(char) ? `${char} ●` : char);
+					option.value = char;
+					return option;
+				})
+			);
+			if (chars.includes(kept)) select.value = kept;
+			const char = select.value;
+			const zone = state.zones.get(char) || new Set();
+			drawBoard($('lo-zone-board'), start, {
+				marked: (code) => zone.has(code),
+				changed: (code) => legend(start, code) === char,
+				onKey: (code) => {
+					if (code === 'Space' || !char) return;
+					if (zone.has(code)) zone.delete(code);
+					else zone.add(code);
+					if (zone.size) state.zones.set(char, zone);
+					else state.zones.delete(char);
+					drawZones(start);
+				}
+			});
+			const summary = [...state.zones.entries()]
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([key, codes]) => t(`${PREFIX}zones.summary`, { char: key, count: codes.size }));
+			$('lo-zones-summary').textContent = summary.length
+				? summary.join(' · ')
+				: t(`${PREFIX}zones.none`);
 		}
 
 		// ============================
@@ -606,7 +669,12 @@
 		function options() {
 			const out = {
 				pinnedCodes: [...state.pinnedCodes].sort(),
-				qwertyPins: [...state.qwertyPins].sort()
+				qwertyPins: [...state.qwertyPins].sort(),
+				zones: Object.fromEntries(
+					[...state.zones.entries()]
+						.sort(([a], [b]) => (a < b ? -1 : 1))
+						.map(([char, codes]) => [char, [...codes].sort()])
+				)
 			};
 			for (const id of SWITCHES) out[id] = $(`lo-switch-${id}`).checked;
 			return out;
@@ -949,6 +1017,15 @@
 				drawPinBoards();
 			});
 			$('lo-keyboard').addEventListener('change', drawPinBoards);
+			$('lo-zone-char').addEventListener('change', drawPinBoards);
+			$('lo-zone-clear').addEventListener('click', () => {
+				state.zones.delete($('lo-zone-char').value);
+				drawPinBoards();
+			});
+			$('lo-zones-clear').addEventListener('click', () => {
+				state.zones.clear();
+				drawPinBoards();
+			});
 			$('lo-switches').addEventListener('change', syncSwitches);
 			$('lo-weights-restore').addEventListener('click', () => {
 				state.weights = E.defaultWeights();

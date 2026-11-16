@@ -404,6 +404,32 @@ check(
 	),
 	'a zoned letter stays in its zone'
 );
+// A zone that leaves out the letter's start key: the letter is placed in it
+// first, from either start, and never goes back to its start key.
+for (const start of ['layout', 'random']) {
+	const moved = search(azerty, { zones: { e: ['KeyJ', 'KeyK'] } }, { start });
+	check(
+		everyLayout(moved, (layout) => ['KeyJ', 'KeyK'].some((code) => layout.rows[code][0] === 'e')),
+		`a zone without the start key holds from a ${start} start`
+	);
+	check(
+		moved.p.start.every((u, s) => O.allowed(moved.p, u, s)),
+		`the zoned start is a valid arrangement (${start})`
+	);
+}
+check(
+	refusal(() => O.problem(E, azerty, { zones: { ß: ['KeyA'] } })) === 'zone_missing',
+	'a zone for a character the layout lacks is refused'
+);
+check(
+	refusal(() => O.problem(E, azerty, { pinnedCodes: ['KeyE'], zones: { e: ['KeyJ'] } })) ===
+		'zone_unreachable',
+	'a pinned character outside its zone is refused'
+);
+check(
+	refusal(() => O.problem(E, azerty, { zones: { e: [] } })) === 'option_value',
+	'an empty zone is refused'
+);
 
 // Refusals.
 check(

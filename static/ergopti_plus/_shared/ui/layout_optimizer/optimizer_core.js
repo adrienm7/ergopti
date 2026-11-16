@@ -327,6 +327,38 @@ var LAYOUT_OPTIMIZER = (function () {
 			typedLetters
 		};
 		result.movable = units.filter((unit) => !fixed[unit.index]).map((unit) => unit.index);
+		// Zones: a character outside its zone is moved first onto the first key of
+		// the zone whose unit may take its place, as the QWERTY pins are.
+		for (const [char, codes] of Object.entries(opts.zones)) {
+			if (!Array.isArray(codes) || !codes.length || codes.some((code) => typeof code !== 'string'))
+				throw new OptimizerError(
+					'option_value',
+					{ option: 'zones' },
+					`zone of ${char} is no key list`
+				);
+			const unit = units.find((u) => u.cells.includes(char));
+			if (!unit) throw new OptimizerError('zone_missing', { char }, `${char} is not on the layout`);
+			const from = slotOfUnit[unit.index];
+			if (allowed(result, unit.index, from)) continue;
+			const target = fixed[unit.index]
+				? undefined
+				: codes
+						.map((code) => slots.find((slot) => slot.kind === 'key' && slot.code === code))
+						.find(
+							(slot) =>
+								slot &&
+								!fixed[assignment[slot.index]] &&
+								allowed(result, unit.index, slot.index) &&
+								allowed(result, assignment[slot.index], from)
+						);
+			if (!target)
+				throw new OptimizerError('zone_unreachable', { char }, `${char} cannot reach its zone`);
+			const displaced = assignment[target.index];
+			assignment[target.index] = unit.index;
+			assignment[from] = displaced;
+			slotOfUnit[unit.index] = target.index;
+			slotOfUnit[displaced] = from;
+		}
 		// Every pinned or fixed unit must already sit where it may.
 		assignment.forEach((u, s) => {
 			if (!allowed(result, u, s))
@@ -349,8 +381,14 @@ var LAYOUT_OPTIMIZER = (function () {
 	function allowed(p, u, s) {
 		const unit = p.units[u];
 		const slot = p.slots[s];
-		// A unit may always stay where the start layout had it, and a hole goes anywhere.
-		if (u === s || unit.kind === 'empty') return true;
+		// A hole goes anywhere; a zoned character never leaves its zone, not even
+		// for its start key; otherwise a unit may always stay where the start had it.
+		if (unit.kind === 'empty') return true;
+		for (const cell of unit.cells) {
+			const zone = typeof cell === 'string' ? p.options.zones[cell] : undefined;
+			if (zone && (slot.kind === 'dead' || !zone.includes(slot.code))) return false;
+		}
+		if (u === s) return true;
 		if (slot.kind === 'dead') {
 			// A dead key never hides behind a dead key, and the typed letters stay put.
 			if (unit.kind === 'dead' || unit.cells.some(isDead)) return false;
@@ -359,10 +397,6 @@ var LAYOUT_OPTIMIZER = (function () {
 		const numberRow = slot.kind !== 'dead' && NUMBER_ROW.has(slot.code);
 		if (unit.kind === 'digit' && !p.options.digitsOutsideNumberRow && !numberRow) return false;
 		if (unit.kind === 'letter' && !p.options.lettersOnNumberRow && numberRow) return false;
-		for (const cell of unit.cells) {
-			const zone = typeof cell === 'string' ? p.options.zones[cell] : undefined;
-			if (zone && (slot.kind === 'dead' || !zone.includes(slot.code))) return false;
-		}
 		return true;
 	}
 

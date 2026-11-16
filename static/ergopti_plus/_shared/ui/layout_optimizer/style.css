@@ -162,6 +162,13 @@ body:has(> main.layout-optimizer) {
 	min-width: 0;
 }
 
+/* A field beside buttons: its label on the same line (the zone's character). */
+.lo-field.lo-inline {
+	align-items: center;
+	flex-direction: row;
+	margin-bottom: 0;
+}
+
 .lo-radios {
 	border: 0;
 	padding: 0;

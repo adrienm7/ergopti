@@ -53,7 +53,11 @@ the move set and each unit-tested:
 | `qwertyPins`             | `[]`    | Letters placed on their QWERTY key first, then fixed (presets `z x c v` and `a s`).       |
 | `zones`                  | `{}`    | Character → the only codes its unit may sit on.                                           |
 
-A unit may always stay where the start had it. With the dead key's layer on,
+A unit may always stay where the start had it, unless a zone leaves that key
+out: a zoned character never leaves its zone, and one that starts outside it
+is first moved onto the first key of the zone whose unit may take its place
+(`zone_unreachable` when none can, or when its key is pinned; `zone_missing`
+for a character the start lacks). With the dead key's layer on,
 one place follows each letter of the base level (« dead key, then e »); the
 place follows its letter, so every rule stays reachable whatever moves, and
 those letters stay on base places. A dead key never goes behind a dead key.
@@ -127,7 +131,9 @@ start layout (the library, and the layouts open in « Éditer »), « this
 layout » or « a random arrangement of its keys », the keyboard; the
 switches, each explained; keys kept in place (click them on the start
 layout's board); letters kept at their QWERTY place (click them on the QWERTY
-board, or the presets « Ctrl Z X C V » and « Ctrl A S »); the weights (the
+board, or the presets « Ctrl Z X C V » and « Ctrl A S »); zones (choose a
+character, then click the keys it may sit on, on the start layout's board; its
+start key outlined, every zone summed up under the board); the weights (the
 engine's defaults, editable); the budget (seconds, swaps per restart,
 restarts, seed, accuracy). « Optimize » shows the best layout so far (changed
 keys outlined), its score against the start, and the main metrics against the
@@ -163,5 +169,4 @@ only), keyboard ISO, format TKL, default weights, 1 restart of 3 000 swaps on
   shares of ways changed, and re-plans only their contexts.
 - The app: mount `LAYOUT_OPTIMIZER_PAGE` in the Studio window of ErgoptiPlus
   (Windows, macOS, Linux), with the keystats corpus « My typing ».
-- Zones in the page (a letter restricted to some keys by clicking them).
 - Saving the page's choices per viewer (localStorage), as the Comparer does.
