@@ -1430,7 +1430,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_symlinked_folder_opens_through_the_link(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             moved = relocation.Relocation("symlinked_applications", app, home)
             opened = moved.enter()
@@ -1447,7 +1449,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_spaced_accented_folder_keeps_its_precomposed_name(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             moved = relocation.Relocation("spaced_accented_path", app, home)
             opened = moved.enter()
@@ -1461,7 +1465,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_translocation_approves_the_download_and_unmounts_its_mount(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
             mount = (
@@ -1496,7 +1502,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_linked_folder_follows_the_resolved_bundle_that_runs(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             moved = relocation.Relocation("symlinked_applications", app, home)
             opened = moved.enter()
@@ -1508,7 +1516,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_existing_location_is_refused_before_moving_the_bundle(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             (home / "gitcfg/Applications de L\u00e9a").mkdir(parents=True)
             moved = relocation.Relocation("spaced_accented_path", app, home)
@@ -1518,7 +1528,9 @@ class RelocationTests(unittest.TestCase):
 
     def test_failed_unmount_is_reported_after_the_bundle_returns(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temp folders sit behind /var -> /private/var; resolve them so
+            # only the link a scenario creates can differ from the opened path.
+            root = Path(folder).resolve()
             app, home = self.installed(root), root / "home"
             downloaded = home / "gitcfg/Downloads/ErgoptiPlus.app"
             mounts = FakeMounts(
