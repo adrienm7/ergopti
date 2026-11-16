@@ -1,7 +1,7 @@
 # i18n and locale fallback at run time: Windows, macOS and Linux
 
 Audited source: `b61a7b67` (`claude/ergopti-todo-parity-b`, on `dev`
-`54e2486f`). Date: November 12, 2026.
+`6dfaa693`). Date: November 12, 2026.
 
 ## Scope
 

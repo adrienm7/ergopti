@@ -1,7 +1,7 @@
 # Tap-holds, chords and the navigation layer: follow-up on the drift
 
 Audited source: `c054579d` (`claude/ergopti-todo-parity-audit`), against the
-2026-11-10 campaign at `637c017a`. Date: November 12, 2026. Census:
+2026-11-10 campaign at `36d88cc2`. Date: November 12, 2026. Census:
 `source-areas.json` beside this report (381 areas; see the register in
 `docs/platform-parity-audit.md`).
 
@@ -19,7 +19,7 @@ This report covers only what changed in the module since
 It also covers that campaign's two open macOS rows. THD-1 to 4 are not
 repeated.
 
-Context: `9b9ccd07` took the shared tap-hold layout back off `dev`. The series
+Context: `ad8e3edf` took the shared tap-hold layout back off `dev`. The series
 stays on `wt/taphold-landed` until its macOS and Linux suites pass in CI. So
 the 2026-11-11 decision « One configuration layout on every OS for tap-holds »
 is not the state of `dev`. Its text sits, misplaced, under « No Linux keyboard

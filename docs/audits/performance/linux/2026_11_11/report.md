@@ -1,6 +1,6 @@
 # Linux performance pass: daemon session measurements 2026-11-11
 
-Baseline: `origin/dev` at `adfc5569` (the branch's start), measured from an
+Baseline: `origin/dev` at `2c94b824` (the branch's start), measured from an
 untouched worktree. After: branch `claude/ergopti-todo-linux-perf`. Both with the
 same command, three runs each, on the same cloud container (no other workload
 during a run):

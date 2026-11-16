@@ -1,6 +1,6 @@
 # Start at login: Windows, macOS and Linux
 
-Audited source: `54e2486f` (`dev`). Date: November 12, 2026.
+Audited source: `6dfaa693` (`dev`). Date: November 12, 2026.
 
 ## Source census reconciliation
 

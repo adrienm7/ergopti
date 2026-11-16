@@ -1,7 +1,7 @@
 # Hammerspoon performance pass: Lua-side boot, menu and hotstring load 2026-11-11
 
 Round 3 of the 2026-11-11 performance pass (after the two Linux rounds), on
-branch `claude/ergopti-todo-linux-perf` from `origin/dev` at `6fec42de`. No Mac
+branch `claude/ergopti-todo-linux-perf` from `origin/dev` at `48571ff8`. No Mac
 was available. Every figure is Lua CPU time measured off-Mac under Lua 5.4.6 (the
 Hammerspoon runtime's language version) on a shared 4-core cloud container.
 Native costs (AppKit menus, AX, `hs.json`, Karabiner, canvas) are not reproduced;

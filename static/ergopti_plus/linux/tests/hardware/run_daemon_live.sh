@@ -43,7 +43,7 @@ PIDS="${PIDS} ${DBUS_SESSION_BUS_PID}"
 # The daemon moves the fixture's plaintext API key to the secret service in
 # the background. A locked keyring once held the boot before its output
 # keyboard opened: secret-tool store waited on a prompt nobody here can
-# dismiss (cbbf7766). The daemon below runs with a secret-tool that blocks the
+# dismiss (5bf79358). The daemon below runs with a secret-tool that blocks the
 # same way (decided by the maintainer on 2026-11-11: that must never delay
 # input readiness); run_daemon_live.lua checks the daemon is ready meanwhile.
 SECRET_TOOL_SHIM="$(mktemp -d)"

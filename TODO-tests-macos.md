@@ -197,7 +197,7 @@ Hands needed:
       (moved 2026-11-15 from TODO.md « macOS lane », CI acceptance; runs 42929436137, 43012056158): native
       qualification on an installed driver on a real Mac (no hosted row types into them).
 - [ ] <!-- field-point: autocorrection_sections --> Common autocorrection sections and dynamic hotstrings, native
-      macOS cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance; the Linux per-section E2E is e13cf14a03,
+      macOS cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance; the Linux per-section E2E is fd95ef2d87,
       `run_e2e.lua`): with one common section chosen at a time (`[hotstrings.groups]`,
       `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT with names, only ADN
       with abbreviations and only AdaBoost with technical terms, as the Linux daemon E2E (`AUTOCORRECT_SCENARIOS`)

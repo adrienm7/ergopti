@@ -107,7 +107,7 @@ class PortableControls(unittest.TestCase):
     def test_candidate_pin_names_the_committed_source_probe(self):
         # The native step refuses a candidate whose digest differs from the pin
         # with only "FAIL ... CONTROLLED runtime" (run 42929436137 after
-        # 7a53f387 changed the probe): name the stale pin here instead.
+        # 4eda00c0 changed the probe): name the stale pin here instead.
         probe = HERE.parents[1] / "adapters/xkb_source_probe.lua"
         self.assertEqual(
             hashlib.sha256(probe.read_bytes()).hexdigest(),

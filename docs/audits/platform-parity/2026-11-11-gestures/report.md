@@ -1,7 +1,7 @@
 # Gestures and touchpad event ownership: Windows, macOS, Linux and shared
 
 Audited source: `0ca3803f` (`claude/ergopti-todo-parity-audit`, from `dev`
-`adfc5569`). Date: November 11, 2026.
+`2c94b824`). Date: November 11, 2026.
 
 The register's next module after the hotstring cascade. Windows
 (`windows/modules/gestures/*.ahk`) is the read-only reference; the Linux

@@ -1,7 +1,7 @@
 # Bundled apps: App Cloner and Encryptor
 
 Audited source: `a7cb1c1e` (`claude/ergopti-todo-parity-audit`, on `dev`
-`c250f655`). Date: November 12, 2026.
+`9491eea8`). Date: November 12, 2026.
 
 ## Scope
 

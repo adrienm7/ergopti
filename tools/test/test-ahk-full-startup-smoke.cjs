@@ -219,7 +219,7 @@ function hotstringsRenderTimes(configRoot) {
 // and its boot parses that config.toml eight times: 11943 -> 12109 slow
 // steps (118 personal_info + 48) and 2179 -> 2191 flat values.
 // Raised on 2026-11-12, measured on a local run and CI run 43159682408:
-// 32b501b56f put the eight [gestures.modes] strings and eight
+// 7aff0236dd put the eight [gestures.modes] strings and eight
 // [gestures.sensitivities] numbers into the generated template. One parse of
 // the template went from 975 to 1029 slow lexer steps; the realistic boot,
 // whose CI parse count varies by one, counted 13567 locally and 13582 on CI
@@ -238,12 +238,12 @@ function hotstringsRenderTimes(configRoot) {
 // every boot reads 17 more flat values (fresh-config 1162 -> 1179, realistic
 // 1195 -> 1212) and 27 fewer slow lexer steps, the same for each fixture. The
 // tap-hold loader now reads _shared/tap_hold/data/shared_file.toml at its
-// include position for the Mac thumb positions (4984431ee8) and the macOS-only
+// include position for the Mac thumb positions (f94137f677) and the macOS-only
 // modifiers (11 values, parsed once and cached), the config migrations gained
-// the schema v22 import_companion step (5 values, 23860b1e00), and the timing
-// registry gained tap_hold.max_activation_ms (1 value, 0aa18f15f1). The
+// the schema v22 import_companion step (5 values, 2187982b36), and the timing
+// registry gained tap_hold.max_activation_ms (1 value, 86e59b8dfd). The
 // neutral-defaults boot reads the same documents and seeds the generated
-// template, which gained [tap_holds] sticky_timeout_ms (c125313940): measured
+// template, which gained [tap_holds] sticky_timeout_ms (c81728c4fa): measured
 // 2250 -> 2271 on run 43514634523, its slow steps 12841 -> 12838.
 const BOOT_OPERATION_CEILINGS = {
 	'config.snapshot_read': { all: 9 },

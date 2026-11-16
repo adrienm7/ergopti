@@ -2,11 +2,11 @@
 
 Audited source: `943cabf4` (`claude/ergopti-todo-parity-audit`), against the
 [cascade campaign](../2026-11-11-hotstring-cascade/report.md) (fixes rebased on
-`b42d3cb8`). Date: November 12, 2026.
+`ab5b4b3a`). Date: November 12, 2026.
 
 ## Scope
 
-- **Drift since `b42d3cb8`:** `macos/modules/keymap/expander.lua` and
+- **Drift since `ab5b4b3a`:** `macos/modules/keymap/expander.lua` and
   `init.lua`, `linux/modules/hotstrings/injector.lua`, the dynamic-hotstring
   `prefix_rules.lua` and `rules_engine.lua`, and the shared
   `hotstring_engine/init.lua`.

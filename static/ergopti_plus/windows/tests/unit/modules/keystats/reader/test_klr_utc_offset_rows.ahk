@@ -308,7 +308,7 @@ _KLUOR_MigrationMatchesSharedLua() {
 	}
 	AssertEqual(_KLUOR_Join(LuaTables, ","), _KLUOR_Join(KLR_UtcOffsetShape()["tables"], ","),
 		"the raw tables are the Lua module's, in its order")
-	; 9359288f59 builds the Lua definition from local_time.MAX_OFFSET_MIN; the
+	; ac8b9d3574 builds the Lua definition from local_time.MAX_OFFSET_MIN; the
 	; Windows one must spell the same CHECK with the same bound.
 	LocalTime := FileRead(_SharedDir . "\metrics\engine\local_time.lua", "UTF-8")
 	AssertTrue(RegExMatch(LocalTime, "m)^M\.MAX_OFFSET_MIN = (\d+)$", &Bound) > 0, "local_time declares its widest offset")

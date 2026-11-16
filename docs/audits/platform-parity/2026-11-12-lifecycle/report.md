@@ -1,7 +1,7 @@
 # Lifecycle: reload, quit, signals, wake and first run
 
 Audited source: `d9224c54` (`claude/ergopti-todo-parity-audit`, merged with
-`dev` at `10d00b83`). Date: November 12, 2026.
+`dev` at `e1c20d87`). Date: November 12, 2026.
 
 ## Scope
 

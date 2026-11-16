@@ -1,14 +1,14 @@
 # Updater: Windows, macOS, Linux and shared
 
 Audited source: `61162fd0` (`claude/ergopti-todo-parity-audit`, merged with
-`dev` `205fce86`). Date: November 11, 2026.
+`dev` `c63d1286`). Date: November 11, 2026.
 
 The census's next module after the shortcuts. The updater was campaigned on
 2026-11-04 ([recovery audit](../2026-11-04-recovery/report.md), source
 `3a680d9f`); its findings (LUR-001, MUR-001) and recorded policies
 (notify-only, a feed-only release is never installed, signature enforcement
 off, backup of the chosen release only) are not repeated. This clone is
-shallow (oldest commit `c6582d2e`), so the drift since `3a680d9f` was read
+shallow (oldest commit `f5696c77`), so the drift since `3a680d9f` was read
 from the current source, not from a diff. Windows
 (`windows/modules/updater/*.ahk`) is the read-only reference; the shared
 updater (`_shared/lua/updater`, `_shared/modules/updater`), the Linux manager

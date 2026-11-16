@@ -53,8 +53,8 @@ network stage after the system one.
 - **KMD-2, excluded-app scope for telemetry that is not typing.** The fixes
   above follow Windows (refuse the row). Decided by the maintainer on
   2026-11-11: refused on every OS, no neutral label. Verified on dev: Linux
-  d379d11a (network; topology and capture already refused, now pinned by
-  `linux-topology-excluded-app`), macOS ed0d90e9 (`macos-network-private`,
+  c8866881 (network; topology and capture already refused, now pinned by
+  `linux-topology-excluded-app`), macOS d8529f35 (`macos-network-private`,
   `macos-topology-private`); Windows already refuses in `KL_AppendLog`.
   Closed.
 - **KMD-3, Linux `awake_ms`.** Sampled unlocked uptime on Linux, keep-awake

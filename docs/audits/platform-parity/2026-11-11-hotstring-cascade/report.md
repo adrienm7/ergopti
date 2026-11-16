@@ -1,6 +1,6 @@
 # Hotstring cascade and trigger arbitration: Windows, macOS, Linux and shared
 
-Audited source: `2419b397` (`dev`); fixes rebased on `b42d3cb8b`. Date: November 11, 2026.
+Audited source: `96e13ff9` (`dev`); fixes rebased on `ab5b4b3ab`. Date: November 11, 2026.
 
 The register's next module (« Hotstring cascade and trigger arbitration »).
 Windows (`windows/infra/hotstrings/hotstring_cascade.ahk`, `hotstring_match.ahk`,
@@ -57,7 +57,7 @@ final entry leaves the link alone) passes before and after.
 | HCM-006 | macOS, `ab`, a no-break space, `:` fires `cd:`, then Backspace                        | Restores the trigger alone, the no-break space is not typed back (Linux the same) | The record was refused whenever a no-break space was stripped               | `undo-nbsp-stripped`                       |
 | HCS-001 | Inventory: macOS Backspace restore, Linux repeat window and consecutive repeat        | —                                                                                 | Declared absent on macOS / Linux after the 2026-11-06 decisions and URL-001 | `test-linux-feature-parity.cjs` projection |
 
-Continued later on November 11 (source `adfc5569`), from the remaining rows below:
+Continued later on November 11 (source `2c94b824`), from the remaining rows below:
 
 | Id      | Sequence                                                        | Windows and Linux                                                                                         | macOS before                                     | Regression           |
 | ------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------- |

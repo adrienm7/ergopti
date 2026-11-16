@@ -13,7 +13,7 @@
 ---    (api_token_store.store_async, clear_async, probe_lock_async): a locked
 ---    keyring whose prompt nobody answers costs one killed child, never the
 ---    event loop, so input readiness never waits on it. The synchronous move
----    once blocked the boot before the output keyboard opened (cbbf7766).
+---    once blocked the boot before the output keyboard opened (5bf79358).
 --- 2. A locked default collection is read over D-Bus, which never prompts, and
 ---    the attempt waits for the next probe: no unlock prompt opens behind the
 ---    user's back. An unknown lock state tries the store under its deadline.

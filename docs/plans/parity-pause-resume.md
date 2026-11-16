@@ -7,7 +7,7 @@ Configuration rows run while paused and apply on resume; typing stays inert.
 
 ## Landed on `dev`
 
-- 59c36cc7 (CI run 43574300302): the third and fourth pause passes. See the
+- 5d1d68e4 (CI run 43574300302): the third and fourth pause passes. See the
   [pause report](../audits/platform-parity/2026-11-12-pause/report.md).
 
 ## On branch `claude/ergopti-todo-parity`, not landed
@@ -51,7 +51,7 @@ now hands it to `modules.llm.warmup_controller.defer_to_resume`, which
 (`warmup_target` is nil while paused); Windows defers the bridge start
 (`bootstrap_pending`, `LLM_Menu_OnResume`).
 
-Done for (1), proof run 43628135718 on 9cc9b2b1: the macOS model page opens
+Done for (1), proof run 43628135718 on 1151979a: the macOS model page opens
 while paused and its choices, downloads and API entry changes run (a key test,
 a server rescan, an MLX port change and a runtime install wait for resume:
 `model_selector_page.handle_action`, `api_panel` `runtime_is_paused`); Linux
@@ -60,7 +60,7 @@ paused: its pause retires every AI operation (`LLM_AuxInvalidate("suspend")`
 in `aux_ownership.ahk`) and its tray greys the AI submenu; that is the EDD-1 on
 AHK item.
 
-Item (1) landed on `dev` at 8b2214fe (CI run 43628135718).
+Item (1) landed on `dev` at 43e1f190 (CI run 43628135718).
 
 Decision for (2), by the maintainer on 2026-11-14 (relayed by the coordinator
 at 21:40 Paris): defer to resume. A shortcut slot changed while paused is

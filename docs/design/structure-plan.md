@@ -34,7 +34,7 @@ tree means knowing the macOS and Linux trees; a developer looking for
 gestures opens `gestures/` on any of them. No folder holds fewer than 2 or more
 than 20 entries (40 in tests).
 
-## Findings in numbers (measured 2026-11-11 on `dev` at e87a9d0d)
+## Findings in numbers (measured 2026-11-11 on `dev` at a85f2f75)
 
 | measurement                                                 | value                                                                                                                                                                                                   |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -416,7 +416,7 @@ exclusion glob, a prune, a test-double root) becomes `_shared/tests`.
   packaging manifests, build scripts, tools and repository tests that name a
   moved path, with the steps that touch each.
 
-The appendices are a snapshot of 2026-11-11 on e87a9d0d. Regenerate them with
+The appendices are a snapshot of 2026-11-11 on a85f2f75. Regenerate them with
 `npm run audit:structure-plan` (about a minute); the applier recomputes
 everything from the index of the day anyway.
 
@@ -528,7 +528,7 @@ sequence instead, on today's index (about three minutes):
   that moves the file it names, or the last one to empty the folder it names)
   and is either rewritten mechanically or listed for review; none is refused.
 
-On e87a9d0d it reports 0 refusals and 651 references to read in review. They
+On a85f2f75 it reports 0 refusals and 651 references to read in review. They
 are references to a folder the plan scatters:
 
 - in prose and comments they name the folder's deepest common new home
@@ -574,8 +574,8 @@ references it rewrites.
 [structure-folder-bounds-baseline.json](../../tools/test/structure-folder-bounds-baseline.json))
 ratchets per tree the oversized and one-entry folders, code and tests apart,
 and the top-level folders on one or two drivers. It was rebaselined on
-c96d2090, where Windows test folders had grown past the first baseline, and on
-e87a9d0d, when the GNOME Shell and KWin package layouts became exempt. The
+679ee405, where Windows test folders had grown past the first baseline, and on
+a85f2f75, when the GNOME Shell and KWin package layouts became exempt. The
 plan's target is at or below every count, so the ratchet never blocks a step.
 
 Proposed for phase 2, when the last step lands: extend

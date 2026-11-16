@@ -112,7 +112,7 @@ without a click (53c1766514), the report marks, and `driver_reload` (one daemon 
       shortcut sends the shortcut key.
 - [ ] <!-- field-point: incremental_swipes --> Incremental touchpad swipes (moved 2026-11-15 from TODO.md « Windows
       and Linux: evaluate incremental touchpad gesture modes and step sizes », Cross-platform feature inventory;
-      65b21ccab4, `test_gesture_incremental.lua`): on a real touchpad, an incremental slot's action fires while the
+      fd628ef212, `test_gesture_incremental.lua`): on a real touchpad, an incremental slot's action fires while the
       fingers move (`modules/gestures/incremental_tracker.lua`), with the step rule and reversal shared with macOS;
       the travel is in millimetres from the touchpad's own resolution (EVIOCGABS), so the steps set in
       `[gestures.sensitivities]` and in each swipe slot's submenu match the distance swiped; a pad that reports no

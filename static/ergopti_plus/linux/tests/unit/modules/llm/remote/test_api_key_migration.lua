@@ -10,7 +10,7 @@
 --- deadline, the plaintext key stays in api_keys.json, and a later attempt
 --- moves it once the keyring lets it through. The first test failed before
 --- the change: the boot ran migrate_plaintext() synchronously and its
---- io.popen of secret-tool held the loop until the child exited (cbbf7766).
+--- io.popen of secret-tool held the loop until the child exited (5bf79358).
 --- Real child processes and the real luv loop; only secret-tool and gdbus are
 --- stand-ins.
 --- ==============================================================================

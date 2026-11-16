@@ -235,7 +235,7 @@ Account and tester actions (maintainer, from the PC):
       stay live, a click that still waits for the resume shows the paused notice once, the tray rebuilds after a
       pause and a resume, and nothing that acts on typing stays active under Suspend.
 - [ ] Immediate-Backspace restoration after Notepad-paste and terminal expansions (moved 2026-11-15 from TODO.md
-      « Remaining code work »; c448c6d1ff): once the Notepad and terminal owners keep an undo record, a PC run in
+      « Remaining code work »; bb083f60a4): once the Notepad and terminal owners keep an undo record, a PC run in
       Notepad and in a terminal qualifies that the undo burst goes through the same owned output as the expansion (the
       clipboard owner of `_HSE_BeginOwnedNotepadTransaction`, the paced capture of
       `_HSE_BeginOwnedTerminalTransaction`): a Backspace right after the expansion types the trigger back. Until then
@@ -246,11 +246,11 @@ Account and tester actions (maintainer, from the PC):
       `%LOCALAPPDATA%\Ergopti\logs\`, the old folders gone, the configuration in `%LOCALAPPDATA%\Ergopti\config\`,
       `before-folder-migration\` read for clashes); the migration is removed only once the maintainer's machines pass.
 - [ ] Hot-path span lines on Windows (moved 2026-11-15 from TODO.md « Linux performance », « Windows counterparts »;
-      fa8175e636, `test_hotpath_span_lines.ahk`): at DEBUG on the PC, a field log holds the `[TRACE] [Span] <name>…`
+      9a3fa08e75, `test_hotpath_span_lines.ahk`): at DEBUG on the PC, a field log holds the `[TRACE] [Span] <name>…`
       and `[DONE] [Span] <name> done in N ms (<outcome>)` pairs for `hotstring.expand` (fired, declined or pending),
       `tray.fill` and `layout.switch`.
 - [ ] Common autocorrection sections, native Windows cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance;
-      the Linux per-section E2E is e13cf14a03, `run_e2e.lua`): with one common section chosen at a time
+      the Linux per-section E2E is fd95ef2d87, `run_e2e.lua`): with one common section chosen at a time
       (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT
       with names, only ADN with abbreviations and only AdaBoost with technical terms, as the Linux daemon E2E
       (`AUTOCORRECT_SCENARIOS`) does.

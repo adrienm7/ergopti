@@ -1,6 +1,6 @@
 # Tap-holds, chords and the navigation layer: Windows, macOS, Linux and shared
 
-Audited source: `637c017a` (`dev`). Date: November 10, 2026.
+Audited source: `36d88cc2` (`dev`). Date: November 10, 2026.
 
 The register's next module. Windows (`windows/platform/remap/*.ahk`,
 `windows/infra/key_combinations.ahk`) is the read-only reference; the Linux
@@ -35,7 +35,7 @@ OS, `lua/tap_hold`, the keymap areas it reads).
 | THL-004 | Pair with a hold, second key released after 20 ms                                    | Minimum tap checked (`constants.ahk` `TapHoldOwnImmediateModifier`)                        | The pair's tap ran                            | `pair-tap-minimum`                          |
 | THS-001 | Chord delay and symmetry defaults                                                    | Manifest `mod_combos` (100, false)                                                         | macOS reads `[hs_timeouts]`, an unpinned copy | `chord-defaults-single-source`              |
 
-Continued on November 11, 2026 (source `adfc5569`), from the remaining rows below:
+Continued on November 11, 2026 (source `2c94b824`), from the remaining rows below:
 
 | Id      | Sequence                                                                                          | Windows                                                                                       | Linux before                                         | Regression                      |
 | ------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------- |

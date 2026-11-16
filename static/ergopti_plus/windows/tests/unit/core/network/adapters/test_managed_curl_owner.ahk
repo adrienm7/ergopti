@@ -219,7 +219,7 @@ Test("managed curl owner: an interrupted admission stop never hands SetTimer an 
 
 ; The compiled upgrade smoke (42480459552; 42619305563 attempt 1) logged
 ; « Curl child termination was refused » 0.5 s after ready, then exited 1 with
-; empty streams, which before 13cfcd3070 meant an uncaught error. This plays a
+; empty streams, which before ee1c5c9ddc meant an uncaught error. This plays a
 ; sequence that yields that order: an Abort enters the admission stop, the
 ; admission poll interrupts it and aborts the request itself, the nested
 ; Abort's Job close is refused and logs that warning, and the outer stop then

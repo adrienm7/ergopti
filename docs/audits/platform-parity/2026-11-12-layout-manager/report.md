@@ -1,7 +1,7 @@
 # Layout manager and layout editor host
 
 Audited source: `49d49988` (`claude/ergopti-todo-parity-audit`), fixed on top
-of `d0bc45f1` (`dev`). Date: November 12, 2026.
+of `dd3371d9` (`dev`). Date: November 12, 2026.
 
 ## Scope
 

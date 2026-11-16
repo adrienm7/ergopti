@@ -7,12 +7,12 @@ same commit as each step or checkpoint. Times are Paris time.
 ## Where things stand (2026-11-14, 17:20)
 
 - Branch: `claude/ergopti-todo-structure-phase2-night2`, from dev
-  `984baf1c3`, fast-forward only. The `-night` branch could not fast-forward
+  `0604ff954`, fast-forward only. The `-night` branch could not fast-forward
   onto dev after the S03–S12 landing rebase and is frozen, as is the older
   `claude/ergopti-todo-structure-phase2`. Never merge dev into a branch:
   rebase it, so each block lands linear (dev refuses merge commits).
-- Steps landed on dev: S01+S02 (dev `520bb24c8..42f8c1327`); S03–S12 (dev
-  `708161bc9..984baf1c3`, 115 commits, landed 16:37; dev push CI run
+- Steps landed on dev: S01+S02 (dev `209540443..98a7b2ff7`); S03–S12 (dev
+  `ce39e07e3..0604ff954`, 115 commits, landed 16:37; dev push CI run
   43611195865).
 - Landing flow (the coordinator, 2026-11-14): prove a block until its CI
   shows only baseline names; tell the coordinator one line before the landing
@@ -51,7 +51,7 @@ same commit as each step or checkpoint. Times are Paris time.
   exactly (the logger order leak is gone). Windows AHK changes are
   unverified locally (no AutoHotkey here); CI is their proof.
 - Proof 21 (`…-proof-21` at `86de9408`, run 43514443381, S03–S05 on dev
-  `ed5adcad`): two reds beyond the baseline, both fixed on night since:
+  `26d5b73e`): two reds beyond the baseline, both fixed on night since:
   - Data and source contracts: the path-forms check expected the OS-purity
     edit again on a tree where it had landed, because that edit appends to
     its own text (`3d0d23e2`);
@@ -112,7 +112,7 @@ same commit as each step or checkpoint. Times are Paris time.
     `$3/platform/network/` (`e94990ce`).
     The four Linux E2E jobs share their tests differently from run to run:
     compare the union of their failing names with the baseline union.
-- Proof 24 (S03–S12 on dev `37de779c`, run 43581641357, cancelled at its
+- Proof 24 (S03–S12 on dev `f7e93ced`, run 43581641357, cancelled at its
   last job): Windows core, hotstrings and Driver startup green. New names:
   the Windows OS-purity ratchet (modules+lib 247 to 249: S06's singleton
   pass folds windows/core/lifecycle/driver_control.ahk into core/lifecycle, fixed
@@ -138,7 +138,7 @@ same commit as each step or checkpoint. Times are Paris time.
 - Next: if only baseline names, land S03–S12 (rebase on origin/dev, 0
   merges and trailers, gates, `git push origin HEAD:refs/heads/dev`); then
   S13 onwards the same way.
-- **The real dev baseline is run 43309556011** (dev `520bb24c`, all lanes).
+- **The real dev baseline is run 43309556011** (dev `20954044`, all lanes).
   Its only reds: Common Shared ui; Linux E2E desktop-webview, updater,
   input-display, platform-metrics; Windows Integration Driver startup (and
   the verdicts). Any other red on a proof is the steps'.
