@@ -557,13 +557,35 @@ async function exerciseForeignFiles(page) {
 	);
 	assert.match(
 		await page.textContent('#le-message'),
-		/dead_key/,
-		'KLA says it cannot hold dead keys'
+		/dead key/,
+		"KLA says, in the page's language, that it cannot hold dead keys"
 	);
 	const kalamine = await downloaded(page, () => page.click('#le-export-kalamine'));
 	assert.match(kalamine.name, /\.kalamine\.toml$/);
 	assert.match(kalamine.text, /^name = "Ergo-L"/);
 	assert.match(kalamine.text, /geometry = "ISO"/);
+	assert.ok(
+		await page.isVisible('#le-kbe-note'),
+		'the export section says why .kbe is not offered'
+	);
+	// (editor-reads-klanext-and-kbe) A KLAnext ErgoDox file opens and names the
+	// keys the ISO board lacks; a KbdEdit .kbe is recognised and refused with its reason.
+	assert.match(await page.getAttribute('#le-open-file', 'accept'), /\.kbe/);
+	await page.setInputFiles(
+		'#le-open-file',
+		path.join(ROOT, 'static', 'layouts', 'kla_ergodox', 'ergopti.v2.2.0.fr.ergodox.json')
+	);
+	await page.waitForFunction(() =>
+		/ergodox\.json/.test((document.getElementById('le-message') || {}).textContent || '')
+	);
+	assert.match(await page.textContent('#le-message'), /key 39 \(z Z % ‰\) has no place/);
+	await page.setInputFiles(
+		'#le-open-file',
+		path.join(ROOT, 'static', 'layouts', 'registry', 'bepo', 'kbdedit', 'French_Standard_BEPO.kbe')
+	);
+	await page.waitForFunction(() =>
+		/KbdEdit encrypts/.test((document.getElementById('le-message') || {}).textContent || '')
+	);
 }
 
 /**

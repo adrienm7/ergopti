@@ -868,7 +868,7 @@ var LayoutEditorPage = (function () {
 		// ======= 4/ Files ===========
 		// ============================
 
-		function openText(name, text) {
+		function openText(name, text, bytes) {
 			if (/\.keylayout$/i.test(name)) {
 				const convention = state.importConvention;
 				try {
@@ -880,9 +880,10 @@ var LayoutEditorPage = (function () {
 				}
 				return;
 			}
-			// An Ergopti source opens as it is; any other layout file (KLA JSON, Kalamine,
-			// XKB symbols, KLC, DOF, cmini, rows) goes through the Comparer's readers.
-			if (!/^\s*format\s*=\s*"ergopti-layout"/m.test(text)) return importForeign(name, text);
+			// An Ergopti source opens as it is; any other layout file (KLA or KLAnext
+			// JSON, Kalamine, XKB symbols, KLC, DOF, cmini, rows, KbdEdit .kbe) goes
+			// through the Comparer's readers.
+			if (!/^\s*format\s*=\s*"ergopti-layout"/m.test(text)) return importForeign(name, text, bytes);
 			const parsed = LayoutSourceIO.parse(text);
 			if (!parsed.ok) return notify('error', problemText(parsed.error));
 			replace(parsed.doc);
@@ -893,19 +894,23 @@ var LayoutEditorPage = (function () {
 		 * Reads another tool's layout file into a new Ergopti source: the
 		 * Comparer's readers (layout_formats.js) give each key's characters and
 		 * dead keys, toSource the source; what they could not read is listed.
+		 * The file's bytes, when the page has them, let a .kbe header be checked.
 		 */
-		function importForeign(name, text) {
+		function importForeign(name, text, bytes) {
 			let result;
 			let started;
+			const tools = {
+				parseToml: window.exports && window.exports.parse,
+				scancodes: LAYOUT_ANALYSIS_DATA.scancodes,
+				composer: LayoutComposer,
+				table: LAYOUT_COMPOSER_DATA,
+				analysis: LAYOUT_ANALYSIS,
+				convention: state.importConvention
+			};
 			try {
-				result = LAYOUT_FORMATS.read(name, text, {
-					parseToml: window.exports && window.exports.parse,
-					scancodes: LAYOUT_ANALYSIS_DATA.scancodes,
-					composer: LayoutComposer,
-					table: LAYOUT_COMPOSER_DATA,
-					analysis: LAYOUT_ANALYSIS,
-					convention: state.importConvention
-				});
+				result = bytes
+					? LAYOUT_FORMATS.readBytes(name, bytes, tools)
+					: LAYOUT_FORMATS.read(name, text, tools);
 				const base = name.replace(/\.[^.]+$/, '');
 				started = LayoutSourceIO.startFromDocument(
 					LAYOUT_FORMATS.toSource(result.layout),
@@ -914,12 +919,8 @@ var LayoutEditorPage = (function () {
 				);
 			} catch (error) {
 				// The Comparer's words for a file its readers refuse.
-				notify(
-					'error',
-					t('layout_analysis.layouts.import_failed', {
-						reason: (error && (error.code || error.message)) || name
-					})
-				);
+				const refusal = LAYOUT_FORMATS.refusalMessage(error);
+				notify('error', t(refusal.key, refusal.values));
 				return;
 			}
 			replace(started.doc);
@@ -936,12 +937,13 @@ var LayoutEditorPage = (function () {
 			);
 		}
 
-		/** What a reader or writer could not carry, in a few words. */
+		/** What a reader or writer could not carry, in a few words of the page's language. */
 		function lossList(unmapped) {
-			const words = unmapped.map((entry) =>
-				typeof entry === 'string' ? entry : [entry.what, entry.detail].filter(Boolean).join(' ')
-			);
-			return words.length > 8 ? `${words.slice(0, 8).join(', ')}…` : words.join(', ');
+			const words = unmapped.slice(0, 8).map((entry) => {
+				const loss = LAYOUT_FORMATS.lossMessage(entry);
+				return t(loss.key, loss.values);
+			});
+			return unmapped.length > 8 ? `${words.join(', ')}…` : words.join(', ');
 		}
 
 		/**
@@ -971,11 +973,18 @@ var LayoutEditorPage = (function () {
 			);
 		}
 
+		/**
+		 * Reads a picked file: its text (a KLC's UTF-16 decoded by its byte-order
+		 * mark) and its bytes (a KbdEdit .kbe is binary).
+		 */
 		function readFile(input, onText) {
 			const file = input.files && input.files[0];
 			if (!file) return;
-			file.text().then(
-				(text) => onText(file.name, text),
+			file.arrayBuffer().then(
+				(buffer) => {
+					const bytes = new Uint8Array(buffer);
+					onText(file.name, LAYOUT_FORMATS.decode(bytes), bytes);
+				},
 				(error) => notify('error', problemText({ code: 'file_unreadable', path: String(error) }))
 			);
 			input.value = '';
@@ -1079,7 +1088,7 @@ var LayoutEditorPage = (function () {
 			const fileInput = el('input', {
 				type: 'file',
 				id: 'le-open-file',
-				accept: '.toml,.keylayout,.json,.klc,.dof,.txt,.yaml,.xkb',
+				accept: LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`).join(','),
 				hidden: true,
 				onchange: (event) => readFile(event.target, openText)
 			});
@@ -3670,6 +3679,8 @@ var LayoutEditorPage = (function () {
 				shortcutExportNote(report),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
 				el('p', { class: 'le-note', id: 'le-dll-note', text: tl('export.windows_dll_note') }),
+				// KbdEdit encrypts its .kbe (layout_formats.js, KBE_SIGNATURE): say where to go instead.
+				el('p', { class: 'le-note', id: 'le-kbe-note', text: tl('export.kbe_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
 				el('div', { class: 'le-buttons' }, buttons),
 				host.install

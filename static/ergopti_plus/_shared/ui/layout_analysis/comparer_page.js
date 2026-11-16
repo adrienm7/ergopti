@@ -173,11 +173,7 @@
 		<button id="la-none" type="button" data-i18n="layout_analysis.layouts.none"></button>
 		<label class="la-file">
 			<span class="la-file-button" data-i18n="layout_analysis.layouts.import"></span>
-			<input
-				id="la-import"
-				type="file"
-				accept=".json,.toml,.klc,.keylayout,.xkb,.xkb_symbols,.txt,.dof"
-			/>
+			<input id="la-import" type="file" />
 		</label>
 	</div>
 	<p id="la-import-report" class="la-muted" hidden></p>
@@ -1448,14 +1444,13 @@
 			);
 		}
 
-		/** Decodes a picked layout file: UTF-16 with its byte-order mark (KLC) or UTF-8. */
-		async function fileText(file) {
-			const bytes = new Uint8Array(await file.arrayBuffer());
-			if (bytes[0] === 0xff && bytes[1] === 0xfe)
-				return new TextDecoder('utf-16le').decode(bytes.subarray(2));
-			if (bytes[0] === 0xfe && bytes[1] === 0xff)
-				return new TextDecoder('utf-16be').decode(bytes.subarray(2));
-			return new TextDecoder().decode(bytes).replace(/^\uFEFF/, '');
+		/** What a reader could not carry, worded in the page's language (eight at most). */
+		function lossList(unmapped) {
+			const words = unmapped.slice(0, 8).map((entry) => {
+				const loss = window.LAYOUT_FORMATS.lossMessage(entry);
+				return t(loss.key, loss.values);
+			});
+			return unmapped.length > 8 ? `${words.join(', ')}…` : words.join(', ');
 		}
 
 		/** Reads a layout file into the comparison, and says what could not be read. */
@@ -1463,7 +1458,8 @@
 			const report = $('la-import-report');
 			report.hidden = false;
 			try {
-				const result = window.LAYOUT_FORMATS.read(file.name, await fileText(file), {
+				const bytes = new Uint8Array(await file.arrayBuffer());
+				const result = window.LAYOUT_FORMATS.readBytes(file.name, bytes, {
 					parseToml: window.exports && window.exports.parse,
 					scancodes: DATA.scancodes,
 					composer: window.LayoutComposer,
@@ -1489,18 +1485,14 @@
 								name: layout.name,
 								format: result.format,
 								count: result.unmapped.length,
-								list: result.unmapped
-									.slice(0, 8)
-									.map((u) => u.detail)
-									.join(', ')
+								list: lossList(result.unmapped)
 							});
 				save();
 				fillLayouts();
 				analyse();
 			} catch (error) {
-				report.textContent = t('layout_analysis.layouts.import_failed', {
-					reason: error.code || error.message
-				});
+				const refusal = window.LAYOUT_FORMATS.refusalMessage(error);
+				report.textContent = t(refusal.key, refusal.values);
 			}
 		}
 
@@ -1576,6 +1568,8 @@
 				}
 			});
 			$('la-filter').addEventListener('input', fillLayouts);
+			// The file types every layout reader opens (layout_formats.js).
+			$('la-import').accept = window.LAYOUT_FORMATS.EXTENSIONS.map((ext) => `.${ext}`).join(',');
 			$('la-import').addEventListener('change', (event) => {
 				const file = event.target.files && event.target.files[0];
 				if (file) importLayout(file);

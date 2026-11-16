@@ -16,12 +16,16 @@
  *    forks), Kalamine TOML and JSON (Ergo-L and its family), XKB symbols,
  *    Windows KLC, Oxeylyzer DOF, cmini JSON and plain rows of characters. A
  *    macOS .keylayout goes through the layout composer's reader, which the
- *    editor already loads.
+ *    editor already loads. A KbdEdit .kbe is recognised and refused: its body
+ *    is encrypted (KBE_SIGNATURE).
  * 2. Dead keys of the standard accents compose by Unicode normalisation (the
  *    accent's combining mark after the letter, NFC), the same table XKB's
  *    Compose and Kalamine's built-in dead keys hold for those accents; any
  *    other dead key keeps only the compositions its file states.
- * 3. Pure: no DOM, no fetch; a Kalamine TOML is passed already parsed, so the
+ * 3. Every refusal and loss has a stable code that refusalMessage and
+ *    lossMessage turn into a locale key, so the Studio and the Comparer word
+ *    them the same way in every language.
+ * 4. Pure: no DOM, no fetch; a Kalamine TOML is passed already parsed, so the
  *    page's TOML codec (vendor/smol-toml.js) and Node's are the same one.
  * ==============================================================================
  */
@@ -37,6 +41,50 @@ var LAYOUT_FORMATS = (function () {
 
 	const LAYERS = 4;
 	const NONE = null;
+	const MAX_CODE_POINT = 0x10ffff;
+	// A UTF-16 code unit as a KLC writes it.
+	const HEX4 = /^[0-9a-fA-F]{4}$/;
+	// KbdEdit's .kbe header, read from the samples it exports
+	// (static/layouts/registry/bepo/kbdedit, static/ergopti/windows): a UInt16
+	// length and the ASCII signature, a UInt32 format version, a UInt32 field
+	// (0x40, 0x7c or 0x7f), then a UInt16 length of the rest of the file. The
+	// rest has the byte statistics of random data, and two layouts that differ by
+	// a few keys share no 8-byte run: it is encrypted, and only KbdEdit holds the
+	// key, so a .kbe is recognised and refused with that reason.
+	const KBE_SIGNATURE = 'KbdEdit export file';
+	const KBE_HEADER_SIZE = 2 + KBE_SIGNATURE.length + 4 + 4 + 2;
+	// The file types the Studio opens, for the pages' file pickers; the app's
+	// native panel reads the same list from the layout defaults
+	// (source.pick_extensions, held equal by tools/test/test-layout-formats.cjs).
+	const EXTENSIONS = [
+		'toml',
+		'keylayout',
+		'json',
+		'klc',
+		'kbe',
+		'xkb',
+		'xkb_symbols',
+		'yaml',
+		'dof',
+		'txt'
+	];
+	// The refusals and losses a page words in the user's language
+	// (layout_analysis.formats.refused.* and .loss.* in every locale).
+	const REFUSALS = [
+		'format_unknown',
+		'format_invalid',
+		'format_unsupported_board',
+		'format_kbe_encrypted'
+	];
+	const LOSSES = [
+		'key',
+		'keysym',
+		'include',
+		'ligature',
+		'dead_key_rules',
+		'dead_key',
+		'multi_character'
+	];
 	// XKB and Kalamine key names of the keys a layout defines.
 	const XKB_KEYS = (() => {
 		const out = { TLDE: 'Backquote', BKSL: 'Backslash', LSGT: 'IntlBackslash', SPCE: 'Space' };
@@ -628,20 +676,25 @@ var LAYOUT_FORMATS = (function () {
 		if (!json || !Array.isArray(json.keys)) fail('format_invalid', 'keys');
 		const board = KLA_KEYS[json.keyboardType];
 		if (!board) fail('format_unsupported_board', String(json.keyboardType));
-		const name = json.label || 'KLA layout';
+		const name = typeof json.label === 'string' && json.label !== '' ? json.label : 'KLA layout';
 		const result = start('kla', slug(name), name);
 		const cellOf = (value) => {
 			if (value === undefined || value === null || value === -1 || value === '') return NONE;
 			if (typeof value === 'string') return value;
-			if (typeof value === 'number' && value >= 32) return String.fromCodePoint(value);
+			if (Number.isInteger(value) && value >= 32 && value <= MAX_CODE_POINT)
+				return String.fromCodePoint(value);
 			return NONE;
 		};
 		json.keys.forEach((key, index) => {
+			if (!key || typeof key !== 'object') fail('format_invalid', `keys[${index}]`);
 			const cells = ['primary', 'shift', 'altGr', 'shiftAltGr'].map((field) => cellOf(key[field]));
 			if (cells.every((cell) => cell === NONE)) return;
 			const code = board[index];
 			if (!code) {
-				result.unmapped.push({ what: 'key', detail: String(index) });
+				// A key the ISO board has no place for (an ErgoDox thumb or outer
+				// column): its characters are named so the user sees what is left out.
+				const typed = cells.filter((cell) => cell !== NONE).join(' ');
+				result.unmapped.push({ what: 'key', detail: `${index} (${typed})` });
 				return;
 			}
 			cells.forEach((cell, layer) => {
@@ -683,6 +736,7 @@ var LAYOUT_FORMATS = (function () {
 		for (const [id, table] of Object.entries(json.deadkeys || {})) {
 			const state = deadState(id);
 			const rules = result.layout.dead[state] || (result.layout.dead[state] = {});
+			if (!table || typeof table !== 'object') fail('format_invalid', `deadkeys ${id}`);
 			for (const [typed, made] of Object.entries(table)) {
 				if (typeof made !== 'string') continue;
 				// A dead key typed in a dead state (Ergo-L's ** then **) is « dead:<state> ».
@@ -848,7 +902,7 @@ var LAYOUT_FORMATS = (function () {
 		let section = '';
 		let deadChar = null;
 		const deadName = (hex) => `dead_${hex.toLowerCase()}`;
-		const decode = (value) => {
+		const klcCell = (value) => {
 			if (value === '-1' || value === '%%') return NONE;
 			const dead = value.endsWith('@');
 			const raw = dead ? value.slice(0, -1) : value;
@@ -876,6 +930,7 @@ var LAYOUT_FORMATS = (function () {
 			) {
 				section = keyword;
 				if (keyword === 'DEADKEY') {
+					if (!HEX4.test(words[1] || '')) fail('format_invalid', `DEADKEY ${words[1]}`);
 					deadChar = deadName(words[1]);
 					result.layout.dead[deadChar] = result.layout.dead[deadChar] || {};
 				}
@@ -888,12 +943,18 @@ var LAYOUT_FORMATS = (function () {
 				words.slice(3, 3 + states.length).forEach((value, column) => {
 					const layer = LAYER_OF_STATE[states[column]];
 					if (layer === undefined) return;
-					const cell = decode(value);
+					const cell = klcCell(value);
 					if (cell !== NONE) put(result, code, layer, cell);
 				});
 			} else if (section === 'DEADKEY' && words.length >= 2) {
+				// The result ends with @ when it chains to another dead key.
+				const chained = words[1].endsWith('@');
+				const made = chained ? words[1].slice(0, -1) : words[1];
+				if (!HEX4.test(words[0]) || !HEX4.test(made)) fail('format_invalid', `DEADKEY ${line}`);
 				const typed = String.fromCharCode(parseInt(words[0], 16));
-				result.layout.dead[deadChar][typed] = String.fromCharCode(parseInt(words[1], 16));
+				result.layout.dead[deadChar][typed] = chained
+					? { dead: deadName(made) }
+					: String.fromCharCode(parseInt(made, 16));
 			} else if (section === 'LIGATURE')
 				result.unmapped.push({ what: 'ligature', detail: words[0] });
 		}
@@ -922,12 +983,14 @@ var LAYOUT_FORMATS = (function () {
 			label = input.name || label;
 			rows = [[], [], []];
 			for (const [char, pos] of Object.entries(input.keys)) {
+				if (!pos || typeof pos !== 'object') fail('format_invalid', `keys ${char}`);
 				if (!rows[pos.row]) continue;
 				rows[pos.row][pos.col] = char;
 			}
 		} else fail('format_invalid', 'rows');
 		const result = start(format, slug(label), label);
 		rows.slice(0, ROW_CODES.length).forEach((row, r) => {
+			if (!Array.isArray(row) && typeof row !== 'string') fail('format_invalid', `rows[${r}]`);
 			const chars = Array.isArray(row)
 				? row
 				: row.includes(' ')
@@ -976,6 +1039,48 @@ var LAYOUT_FORMATS = (function () {
 		return result;
 	}
 
+	/** Whether bytes or text start with KbdEdit's .kbe signature. */
+	function isKbe(data) {
+		const head =
+			typeof data === 'string'
+				? data.slice(2, 2 + KBE_SIGNATURE.length)
+				: String.fromCharCode(...Array.from(data.subarray(2, 2 + KBE_SIGNATURE.length)));
+		return head === KBE_SIGNATURE;
+	}
+
+	/**
+	 * Reads a KbdEdit .kbe: checks its header, then refuses it, since its body
+	 * is encrypted with a key only KbdEdit holds (see KBE_SIGNATURE).
+	 * @param {Uint8Array|string} data - The file's bytes, or its text when only
+	 *   the text is at hand (the header's ASCII survives any decoding).
+	 * @throws {Error} format_invalid for a damaged header, else format_kbe_encrypted.
+	 */
+	function fromKbe(data) {
+		if (!isKbe(data)) fail('format_invalid', 'kbe signature');
+		if (typeof data === 'string') fail('format_kbe_encrypted', 'kbe');
+		if (data.length < KBE_HEADER_SIZE) fail('format_invalid', 'kbe header');
+		const at = 2 + KBE_SIGNATURE.length;
+		const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+		const version = view.getUint32(at, true);
+		const rest = view.getUint16(at + 8, true);
+		if (rest !== data.length - KBE_HEADER_SIZE) fail('format_invalid', 'kbe length');
+		return fail('format_kbe_encrypted', `kbe version ${version}`);
+	}
+
+	/**
+	 * A layout file's text: UTF-16 with its byte-order mark (a KLC), else UTF-8
+	 * without its mark.
+	 * @param {Uint8Array} bytes - The file.
+	 * @returns {string} Its text.
+	 */
+	function decode(bytes) {
+		if (bytes[0] === 0xff && bytes[1] === 0xfe)
+			return new TextDecoder('utf-16le').decode(bytes.subarray(2));
+		if (bytes[0] === 0xfe && bytes[1] === 0xff)
+			return new TextDecoder('utf-16be').decode(bytes.subarray(2));
+		return new TextDecoder().decode(bytes).replace(/^﻿/, '');
+	}
+
 	/**
 	 * Recognises a file and reads it.
 	 * @param {string} name - The file name.
@@ -984,20 +1089,44 @@ var LAYOUT_FORMATS = (function () {
 	 *   (LAYOUT_ANALYSIS_DATA.scancodes), and for a .keylayout composer, table,
 	 *   analysis and convention.
 	 * @returns {object} {format, layout, unmapped}.
-	 * @throws {Error} With code format_unknown when nothing matches.
+	 * @throws {Error} With code format_unknown when nothing matches, format_invalid
+	 *   when the file is damaged or places no character on any key.
 	 */
 	function read(name, text, tools) {
+		const result = recognise(name, text, tools);
+		const typing = Object.entries(result.layout.rows).some(
+			([code, row]) => code !== 'Space' && row.some((cell) => cell !== NONE)
+		);
+		if (!typing) fail('format_invalid', 'no key');
+		return result;
+	}
+
+	/** The reader of a file's format, by extension and content. */
+	function recognise(name, text, tools) {
 		const extension = (name.split('.').pop() || '').toLowerCase();
+		if (extension === 'kbe' || isKbe(text)) return fromKbe(text);
 		if (extension === 'keylayout' || /<keyboard\s/.test(text))
 			return fromKeylayout(text, name.replace(/\.[^.]+$/, ''), tools.convention || 'iso', tools);
 		if (extension === 'klc' || /^KBD\s/m.test(text)) return fromKlc(text, tools.scancodes);
 		if (/xkb_symbols\s+"/.test(text)) return fromXkb(text);
 		if (extension === 'toml' || extension === 'yaml') {
 			if (!tools.parseToml) fail('format_unknown', name);
-			return fromKalamineToml(tools.parseToml(text));
+			let doc;
+			try {
+				doc = tools.parseToml(text);
+			} catch (error) {
+				fail('format_invalid', `toml ${error.message}`);
+			}
+			return fromKalamineToml(doc);
 		}
 		if (extension === 'json' || extension === 'dof' || /^\s*\{/.test(text)) {
-			const json = JSON.parse(text);
+			let json;
+			try {
+				json = JSON.parse(text);
+			} catch (error) {
+				fail('format_invalid', `json ${error.message}`);
+			}
+			if (!json || typeof json !== 'object') fail('format_invalid', 'json');
 			if (Array.isArray(json.keys)) return fromKla(json);
 			if (json.keymap) return fromKalamineJson(json);
 			return fromRows(json, name.replace(/\.[^.]+$/, ''));
@@ -1006,8 +1135,51 @@ var LAYOUT_FORMATS = (function () {
 		return fail('format_unknown', name);
 	}
 
+	/**
+	 * Reads a picked file from its bytes: a .kbe by its header, any other format
+	 * from its decoded text.
+	 * @param {string} name - The file name.
+	 * @param {Uint8Array} bytes - Its content.
+	 * @param {object} tools - As read.
+	 * @returns {object} {format, layout, unmapped}.
+	 */
+	function readBytes(name, bytes, tools) {
+		if (/\.kbe$/i.test(name) || isKbe(bytes)) return fromKbe(bytes);
+		return read(name, decode(bytes), tools);
+	}
+
+	// ===========================
+	// ======= 4/ Messages =======
+	// ===========================
+
+	/**
+	 * The locale key and values that word a reader's refusal; an error that is
+	 * not a reader's (a failed save…) keeps the generic words with its reason.
+	 * @param {Error} error - What a reader or writer threw.
+	 * @returns {{key: string, values: object}}
+	 */
+	function refusalMessage(error) {
+		if (error && REFUSALS.includes(error.code))
+			return {
+				key: `layout_analysis.formats.refused.${error.code}`,
+				values: { detail: String(error.detail) }
+			};
+		const reason = (error && (error.code || error.message)) || String(error);
+		return { key: 'layout_analysis.layouts.import_failed', values: { reason } };
+	}
+
+	/**
+	 * The locale key and values that word one item a reader or writer could not carry.
+	 * @param {{what: string, detail: string}} entry - One unmapped item.
+	 * @returns {{key: string, values: object}}
+	 */
+	function lossMessage(entry) {
+		if (!LOSSES.includes(entry.what)) fail('format_loss_unknown', String(entry.what));
+		return { key: `layout_analysis.formats.loss.${entry.what}`, values: { detail: entry.detail } };
+	}
+
 	// ==========================
-	// ======= 4/ Writers =======
+	// ======= 5/ Writers =======
 	// ==========================
 
 	/**
@@ -1159,6 +1331,7 @@ var LAYOUT_FORMATS = (function () {
 	}
 
 	return {
+		EXTENSIONS,
 		XKB_KEYS,
 		KLA_KEYS,
 		ACCENTS,
@@ -1169,7 +1342,12 @@ var LAYOUT_FORMATS = (function () {
 		fromKlc,
 		fromRows,
 		fromKeylayout,
+		fromKbe,
+		decode,
 		read,
+		readBytes,
+		refusalMessage,
+		lossMessage,
 		toSource,
 		toKla,
 		toKalamineToml

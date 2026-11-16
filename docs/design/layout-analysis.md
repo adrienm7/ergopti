@@ -387,7 +387,33 @@ all is refused with a stable code (`format_unknown`, `format_invalid`,
 | `fromKlc(text, scancodes)`                   | Windows KLC                                            | SHIFTSTATE columns 0, 1, 6, 7; `DEADKEY` tables; ligatures reported.                                                                            |
 | `fromKeylayout(text, id, convention, tools)` | macOS .keylayout                                       | through the layout composer's reader; its refusals become `format_invalid`.                                                                     |
 | `fromRows(input)`                            | Oxeylyzer DOF, cmini JSON, plain rows                  | base layer, upper case on Shift.                                                                                                                |
-| `read(name, text, tools)`                    | any of the above                                       | recognised by content and extension.                                                                                                            |
+| `fromKbe(bytes)`                             | KbdEdit .kbe                                           | header checked, then refused (`format_kbe_encrypted`): the body is encrypted with a key only KbdEdit holds (below).                             |
+| `read(name, text, tools)`                    | any of the above                                       | recognised by content and extension; a file that places no character is refused.                                                                |
+| `readBytes(name, bytes, tools)`              | any of the above, from a picked file's bytes           | a .kbe by its header, else `decode(bytes)` (UTF-16 by its byte-order mark, else UTF-8) then `read`.                                             |
+
+Every refusal has a stable code (`format_unknown`, `format_invalid`,
+`format_unsupported_board`, `format_kbe_encrypted`) and every loss a kind
+(`key`, `keysym`, `include`, `ligature`, `dead_key_rules`, `dead_key`,
+`multi_character`); `refusalMessage(error)` and `lossMessage(entry)` turn them
+into `layout_analysis.formats.*` locale keys, which the editor and the Comparer
+show in the user's language. A malformed file is refused with one of those
+codes, never a crash (`tools/test/test-layout-formats.cjs` cuts and overwrites
+real files from a fixed seed). `EXTENSIONS` lists the file types the pages'
+pickers offer; the app's macOS open panel offers the same list from the layout
+defaults (`source.pick_extensions`).
+
+KbdEdit .kbe, reverse-engineered from the committed exports
+(`static/layouts/registry/bepo/kbdedit`, `static/ergopti/windows`): a UInt16
+length and the ASCII signature « KbdEdit export file », a UInt32 version (5),
+a UInt32 field (0x40, 0x7c or 0x7f), a UInt16 length of the rest of the file,
+then the body. The body has the byte statistics of random data (7.96 bits per
+byte on 4 KB), no zlib, deflate or gzip stream starts at any offset, and the
+exports of Ergopti 2.2.0 and 2.2.1, which differ by a few keys, share no
+8-byte run: it is encrypted, so neither a reader nor a writer can be built
+from the files alone, and decompiling KbdEdit would break this project's
+clean-room rule (docs/design/layout-generator-kbdedit-parity.md). The Studio
+refuses a .kbe with that reason and points to KbdEdit's .keylayout export; for
+KbdEdit, the Studio's .keylayout and KLC downloads are what it imports.
 
 The standard accents (grave, acute, circumflex, tilde, diaeresis, cedilla…) a
 format names without a table compose by Unicode normalisation: the letter
@@ -395,9 +421,14 @@ followed by the accent's combining mark, normalised to one character. Writers:
 `toSource(layout)` gives an Ergopti layout source the source model validates;
 `toKla(layout, fingering)` a KLA JSON on the european board; `toKalamineToml`
 a Kalamine ISO `full` drawing, listing what Kalamine cannot hold (another dead
-key, several characters on one key). `tools/test/test-layout-formats.cjs` holds
-the readers to the repository's own files of Ergopti 1DK v2.1.2 (its Kalamine
-TOML, JSON, KLC, XKB and .keylayout) and Ergopti's published KLA files. The
+key, several characters on one key). A .keylayout is written by the layout
+source compiler from the source `toSource` builds (the editor's macOS
+download). `tools/test/test-layout-formats.cjs` holds the readers to the
+repository's own files of Ergopti 1DK v2.1.2 (its Kalamine TOML, JSON, KLC,
+XKB and .keylayout), and holds import, export, import to the same layout on
+every committed KLAnext JSON (ISO and ErgoDox) and on bépo's, Ergopti's and
+KbdEdit's own .keylayout files. A KLC `DEADKEY` result ending in `@` chains to
+another dead key. The
 « Comparer » page adds an imported layout to the comparison and shows that
 report.
 
