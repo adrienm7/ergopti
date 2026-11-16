@@ -1477,10 +1477,10 @@ async function exerciseLongLabels(browser, origin) {
 	assert.ok(
 		await page.$eval('#le-board [data-code="KeyA"] .le-legend', (n) => n.classList.contains('cut'))
 	);
-	assert.ok(
-		(await page.getAttribute('#le-board [data-code="KeyA"]', 'title')).endsWith(LONG),
-		'the tooltip holds the whole label'
-	);
+	// The key's own line comes first; once the panel's analysis lands, « Key colours »
+	// adds its cost on a line of its own (applyHeat), so the label is not the title's end.
+	const title = await page.getAttribute('#le-board [data-code="KeyA"]', 'title');
+	assert.ok(title.split('\n')[0].endsWith(LONG), `the tooltip holds the whole label: ${title}`);
 	const ss = await page.$eval('#le-board [data-code="KeyS"] .le-legend', (n) => ({
 		cut: n.classList.contains('cut'),
 		size: parseFloat(getComputedStyle(n).fontSize)
