@@ -16,6 +16,7 @@ The Windows checks only a real PC can answer; code work stays in [TODO.md](TODO.
 
 - [ ] **Windows personal-info eager pre-generation:** measure boot cost at the highest accepted pattern length; cover the accepted-agent policy test, the wrap-scalar test and the 2026-11-06 AHK changes with a native run.
       PC run 2026-11-11: the accepted-agent policy test (`test_llm_agent.ahk`, llm group), the wrap-scalar test (`test_wrap_symbols_global_transaction.ahk`, hotstrings-shortcuts group) and the rest of the suite passed natively; the boot cost is not measured yet.
+      PC run 2026-11-16: `tools/dev/bench-ahk-startup.cjs` (one smoke boot per length, the default 13 letters and values, the full AHK suite running beside it) put the `@-personal-info combos registered` step at 0 ms at lengths 1 and 2, 875 ms at 3 and 13.5 s at 4 (14.1 s of a 21.7 s boot): about 0.47 ms per combo, 13^n combos. The schema accepts up to 16, where boot would never end (13^16 combos), and 5 would already take about 3 minutes; the accepted maximum needs a decision (cap the eager length, or resolve every combo at fire time as `HSE_TryPersonalInfoCombo` does).
 
 - [ ] **Windows incremental swipes (raw touchpad reader):** on a Precision Touchpad, after « Configurer automatiquement » so the slots are routed to Ergopti: 1. The log at start has `Touchpad raw reports registered`, and at the first touch `Touchpad <handle>: N finger(s), X x Y units per mm` (not `reports no physical size`); X and Y match the pad's width and height (logical span over millimetres). 2. With `swipe_3_left`/`swipe_3_right` incremental (the default) and tab_next/tab_prev bound, a slow three-finger swipe across the pad in a browser steps one tab per 3.5 mm, starting after 3.5 mm; coming back half a step reverses; a debug log shows `swallowed` for the shortcut and the tab count equals the steps, never one more. 3. A quick short swipe (under the first step) still switches exactly one tab (the deferred shortcut, `fires once` at the lift). 4. Change the step to 10.0 and 1.0 from the slot's submenu: the distance per tab follows without a restart; set the slot to « Action unique (x1) »: one tab per swipe, no step. 5. Four-finger swipes (x1 by default) still act once; three-finger taps unchanged; swipes on a slot Windows does not route to Ergopti do nothing extra. 6. Pause Ergopti mid-swipe: no further step; resume: the next swipe steps from zero. Unplug/replug an external Precision Touchpad: `forgotten` then a fresh descriptor log. 7. Note in the log whether the shortcut (`shortcut swallowed`/`deferred`) arrives before or after the lift, to confirm the handoff window (300 ms) is enough.
 
@@ -99,12 +100,14 @@ Account and tester actions (maintainer, from the PC):
       Shortcuts > Key combinations > « Copy tap → combo », then a chord fires the copied action; a model pull behind
       a `PROXY dead:3128; DIRECT` PAC goes direct after the 1 s probe.
       PC run 2026-11-11: `test_wpm_config_types.ahk` (ui group), the copy cases of `test_key_combination_chord_engine.ahk` (keymap-gestures group) and the persistence census (`test_config_persistence_callers.ahk`, meta group) passed natively.
+      PC run 2026-11-16: `test-windows-route-plan.cjs` passed natively (24 plan and 7 redirect vectors, 9 daemon environments, 6 relay answers).
 - [ ] Branch `wave3/metrics` virtual desktops (AHK unrun on Linux): run `test_keystats_virtual_desktop.ahk` and the aggregation corpus (`system_event_night_wake`), then on Windows 11 and Windows 10 switch desktops (Win+Ctrl+Left/Right) and confirm one `space_change` per switch in today.log and the dashboard's desktop-change KPI, and none from Alt+Tab.
       PC run 2026-11-11: `test_keystats_virtual_desktop.ahk` (keystats group) and the aggregation corpus (`test_corpus_keystats_aggregation.ahk`, meta group) passed natively.
 - [ ] Bundled apps (`wave3/app-cloner-encryptor`, AHK unrun on Linux): parse and run `test_bundled_apps.ahk`; from the
       PC run 2026-11-11: `test_bundled_apps.ahk` (ui group) passed natively.
-- [ ] [COVERAGE] Windows managed-runtime fixture: after a first native Windows run of the legacy fixture, register it
+- [x] [COVERAGE] Windows managed-runtime fixture: after a first native Windows run of the legacy fixture, register it
       in `ci-windows.yml` (it holds the only reuse and runtime-receipt retirement cases).
+      PC run 2026-11-16: `test_ollama_managed_bootstrap.ps1` passed natively under Windows PowerShell 5.1 (9 of 9, with `test_ollama_install_files.ps1` 35 of 35); `ci-windows.yml` already runs it in the « Native cohorts and contracts » lot.
 - [ ] Branch `wave3/windows-deep` (2026-11-06, AHK unrun on Linux): run `test_keystats_journal_sealing.ahk`; then
       enable Metrics > « Encrypt logs on disk », type a unique marker in Notepad, wait for the ingest and check that
       `by_device\<id>\today.log` holds no readable marker while the dashboard still counts it.
@@ -123,6 +126,7 @@ Account and tester actions (maintainer, from the PC):
       PC run 2026-11-11: `test_tap_hold_one_shot_timeout.ahk` (keymap-gestures group) passed natively.
 - [ ] Branch `layout/windows-klc-installer` (2026-11-06, built on Linux only: no MSVC run, AHK unit tests under Wine):
       PC run 2026-11-11: the AHK unit tests ran natively, not under Wine; no MSVC build yet.
+      PC run 2026-11-16: `build_windows_keyboard_layout.ps1` refuses before compiling: the PC's Visual Studio 2019 Build Tools (MSVC 14.29.30133) lack the ARM64 C++ build tools; `npm run kbd-dll` needs `llvm-rc` and `makensis`, neither installed. Installing the ARM64 component (administrator) is the next step.
 
 - [ ] Metrics ledgers: the Windows reader replays a Linux `by_device/` ledger (never run, no AutoHotkey in the cloud
       containers).
@@ -164,8 +168,10 @@ Account and tester actions (maintainer, from the PC):
 
 - [ ] Metrics export and purge on Windows (`KL_RunMetricsMaintenance`): only source contracts check that path.
 
-- [ ] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
+- [x] Navigation-owner DLL after the folder migration (2026-11-13): its manifest fingerprint was derived by the
       migration without a rebuild; run `-UpdateTracked` with the pinned MSVC and check the DLL is byte-identical.
+      PC run 2026-11-16: `build_windows_nav_owner.ps1 -UpdateTracked` with MSVC 14.29.30133 and SDK 10.0.19041.0
+      passed its core tests and contracts and left the DLL and its manifest byte-identical (SHA-256 3006B41C…6BA7).
 
 - [ ] Physical shortcut collision and delivery owners (2026-11-13, worker F, `ui/physical_shortcuts/delivery.ahk`):
       in an isolated driver only, make `PhysicalShortcutDeliveryAvailable` answer true, then run steps (3) to (7) of
@@ -178,6 +184,8 @@ Account and tester actions (maintainer, from the PC):
       shift states 8, 9, 16 and 17 with F12 on `VK_KANA` and Caps Lock on `VK_OEM_FJ_ROYA`. Check that MSKLC's
       `kbdutool` builds it, and that with the DLL installed F12+B types « ka » and Caps Lock+A types ←. The
       repository KLC reader reads it back (`tools/test/test-layout-source-compiler.cjs`); MSKLC itself was not run.
+      PC run 2026-11-16: `test-layout-source-compiler.cjs` passed natively (23 contract groups); MSKLC is not installed
+      on the PC.
 - [ ] One-shot modifiers (worker A, 2026-11-13): the sticky delay row accepts 0 and shows « no time limit », and the
       one-shot Shift and `sticky_*` captures then wait with no InputHook timeout; `sticky_altgr` types the AltGr level
       on the Ergopti layout, through Kana on a Kana-style layout; a tap-hold key set to tap `sticky_altgr` and hold
@@ -202,6 +210,8 @@ Account and tester actions (maintainer, from the PC):
       save is refused with `collision`; (7) close the window during a capture and while the picker is open: no capture
       survives, no draft is saved.. Only then may the getter turn true. Token-by-token prediction display also remains
       unvalidated on Windows (`platform_reason.token_streaming_unvalidated_on_windows`, the « Live Ollama » line).
+      PC run 2026-11-16: `test_physical_shortcut_delivery.ahk` and `test_physical_shortcut_host.ahk` passed natively
+      (20 of 20, the production getter still false); steps (2) to (7) need a person.
 - [ ] Native runtime, editor and diagnostics receiving on Windows (moved 2026-11-15 from TODO.md « [NATIVE] Exercise
       the retained runtime/editor/diagnostics receiving boundaries », [native UI
       audit](docs/audits/platform-parity/2026-11-05-native-ui/report.md)): on the real PC, replay refused writes,
@@ -222,11 +232,21 @@ Account and tester actions (maintainer, from the PC):
       logs) and a toggle, which must not rebuild 1000 rows, after the deferred emoji and symbol registration
       (`HSE_DeferRegistration`) and the AI submenu built at its first open; measure each with interleaved
       base/candidate boots (summed `process_cpu`).
+      PC run 2026-11-16: `tools/dev/bench-ahk-startup.cjs` (smoke boots of the shipped template, the full AHK suite
+      running beside them) gave `Boot complete` between 5.9 and 8.7 s, of which hotstrings 0.42 to 0.67 s, layout and
+      remaps 0.56 to 0.86 s, tray menu 0.19 to 0.48 s. The toggle and the interleaved base/candidate comparison are not
+      measured yet.
 - [ ] Requalify the Windows key-combination and updater cohorts after the structure migration (moved 2026-11-15 from
       TODO.md « Remaining code work »; rule C1, decided by the coordinator on 2026-11-12, to review by the
       maintainer): each structure step re-pins the immutable cohort receipts and its commit body lists every old→new
       pin with the move that justifies it under « Requalification ». Run both cohorts natively on the Windows PC once
       the migration has landed, and confirm the re-pinned frames.
+      PC run 2026-11-16: `test-windows-key-combination-cohorts.cjs` passed (68 modeled controls; the symlink case is
+      skipped without the symlink privilege) and reports the native run UNRUN: `run-windows-key-combination-cohorts.cjs`
+      needs the generated `windows-key-combination-cohort-inputs.json` of the CI lane. The updater cohort
+      (`run-windows-updater-original-diagnostic-cohort.cjs --local`) refuses with « source pin changed » because
+      `windows-updater-original-diagnostic-cohort-inputs.json` still pins an older `tests/run_all.ahk`, which also fails
+      `test-windows-updater-original-source.cjs`: reseal, then rerun it.
 - [ ] EDD-1 on AHK, a pause stops typing, not configuration (moved 2026-11-15 from TODO.md « EDD-1 on AHK »; 392ae998,
       [pause Windows inventory](docs/audits/platform-parity/2026-11-12-pause/windows-inventory.md)): once the suspend
       gates of prompt_editor, paths_editor, layer_editor, layout_manager, hotstrings_config_window, action_picker,
@@ -245,10 +265,18 @@ Account and tester actions (maintainer, from the PC):
       against the handoff's Windows list (after the first boot, the « Moved legacy folder entry » lines in
       `%LOCALAPPDATA%\Ergopti\logs\`, the old folders gone, the configuration in `%LOCALAPPDATA%\Ergopti\config\`,
       `before-folder-migration\` read for clashes); the migration is removed only once the maintainer's machines pass.
+      PC check 2026-11-16 (files only): the log of 7 November holds the five « Moved legacy folder entry » lines
+      (paths.toml, configuration, cache, control, and the logs to the backup because `Ergopti\logs` already existed);
+      `%USERPROFILE%\.config\ergopti_plus`, `%LOCALAPPDATA%\ergopti_plus`, `ergopti_plus_ollama` and `Ergopti-ollama`
+      are gone; `%LOCALAPPDATA%\Ergopti\config\` exists, while `paths.toml` points the configuration at
+      `D:\Documents\GitHub\config\ergopti_plus\`; `before-folder-migration\ergopti_plus\logs` only holds the old logs
+      (21 October to 4 November). Left over: `%APPDATA%\Ergopti\` still holds a `bootstrap.log` of 7 September, which
+      the migration does not move, so that folder is never empty and stays.
 - [ ] Hot-path span lines on Windows (moved 2026-11-15 from TODO.md « Linux performance », « Windows counterparts »;
       9a3fa08e75, `test_hotpath_span_lines.ahk`): at DEBUG on the PC, a field log holds the `[TRACE] [Span] <name>…`
       and `[DONE] [Span] <name> done in N ms (<outcome>)` pairs for `hotstring.expand` (fired, declined or pending),
       `tray.fill` and `layout.switch`.
+      PC run 2026-11-16: `test_hotpath_span_lines.ahk` passed natively (4 of 4). The maintainer's field logs of 14 and 15 November hold the pairs for `tray.fill` (hotstrings and layout menus) and `hotstring.expand` (21 fired, 5 pending, 1 declined); no `layout.switch` pair yet: switch the layout once at DEBUG.
 - [ ] Common autocorrection sections, native Windows cases (moved 2026-11-15 from TODO.md « 104, 105 », CI acceptance;
       the Linux per-section E2E is fd95ef2d87, `run_e2e.lua`): with one common section chosen at a time
       (`[hotstrings.groups]`, `[hotstrings.modules.autocorrection]`), typing `chatgpt adn adaboost` gives only ChatGPT
