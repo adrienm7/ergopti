@@ -359,7 +359,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       On the site 2026-11-15 (`claude/ergopti-todo-site-studio-handoff`): the framed editor keeps the layout in the
       tab's storage and the Studio opens « Comparer », which ranks it; proof: `studio-site-handoff` in
       site-structure.playwright.cjs.
-- [ ] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
+- [x] **Comparison with other layouts.** Compare the edited layout with a library of about a hundred layouts
       (Bépo, Ergopti, Ergo-L, AZERTY, QWERTY, Colemak, Dvorak and the other ones of the benchmark pages): table and
       charts per metric, on the user's keystats data or on a chosen corpus. One shared source for the layout library,
       read by the site's benchmarks and by the Studio.
@@ -373,18 +373,22 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       being edited is not in the Comparer's tables, only ranked in the editor panel (done in the app 2026-11-15:
       « Compare with other layouts », ranked against the layouts ticked there). The benchmark page is rebuilt on the
       shared library and engine (maintainer decision, 2026-11-15; `claude/ergopti-todo-studio-w-bench-2`, 225367b4,
-      a10f7a21): /ergopti/benchmarks frames the Studio's Comparer opened on `fr_nemolivier` and ISO through its new
-      `?corpus=`?corpus=&keyboard=` link, its KLAnextkeyboard=`?corpus=&keyboard=` link, its KLAnextformat=` link, its KLAnext screenshots are gone, its Ergo-L PDF reports too (maintainer decision, 2026-11-15: one source of
-      truth, the live Comparer), and /benchmarks still redirects there; proof:
+      a10f7a21): /ergopti/benchmarks frames the Studio's Comparer opened on `fr_nemolivier` and ISO through its
+      `?corpus=&keyboard=&format=` link; its KLAnext screenshots are gone, its Ergo-L PDF reports too (maintainer
+      decision, 2026-11-15: one source of truth, the live Comparer), and /benchmarks still redirects there; proof:
       site-structure.playwright.cjs (exerciseBenchmarks), layout-editor.playwright.cjs (exerciseComparerLink).
+      Checked 2026-11-16: the layouts open in « Éditer » are in the Comparer's tables on the site and in the app
+      (3954240242, 97525eb71d, 7a1af4db81; `editor-layouts-in-comparer` and `studio-compare-edited` in
+      layout-editor.playwright.cjs, `studio-site-handoff` in site-structure.playwright.cjs), so the gap above is closed.
 
-- [ ] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
+- [x] **The same comparison online on ergopti.fr.** The Studio page of the site (`/studio`) runs the same analysis and
       comparison in the browser (corpus upload, layout library, the layout being edited), with the same shared engine
       as the app, so ergopti.fr is a full alternative to the online layout analysers. No upload of the user's text to
       a server: the analysis runs in the page.
       [CODE] Left (2026-11-15): /studio and /studio/comparer analyse in the page, nothing uploaded (f555c231e5,
       61ee756d7b, 34fa1ff045; layout-editor.playwright.cjs); the layout being edited does not enter the comparison (same
       gap as the item above).
+      Checked 2026-11-16: the edited layout enters the comparison on the site too (7a1af4db81, the site handoff above).
 - [x] **Study of the existing layout analysers, then match and exceed them.** First write a detailed report
       (`docs/audits/layout-analysers/`): Keyboard Layout Analyzer (KLA), KLAnext, the Ergo-L site's analyser and the
       other public analysers and generators found (online sites and open-source tools), including the Kalamine
@@ -474,7 +478,7 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       Comparer's own heatmap still names SFB partners only, now read from the engine's `worst.sfb`; its other metrics
       can name their worst groups by analysing the shown layout with `keyGroups`.
 
-- [ ] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
+- [x] **Two tabs in Ergopti Studio (maintainer, 2026-11-14).** One product, two tabs, in the app and on the site:
       « Éditer » (the editor, with a right-hand side panel showing the current layout's metrics, its global score and
       its rank against all library layouts or a chosen selection, updated live) and « Comparer » (layout battles: pick
       layouts, see every metric, the global score and the ranking side by side, with charts). A layout being edited
@@ -483,6 +487,37 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       577223005a, e06a7c35e8, ffbf598420; layout-editor.playwright.cjs, site-structure.playwright.cjs); the panel ranks
       against the whole library only, not a chosen selection, and no one-click « send to Comparer » exists. Real-machine
       tab checks: the three TODO-tests files.
+      Done 2026-11-16: « Compare with other layouts » is the one-click send (7b4f2886c2, 7a1af4db81); the panel's
+      « Rank among » ranks the edited layout among the whole library or the layouts ticked in « Comparer » (its saved
+      selection), and its finger load marks each finger's ideal load; proof: `panel-rank-selection` in
+      layout-editor.playwright.cjs.
+
+- [x] **Comparer design and comparison pass (2026-11-16).** « Compare with » in a layout's details puts a second
+      layout's value and the difference beside every metric and the score, each with its verdict in words (the
+      engine's `diff`); the finger chart shows each finger's share of the non-thumb presses against its ideal load
+      (`fingerShares`, `idealLoad`: the two sides of `finger_imbalance`), then hands and rows; « Copy the link »
+      shares the corpus, keyboard, format, compared layouts, details and versus (the site's /studio/comparer and
+      /ergopti/benchmarks hand them on to the frame; the user's own layouts and texts stay out). Design: score chart
+      with a zero line, legend and units; sortable headers as buttons with units; chart rows and table rows open the
+      details from the keyboard; the key heatmap in one blue hue with its scale, shrinking with the page instead of
+      scrolling; loading state (`aria-busy`); the score settings folded under the results (the phone page went from
+      8 200 to 4 300 px); validated chart tokens in theme.css « Chart look » for light and dark; 30 new strings in the
+      21 locales. Proof: test-layout-analysis-engine.cjs (hand-worked « asdf » shares and « ed » diff),
+      test-layout-comparer-page.cjs (link parameters shared with src/lib/js/comparerLink.js), `comparer-diff`,
+      `comparer-share` in layout-editor.playwright.cjs. Colours, folding and the share wording decided by the agent,
+      to review by the maintainer.
+  - [ ] Let the ranking table choose its metric columns (today the 12 of TABLE_METRICS; every metric is in the
+        details) and filter its rows.
+  - [ ] Heatmap of the Comparer: offer the other per-key metrics of `KEY_COST_METRICS` and name each key's worst
+        groups for every event (analyse the shown layout with `keyGroups: true`), as the editor's panel does.
+  - [ ] theme.css follows only `prefers-color-scheme`; the site has no light/dark toggle reaching the framed pages.
+  - [ ] `layout_analysis.panel.ranking` (« Ranking against the library… ») also shows while ranking among the
+        Comparer's ticks: reword it in the 21 locales.
+  - [ ] Locally (2026-11-16, Edge on a French Windows) `exerciseLongLabels` of layout-editor.playwright.cjs fails
+        (« the tooltip holds the whole label »), and every `toLocaleString` without a locale prints French digits
+        unless the browser is launched with `--lang=en-US`; check both against CI before calling either a regression.
+  - [ ] `codegen-native-theme.cjs` on dev drops two palette hues (`hue-2e9d4f`, `hue-c77700`) from
+        native_theme_data.lua: regenerate it through its owner.
 
 - [ ] **Read every common layout format (maintainer, 2026-11-14).** A layout is only what each physical key types
       (base, Shift, AltGr, AltGr+Shift, dead keys). The Studio (app and site) imports, at least: the Keyboard Layout
@@ -551,12 +586,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       DecompressionStream (WebKitGTK 2.40 or later on Linux); the editor's own backups are stored and read
       everywhere. Tab bar placement decided by the agent, to review by the maintainer. Real-machine checks: the
       `layout_editor_window` lines of the three TODO-tests files.
-- [ ] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
+- [x] **« My typing » is the default corpus in the app (maintainer, 2026-11-14).** In the app's Studio, the user's own
       keystats tables are an extra corpus and the default one for comparing layouts (the site has no such data and
       defaults to a built-in corpus).
       [CODE] Left (2026-11-15): « My typing » becomes the default once loaded (5751c907fa, 9e01fc138b;
       test-layout-manager-page.cjs), but it loads only on « Analyse my typing »; load it when the window opens if
       keystats exist.
+      Checked 2026-11-16: done on dev (2bb35e5d6b: the window reads the store once when it opens if keystats exist;
+      proof: test-layout-manager-page.cjs).
 - [x] **Each layout's score as every major analyser computes it (maintainer, 2026-11-14).** Besides Ergopti's own
       global score, « Comparer » and the « Éditer » side panel show each layout's score as KLAnext, Oxeylyzer, genkey,
       cmini, the Ergo-L analyser / Kalamine statistics, KLA, a200, Keyboard Layout Optimizer (dariogoetz) and any
