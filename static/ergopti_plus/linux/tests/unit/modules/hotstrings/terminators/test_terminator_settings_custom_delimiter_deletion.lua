@@ -178,7 +178,9 @@ helpers.describe("declared delay configuration command: actual Linux provider", 
 			local expected = delay_settings_command_expected()
 			helpers.assert_eq(rows[expected.position].title, require("core.i18n.engine.i18n").get("button.ok"))
 			helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_eq(#rows, 5, "the three existing variable-delay rows stay after the command")
+			-- b3e98ac499 added a separator and the AI suggestion's lifetime row.
+			helpers.assert_eq(#rows, 7,
+				"the three variable-delay rows, a separator and the AI row stay after the command")
 		end)
 	end)
 
