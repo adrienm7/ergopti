@@ -1489,6 +1489,11 @@ between workers) green alone. All live checks pass, typed by the harness.
   ("file changed before capture"), `test-keylayout-row-options` (different Lua keyboard ids),
   `test-linux-field-report-contract` (setup error), `test-menu-manifest` in a worktree (a `node_modules` junction
   copy fails with `EPERM`). Make each one pass locally or skip with a stated reason.
+  PC run 2026-11-16 (worktree on dev 164d6536aa, its own `npm ci` node_modules, `PYTHONUTF8=1`): all pass or skip
+  with their reason, so nothing is left here: `test-site-github-release` (35 controls),
+  `tools/test/fixtures/site-deploy-admission-controls.cjs` (165 controls), `test-keylayout-row-options` (10 cases),
+  `test-menu-manifest`, and `test-linux-field-report-contract` skips (« a Linux shell tool; not run on Windows »).
+  A worktree whose `node_modules` is a junction to the main checkout was not retried.
 - **108. Per-device physical bindings.** Deferred until designed: the collision, source, modifier and output joins
   of a shortcut bound to a key position on one device; `keyboard_hook.capture_position` hands only `native_code` and
   `mods` (macOS capture is item 31's).
