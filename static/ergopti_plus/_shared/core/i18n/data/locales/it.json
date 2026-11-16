@@ -4684,7 +4684,7 @@
 	"layout_optimizer.budget.seconds": "Tempo (secondi)",
 	"layout_optimizer.budget.iterations": "Scambi per riavvio",
 	"layout_optimizer.budget.restarts": "Riavvii",
-	"layout_optimizer.budget.seed": "Seed",
+	"layout_optimizer.budget.seed": "Seme",
 	"layout_optimizer.budget.accuracy": "Precisione",
 	"layout_optimizer.budget.help": "La ricerca si ferma al primo limite raggiunto. Con lo stesso seed e abbastanza tempo, restituisce di nuovo lo stesso layout.",
 	"layout_optimizer.accuracy.full": "Corpus intero",

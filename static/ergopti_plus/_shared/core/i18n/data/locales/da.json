@@ -4684,7 +4684,7 @@
 	"layout_optimizer.budget.seconds": "Tid (sekunder)",
 	"layout_optimizer.budget.iterations": "Bytninger pr. genstart",
 	"layout_optimizer.budget.restarts": "Genstarter",
-	"layout_optimizer.budget.seed": "Seed",
+	"layout_optimizer.budget.seed": "Frø",
 	"layout_optimizer.budget.accuracy": "Nøjagtighed",
 	"layout_optimizer.budget.help": "Søgningen stopper ved den første grænse, der nås. Med samme seed og nok tid giver den igen det samme layout.",
 	"layout_optimizer.accuracy.full": "Hele korpusset",

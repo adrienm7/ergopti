@@ -4684,7 +4684,7 @@
 	"layout_optimizer.budget.seconds": "Tijd (seconden)",
 	"layout_optimizer.budget.iterations": "Wisselingen per herstart",
 	"layout_optimizer.budget.restarts": "Herstarts",
-	"layout_optimizer.budget.seed": "Seed",
+	"layout_optimizer.budget.seed": "Startwaarde",
 	"layout_optimizer.budget.accuracy": "Nauwkeurigheid",
 	"layout_optimizer.budget.help": "De zoektocht stopt bij de eerste bereikte limiet. Met dezelfde seed en genoeg tijd levert ze opnieuw dezelfde indeling op.",
 	"layout_optimizer.accuracy.full": "Heel corpus",

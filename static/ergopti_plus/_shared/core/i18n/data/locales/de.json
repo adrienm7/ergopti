@@ -4684,7 +4684,7 @@
 	"layout_optimizer.budget.seconds": "Zeit (Sekunden)",
 	"layout_optimizer.budget.iterations": "Tausche pro Neustart",
 	"layout_optimizer.budget.restarts": "Neustarts",
-	"layout_optimizer.budget.seed": "Seed",
+	"layout_optimizer.budget.seed": "Startwert",
 	"layout_optimizer.budget.accuracy": "Genauigkeit",
 	"layout_optimizer.budget.help": "Die Suche endet bei der ersten erreichten Grenze. Mit demselben Seed und genug Zeit liefert sie wieder dasselbe Layout.",
 	"layout_optimizer.accuracy.full": "Ganzer Korpus",

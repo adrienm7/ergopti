@@ -6735,6 +6735,80 @@
 				"uk",
 				"zh"
 			]
+		},
+		"layout_optimizer.qwerty.preset.undo_cut_copy_paste": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_optimizer.qwerty.preset.select_all_save": {
+			"reason": "keyboard-key-name",
+			"locales": [
+				"ar",
+				"cs",
+				"da",
+				"de",
+				"es",
+				"fr",
+				"he",
+				"hi",
+				"it",
+				"ja",
+				"ko",
+				"nl",
+				"no",
+				"pl",
+				"pt",
+				"ru",
+				"sv",
+				"tr",
+				"uk",
+				"zh"
+			]
+		},
+		"layout_optimizer.corpus.label": {
+			"reason": "loanword-or-cognate",
+			"locales": ["es", "fr", "it", "nl", "pt"]
+		},
+		"layout_optimizer.language.code": {
+			"reason": "loanword-or-cognate",
+			"locales": ["de", "fr", "nl"]
+		},
+		"layout_optimizer.result.start": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "nl", "no", "pl", "sv"]
+		},
+		"layout_optimizer.result.score": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "nl"]
+		},
+		"layout_optimizer.result.best": {
+			"reason": "loanword-or-cognate",
+			"locales": ["no"]
+		},
+		"layout_optimizer.stop": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da"]
 		}
 	}
 }
