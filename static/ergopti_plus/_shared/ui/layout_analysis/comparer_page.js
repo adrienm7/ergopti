@@ -52,6 +52,14 @@
  *    with its verdict in words), each finger's share against its ideal load,
  *    hands and rows, and a one-hue key heatmap with its scale that shrinks
  *    with the page. The score settings are folded under the results.
+ * 13. The heatmap shows the presses, the points each key costs the score or
+ *    any per-key metric (costs and gains), each key naming its worst groups;
+ *    against another layout it shows the key-by-key difference. Folded
+ *    figures follow: the worst pairs and trigrams of the board, bigram and
+ *    trigram classes, each finger's travel, modifiers and dead keys, and the
+ *    layout's standing among the compared ones; every number is the engine's.
+ * 14. The ranking table's columns (any metric) and row filters (name, family,
+ *    score range) are the viewer's, kept with the other conveniences.
  * ==============================================================================
  */
 
@@ -79,6 +87,37 @@
 		'home_row',
 		'distance',
 		'unsupported'
+	];
+	// What the heatmap can show: the presses, the points each key costs the
+	// score, or any per-key metric of the engine (its costs and its gains).
+	const HEAT_PRESSES = 'presses';
+	const HEAT_SCORE = 'score';
+	const HEAT_CHOICES = [HEAT_PRESSES, HEAT_SCORE].concat(E.KEY_COST_METRICS, E.KEY_GAINS);
+	// Digits of a key's value in the heatmap.
+	const HEAT_DIGITS = 2;
+	// How many metrics a key's score tooltip names, worst first.
+	const HEAT_SCORE_PARTS = 3;
+	// A difference key is at most this mix of its colour, so its ink stays readable.
+	const HEAT_DIFF_MAX_SHARE = 0.7;
+	// The bigram classes and trigram classes shown as shares (engine metrics and
+	// trigramClasses).
+	const BIGRAM_CLASSES = [
+		'sfb',
+		'repeat',
+		'lsb',
+		'scissors',
+		'half_scissors',
+		'roll_in',
+		'roll_out',
+		'hand_change'
+	];
+	const TRIGRAM_CLASSES = [
+		'roll3_in',
+		'roll3_out',
+		'alternation',
+		'redirect',
+		'roll_mixed',
+		'same_finger'
 	];
 	// Layouts ticked on a first visit: the registry and the two references.
 	const DEFAULT_ORIGINS = ['registry', 'reference'];
@@ -194,6 +233,33 @@
 		<li><span class="la-swatch la-swatch-loss"></span><span data-i18n="layout_analysis.chart.loss"></span></li>
 	</ul>
 	<div id="la-chart" class="la-chart"></div>
+	<details id="la-table-options" class="la-table-options">
+		<summary data-i18n="layout_analysis.table.options"></summary>
+		<fieldset class="la-columns">
+			<legend data-i18n="layout_analysis.table.columns"></legend>
+			<div id="la-column-list" class="la-column-list"></div>
+		</fieldset>
+		<div class="la-table-filters">
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.table.filter_name"></span>
+				<input id="la-row-name" type="search" />
+			</label>
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.table.filter_family"></span>
+				<select id="la-row-family"></select>
+			</label>
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.table.score_min"></span>
+				<input id="la-row-min" type="number" step="any" />
+			</label>
+			<label class="la-filter-field">
+				<span data-i18n="layout_analysis.table.score_max"></span>
+				<input id="la-row-max" type="number" step="any" />
+			</label>
+		</div>
+		<button id="la-table-reset" type="button" data-i18n="layout_analysis.table.reset"></button>
+	</details>
+	<p id="la-table-count" class="la-muted" role="status"></p>
 	<div class="la-table-wrap">
 		<table id="la-table" class="la-table"></table>
 	</div>
@@ -212,17 +278,47 @@
 		<select id="la-versus"></select>
 	</div>
 	<h3 data-i18n="layout_analysis.details.heatmap"></h3>
-	<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
-	<select id="la-heat-metric" data-i18n-option-prefix="layout_analysis.heat">
-		<option value="presses"></option>
-		<option value="sfb"></option>
-		<option value="sfs"></option>
-		<option value="lsb"></option>
-		<option value="scissors"></option>
-		<option value="redirect"></option>
-	</select>
+	<div class="la-heat-controls">
+		<label class="la-sr-only" for="la-heat-metric" data-i18n="layout_analysis.details.heatmap"></label>
+		<select id="la-heat-metric"></select>
+		<label id="la-heat-diff-field" class="la-check" hidden>
+			<input id="la-heat-diff" type="checkbox" />
+			<span id="la-heat-diff-label"></span>
+		</label>
+	</div>
 	<div id="la-heatmap" class="la-heatmap"></div>
 	<div id="la-heat-legend" class="la-heat-legend"></div>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.worst.title"></summary>
+		<p class="la-muted" data-i18n="layout_analysis.worst.caption"></p>
+		<label for="la-worst-event" data-i18n="layout_analysis.worst.event"></label>
+		<select id="la-worst-event"></select>
+		<div class="la-table-wrap">
+			<table id="la-worst" class="la-table"></table>
+		</div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.classes.title"></summary>
+		<h4 data-i18n="layout_analysis.classes.bigrams"></h4>
+		<div id="la-bigram-classes" class="la-bars"></div>
+		<h4 data-i18n="layout_analysis.classes.trigrams"></h4>
+		<div id="la-trigram-classes" class="la-bars"></div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.travel.title"></summary>
+		<p class="la-muted" data-i18n="layout_analysis.travel.caption"></p>
+		<div id="la-travel" class="la-bars"></div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.layers.title"></summary>
+		<p class="la-muted" data-i18n="layout_analysis.layers.caption"></p>
+		<div id="la-layers" class="la-bars"></div>
+	</details>
+	<details class="la-section">
+		<summary data-i18n="layout_analysis.standing.title"></summary>
+		<p class="la-muted" data-i18n="layout_analysis.standing.caption"></p>
+		<div id="la-standing" class="la-bars"></div>
+	</details>
 	<div class="la-detail-grid">
 		<div>
 			<h3 data-i18n="layout_analysis.details.contributions"></h3>
@@ -410,7 +506,11 @@
 						shortcuts: state.shortcuts,
 						formWeights: state.formWeights,
 						custom: state.custom,
-						imported
+						imported,
+						// The ranking table's columns and filters, and the heatmap's choice.
+						table: state.table,
+						heat: state.heat,
+						heatDiff: state.heatDiff
 					})
 				);
 			} catch {
@@ -484,7 +584,10 @@
 			tables: null,
 			results: [],
 			sort: { key: 'rank', descending: false },
-			heat: 'presses',
+			table: validTable(saved.table),
+			heat: HEAT_CHOICES.includes(saved.heat) ? saved.heat : HEAT_PRESSES,
+			// With a layout to compare with, the heatmap shows the key-by-key difference.
+			heatDiff: saved.heatDiff === true,
 			details: linked.details || null,
 			// The layout the details compare with (diff), null for none.
 			versus: linked.versus || null
@@ -576,6 +679,25 @@
 			return out;
 		}
 
+		/**
+		 * The ranking table's saved columns (metric ids the engine still has, the
+		 * default set when none) and row filters (a name, a family, a score range).
+		 */
+		function validTable(table) {
+			const value = table && typeof table === 'object' ? table : {};
+			const columns = Array.isArray(value.columns)
+				? value.columns.filter((id) => id in E.METRICS)
+				: TABLE_METRICS.slice();
+			const bound = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+			return {
+				columns,
+				name: typeof value.name === 'string' ? value.name : '',
+				family: typeof value.family === 'string' ? value.family : '',
+				min: bound(value.min),
+				max: bound(value.max)
+			};
+		}
+
 		/** The saved ideal finger load when the engine still accepts it, else the default. */
 		function validIdealLoad(load) {
 			if (!load) return E.defaultIdealLoad();
@@ -618,6 +740,36 @@
 		// ======= 4/ Analysis ======
 		// ==========================
 
+		/** The options every analysis of the page uses: board, format, weights and tables. */
+		function analysisOptions() {
+			return {
+				keyboard: state.keyboard,
+				format: state.format,
+				weights: state.weights,
+				idealLoad: state.idealLoad,
+				shortcuts: state.shortcuts,
+				formWeights: state.formWeights,
+				profile: FINGERING.current(state.keyboard) || undefined
+			};
+		}
+
+		// The layout shown in detail, analysed again with every key's worst groups
+		// (keyGroups): a ranking counts only the SFB ones. Kept per result, so a new
+		// analysis (new results) analyses it again.
+		const detailed = new WeakMap();
+		function detailOf(result) {
+			if (!detailed.has(result))
+				detailed.set(
+					result,
+					E.analyse(
+						byId.get(result.layout.id),
+						state.tables,
+						Object.assign(analysisOptions(), { keyGroups: true })
+					)
+				);
+			return detailed.get(result);
+		}
+
 		let generation = 0;
 		// Extra views (other analysers' scores) told about each comparison.
 		const resultListeners = [];
@@ -647,15 +799,7 @@
 				return;
 			}
 			const start = performance.now();
-			state.results = E.compare(chosen, tables, {
-				keyboard: state.keyboard,
-				format: state.format,
-				weights: state.weights,
-				idealLoad: state.idealLoad,
-				shortcuts: state.shortcuts,
-				formWeights: state.formWeights,
-				profile: FINGERING.current(state.keyboard) || undefined
-			});
+			state.results = E.compare(chosen, tables, analysisOptions());
 			const ms = Math.round(performance.now() - start);
 			// The compared layouts themselves (rows, dead keys…), for extra scorers.
 			const compared = new Map(chosen.map((layout) => [layout.id, layout]));
@@ -765,11 +909,79 @@
 			}
 		}
 
-		/** The ranking table, sortable by any column. */
+		/** A compared layout's family ('' for none). */
+		function familyOf(result) {
+			const layout = byId.get(result.layout.id);
+			return (layout && layout.family) || '';
+		}
+
+		/** The results the table's row filters keep: name, family and score range. */
+		function shownRows() {
+			const { name, family, min, max } = state.table;
+			const needle = name.trim().toLowerCase();
+			return state.results.filter(
+				(r) =>
+					(!needle || r.layout.name.toLowerCase().includes(needle)) &&
+					(!family || familyOf(r) === family) &&
+					(min === null || r.score.total >= min) &&
+					(max === null || r.score.total <= max)
+			);
+		}
+
+		/** The column choices (every metric, in the engine's order) and the filters' values. */
+		function fillTableOptions() {
+			const list = $('la-column-list');
+			list.replaceChildren(
+				...Object.keys(E.METRICS).map((id) => {
+					const label = el('label', 'la-check');
+					const box = el('input');
+					box.type = 'checkbox';
+					box.value = id;
+					box.checked = state.table.columns.includes(id);
+					box.addEventListener('change', () => {
+						// The engine's order, whatever order the boxes were ticked in.
+						const ticked = new Set(
+							Array.from(list.querySelectorAll('input:checked'), (input) => input.value)
+						);
+						state.table.columns = Object.keys(E.METRICS).filter((m) => ticked.has(m));
+						save();
+						renderTable();
+					});
+					label.append(box, el('span', '', t(`layout_analysis.metric.${id}`)));
+					return label;
+				})
+			);
+			const families = Array.from(new Set(layouts.map((l) => l.family).filter(Boolean))).sort();
+			const all = el('option', '', t('layout_analysis.table.family_all'));
+			all.value = '';
+			$('la-row-family').replaceChildren(
+				all,
+				...families.map((family) => {
+					// A family is named by its first layout's name (Ergopti, Bépo…).
+					const option = el('option', '', layouts.find((l) => l.family === family).name);
+					option.value = family;
+					return option;
+				})
+			);
+			if (!families.includes(state.table.family)) state.table.family = '';
+			$('la-row-family').value = state.table.family;
+			$('la-row-name').value = state.table.name;
+			$('la-row-min').value = state.table.min === null ? '' : String(state.table.min);
+			$('la-row-max').value = state.table.max === null ? '' : String(state.table.max);
+		}
+
+		/** The ranking table, sortable by any column, with its chosen columns and rows. */
 		function renderTable() {
 			const table = $('la-table');
 			table.replaceChildren();
+			const count = $('la-table-count');
+			count.textContent = '';
 			if (state.results.length === 0) return;
+			const shown = shownRows();
+			count.textContent = t('layout_analysis.table.count', {
+				shown: shown.length,
+				total: state.results.length
+			});
 			const columns = [
 				{ key: 'rank', label: t('layout_analysis.table.rank'), value: (r) => r.rank },
 				{ key: 'name', label: t('layout_analysis.table.layout'), value: (r) => r.layout.name },
@@ -780,7 +992,7 @@
 					digits: 1
 				}
 			].concat(
-				TABLE_METRICS.map((id) => ({
+				state.table.columns.map((id) => ({
 					key: id,
 					label: `${t(`layout_analysis.metric.${id}`)} (${unitText(id)})`,
 					value: (r) => r.metrics[id],
@@ -809,8 +1021,11 @@
 			}
 			const thead = el('thead');
 			thead.append(head);
+			// A sorted column the user hid sorts by rank again.
+			if (!columns.some((c) => c.key === state.sort.key))
+				state.sort = { key: 'rank', descending: false };
 			const sortColumn = columns.find((c) => c.key === state.sort.key);
-			const rows = state.results.slice().sort((a, b) => {
+			const rows = shown.slice().sort((a, b) => {
 				const x = sortColumn.value(a);
 				const y = sortColumn.value(b);
 				const order = typeof x === 'string' ? x.localeCompare(y) : x - y;
@@ -872,10 +1087,16 @@
 		 * Magnitude bars from zero, in one colour, each with an optional target
 		 * mark (the ideal finger load); the value is written in its unit.
 		 * @param {HTMLElement} box
-		 * @param {Array<{label: string, value: number, target?: number}>} entries
+		 * @param {Array<{label: string, value: number, target?: number, text?: string}>} entries
+		 *   text: the value as written, when it is not the value in its unit.
 		 * @param {number} scale The value a full bar stands for.
+		 * @param {{unit?: string, digits?: number}} [written] The unit (%) and
+		 *   decimals (1) of the values.
 		 */
-		function loadBars(box, entries, scale) {
+		function loadBars(box, entries, scale, written) {
+			const unit = (written && written.unit) || '%';
+			const digits = written && written.digits !== undefined ? written.digits : 1;
+			const value = (v) => `${format(v, digits)} ${unit}`;
 			box.replaceChildren();
 			for (const entry of entries) {
 				const row = el('div', 'la-chart-row');
@@ -883,17 +1104,18 @@
 				const track = el('span', 'la-chart-track');
 				const bar = el('span', 'la-bar la-bar-load');
 				bar.style.left = '0';
-				bar.style.width = `${Math.min(100, (entry.value / scale) * 100)}%`;
+				bar.style.width = `${scale > 0 ? Math.min(100, (entry.value / scale) * 100) : 0}%`;
 				track.append(bar);
-				let title = `${entry.label}: ${format(entry.value, 1)} %`;
+				const text = entry.text === undefined ? value(entry.value) : entry.text;
+				let title = `${entry.label}: ${text}`;
 				if (entry.target !== undefined) {
 					const mark = el('span', 'la-target');
 					mark.style.left = `${Math.min(100, (entry.target / scale) * 100)}%`;
 					track.append(mark);
-					title += ` (${t('layout_analysis.details.ideal_mark')}: ${format(entry.target, 1)} %)`;
+					title += ` (${t('layout_analysis.details.ideal_mark')}: ${value(entry.target)})`;
 				}
 				row.title = title;
-				row.append(track, el('span', 'la-chart-value', `${format(entry.value, 1)} %`));
+				row.append(track, el('span', 'la-chart-value', text));
 				box.append(row);
 			}
 		}
@@ -903,21 +1125,109 @@
 			return E.METRICS[id].unit === 'mm' ? t('layout_analysis.unit.mm') : '%';
 		}
 
+		/** What a key types on its base layer, as the heatmap and the tables show it. */
+		function keyText(layout, code) {
+			if (code === 'Space') return '␣';
+			const row = layout.rows[code];
+			// A dead key shows its bare accent (what it types alone).
+			const dead = row && row[0] && typeof row[0] === 'object' ? row[0].dead : null;
+			if (dead !== null)
+				return KEY_LEGEND.deadKeyText(((layout.dead || {})[dead] || {})[' '] || '') || dead;
+			return row && typeof row[0] === 'string' && row[0] !== '' ? row[0] : code;
+		}
+
+		/** The name of a heatmap choice. */
+		function heatName(id) {
+			if (id === HEAT_PRESSES) return t('layout_analysis.heat.presses');
+			if (id === HEAT_SCORE) return t('layout_analysis.panel.heat.score');
+			return t(`layout_analysis.metric.${id}`);
+		}
+
+		/** The unit of a heatmap choice's values. */
+		function heatUnit(id) {
+			if (id === HEAT_PRESSES) return '%';
+			if (id === HEAT_SCORE) return t('layout_analysis.unit.points');
+			return unitText(id);
+		}
+
+		/**
+		 * Each key's value for the chosen heatmap: the engine's per-key value
+		 * (keyValues) or the points it costs the score (keyScoreCost); with a
+		 * layout to compare with and the difference asked for, this layout's
+		 * value minus the other's on the same physical key (keyDiff).
+		 * @returns {object} code → value.
+		 */
+		function heatValues(detail, other) {
+			if (state.heat === HEAT_SCORE) {
+				const own = E.keyScoreCost(detail, state.weights);
+				if (!other) return own;
+				const theirs = E.keyScoreCost(other, state.weights);
+				return Object.fromEntries(Object.keys(own).map((code) => [code, own[code] - theirs[code]]));
+			}
+			return other ? E.keyDiff(detail, other, state.heat) : E.keyValues(detail, state.heat);
+		}
+
+		/**
+		 * A key's tooltip line: its value in the chosen unit, then its worst
+		 * groups for a bad event, or the metrics it costs the most points on.
+		 */
+		function heatTitle(detail, layout, code, value, signed) {
+			const unit = heatUnit(state.heat);
+			const written = `${signed && value > 0 ? '+' : ''}${format(value, HEAT_DIGITS)} ${unit}`;
+			let title = `${keyText(layout, code)} · ${heatName(state.heat)}: ${written}`;
+			if (signed) return title;
+			const key = detail.keys[code];
+			if (E.KEY_EVENTS.includes(state.heat) && key.worst[state.heat].length > 0) {
+				const groups = key.worst[state.heat]
+					.map(
+						([others, share]) =>
+							`${[code]
+								.concat(others)
+								.map((c) => keyText(layout, c))
+								.join(' ')} ${format(share, HEAT_DIGITS)} %`
+					)
+					.join(', ');
+				title += ` — ${t('layout_analysis.panel.heat.worst', { groups })}`;
+			} else if (state.heat === HEAT_SCORE) {
+				const used = Object.assign(E.defaultWeights(), state.weights);
+				const parts = E.KEY_COST_METRICS.map((id) => [id, (used[id] || 0) * key.cost[id]])
+					.filter(([, part]) => part > 0)
+					.sort((a, b) => b[1] - a[1])
+					.slice(0, HEAT_SCORE_PARTS)
+					.map(([id, part]) => `${t(`layout_analysis.metric.${id}`)} ${format(part, HEAT_DIGITS)}`);
+				if (parts.length > 0) title += ` (${parts.join(' · ')})`;
+			}
+			return title;
+		}
+
 		/**
 		 * The board of the chosen keyboard, each key showing the layout's base
-		 * character and shaded light to dark (one hue) by its share of the
-		 * chosen per-key value (presses or a bad event); the legend gives the
-		 * scale, the tooltip the value and, for SFBs, the worst partners. The
-		 * board shrinks with the page instead of scrolling.
+		 * character. One layout: shaded light to dark (one hue) by its share of
+		 * the largest value of the chosen per-key metric. Against another layout
+		 * (the difference): orange where this layout puts more, blue where less,
+		 * stronger with the size of the gap, each tooltip signed. The legend
+		 * gives the scale; every key is reachable from the keyboard with its
+		 * value as its name. The board shrinks with the page instead of scrolling.
 		 */
 		function renderHeatmap(result) {
 			const box = $('la-heatmap');
 			box.replaceChildren();
+			const detail = detailOf(result);
+			const versus = state.results.find((r) => r.layout.id === state.versus) || null;
+			const field = $('la-heat-diff-field');
+			field.hidden = !versus;
+			if (versus)
+				$('la-heat-diff-label').textContent = t('layout_analysis.heat.diff', {
+					layout: versus.layout.name
+				});
+			$('la-heat-diff').checked = state.heatDiff;
+			const other = versus && state.heatDiff ? versus : null;
 			const board = E.keyboard(result.keyboard, result.profile || undefined);
 			const layout = byId.get(result.layout.id);
 			const modifiers = new Set(Object.values(DATA.model.modifier_keys));
-			const values = board.codes.map((code) => result.keys[code][state.heat]);
-			const max = Math.max(...values, 1e-9);
+			const byCode = heatValues(detail, other);
+			const shown = board.codes.filter((code) => !modifiers.has(code));
+			const extent = Math.max(...shown.map((code) => Math.abs(byCode[code])), 0);
 			const minX = Math.min(...board.x) - 0.5;
 			const maxX = Math.max(...board.x) + 0.5;
 			const maxY = Math.max(...board.y);
@@ -927,49 +1237,174 @@
 			const down = (units) => `${(units / maxY) * 100}%`;
 			box.style.maxWidth = `${width * HEAT_UNIT_PX}px`;
 			box.style.aspectRatio = `${width} / ${maxY}`;
+			box.classList.toggle('la-heatmap-diff', Boolean(other));
 			board.codes.forEach((code, k) => {
 				if (modifiers.has(code)) return;
+				const key = el('span', 'la-key', keyText(layout, code));
 				const row = layout.rows[code];
-				// A dead key shows its bare accent (what it types alone), marked as dead.
-				const dead = row && row[0] && typeof row[0] === 'object' ? row[0].dead : null;
-				const base =
-					dead !== null
-						? KEY_LEGEND.deadKeyText(((layout.dead || {})[dead] || {})[' '] || '') || dead
-						: row && typeof row[0] === 'string'
-							? row[0]
-							: '';
-				const key = el('span', 'la-key', code === 'Space' ? '␣' : base);
-				if (dead !== null) key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
-				const share = values[k] / max;
+				if (row && row[0] && typeof row[0] === 'object')
+					key.classList.add(KEY_LEGEND.DEAD_KEY_CLASS);
+				const value = byCode[code];
+				const share = extent > 0 ? Math.abs(value) / extent : 0;
 				const span = code === 'Space' ? SPACE_UNITS : 1;
 				const left = code === 'Space' ? board.x[k] - SPACE_UNITS / 2 : board.x[k] - 0.5;
 				key.style.left = across(left - minX);
 				key.style.top = down(board.y[k] - 1);
 				key.style.width = across(span);
 				key.style.height = down(1);
-				key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
-				if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
-				const partners = result.keys[code].worst.sfb
-					.map(
-						([[other], pct]) => `${(layout.rows[other] || [''])[0] || other} ${format(pct, 2)} %`
-					)
-					.join(', ');
-				key.title = `${t(`layout_analysis.heat.${state.heat}`)}: ${format(values[k], 2)} %${
-					state.heat === 'sfb' && partners ? ` (${partners})` : ''
-				}`;
+				if (other) {
+					key.classList.add(value > 0 ? 'la-key-more' : value < 0 ? 'la-key-less' : 'la-key-same');
+					key.style.setProperty('--la-share', `${Math.round(share * HEAT_DIFF_MAX_SHARE * 100)}%`);
+				} else {
+					key.style.setProperty('--la-share', `${Math.round(share * 100)}%`);
+					if (share >= HEAT_STRONG_SHARE) key.classList.add('la-key-strong');
+				}
+				const title = heatTitle(detail, layout, code, value, Boolean(other));
+				key.title = title;
+				key.tabIndex = 0;
+				key.setAttribute('role', 'img');
+				key.setAttribute('aria-label', title);
 				box.append(key);
 			});
-			// The scale: what the lightest and the darkest key stand for.
 			const legend = $('la-heat-legend');
+			const unit = heatUnit(state.heat);
+			if (other) {
+				// Both directions in words with a sign, never by colour alone.
+				const swatch = (kind, mark, words) => {
+					const item = el('span', 'la-heat-key');
+					item.append(el('span', `la-swatch la-swatch-${kind}`), `${mark} ${words}`);
+					return item;
+				};
+				legend.replaceChildren(
+					swatch('more', '+', t('layout_analysis.heat.diff_more', { layout: other.layout.name })),
+					swatch('less', '−', t('layout_analysis.heat.diff_less', { layout: other.layout.name })),
+					el('span', 'la-muted', `± ${format(extent, HEAT_DIGITS)} ${unit}`)
+				);
+				return;
+			}
+			// The scale: what the lightest and the darkest key stand for.
 			legend.replaceChildren(
-				el('span', '', `${format(0, 2)} %`),
+				el('span', '', `${format(0, HEAT_DIGITS)} ${unit}`),
 				el('span', 'la-heat-ramp'),
-				el('span', '', `${format(max === 1e-9 ? 0 : max, 2)} %`),
-				el(
-					'span',
-					'la-muted',
-					t('layout_analysis.heat.scale', { metric: t(`layout_analysis.heat.${state.heat}`) })
-				)
+				el('span', '', `${format(extent, HEAT_DIGITS)} ${unit}`),
+				el('span', 'la-muted', t('layout_analysis.heat.scale', { metric: heatName(state.heat) }))
+			);
+		}
+
+		/** The heatmap's choices: the presses, the score, then every per-key metric. */
+		function fillHeatChoices() {
+			const select = $('la-heat-metric');
+			select.replaceChildren(
+				...HEAT_CHOICES.map((id) => {
+					const option = el('option', '', heatName(id));
+					option.value = id;
+					return option;
+				})
+			);
+			select.value = state.heat;
+			const events = $('la-worst-event');
+			const chosen = events.value || E.KEY_EVENTS[0];
+			events.replaceChildren(
+				...E.KEY_EVENTS.map((id) => {
+					const option = el('option', '', t(`layout_analysis.metric.${id}`));
+					option.value = id;
+					return option;
+				})
+			);
+			events.value = chosen;
+		}
+
+		/**
+		 * The heaviest key groups of the chosen bad event over the whole board
+		 * (the engine's topGroups): the keys as typed, how often the corpus has
+		 * them, and their share of the bigrams or trigrams.
+		 */
+		function renderWorst(result) {
+			const detail = detailOf(result);
+			const layout = byId.get(result.layout.id);
+			const event = $('la-worst-event').value || E.KEY_EVENTS[0];
+			const table = $('la-worst');
+			const head = el('tr');
+			for (const label of [
+				t('layout_analysis.worst.keys'),
+				t('layout_analysis.worst.count'),
+				t('layout_analysis.worst.share')
+			]) {
+				const th = el('th', '', label);
+				th.scope = 'col';
+				head.append(th);
+			}
+			const thead = el('thead');
+			thead.append(head);
+			const tbody = el('tbody');
+			const groups = detail.topGroups[event];
+			if (groups.length === 0) {
+				const tr = el('tr');
+				const td = el('td', 'la-muted', t('layout_analysis.worst.none'));
+				td.colSpan = 3;
+				tr.append(td);
+				tbody.append(tr);
+			}
+			for (const group of groups) {
+				const tr = el('tr');
+				tr.append(
+					el('td', 'la-keys', group.keys.map((code) => keyText(layout, code)).join(' ')),
+					el('td', '', format(group.count, 0)),
+					el('td', '', `${format(group.share, HEAT_DIGITS)} %`)
+				);
+				tbody.append(tr);
+			}
+			table.replaceChildren(thead, tbody);
+		}
+
+		/**
+		 * The other figures of the details: bigram and trigram classes, each
+		 * finger's travel, modifiers and dead keys, and the standing among the
+		 * compared layouts, all from the engine's numbers.
+		 */
+		function renderFigures(result) {
+			const metricLabel = (id) => t(`layout_analysis.metric.${id}`);
+			loadBars(
+				$('la-bigram-classes'),
+				BIGRAM_CLASSES.map((id) => ({ label: metricLabel(id), value: result.metrics[id] })),
+				100
+			);
+			const trigramLabel = {
+				roll_mixed: t('layout_analysis.classes.roll_mixed'),
+				same_finger: t('layout_analysis.classes.same_finger')
+			};
+			loadBars(
+				$('la-trigram-classes'),
+				TRIGRAM_CLASSES.map((id) => ({
+					label: trigramLabel[id] || metricLabel(id),
+					value: result.trigramClasses[id]
+				})),
+				100
+			);
+			const travel = Object.entries(result.fingerDistance);
+			loadBars(
+				$('la-travel'),
+				travel.map(([id, mm]) => ({ label: t(`layout_analysis.finger.${id}`), value: mm })),
+				Math.max(...travel.map(([, mm]) => mm), 0),
+				{ unit: t('layout_analysis.unit.mm'), digits: 2 }
+			);
+			loadBars(
+				$('la-layers'),
+				['modifier_usage', 'dead_key_usage'].map((id) => ({
+					label: metricLabel(id),
+					value: result.metrics[id]
+				})),
+				100
+			);
+			const standing = E.standing(state.results, result.layout.id);
+			loadBars(
+				$('la-standing'),
+				Object.entries(standing).map(([id, entry]) => ({
+					label: metricLabel(id),
+					value: entry.others > 0 ? entry.beats / entry.others : 0,
+					text: t('layout_analysis.standing.value', { beats: entry.beats, others: entry.others })
+				})),
+				1
 			);
 		}
 
@@ -1088,6 +1523,8 @@
 			INFO.routeLink(link);
 			fillVersus(result);
 			renderHeatmap(result);
+			renderWorst(result);
+			renderFigures(result);
 			const contributions = Object.entries(result.score.contributions)
 				.filter(([, v]) => v !== 0)
 				.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -1574,7 +2011,36 @@
 			});
 			$('la-heat-metric').addEventListener('change', (event) => {
 				state.heat = event.target.value;
+				save();
 				renderDetails();
+			});
+			$('la-heat-diff').addEventListener('change', (event) => {
+				state.heatDiff = event.target.checked;
+				save();
+				renderDetails();
+			});
+			$('la-worst-event').addEventListener('change', renderDetails);
+			// The table's row filters: an empty or unreadable bound filters nothing.
+			const bound = (input) => {
+				const value = Number(input.value);
+				return input.value === '' || !Number.isFinite(value) ? null : value;
+			};
+			const filtered = () => {
+				state.table.name = $('la-row-name').value;
+				state.table.family = $('la-row-family').value;
+				state.table.min = bound($('la-row-min'));
+				state.table.max = bound($('la-row-max'));
+				save();
+				renderTable();
+			};
+			for (const id of ['la-row-name', 'la-row-min', 'la-row-max'])
+				$(id).addEventListener('input', filtered);
+			$('la-row-family').addEventListener('change', filtered);
+			$('la-table-reset').addEventListener('click', () => {
+				state.table = validTable(null);
+				fillTableOptions();
+				save();
+				renderTable();
 			});
 			$('la-versus').addEventListener('change', (event) => {
 				state.versus = event.target.value || null;
@@ -1628,6 +2094,8 @@
 				fillIdealLoad();
 				fillShortcuts();
 				fillForms();
+				fillTableOptions();
+				fillHeatChoices();
 				render();
 				analyse();
 			});
@@ -1776,6 +2244,8 @@
 			fillIdealLoad();
 			fillShortcuts();
 			fillForms();
+			fillTableOptions();
+			fillHeatChoices();
 			fingeringView = FINGERING.mount($('la-fingering'), { keyboard: () => state.keyboard });
 			window.LAYOUT_ANALYSIS_FILES.onEditorLayouts(useEditorLayouts);
 			FINGERING.onChange(() => analyse());

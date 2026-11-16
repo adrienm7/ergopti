@@ -510,6 +510,119 @@ body:has(> main.layout-analysis) {
 	margin-bottom: 8px;
 }
 
+/* Against another layout: orange where this one puts more, blue where less,
+   mixed into the neutral surface so the midpoint is grey, never a hue. */
+.la-heatmap .la-key-more {
+	background: color-mix(in oklab, var(--la-loss) var(--la-share), var(--la-surface-2));
+}
+
+.la-heatmap .la-key-less {
+	background: color-mix(in oklab, var(--la-gain) var(--la-share), var(--la-surface-2));
+}
+
+.la-heatmap .la-key-same {
+	background: var(--la-surface-2);
+}
+
+.la-heatmap .la-key:focus-visible {
+	outline: 2px solid var(--la-accent);
+	outline-offset: 1px;
+	z-index: 1;
+}
+
+.la-heat-controls {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+}
+
+.la-check {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-heat-key {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+}
+
+.la-swatch-more {
+	background: var(--la-loss);
+}
+
+.la-swatch-less {
+	background: var(--la-gain);
+}
+
+/* The details' other figures fold, so the phone page stays short. */
+.la-section {
+	border-top: 1px solid var(--la-border);
+	margin-top: 8px;
+	padding: 4px 0;
+}
+
+.la-section > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 6px 0;
+}
+
+.la-section h4 {
+	font-size: 1em;
+	margin: 10px 0 4px;
+}
+
+.la-keys {
+	font-weight: 600;
+	white-space: pre;
+}
+
+/* The ranking table's column choices and row filters. */
+.la-table-options {
+	margin: 8px 0;
+}
+
+.la-table-options > summary {
+	cursor: pointer;
+	font-weight: 600;
+	padding: 4px 0;
+}
+
+.la-columns {
+	border: 1px solid var(--la-border);
+	border-radius: 6px;
+	margin: 6px 0;
+	padding: 6px 10px;
+}
+
+.la-column-list {
+	display: grid;
+	gap: 4px 12px;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+}
+
+.la-table-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 16px;
+	margin: 6px 0;
+}
+
+.la-filter-field {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.la-filter-field input,
+.la-filter-field select {
+	max-width: 100%;
+}
+
 .la-heat-ramp {
 	background: linear-gradient(to right, var(--la-heat-low), var(--la-heat-high));
 	border: 1px solid var(--la-border);

@@ -815,9 +815,43 @@ async function exerciseStudioComparer(page) {
 	await page.selectOption('#la-heat-metric', 'sfb');
 	assert.ok(
 		await page.$$eval('#la-heatmap .la-key', (keys) =>
-			keys.some((key) => /: [\d.,]+ % \(.+ [\d.,]+ %/.test(key.title))
+			keys.some((key) => /: [\d.,]+ % — .+ [\d.,]+ %/.test(key.title))
 		),
 		'the Comparer heatmap names SFB partners'
+	);
+	// (comparer-heat-metrics) Every per-key metric of the engine, the presses and
+	// the score; a bad event names its worst groups (the layout analysed with
+	// keyGroups), and every key is reachable from the keyboard with its value.
+	const heatChoices = await page.$$eval('#la-heat-metric option', (options) =>
+		options.map((option) => option.value)
+	);
+	for (const id of ['presses', 'score', 'redirect_bad', 'distance', 'roll_in', 'alternation'])
+		assert.ok(heatChoices.includes(id), `the heatmap offers ${id}`);
+	await page.selectOption('#la-heat-metric', 'redirect_bad');
+	assert.ok(
+		await page.$$eval('#la-heatmap .la-key', (keys) =>
+			keys.some((key) => / — .+ [\d.,]+ %/.test(key.title))
+		),
+		'the Comparer heatmap names the worst bad redirects'
+	);
+	assert.ok(
+		await page.$$eval('#la-heatmap .la-key', (keys) =>
+			keys.every((key) => key.tabIndex === 0 && key.getAttribute('aria-label') === key.title)
+		),
+		'every heatmap key is named and focusable'
+	);
+	// (comparer-worst-groups) The board's worst pairs, with their counts and shares.
+	await page.click('#la-details .la-section > summary');
+	await page.selectOption('#la-worst-event', 'sfb');
+	assert.ok(
+		(await page.locator('#la-worst tbody tr').count()) > 1,
+		'the worst SFB pairs are listed'
+	);
+	assert.match(await page.textContent('#la-worst tbody tr td:nth-child(3)'), /^[\d.,]+ %$/);
+	assert.equal(await page.locator('#la-travel .la-chart-row').count(), 10, 'every finger travels');
+	assert.ok(
+		(await page.locator('#la-standing .la-chart-row').count()) > 10,
+		'a standing per metric'
 	);
 	// (comparer-diff) « Compare with » puts a second layout's value and the
 	// difference beside each metric, its verdict in words; the finger chart
@@ -837,6 +871,57 @@ async function exerciseStudioComparer(page) {
 		'every metric has its verdict'
 	);
 	assert.equal(await page.locator('#la-fingers .la-target').count(), 8, 'eight ideal marks');
+	// (comparer-heat-diff) Against the other layout, the heatmap shows the key-by-key
+	// difference, both directions in words, each key's value signed.
+	await page.check('#la-heat-diff');
+	assert.ok(
+		(await page.locator('#la-heatmap .la-key-more, #la-heatmap .la-key-less').count()) > 0,
+		'keys differ between the two layouts'
+	);
+	assert.equal(await page.locator('#la-heat-legend .la-heat-key').count(), 2, 'more and less');
+	assert.ok(
+		await page.$$eval('#la-heatmap .la-key-more', (keys) =>
+			keys.every((key) => / \+[\d.,]+ /.test(key.title))
+		),
+		'a key with more is signed +'
+	);
+	await page.uncheck('#la-heat-diff');
+	// (comparer-table-options) The ranking table's columns and rows are the
+	// viewer's: a metric added, a name filter, both kept for the next visit.
+	await page.click('#la-table-options > summary');
+	const columnsBefore = await page.locator('#la-table thead th').count();
+	await page.check('#la-column-list input[value="pinky_load"]');
+	assert.equal(
+		await page.locator('#la-table thead th').count(),
+		columnsBefore + 1,
+		'a column added'
+	);
+	const rowsBefore = await page.locator('#la-table tbody tr').count();
+	await page.fill('#la-row-name', 'ergopti');
+	const rowsAfter = await page.locator('#la-table tbody tr').count();
+	assert.ok(
+		rowsAfter > 0 && rowsAfter < rowsBefore,
+		`the name filter keeps ${rowsAfter} of ${rowsBefore}`
+	);
+	assert.match(
+		await page.textContent('#la-table-count'),
+		new RegExp(`^${rowsAfter}\\D+${rowsBefore}\\D`)
+	);
+	await page.fill('#la-row-min', '1000000');
+	assert.equal(await page.locator('#la-table tbody tr').count(), 0, 'no layout scores that much');
+	const keptTable = await page.evaluate(
+		() => JSON.parse(window.localStorage.getItem('ergopti.layout_analysis.v1')).table
+	);
+	assert.equal(keptTable.name, 'ergopti');
+	assert.equal(keptTable.min, 1000000);
+	assert.ok(keptTable.columns.includes('pinky_load'), 'the chosen columns are kept');
+	await page.click('#la-table-reset');
+	assert.equal(await page.locator('#la-table tbody tr').count(), rowsBefore, 'every row is back');
+	assert.equal(
+		await page.locator('#la-table thead th').count(),
+		columnsBefore,
+		'the default columns'
+	);
 	// (comparer-share) « Copy the link » names the compared layouts and the
 	// details; opening it shows them.
 	await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
