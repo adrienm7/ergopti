@@ -378,6 +378,7 @@ class OllamaManagedBootstrap {
 			"port", Integer(Match[1]), "deadline_ms", LLM_DEPS_POLL_TIMEOUT_MS,
 			"download", Map("ManagedRoot", Root, "CataloguePath", Catalogue,
 				"CatalogueSha256", this.Sources[Catalogue], "AssetId", Asset,
+				"ReleaseHost", Identifiers.Hosts.GITHUB,
 				"ManagedHelperPath", Helper, "ManagedHelperSha256", this.Sources[Helper],
 				"AcquisitionHelperPath", Acquisition, "AcquisitionHelperSha256", this.Sources[Acquisition],
 				"VendorDirectory", Vendor, "VendorSha256", CryptoSha256(Inventory),

@@ -322,7 +322,7 @@ try {
 				'-ManagedSource',
 				path.join(ollamaModuleRoot, 'ollama_managed_files.ps1')
 			],
-			6,
+			8,
 			[
 				'Archive entry retains exact final closure debt.',
 				'Archive entry original deadline expired after exact closure.'

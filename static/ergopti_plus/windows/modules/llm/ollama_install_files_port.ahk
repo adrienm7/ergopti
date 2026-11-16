@@ -126,7 +126,7 @@ class OllamaInstallFilesPort {
 		}
 		if !this._Local(this.Options.Get("download_helper", ""))
 			throw ValueError("Download requires its explicit captured helper.")
-		Names := ["ManagedRoot", "CataloguePath", "CatalogueSha256", "AssetId", "TicketId",
+		Names := ["ManagedRoot", "CataloguePath", "CatalogueSha256", "AssetId", "ReleaseHost", "TicketId",
 			"ManagedHelperPath", "ManagedHelperSha256", "AcquisitionHelperPath", "AcquisitionHelperSha256",
 			"VendorDirectory", "VendorSha256", "ProxyPolicyPath", "ProxyPolicySha256",
 			"UpdaterDefaultsPath", "UpdaterDefaultsSha256", "ConnectTimeoutMs", "DeadlineMs", "StartedTick"]
@@ -159,6 +159,10 @@ class OllamaInstallFilesPort {
 				} else if Name == "AssetId" {
 					if Value != "windows-amd64" && Value != "windows-arm64"
 						throw ValueError("Download requires a canonical Windows asset.")
+				} else if Name == "ReleaseHost" {
+					; The shared identifiers' host (Identifiers.Hosts.GITHUB), never a URL
+					if !RegExMatch(Value, "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\z")
+						throw ValueError("Download requires the shared release host.")
 				} else if !this._Local(Value)
 					throw ValueError("Download source paths must be explicit and absolute.", -1, Name)
 			}

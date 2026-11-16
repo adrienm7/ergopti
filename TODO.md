@@ -1516,7 +1516,8 @@ between workers) green alone. All live checks pass, typed by the harness.
 - **Parity.** PAR-58 families not yet consumed: `terminator_restoration`, `context_buffer`, `request_plan_*`, the
   keystats families, `row_options`, `menus/*`. PAR-74: 549 literals left, the rest of the menu files need
   `test-menu-manifest` to stop pinning their spelling. PAR-79: the 28 literals left are inventory pollers and sleeps
-  before the registry loads. PAR-83: the host in `ollama_managed_files.ps1`. Moving `tests/run_*.ahk` to
+  before the registry loads. PAR-83 done 2026-11-16: the Ollama archive URL's host comes from
+  `Identifiers.Hosts.GITHUB` through the download plan (`-ReleaseHost`), no Windows copy left in the baseline. Moving `tests/run_*.ahk` to
   `tests/runners/` is not worth it (455 `A_ScriptDir` uses, 1,908 includes).
 - **Tests.** Source assertions left to convert to behaviour; `--reverse` on the `llm` group has 3 order-dependent reds.
   PC run 2026-11-11: `--reverse` on the `llm` group passes 2295/2295 after the order fixes. Count of `_Driver*` source

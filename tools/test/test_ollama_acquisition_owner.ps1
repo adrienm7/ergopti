@@ -17,6 +17,13 @@ $managedAst=[Management.Automation.Language.Parser]::ParseInput($managedText,[re
 if($errors.Count){throw 'Actual managed owner header must parse.'}
 $firstFunction=@($managedAst.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst]},$false))[0]
 $script:managedHeader=[scriptblock]::Create($managedText.Substring(0,$firstFunction.Extent.StartOffset))
+# The real URL builder of the managed owner, fed the shared identifiers' host (PAR-83)
+$urlBuilder=@($managedAst.FindAll({param($n)$n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -ceq 'Get-OllamaReleaseUrl'},$false))
+if($urlBuilder.Count -ne 1){throw 'Actual managed owner must build the release URL.'}
+. ([scriptblock]::Create($urlBuilder[0].Extent.Text))
+$identifiersPath=[IO.Path]::Combine($PSScriptRoot,'..','..','static','ergopti_plus','_shared','core','text','data','identifiers.json')
+$sharedHost=([IO.File]::ReadAllText($identifiersPath,[Text.Encoding]::UTF8)|ConvertFrom-Json).hosts.github
+if(-not $sharedHost){throw 'identifiers.json must name hosts.github.'}
 function Require($Value,$Message){if(-not $Value){throw $Message}}
 function Read-OllamaCapturedSource($Path,$Hash) {
 	$script:reads++
@@ -28,24 +35,26 @@ function Open-OllamaCapturedVendor($Path,$Hash) {
 	return [ordered]@{'ergopti_updater_download.ps1'=@{stream=[IO.MemoryStream]::new();path='C:\owned\vendor\ergopti_updater_download.ps1'};'ergopti_network_routes.ps1'=@{stream=[IO.MemoryStream]::new();path='C:\owned\vendor\ergopti_network_routes.ps1'}}
 }
 function Open-OllamaManagedRoot($Path,$Create){$script:rootCalls++;Require ($Create -and $Path -ceq 'C:\owned\root') 'Original root survives actual dot-sourced CLI defaults.';return @{path=$Path;identity='11111111:0000000000000001'}}
-function Open-OllamaReleaseSource($Path,$Hash,$Asset){$script:releaseCalls++;Require ($Path -ceq 'C:\owned\release.json' -and $Hash -ceq ('a'*64) -and $Asset -ceq 'windows-amd64') 'Original release admission survives real helper parameters.';return @{stream=[IO.MemoryStream]::new()}}
+function Open-OllamaReleaseSource($Path,$Hash,$Asset){$script:releaseCalls++;Require ($Path -ceq 'C:\owned\release.json' -and $Hash -ceq ('a'*64) -and $Asset -ceq 'windows-amd64') 'Original release admission survives real helper parameters.';return @{stream=[IO.MemoryStream]::new();version='0.24.0';pin=@{filename='ollama-windows-amd64.zip'}}}
 function Invoke-OllamaManagedArchiveDownload($Root,$Release,$Ticket,$Connect,$Deadline,$Start,$Policy,$Defaults) {
 	$script:downloadCalls++
+	Require ($Release.url -ceq ('https://'+$sharedHost+'/ollama/ollama/releases/download/v0.24.0/ollama-windows-amd64.zip')) 'The download URL is built from the shared identifiers host.'
 	Require ($Start -eq 987654321 -and $Deadline -eq 30000 -and $Connect -eq 2000) 'Captured original clock must reach the existing acquisition owner unchanged.'
 	if($script:mode -eq 'download-refused'){$ex=[InvalidOperationException]::new('transport-refused');$ex.Data['ollama_creation_receipt']=@{creation_wal_identity='11111111:0000000000000008';creation_wal_sha256=('4'*64)};throw $ex}
 	return @{ok=$true;phase='downloaded';ticket=$Ticket;creation_wal_identity='11111111:0000000000000008';creation_wal_sha256=('4'*64)}
 }
 function Close-OllamaManagedRoot($Root){$script:closeCalls++;if($script:mode -eq 'root-close-refused'){throw 'root-close-refused'}}
 function Get-ErgoptiUpdaterRemainingMilliseconds($Start,$Budget) {Require ($Start -eq 987654321 -and $Budget -eq 30000) 'Final fence retains exact original clock.';if($script:mode -eq 'late-final-close'){Require ($script:closeCalls -eq 1) 'Late expiry is observed after exact root closure.';throw [TimeoutException]::new('recorded_deadline_expired')};return 1}
-$Action='download';$ManagedRoot='C:\owned\root';$CataloguePath='C:\owned\release.json';$CatalogueSha256='a'*64;$AssetId='windows-amd64';$TicketId='b'*32
+$Action='download';$ManagedRoot='C:\owned\root';$CataloguePath='C:\owned\release.json';$CatalogueSha256='a'*64;$AssetId='windows-amd64';$ReleaseHost=$sharedHost;$TicketId='b'*32
 $ManagedHelperPath='C:\owned\files.ps1';$ManagedHelperSha256='c'*64;$AcquisitionHelperPath='C:\owned\acquisition.ps1';$AcquisitionHelperSha256='d'*64
 $VendorDirectory='C:\owned\vendor';$VendorSha256='e'*64;$ProxyPolicyPath='C:\owned\policy.json';$ProxyPolicySha256='f'*64;$UpdaterDefaultsPath='C:\owned\defaults.json';$UpdaterDefaultsSha256='1'*64
 $ConnectTimeoutMs=2000;$DeadlineMs=30000;$StartedTick=[int64]987654321
 $passed=0;$failed=0
-foreach($script:mode in @('success','source-refused','download-refused','root-close-refused','invalid-clock','late-final-close')) {
+foreach($script:mode in @('success','source-refused','download-refused','root-close-refused','invalid-clock','late-final-close','missing-host','url-as-host')) {
 	try {
 		$script:reads=0;$script:loads=0;$script:rootCalls=0;$script:releaseCalls=0;$script:downloadCalls=0;$script:closeCalls=0
 		$StartedTick=if($script:mode -eq 'invalid-clock'){[int64]0}else{[int64]987654321}
+		$ReleaseHost=switch($script:mode){'missing-host'{''}'url-as-host'{'https://'+$sharedHost}default{$sharedHost}}
 		$r=Invoke-OllamaArchiveEntry
 		Require ($r -is [hashtable]) 'Entry returns exactly one typed completion, not accidental pipeline values.'
 		if($script:mode -eq 'success') {
@@ -55,6 +64,7 @@ foreach($script:mode in @('success','source-refused','download-refused','root-cl
 			Require ($r.exit_code -eq 1 -and $r.receipt.ok -eq $false -and $r.receipt.cleanup_pending -eq $true) 'Every refusal stays failed with explicit debt.'
 			Require (-not $r.receipt.Contains('executable')) 'Refusal cannot admit an executable.'
 			if($script:mode -eq 'invalid-clock'){Require ($script:reads -eq 0 -and $script:rootCalls -eq 0) 'Unadmitted clock refuses before any acquisition.'}
+			if($script:mode -eq 'missing-host' -or $script:mode -eq 'url-as-host'){Require ($script:releaseCalls -eq 1 -and $script:downloadCalls -eq 0 -and $script:closeCalls -eq 1) 'A missing or foreign release host refuses before any transport and closes the root.'}
 			if($script:mode -eq 'source-refused'){Require ($script:rootCalls -eq 0 -and $script:downloadCalls -eq 0) 'Source refusal cannot construct native files or transport.'}
 			if($script:mode -eq 'download-refused' -or $script:mode -eq 'root-close-refused' -or $script:mode -eq 'late-final-close'){
 				Require ($r.receipt.Contains('creation_receipt') -and $null -ne $r.receipt.creation_receipt) 'Exact known WAL evidence must survive refusal.'

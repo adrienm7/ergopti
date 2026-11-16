@@ -7,6 +7,7 @@ param(
 	[Parameter(Mandatory = $true)][string]$CataloguePath,
 	[Parameter(Mandatory = $true)][string]$CatalogueSha256,
 	[Parameter(Mandatory = $true)][string]$AssetId,
+	[Parameter(Mandatory = $true)][string]$ReleaseHost,
 	[Parameter(Mandatory = $true)][string]$TicketId,
 	[Parameter(Mandatory = $true)][string]$ManagedHelperPath,
 	[Parameter(Mandatory = $true)][string]$ManagedHelperSha256,
@@ -86,7 +87,7 @@ function Invoke-OllamaArchiveEntry {
 	# Dot-sourcing the managed file owner binds its CLI defaults in this scope.
 	# Preserve the admitted acquisition values before loading that exact header.
 	$entryRequest = @{ root = $ManagedRoot; catalogue = $CataloguePath; catalogue_sha256 = $CatalogueSha256;
-		asset = $AssetId; ticket = $TicketId; connect_ms = $ConnectTimeoutMs;
+		asset = $AssetId; release_host = $ReleaseHost; ticket = $TicketId; connect_ms = $ConnectTimeoutMs;
 		deadline_ms = $DeadlineMs; started_tick = $StartedTick;
 		policy = $ProxyPolicyPath; defaults = $UpdaterDefaultsPath }
 	try {
@@ -108,6 +109,7 @@ function Invoke-OllamaArchiveEntry {
 		. (Get-OllamaCapturedSourceBlock $vendor['ergopti_network_routes.ps1'])
 		$root = Open-OllamaManagedRoot $entryRequest.root $true
 		$release = Open-OllamaReleaseSource $entryRequest.catalogue $entryRequest.catalogue_sha256 $entryRequest.asset
+		$release.url = Get-OllamaReleaseUrl $release $entryRequest.release_host
 		$result = Invoke-OllamaManagedArchiveDownload $root $release $entryRequest.ticket $entryRequest.connect_ms $entryRequest.deadline_ms $entryRequest.started_tick $entryRequest.policy $entryRequest.defaults
 		# Preserve exact WAL evidence if the final source/root closure refuses.
 		$retainedReceipt = $result

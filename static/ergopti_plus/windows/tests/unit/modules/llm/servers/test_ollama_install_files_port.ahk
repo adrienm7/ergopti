@@ -332,7 +332,7 @@ class _OIFP_DownloadFixture extends _OIFP_Fixture {
 	Request() {
 		return Map("ManagedRoot", "C:\owned\root", "CataloguePath", "C:\owned\release.json",
 			"CatalogueSha256", StrReplace(Format("{:064}", 0), "0", "a"), "AssetId", "windows-amd64",
-			"TicketId", StrReplace(Format("{:032}", 0), "0", "b"),
+			"ReleaseHost", Identifiers.Hosts.GITHUB, "TicketId", StrReplace(Format("{:032}", 0), "0", "b"),
 			"ManagedHelperPath", "C:\owned\files.ps1", "ManagedHelperSha256", StrReplace(Format("{:064}", 0), "0", "c"),
 			"AcquisitionHelperPath", "C:\owned\acquire.ps1", "AcquisitionHelperSha256", StrReplace(Format("{:064}", 0), "0", "d"),
 			"VendorDirectory", "C:\owned\vendor", "VendorSha256", StrReplace(Format("{:064}", 0), "0", "e"),
@@ -375,7 +375,9 @@ _OIFP_DownloadRefusal() {
 	}
 	for Pair in [["Foreign", "C:\owned\unexpected"], ["StartedTick", 0], ["StartedTick", "987654321"],
 		["DeadlineMs", -1], ["ConnectTimeoutMs", 2147483648], ["AssetId", "linux-amd64"],
-		["TicketId", "b`n"], ["VendorSha256", "bad"], ["CataloguePath", "relative.json"]] {
+		["TicketId", "b`n"], ["VendorSha256", "bad"], ["CataloguePath", "relative.json"],
+		["ReleaseHost", ""], ["ReleaseHost", "https://" . Identifiers.Hosts.GITHUB],
+		["ReleaseHost", Identifiers.Hosts.GITHUB . "/ollama"], ["ReleaseHost", "localhost"]] {
 		F := _OIFP_DownloadFixture()
 		Request := F.Request()
 		Request[Pair[1]] := Pair[2]

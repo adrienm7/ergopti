@@ -1330,6 +1330,19 @@ _G4CX_CaseWithTimingsReady(Mode) {
 				&& HasMethod(Returned.Runtime.Options["on_retired"], "Call")
 				&& Returned.Runtime.Options["on_retired"] != OllamaManagedBootstrap._UnstartedObserver,
 				"Normal constructor success must replace every provisional physical observer before returning")
+			; PAR-83: the archive helper builds its download URL from the shared
+			; identifiers' host, which only this captured plan hands it.
+			Download := Returned.Plan["download"].Clone()
+			AssertEqual(Identifiers.Hosts.GITHUB, Download["ReleaseHost"],
+				"The download plan carries the shared identifiers' release host")
+			Download["TicketId"] := StrReplace(Format("{:032}", 0), "0", "b")
+			Download["StartedTick"] := 1
+			Argv := Returned.Files._Arguments("download", Download)
+			Forwarded := ""
+			Loop Argv.Length - 1
+				if Argv[A_Index] == "-ReleaseHost"
+					Forwarded := Argv[A_Index + 1]
+			AssertEqual(Identifiers.Hosts.GITHUB, Forwarded, "The real file port forwards the shared release host")
 			AssertTrue(Returned.Cancel(), "No native task was started; the actual owner must acknowledge ordinary retirement")
 			Returned := 0
 			AssertEqual(1, ControlCounter.Deleted, "The ordinary full constructor remains destructible after real cancellation")

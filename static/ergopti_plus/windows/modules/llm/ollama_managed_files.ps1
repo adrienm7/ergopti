@@ -496,9 +496,18 @@ function Open-OllamaReleaseSource([string]$Catalogue, [string]$ExpectedCatalogue
 		}
 		if ($pin.filename -ne ('ollama-' + $Asset + '.zip')) { throw 'The selected archive basename disagrees with its canonical asset identity.' }
 		return @{ stream = $catalogueStream; version = $data.version; pin = $pin; asset = $Asset;
-			catalogue_sha256 = $ExpectedCatalogueHash;
-			url = ('https://github.com/ollama/ollama/releases/download/v' + $data.version + '/' + $pin.filename) }
+			catalogue_sha256 = $ExpectedCatalogueHash }
 	} catch { $catalogueStream.Dispose(); throw }
+}
+
+# The download URL of an admitted release source. The host is the caller's
+# copy of the shared identifiers (identifiers.json hosts.github, passed by the
+# AutoHotkey owner from Identifiers.Hosts.GITHUB): this helper declares none.
+function Get-OllamaReleaseUrl($Source, [string]$ReleaseHost) {
+	if ($ReleaseHost -cnotmatch '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\z') {
+		throw 'The release download requires the shared release host.'
+	}
+	return 'https://' + $ReleaseHost + '/ollama/ollama/releases/download/v' + $Source.version + '/' + $Source.pin.filename
 }
 
 function Read-OllamaPinnedArchive([string]$Catalogue, [string]$ExpectedCatalogueHash, [string]$Asset,
