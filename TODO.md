@@ -2062,3 +2062,16 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
   2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
      written to `vendor/keyboard_layout`.
   3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
+- [ ] **Linux: a touchpad unplugged while gestures are on (asked 2026-11-16, deep audit linux-gestures « Device
+      loss / hotplug »).** A failed touchpad read stops the reader and logs « re-enable gestures to retry »
+      (`modules/gestures/manager.lua` `pump`); plugging the pad back starts nothing. Read in the source on 2026-11-16:
+      the master stays on with no reader, and `capture_scope_state` refuses that state, so every gesture setting
+      (the switch, bindings, the restore and clear of the section) is refused until the daemon restarts. macOS and
+      Windows receive gestures from the OS, which keeps them across a reconnect. Kept meanwhile: today's stop.
+  1. **(recommended) Look for the pad again:** while the master is on and its pad is lost, the pump runs the
+     finder every few seconds (a new `[gestures]` registry delay, one INFO line at loss and one at return, none per
+     attempt) and reopens it; « on, waiting for its touchpad » becomes a state the gesture scope admits, so settings
+     stay editable meanwhile. A pad first plugged after a start that found none is not watched.
+  2. Turn the master off at loss (the config keeps `enabled = true`, the next start reads the pad again) and
+     notify the user once; settings stay editable.
+  3. Keep today's stop and only make the settings editable while no reader runs.
