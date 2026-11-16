@@ -172,10 +172,18 @@ ConfigRegistryCacheCodeIdentity() {
 	if A_IsCompiled
 		return CryptoSha256Bytes(FSReadBytesStrict(A_ScriptFullPath))
 	SplitPath(A_LineFile, , &Directory)
-	Files := [Directory . "\..\migration\migrate.ahk", Directory . "\manifest_reader.ahk",
-		Directory . "\..\..\..\_generated\config_migration_ops.ahk", A_LineFile]
-	loop files Directory . "\toml\*.ahk", "F"
+	Root := Directory . "\..\..\.."
+	Files := [Root . "\settings\engine\migration\migrate.ahk", Root . "\menu\engine\manifest_reader.ahk",
+		Root . "\_generated\config_migration_ops.ahk", A_LineFile]
+	; An empty parser folder would fence nothing: the cache would survive a
+	; parser change. Refuse it, as a missing file above already is.
+	ParserFiles := 0
+	loop files Root . "\core\text\engine\toml\*.ahk", "F" {
 		Files.Push(A_LoopFileFullPath)
+		ParserFiles += 1
+	}
+	if !ParserFiles
+		throw Error("Registry parser identity found no TOML parser source")
 	Identity := "typed-registry-cache-v1`n" . A_AhkVersion . "`n"
 	for Path in Files {
 		Bytes := FSReadBytesStrict(Path)

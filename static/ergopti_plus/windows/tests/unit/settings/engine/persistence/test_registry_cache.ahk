@@ -341,3 +341,15 @@ _CRC_PendingOwnsDeepValues(Mode) {
 for _CRC_DeepMode in ["typed-booleans", "ops-array"]
 	Test("Registry cache pending source: " . _CRC_DeepMode . " stays independent of mutable runtime values (registry-pending-deep-ownership)",
 		_CRC_PendingOwnsDeepValues.Bind(_CRC_DeepMode))
+
+; The production identity hashes the real parser, migration and manifest owners.
+; Their paths broke when the settings engine and the TOML parser left infra/: the
+; identity threw on every load, so each boot warned and reparsed (registry-cache-
+; code-identity).
+_CRC_ProductionCodeIdentity() {
+	Code := ConfigRegistryCacheCodeIdentity()
+	AssertTrue(RegExMatch(Code, "^[0-9a-f]{64}$") > 0, "the driver's own parser identity hashes: " . Code)
+	AssertEqual(Code, ConfigRegistryCacheCodeIdentity(), "the identity is stable between loads")
+}
+Test("registry cache: the production parser identity reads every owner it fences (registry-cache-code-identity)",
+	_CRC_ProductionCodeIdentity)
