@@ -139,7 +139,7 @@ global Features := Map(
     ; modules/hotstrings.ahk + modules/keymap/layout.ahk read these gates
     ; for hotstring registration and AltGr rolls. Each entry is a Map with
     ; at least an "enabled" key; the production loader pulls extra props
-    ; (time_activation_seconds, pattern_max_length) from the manifest, but
+    ; (time_activation_seconds) from the manifest, but
     ; tests don't exercise those — the "enabled" key alone is enough to
     ; satisfy the migrated `if Features["hotstrings"][...][...]["enabled"]`
     ; gates without crashing.
@@ -216,7 +216,7 @@ global Features := Map(
             "iban_prefixes",                     Map("enabled", true),
             "phone_prefixes",                    Map("enabled", true),
             "ssn_prefixes",                      Map("enabled", true),
-            "text_expansion_personal_information", Map("enabled", true, "pattern_max_length", 1),
+            "text_expansion_personal_information", Map("enabled", true),
         ),
         ; Personal sub-Map — in production this is populated from the user's
         ; personal_hotstrings.toml [_meta.sections] block (via BootstrapPersonalFeatures

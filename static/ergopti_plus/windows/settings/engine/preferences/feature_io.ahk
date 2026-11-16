@@ -299,7 +299,7 @@ ReadFeatureStateV2(V2Path) {
 		return State
 	if Loc["is_alpha"] {
 		for _, P in ["enabled", "letter", "link", "search_engine", "search_engine_url_query"
-			, "dated_notes", "destination_folder", ConfigLeaf.PATTERN_MAX_LENGTH] {
+			, "dated_notes", "destination_folder"] {
 			if Node.Has(P)
 				State[P] := (P == "enabled" or P == "dated_notes") ? (Node[P] = true) : Node[P]
 		}

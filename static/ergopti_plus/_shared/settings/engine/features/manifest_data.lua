@@ -318,7 +318,7 @@ M.features = {
 		path = "hotstrings.dynamic.user_code", id = "user_code", section = "hotstrings.dynamic", default = { enabled = false, time_activation_seconds = 0.5 }, type = "feature", description_key = "menu.hotstrings.user_code.title", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, time_activation_seconds = 0.5 }, family = "feature",
 	},
 	{
-		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false, pattern_max_length = 1 }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false, pattern_max_length = 1 }, family = "feature",
+		path = "hotstrings.dynamic.text_expansion_personal_information", id = "text_expansion_personal_information", section = "hotstrings.dynamic", default = { enabled = false }, type = "feature", description_key = "menu.hotstrings.dynamic.text_expansion_personal_information", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = false }, family = "feature",
 	},
 	{
 		path = "hotstrings.personal.autocorrection", id = "autocorrection", section = "hotstrings.personal", default = { enabled = false, time_activation_seconds = 0.75 }, type = "feature", description_key = "menu.hotstrings.personal.autocorrection", platforms = { "ahk", "hs", "linux" }, recommended = { enabled = true, time_activation_seconds = 0.75 }, family = "feature",

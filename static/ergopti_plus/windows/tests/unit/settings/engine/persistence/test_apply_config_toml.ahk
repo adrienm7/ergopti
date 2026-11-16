@@ -218,33 +218,19 @@ TestFMv2_RejectsFeatureValuesOutsideSchemaDomain() {
 	try {
 		Path := _FM_WriteFixture("feature_domain",
 			"[hotstrings.french_autocorrection.accents]`r`n"
-			. "time_activation_seconds = -0.5`r`n"
-			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
-			. "pattern_max_length = 17`r`n")
+			. "time_activation_seconds = -0.5`r`n")
 		Applied := ApplyConfigToml(Features, Path)
 		AssertEqual(0, Applied,
 			"out-of-domain feature values must never replace manifest defaults")
 		AssertEqual(0.5,
 			Features["hotstrings"]["french_autocorrection"]["accents"]
 				["time_activation_seconds"])
-		AssertEqual(1,
-			Features["hotstrings"]["dynamic"]
-				["text_expansion_personal_information"]["pattern_max_length"])
-
-		FileDelete(Path)
-		Path := _FM_WriteFixture("feature_domain_fraction",
-			"[hotstrings.dynamic.text_expansion_personal_information]`r`n"
-			. "pattern_max_length = 1.5`r`n")
-		AssertEqual(0, ApplyConfigToml(Features, Path),
-			"pattern_max_length must reject non-integer numbers")
 
 		FileDelete(Path)
 		Path := _FM_WriteFixture("feature_domain_boundaries",
 			"[hotstrings.french_autocorrection.accents]`r`n"
-			. "time_activation_seconds = 0`r`n"
-			. "[hotstrings.dynamic.text_expansion_personal_information]`r`n"
-			. "pattern_max_length = 16`r`n")
-		AssertEqual(2, ApplyConfigToml(Features, Path),
+			. "time_activation_seconds = 0`r`n")
+		AssertEqual(1, ApplyConfigToml(Features, Path),
 			"schema boundary values must remain valid")
 	} finally {
 		if IsSet(Path) && FileExist(Path)
@@ -407,6 +393,39 @@ TestFMv2_ApplyUnknownStaticLeafIsRejected() {
 }
 Test("ApplyConfigToml: unused static leaf keys are offered for cleanup",
 	TestFMv2_ApplyUnknownStaticLeafIsRejected)
+
+; The personal-info pattern_max_length setting was retired on 2026-11-16: boot
+; registered 13^n combos up to it (13.5 s at 4, never ending at 16), and the
+; length is now fixed at 1. A config written before keeps loading: the key is
+; reported once and offered for cleanup, never applied, never an ERROR, and the
+; sibling enabled switch of the same table still applies.
+TestFMv2_RetiredPatternMaxLengthIsOfferedForCleanup() {
+	OldFeatures := _FM_BeginIsolated()
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _FM_WriteFixture("retired_pattern_max_length",
+			"[hotstrings.dynamic.text_expansion_personal_information]`r`n"
+			. "enabled = true`r`n"
+			. "pattern_max_length = 16`r`n")
+		Applied := ApplyConfigToml(Features, Path)
+		AssertEqual(1, Applied,
+			"only the enabled switch applies; the retired length is not a setting any more")
+		Entry := Features["hotstrings"]["dynamic"]["text_expansion_personal_information"]
+		AssertTrue(Entry["enabled"] = true, "the sibling switch of the retired key still applies")
+		AssertFalse(Entry.Has("pattern_max_length"),
+			"the retired length must never reach the Features map the registration reads")
+		_FM_AssertUnusedWarning(Captured, Path,
+			["hotstrings.dynamic.text_expansion_personal_information.pattern_max_length"])
+	} finally {
+		LoggerClearTestSink()
+		if IsSet(Path) && FileExist(Path)
+			FileDelete(Path)
+		_FM_EndIsolated(OldFeatures)
+	}
+}
+Test("ApplyConfigToml: a retired pattern_max_length = 16 is reported and offered for cleanup",
+	TestFMv2_RetiredPatternMaxLengthIsOfferedForCleanup)
 
 TestFMv2_ForeignOwnedKeysAreExactAndQuiet() {
 	OldFeatures := _FM_BeginIsolated()

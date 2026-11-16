@@ -55,7 +55,6 @@ time_activation_seconds = 0.5
 
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = false
-pattern_max_length = 1
 
 
 

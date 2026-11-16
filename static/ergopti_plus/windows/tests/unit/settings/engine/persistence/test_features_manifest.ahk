@@ -283,9 +283,10 @@ TestFMv2_HotstringsDynamicGroup() {
 	AssertTrue(Built["hotstrings"].Has("dynamic"))
 	AssertTrue(Built["hotstrings"]["dynamic"].Has("text_expansion_personal_information"))
 	Entry := Built["hotstrings"]["dynamic"]["text_expansion_personal_information"]
-	AssertEqual(1, Entry["pattern_max_length"])
+	AssertFalse(Entry.Has("pattern_max_length"),
+		"pattern_max_length was retired on 2026-11-16: the combo length is fixed at 1")
 }
-Test("ManifestBuildFeaturesMap: hotstrings.dynamic carries pattern_max_length",
+Test("ManifestBuildFeaturesMap: hotstrings.dynamic no longer carries pattern_max_length",
 	TestFMv2_HotstringsDynamicGroup)
 
 TestFMv2_LlmStructureSplit() {

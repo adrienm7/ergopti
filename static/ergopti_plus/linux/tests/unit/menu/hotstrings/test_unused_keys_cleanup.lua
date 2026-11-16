@@ -368,6 +368,21 @@ helpers.describe("unused keys (linux): the rule is exactly the readers'", functi
 		helpers.assert_eq(#scan.keys, 1)
 		helpers.assert_eq(scan.keys[1].key, "tap_3__open_url")
 	end)
+
+	helpers.it("unused keys: the retired personal-info pattern_max_length is offered, its switch kept", function()
+		-- Retired on 2026-11-16 on the three drivers: the combo length is fixed
+		-- at one letter, so a config written before still holds the key.
+		local scan = Engine.find_in_source(table.concat({
+			"[hotstrings.dynamic.text_expansion_personal_information]",
+			"enabled = true",
+			"pattern_max_length = 16",
+			"",
+		}, "\n"), Cleanup.collect)
+		helpers.assert_eq(scan.status, "ok")
+		helpers.assert_eq(#scan.keys, 1)
+		helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },
+			{ "hotstrings.dynamic.text_expansion_personal_information", "pattern_max_length" })
+	end)
 end)
 
 

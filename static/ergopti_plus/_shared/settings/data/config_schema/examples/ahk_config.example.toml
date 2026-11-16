@@ -302,7 +302,6 @@ enabled = true
 
 [hotstrings.dynamic.text_expansion_personal_information]
 enabled = true
-pattern_max_length = 1
 
 
 

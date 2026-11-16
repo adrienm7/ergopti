@@ -105,14 +105,16 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			PersonalInformationHotstrings[InfoKey] := PersonalInformation[InfoValue]
 		}
 
-		; Generate all possible combinations of letters between 1 and PatternMaxLength characters
+		; Register the single-letter combos only. The length is fixed at 1
+		; (maintainer decision 2026-11-16, which retired pattern_max_length):
+		; 13 registrations cost nothing at boot, while 13^n grew to 13.5 s at 4
+		; and never ended at 16. Longer combos resolve at fire time.
 		GeneratePersonalInformationHotstrings(
 			PersonalInformationHotstrings,
-			PersonalInformationLetters,
-			Features["hotstrings"]["dynamic"][ConfigLeaf.TEXT_EXPANSION_PERSONAL_INFORMATION][ConfigLeaf.PATTERN_MAX_LENGTH]
+			PersonalInformationLetters
 		)
 
-		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter, maxLen) {
+		GeneratePersonalInformationHotstrings(hotstrings, fieldsByLetter) {
 			keys := []
 			; ``hotstrings`` is a Map keyed by the alias LETTER (n, t, …); the combo
 			; generator needs those keys, not the personal-data values. The 2-var Map
@@ -121,8 +123,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 			; @<letter> combo (a Map is not an Array)
 			for k, _ in hotstrings
 				keys.Push(k)
-			loop maxLen
-				Generate(keys, hotstrings, fieldsByLetter, "", A_Index)
+			Generate(keys, hotstrings, fieldsByLetter, "", 1)
 		}
 
 		; In case email is "^a" we want to send raw string and not Ctrl + A.
@@ -179,7 +180,7 @@ _HS_RegisterTextExpansionAndDynamic(DeferHeavy := false) {
 				.Set("PreviewFields", PreviewFields).Set("PreviewValues", PreviewValues))
 		}
 
-		; Every combo LONGER than pattern_max_length is resolved at fire time by
+		; Every combo LONGER than one letter is resolved at fire time by
 		; HSE_TryPersonalInfoCombo instead of being registered here.
 		;
 		; This replaced a hand-written list of thirty-one CreateHotstringComboAuto

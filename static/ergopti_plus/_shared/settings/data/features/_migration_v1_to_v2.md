@@ -184,15 +184,15 @@ v1 `Features["SFBsReduction"]["IÉ"].Enabled` → v2 `Features["hotstrings"]["sf
 
 Group is renamed from `DynamicHotstrings` to `dynamic` (the parent section already says `hotstrings`, so the `Hotstrings` suffix is redundant).
 
-| v1 id                              | v2 id                                 | Extra fields                                      |
-| ---------------------------------- | ------------------------------------- | ------------------------------------------------- |
-| `Date`                             | `date`                                | —                                                 |
-| `DateFr`                           | `date_fr`                             | —                                                 |
-| `DateLongFr`                       | `date_long_fr`                        | —                                                 |
-| `IbanPrefixes`                     | `iban_prefixes`                       | —                                                 |
-| `PhonePrefixes`                    | `phone_prefixes`                      | —                                                 |
-| `SsnPrefixes`                      | `ssn_prefixes`                        | —                                                 |
-| `TextExpansionPersonalInformation` | `text_expansion_personal_information` | `pattern_max_length = 1` (was `PatternMaxLength`) |
+| v1 id                              | v2 id                                 | Extra fields                                        |
+| ---------------------------------- | ------------------------------------- | --------------------------------------------------- |
+| `Date`                             | `date`                                | —                                                   |
+| `DateFr`                           | `date_fr`                             | —                                                   |
+| `DateLongFr`                       | `date_long_fr`                        | —                                                   |
+| `IbanPrefixes`                     | `iban_prefixes`                       | —                                                   |
+| `PhonePrefixes`                    | `phone_prefixes`                      | —                                                   |
+| `SsnPrefixes`                      | `ssn_prefixes`                        | —                                                   |
+| `TextExpansionPersonalInformation` | `text_expansion_personal_information` | `PatternMaxLength` retired (2026-11-16): fixed at 1 |
 
 ### 2.7 Personal — `[Hotstrings.Personal]` → `[hotstrings.personal.<entry>]`
 

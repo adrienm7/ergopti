@@ -489,9 +489,6 @@ _HotstringsSectionAdmit(CategoryName, SectionName, FeatureConfig) {
 				if FeatureConfig.Has(ConfigLeaf.TIME_ACTIVATION_SECONDS) {
 						_V1Compat.TimeActivationSeconds := FeatureConfig[ConfigLeaf.TIME_ACTIVATION_SECONDS]
 				}
-				if FeatureConfig.Has(ConfigLeaf.PATTERN_MAX_LENGTH) {
-						_V1Compat.PatternMaxLength := FeatureConfig[ConfigLeaf.PATTERN_MAX_LENGTH]
-				}
 				FeatureConfig := _V1Compat
 		}
 

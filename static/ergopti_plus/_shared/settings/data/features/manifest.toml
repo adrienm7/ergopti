@@ -1328,8 +1328,8 @@ description_key = "menu.hotstrings.user_code.title"
 [[features.hotstrings.dynamic]]
 id = "text_expansion_personal_information"
 requires = { macos = [], linux = ["evdev", "uinput"], windows = [] }
-default = { enabled = false, pattern_max_length = 1 }
-recommended = { enabled = false, pattern_max_length = 1 }
+default = { enabled = false }
+recommended = { enabled = false }
 family = "feature"
 type = "feature"
 description_key = "menu.hotstrings.dynamic.text_expansion_personal_information"

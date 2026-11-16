@@ -6,7 +6,7 @@
 ; DESCRIPTION:
 ; @npd expanded and @npdt did nothing. @t expanded and @nt did nothing. The
 ; letters resolved, the values existed, and the only thing missing was a line in
-; a list: pattern_max_length is 1, so the registration loop produced ONLY the
+; a list: registration stops at one letter, so the loop produced ONLY the
 ; single-letter combos, and every multi-letter one came from thirty-one
 ; hand-written CreateHotstringComboAuto calls. @npdt and @nt were not among them.
 ;
@@ -131,13 +131,13 @@ Test("combo resolver: @npd and @npdt both expand (personal-info-combo-hand-list)
 
 
 ; The second reported pair. @t is a single letter, so the registration loop
-; produced it (pattern_max_length = 1); @nt is two, so only the hand list could
+; produced it (registration stops at one letter); @nt is two, so only the hand list could
 ; have — and did not.
 _PICR_TwoLetterCaseExpands() {
 	AssertEqual("0606060606", _PICR_ReplacementFor("t"),
 		"@t is a single-letter combo, produced by the registration loop, and must keep working")
 	AssertEqual("Dupont{Tab}0606060606", _PICR_ReplacementFor("nt"),
-		"@nt is the second reported case: two letters is already past pattern_max_length, so every two-letter combo depended on being hand-listed")
+		"@nt is the second reported case: two letters is already past the registered length, so every two-letter combo depended on being hand-listed")
 }
 Test("combo resolver: @t and @nt both expand (personal-info-combo-hand-list)",
 	_PICR_TwoLetterCaseExpands)

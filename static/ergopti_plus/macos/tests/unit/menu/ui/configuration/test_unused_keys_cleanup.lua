@@ -284,6 +284,20 @@ helpers.with_stub_scope(MODULES, function()
 			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key }, { "llm.trigger", "debounce_ms" })
 		end)
 
+		helpers.it("unused keys: the retired personal-info pattern_max_length is offered", function()
+			-- Retired on 2026-11-16 on the three drivers: the combo length is fixed
+			-- at one letter, so a config written before still holds the key. The
+			-- table's enabled switch is left out: no macOS config.toml reader
+			-- takes it (the menu state starts from the manifest default).
+			local source = "[hotstrings.dynamic.text_expansion_personal_information]\n"
+				.. "pattern_max_length = 16\n"
+			local scan = Engine.find_in_source(source, Cleanup.collect)
+			helpers.assert_eq(scan.status, "ok")
+			helpers.assert_eq(#scan.keys, 1)
+			helpers.assert_eq({ scan.keys[1].section, scan.keys[1].key },
+				{ "hotstrings.dynamic.text_expansion_personal_information", "pattern_max_length" })
+		end)
+
 		helpers.it("unused keys: each entry the cleanup offers is named once after boot (config-outdated-unknown-leaves)", function()
 			-- An unknown leaf or section was dropped at load without a word: only
 			-- the cleanup's list ever showed it, unlike the Windows loader.

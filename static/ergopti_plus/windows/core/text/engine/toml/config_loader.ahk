@@ -580,8 +580,9 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 		} else {
 		; Feature entries own a nested value table while their manifest path ends
 		; at the feature id itself. These domains mirror config.schema.json: a
-		; negative delay disables the downstream gate, and an unbounded personal
-		; pattern length makes the combinatorial registration loop unsafe.
+		; negative delay disables the downstream gate. Any other leaf, such as the
+		; retired personal-info pattern_max_length, is unused and offered for
+		; cleanup.
 			Entry := ManifestFindEntryByPath(CurrentSection)
 			if !(Entry is Map) || Entry.Get("type", "") != "feature"
 				return ""
@@ -589,10 +590,6 @@ TomlConfigExpectedType(CurrentSection, Key, &Entry) {
 				ExpectedType := "boolean"
 			else if Key == ConfigLeaf.TIME_ACTIVATION_SECONDS
 				ExpectedType := "non-negative number"
-			else if (Key == ConfigLeaf.PATTERN_MAX_LENGTH
-					&& CurrentSection
-						== ConfigKey.HOTSTRINGS_DYNAMIC_TEXT_EXPANSION_PERSONAL_INFORMATION)
-				ExpectedType := "integer from 1 through 16"
 			else
 				return ""
 		}
@@ -646,9 +643,6 @@ TomlConfigValueMatchesManifest(CurrentSection, Key, Value, &ExpectedType,
 			if (Key == ConfigLeaf.TIME_ACTIVATION_SECONDS)
 				return TickTryDurationMsFromSeconds(Value, &DurationMs)
 			return true
-		case "integer from 1 through 16":
-			return (!IsSet(RawValue) || LiteralKind == "number")
-				&& Value is Integer && Value >= 1 && Value <= 16
 		case "string", "action":
 			return (!IsSet(RawValue) || LiteralKind == "string")
 				&& Value is String

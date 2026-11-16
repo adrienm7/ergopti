@@ -53,3 +53,16 @@ _PICG_GeneratorEscapesEachValueAndDeclinesEmpty() {
 		"an incomplete combo must not be registered")
 }
 Test("personal-info combos: registered compounds escape per value and decline empty fields (PIW-001)", _PICG_GeneratorEscapesEachValueAndDeclinesEmpty)
+
+; The retired pattern_max_length (2026-11-16) let boot register 13^n combos:
+; 13.5 s at 4, never ending at 16. The length is fixed at one letter, so the
+; generator takes no length and reads no configuration that could raise it.
+_PICG_RegistrationLengthIsFixedAtOne() {
+	Body := _StripFullLineComments(_DriverFuncBody("GeneratePersonalInformationHotstrings"))
+	Assert(Body != "", "GeneratePersonalInformationHotstrings must exist in modules/hotstrings/hotstrings_text_expansion.ahk")
+	Assert(InStr(Body, "Generate(keys, hotstrings, fieldsByLetter, " . Chr(34) . Chr(34) . ", 1)") > 0,
+		"the generator must register the single-letter combos only")
+	Assert(!RegExMatch(Body, "i)loop\s+maxLen|pattern_max_length"),
+		"no configured length may drive the registration loop again")
+}
+Test("personal-info combos: the registered length is fixed at one letter (pattern_max_length retired)", _PICG_RegistrationLengthIsFixedAtOne)

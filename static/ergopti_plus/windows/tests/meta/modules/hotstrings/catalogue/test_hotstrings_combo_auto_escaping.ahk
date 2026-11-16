@@ -36,19 +36,19 @@
 ; ============================================================
 
 _HSCAEscapingApplied() {
-	; The fire-time resolver: the path every combo longer than
-	; pattern_max_length now takes.
+	; The fire-time resolver: the path every combo longer than one letter
+	; now takes.
 	FnBody := _DriverFuncBody("HSE_TryPersonalInfoCombo")
 	Assert(FnBody != "",
 		"infra/hotstrings/hotstring_engine_main.ahk must define HSE_TryPersonalInfoCombo(MagicKey) — it is the only thing that expands a multi-letter @-combo since the hand-written list was removed")
 	Assert(InStr(FnBody, "SendEscapeLiteral(") > 0,
 		"HSE_TryPersonalInfoCombo must pass each field value through SendEscapeLiteral: it registers the expansion with OnlyText:False, so a '+' in an email address is read as Shift and the user's own address is typed wrong")
 
-	; The registration path for the short combos (pattern_max_length) still
+	; The registration path for the single-letter combos still
 	; exists and reaches the same Send-key mode, so it needs the same treatment.
 	GenBody := _DriverFuncBody("Generate")
 	Assert(GenBody != "",
-		"modules/hotstrings/hotstrings_text_expansion.ahk must define Generate() — the registration path for combos up to pattern_max_length")
+		"modules/hotstrings/hotstrings_text_expansion.ahk must define Generate() — the registration path for the single-letter combos")
 	Assert(InStr(GenBody, "EscapeSpecialChars(") > 0,
 		"Generate() must escape each field value before registering it (EscapeSpecialChars delegates to SendEscapeLiteral)")
 }

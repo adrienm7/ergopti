@@ -1530,8 +1530,9 @@ HSE_TryRepeatKey(MagicKey) {
 ; letters alias, at FIRE time rather than at registration time.
 ;
 ; WHY THIS EXISTS: the combos used to be pre-registered, and a pre-registered
-; combo is an enumeration. pattern_max_length is 1 — "increasing it expands
-; memory exponentially", and with thirteen alias letters it does: 169 registrations
+; combo is an enumeration. Registration stops at one letter (the retired
+; pattern_max_length setting grew it exponentially), and with thirteen alias
+; letters each further letter multiplies it: 169 registrations
 ; at length two, 2 197 at three, 28 561 at four. So every multi-letter combo came
 ; from a hand-written list of thirty-one calls, and that list was missing @npdt,
 ; @nt, and most of the other 28 000. The user typed @npdt, nothing happened, and

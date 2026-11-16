@@ -170,17 +170,7 @@
 						"phone_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"ssn_prefixes": { "$ref": "#/$defs/feature_toggle" },
 						"user_code": { "$ref": "#/$defs/feature_toggle" },
-						"text_expansion_personal_information": {
-							"description": "feature_toggle plus an optional pattern_max_length. Spelled out (not allOf with feature_toggle) because that strict toggle sets additionalProperties:false, which would otherwise reject pattern_max_length.",
-							"type": "object",
-							"additionalProperties": false,
-							"required": ["enabled"],
-							"properties": {
-								"enabled": { "type": "boolean" },
-								"time_activation_seconds": { "type": "number", "minimum": 0, "maximum": 3600 },
-								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
-							}
-						}
+						"text_expansion_personal_information": { "$ref": "#/$defs/feature_toggle" }
 					}
 				}
 			}
