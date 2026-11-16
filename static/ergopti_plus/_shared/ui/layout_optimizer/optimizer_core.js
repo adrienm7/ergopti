@@ -92,7 +92,6 @@ var LAYOUT_OPTIMIZER = (function () {
 	]);
 	// The prose punctuation movePunctuation releases.
 	const PUNCTUATION = new Set(Array.from(',.;:!?\'"-’«»…–—'));
-	const KIND_ORDER = ['space', 'digit', 'letter', 'dead', 'punctuation', 'symbol', 'empty'];
 	const LEVEL_PAIRS = { key: [0, 1], altgr: [2, 3] };
 	// Valid swaps tried before an iteration gives up and counts as rejected.
 	const PICK_ATTEMPTS = 32;
@@ -151,12 +150,16 @@ var LAYOUT_OPTIMIZER = (function () {
 	const isDigit = (s) => typeof s === 'string' && /^[0-9]$/.test(s);
 	const isDead = (cell) => cell !== null && typeof cell === 'object';
 
-	/** What kind of unit a pair of cells is; the first matching kind of KIND_ORDER wins. */
+	/**
+	 * What kind of unit a pair of cells is, the first that matches of: empty,
+	 * space, digit, letter (on the base level), dead, punctuation, symbol.
+	 */
 	function kindOf(cells) {
 		if (cells.every((cell) => cell === null)) return 'empty';
 		if (cells.some((cell) => cell === ' ' || cell === ' ' || cell === ' ')) return 'space';
 		if (cells.some(isDigit)) return 'digit';
-		if (cells.some(isLetter)) return 'letter';
+		// A letter on the base level makes a letter unit; AZERTY's « * µ » is a symbol.
+		if (isLetter(cells[0])) return 'letter';
 		if (cells.some(isDead)) return 'dead';
 		if (cells.some((cell) => typeof cell === 'string' && PUNCTUATION.has(cell)))
 			return 'punctuation';

@@ -310,6 +310,17 @@ check(
 	'lettersOnNumberRow opens the number row to letters'
 );
 
+// Kinds: a letter unit has a letter on its base level (AZERTY's « * µ » is a symbol).
+check(
+	O.kindOf(['e', 'E']) === 'letter' &&
+		O.kindOf(['*', 'µ']) === 'symbol' &&
+		O.kindOf(['é', '2']) === 'digit' &&
+		O.kindOf([',', ';']) === 'punctuation' &&
+		O.kindOf([' ', ' ']) === 'space' &&
+		O.kindOf([null, null]) === 'empty',
+	'unit kinds'
+);
+
 // Punctuation and symbols.
 const kinds = (p) => new Set(p.movable.map((u) => p.units[u].kind));
 check(!kinds(O.problem(E, azerty)).has('punctuation'), 'punctuation is fixed by default');
