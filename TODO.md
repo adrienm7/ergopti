@@ -1100,7 +1100,16 @@ and the next module candidates. The audit is paused at the maintainer's request.
       `llm_prediction` override (`tooltips-wpm-llm-delay-row`), and a lifetime of 0 keeps the prediction until the
       next activity on Windows too, which hid it after the 50 ms floor (`llm-zero-lifetime`). Still open on
       Windows: KMD-1 (UTC metrics rows, a cache migration) and the Notepad and terminal Backspace undo (item
-      below); TWD-1 and TWD-2 are under « Maintainer decisions pending ».
+      below).
+      TWD-1 and TWD-2, decided by the maintainer and done on 2026-11-16: - TWD-1: a hotstring preview with no delay hides after the shared `[timing] safety_timeout_sec` on the three
+      OS (Windows read a typed 3.0, macOS and Linux kept the bubble until the next key); the single-source gate
+      `test-tooltip-style-single-source.cjs` now requires the three readers. Tests `twd1-zero-delay-safety`. - TWD-2: the typing-speed widget shows only while text is typed, never for a shortcut, an arrow, a
+      navigation or function key or a modifier alone, and hides as soon as the burst ends (shortcut, ending
+      key, modifier tapped alone, click, focus change or the idle delay), on the three OS. One rule:
+      `[typing_burst]` of `_shared/metrics/data/wpm_widget/constants.toml` names the keys by
+      `KeyboardEvent.code`, mapped through `physical_keys.json` (`metrics/engine/wpm/typing_keys.lua` and
+      `activity.lua` on macOS and Linux, `WPMWidget_TypingBurstIndex` and `WPMWidget_Burst*` on Windows).
+      Tests `twd2-typing-burst`. Left: a real-keyboard look on each OS (not yet in the TODO-tests files).
 
 ## Dead-key composition parity follow-up
 
@@ -2000,20 +2009,3 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
   2. Add `-Builds amd64,x86,wow64` for a local check into a folder of its choosing, never packaged and never
      written to `vendor/keyboard_layout`.
   3. Install the « MSVC ARM64 build tools » component on the PC (administrator, Visual Studio Installer).
-- [ ] **TWD-1: a hotstring preview with no delay, hide it after 3 s? (asked 2026-11-16, tooltips and WPM campaign)**
-      Windows hides a zero-delay preview after a typed 3.0 s (`_TOOLTIP_SAFETY_SEC`,
-      `windows/core/ui/ui/tooltip/core.ahk`); macOS and Linux keep it until the next key. The shared
-      `[timing] safety_timeout_sec = 3.0` (`_shared/core/ui/data/tooltip/constants.toml`) has no reader on any OS.
-      Kept meanwhile: each OS as today.
-  1. **(recommended) Read the shared `safety_timeout_sec` on the three OS**: a zero-delay preview hides after 3 s
-     everywhere, the Windows literal goes, and a shared vector pins the hide.
-  2. Keep the bubble until the next key on the three OS: Windows drops its safety hide and the shared key is
-     deleted.
-  3. Keep today's difference and delete the unread shared key.
-- [ ] **TWD-2: the WPM widget after a key that types nothing (asked 2026-11-16, tooltips and WPM campaign).**
-      macOS and Linux show « 0 » for 3 s after a shortcut or an arrow key; Windows shows the widget only with a
-      speed or a recent typing source (possibly the deliberate pointer alignment of 2026-11-06). Kept meanwhile:
-      each OS as today.
-  1. **(recommended) Follow Windows:** a key that types nothing never shows « 0 » on macOS and Linux.
-  2. Follow macOS and Linux: Windows shows « 0 » for 3 s after such a key.
-  3. Keep the difference and record it as intentional in the parity register.

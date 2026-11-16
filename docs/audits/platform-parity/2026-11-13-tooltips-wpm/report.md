@@ -24,9 +24,15 @@ through the real Linux modules; no desktop was rendered.
   (`_TOOLTIP_SAFETY_SEC`); macOS and Linux keep it until the next key. The
   shared `safety_timeout_sec = 3.0` has no reader on any OS. A decision: read
   the shared value everywhere, or keep the bubble.
+  Decided by the maintainer on 2026-11-16 and done: the shared value on the
+  three OS (`twd1-zero-delay-safety`).
 - **TWD-2, the WPM widget on a key that types nothing.** macOS and Linux show
   « 0 » for 3 s after a shortcut or an arrow key; Windows requires a speed or a
   recent source. Possibly deliberate (the 2026-11-06 pointer alignment).
+  Decided by the maintainer on 2026-11-16 and done: the widget shows only while
+  text is typed and hides at a shortcut, an ending key, a modifier tapped alone,
+  a click or a focus change, on the three OS (`[typing_burst]`,
+  `twd2-typing-burst`).
 - The user's `llm_prediction` delay override (Windows and macOS Delays row)
   has no Linux row: Linux uses the shared default.
   Done on 2026-11-16: Linux shows the row after the separator, as Windows,
