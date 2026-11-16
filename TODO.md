@@ -2032,28 +2032,6 @@ under « Maintainer decisions of 2026-11-13, to implement » at the top.
       logos) is new.
       [DECISION] Left (2026-11-15): all of it is implemented (fb510e1113, f555c231e5); the maintainer approves or
       changes the placements listed above.
-- [x] **Personal-info `pattern_max_length`: what to accept? (asked 2026-11-16, PC measurement)** The shared schema
-      (`config.schema.json`) accepts 1 to 16. Only Windows reads it: boot registers every `@<letters>★` combo up to
-      that length (`GeneratePersonalInformationHotstrings`, 13 alias letters, 13^n combos, about 0.47 ms each). PC
-      measurement (`tools/dev/bench-ahk-startup.cjs`, TODO-tests-windows.md): 0 ms at 1 and 2, 875 ms at 3, 13.5 s at 4,
-      about 3 minutes at 5, never ending at 16. Every longer combo already works at fire time on the three OS
-      (`HSE_TryPersonalInfoCombo`, macOS `resolve_combo`, Linux `manager.resolve_combo`); macOS and Linux ignore the
-      key. Registration only matters for priority: a registered `@t★` beats a shorter registered trigger such as
-      `t★`, which the fire-time fallback never reaches. Kept meanwhile: 1 to 16, default 1.
-  1. **(recommended) Cap the schema at 2**, the longest length with no measurable boot cost; a config holding 3 or
-     more is refused at load like any out-of-range value, with its reason, and the Windows tests that accept 16
-     move to 2.
-  2. Retire the key on the three OS: Windows registers the single letters only (as Linux) and resolves the rest at
-     fire time; the setting disappears from the schema, the manifest and the menus.
-  3. Keep 16 and register lazily (a combo is registered the first time it fires): no boot cost, but the first use
-     of each long combo still loses to a shorter registered trigger.
-  4. Keep 1 to 16 as today and document the boot cost beside the setting.
-     Decided 2026-11-16 (maintainer): option 2, the key is retired on the three OS with today's default kept fixed:
-     Windows registers the single-letter combos only and resolves longer ones at fire time, as macOS and Linux do.
-     The key is gone from the schema, the manifest, the generated templates and config keys. A config that still
-     holds it loads cleanly: the key is never applied, is reported once as unused and is offered by the
-     unused-settings cleanup on the three drivers (Windows `test_apply_config_toml.ahk`, macOS and Linux
-     `test_unused_keys_cleanup.lua`).
 - [ ] **Windows layout DLL builder on a PC without the ARM64 C++ tools? (asked 2026-11-16)** The PC's Visual Studio
       2019 Build Tools have the x64/x86 tools only; `build_windows_keyboard_layout.ps1` requires ARM64 too and refuses
       before compiling. The three other images compile there (TODO-tests-windows.md, PC run 2026-11-16).
