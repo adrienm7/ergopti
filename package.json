@@ -184,6 +184,7 @@
 		"test:structure-shell-paths": "node ./tools/test/test-structure-shell-paths.cjs",
 		"test:structure-platform-markers": "node ./tools/test/test-structure-platform-markers.cjs",
 		"test:structure-keymap-registry": "node ./tools/test/test-structure-keymap-registry.cjs",
+		"test:structure-macos-installer-cohort": "node ./tools/test/test-structure-macos-installer-cohort.cjs",
 		"test:ahk-os-purity-platform": "node ./tools/test/test-ahk-os-purity-platform.cjs",
 		"test:structure-guard-needles": "node ./tools/test/test-structure-guard-needles.cjs",
 		"test:structure-optional-includes": "node ./tools/test/test-structure-optional-includes.cjs",

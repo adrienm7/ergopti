@@ -496,7 +496,7 @@
 		},
 		{
 			"id": "corpus-count-tables",
-			"ordinal": 676,
+			"ordinal": 677,
 			"name": "every published count table under static/corpus/frequency passes the strict reader and traces to its pinned archive and register entry, and the importer's Leipzig, Lexique and pruning rules give hand-computed counts",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-count-tables.cjs"],
@@ -504,7 +504,7 @@
 		},
 		{
 			"id": "corpus-text-sources",
-			"ordinal": 677,
+			"ordinal": 678,
 			"name": "every Project Gutenberg text under static/corpus/original traces to its pinned ebook, register entry and shipped corpus, keeps no Project Gutenberg header or footer, and the importer strips an ebook as hand-computed",
 			"cmd": "node",
 			"args": ["tools/test/test-corpus-text-sources.cjs"],
@@ -512,7 +512,7 @@
 		},
 		{
 			"id": "pdf-text",
-			"ordinal": 678,
+			"ordinal": 679,
 			"name": "the Comparer reads the text of a PDF in the page: whole words and lines for Chrome, Firefox and Google Docs exports, and refuses a locked or text-less PDF",
 			"cmd": "node",
 			"args": ["tools/test/test-pdf-text.cjs"],
@@ -520,7 +520,7 @@
 		},
 		{
 			"id": "kbd-dll-wow64",
-			"ordinal": 682,
+			"ordinal": 683,
 			"name": "the compiler-free SysWOW64 layout DLL returns kbd.h's 64-bit descriptor and holds the MSVC build's tables, and the reader refuses a truncated descriptor",
 			"cmd": "node",
 			"args": ["tools/test/test-kbd-dll-wow64.cjs"],

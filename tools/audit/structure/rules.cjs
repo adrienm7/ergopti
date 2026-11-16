@@ -480,6 +480,11 @@ const SPLITS = {
 	},
 	'ai/engine': {
 		strip: /^llm_(?!request)/,
+		// The macOS installers and the shell and Python helpers they reach as
+		// "$SCRIPT_DIR/<name>" share one folder: the launcher's PTY guardian
+		// admits the four ensure-*.sh in a single directory and hands each its
+		// own folder as ERGOPTI_BOOTSTRAP_SCRIPT_DIR.
+		keep: /^(ensure-[a-z-]+\.sh|network-retry\.sh|native_python_bootstrap\.sh|uv-release\.sh|managed-python-release\.sh|managed-pyobjc\.json|managed-python-downloads\.json|managed_bootstrap_http\.py)$/,
 		table: [
 			[
 				'settings',
@@ -815,6 +820,7 @@ function applySplits(rel) {
 	const folder = parts.slice(0, -1).join('/');
 	const split = SPLITS[folder];
 	if (!split || /^(README\.md|init\.(lua|ahk)|_index\.ahk)$/.test(name)) return rel;
+	if (split.keep && split.keep.test(name)) return rel;
 	const sub = classify(split.table, classStem(name, split.strip));
 	return sub ? applySplits(`${folder}/${sub}/${name}`) : rel;
 }

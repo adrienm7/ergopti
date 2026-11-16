@@ -550,7 +550,7 @@
 		},
 		{
 			"id": "js-0543",
-			"ordinal": 680,
+			"ordinal": 681,
 			"name": "startup benchmark fixture paths follow app_dirs.toml",
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-bench-ahk-startup-paths.cjs"],
