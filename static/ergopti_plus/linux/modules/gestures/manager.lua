@@ -2391,6 +2391,35 @@ local function report_slots(touchpad)
 	end
 end
 
+--- Reads the touchpad's multitouch registers from the kernel: the selected
+--- slot (EVIOCGABS ABS_MT_SLOT) and each slot's tracking id, position and major
+--- axis (EVIOCGMTSLOTS), retired slots included. The decoder seeds them at open
+--- and after SYN_DROPPED, since the kernel omits a later value equal to them.
+--- @param Reader table platform.input.evdev_reader.
+--- @return table|nil snapshot { current_slot, slots = { [index] = { id, x, y, major } } }
+--- @return string|nil reason
+local function read_touch_registers(Reader)
+	local Decoder = require("modules.gestures.mt_decoder")
+	if type(Reader.abs_info) ~= "function" or type(Reader.mt_slot_values) ~= "function" then
+		return nil, "the reader cannot query multitouch registers"
+	end
+	local selected, reason = Reader.abs_info(Reader.TOUCHPAD, Decoder.ABS_MT_SLOT)
+	if not selected then return nil, "ABS_MT_SLOT: " .. tostring(reason) end
+	local count = selected.maximum + 1
+	local axes = {}
+	for name, code in pairs({ id = Decoder.ABS_MT_TRACKING_ID, x = Decoder.ABS_MT_POSITION_X,
+		y = Decoder.ABS_MT_POSITION_Y, major = Decoder.ABS_MT_TOUCH_MAJOR }) do
+		local values, detail = Reader.mt_slot_values(Reader.TOUCHPAD, code, count)
+		if not values then return nil, name .. ": " .. tostring(detail) end
+		axes[name] = values
+	end
+	local slots = {}
+	for index = 0, count - 1 do
+		slots[index] = { id = axes.id[index], x = axes.x[index], y = axes.y[index], major = axes.major[index] }
+	end
+	return { current_slot = selected.value, slots = slots }
+end
+
 --- Starts reading the touchpad.
 ---
 --- Reads the device's evdev node directly, WITHOUT a grab, and decodes the
@@ -2442,7 +2471,20 @@ function M.start_reading()
 		Logger.warn(LOG, "%s reports no MT axes: a resting thumb beside a pair cannot be told from a third finger.",
 			touchpad.path)
 	end
-	_decoder = Decoder.new({ units_per_mm = (mm_x and mm_y) and { x = mm_x, y = mm_y } or nil })
+	_decoder = Decoder.new({ units_per_mm = (mm_x and mm_y) and { x = mm_x, y = mm_y } or nil,
+		query_registers = function() return read_touch_registers(Reader) end })
+	-- The kernel sends no initial state: a first contact on the coordinates it
+	-- retained from before the open would otherwise arrive without them.
+	local registers, register_reason = read_touch_registers(Reader)
+	local seeded, seed_reason = false, register_reason
+	if registers then seeded, seed_reason = _decoder:resync(registers) end
+	if seeded then
+		Logger.debug(LOG, "%s: multitouch registers read at open, slot %d selected.", touchpad.path,
+			registers.current_slot)
+	else
+		Logger.warn(LOG, "%s: multitouch registers unreadable at open (%s): a first contact on a retained coordinate is missed until it moves.",
+			touchpad.path, tostring(seed_reason))
+	end
 	_touchpad = touchpad
 	_reading = true
 	_incremental = new_incremental(units_x, units_y)

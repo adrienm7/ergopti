@@ -28,8 +28,9 @@ helpers.describe("gesture round trip through the emulated input core", function(
 	helpers.it("every gesture the harness writes reaches the real decoder", function()
 		local code, lines = Emulation.run(HARNESS, { advertise_msc = true })
 		helpers.assert_eq(code, 0, transcript(lines))
-		helpers.assert_true(transcript(lines):find("=== 12 check(s), 0 failure(s) ===", 1, true) ~= nil,
-			"the swipe, the five-finger tap and the four-finger swipe all decode; got\n" .. transcript(lines))
+		helpers.assert_true(transcript(lines):find("=== 14 check(s), 0 failure(s) ===", 1, true) ~= nil,
+			"the swipe, the five-finger tap and the four-finger swipe all decode, and the registers read back; got\n"
+				.. transcript(lines))
 	end)
 
 	helpers.it("a still tap without per-report stamps collapses to one frame, as on the kernel", function()

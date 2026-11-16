@@ -85,6 +85,16 @@ local EVIOCGKEY_NR = 0x18
 local EVIOCGLED_NR = 0x19
 local EVIOCGBIT_NR = 0x20
 local EVENT_TYPE_BYTES = 4 -- EV_MAX is 0x1f: one complete event-type bitmap.
+-- EVIOCGMTSLOTS(len): a __u32 axis code in, then one __s32 per slot out.
+local EVIOCGMTSLOTS_NR = 0x0a
+-- EVIOCGABS(abs) = _IOR('E', 0x40 + abs, struct input_absinfo): six __s32.
+local EVIOCGABS_BASE = 0x80184540
+local ABS_MAX = 0x3f
+-- linux/input-event-codes.h ABS_MT_SLOT .. ABS_MT_TOOL_Y: the axes a slot holds.
+local ABS_MT_FIRST, ABS_MT_LAST = 0x2f, 0x3d
+-- No touchpad reports more slots than this: a larger ABS_MT_SLOT maximum is a
+-- corrupt answer, not a buffer to allocate.
+local MT_MAX_SLOTS = 64
 
 -- poll(2) event mask for "there is something to read".
 local POLLIN = 0x001
@@ -170,6 +180,8 @@ end
 ---   open(path, flags)        → handle|nil, err
 ---   ioctl(handle, req, arg)  → boolean
 ---   read_event_bits(fd, req, count) → string|nil (full event-type bitmap)
+---   read_abs(fd, req)        → table|nil, reason (struct input_absinfo, 6 integers)
+---   read_mt_slots(fd, req, code, count) → table|nil, reason (count slot values)
 ---   read(handle, count)      → string|nil, "would_block"|"fatal"|nil, reason
 ---   poll(handle, timeout_ms) → boolean      (true when readable)
 ---   close(handle)            → true|nil on completion, false, reason on failure
@@ -272,6 +284,25 @@ local function build_ffi_backend()
 			if copied ~= count then return nil, "event-type ioctl did not acknowledge the full bitset" end
 			return native_string(bits, count)
 		end,
+		read_abs = function(fd, request)
+			local info = native_new("int32_t[6]")
+			if tonumber(native_ioctl(fd, request, info)) ~= 0 then
+				return nil, "EVIOCGABS failed (errno=" .. tostring(native_errno()) .. ")"
+			end
+			local values = {}
+			for index = 0, 5 do values[index + 1] = tonumber(info[index]) end
+			return values
+		end,
+		read_mt_slots = function(fd, request, code, count)
+			local values = native_new("int32_t[?]", count + 1)
+			values[0] = code
+			if tonumber(native_ioctl(fd, request, values)) ~= 0 then
+				return nil, "EVIOCGMTSLOTS failed (errno=" .. tostring(native_errno()) .. ")"
+			end
+			local slots = {}
+			for index = 1, count do slots[index] = tonumber(values[index]) end
+			return slots
+		end,
 		read = function(fd, count)
 			local got = tonumber(native_read(fd, buf, count))
 			if not got then return nil, "fatal", "read returned no result" end
@@ -351,7 +382,8 @@ function M.use_ffi_backend()
 	end
 	_backend, _native_backend = backend, backend
 	_native_ports = {}
-	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "poll", "close" }) do
+	for _, name in ipairs({ "open", "read", "ioctl", "read_bits", "read_owned_key_bits", "read_event_bits", "read_abs",
+		"read_mt_slots", "poll", "close" }) do
 		_native_ports[name] = rawget(backend, name)
 	end
 	pcall(Logger.debug, LOG, "FFI backend bound.")
@@ -641,6 +673,70 @@ end
 --- @return table|nil, string|nil
 function M.active_leds(slot, max_code)
 	return bit_snapshot(slot, EVIOCGLED_NR, max_code)
+end
+
+--- Calls one state-query port of the bound backend on an open source.
+--- @param slot string|nil Reader slot.
+--- @param port string Backend port name.
+--- @return boolean called, any answer, any detail
+local function state_query(slot, port, ...)
+	if _busy then return false, nil, "native operation is unavailable" end
+	local st = state(slot)
+	if not st.fd or st.close_error then return false, nil, "device is not open" end
+	local query = type(_backend) == "table" and rawget(_backend, port)
+	if type(query) ~= "function" then return false, nil, "backend cannot query " .. port end
+	_busy = true
+	local called, answer, detail = pcall(query, st.fd, ...)
+	_busy = false
+	if not called then return false, nil, tostring(answer) end
+	return true, answer, detail
+end
+
+--- Reads one absolute axis's struct input_absinfo (EVIOCGABS) on an open source.
+--- @param slot string|nil Reader slot.
+--- @param code integer ABS_* axis code.
+--- @return table|nil info { value, minimum, maximum, fuzz, flat, resolution }
+--- @return string|nil reason
+function M.abs_info(slot, code)
+	if type(code) ~= "number" or code < 0 or code > ABS_MAX or code % 1 ~= 0 then
+		return nil, "not an absolute axis code"
+	end
+	local called, values, detail = state_query(slot, "read_abs", EVIOCGABS_BASE + code)
+	if not called then return nil, detail end
+	if type(values) ~= "table" then return nil, tostring(detail or "EVIOCGABS gave no answer") end
+	for index = 1, 6 do
+		if type(values[index]) ~= "number" then return nil, "EVIOCGABS answer is incomplete" end
+	end
+	return { value = values[1], minimum = values[2], maximum = values[3], fuzz = values[4], flat = values[5],
+		resolution = values[6] }
+end
+
+--- Reads one multitouch axis in every slot (EVIOCGMTSLOTS) on an open source.
+--- The kernel answers the retained value of retired slots too, which is what
+--- a reader must know: it omits a later value equal to it.
+--- @param slot string|nil Reader slot.
+--- @param code integer ABS_MT_* axis code.
+--- @param count integer Slots to read (the ABS_MT_SLOT maximum plus one).
+--- @return table|nil values Indexed by slot number from 0.
+--- @return string|nil reason
+function M.mt_slot_values(slot, code, count)
+	if type(code) ~= "number" or code <= ABS_MT_FIRST or code > ABS_MT_LAST or code % 1 ~= 0 then
+		return nil, "not a multitouch slot axis"
+	end
+	if type(count) ~= "number" or count < 1 or count > MT_MAX_SLOTS or count % 1 ~= 0 then
+		return nil, "slot count out of range"
+	end
+	local bytes = 4 * (count + 1)
+	local called, values, detail = state_query(slot, "read_mt_slots",
+		ioctl_read_request(EVIOCGMTSLOTS_NR, bytes), code, count)
+	if not called then return nil, detail end
+	if type(values) ~= "table" then return nil, tostring(detail or "EVIOCGMTSLOTS gave no answer") end
+	local by_slot = {}
+	for index = 1, count do
+		if type(values[index]) ~= "number" then return nil, "EVIOCGMTSLOTS answer is incomplete" end
+		by_slot[index - 1] = values[index]
+	end
+	return by_slot
 end
 
 
@@ -1204,6 +1300,8 @@ M.O_NONBLOCK = O_NONBLOCK
 M.MAX_EVENTS_PER_DRAIN = MAX_EVENTS_PER_DRAIN
 M.EVIOCGKEY_NR = EVIOCGKEY_NR
 M.EVIOCGLED_NR = EVIOCGLED_NR
+M.EVIOCGMTSLOTS_NR = EVIOCGMTSLOTS_NR
+M.EVIOCGABS_BASE = EVIOCGABS_BASE
 
 original_source_owner_ports.capture = M.capture_source_owner
 original_source_owner_ports.current = M.source_owner_current

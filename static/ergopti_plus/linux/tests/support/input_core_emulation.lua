@@ -98,7 +98,20 @@ local function emulated_device(options)
 		for _, event in ipairs(batch) do callback(event) end
 		return #batch
 	end
-	return ffi, drain
+
+	--- The kernel's registers, as EVIOCGABS and EVIOCGMTSLOTS answer them.
+	local registers = {
+		abs_info = function(_, code)
+			if code ~= ABS_MT_SLOT then return nil, "only ABS_MT_SLOT is modelled" end
+			return { value = slot, minimum = 0, maximum = DEVICE.max_fingers - 1, fuzz = 0, flat = 0, resolution = 0 }
+		end,
+		mt_slot_values = function(_, code, count)
+			local values = {}
+			for index = 0, count - 1 do values[index] = (axes[index] or {})[code] or 0 end
+			return values
+		end,
+	}
+	return ffi, drain, registers
 end
 
 --- Runs the hardware round trip against the emulated input core.
@@ -109,12 +122,13 @@ function M.run(harness_path, options)
 	assert(type(harness_path) == "string" and harness_path ~= "", "the harness path is required")
 	assert(type(options) == "table" and type(options.advertise_msc) == "boolean",
 		"options.advertise_msc must be a boolean")
-	local ffi, drain = emulated_device(options)
+	local ffi, drain, registers = emulated_device(options)
 	local Finder = require("modules.gestures.touchpad_finder")
 	local Reader = require("platform.input.evdev_reader")
 	local saved = {
 		ffi = package.loaded.ffi, open = io.open, execute = os.execute, exit = os.exit, print = print,
 		list = Finder.list, reader_open = Reader.open, reader_close = Reader.close, reader_drain = Reader.drain,
+		reader_abs_info = Reader.abs_info, reader_mt_slot_values = Reader.mt_slot_values,
 	}
 	local lines = {}
 	local exit_sentinel = {}
@@ -135,6 +149,7 @@ function M.run(harness_path, options)
 	Reader.open = function() return true end
 	Reader.close = function() end
 	Reader.drain = function(callback) return drain(callback) end
+	Reader.abs_info, Reader.mt_slot_values = registers.abs_info, registers.mt_slot_values
 
 	local ok, failure = pcall(dofile, harness_path)
 
@@ -142,6 +157,7 @@ function M.run(harness_path, options)
 	io.open, os.execute, os.exit, print = saved.open, saved.execute, saved.exit, saved.print
 	Finder.list = saved.list
 	Reader.open, Reader.close, Reader.drain = saved.reader_open, saved.reader_close, saved.reader_drain
+	Reader.abs_info, Reader.mt_slot_values = saved.reader_abs_info, saved.reader_mt_slot_values
 
 	if not ok and failure ~= exit_sentinel then error(failure, 0) end
 	assert(type(code) == "number", "the round trip must end with an explicit exit code")

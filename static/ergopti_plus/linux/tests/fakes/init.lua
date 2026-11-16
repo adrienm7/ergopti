@@ -109,7 +109,8 @@ function M.uinput_writer(opts)
 end
 
 --- An in-memory evdev reader that replays a scripted event list.
---- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason? }
+--- @param opts table|nil { events?, open_fails?, pressed_keys?, active_leds?, event_capabilities?, drain_status?, drain_reason?,
+---   abs?, mt_slots? }
 --- @return table
 function M.evdev_reader(opts)
 	opts = opts or {}
@@ -186,6 +187,23 @@ function M.evdev_reader(opts)
 	function fake.pressed_keys(slot, max_code)
 		if type(opts.pressed_keys) == "function" then return opts.pressed_keys(slot, max_code) end
 		return opts.pressed_keys or {}
+	end
+	-- Multitouch registers: opts.abs = { [code] = absinfo table }, opts.mt_slots =
+	-- { [code] = { [slot] = value } }. A scripted reader without them answers as
+	-- a device whose query is refused.
+	function fake.abs_info(slot, code)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local info = (opts.abs or {})[code]
+		if info == nil then return nil, "no scripted absinfo" end
+		return info
+	end
+	function fake.mt_slot_values(slot, code, count)
+		if fake.open_slots[slot or fake.KEYBOARD] == nil then return nil, "device is not open" end
+		local values = (opts.mt_slots or {})[code]
+		if values == nil then return nil, "no scripted slot values" end
+		local out = {}
+		for index = 0, count - 1 do out[index] = values[index] or 0 end
+		return out
 	end
 	function fake.active_leds(slot, max_code)
 		if type(opts.active_leds) == "function" then return opts.active_leds(slot, max_code) end

@@ -174,11 +174,21 @@ local function destroy()
 	ffi.C.close(fd)
 end
 
+-- The slot selected last and each slot's last axis values, as written: what
+-- the kernel retains, and what the driver re-reads at open and after SYN_DROPPED.
+local _written_slot, _written = 0, {}
+
 --- Writes one event to the virtual device.
 --- @param etype integer
 --- @param code integer
 --- @param value integer
 local function emit(etype, code, value)
+	if etype == EV_ABS and code == Decoder.ABS_MT_SLOT then
+		_written_slot = value
+	elseif etype == EV_ABS then
+		_written[_written_slot] = _written[_written_slot] or {}
+		_written[_written_slot][code] = value
+	end
 	local ev = ffi.new("struct rt_input_event")
 	ev.tv_sec, ev.tv_usec = 0, 0
 	ev.type, ev.code, ev.value = etype, code, value
@@ -345,6 +355,26 @@ local left = play(4, -600, 0)
 check(left ~= nil and left.direction == "left", string.format(
 	"a four-finger swipe left came back as left; got %s",
 	left and tostring(left.direction) or "nothing"))
+
+-- EVIOCGABS and EVIOCGMTSLOTS through the reader's FFI ports, against the
+-- registers the kernel kept from the gestures above.
+local selected, selected_error = Reader.abs_info(Reader.TOUCHPAD, Decoder.ABS_MT_SLOT)
+check(selected ~= nil and selected.value == _written_slot and selected.maximum == SLOT_COUNT - 1, string.format(
+	"EVIOCGABS answers the selected slot %d of %d; got %s", _written_slot, SLOT_COUNT,
+	selected and string.format("%d of %d", selected.value, selected.maximum + 1) or tostring(selected_error)))
+local retained, mismatch = true, nil
+for _, code in ipairs({ Decoder.ABS_MT_TRACKING_ID, Decoder.ABS_MT_POSITION_X, Decoder.ABS_MT_POSITION_Y }) do
+	local values, values_error = Reader.mt_slot_values(Reader.TOUCHPAD, code, SLOT_COUNT)
+	for slot = 0, SLOT_COUNT - 1 do
+		local expected = (_written[slot] or {})[code] or 0
+		if retained and (values == nil or values[slot] ~= expected) then
+			retained = false
+			mismatch = string.format("axis 0x%x slot %d: %s, written %d", code, slot,
+				values and tostring(values[slot]) or tostring(values_error), expected)
+		end
+	end
+end
+check(retained, "EVIOCGMTSLOTS answers every slot's retained values" .. (mismatch and ": " .. mismatch or ""))
 
 Reader.close(Reader.TOUCHPAD)
 

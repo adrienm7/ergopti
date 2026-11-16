@@ -1292,6 +1292,13 @@ Audited source and immutable evidence: [18-scope review](docs/audits/platform-pa
       [CODE] Left (2026-11-15): Linux touchpad hotplug and SYN_DROPPED, multi-field Tab and grapheme deletion, pointer
       metrics, KDE live layout apply. Windows account-context and PnP and the macOS device and provider scenarios are
       in TODO-tests-windows.md and TODO-tests-macos.md (2026-11-15).
+      SYN_DROPPED re-query done 2026-11-16: the gesture decoder threw the kernel's slot registers away on a lost
+      queue and never had them at open, so a contact landing on a retained coordinate (which the kernel omits) never
+      fired; the reader now answers EVIOCGABS and EVIOCGMTSLOTS (`abs_info`, `mt_slot_values`) and the manager seeds
+      the decoder at open and once the dropped packet ends (a touch held across the loss still owns no gesture).
+      Regression `test_mt_register_resync.lua` (kernel filter and overflow model, real reader, manager and decoder;
+      fails on the old code); the uinput round trip (`run_gesture_roundtrip.lua`, CI native lane) reads the
+      registers back from a real kernel. Linux only: macOS and Windows receive gestures from the OS, not evdev.
 
 ## Carried over from the 1.0.9 requests (1-2 November)
 

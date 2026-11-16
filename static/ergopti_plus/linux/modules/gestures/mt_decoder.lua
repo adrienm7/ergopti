@@ -48,6 +48,15 @@
 ---    hand's fingers: a far or oversized third contact is a resting thumb
 ---    (shared rule, _shared/gestures/engine/contact_join.lua, the macOS engine's
 ---    too), judged in millimetres from the pad's resolution.
+---
+--- KERNEL REGISTERS AFTER A LOST QUEUE OR AT OPEN:
+--- The kernel keeps each slot's axis values and the selected slot, and omits a
+--- value that did not change. After SYN_DROPPED, and before the first event of a
+--- freshly opened reader, this decoder does not know them, so the next contact
+--- landing on a retained coordinate arrived without it and no gesture fired.
+--- `resync` seeds them from the kernel's own answer (EVIOCGMTSLOTS and
+--- EVIOCGABS, queried by the adapter through `opts.query_registers`); a touch
+--- held across the loss still owns no gesture.
 --- ==============================================================================
 
 local M = {}
@@ -151,11 +160,14 @@ M.FALLBACK_UNITS_PER_MM = ok_timings and Timings.count("gestures", "touchpad_fal
 
 --- Creates a decoder.
 --- @param opts table|nil { units_per_mm = { x, y }, swipe_minimum_mm = number,
----   pair_scroll_travel_mm = number }
+---   pair_scroll_travel_mm = number, query_registers = function }
 ---   units_per_mm converts device units to millimetres: the swipe minimum, the
 ---   pair-scroll travel and the third-contact rule (rule 4) are judged in
 ---   millimetres. Without it the distances use the registry's fallback
 ---   resolution and the third-contact rule admits any contact.
+---   query_registers() answers the kernel's registers in the shape `resync`
+---   takes (or nil and a reason); it is asked once the packet a SYN_DROPPED
+---   invalidated has ended.
 --- @return table
 function M.new(opts)
 	opts = opts or {}
@@ -197,6 +209,9 @@ function M.new(opts)
 		"[gestures].multi_finger_landing_ms must be a duration")
 	assert(type(scroll_guard_sec) == "number" and scroll_guard_sec >= 0,
 		"[gestures].scroll_momentum_guard_ms must be a duration")
+	local query_registers = opts.query_registers
+	assert(query_registers == nil or type(query_registers) == "function",
+		"query_registers must be a function answering the kernel's multitouch registers")
 	local units_per_mm = opts.units_per_mm
 	if units_per_mm ~= nil then
 		assert(type(units_per_mm) == "table" and tonumber(units_per_mm.x) and tonumber(units_per_mm.x) > 0
@@ -289,6 +304,72 @@ function M.new(opts)
 		_last_frame_at, _clock_invalid = nil, false
 	end
 
+	--- Why a register snapshot cannot seed this decoder, or nil when it can.
+	--- @param snapshot any
+	--- @return string|nil reason
+	local function snapshot_refusal(snapshot)
+		if type(snapshot) ~= "table" then return "the snapshot is not a table" end
+		local current = snapshot.current_slot
+		if type(current) ~= "number" or current < 0 or current % 1 ~= 0 then
+			return "the selected slot is not a slot index"
+		end
+		if type(snapshot.slots) ~= "table" then return "the snapshot names no slots" end
+		for index, slot in pairs(snapshot.slots) do
+			if type(index) ~= "number" or index < 0 or index % 1 ~= 0 then
+				return "a slot index is not a non-negative integer"
+			end
+			if type(slot) ~= "table" then return string.format("slot %d is not a table", index) end
+			for _, field in ipairs({ "id", "x", "y" }) do
+				if type(slot[field]) ~= "number" then
+					return string.format("slot %d has no %s register", index, field)
+				end
+			end
+			if slot.major ~= nil and type(slot.major) ~= "number" then
+				return string.format("slot %d has a non-numeric major axis", index)
+			end
+		end
+		return nil
+	end
+
+	--- Seeds the kernel's protocol registers into a decoder with no gesture.
+	--- Only registers: a touch already down owns no gesture (no observed start),
+	--- as after any loss, so the count and BTN_TOUCH stay unseeded.
+	--- @param snapshot table { current_slot = integer, slots = { [index] = { id, x, y, major? } } }
+	--- @return boolean seeded
+	--- @return string|nil reason
+	local function seed_registers(snapshot)
+		if _dropping then return false, "the dropped packet has not ended" end
+		if _started_at ~= nil or _touching then return false, "a touch is in progress" end
+		local refusal = snapshot_refusal(snapshot)
+		if refusal then return false, refusal end
+		reset()
+		for index, slot in pairs(snapshot.slots) do
+			-- A retired slot (id -1) keeps its axis values: the next contact in it
+			-- omits every coordinate it shares with them.
+			_slots[index] = { id = slot.id >= 0 and slot.id or nil, x = slot.x, y = slot.y,
+				major = slot.major }
+		end
+		_current_slot = snapshot.current_slot
+		return true, nil
+	end
+
+	--- Asks the adapter for the kernel's registers once a lost packet ended.
+	local function recover_registers()
+		local called, snapshot, detail = pcall(query_registers)
+		if not called or snapshot == nil then
+			Logger.warn(LOG, "Touchpad registers unreadable after SYN_DROPPED (%s): a contact on a retained coordinate is missed until it moves.",
+				tostring(not called and snapshot or detail or "no answer"))
+			return
+		end
+		local seeded, reason = seed_registers(snapshot)
+		if not seeded then
+			Logger.warn(LOG, "Touchpad registers refused after SYN_DROPPED (%s): a contact on a retained coordinate is missed until it moves.",
+				tostring(reason))
+			return
+		end
+		Logger.debug(LOG, "Touchpad registers re-read after SYN_DROPPED: slot %d selected.", _current_slot)
+	end
+
 	--- The mean position of every live contact, or nil when there is none.
 	--- @return number|nil, number|nil
 	local function centroid()
@@ -352,7 +433,11 @@ function M.new(opts)
 		-- event-codes.rst requires ignoring the whole packet after SYN_DROPPED.
 		-- No slot, count or touch edge inside that packet can start a new gesture.
 		if _dropping then
-			if etype == EV_SYN and code == SYN_REPORT then _dropping = false end
+			if etype == EV_SYN and code == SYN_REPORT then
+				_dropping = false
+				-- event-codes.rst: once the packet is over, query the device.
+				if query_registers then recover_registers() end
+			end
 			return nil
 		end
 
@@ -577,6 +662,15 @@ function M.new(opts)
 	--- Throws away any partial gesture.
 	function decoder:reset()
 		reset()
+	end
+
+	--- Seeds the kernel's multitouch registers (EVIOCGMTSLOTS and the selected
+	--- slot), as a reader does right after it opens the device.
+	--- @param snapshot table { current_slot = integer, slots = { [index] = { id, x, y, major? } } }
+	--- @return boolean seeded
+	--- @return string|nil reason Why the snapshot was refused.
+	function decoder:resync(snapshot)
+		return seed_registers(snapshot)
 	end
 
 	--- Test seam: the peak count latched so far.
