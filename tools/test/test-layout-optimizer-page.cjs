@@ -39,6 +39,8 @@ const SCRIPTS = [
 	// The theme the site's visitor chose (theme_choice.js), before the first paint.
 	'../theme_choice.js',
 	'../i18n.js',
+	// Keeps the native context menu closed outside text fields (test-host-context-menu).
+	'../host_bridge.js',
 	'../_generated/key_legend.js',
 	'../layout_analysis/_generated/analysis_data.js',
 	'../layout_analysis/analysis_engine.js',
