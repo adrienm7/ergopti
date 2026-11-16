@@ -87,17 +87,15 @@ Design: [layout-editor.md](docs/design/layout-editor.md), [layout-analysis.md](d
 analyser study is [docs/audits/layout-analysers/report.md](docs/audits/layout-analysers/report.md) (its section 15
 waits for the maintainer's review).
 
-- [ ] **Comparer follow-ups (2026-11-16).**
-  - Let the ranking table choose its metric columns (today the 12 of `TABLE_METRICS` in `comparer_page.js`; every
-    metric is in the details) and filter its rows.
-  - The Comparer's heatmap: offer the other per-key metrics of `KEY_COST_METRICS` and name each key's worst groups
-    for every event (analyse the shown layout with `keyGroups: true`), as the editor's panel does.
-  - theme.css follows only `prefers-color-scheme`; the site has no light/dark toggle reaching the framed pages.
-  - `layout_analysis.panel.ranking` (« Ranking against the library… ») also shows while ranking among the Comparer's
-    ticks: reword it in the 21 locales.
-  - Locally (Edge on a French Windows) `exerciseLongLabels` of layout-editor.playwright.cjs fails (« the tooltip
-    holds the whole label »), and every `toLocaleString` without a locale prints French digits unless the browser
-    runs with `--lang=en-US`; check both against CI before calling either a regression.
+- [ ] **More figures per layout in the Comparer (maintainer, 2026-11-17), what remains.** Every figure from the
+      engine's numbers with a hand-checked tiny-corpus test, legend and units, light and dark, phone width, 21 locales.
+  - [ ] A key × key bigram matrix (which pairs a layout makes, coloured by count or by event).
+  - [ ] Effort per word and the hardest words to type: the corpus tables hold n-grams only, so the built-in corpora
+        and a user's text first need a word table (prepared once and cached like the n-grams).
+  - [ ] Row jumps per key (a key pair two or more rows apart on one hand): no such metric exists yet; define it in
+        docs/design/layout-analysis.md first, coordinated with the agent changing the engine's typing paths.
+  - [ ] Check the figures again once the engine types through best paths (alternative copies, AltGr, dead keys):
+        they read the engine's per-key output (keyValues, topGroups, fingerDistance), so they should follow.
 - [ ] **Layout formats, what is left.** The library comes only from Oxeylyzer and cmini: add another source (genkey,
       GPL-3.0 like cmini; KLA's built-in list) once its layout list can be read. No third-party KLA JSON, XKB
       symbols, KLC or DOF file under a licence that allows shipping it has been found for the reader tests.
