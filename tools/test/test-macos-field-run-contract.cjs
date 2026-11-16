@@ -394,8 +394,14 @@ function addProbe(paths, withMarker) {
 	return log;
 }
 
-/** A report file wherever field-report-tidy.py sorted it (0_main, 1_logs, 2_digests, 3_system), else at the root. */
-function reportFile(folder, name) {
+/**
+ * A report file wherever field-report-tidy.py sorted it (0_main, 1_logs, 2_digests, 3_system), else at the root.
+ * @param {string} folder The report folder.
+ * @param {...string} segments The file's path inside it, joined (« field_run », « done.json »).
+ * @returns {string} The file's path.
+ */
+function reportFile(folder, ...segments) {
+	const name = path.join(...segments);
 	for (const sub of ['', '0_main', '1_logs', '2_digests', '3_system']) {
 		const candidate = path.join(folder, sub, name);
 		if (fs.existsSync(candidate)) return candidate;
