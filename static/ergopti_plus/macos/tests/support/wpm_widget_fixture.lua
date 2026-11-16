@@ -84,12 +84,17 @@ local function with_widget(callback, position)
 		end }
 		local widget = helpers.load_with_stubs("ui.wpm.wpm_widget", {
 			timer = { absoluteTime = function() return state.now * 1000000000 end },
+			processInfo = { processID = 4242 },
 			screen = { mainScreen = function()
 				phase("screen")
 				return { fullFrame = function() return { x = 0, y = 0, w = 1600, h = 1000 } end }
 			end },
 			eventtap = {
-				event = { types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4 } },
+				event = {
+					types = { mouseMoved = 1, leftMouseDown = 2, rightMouseDown = 3, scrollWheel = 4,
+						leftMouseDragged = 5, rightMouseDragged = 6, otherMouseDragged = 7, otherMouseDown = 8 },
+					properties = { eventSourceUnixProcessID = "pid" },
+				},
 				new = function(_, run)
 					local tap = { run = run, enabled = false }
 					function tap:start() self.enabled = true; return self end

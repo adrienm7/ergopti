@@ -219,8 +219,9 @@ alpha_idle = 140
 # ===============================
 
 # The widget shows only while text is being typed (maintainer, 2026-11-16, TWD-2).
-# A text key shows or updates it; a shortcut, a key of an ending group, a modifier
-# tapped alone, a click or a focus change ends the burst and hides it at once.
+# A text key shows or updates it; a shortcut, a key of an ending group, a shortcut
+# modifier tapped alone, a focus change, any pointer movement (a single pixel), a
+# click, a wheel or touchpad scroll ends the burst and hides it at once.
 # Keys are named by their KeyboardEvent.code in
 # _shared/layouts/data/keycodes/physical_keys.json, which maps them to each
 # driver's native code.
@@ -230,10 +231,20 @@ alpha_idle = 140
 # Home, End, Page Up/Down, Insert, Delete, media keys).
 ending_groups = ["function", "navigation", "media"]
 
-# Modifiers: pressed they neither show nor hide the widget (a held Shift types
-# capitals); tapped alone, with no other key between press and release, they end
-# the burst.
-modifier_codes = ["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight", "MetaLeft", "MetaRight"]
+# Shortcut modifiers: pressed they neither show nor hide the widget; tapped
+# alone, with no other key between press and release, they end the burst. Held
+# with a key, the driver's own shortcut test ends it (Ctrl, Alt but not AltGr,
+# Win or Cmd, Fn).
+modifier_codes = ["ControlLeft", "ControlRight", "AltLeft", "MetaLeft", "MetaRight"]
+
+# Level modifiers: part of typing text (capitals, AltGr levels), so they never end
+# a burst, held or tapped, alone or together (maintainer, 2026-11-16). AltRight is
+# AltGr (Windows, where it arrives as LCtrl+RAlt, and Linux ISO_Level3_Shift).
+level_codes = ["ShiftLeft", "ShiftRight", "AltRight"]
+
+# macOS level modifiers on top of level_codes: both Option keys type the AltGr
+# level of the Ergopti layout there.
+hs_level_codes = ["AltLeft"]
 
 # Keys that edit or lay out text without being text: they keep a burst going but
 # never start one.

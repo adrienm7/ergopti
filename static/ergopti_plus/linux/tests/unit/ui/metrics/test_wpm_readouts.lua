@@ -396,7 +396,28 @@ helpers.describe("wpm readouts: the live speed", function()
 				keystats.record_physical_key("app", 42, now)
 				now = now + 10
 				keystats.record_physical_release(42)
-				helpers.assert_true(not visible(), "a Shift tapped alone hides it")
+				helpers.assert_true(visible(), "a Shift tapped alone keeps the burst: it types capitals")
+				-- evdev 100 = AltGr (ISO_Level3_Shift), 18 = E.
+				now = now + 10
+				keystats.record_physical_key("app", 100, now)
+				now = now + 10
+				keystats.record_physical_release(100)
+				helpers.assert_true(visible(), "an AltGr tapped alone keeps the burst")
+				now = now + 10
+				keystats.record_physical_key("app", 42, now)
+				keystats.record_physical_key("app", 100, now)
+				now = now + 10
+				keystats.record_physical_key("app", 18, now)
+				keystats.on_keydown("€", now, "app", 18)
+				keystats.record_physical_release(100)
+				keystats.record_physical_release(42)
+				helpers.assert_true(visible(), "Shift+AltGr held then a key keeps and updates the burst")
+				helpers.assert_eq(keystats.get_live_stats(now).last_input_time, now / 1000, "the AltGr character is text")
+				now = now + 10
+				keystats.record_physical_key("app", 29, now)
+				now = now + 10
+				keystats.record_physical_release(29)
+				helpers.assert_true(not visible(), "a Ctrl tapped alone hides it")
 				now = now + 10
 				keystats.record_physical_key("app", 30, now)
 				keystats.on_keydown("a", now, "app", 30)
@@ -623,6 +644,37 @@ helpers.describe("wpm readouts: the floating widget", function()
 			helpers.assert_true(surface.visible)
 			Widget.tick(stats(42, nil, nil, 11.4), 100)
 			helpers.assert_true(not surface.visible, "refresh cannot extend real input")
+		end)
+	end)
+
+	-- TWD-2, decided by the maintainer on 2026-11-16: a single pixel of movement, a
+	-- wheel turn, a touchpad scroll or a click hides the widget; the next key shows
+	-- it again. A zero-distance report is no movement.
+	helpers.it("(twd2-pointer-hides) a one-pixel move, a wheel turn, a touchpad scroll or a click hides it", function()
+		with_storage({}, function()
+			local Widget = require("ui.wpm.widget")
+			local surface = fake_surface()
+			Widget._set_surface(surface)
+			Widget.start()
+			local now = 10
+			local function after(kind, value)
+				now = now + 0.5
+				Widget.tick(stats(42, nil, nil, now), now)
+				helpers.assert_true(surface.visible, "the key shows the widget before " .. kind)
+				now = now + 0.5
+				Widget.observe_pointer(kind, value, now)
+				Widget.tick(stats(42, nil, nil, now - 0.5), now)
+			end
+			after("motion", 0)
+			helpers.assert_true(surface.visible, "a zero-distance report is no movement")
+			after("motion", 1)
+			helpers.assert_true(not surface.visible, "a one-pixel move hides it")
+			after("motion", -1)
+			helpers.assert_true(not surface.visible, "a wheel turn hides it")
+			after("absolute_motion", 512)
+			helpers.assert_true(not surface.visible, "a touchpad scroll hides it")
+			after("press", 1)
+			helpers.assert_true(not surface.visible, "a click hides it")
 		end)
 	end)
 

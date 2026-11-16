@@ -61,7 +61,7 @@ _WPMC_TypingBurstIndexFromTheCanon() {
 	AssertTrue(Index is Map && Index.Count > 0, "the burst index loads with the canon")
 	AssertEqual("ends", WPMWidget_BurstRole(Index, 0x14B), "an arrow ends the burst")
 	AssertEqual("ends", WPMWidget_BurstRole(Index, 0x001), "Escape ends the burst")
-	AssertEqual("modifier", WPMWidget_BurstRole(Index, 0x02A), "Shift is a modifier")
+	AssertEqual("level", WPMWidget_BurstRole(Index, 0x02A), "Shift is a level modifier")
 	AssertEqual("modifier", WPMWidget_BurstRole(Index, 0x01D), "Ctrl is a modifier")
 	AssertEqual("neutral", WPMWidget_BurstRole(Index, 0x00E), "Backspace keeps a burst without starting one")
 	AssertEqual("", WPMWidget_BurstRole(Index, 0x01E), "a letter is text")
@@ -94,9 +94,9 @@ _WPMC_TypingBurstSequence() {
 	LastInput := 515
 	WPMWidget_BurstObserveKeyUp(State, 0x02A, 520)
 	AssertFalse(WPMWidget_BurstEnded(LastInput, State._last_break_ms), "a Shift held for a capital keeps the burst")
-	Press(0x02A, false, 600)
-	WPMWidget_BurstObserveKeyUp(State, 0x02A, 610)
-	AssertTrue(WPMWidget_BurstEnded(LastInput, State._last_break_ms), "a Shift tapped alone hides it")
+	Press(0x01D, false, 600)
+	WPMWidget_BurstObserveKeyUp(State, 0x01D, 610)
+	AssertTrue(WPMWidget_BurstEnded(LastInput, State._last_break_ms), "a Ctrl tapped alone hides it")
 	State._last_input_ms := 700
 	Press(0x00E, false, 710)
 	AssertEqual(710, State._last_input_ms, "a Backspace keeps a live burst going")
@@ -106,8 +106,57 @@ _WPMC_TypingBurstSequence() {
 	AssertEqual(710, State._last_input_ms, "a Backspace never starts a burst")
 	AssertTrue(WPMWidget_BurstEnded(State._last_input_ms, State._last_break_ms))
 }
-Test("WPM canon: text shows the widget, a shortcut, arrow or lone modifier hides it (twd2-typing-burst)",
+Test("WPM canon: text shows the widget, a shortcut, arrow or lone Ctrl hides it (twd2-typing-burst)",
 	_WPMC_TypingBurstSequence)
+
+; Shift, AltGr and Shift+AltGr type text (capitals, AltGr levels): held or tapped,
+; alone or together, they never end the burst. AltGr arrives as LCtrl+RAlt: that
+; LCtrl is no lone Ctrl tap. A real Ctrl+C still ends it (twd2-level-modifiers).
+_WPMC_LevelModifiersKeepTheBurst() {
+	AssertTrue(WPMWidget_LoadSharedConst())
+	Index := WPMWidgetConst.BURST
+	AssertEqual("level", WPMWidget_BurstRole(Index, 0x02A), "Shift is a level modifier")
+	AssertEqual("level", WPMWidget_BurstRole(Index, 0x138), "AltGr is a level modifier")
+	AssertEqual("modifier", WPMWidget_BurstRole(Index, 0x01D), "Ctrl is a shortcut modifier")
+	State := { _lone_modifier: 0, _last_break_ms: 0, _last_input_ms: 100 }
+	Press(Sc, Shortcut, Now) => WPMWidget_BurstObserveKey(State, WPMWidget_BurstRole(Index, Sc), Sc, Shortcut, Now)
+	Release(Sc, Now) => WPMWidget_BurstObserveKeyUp(State, Sc, Now)
+	Ended() => WPMWidget_BurstEnded(State._last_input_ms, State._last_break_ms)
+	Press(0x02A, false, 110), Release(0x02A, 120)
+	AssertFalse(Ended(), "Shift tapped alone keeps the burst")
+	Press(0x01D, false, 130), Press(0x138, false, 131), Release(0x01D, 140), Release(0x138, 141)
+	AssertFalse(Ended(), "AltGr tapped alone, LCtrl+RAlt, keeps the burst")
+	Press(0x02A, false, 150), Press(0x01D, false, 151), Press(0x138, false, 152)
+	Press(0x012, false, 160)
+	State._last_input_ms := 160
+	Release(0x01D, 170), Release(0x138, 171), Release(0x02A, 172)
+	AssertFalse(Ended(), "Shift+AltGr held, then a key, keeps the burst")
+	Press(0x01D, false, 180), Press(0x138, false, 181), Press(0x012, false, 190)
+	State._last_input_ms := 190
+	Release(0x01D, 195), Release(0x138, 196)
+	AssertFalse(Ended(), "AltGr+e typing a euro sign keeps and updates the burst")
+	Press(0x01D, false, 200), Press(0x02E, true, 210)
+	AssertTrue(Ended(), "a real Ctrl+C ends it")
+}
+Test("WPM canon: Shift, AltGr and Shift+AltGr never end the burst (twd2-level-modifiers)",
+	_WPMC_LevelModifiersKeepTheBurst)
+
+; Any physical pointer input newer than the last key hides the widget, a single
+; pixel included; the next key shows it again (twd2-pointer-hides).
+_WPMC_PointerEndsTheBurst() {
+	AssertTrue(WPMWidget_PointerEndsBurst(0, 5), "a pointer moved after the last key hides the widget")
+	AssertFalse(WPMWidget_PointerEndsBurst(5, 0), "the next key shows it again")
+	AssertFalse(WPMWidget_PointerEndsBurst(5, 5), "no pointer input since the key keeps it")
+	Tick := _DriverFuncBody("WPMWidget_Tick")
+	Watch := _DriverFuncBody("WPMWidget_MouseWatch")
+	AssertTrue(Tick != "" && Watch != "", "the widget's tick and mouse watch exist")
+	AssertTrue(InStr(Tick, "WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)") > 0,
+		"the tick hides on physical pointer input")
+	AssertTrue(InStr(Watch, "WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)") > 0,
+		"the mouse watch ignores the driver's own cursor moves")
+}
+Test("WPM canon: any physical pointer input hides the widget, the next key shows it (twd2-pointer-hides)",
+	_WPMC_PointerEndsTheBurst)
 
 #Include test_wpm_tick_rollover_owner.ahk
 

@@ -55,7 +55,7 @@ WPMWidget_TypingBurstIndex(Canon, SharedRoot := unset) {
 		if !Canon.Has("typing_burst") || !(Canon["typing_burst"] is Map)
 				throw ValueError("[typing_burst] is missing")
 		Burst := Canon["typing_burst"]
-		for _, Key in ["ending_groups", "modifier_codes", "neutral_codes"]
+		for _, Key in ["ending_groups", "modifier_codes", "neutral_codes", "level_codes"]
 				if !Burst.Has(Key) || !(Burst[Key] is Array) || !Burst[Key].Length
 						throw ValueError("[typing_burst]." . Key . " must be a non-empty list")
 		Root := IsSet(SharedRoot) ? SharedRoot : _SharedDir
@@ -67,7 +67,7 @@ WPMWidget_TypingBurstIndex(Canon, SharedRoot := unset) {
 		for Code, Record in Registry["keys"]
 				if Record is Map && Record.Has("ahk") && Record["ahk"] is String && Record.Has("group") && Ending.Has(Record["group"])
 						Index[StrUpper(Record["ahk"])] := "ends"
-		for _, Pair in [["modifier_codes", "modifier"], ["neutral_codes", "neutral"]]
+		for _, Pair in [["modifier_codes", "modifier"], ["neutral_codes", "neutral"], ["level_codes", "level"]]
 				for _, Code in Burst[Pair[1]] {
 						if !Registry["keys"].Has(Code)
 								throw ValueError("[typing_burst]." . Pair[1] . " names an unknown key " . Code)
@@ -76,7 +76,7 @@ WPMWidget_TypingBurstIndex(Canon, SharedRoot := unset) {
 		return Index
 }
 
-; The role of a scan code in a burst: "ends", "modifier", "neutral" or "" (text).
+; The role of a scan code in a burst: "ends", "modifier", "neutral", "level" or "" (text).
 ; @param Index {Map|Integer} From WPMWidget_TypingBurstIndex, 0 before the canon loads.
 ; @param Sc {Integer}
 ; @returns {String}
@@ -100,7 +100,11 @@ WPMWidget_BurstObserveKey(State, Role, Sc, IsShortcut, Now) {
 				State._lone_modifier := Sc
 				return
 		}
+		; Shift and AltGr type text: they never end a burst, and one pressed after a
+		; Ctrl (the LCtrl Windows sends with AltGr) means that Ctrl was no lone tap.
 		State._lone_modifier := 0
+		if Role == "level"
+				return
 		; A correction, a new line or a Tab keeps a live burst going, never starts one.
 		if IsShortcut || Role == "ends"
 				State._last_break_ms := Now
@@ -117,6 +121,17 @@ WPMWidget_BurstObserveKeyUp(State, Sc, Now) {
 				State._lone_modifier := 0
 				State._last_break_ms := Now
 		}
+}
+
+; Any physical pointer input newer than the last physical key — a single pixel
+; of movement, a click, a wheel or touchpad scroll — ends the burst (TWD-2,
+; decided by the maintainer on 2026-11-16). Both clocks count physical input
+; only, so the driver's own cursor moves never hide the widget.
+; @param MouseIdleMs {Integer} A_TimeIdleMouse.
+; @param KeyboardIdleMs {Integer} A_TimeIdleKeyboard.
+; @returns {Boolean}
+WPMWidget_PointerEndsBurst(MouseIdleMs, KeyboardIdleMs) {
+		return MouseIdleMs < KeyboardIdleMs
 }
 
 ; Whether the burst ended after the last text: the widget then hides.

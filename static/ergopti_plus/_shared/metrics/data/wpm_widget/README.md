@@ -32,8 +32,9 @@ source, the graph's curve, when to show, the default place — in
 buffers over the same timings).
 
 The widget shows only while text is typed (`[typing_burst]`, decided by the
-maintainer on 2026-11-16): the keys that end a burst, the modifiers and the
-neutral keys are named by `KeyboardEvent.code` and mapped to each driver's codes
+maintainer on 2026-11-16): any pointer input ends a burst, and the keys that end
+one, the shortcut modifiers, the level modifiers (Shift, AltGr) and the neutral
+keys are named by `KeyboardEvent.code` and mapped to each driver's codes
 through `_shared/layouts/data/keycodes/physical_keys.json`
 (`_shared/metrics/engine/wpm/typing_keys.lua` on macOS and Linux,
 `WPMWidget_TypingBurstIndex` on Windows).

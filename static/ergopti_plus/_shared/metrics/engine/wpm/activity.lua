@@ -42,7 +42,7 @@ end
 
 --- Observes a physical key press that is not text by itself.
 --- @param state table
---- @param role string|nil From typing_keys: "ends", "modifier", "neutral", or nil.
+--- @param role string|nil From typing_keys: "ends", "modifier", "neutral", "level", or nil.
 --- @param code any The native key code.
 --- @param shortcut boolean A Ctrl, Alt, Cmd or Win chord.
 --- @param now_ms number Monotonic time.
@@ -51,7 +51,10 @@ function M.observe_key(state, role, code, shortcut, now_ms)
 		state.lone_modifier = code
 		return
 	end
+	-- Shift and AltGr type text: they never end a burst, and one pressed after a
+	-- Ctrl (the LCtrl Windows sends with AltGr) means that Ctrl was no lone tap.
 	state.lone_modifier = nil
+	if role == "level" then return end
 	if shortcut == true or role == "ends" then
 		M.record_break(state, now_ms)
 		state.pending_text_ms = nil

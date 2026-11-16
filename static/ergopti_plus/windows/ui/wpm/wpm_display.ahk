@@ -570,7 +570,11 @@ WPMWidget_PrewarmGraph() {
 WPMWidget_ObserveKey(Sc, IsShortcut, Now := A_TickCount) {
 	if !_WPMWidget_Collecting()
 		return
-	WPMWidget_BurstObserveKey(WPMWidget, WPMWidget_BurstRole(WPMWidgetConst.BURST, Sc), Sc, IsShortcut, Now)
+	Role := WPMWidget_BurstRole(WPMWidgetConst.BURST, Sc)
+	; The layout's own AltGr key, wherever it sits, is a level modifier too.
+	try if Sc == KS_AltGrScanCode()
+		Role := "level"
+	WPMWidget_BurstObserveKey(WPMWidget, Role, Sc, IsShortcut, Now)
 }
 
 ; A modifier released with no other key since its press ends the burst.
@@ -801,7 +805,7 @@ WPMWidget_Tick() {
         || (last_input > 0 && _WPMWidget_TickDelta(now, last_input) > WPMWidgetConst.IDLE_HIDE_MS)
     ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
     ; A_TimeIdleMouse is built into AHK and requires no hook install.
-    mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
+    mouse_active  := WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)
     should_show   := _WPMWidget_TooltipUp()
         || (!keyboard_idle && !mouse_active && !WPMWidget_BurstEnded(last_input, last_break)
             && ((wpm > 0) || has_hs || has_ai || has_ac))
@@ -906,6 +910,10 @@ WPMWidget_MouseWatch() {
         return
     WPMWidget._last_mouse_x := mx
     WPMWidget._last_mouse_y := my
+    ; A move the driver made itself (a cursor restore, a pointer action) is no
+    ; physical input: the physical idle clocks tell them apart (TWD-2).
+    if !WPMWidget_PointerEndsBurst(A_TimeIdleMouse, A_TimeIdleKeyboard)
+        return
     ; The tick keeps the widget up while a preview is on screen; hiding it here
     ; would only make it flicker back.
     if _WPMWidget_TooltipUp()

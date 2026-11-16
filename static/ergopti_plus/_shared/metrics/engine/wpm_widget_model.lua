@@ -95,7 +95,7 @@ function M.validate(canon)
 	end
 	-- The typing burst rule: lists of KeyboardEvent.code names and registry groups.
 	if type(canon.typing_burst) ~= "table" then return nil, "missing [typing_burst]" end
-	for _, key in ipairs({ "ending_groups", "modifier_codes", "neutral_codes" }) do
+	for _, key in ipairs({ "ending_groups", "modifier_codes", "neutral_codes", "level_codes" }) do
 		local list = canon.typing_burst[key]
 		if type(list) ~= "table" or #list == 0 then
 			return nil, string.format("[typing_burst].%s must be a non-empty list", key)

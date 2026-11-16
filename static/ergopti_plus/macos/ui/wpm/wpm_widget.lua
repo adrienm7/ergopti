@@ -495,6 +495,17 @@ end
 -- =====================================
 -- =====================================
 
+--- Whether an event was posted by this process.
+--- @param event any The eventtap event.
+--- @return boolean
+local function is_own_event(event)
+	local properties = hs.eventtap.event.properties
+	local key = type(properties) == "table" and properties.eventSourceUnixProcessID or nil
+	if key == nil or event == nil or type(hs.processInfo) ~= "table" then return false end
+	local ok, pid = pcall(function() return event:getProperty(key) end)
+	return ok and pid ~= nil and pid == hs.processInfo.processID
+end
+
 --- Starts the floating widget loop.
 --- @param show_graph boolean Whether to draw the history curve.
 --- @return boolean committed True only when both polling capabilities are active.
@@ -546,15 +557,19 @@ function M.start(show_graph)
 		return false
 	end
 
-	-- Watch all mouse/touchpad events to know when to hide the widget.
+	-- Watch all mouse/touchpad events to know when to hide the widget: any move,
+	-- a single pixel included, a drag, a click or a wheel or touchpad scroll ends
+	-- the typing burst (TWD-2, decided by the maintainer on 2026-11-16).
+	local types = hs.eventtap.event.types
 	local tap_ok, tap_candidate = xpcall(function()
 		return hs.eventtap.new({
-			hs.eventtap.event.types.mouseMoved,
-			hs.eventtap.event.types.leftMouseDown,
-			hs.eventtap.event.types.rightMouseDown,
-			hs.eventtap.event.types.scrollWheel,
-		}, function()
+			types.mouseMoved, types.leftMouseDragged, types.rightMouseDragged, types.otherMouseDragged,
+			types.leftMouseDown, types.rightMouseDown, types.otherMouseDown, types.scrollWheel,
+		}, function(event)
 			if not _running or generation ~= _generation then return false end
+			-- A move this process posted (a cursor restore, a pointer action) is no
+			-- user input.
+			if is_own_event(event) then return false end
 			-- Even a single move immediately after a key must hide the widget.
 			_last_mouse_sec = hs.timer.absoluteTime() / 1000000000
 			return false  -- do not consume the event

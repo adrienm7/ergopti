@@ -18,7 +18,7 @@
 local M = {}
 
 --- The role of a key in a burst.
-M.ROLE = { ENDS = "ends", MODIFIER = "modifier", NEUTRAL = "neutral" }
+M.ROLE = { ENDS = "ends", MODIFIER = "modifier", NEUTRAL = "neutral", LEVEL = "level" }
 
 --- Builds native code → role from the registry and the canon's [typing_burst].
 --- A key absent from the index is a text key.
@@ -38,7 +38,10 @@ function M.index(registry, burst, field)
 		local native = type(record) == "table" and record[field] or nil
 		if native ~= nil and ending[record.group] then index[native] = M.ROLE.ENDS end
 	end
-	for _, list_role in ipairs({ { "modifier_codes", M.ROLE.MODIFIER }, { "neutral_codes", M.ROLE.NEUTRAL } }) do
+	-- The level modifiers come last: a driver's own extra list (hs_level_codes)
+	-- turns a shortcut modifier of the other drivers into a level one there.
+	for _, list_role in ipairs({ { "modifier_codes", M.ROLE.MODIFIER }, { "neutral_codes", M.ROLE.NEUTRAL },
+		{ "level_codes", M.ROLE.LEVEL }, { field .. "_level_codes", M.ROLE.LEVEL } }) do
 		for _, code in ipairs(burst[list_role[1]] or {}) do
 			local record = registry.keys[code]
 			if type(record) ~= "table" then
