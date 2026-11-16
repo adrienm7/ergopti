@@ -300,7 +300,9 @@ def seed(scenario, home, seed_tag, today):
         path.symlink_to(target, target_is_directory=True)
         state["symlinks"].append(str(path))
 
-    if scenario in ("clean", "plain_open", "karabiner_config"):
+    # A relocation moves only the bundle (macos_app_relocation.py); the user's
+    # own state stays the clean one so the launch proves the location alone.
+    if scenario in ("clean", "plain_open", "karabiner_config", *relocation.SCENARIOS):
         return state
     if scenario == "upgraded":
         seed_personal_files(default, seed_tag)
