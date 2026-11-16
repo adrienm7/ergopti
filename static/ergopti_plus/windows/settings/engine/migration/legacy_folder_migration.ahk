@@ -4,7 +4,8 @@
 ; MODULE: Legacy Folder Migration (Windows)
 ; DESCRIPTION:
 ; Moves, once at boot, the folders of the builds before the single folder name
-; into %LOCALAPPDATA%\Ergopti: the Roaming paths.toml, the default
+; into %LOCALAPPDATA%\Ergopti: the Roaming paths.toml (and the bootstrap.log
+; those builds wrote beside it, into the logs folder), the default
 ; configuration folder %USERPROFILE%\.config\<old>, every entry of the old
 ; LocalAppData folder (logs, cache, control, updater, diagnostics) and the old
 ; managed Ollama folders (the first build's, then the protected sibling), each
@@ -609,10 +610,19 @@ LegacyFolderMigrationRun(PathsFile) {
 				ConfigTransitionRecoverAtBootOrThrow(LegacyPaths)
 		LegacyFolderMoveEntry(LegacyPaths, AppFoldersPathsFile(),
 				Backup . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative(), Report)
-		SplitPath(LegacyPaths, , &LegacyPathsDir)
-		LegacyFolderRemoveIfEmpty(LegacyPathsDir, Report)
 		LegacyFolderMoveEntry(LegacyConfig, NewConfig, Backup . "\" . AppDirsMigrationWindowsLegacyConfigRelative(), Report)
 		LegacyFolderMergeEntries(LegacyLocal, Root, Backup . "\" . AppDirsMigrationWindowsLegacyLocalFolder(), Report)
+		; The builds before the single folder wrote their pre-logger lines to
+		; bootstrap.log beside that paths.toml; left there, the old folder never
+		; empties. It joins the default logs folder, where bootstrap.log lives
+		; now, after the old logs folder merged in, so it never takes that
+		; folder's place and sends it to the backup.
+		SplitPath(LegacyPaths, , &LegacyPathsDir)
+		SplitPath(AppDirsMigrationWindowsLegacyPathsFileRelative(), , &LegacyPathsRelativeDir)
+		LegacyFolderMoveEntry(LegacyPathsDir . "\" . AppDirsLogBootstrapName(),
+				RTrim(LoggerDefaultLogsDir(), "\") . "\" . AppDirsLogBootstrapName(),
+				Backup . "\" . LegacyPathsRelativeDir . "\" . AppDirsLogBootstrapName(), Report)
+		LegacyFolderRemoveIfEmpty(LegacyPathsDir, Report)
 		; A rename keeps the runtime folder's protected ACL and file identity, which
 		; its root-owner.json receipt records; the second old folder, when the first
 		; one already moved, goes to the backup.

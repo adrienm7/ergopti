@@ -271,7 +271,10 @@ Account and tester actions (maintainer, from the PC):
       are gone; `%LOCALAPPDATA%\Ergopti\config\` exists, while `paths.toml` points the configuration at
       `D:\Documents\GitHub\config\ergopti_plus\`; `before-folder-migration\ergopti_plus\logs` only holds the old logs
       (21 October to 4 November). Left over: `%APPDATA%\Ergopti\` still holds a `bootstrap.log` of 7 September, which
-      the migration does not move, so that folder is never empty and stays.
+      the migration does not move, so that folder is never empty and stays. Fixed 2026-11-16: the migration moves that
+      log into `%LOCALAPPDATA%\Ergopti\logs\` (to `before-folder-migration\Ergopti\bootstrap.log` when one is already
+      there) and removes the folder (`legacy-folder-migration-bootstrap-log`); after the next boot, check that
+      `%APPDATA%\Ergopti\` is gone and the log holds « Removed the emptied legacy folder ».
 - [ ] Hot-path span lines on Windows (moved 2026-11-15 from TODO.md « Linux performance », « Windows counterparts »;
       9a3fa08e75, `test_hotpath_span_lines.ahk`): at DEBUG on the PC, a field log holds the `[TRACE] [Span] <name>…`
       and `[DONE] [Span] <name> done in N ms (<outcome>)` pairs for `hotstring.expand` (fired, declined or pending),

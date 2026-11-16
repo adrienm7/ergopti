@@ -246,6 +246,51 @@ _LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile() {
 Test("legacy folder migration: the Windows plan moves both old Ollama folders on a private profile (legacy-folder-migration-windows-plan)",
 	_LFM_WindowsPlanMovesEveryOldFolderOnAPrivateProfile)
 
+; The builds before the single folder wrote bootstrap.log beside the Roaming
+; paths.toml. Only paths.toml moved, so on the maintainer's PC (2026-11-16) the
+; old Roaming folder kept that log and was never removed, even once paths.toml
+; had left at an earlier boot. The log joins the default logs folder, or the
+; backup when that folder already holds one, and the old folder goes.
+_LFM_StrayBootstrapLogEmptiesTheRoamingFolder() {
+	Profile := A_Temp . "\ergopti_test_legacy_folder_bootstrap_" . A_TickCount
+	Saved := Map()
+	for Name in ["LOCALAPPDATA", "APPDATA", "USERPROFILE"]
+		Saved[Name] := EnvGet(Name)
+	try {
+		Local_ := Profile . "\Local", Roaming := Profile . "\Roaming", Home := Profile . "\Home"
+		SplitPath(Roaming . "\" . AppDirsMigrationWindowsLegacyPathsFileRelative(), , &OldDir)
+		for Path in [Local_, OldDir, Home]
+			DirCreate(Path)
+		FileAppend("OLD", OldDir . "\" . AppDirsLogBootstrapName())
+		EnvSet("LOCALAPPDATA", Local_), EnvSet("APPDATA", Roaming), EnvSet("USERPROFILE", Home)
+		NewLog := LoggerDefaultLogsDir() . AppDirsLogBootstrapName()
+		Report := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		AssertEqual("OLD", FileRead(NewLog), "the stray log joined the default logs folder")
+		Assert(!FileExist(OldDir), "the old Roaming folder is removed once paths.toml already left")
+		AssertEqual(0, Report["kept"].Length, "nothing left behind")
+
+		; A second stray log, the logs folder already holding one: it goes to the
+		; backup, the current log stays, and the old folder still goes.
+		DirCreate(OldDir)
+		FileAppend("OLDER", OldDir . "\" . AppDirsLogBootstrapName())
+		Again := LegacyFolderMigrationRun(AppFoldersPathsFile())
+		SplitPath(AppDirsMigrationWindowsLegacyPathsFileRelative(), , &RelativeDir)
+		Backup := RTrim(AppFoldersRoot(), "\") . "\" . AppDirsMigrationBackupFolder() . "\" . RelativeDir . "\"
+			. AppDirsLogBootstrapName()
+		AssertEqual("OLD", FileRead(NewLog), "the current log is never replaced")
+		AssertEqual("OLDER", FileRead(Backup), "the stray log went to the backup")
+		Assert(!FileExist(OldDir), "the old Roaming folder is removed")
+		AssertEqual(1, Again["backed_up"].Length, "the backup is reported")
+	} finally {
+		for Name, Value in Saved
+			EnvSet(Name, Value)
+		if DirExist(Profile)
+			DirDelete(Profile, true)
+	}
+}
+Test("legacy folder migration: a stray bootstrap.log leaves the old Roaming folder (legacy-folder-migration-bootstrap-log)",
+	_LFM_StrayBootstrapLogEmptiesTheRoamingFolder)
+
 ; Runs Body(OldConfig) with LOCALAPPDATA, APPDATA and USERPROFILE pointing at
 ; a private profile holding an old paths.toml that names the old configuration
 ; folder (or the folder Chosen below it), so the real AppData is never read or

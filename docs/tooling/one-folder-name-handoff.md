@@ -86,7 +86,8 @@ Drivers:
   `ergopti`; the backup is `<base>/ergopti/before-folder-migration/`.
 - **Windows** `settings/engine/migration/legacy_folder_migration.ahk`, from `boot.ahk` before the
   transition recovery and never under the startup smoke: the Roaming
-  `%APPDATA%\Ergopti\paths.toml`, `%USERPROFILE%\.config\ergopti_plus`, every
+  `%APPDATA%\Ergopti\paths.toml` and the `bootstrap.log` those builds wrote
+  beside it (into `%LOCALAPPDATA%\Ergopti\logs`), `%USERPROFILE%\.config\ergopti_plus`, every
   entry of `%LOCALAPPDATA%\ergopti_plus`, then `ergopti_plus_ollama` and the
   `Ergopti-ollama` sibling into `%LOCALAPPDATA%\Ergopti\ollama` (the second one
   to the backup when the first already moved).
