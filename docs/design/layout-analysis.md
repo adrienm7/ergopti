@@ -348,7 +348,9 @@ Shipped as of 2026-11-14:
   n-gram of the wrong length or a count under its floor.
   `tools/build/import-count-tables.cjs` rebuilds them from the archives pinned
   by SHA-256 in `static/corpus/count_table_sources.json`, with the engine's
-  own counting rules. It drops the n-grams rarer than the register's
+  own counting rules. It first repairs the UTF-8 a crawled page decoded as
+  CP1252 (the French news sentences hold some 2,600 such apostrophes), so one
+  apostrophe is not counted as three rare characters. It drops the n-grams rarer than the register's
   `prune_ratio` of their table (5e-8) and refuses a table when any metric of
   QWERTY, AZERTY, BÉPO, Ergopti, Dvorak, Colemak or Ergo-L measured on the
   pruned counts differs from the full counts by more than 0.05 (percentage

@@ -101,6 +101,31 @@ let checks = 0;
 	checks++;
 }
 
+// A Leipzig sentence holding UTF-8 a crawled page decoded as CP1252 counts the
+// characters it meant; Latin-1 text that happens to be valid UTF-8 stays. The
+// runs are escaped: spelled out, they would trip the source encoding gate.
+{
+	const repair = Import.repairMojibake;
+	assert.equal(repair('d\u00e2\u20ac\u2122un'), 'd\u2019un', 'apostrophe');
+	assert.equal(repair('c\u00c5\u201cur'), 'c\u0153ur', 'oe ligature');
+	assert.equal(repair('1\u00e1\u00b5\u2030r'), '1\u1d49r', 'superscript e');
+	assert.equal(repair('fin\u00e2\u20ac\u00a6'), 'fin\u2026', 'ellipsis');
+	// « Ç’a » is the UTF-8 of a Latin Extended-B letter, « é»« » of a CJK one.
+	assert.equal(repair('\u00c7\u2019a'), '\u00c7\u2019a');
+	assert.equal(
+		repair('pr\u00e9c\u00e9d\u00e9\u00bb\u00abet'),
+		'pr\u00e9c\u00e9d\u00e9\u00bb\u00abet'
+	);
+	// Only CP1252-only bytes mark a run: an all-Latin-1 run is left as written.
+	assert.equal(repair('1\u00ca\u00b3'), '1\u00ca\u00b3');
+	const engine = Analysis.loadEngine();
+	assert.deepEqual(
+		plain(Import.leipzigCounts('1\tl\u00e2\u20ac\u2122a\n', engine)),
+		plain(engine.ngramsFromText('l\u2019a'))
+	);
+	checks++;
+}
+
 // A Lexique table: a form's rows are summed, a multi-word entry is left out.
 {
 	const tsv = [

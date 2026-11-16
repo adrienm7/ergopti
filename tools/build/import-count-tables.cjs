@@ -138,9 +138,72 @@ function merge(into, from) {
 			into[name][gram] = (into[name][gram] || 0) + n;
 }
 
+// The characters CP1252 gives the bytes 0x80-0x9F (Latin-1 gives the others
+// their own code point). 0x81, 0x8D, 0x8F, 0x90 and 0x9D are undefined there.
+// Written as escapes: spelling a mojibake run here would trip the encoding gate.
+const CP1252_HIGH = [
+	0x20ac, 0, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039, 0x0152,
+	0, 0x017d, 0, 0, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014, 0x02dc, 0x2122, 0x0161,
+	0x203a, 0x0153, 0, 0x017e, 0x0178
+];
+const CP1252_BYTE = new Map();
+for (let byte = 0xa0; byte <= 0xff; byte++) CP1252_BYTE.set(String.fromCharCode(byte), byte);
+CP1252_HIGH.forEach((code, i) => code && CP1252_BYTE.set(String.fromCharCode(code), 0x80 + i));
+const UTF8_STRICT = new TextDecoder('utf-8', { fatal: true });
+// The code points a repaired run may yield: Latin-1 and Latin Extended-A
+// (« œ »), the spacing modifiers, the phonetic superscripts (« 1ᵉʳ ») and the
+// punctuation and symbol blocks. Anything else is a coincidence of real text:
+// « Ç’a » forms the valid UTF-8 of « ǒ » (Latin Extended-B), a run of
+// accented letters and quotes can form a CJK character.
+const REPAIRABLE = /^[\u00a0-\u017f\u02b0-\u02ff\u1d00-\u1dbf\u2000-\u2bff]$/u;
+
+/**
+ * Repairs the UTF-8 sequences a source page decoded as CP1252 before Leipzig
+ * crawled it (« d’un » reaching the corpus as « d », « â », « € », « ™ », « un »):
+ * counted as they are, they turn one apostrophe into three rare characters.
+ * A run is repaired only when its CP1252 bytes are one valid UTF-8 character
+ * in REPAIRABLE and one of them is a CP1252-only character (0x80-0x9F), so
+ * Latin-1 text that happens to form valid UTF-8 (« précédé»« ») stays as written.
+ * @param {string} line - One sentence.
+ * @returns {string} The sentence with each such run decoded.
+ */
+function repairMojibake(line) {
+	let out = '';
+	for (let i = 0; i < line.length; ) {
+		const lead = CP1252_BYTE.get(line[i]);
+		const size =
+			lead >= 0xc2 && lead <= 0xdf ? 2 : lead >= 0xe0 && lead <= 0xf4 ? 3 + (lead >= 0xf0) : 0;
+		const bytes = [lead];
+		let cp1252Only = false;
+		for (let k = 1; k < size; k++) {
+			const byte = CP1252_BYTE.get(line[i + k]);
+			if (byte === undefined || byte > 0xbf) break;
+			cp1252Only ||= byte < 0xa0;
+			bytes.push(byte);
+		}
+		if (size && bytes.length === size && cp1252Only) {
+			let decoded = '';
+			try {
+				decoded = UTF8_STRICT.decode(Uint8Array.from(bytes));
+			} catch {
+				decoded = '';
+			}
+			if (REPAIRABLE.test(decoded)) {
+				out += decoded;
+				i += size;
+				continue;
+			}
+		}
+		out += line[i];
+		i += 1;
+	}
+	return out;
+}
+
 /**
  * The counts of a Leipzig sentence file: its « number<TAB> » prefixes removed,
- * each line counted as text by the engine.
+ * its CP1252-decoded UTF-8 repaired (repairMojibake), each line counted as text
+ * by the engine.
  * @param {string} text - The sentence file.
  * @param {object} engine - LAYOUT_ANALYSIS.
  * @returns {{chars: object, bigrams: object, trigrams: object}}
@@ -151,7 +214,7 @@ function leipzigCounts(text, engine) {
 	for (let i = 0; i < lines.length; i += LINES_PER_CHUNK) {
 		const chunk = lines
 			.slice(i, i + LINES_PER_CHUNK)
-			.map((line) => line.replace(/^\d+\t/, ''))
+			.map((line) => repairMojibake(line.replace(/^\d+\t/, '')))
 			.join('\n');
 		merge(counts, engine.ngramsFromText(chunk));
 	}
@@ -380,6 +443,7 @@ module.exports = {
 	zipMember,
 	leipzigCounts,
 	lexiqueCounts,
+	repairMojibake,
 	prune,
 	pruneDeviation,
 	engineWithLibrary,
