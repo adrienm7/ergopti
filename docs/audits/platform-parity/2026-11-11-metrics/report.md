@@ -45,11 +45,13 @@ network stage after the system one.
   Linux row the reading device's current offset (logged). Done on Linux and
   macOS (writers, migration, purge triggers, the Linux ledger rebuild and the
   macOS raw rebuild; `linux-utc-offset`, `linux-import-utc-offset`,
-  `utc-offset-rows`). **Windows counterpart (maintainer):** see the decision
-  entry in `docs/memory/maintainer-decisions.md` (cache migration before
-  `KLR_LoadPurgeSchema`, UTC `ts` and the offset in the `keystats_sql.ahk`
-  writers and the tombstone, `keystats_walker_events.ahk` readers); an
-  existing Windows cache refuses raw INSERTs until it migrates.
+  `utc-offset-rows`). **Windows counterpart:** done in 650a49bdb2
+  (2026-11-11; cache migration before `KLR_LoadPurgeSchema`, UTC `ts` and the
+  offset in the `keystats_sql.ahk` writers and the tombstone,
+  `keystats_walker_events.ahk` readers; `klr-utc-offset-migration`,
+  `utc-offset-rows`). Rechecked on the PC on 2026-11-16: an older row keeps its
+  local `ts` and a NULL offset, the migration is idempotent, a partial image
+  gains the column only where it lacks it and a refused one rolls back.
 - **KMD-2, excluded-app scope for telemetry that is not typing.** The fixes
   above follow Windows (refuse the row). Decided by the maintainer on
   2026-11-11: refused on every OS, no neutral label. Verified on dev: Linux
@@ -78,8 +80,9 @@ invalidation; shared-schema tables refused on import.
 - **macOS:** an imported Linux sibling's system rows took their day from `ts`
   (`aggregator/events.lua`); the raw rebuild now feeds the lived local time
   (KMD-1), so their day is the sibling's own.
-- **Windows (report only):** the same for `keystats_walker_events.ahk`, and
-  Windows' reader of a Linux ledger stays unverified.
+- **Windows:** `keystats_walker_events.ahk` reads ts plus the offset since
+  650a49bdb2 (an older Linux row with the current offset); a real Linux ledger
+  read by Windows stays unverified.
 - **Not checked:** whether Windows typed text carries a raw CR for Enter (how
   often KML-001 triggers), the Linux Ctrl+V identity under the remap, a macOS
   VPN answer arriving after a pause starts.

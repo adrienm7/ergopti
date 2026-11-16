@@ -438,12 +438,13 @@ a future one converts `ts` from UTC.
   tombstone's local time.
 - Readers: Linux `ledger_rebuild.walk_device`, macOS
   `_publish_rebuilt_partitions` (log_manager).
-- Windows (maintainer): add the same column on open of an existing cache and
-  drop the 16 purge triggers before `KLR_LoadPurgeSchema`
-  (`keystats_reader_db.ahk`); until then an existing Windows cache refuses
-  every raw INSERT, which now names the column. Pass `ts` in UTC and
-  `utc_offset_min` in every `KeystatsQuery("events.*")` of `keystats_sql.ahk`
-  and the network, topology, capture, ROI and clipboard writers; the
+- Windows (done in 650a49bdb2, 2026-11-11; rechecked 2026-11-16): the same
+  column is added on open of an existing cache and the 16 purge triggers are
+  dropped before `KLR_LoadPurgeSchema` (`keystats_reader_db.ahk`,
+  `KLR_EnsureUtcOffsetColumn`, one savepoint, nothing when no table lacks it).
+  Every `KeystatsQuery("events.*")` of `keystats_sql.ahk` and the network,
+  topology, capture, ROI and clipboard writers pass `ts` in UTC and
+  `utc_offset_min`; the
   tombstone of `keystats_maintenance.ahk` gives `utc` milliseconds and its own
   offset; `keystats_walker_events.ahk` reads ts + offset (an older Linux row
   with the current offset) for `KLW_IsNightWake`, the hour slot and the days
