@@ -12,7 +12,7 @@ file's declared sections. It prints one receipt line per bound file.
 
 The packaged registry is a folder (the macOS and Linux packages) or a folder
 inside a ZIP archive written `<archive.zip>::<folder in it>` (the Windows
-static bundle, tools/build/build_static_bundle.py, which ErgoptiPlus.exe
+static bundle, tools/build/build_static_bundle.py, which the Windows executable
 embeds and extracts on first launch).
 """
 
