@@ -469,3 +469,30 @@ _TLL_SharedHeaderExpiryIsArmed() {
 Test("llm tooltip layout: a shared hotstring row leaves on its own expiry (llm-hotstring-tooltip-both-expiry)",
 	_TLL_SharedHeaderExpiryIsArmed)
 
+; The Delays row shows a lifetime of 0 as « infinite », and macOS and Linux keep
+; the prediction until the next activity; Windows hid it after the 50 ms floor.
+_TLL_ZeroLifetimeKeepsThePrediction() {
+	global UI_TIMEOUT_DECREMENT_SEC, UI_TIMEOUT_FLOOR_SEC, _SharedDir
+	; This headless harness does not run UiStyle_LoadSharedConst: seed the two
+	; shared [timing] values from the constants.toml it reads.
+	Saved := [UI_TIMEOUT_DECREMENT_SEC, UI_TIMEOUT_FLOOR_SEC]
+	Constants := ParseTomlFile(_SharedDir . "\core\ui\data\tooltip\constants.toml")
+	try {
+		UI_TIMEOUT_DECREMENT_SEC := Float(IniCacheGet(Constants, "timing", "timeout_decrement_sec"))
+		UI_TIMEOUT_FLOOR_SEC := Float(IniCacheGet(Constants, "timing", "timeout_floor_sec"))
+		Assert(UI_TIMEOUT_DECREMENT_SEC > 0 and UI_TIMEOUT_FLOOR_SEC > 0, "constants.toml declares the [timing] values")
+		AssertEqual(0, _LLM_TooltipLifetimeMs(0), "0 arms no auto-hide")
+		AssertEqual(0, _LLM_TooltipLifetimeMs("0"), "a stored text 0 too")
+		AssertEqual(Round((20 - UI_TIMEOUT_DECREMENT_SEC) * 1000), _LLM_TooltipLifetimeMs(20),
+			"a lifetime loses the shared decrement")
+		AssertEqual(Round(UI_TIMEOUT_FLOOR_SEC * 1000), _LLM_TooltipLifetimeMs(UI_TIMEOUT_DECREMENT_SEC / 2),
+			"a lifetime shorter than the decrement keeps the shared floor")
+		AssertThrows(() => _LLM_TooltipLifetimeMs(-1), "a negative lifetime is refused")
+	} finally {
+		UI_TIMEOUT_DECREMENT_SEC := Saved[1]
+		UI_TIMEOUT_FLOOR_SEC := Saved[2]
+	}
+}
+Test("llm tooltip layout: a prediction lifetime of 0 keeps it until the next activity (llm-zero-lifetime)",
+	_TLL_ZeroLifetimeKeepsThePrediction)
+

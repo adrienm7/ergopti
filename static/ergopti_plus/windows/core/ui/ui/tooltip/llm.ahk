@@ -496,8 +496,7 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 			if _llm_ov.HasOverride
 				llm_timeout_sec := _llm_ov.Delay
 		}
-		Meta["timeout_ms"] := Round(
-			Max(0.05, llm_timeout_sec - 0.2) * 1000)
+		Meta["timeout_ms"] := _LLM_TooltipLifetimeMs(llm_timeout_sec)
 	}
     ; Reserve render ownership and cancel the older hotstring dequeue cycle in
     ; one short transaction. Slots/Visible/ShownAt deliberately remain owned by
@@ -549,6 +548,23 @@ LLM_TooltipShow(payload, active := 1, is_final := false,
 		slots.Length, (is_final ? "true" : "false"),
 		Meta["timeout_ms"], RenderGeneration)
 	return RenderGeneration
+}
+
+; The auto-hide of a prediction in ms: its configured lifetime less the shared
+; [timing] decrement, never below the shared floor. A lifetime of 0, which the
+; Delays row shows as « infinite », keeps the prediction until the next activity
+; (0 arms no timeout), as on macOS and Linux; it used to hide it after the 50 ms
+; floor.
+; @param Sec {Number} The configured lifetime in seconds.
+; @returns {Integer} Milliseconds, 0 for no auto-hide.
+_LLM_TooltipLifetimeMs(Sec) {
+	global UI_TIMEOUT_DECREMENT_SEC, UI_TIMEOUT_FLOOR_SEC
+	if !IsNumber(Sec) || Number(Sec) < 0
+		throw ValueError("A prediction lifetime must be a non-negative number of seconds.", -1, Sec)
+	Sec := Number(Sec)
+	if Sec == 0
+		return 0
+	return Round(Max(UI_TIMEOUT_FLOOR_SEC, Sec - UI_TIMEOUT_DECREMENT_SEC) * 1000)
 }
 
 ; A caller that attaches state to a paint must compare the returned generation
