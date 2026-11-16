@@ -252,7 +252,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-bg: var(--theme-gray6-dark);
 		--theme-surface: var(--theme-gray5-dark);
 		--theme-surface-2: #242426;
@@ -263,6 +263,18 @@
 		--theme-accent-soft: rgba(10, 132, 255, 0.22);
 		--theme-danger: var(--theme-red-dark);
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-bg: var(--theme-gray6-dark);
+	--theme-surface: var(--theme-gray5-dark);
+	--theme-surface-2: #242426;
+	--theme-separator: var(--theme-gray4-dark);
+	--theme-text: #fff;
+	--theme-sub: rgba(235, 235, 245, 0.6);
+	--theme-accent: var(--theme-blue-dark);
+	--theme-accent-soft: rgba(10, 132, 255, 0.22);
+	--theme-danger: var(--theme-red-dark);
 }
 
 /* ===================================================== */
@@ -286,7 +298,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-dialog-text: #e6e6e6;
 		--theme-dialog-muted: #9a9a9a;
 		--theme-dialog-background: #1f1f1f;
@@ -296,6 +308,17 @@
 		--theme-dialog-ok: #3fb950;
 		--theme-dialog-fail: #ff7b72;
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-dialog-text: #e6e6e6;
+	--theme-dialog-muted: #9a9a9a;
+	--theme-dialog-background: #1f1f1f;
+	--theme-dialog-panel: #2a2a2a;
+	--theme-dialog-border: #3a3a3a;
+	--theme-dialog-code-background: #111;
+	--theme-dialog-ok: #3fb950;
+	--theme-dialog-fail: #ff7b72;
 }
 
 /* =========================================== */
@@ -317,7 +340,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-metrics-bg: #1e1e1e;
 		--theme-metrics-panel: #2d2d2d;
 		--theme-metrics-text: #f0f0f0;
@@ -328,6 +351,18 @@
 		--theme-metrics-th-hover: #444444;
 		--theme-metrics-td-hover: #3d3d3d;
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-metrics-bg: #1e1e1e;
+	--theme-metrics-panel: #2d2d2d;
+	--theme-metrics-text: #f0f0f0;
+	--theme-metrics-text-muted: #aaaaaa;
+	--theme-metrics-strong: #ffffff;
+	--theme-metrics-border: #444444;
+	--theme-metrics-th-bg: #333333;
+	--theme-metrics-th-hover: #444444;
+	--theme-metrics-td-hover: #3d3d3d;
 }
 
 /* ========================================= */
@@ -348,11 +383,37 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		--theme-chart-gain: #3987e5;
 		--theme-chart-loss: #d95926;
 		--theme-chart-ramp-low: #2a3442;
 		--theme-chart-ramp-high: #9ec5f4;
 		--theme-chart-ramp-ink-strong: #0d1a2b;
 	}
+}
+
+:root[data-theme='dark'] {
+	--theme-chart-gain: #3987e5;
+	--theme-chart-loss: #d95926;
+	--theme-chart-ramp-low: #2a3442;
+	--theme-chart-ramp-high: #9ec5f4;
+	--theme-chart-ramp-ink-strong: #0d1a2b;
+}
+
+/* ======================================== */
+/* ======================================== */
+/* ======= 6/ Chosen theme (framed) ======== */
+/* ======================================== */
+/* ======================================== */
+
+/* A page framed by the site follows the theme the visitor chose there
+   (theme_choice.js sets data-theme): each dark block above has a twin under
+   :root[data-theme='dark'], and the system's dark appearance yields to a
+   chosen light one. Form controls follow the same choice. */
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+	color-scheme: dark;
 }

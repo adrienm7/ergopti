@@ -36,6 +36,8 @@ const PAGE_DIR = shared('ui', 'layout_optimizer');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const PREFIX = 'layout_optimizer.';
 const SCRIPTS = [
+	// The theme the site's visitor chose (theme_choice.js), before the first paint.
+	'../theme_choice.js',
 	'../i18n.js',
 	'../_generated/key_legend.js',
 	'../layout_analysis/_generated/analysis_data.js',

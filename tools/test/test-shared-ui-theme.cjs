@@ -157,6 +157,31 @@ for (const entry of fs.readdirSync(UI, { withFileTypes: true })) {
 }
 assert.ok(linked > 0, 'no shared page links the theme');
 
+// (studio-chosen-theme) A page framed by the site follows the visitor's chosen
+// theme: each dark block applies to the system's dark appearance unless light
+// was chosen, and its :root[data-theme='dark'] twin holds the same values, so
+// a chosen dark theme cannot drift from the system's.
+{
+	const bodies = (pattern) =>
+		[...themeCss.matchAll(pattern)].map((m) =>
+			m[1]
+				.split('\n')
+				.map((line) => line.trim())
+				.filter(Boolean)
+				.join('\n')
+		);
+	const system = bodies(
+		/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme='light'\]\) \{([^}]*)\}/g
+	);
+	const chosen = bodies(/:root\[data-theme='dark'\] \{([^}]*--theme-[^}]*)\}/g);
+	if (system.length < 4)
+		failures.push(`only ${system.length} dark block(s) yield to a chosen light theme`);
+	if (/@media \(prefers-color-scheme: dark\) \{\s*:root \{/.test(themeCss))
+		failures.push('a dark block ignores the chosen theme');
+	if (JSON.stringify(system) !== JSON.stringify(chosen))
+		failures.push("the :root[data-theme='dark'] twins differ from the dark blocks");
+}
+
 // theme_tokens.js answers a declared token and raises for an unknown one: no fallback colour.
 {
 	const vm = require('node:vm');

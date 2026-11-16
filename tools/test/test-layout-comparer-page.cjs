@@ -41,6 +41,8 @@ const PAGE_DIR = shared('ui', 'layout_analysis');
 const LOCALES_DIR = shared('core', 'i18n', 'data', 'locales');
 const PREFIX = 'layout_analysis.';
 const SCRIPTS = [
+	// The theme the site's visitor chose (theme_choice.js), before the first paint.
+	'../theme_choice.js',
 	'../i18n.js',
 	'../host_bridge.js',
 	// The shared key legend formatter (dead keys as their bare accent).
@@ -393,12 +395,13 @@ check(
 );
 
 // The app's Studio window mounts the Comparer in a tab: it loads every script
-// of the Comparer's page (but i18n.js: its host seeds the strings), the
-// Comparer's own last, and its stylesheet.
+// of the Comparer's page (but i18n.js: its host seeds the strings; and
+// theme_choice.js: no site frames it, it follows the system), the Comparer's
+// own last, and its stylesheet.
 const windowPage = fs.readFileSync(shared('ui', 'layout_editor_window', 'index.html'), 'utf8');
 const inWindow = (src) => (src.startsWith('../') ? src : `../layout_analysis/${src}`);
 const comparerAt = windowScripts.indexOf('../layout_analysis/comparer_page.js');
-for (const src of SCRIPTS.filter((s) => s !== '../i18n.js')) {
+for (const src of SCRIPTS.filter((s) => s !== '../i18n.js' && s !== '../theme_choice.js')) {
 	const at = windowScripts.indexOf(inWindow(src));
 	check(at >= 0, `layout_editor_window/index.html: no ${inWindow(src)} for the Comparer tab`);
 	check(
@@ -436,6 +439,61 @@ check(
 	check(
 		files === 'object',
 		`an inlined corpus_files.js defines no LAYOUT_ANALYSIS_FILES (${files})`
+	);
+}
+
+// (studio-chosen-theme) The framed Studio pages follow the theme the site's
+// visitor chose: a link's ?theme= and the framing page's message set
+// <html data-theme> (theme.css reads it); 'system' removes it; a message from
+// another origin or window, or an unknown theme, changes nothing.
+{
+	const listeners = [];
+	const parent = {};
+	const dataset = {};
+	const warnings = [];
+	const themed = {
+		location: { search: '?lang=fr&theme=dark', origin: 'https://ergopti.fr' },
+		URLSearchParams,
+		document: { documentElement: { dataset } },
+		console: { warn: (text) => warnings.push(text) },
+		window: { parent, addEventListener: (type, listener) => listeners.push([type, listener]) }
+	};
+	vm.createContext(themed);
+	vm.runInContext(fs.readFileSync(shared('ui', 'theme_choice.js'), 'utf8'), themed);
+	check(dataset.theme === 'dark', `?theme=dark sets the theme (${dataset.theme})`);
+	const message = listeners.find(([type]) => type === 'message');
+	check(message, 'the page listens for the framing page');
+	const send = (data, origin = 'https://ergopti.fr', source = parent) =>
+		message[1]({ data, origin, source });
+	send({ type: 'ergopti-theme', theme: 'light' });
+	check(dataset.theme === 'light', 'the framing page chooses light');
+	send({ type: 'ergopti-theme', theme: 'dark' }, 'https://example.com');
+	send({ type: 'ergopti-theme', theme: 'dark' }, 'https://ergopti.fr', {});
+	check(dataset.theme === 'light', 'another origin or window is not heard');
+	send({ type: 'ergopti-theme', theme: 'sepia' });
+	check(
+		dataset.theme === 'light' && warnings.length === 1,
+		'an unknown theme is named, not applied'
+	);
+	send({ type: 'ergopti-theme', theme: 'system' });
+	check(!('theme' in dataset), "'system' gives the page back to the system");
+	const site = fs.readFileSync(
+		path.join(__dirname, '..', '..', 'src', 'lib', 'js', 'frameTheme.js'),
+		'utf8'
+	);
+	check(
+		site.includes("THEME_MESSAGE = 'ergopti-theme'") &&
+			site.includes("THEME_CHOICES = Object.freeze(['system', 'light', 'dark'])"),
+		'the site sends the message and the choices theme_choice.js reads'
+	);
+	check(
+		fs
+			.readFileSync(
+				path.join(__dirname, '..', '..', 'src', 'routes', 'studio', '+layout.svelte'),
+				'utf8'
+			)
+			.includes('#lib/js/frameTheme.js'),
+		'the Studio shell does not send the chosen theme to its frames'
 	);
 }
 

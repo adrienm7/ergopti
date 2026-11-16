@@ -11,6 +11,8 @@ inside itself. The site page around it does not scroll. The editor's
 « Compare with other layouts » opens the « Comparer » tab, which takes the
 layout the editor stored for this tab; the optimizer's « Open in the editor »
 opens « Éditer », which takes the layout the optimizer stored the same way.
+« Apparence » chooses the framed tools' light or dark theme (or the
+system's), kept in this browser and sent to each frame (frameTheme.js).
 ==============================================================================
 -->
 
@@ -21,8 +23,49 @@ opens « Éditer », which takes the layout the optimizer stored the same way.
 	import { resolve } from '$app/paths';
 	import SubNav from '#lib/components/SubNav.svelte';
 	import { STUDIO_PAGES } from '#lib/js/siteNavigation.js';
+	import {
+		THEME_CHOICES,
+		THEME_STORAGE_KEY,
+		readThemeChoice,
+		sendTheme
+	} from '#lib/js/frameTheme.js';
 
 	let { children } = $props();
+
+	// The framed tools' theme: the system's appearance until the visitor
+	// chooses, then the choice, kept in this browser (frameTheme.js).
+	const THEME_LABELS = { system: 'Thème du système', light: 'Clair', dark: 'Sombre' };
+	let theme = $state(THEME_CHOICES[0]);
+	let workspace = $state();
+
+	/** Tells every framed tool the theme. */
+	function sendToFrames() {
+		for (const frame of workspace?.querySelectorAll('iframe') ?? []) sendTheme(frame, theme);
+	}
+
+	function chooseTheme() {
+		try {
+			localStorage.setItem(THEME_STORAGE_KEY, theme);
+		} catch {
+			// A private window or blocked storage: the choice holds for this page only.
+		}
+		sendToFrames();
+	}
+
+	onMount(() => {
+		try {
+			theme = readThemeChoice(localStorage.getItem(THEME_STORAGE_KEY));
+		} catch {
+			theme = THEME_CHOICES[0];
+		}
+		// Each framed tool, when it loads (or loads another tab), hears the theme.
+		const loaded = (event) => {
+			if (event.target instanceof HTMLIFrameElement) sendTheme(event.target, theme);
+		};
+		workspace.addEventListener('load', loaded, true);
+		sendToFrames();
+		return () => workspace.removeEventListener('load', loaded, true);
+	});
 
 	// The editor's « Compare with other layouts »: the framed editor stores the
 	// layout for this tab, then asks for the Comparer (the message type of
@@ -53,8 +96,18 @@ opens « Éditer », which takes the layout the optimizer stored the same way.
 </script>
 
 <div class="studio-shell">
-	<SubNav label="Onglets d’Ergopti Studio" {items} compact />
-	<main class="studio-workspace">
+	<div class="studio-bar">
+		<SubNav label="Onglets d’Ergopti Studio" {items} compact />
+		<label class="studio-theme">
+			<span>Apparence</span>
+			<select bind:value={theme} onchange={chooseTheme}>
+				{#each THEME_CHOICES as choice (choice)}
+					<option value={choice}>{THEME_LABELS[choice]}</option>
+				{/each}
+			</select>
+		</label>
+	</div>
+	<main class="studio-workspace" bind:this={workspace}>
 		{@render children()}
 	</main>
 </div>
@@ -66,6 +119,36 @@ opens « Éditer », which takes the layout the optimizer stored the same way.
 		flex-direction: column;
 		height: calc(100dvh - var(--header-height) - var(--banner-height));
 		min-height: 480px;
+	}
+
+	/* The tabs and the appearance choice share the header's dark band; on a
+	   phone the choice wraps under the tabs. */
+	.studio-bar {
+		align-items: center;
+		background-color: var(--header-color);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 12px;
+		justify-content: center;
+	}
+
+	.studio-bar :global(.subnav.compact) {
+		flex: 1 1 auto;
+		width: auto;
+	}
+
+	.studio-theme {
+		align-items: center;
+		color: rgba(255, 255, 255, 0.9);
+		display: flex;
+		font-size: 0.9rem;
+		gap: 6px;
+		padding: 0.4rem 16px;
+	}
+
+	.studio-theme select {
+		font: inherit;
+		max-width: 100%;
 	}
 
 	/* The site's main rule sizes text pages; the workspace is full bleed. */

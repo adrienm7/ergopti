@@ -44,7 +44,13 @@ function loadPage() {
 		.map((m) => path.relative(UI, path.resolve(path.join(UI, 'layout_editor'), m[1])))
 		.filter(
 			(file) =>
-				!['i18n.js', 'layout_editor/editor_page.js', 'layout_editor/standalone.js'].includes(file)
+				![
+					'i18n.js',
+					// The site's chosen theme: a page concern, no export reads it.
+					'theme_choice.js',
+					'layout_editor/editor_page.js',
+					'layout_editor/standalone.js'
+				].includes(file)
 		);
 	for (const needed of ['layout_composer/target_export.js', 'layout_editor/lua_runner.js'])
 		assert(scripts.includes(needed), `index.html loads ${needed}`);
