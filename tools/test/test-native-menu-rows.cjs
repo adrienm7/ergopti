@@ -298,17 +298,29 @@ function admittedRemapSwitchRetirement(manifest) {
  * @returns {Set<string>}
  */
 /**
- * Admits the Windows chord switches' retired file only while nothing includes it.
+ * Admits the Windows retired files (the chord switches and the navigation layer
+ * editor host) only while nothing includes them.
  * @returns {Set<string>} The admitted retired sources.
  */
 function admittedWindowsRetirements() {
-	const retired = 'windows/modules/shortcuts/ctrl.ahk';
-	for (const file of sourceFiles(path.join(SP, 'windows'), '.ahk'))
-		assert.ok(
-			!/^\s*#Include\b.*shortcuts[\\/]ctrl\.ahk/im.test(fs.readFileSync(file, 'utf8')),
-			`retired chord switch file is included again: ${path.relative(SP, file)}`
-		);
-	return new Set([retired]);
+	const retirements = [
+		{
+			rel: 'windows/modules/shortcuts/ctrl.ahk',
+			include: /^\s*#Include\b.*shortcuts[\\/]ctrl\.ahk/im,
+			what: 'retired chord switch file'
+		},
+		{
+			rel: 'windows/ui/layer_editor/init.ahk',
+			include: /^\s*#Include\b.*layer_editor[\\/]init\.ahk/im,
+			what: 'retired navigation layer editor host'
+		}
+	];
+	for (const file of sourceFiles(path.join(SP, 'windows'), '.ahk')) {
+		const text = fs.readFileSync(file, 'utf8');
+		for (const { include, what } of retirements)
+			assert.ok(!include.test(text), `${what} is included again: ${path.relative(SP, file)}`);
+	}
+	return new Set(retirements.map(({ rel }) => rel));
 }
 
 function admittedSelectorRetirement() {
@@ -453,7 +465,8 @@ const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
 		'macos/ui/menu/remap_switch.lua'
 	]),
 	// ctrl.ahk retired when schema v19 turned the chord switches into keyboard slots.
-	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk'])
+	// layer_editor/init.ahk retired once Ergopti Studio edited the navigation layer.
+	windows: Object.freeze(['windows/modules/shortcuts/ctrl.ahk', 'windows/ui/layer_editor/init.ahk'])
 });
 
 // The frozen oracle keeps the pre-rename spellings; the current tree uses the new ones.
