@@ -462,6 +462,8 @@ _RPA_IndependentLiteralScript(Context) {
 		FileDelete(Context["script"])
 		; This real BOM script uses only AHK primitives. The owned gate keeps its
 		; process alive until independent process and Job observers are retained.
+		; The receipt is written aside, then renamed: the test reads it as soon as
+		; it exists, and CI run 43951206595 read one the child was still writing.
 		Source := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n"
 			. 'if A_Args.Length != 13`n ExitApp(74)`n'
 			. 'Receipt := (A_Args.Length - 2) . Chr(10)`n'
@@ -472,7 +474,8 @@ _RPA_IndependentLiteralScript(Context) {
 			. ' Receipt .= Count . ":"`n'
 			. ' loop Count`n  Receipt .= Format("{:02X}", NumGet(Bytes, A_Index - 1, "UChar"))`n'
 			. ' Receipt .= Chr(10)`n}`n'
-			. 'FileAppend(Receipt, A_Args[1], "UTF-8-RAW")`n'
+			. 'FileAppend(Receipt, A_Args[1] . ".part", "UTF-8-RAW")`n'
+			. 'FileMove(A_Args[1] . ".part", A_Args[1])`n'
 			. 'FileAppend("private-stdout106", "*", "UTF-8-RAW")`n'
 			. 'FileAppend("private-stderr106", "**", "UTF-8-RAW")`n'
 			. 'Started := A_TickCount`n'
