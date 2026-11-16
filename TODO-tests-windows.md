@@ -6,7 +6,7 @@ The Windows checks only a real PC can answer; code work stays in [TODO.md](TODO.
 
 ## To confirm on the Windows PC
 
-- [ ] **Layout editor's Windows installer (2026-11-15):** from the Studio (site or app), « Download the Windows installer » on Ergopti, unzip, run `kbdergop-setup.exe` as administrator: the layout is listed and types as with the tool's own installer; edit `layout.ini` (a space, an extra key or line) and run it again: it refuses before writing anything; uninstall from Settings → Apps leaves no `a0nn040c` key. See docs/design/layout-windows-dll.md « Windows check », step 6.
+- [ ] **Layout editor's Windows installer (2026-11-15):** from the Studio (site or app), « Format » « Windows installer (.zip) » then « Download » on Ergopti, unzip, run `kbdergop-setup.exe` as administrator: the layout is listed and types as with the tool's own installer; edit `layout.ini` (a space, an extra key or line) and run it again: it refuses before writing anything; uninstall from Settings → Apps leaves no `a0nn040c` key. See docs/design/layout-windows-dll.md « Windows check », step 6.
 - [ ] Hotstring section order: run the category-order AHK regressions, move/reset sections through the real tray, restart, and verify persistence plus refusal of a stale menu after external config changes.
       PC run 2026-11-11: the category-order regressions (`test_hotstring_category_scope.ahk`, `test_hotstring_dynamic_menu_scope.ahk`, config-scope-features group) passed natively.
 

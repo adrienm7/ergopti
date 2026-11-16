@@ -169,7 +169,7 @@ verified images, and checks the script.
 
 ### Generic installer (layout editor)
 
-The layout editor (site and app windows) cannot run `makensis`, so its « Download the Windows installer » gives
+The layout editor (site and app windows) cannot run `makensis`, so its « Format » « Windows installer (.zip) » then « Download » gives
 `<dll>-windows.zip`: in `<dll>/`, the four images as `<arch>/<dll>.dll`, `omitted.json`, a `layout.ini` and one
 generic installer renamed `<dll>-setup.exe`. That installer is the same for every layout: `emitStubNsis` in
 `kbd-dll/installer.cjs`, built by `npm run codegen:kbd-setup-stub:js` into
@@ -238,7 +238,7 @@ build/kbd-dll/bepo` (or take the CI artifact) and install `bepo-setup.exe` as ad
 4. Use the layout for a day, then Event Viewer → Windows Logs → Application: filter on source « Application Error »
    and check that no fault names `ctfmon.exe` (or names the layout DLL) since the install.
 5. Repeat with `kbdergop-setup.exe` from `static/layouts/sources/ergopti.toml`: Right Alt holds the Kana level.
-6. From the layout editor (site or app), « Download the Windows installer » on Ergopti: unzip, run
+6. From the layout editor (site or app), « Format » « Windows installer (.zip) » then « Download » on Ergopti: unzip, run
    `kbdergop-setup.exe` as administrator; the same checks as step 5. Edit `layout.ini` (add a space, a key or a
    line) and run it again: it refuses before writing anything.
 7. Uninstall from Settings → Apps; check that `HKLM\SYSTEM\CurrentControlSet\Control\Keyboard Layouts` no longer

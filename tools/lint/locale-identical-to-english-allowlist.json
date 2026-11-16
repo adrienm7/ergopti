@@ -10,6 +10,30 @@
 		"pending-translation": "Studio, layout editor or analyser label written in English and French first (maintainer rule, 2026-11-14): the other locales carry the English value until the labels settle, then the entry is translated and deleted. Never for French."
 	},
 	"entries": {
+		"layout_editor.export.format": {
+			"reason": "loanword-or-cognate",
+			"locales": ["da", "de", "no", "pl", "sv"]
+		},
+		"layout_editor.export.option.macos_iso": {
+			"reason": "file-name-or-token",
+			"locales": ["hi", "tr"]
+		},
+		"layout_editor.export.option.macos_ansi": {
+			"reason": "file-name-or-token",
+			"locales": ["hi", "tr"]
+		},
+		"layout_editor.export.option.klc": {
+			"reason": "file-name-or-token",
+			"locales": ["hi", "ko", "tr", "zh"]
+		},
+		"layout_editor.export.option.kla": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "ko", "tr"]
+		},
+		"layout_editor.export.option.kalamine": {
+			"reason": "brand-or-feature-name",
+			"locales": ["hi", "ko", "tr"]
+		},
 		"app_category.finance": {
 			"reason": "loanword-or-cognate",
 			"locales": ["cs", "fr"]
@@ -2497,54 +2521,6 @@
 			]
 		},
 		"layout_editor.error.kbd_installer_text": {
-			"reason": "pending-translation",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
-		},
-		"layout_editor.export.windows_package": {
-			"reason": "pending-translation",
-			"locales": [
-				"ar",
-				"cs",
-				"da",
-				"de",
-				"es",
-				"he",
-				"hi",
-				"it",
-				"ja",
-				"ko",
-				"nl",
-				"no",
-				"pl",
-				"pt",
-				"ru",
-				"sv",
-				"tr",
-				"uk",
-				"zh"
-			]
-		},
-		"layout_editor.export.kalamine": {
 			"reason": "pending-translation",
 			"locales": [
 				"ar",

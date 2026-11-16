@@ -546,8 +546,8 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       [DECISION] confirm the KLA JSON and Kalamine TOML exports.
       KLAnext JSON, .keylayout and KbdEdit .kbe, import and export (2026-11-16, on dev; proof:
       test-layout-formats.cjs sections 6-10, test_layout_editor_source_store.lua, test_app_parameter_chooser.lua): - KLAnext JSON: import and export done. Every committed KLAnext file (52, ISO and ErgoDox) reads, and
-      import → « Download KLA / KLAnext JSON » → import gives the same layout; an ErgoDox key the ISO board lacks
-      is listed with what it types (« key 39 (z Z % ‰) has no place on this keyboard »), never dropped silently. - .keylayout: import (verbatim, then « Convert ») and export (the macOS format drop-down: bundle, ISO, ANSI)
+      import → export as « KLA / KLAnext JSON » → import gives the same layout; an ErgoDox key the ISO board lacks
+      is listed with what it types (« key 39 (z Z % ‰) has no place on this keyboard »), never dropped silently. - .keylayout: import (verbatim, then « Convert ») and export (bundle, ISO or ANSI)
       were already there; now held by an import → export → import round trip through the source compiler on
       bépo, KbdEdit's own .keylayout exports (`static/ergopti/macos/raw_kbdedit_keylayouts`) and the Ergopti 2.2.2
       bundle, the output checked against Apple's DTD structure. - KbdEdit .kbe: neither import nor export is possible. The header is read (signature, version 5, length), but
@@ -572,8 +572,14 @@ software (name kept everywhere); « Ergopti Studio » the layout editor.
       yet (to add with the next browser run). Real-machine checks: the macOS « Open » panel with a .json, a UTF-16
       .klc and a .kbe, and the KLA and Kalamine downloads landing in Downloads (TODO-tests-macos.md,
       TODO-tests-windows.md, TODO-tests-linux.md, `layout_editor_window`).
-      [DECISION] the export section keeps one button per format plus the macOS format drop-down; a single
-      « Format » drop-down with one download button is not built.
+      Export « Format » drop-down (maintainer decision of 2026-11-15, done 2026-11-16): the export section has one
+      « Format » drop-down (Ergopti source, macOS bundle, .keylayout ISO and ANSI, XKB, KLC, Windows installer,
+      KLA / KLAnext JSON, Kalamine TOML, navigation layer: each when the host can produce it) and one « Download »
+      button, on the site and in the app; the viewer's last choice is kept in the browser's storage
+      (`ergopti.studio.export_format`). The macOS drop-down that wrote `exports.macos.format` into the source is
+      gone: the format is chosen per download; a source keeps its `exports.macos.format` (TOML) for the default
+      bundle. Install, emulate and « Apply the navigation layer » stay buttons. Proof: `export-format-dropdown`
+      in layout-editor.playwright.cjs.
 - [x] **Edit, evaluate, then install (maintainer, 2026-11-14).** In « Éditer », start from any layout (AZERTY…), swap
       two keys in one gesture, see the score change, and generate the installable layout for Windows, macOS and Linux
       (the existing compilers and offline downloads, and in the app the one-click install): the feature analysers such

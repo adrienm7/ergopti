@@ -118,6 +118,26 @@ function tool(page, id) {
 	return page.click(`#le-tools [data-tool="${id}"]`);
 }
 
+/**
+ * Downloads one format through the export section's « Format » drop-down and
+ * its « Download » button.
+ * @param {import('playwright').Page} page
+ * @param {string} id - A download id (toml, macos_iso, xkb, kla…).
+ */
+async function exportAs(page, id) {
+	await page.selectOption('#le-export-format', id);
+	await page.click('#le-export-download');
+}
+
+/**
+ * The download ids the export « Format » drop-down offers, in order.
+ * @param {import('playwright').Page} page
+ * @returns {Promise<string[]>}
+ */
+function exportFormats(page) {
+	return page.$$eval('#le-export-format option', (options) => options.map((o) => o.value));
+}
+
 /** The raw locale keys the page shows (texts, placeholders and titles). */
 function rawKeys(page) {
 	return page.evaluate(() => {
@@ -547,7 +567,7 @@ async function exerciseForeignFiles(page) {
 		"Ergo-L's letters on the board"
 	);
 	await tool(page, 'export');
-	const kla = await downloaded(page, () => page.click('#le-export-kla'));
+	const kla = await downloaded(page, () => exportAs(page, 'kla'));
 	assert.match(kla.name, /\.kla\.json$/);
 	const json = JSON.parse(kla.text);
 	assert.equal(json.keyboardType, 'european');
@@ -560,7 +580,7 @@ async function exerciseForeignFiles(page) {
 		/dead key/,
 		"KLA says, in the page's language, that it cannot hold dead keys"
 	);
-	const kalamine = await downloaded(page, () => page.click('#le-export-kalamine'));
+	const kalamine = await downloaded(page, () => exportAs(page, 'kalamine'));
 	assert.match(kalamine.name, /\.kalamine\.toml$/);
 	assert.match(kalamine.text, /^name = "Ergo-L"/);
 	assert.match(kalamine.text, /geometry = "ISO"/);
@@ -679,7 +699,7 @@ async function exerciseDownloadWithoutLuaVm(browser, origin) {
 	});
 	await tool(page, 'export');
 	for (const target of ['xkb', 'klc']) {
-		await page.click(`#le-export-${target}`);
+		await exportAs(page, target);
 		await page.waitForFunction(
 			() => /\berror\b/.test((document.getElementById('le-message') || {}).className || ''),
 			null,
@@ -2227,8 +2247,12 @@ async function exerciseComparerLink(browser, origin) {
 		await page.waitForSelector('#le-preserved');
 		await tool(page, 'export');
 		assert.equal(await page.locator('#le-macos-format').count(), 0, 'an import keeps its variant');
-		assert.equal(await page.getAttribute('#le-export-macos', 'data-format'), 'iso');
-		const exported = await downloaded(page, () => page.click('#le-export-macos'));
+		assert.deepEqual(
+			(await exportFormats(page)).filter((id) => id.startsWith('macos_')),
+			['macos_iso'],
+			'an imported .keylayout offers only its own variant'
+		);
+		const exported = await downloaded(page, () => exportAs(page, 'macos_iso'));
 		assert.equal(exported.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
 		await page.click('#le-convert');
 		await page.click('#le-confirm-yes');
@@ -2236,17 +2260,14 @@ async function exerciseComparerLink(browser, origin) {
 		assert.notEqual(await page.textContent('#le-board [data-code="KeyA"] .le-legend'), '');
 		// The converted source compiles both variants through the shared compiler.
 		// The macOS drop-down chooses the download: one .keylayout, or the bundle as one ZIP.
-		await page.selectOption('#le-macos-format', 'ansi');
-		const compiled = await downloaded(page, () => page.click('#le-export-macos'));
+		const compiled = await downloaded(page, () => exportAs(page, 'macos_ansi'));
 		assert.match(compiled.text, /<keyboard /);
 		assert.notEqual(compiled.text, fs.readFileSync(KEYLAYOUT, 'utf8'));
-		await page.selectOption('#le-macos-format', 'iso');
-		const iso = await downloaded(page, () => page.click('#le-export-macos'));
+		const iso = await downloaded(page, () => exportAs(page, 'macos_iso'));
 		assert.notEqual(iso.text, compiled.text, 'ISO and ANSI differ');
-		await page.selectOption('#le-macos-format', 'bundle');
 		const [bundle] = await Promise.all([
 			page.waitForEvent('download'),
-			page.click('#le-export-macos')
+			exportAs(page, 'macos_bundle')
 		]);
 		assert.match(bundle.suggestedFilename(), /\.bundle\.zip$/);
 		assert.equal(
@@ -2258,14 +2279,14 @@ async function exerciseComparerLink(browser, origin) {
 		);
 
 		// Linux XKB and Windows KLC download from the shared converters run in the page.
-		const [xkb] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-xkb')]);
+		const [xkb] = await Promise.all([page.waitForEvent('download'), exportAs(page, 'xkb')]);
 		assert.equal(xkb.suggestedFilename(), 'ergopti_xkb.zip');
 		const xkbBytes = fs.readFileSync(await xkb.path());
 		assert.equal(xkbBytes.subarray(0, 2).toString('latin1'), 'PK');
 		for (const name of ['ergopti.xkb', 'ergopti.XCompose', 'xkb_types.txt', 'export.json'])
 			assert(xkbBytes.includes(`ergopti_xkb/${name}`), `the XKB archive holds ${name}`);
 		// The KLC needs its Windows metadata first: the refusal says so.
-		await page.click('#le-export-klc');
+		await exportAs(page, 'klc');
 		await page.waitForSelector('.le-message.error');
 		await tool(page, 'windows');
 		await page.fill('#le-win-locale', 'fr-FR');
@@ -2273,13 +2294,13 @@ async function exerciseComparerLink(browser, origin) {
 		await page.fill('#le-win-dll-name', 'kbdergo');
 		await page.click('#le-win-klc-apply');
 		await tool(page, 'export');
-		const [klc] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-klc')]);
+		const [klc] = await Promise.all([page.waitForEvent('download'), exportAs(page, 'klc')]);
 		assert.equal(klc.suggestedFilename(), 'kbdergo.klc');
 		// The site says where the Windows DLL and installer come from, and offers no
 		// in-app install or emulation.
 		assert.match(await page.textContent('#le-dll-note'), /node tools\/kbd-dll\.cjs build/);
 		// The four Windows DLLs, written in the page with no compiler.
-		const [dll] = await Promise.all([page.waitForEvent('download'), page.click('#le-export-dll')]);
+		const [dll] = await Promise.all([page.waitForEvent('download'), exportAs(page, 'dll')]);
 		assert.equal(dll.suggestedFilename(), 'kbdergo-windows.zip');
 		const dllZip = fs.readFileSync(await dll.path());
 		assert.deepEqual([...dllZip.subarray(0, 4)], [0x50, 0x4b, 0x03, 0x04], 'a ZIP');
@@ -2380,7 +2401,29 @@ async function exerciseComparerLink(browser, origin) {
 		await page.setInputFiles('#le-nav-file', NAV);
 		await page.waitForSelector('[data-layer="nav"].active');
 		await tool(page, 'export');
-		const nav = await downloaded(page, () => page.click('#le-export-nav'));
+		// (export-format-dropdown) One « Format » drop-down lists every download, with
+		// one « Download » button; the viewer's choice survives a redraw and is kept in this browser.
+		assert.deepEqual(await exportFormats(page), [
+			'toml',
+			'macos_bundle',
+			'macos_iso',
+			'macos_ansi',
+			'xkb',
+			'klc',
+			'dll',
+			'kla',
+			'kalamine',
+			'nav'
+		]);
+		assert.equal(await page.locator('#le-export button[id^="le-export-"]').count(), 1);
+		const nav = await downloaded(page, () => exportAs(page, 'nav'));
+		assert.equal(
+			await page.evaluate(() => localStorage.getItem('ergopti.studio.export_format')),
+			'nav'
+		);
+		await tool(page, 'details');
+		await tool(page, 'export');
+		assert.equal(await page.inputValue('#le-export-format'), 'nav', 'the choice survives a redraw');
 		assert.equal(nav.name, 'layers.toml');
 		assert.match(nav.text, /\[layers\.nav\.all\]/);
 

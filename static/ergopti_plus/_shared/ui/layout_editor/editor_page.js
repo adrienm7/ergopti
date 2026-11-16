@@ -118,6 +118,12 @@ var LayoutEditorPage = (function () {
 	];
 	// The drag data type of a character from the palette or the name search.
 	const CHAR_DRAG_TYPE = 'application/x-ergopti-character';
+	// The export « Format » drop-down (maintainer decision, 2026-11-15): the
+	// viewer's last choice, kept in this browser only, and the first one shown.
+	const EXPORT_FORMAT_KEY = 'ergopti.studio.export_format';
+	const DEFAULT_EXPORT_FORMAT = 'toml';
+	// The macOS downloads, in drop-down order: the ISO + ANSI bundle, then one .keylayout per board.
+	const MACOS_EXPORTS = ['bundle', 'iso', 'ansi'];
 
 	// ============================
 	// ======= 2/ Helpers =========
@@ -180,6 +186,28 @@ var LayoutEditorPage = (function () {
 			if (child !== null && child !== undefined && child !== false)
 				node.append(typeof child === 'string' ? document.createTextNode(child) : child);
 		return node;
+	}
+
+	/**
+	 * The export format this viewer chose last (a per-viewer convenience: a
+	 * private window or blocked storage just starts on the default).
+	 * @returns {string} A download id of exportPanel, or DEFAULT_EXPORT_FORMAT.
+	 */
+	function savedExportFormat() {
+		try {
+			return window.localStorage.getItem(EXPORT_FORMAT_KEY) || DEFAULT_EXPORT_FORMAT;
+		} catch (error) {
+			return DEFAULT_EXPORT_FORMAT;
+		}
+	}
+
+	/** Remembers the viewer's export format; storage that refuses keeps nothing. */
+	function rememberExportFormat(id) {
+		try {
+			window.localStorage.setItem(EXPORT_FORMAT_KEY, id);
+		} catch (error) {
+			// Blocked or full storage: the choice holds for this page only.
+		}
 	}
 
 	function select(options, value, onchange, attributes) {
@@ -365,6 +393,8 @@ var LayoutEditorPage = (function () {
 			// The keyboard an imported .keylayout is described on, and the key
 			// held for an imported navigation layer ('' until chosen).
 			importConvention: 'iso',
+			// The download the export « Format » drop-down shows: this viewer's last choice.
+			exportFormat: savedExportFormat(),
 			navHold: '',
 			lost: null,
 			dirty: false,
@@ -3495,142 +3525,124 @@ var LayoutEditorPage = (function () {
 					])
 				]);
 			});
-			const buttons = [
-				el('button', {
-					type: 'button',
-					id: 'le-export-toml',
-					text: tl('export.toml'),
-					onclick: saveSource
-				})
-			];
-			const preserved = LayoutSourceIO.isPreserved(doc());
-			const macFormat = preserved
-				? doc().imported_keylayout.convention
-				: ((doc().exports || {}).macos || {}).format || 'bundle';
-			let macos = null;
-			try {
-				macos = LayoutSourceIO.macosDownload(doc(), macFormat);
-			} catch (error) {
-				// Not producible here; the macOS report row says why.
-			}
-			// A ZIP needs a host that saves bytes; the webview hosts install the layout instead.
-			if (macos && (macos.text !== undefined || host.saveBinary))
-				buttons.push(
-					el('button', {
-						type: 'button',
-						id: 'le-export-macos',
-						'data-format': macFormat,
-						text: tl(macFormat === 'bundle' ? 'export.bundle' : `export.keylayout_${macFormat}`),
-						onclick: () => {
-							if (macos.text !== undefined) return save(macos.filename, macos.text, macos.mime);
-							fromHost(() => host.saveBinary(macos.filename, macos.bytes, macos.mime)).then(
-								() => notify('ok', tl('status.saved', { name: macos.filename })),
-								(error) => notify('error', problemText(error))
-							);
-						}
-					})
+			// Every download the layout has, in one « Format » drop-down with one
+			// « Download » button (maintainer decision, 2026-11-15); each entry is
+			// offered only when this host can produce it, and says why when it fails.
+			const downloads = [];
+			const offer = (id, run) => downloads.push({ id, run });
+			const saveBytes = (file, mime) =>
+				fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
+					() => notify('ok', tl('status.saved', { name: file.filename })),
+					(error) => notify('error', problemText(error))
 				);
+			offer('toml', saveSource);
+			const preserved = LayoutSourceIO.isPreserved(doc());
+			// macOS: the bundle, or one .keylayout per board; an imported .keylayout
+			// stays verbatim, so only its own variant is offered.
+			for (const variant of preserved ? [doc().imported_keylayout.convention] : MACOS_EXPORTS) {
+				let macos = null;
+				try {
+					macos = LayoutSourceIO.macosDownload(doc(), variant);
+				} catch (error) {
+					// Not producible here; the macOS report row says why.
+				}
+				// A ZIP needs a host that saves bytes; the webview hosts install the layout instead.
+				if (macos && (macos.text !== undefined || host.saveBinary))
+					offer(`macos_${variant}`, () =>
+						macos.text !== undefined
+							? save(macos.filename, macos.text, macos.mime)
+							: saveBytes(macos, macos.mime)
+					);
+			}
 			if (host.exportAssets && host.saveBinary)
 				for (const [target, build, mime] of [
 					['xkb', LayoutSourceIO.xkbArchive, 'application/zip'],
 					['klc', LayoutSourceIO.klcFile, 'application/octet-stream']
 				])
-					buttons.push(
-						el('button', {
-							type: 'button',
-							id: `le-export-${target}`,
-							text: tl(`export.${target}`),
-							onclick: () => {
-								// The host loads the converters on the first click; the build runs on the current source.
-								const source = doc();
-								fromHost(() => host.exportAssets())
-									// The build may wait for the host's converters (lua_export).
-									.then((assets) => build(source, assets))
-									.then((file) =>
-										fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
-											() => file.filename
-										)
-									)
-									.then(
-										(name) => notify('ok', tl('status.saved', { name })),
-										(error) => notify('error', problemText(error))
-									);
-							}
-						})
-					);
-			// The Windows installable package: the four DLL images, written in the page
-			// (no compiler), with the generic installer and its layout.ini.
-			if (host.saveBinary && !LayoutSourceIO.isPreserved(doc()))
-				buttons.push(
-					el('button', {
-						type: 'button',
-						id: 'le-export-dll',
-						text: tl('export.windows_package'),
-						onclick: () => {
-							let file;
-							try {
-								file = LayoutSourceIO.windowsPackage(doc());
-							} catch (error) {
-								notify('error', problemText(error));
-								return;
-							}
-							fromHost(() => host.saveBinary(file.filename, file.bytes, 'application/zip')).then(
-								() => notify('ok', tl('status.saved', { name: file.filename })),
+					offer(target, () => {
+						// The host loads the converters on the first download; the build runs on the current source.
+						const source = doc();
+						fromHost(() => host.exportAssets())
+							// The build may wait for the host's converters (lua_export).
+							.then((assets) => build(source, assets))
+							.then((file) =>
+								fromHost(() => host.saveBinary(file.filename, file.bytes, mime)).then(
+									() => file.filename
+								)
+							)
+							.then(
+								(name) => notify('ok', tl('status.saved', { name })),
 								(error) => notify('error', problemText(error))
 							);
-						}
-					})
-				);
-			// Interoperability (coordinator, 2026-11-14): the KLA JSON and Kalamine
-			// TOML of the layout, each saying what it cannot hold.
-			if (!LayoutSourceIO.isPreserved(doc()))
+					});
+			// The Windows installable package: the four DLL images, written in the page
+			// (no compiler), with the generic installer and its layout.ini.
+			if (host.saveBinary && !preserved)
+				offer('dll', () => {
+					let file;
+					try {
+						file = LayoutSourceIO.windowsPackage(doc());
+					} catch (error) {
+						notify('error', problemText(error));
+						return;
+					}
+					saveBytes(file, 'application/zip');
+				});
+			// Interoperability (coordinator, 2026-11-14): the KLA / KLAnext JSON and
+			// Kalamine TOML of the layout, each saying what it cannot hold.
+			if (!preserved)
 				for (const [target, write, extension, mime] of [
 					['kla', klaExport, 'kla.json', 'application/json'],
 					['kalamine', LAYOUT_FORMATS.toKalamineToml, 'kalamine.toml', 'application/toml']
 				])
-					buttons.push(
-						el('button', {
-							type: 'button',
-							id: `le-export-${target}`,
-							text: tl(`export.${target}`),
-							onclick: () => {
-								let file;
-								try {
-									file = write(LAYOUT_ANALYSIS_PANEL.layoutFromEditorDoc(doc()));
-								} catch (error) {
-									notify('error', problemText(error));
-									return;
-								}
-								const filename = `${doc().layout.id}.${extension}`;
-								// A download, not a file of the app's layout store: the app's
-								// store keeps only sources, so the app writes it to Downloads.
-								fromHost(() =>
-									host.saveBinary
-										? host.saveBinary(filename, new TextEncoder().encode(file.text), mime)
-										: host.saveFile(filename, file.text, mime)
-								).then(
-									() =>
-										notify(
-											'ok',
-											file.unmapped.length === 0
-												? tl('status.saved', { name: filename })
-												: tl('status.saved_partial', {
-														name: filename,
-														count: file.unmapped.length,
-														list: lossList(file.unmapped)
-													})
-										),
-									(error) => notify('error', problemText(error))
-								);
-							}
-						})
-					);
+					offer(target, () => {
+						let file;
+						try {
+							file = write(LAYOUT_ANALYSIS_PANEL.layoutFromEditorDoc(doc()));
+						} catch (error) {
+							notify('error', problemText(error));
+							return;
+						}
+						const filename = `${doc().layout.id}.${extension}`;
+						// A download, not a file of the app's layout store: the app's
+						// store keeps only sources, so the app writes it to Downloads.
+						fromHost(() =>
+							host.saveBinary
+								? host.saveBinary(filename, new TextEncoder().encode(file.text), mime)
+								: host.saveFile(filename, file.text, mime)
+						).then(
+							() =>
+								notify(
+									'ok',
+									file.unmapped.length === 0
+										? tl('status.saved', { name: filename })
+										: tl('status.saved_partial', {
+												name: filename,
+												count: file.unmapped.length,
+												list: lossList(file.unmapped)
+											})
+								),
+							(error) => notify('error', problemText(error))
+						);
+					});
+			const hasNav = (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER);
+			if (hasNav)
+				offer('nav', () => {
+					try {
+						save('layers.toml', LayoutSourceIO.navLayerFile(doc(), data), 'application/toml');
+					} catch (error) {
+						notify('error', problemText(error));
+					}
+				});
+			// The viewer's last choice when this layout offers it, else the first download.
+			const chosen = downloads.find((entry) => entry.id === state.exportFormat) || downloads[0];
+			const actions = [];
 			// The two ways ErgoptiPlus uses a layout, each said in one line.
-			if (host.install) buttons.push(installButton(report));
-			if (host.emulate) buttons.push(emulateButton(report));
+			if (host.install) actions.push(installButton(report));
+			if (host.emulate) actions.push(emulateButton(report));
 			// The driver applies the navigation layer through its navigation layer editor's save.
-			if (host.applyNav && (doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
-				buttons.push(
+			if (host.applyNav && hasNav)
+				actions.push(
 					el('button', {
 						type: 'button',
 						id: 'le-apply-nav',
@@ -3654,41 +3666,8 @@ var LayoutEditorPage = (function () {
 						}
 					})
 				);
-			if ((doc().layers || []).some((l) => l.id === LayoutSourceIO.NAV_LAYER))
-				buttons.push(
-					el('button', {
-						type: 'button',
-						id: 'le-export-nav',
-						text: tl('export.nav'),
-						onclick: () => {
-							try {
-								save('layers.toml', LayoutSourceIO.navLayerFile(doc(), data), 'application/toml');
-							} catch (error) {
-								notify('error', problemText(error));
-							}
-						}
-					})
-				);
 			return el('section', { class: 'le-export', id: 'le-export' }, [
 				el('h2', { text: tl('export.title') }),
-				preserved
-					? null
-					: el('label', { class: 'le-inline' }, [
-							tl('export.macos_format'),
-							select(
-								['bundle', 'iso', 'ansi'].map((f) => [f, tl(`export.macos.${f}`)]),
-								macFormat,
-								(value) =>
-									apply((d) =>
-										LayoutEditorModel.setExport(
-											d,
-											'macos',
-											Object.assign({}, (d.exports || {}).macos, { format: value })
-										)
-									),
-								{ id: 'le-macos-format' }
-							)
-						]),
 				el('table', { class: 'le-report', id: 'le-report' }, rows),
 				shortcutExportNote(report),
 				el('p', { class: 'le-note', text: tl('export.bundle_note') }),
@@ -3696,7 +3675,32 @@ var LayoutEditorPage = (function () {
 				// KbdEdit encrypts its .kbe (layout_formats.js, KBE_SIGNATURE): say where to go instead.
 				el('p', { class: 'le-note', id: 'le-kbe-note', text: tl('export.kbe_note') }),
 				host.exportAssets ? null : el('p', { class: 'le-note', text: tl('export.targets_note') }),
-				el('div', { class: 'le-buttons' }, buttons),
+				el('div', { class: 'le-buttons le-export-download' }, [
+					el('label', { class: 'le-inline' }, [
+						tl('export.format'),
+						select(
+							downloads.map((entry) => [entry.id, tl(`export.option.${entry.id}`)]),
+							chosen.id,
+							(value) => {
+								// Kept without a redraw: the drop-down already shows it.
+								state.exportFormat = value;
+								rememberExportFormat(value);
+							},
+							{ id: 'le-export-format' }
+						)
+					]),
+					el('button', {
+						type: 'button',
+						id: 'le-export-download',
+						text: tl('export.download'),
+						onclick: () => {
+							const id = document.getElementById('le-export-format').value;
+							const entry = downloads.find((candidate) => candidate.id === id);
+							entry.run();
+						}
+					})
+				]),
+				actions.length ? el('div', { class: 'le-buttons' }, actions) : null,
 				host.install
 					? el('p', { class: 'le-note', id: 'le-install-hint', text: tl('install_hint') })
 					: null,
